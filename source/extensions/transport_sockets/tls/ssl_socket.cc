@@ -335,6 +335,7 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
     provider->unregisterPrivateKeyMethod(rawSsl());
   }
+
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.

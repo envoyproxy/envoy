@@ -11,6 +11,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+// A cert validator which defers the validation by certain time.
 class TimedCertValidator : public DefaultCertValidator {
 public:
   TimedCertValidator(std::chrono::milliseconds validation_time_out_ms,

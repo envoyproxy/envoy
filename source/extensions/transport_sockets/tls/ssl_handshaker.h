@@ -53,13 +53,14 @@ private:
 class SslExtendedSocketInfoImpl : public Envoy::Ssl::SslExtendedSocketInfo {
 public:
   explicit SslExtendedSocketInfoImpl(SslHandshakerImpl& handshaker) : ssl_handshaker_(handshaker) {}
+  // Overridden to notify cert_validate_result_callback_ that the handshake has been cancelled.
   ~SslExtendedSocketInfoImpl() override;
 
   void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override;
   Envoy::Ssl::ClientValidationStatus certificateValidationStatus() const override;
   Ssl::ValidateResultCallbackPtr createValidateResultCallback(uint8_t* current_tls_alert) override;
   void onCertificateValidationCompleted(bool succeeded) override;
-  absl::optional<Ssl::ValidateResult> certificateValidationResult() override {
+  absl::optional<Ssl::ValidateResult> certificateValidationResult() const override {
     return cert_validation_result_;
   }
   uint8_t tlsAlert() const override { return tls_alert_; }
@@ -71,9 +72,12 @@ private:
       Envoy::Ssl::ClientValidationStatus::NotValidated};
   SslHandshakerImpl& ssl_handshaker_;
   // Latch the in-flight async cert validation callback.
-  // nullopt if there is none in-flight.
+  // nullopt if there is none.
   OptRef<ValidateResultCallbackImpl> cert_validate_result_callback_;
+  // Stores the TLS out_alert.
   uint8_t tls_alert_{SSL_AD_CERTIFICATE_UNKNOWN};
+  // Stores the validation result if there is any.
+  // nullopt if no validation has ever been kicked off.
   absl::optional<Ssl::ValidateResult> cert_validation_result_;
 };
 

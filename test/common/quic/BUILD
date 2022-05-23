@@ -56,7 +56,6 @@ envoy_cc_test(
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
-        ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
@@ -99,7 +98,6 @@ envoy_cc_test(
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
-        ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",

@@ -272,6 +272,7 @@ class MockProofVerifyContext : public EnvoyQuicProofVerifyContext {
 public:
   MOCK_METHOD(absl::string_view, getEchNameOverrride, (), (const));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(bool, isServer, (), (const));
 };
 
 } // namespace Quic

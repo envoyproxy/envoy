@@ -15,7 +15,6 @@ Ssl::ValidateResult TimedCertValidator::doCustomVerifyCertChain(
     const Network::TransportSocketOptions* transport_socket_options, SSL_CTX* ssl_ctx,
     absl::string_view ech_name_override, bool is_server, std::string* /*error_details*/,
     uint8_t* out_alert) {
-  std::cerr << "============ doCustomVerifyCertChain \n";
   if (callback == nullptr) {
     ASSERT(ssl_extended_info);
     callback = ssl_extended_info->createValidateResultCallback(out_alert);
@@ -33,7 +32,6 @@ Ssl::ValidateResult TimedCertValidator::doCustomVerifyCertChain(
   }
   validation_timer_ = callback_->dispatcher().createTimer([ssl_ctx, transport_socket_options,
                                                            is_server, this]() {
-    std::cerr << "=================== on time out " << reinterpret_cast<void*>(ssl_ctx) << "\n";
     bssl::UniquePtr<STACK_OF(X509)> certs(sk_X509_new_null());
     for (auto& cert_str : cert_chain_in_str_) {
       const uint8_t* inp = reinterpret_cast<uint8_t*>(cert_str.data());

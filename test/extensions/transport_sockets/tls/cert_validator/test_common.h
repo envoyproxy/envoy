@@ -24,17 +24,22 @@ public:
     return status_;
   }
 
-  Ssl::ValidateResultCallbackPtr createValidateResultCallback() override { return nullptr; };
+  Ssl::ValidateResultCallbackPtr
+  createValidateResultCallback(uint8_t* /*current_tls_alert*/) override {
+    return nullptr;
+  };
 
   void onCertificateValidationCompleted(bool succeeded) override {
     validate_result_ = succeeded ? Ssl::ValidateResult::Successful : Ssl::ValidateResult::Failed;
   }
-
-  Ssl::ValidateResult certificateValidationResult() override { return validate_result_; }
+  absl::optional<Ssl::ValidateResult> certificateValidationResult() const override {
+    return validate_result_;
+  }
+  uint8_t tlsAlert() const override { return SSL_AD_CERTIFICATE_UNKNOWN; }
 
 private:
   Envoy::Ssl::ClientValidationStatus status_;
-  Ssl::ValidateResult validate_result_{Ssl::ValidateResult::Pending};
+  absl::optional<Ssl::ValidateResult> validate_result_;
 };
 
 class TestCertificateValidationContextConfig

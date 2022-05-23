@@ -64,6 +64,13 @@ private:
 
 } // namespace
 
+absl::string_view EnvoyQuicProofVerifyContextImpl::getEchNameOverrride() const {
+  const char* name = nullptr;
+  size_t name_len = 0;
+  SSL_get0_ech_name_override(ssl_info_.ssl(), &name, &name_len);
+  return absl::string_view(name, name_len);
+}
+
 quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const std::string& hostname, const uint16_t /*port*/, const std::vector<std::string>& certs,
     const std::string& /*ocsp_response*/, const std::string& /*cert_sct*/,
@@ -100,7 +107,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
       static_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get())
           ->customVerifyCertChainForQuic(
               *cert_chain, std::unique_ptr<QuicValidateResultCallback>(envoy_callback),
-              /*extended_socket_info=*/nullptr, /*transport_socket_options=*/nullptr,
+              verify_context->isServer(), /*transport_socket_options=*/nullptr,
               verify_context->getEchNameOverrride(), error_details, out_alert);
   if (result == Ssl::ValidateResult::Pending) {
     // Transfer the ownership of cert_view to callback while asynchronously verifying the cert

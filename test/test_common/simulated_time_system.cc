@@ -87,7 +87,6 @@ public:
       ABSL_LOCKS_EXCLUDED(mutex_) {
     bool inc_pending = false;
     {
-      std::cerr << "============= updateTime\n";
       absl::MutexLock lock(&mutex_);
       // Wait until the event loop associated with this scheduler is not executing callbacks so time
       // does not change in the middle of a callback.
@@ -285,7 +284,6 @@ void SimulatedTimeSystemHelper::SimulatedScheduler::disableAlarmLockHeld(Alarm& 
 }
 
 void SimulatedTimeSystemHelper::SimulatedScheduler::runReadyAlarms() {
-  std::cerr << "========== runReadyAlarms\n";
   bool dec_pending = false;
   {
     absl::MutexLock lock(&mutex_);
@@ -300,13 +298,11 @@ void SimulatedTimeSystemHelper::SimulatedScheduler::runReadyAlarms() {
     }
     auto monotonic_time = monotonic_time_;
     while (!registered_alarms_.empty()) {
-      std::cerr << "========== check registered alarm\n";
       const AlarmRegistration& alarm_registration = registered_alarms_.next();
       MonotonicTime alarm_time = alarm_registration.time_;
       if (alarm_time > monotonic_time) {
         break;
       }
-      std::cerr << "======= alarm expired\n";
       triggered_alarms_.add(alarm_registration);
       registered_alarms_.remove(alarm_registration.alarm_);
     }

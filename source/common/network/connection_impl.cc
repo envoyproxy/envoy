@@ -845,7 +845,6 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
 }
 
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
-  std::cerr << "============= connect timeout\n";
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
   closeConnectionImmediately();
   transport_socket_timeout_stat_->inc();

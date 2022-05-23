@@ -70,10 +70,8 @@ void logSslErrorChain() {
 enum ssl_verify_result_t ValidationResultToSslVerifyResult(Ssl::ValidateResult result) {
   switch (result) {
   case Ssl::ValidateResult::Failed:
-    std::cerr << "============ return ssl_verify_invalid\n";
     return ssl_verify_invalid;
   case Ssl::ValidateResult::Successful:
-    std::cerr << "============ return ssl_verify_ok\n";
     return ssl_verify_ok;
   case Ssl::ValidateResult::Pending:
     return ssl_verify_retry;
@@ -461,9 +459,8 @@ enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* ou
         Ssl::ValidateResult::Pending) {
       return ssl_verify_retry;
     }
-    std::cerr << "=========== already has a result "
-              << static_cast<int>(extended_socket_info->certificateValidationResult().value())
-              << " \n";
+    ENVOY_LOG(debug, "Already has a result: {}",
+              static_cast<int>(extended_socket_info->certificateValidationResult().value()));
     // Already has a binary result, return immediately.
     *out_alert = extended_socket_info->tlsAlert();
     return ValidationResultToSslVerifyResult(
@@ -474,15 +471,14 @@ enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* ou
   ContextImpl* context_impl = static_cast<ContextImpl*>(SSL_CTX_get_app_data(ssl_ctx));
   auto* transport_socket_option =
       static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl));
-  Ssl::ValidateResult result = context_impl->customVerifyCertChain(
-      /*callback=*/nullptr, extended_socket_info, transport_socket_option, ssl,
-      /*error_details=*/nullptr, out_alert);
+  Ssl::ValidateResult result =
+      context_impl->customVerifyCertChain(extended_socket_info, transport_socket_option, ssl,
+                                          /*error_details=*/nullptr, out_alert);
   return ValidationResultToSslVerifyResult(result);
 }
 
 Ssl::ValidateResult
-ContextImpl::customVerifyCertChain(Ssl::ValidateResultCallbackPtr callback,
-                                   Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
+ContextImpl::customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
                                    const Network::TransportSocketOptions* transport_socket_options,
                                    SSL* ssl, std::string* error_details, uint8_t* out_alert) {
   STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
@@ -501,9 +497,11 @@ ContextImpl::customVerifyCertChain(Ssl::ValidateResultCallbackPtr callback,
   SSL_get0_ech_name_override(ssl, &name, &name_len);
   absl::string_view ech_name_override(name, name_len);
   ASSERT(cert_validator_);
+  // Do not provide async callback here, but defer its creation to extended_socket_info if the
+  // vadlidation is async.
   Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
-      *cert_chain, std::move(callback), extended_socket_info, transport_socket_options,
-      SSL_get_SSL_CTX(ssl), ech_name_override, SSL_is_server(ssl), error_details, out_alert);
+      *cert_chain, nullptr, extended_socket_info, transport_socket_options, SSL_get_SSL_CTX(ssl),
+      ech_name_override, SSL_is_server(ssl), error_details, out_alert);
   if (result != Ssl::ValidateResult::Pending && extended_socket_info != nullptr) {
     extended_socket_info->onCertificateValidationCompleted(result ==
                                                            Ssl::ValidateResult::Successful);
@@ -1249,6 +1247,16 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
   return true;
 }
 
+Ssl::ValidateResult ContextImpl::customVerifyCertChainForQuic(
+    STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
+    const Network::TransportSocketOptions* transport_socket_options,
+    absl::string_view ech_name_override, std::string* error_details, uint8_t* out_alert) {
+  Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
+      cert_chain, std::move(callback), /*extended_socket_info=*/nullptr, transport_socket_options,
+      tls_contexts_[0].ssl_ctx_.get(), ech_name_override, is_server, error_details, out_alert);
+  return result;
+}
+
 void TlsContext::loadCertificateChain(const std::string& data, const std::string& data_path) {
   cert_chain_file_path_ = data_path;
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
@@ -1362,18 +1370,6 @@ void TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
   UNREFERENCED_PARAMETER(pkey);
   UNREFERENCED_PARAMETER(key_path);
 #endif
-}
-
-Ssl::ValidateResult ClientContextImpl::customVerifyCertChainForQuic(
-    STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
-    Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
-    const Network::TransportSocketOptions* transport_socket_options,
-    absl::string_view ech_name_override, std::string* error_details, uint8_t* out_alert) {
-  Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
-      cert_chain, std::move(callback), extended_socket_info, transport_socket_options,
-      tls_contexts_[0].ssl_ctx_.get(), ech_name_override, /*is_server=*/false, error_details,
-      out_alert);
-  return result;
 }
 
 } // namespace Tls

@@ -55,15 +55,19 @@ public:
    * asynchronous. If the verification is asynchronous, Pending will be returned. After the
    * asynchronous verification is finished, the result should be passed back via a
    * VerifyResultCallback object.
-   * @param cert_chain the cert chain with the leaf cert at the front.
-   * @param callback called after the asynchronous verification finishes to handle the result. Not
-   * used if doing synchronous verification.
-   * @param ssl_extended_info the info for storing the validation status
+   * @param cert_chain the cert chain with the leaf cert on top.
+   * @param callback called after the asynchronous validation finishes to handle the result. Not
+   * used if doing synchronous verification. If not provided and the validation is asynchronous,
+   * ssl_extended_info will create one.
+   * @param ssl_extended_info the info for creating async validation result callback if needed,
+   * tracking the validation and storing the result.
    * @param transport_socket_options config options to verify cert.
+   * @param ssl_ctx the config context this validation should use.
+   * @param ech_name_override the ECH name override if there is any, otherwise empty.
+   * @param is_server whether the validation is on server side.
    * @param error_details used to return back the verification error.
    * @param out_alert used to return back the verification error to boring SSL.
-   * @return ValidateResult Pending if doing asynchronous verification, otherwise Successful or
-   * Failed.
+   * @return ValidateResult Pending if doing asynchronously, otherwise Successful or Failed.
    */
   virtual Ssl::ValidateResult
   doCustomVerifyCertChain(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,

@@ -3,12 +3,15 @@ load(
     "envoy_cc_extension",
     "envoy_cc_test",
     "envoy_cc_test_library",
+    "envoy_extension_package",
     "envoy_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_extension_package()
 
 envoy_cc_test(
     name = "default_validator_test",

@@ -3,7 +3,6 @@
 #include <array>
 #include <deque>
 #include <functional>
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -252,7 +251,6 @@ Ssl::ValidateResult DefaultCertValidator::doCustomVerifyCertChain(
     const Network::TransportSocketOptions* transport_socket_options, SSL_CTX* ssl_ctx,
     absl::string_view ech_name_override, bool is_server, std::string* error_details,
     uint8_t* out_alert) {
-  std::cerr << "================ DefaultCertValidator::doCustomVerifyCertChain\n";
   if (out_alert != nullptr) {
     *out_alert = SSL_AD_CERTIFICATE_UNKNOWN;
   }
@@ -300,7 +298,6 @@ Ssl::ValidateResult DefaultCertValidator::doCustomVerifyCertChain(
       ENVOY_LOG(debug, error);
       return Ssl::ValidateResult::Failed;
     }
-    std::cerr << "=========== X509_verify_cert\n";
     int ret = X509_verify_cert(ctx.get());
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(

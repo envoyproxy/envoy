@@ -25,10 +25,29 @@ private:
 
 using CertVerifyResultPtr = std::unique_ptr<CertVerifyResult>();
 
+// An interface for the Envoy specific QUICHE verify context.
 class EnvoyQuicProofVerifyContext : public quic::ProofVerifyContext {
 public:
   virtual absl::string_view getEchNameOverrride() const PURE;
   virtual Event::Dispatcher& dispatcher() PURE;
+  virtual bool isServer() const PURE;
+};
+
+// An implementation of the verify context interface.
+class EnvoyQuicProofVerifyContextImpl : public EnvoyQuicProofVerifyContext {
+public:
+  EnvoyQuicProofVerifyContextImpl(QuicSslConnectionInfo& ssl_info, Event::Dispatcher& dispatcher,
+                                  bool is_server)
+      : ssl_info_(ssl_info), dispatcher_(dispatcher), is_server_(is_server) {}
+
+  absl::string_view getEchNameOverrride() const override;
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  bool isServer() const override { return is_server_; }
+
+private:
+  QuicSslConnectionInfo& ssl_info_;
+  Event::Dispatcher& dispatcher_;
+  const bool is_server_;
 };
 
 using EnvoyQuicProofVerifyContextPtr = std::unique_ptr<EnvoyQuicProofVerifyContext>;
