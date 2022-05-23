@@ -1,5 +1,6 @@
 #include "envoy/event/dispatcher.h"
 
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "source/common/http/headers.h"
 #include "source/extensions/filters/http/cache/cache_filter.h"
 #include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
@@ -10,22 +11,31 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-namespace {
 
 class CacheFilterTest : public ::testing::Test {
 protected:
+  const CacheFilterConfigPb& getFilterCfg(CacheFilterSharedPtr filter) {
+    return filter->pb_config_;
+  }
+  const HttpCachePtr& getFilterCache(CacheFilterSharedPtr filter) { return filter->cache_; }
+  const VaryAllowList& getVaryAllowList(CacheFilterSharedPtr filter) {
+    return filter->vary_allow_list_;
+  }
+
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
-  CacheFilterSharedPtr makeFilter(HttpCache& cache) {
-    auto filter = std::make_shared<CacheFilter>(config_, /*stats_prefix=*/"", context_.scope(),
-                                                context_.timeSource(), cache);
+  CacheFilterSharedPtr makeFilter(HttpCachePtr cache) {
+    auto filter = std::make_shared<CacheFilter>(/*stats_prefix=*/"", context_.scope(),
+                                                context_.timeSource(), config_, simple_cache_);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
     filter->setEncoderFilterCallbacks(encoder_callbacks_);
+    filter->cache_ = cache;
     return filter;
   }
 
@@ -35,6 +45,7 @@ protected:
     time_source_.setSystemTime(std::chrono::hours(1));
     // Use the initialized time source to set the response date header
     response_headers_.setDate(formatter_.now(time_source_));
+    simple_cache_ = std::make_shared<SimpleHttpCache>();
   }
 
   void testDecodeRequestMiss(CacheFilterSharedPtr filter) {
@@ -117,7 +128,7 @@ protected:
 
   void waitBeforeSecondRequest() { time_source_.advanceTimeWait(delay_); }
 
-  SimpleHttpCache simple_cache_;
+  HttpCachePtr simple_cache_;
   envoy::extensions::filters::http::cache::v3::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;
@@ -575,6 +586,40 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
   }
 }
 
+// Check that per route config is used in filter (in case if it is defined)
+TEST_F(CacheFilterTest, PerFilterConfigOverride) {
+  // Define per route config
+  const auto yaml_config = R"EOF(
+allowed_vary_headers:
+  - exact: bar
+typed_config:
+  "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
+)EOF";
+
+  envoy::extensions::filters::http::cache::v3::CacheConfig cache_per_route;
+  TestUtility::loadFromYaml(yaml_config, cache_per_route);
+
+  auto filter = makeFilter(nullptr);
+  CacheRouteFilterConfig route_cfg(simple_cache_, cache_per_route);
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.cache"))
+      .WillByDefault(Return(&route_cfg));
+
+  request_headers_.setHost("SomeHost");
+
+  // Filter cache should be null (due to we create filter with null cache - 'makeFilter(nullptr)')
+  ASSERT_TRUE(getFilterCache(filter) == nullptr);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter->decodeHeaders(request_headers_, true));
+
+  // During header decoding filter should reinit config using per route config.
+  // It means that cache should be initialized with 'simple_cache_' and allowed_vary_headers should
+  // be taken from per route config as well
+  EXPECT_EQ(getFilterCache(filter), simple_cache_);
+  EXPECT_EQ(getFilterCfg(filter).DebugString(), cache_per_route.DebugString());
+  EXPECT_TRUE(getVaryAllowList(filter).allowsValue("bar"));
+}
+
 // Checks the case where a cache lookup callback is posted to the dispatcher, then the CacheFilter
 // was deleted (e.g. connection dropped with the client) before the posted callback was executed. In
 // this case the CacheFilter should not be accessed after it was deleted, which is ensured by using
@@ -765,7 +810,6 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
   }
 }
 
-} // namespace
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

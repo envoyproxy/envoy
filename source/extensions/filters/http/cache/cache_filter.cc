@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/cache/cache_filter.h"
 
+#include "cache_filter_config.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -30,11 +31,12 @@ struct CacheResponseCodeDetailValues {
 
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
-CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-                         const std::string&, Stats::Scope&, TimeSource& time_source,
-                         HttpCache& http_cache)
-    : time_source_(time_source), cache_(http_cache),
-      vary_allow_list_(config.allowed_vary_headers()) {}
+bool is_route_config_init_ = false;
+
+CacheFilter::CacheFilter(const std::string&, Stats::Scope&, TimeSource& time_source,
+                         const CacheFilterConfigPb& pb_config, HttpCachePtr cache)
+    : pb_config_(pb_config), cache_(cache), time_source_(time_source),
+      vary_allow_list_(pb_config.allowed_vary_headers()) {}
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;
@@ -44,6 +46,24 @@ void CacheFilter::onDestroy() {
   if (insert_) {
     insert_->onDestroy();
   }
+}
+
+void CacheFilter::initRouteConfig() {
+  if (is_route_config_init_) {
+    return;
+  }
+
+  is_route_config_init_ = true;
+  const auto* cfg = Http::Utility::resolveMostSpecificPerFilterConfig<CacheRouteFilterConfig>(
+      "envoy.filters.http.cache", decoder_callbacks_->route());
+  if (cfg == nullptr) {
+    return;
+  }
+
+  pb_config_ = cfg->proto();
+  cache_ = cfg->getCache();
+  vary_allow_list_ = cfg->proto().allowed_vary_headers();
+  ASSERT(cache_);
 }
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -56,17 +76,21 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
         *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
   }
+
   if (!CacheabilityUtils::canServeRequestFromCache(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
                      *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
   }
+
   ASSERT(decoder_callbacks_);
+
+  initRouteConfig();
 
   LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allow_list_);
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
   is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
-  lookup_ = cache_.makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
+  lookup_ = cache_->makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
 
   ASSERT(lookup_);
   getHeaders(headers);
@@ -105,7 +129,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   if (request_allows_inserts_ && !is_head_request_ &&
       CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
-    insert_ = cache_.makeInsertContext(std::move(lookup_), *encoder_callbacks_);
+    insert_ = cache_->makeInsertContext(std::move(lookup_), *encoder_callbacks_);
     // Add metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
     insert_->insertHeaders(headers, metadata, end_stream);
@@ -438,7 +462,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
     // TODO(yosrym93): else the cached entry should be deleted.
     // Update metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
-    cache_.updateHeaders(*lookup_, response_headers, metadata);
+    cache_->updateHeaders(*lookup_, response_headers, metadata);
   }
 
   // A cache entry was successfully validated -> encode cached body and trailers.

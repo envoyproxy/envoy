@@ -1,6 +1,7 @@
 #include <initializer_list>
 #include <optional>
 
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "envoy/common/optref.h"
 
 #include "test/integration/http_protocol_integration.h"
@@ -595,6 +596,49 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead200WithValidation) {
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
   }
+}
+
+ConfigHelper::HttpModifierFunction overrideConfig(const std::string& yaml_config) {
+  envoy::extensions::filters::http::cache::v3::CacheConfig cache_per_route;
+  TestUtility::loadFromYaml(yaml_config, cache_per_route);
+
+  return
+      [cache_per_route](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              cfg) {
+        auto* config = cfg.mutable_route_config()
+                           ->mutable_virtual_hosts()
+                           ->Mutable(0)
+                           ->mutable_typed_per_filter_config();
+
+        (*config)["envoy.filters.http.cache"].PackFrom(cache_per_route);
+      };
+}
+
+TEST_P(CacheIntegrationTest, RouteOverride) {
+  ConfigHelper::HttpModifierFunction mod = overrideConfig(R"EOF(
+allowed_vary_headers:
+  - exact: bar
+typed_config:
+  "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
+)EOF");
+
+  config_helper_.addConfigModifier(mod);
+  initializeFilter(default_config);
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"}},
+      1024 * 65);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
 }
 
 } // namespace

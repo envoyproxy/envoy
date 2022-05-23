@@ -10,6 +10,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/filters/http/cache/cache_filter_config.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -24,9 +25,8 @@ class CacheFilter : public Http::PassThroughFilter,
                     public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
-  CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-              const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
-              HttpCache& http_cache);
+  CacheFilter(const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
+              const CacheFilterConfigPb& pb_config, HttpCachePtr cache);
   // Http::StreamFilterBase
   void onDestroy() override;
   // Http::StreamDecoderFilter
@@ -39,6 +39,10 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
 private:
+  friend class CacheFilterTest;
+
+  void initRouteConfig();
+
   // Utility functions; make any necessary checks and call the corresponding lookup_ functions
   void getHeaders(Http::RequestHeaderMap& request_headers);
   void getBody();
@@ -86,8 +90,10 @@ private:
   // Updates filter_state_ and continues the encoding stream if necessary.
   void finalizeEncodingCachedResponse();
 
+  bool is_route_config_init_ = false;
+  CacheFilterConfigPbRef pb_config_;
+  HttpCachePtr cache_;
   TimeSource& time_source_;
-  HttpCache& cache_;
   LookupContextPtr lookup_;
   InsertContextPtr insert_;
   LookupResultPtr lookup_result_;

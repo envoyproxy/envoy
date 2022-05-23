@@ -19,6 +19,11 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  Envoy::Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
+      Envoy::Server::Configuration::ServerFactoryContext& context,
+      Envoy::ProtobufMessage::ValidationVisitor& visitor) override;
 };
 
 } // namespace Cache
