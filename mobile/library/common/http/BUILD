@@ -29,6 +29,7 @@ envoy_cc_library(
         "@envoy//envoy/http:header_map_interface",
         "@envoy//envoy/stats:stats_interface",
         "@envoy//envoy/stats:stats_macros",
+        "@envoy//envoy/stats:timespan_interface",
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/buffer:watermark_buffer_lib",
         "@envoy//source/common/common:lock_guard_lib",
@@ -39,6 +40,7 @@ envoy_cc_library(
         "@envoy//source/common/http:header_map_lib",
         "@envoy//source/common/http:headers_lib",
         "@envoy//source/common/http:utility_lib",
+        "@envoy//source/common/stats:timespan_lib",
     ],
 )
 

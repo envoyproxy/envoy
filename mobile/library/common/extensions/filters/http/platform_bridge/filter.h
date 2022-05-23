@@ -2,8 +2,11 @@
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/http/filter.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
@@ -14,17 +17,51 @@ namespace Extensions {
 namespace HttpFilters {
 namespace PlatformBridge {
 
+/**
+ * All PlatformBridge Filter stats. @see stats_macros.h
+ */
+#define ALL_PLATFORM_BRIDGE_FILTER_STATS(COUNTER, HISTOGRAM)                                       \
+  HISTOGRAM(init_callback_latency, Milliseconds)                                                   \
+  HISTOGRAM(on_rq_headers_callback_latency, Milliseconds)                                          \
+  HISTOGRAM(on_rq_data_callback_latency, Milliseconds)                                             \
+  HISTOGRAM(on_rq_trailers_callback_latency, Milliseconds)                                         \
+  HISTOGRAM(on_rq_resume_callback_latency, Milliseconds)                                           \
+  HISTOGRAM(on_rs_headers_callback_latency, Milliseconds)                                          \
+  HISTOGRAM(on_rs_data_callback_latency, Milliseconds)                                             \
+  HISTOGRAM(on_rs_trailers_callback_latency, Milliseconds)                                         \
+  HISTOGRAM(on_rs_resume_callback_latency, Milliseconds)                                           \
+  HISTOGRAM(on_cancel_callback_latency, Milliseconds)                                              \
+  HISTOGRAM(on_error_callback_latency, Milliseconds)
+
+/**
+ * Struct definition for all DNS Filter stats. @see stats_macros.h
+ */
+struct PlatformBridgeFilterStats {
+  ALL_PLATFORM_BRIDGE_FILTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
 class PlatformBridgeFilter;
 
 class PlatformBridgeFilterConfig {
 public:
   PlatformBridgeFilterConfig(
+      Server::Configuration::FactoryContext& context,
       const envoymobile::extensions::filters::http::platform_bridge::PlatformBridge& proto_config);
 
+  PlatformBridgeFilterStats& stats() const { return stats_; }
   const std::string& filter_name() { return filter_name_; }
   const envoy_http_filter* platform_filter() const { return platform_filter_; }
 
 private:
+  static PlatformBridgeFilterStats generateStats(const std::string& stat_prefix,
+                                                 Stats::Scope& scope) {
+    const auto final_prefix = absl::StrCat("pbf_filter.", stat_prefix);
+    return {ALL_PLATFORM_BRIDGE_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                             POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
+  }
+
+  Stats::Scope& root_scope_;
+  mutable PlatformBridgeFilterStats stats_;
   const std::string filter_name_;
   const envoy_http_filter* platform_filter_;
 };
@@ -93,17 +130,27 @@ public:
   // Filter state.
   bool isAlive() { return alive_; }
 
+  TimeSource& timeSource() { return dispatcher_.timeSource(); }
+
 private:
   /**
    * Internal delegate for managing logic and state that exists for both the request (decoding)
    * and response (encoding) paths.
    */
   struct FilterBase : public Logger::Loggable<Logger::Id::filter> {
-    FilterBase(PlatformBridgeFilter& parent, envoy_filter_on_headers_f on_headers,
-               envoy_filter_on_data_f on_data, envoy_filter_on_trailers_f on_trailers,
-               envoy_filter_on_resume_f on_resume)
-        : parent_(parent), on_headers_(on_headers), on_data_(on_data), on_trailers_(on_trailers),
-          on_resume_(on_resume) {
+    FilterBase(PlatformBridgeFilter& parent, std::string direction,
+               envoy_filter_on_headers_f on_headers, envoy_filter_on_data_f on_data,
+               envoy_filter_on_trailers_f on_trailers, envoy_filter_on_resume_f on_resume,
+               Stats::Histogram& on_headers_callback_latency,
+               Stats::Histogram& on_data_callback_latency,
+               Stats::Histogram& on_trailers_callback_latency,
+               Stats::Histogram& on_resume_callback_latency)
+        : parent_(parent), direction_(std::move(direction)), on_headers_(on_headers),
+          on_data_(on_data), on_trailers_(on_trailers), on_resume_(on_resume),
+          on_headers_callback_latency_(on_headers_callback_latency),
+          on_data_callback_latency_(on_data_callback_latency),
+          on_trailers_callback_latency_(on_trailers_callback_latency),
+          on_resume_callback_latency_(on_resume_callback_latency) {
       state_.iteration_state_ = IterationState::Ongoing;
     }
 
@@ -147,21 +194,30 @@ private:
     };
 
     PlatformBridgeFilter& parent_;
+    const std::string direction_;
     FilterState state_;
     envoy_filter_on_headers_f on_headers_;
     envoy_filter_on_data_f on_data_;
     envoy_filter_on_trailers_f on_trailers_;
     envoy_filter_on_resume_f on_resume_;
+    Stats::Histogram& on_headers_callback_latency_;
+    Stats::Histogram& on_data_callback_latency_;
+    Stats::Histogram& on_trailers_callback_latency_;
+    Stats::Histogram& on_resume_callback_latency_;
     Http::HeaderMap* pending_headers_{};
     Http::HeaderMap* pending_trailers_{};
   };
 
   struct RequestFilterBase : FilterBase {
     RequestFilterBase(PlatformBridgeFilter& parent)
-        : FilterBase(parent, parent.platform_filter_.on_request_headers,
+        : FilterBase(parent, "request", parent.platform_filter_.on_request_headers,
                      parent.platform_filter_.on_request_data,
                      parent.platform_filter_.on_request_trailers,
-                     parent.platform_filter_.on_resume_request) {}
+                     parent.platform_filter_.on_resume_request,
+                     parent.config_->stats().on_rq_headers_callback_latency_,
+                     parent.config_->stats().on_rq_data_callback_latency_,
+                     parent.config_->stats().on_rq_trailers_callback_latency_,
+                     parent.config_->stats().on_rq_resume_callback_latency_) {}
 
     // FilterBase
     void addData(envoy_data data) override;
@@ -174,10 +230,14 @@ private:
 
   struct ResponseFilterBase : FilterBase {
     ResponseFilterBase(PlatformBridgeFilter& parent)
-        : FilterBase(parent, parent.platform_filter_.on_response_headers,
+        : FilterBase(parent, "response", parent.platform_filter_.on_response_headers,
                      parent.platform_filter_.on_response_data,
                      parent.platform_filter_.on_response_trailers,
-                     parent.platform_filter_.on_resume_response) {}
+                     parent.platform_filter_.on_resume_response,
+                     parent.config_->stats().on_rs_headers_callback_latency_,
+                     parent.config_->stats().on_rs_data_callback_latency_,
+                     parent.config_->stats().on_rs_trailers_callback_latency_,
+                     parent.config_->stats().on_rs_resume_callback_latency_) {}
 
     // FilterBase
     void addData(envoy_data data) override;
@@ -190,6 +250,7 @@ private:
 
   Event::ScopeTracker& scopeTracker() const { return dispatcher_; }
 
+  PlatformBridgeFilterConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
   const std::string filter_name_;
   envoy_http_filter platform_filter_;

@@ -7,11 +7,13 @@
 #include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/codec_helper.h"
+#include "source/common/stats/timespan_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -25,16 +27,22 @@ namespace Http {
 /**
  * All http client stats. @see stats_macros.h
  */
-#define ALL_HTTP_CLIENT_STATS(COUNTER)                                                             \
+#define ALL_HTTP_CLIENT_STATS(COUNTER, HISTOGRAM)                                                  \
   COUNTER(stream_success)                                                                          \
   COUNTER(stream_failure)                                                                          \
-  COUNTER(stream_cancel)
+  COUNTER(stream_cancel)                                                                           \
+  HISTOGRAM(on_headers_callback_latency, Milliseconds)                                             \
+  HISTOGRAM(on_data_callback_latency, Milliseconds)                                                \
+  HISTOGRAM(on_trailers_callback_latency, Milliseconds)                                            \
+  HISTOGRAM(on_complete_callback_latency, Milliseconds)                                            \
+  HISTOGRAM(on_cancel_callback_latency, Milliseconds)                                              \
+  HISTOGRAM(on_error_callback_latency, Milliseconds)
 
 /**
  * Struct definition for client stats. @see stats_macros.h
  */
 struct HttpClientStats {
-  ALL_HTTP_CLIENT_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_HTTP_CLIENT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -45,7 +53,9 @@ public:
   Client(ApiListener& api_listener, Event::ProvisionalDispatcher& dispatcher, Stats::Scope& scope,
          Random::RandomGenerator& random)
       : api_listener_(api_listener), dispatcher_(dispatcher),
-        stats_(HttpClientStats{ALL_HTTP_CLIENT_STATS(POOL_COUNTER_PREFIX(scope, "http.client."))}),
+        stats_(
+            HttpClientStats{ALL_HTTP_CLIENT_STATS(POOL_COUNTER_PREFIX(scope, "http.client."),
+                                                  POOL_HISTOGRAM_PREFIX(scope, "http.client."))}),
         address_(std::make_shared<Network::Address::SyntheticAddressImpl>()), random_(random) {}
 
   /**
@@ -107,6 +117,8 @@ public:
 
   const HttpClientStats& stats() const;
   Event::ScopeTracker& scopeTracker() const { return dispatcher_; }
+
+  TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
   // Used to fill response code details for streams that are cancelled via cancelStream.
   const std::string& getCancelDetails() {

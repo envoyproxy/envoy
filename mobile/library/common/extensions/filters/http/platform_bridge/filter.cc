@@ -23,6 +23,9 @@ namespace HttpFilters {
 namespace PlatformBridge {
 
 namespace {
+
+constexpr auto SlowCallbackWarningThreshold = std::chrono::seconds(1);
+
 // TODO: https://github.com/envoyproxy/envoy-mobile/issues/1287
 void replaceHeaders(Http::HeaderMap& headers, envoy_headers c_headers) {
   headers.clear();
@@ -67,14 +70,16 @@ static void envoy_filter_reset_idle(const void* context) {
 }
 
 PlatformBridgeFilterConfig::PlatformBridgeFilterConfig(
+    Server::Configuration::FactoryContext& context,
     const envoymobile::extensions::filters::http::platform_bridge::PlatformBridge& proto_config)
-    : filter_name_(proto_config.platform_filter_name()),
+    : root_scope_(context.scope()), stats_(generateStats("", root_scope_)),
+      filter_name_(proto_config.platform_filter_name()),
       platform_filter_(static_cast<envoy_http_filter*>(
           Api::External::retrieveApi(proto_config.platform_filter_name()))) {}
 
 PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr config,
                                            Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher), filter_name_(config->filter_name()),
+    : config_(config), dispatcher_(dispatcher), filter_name_(config->filter_name()),
       platform_filter_(*config->platform_filter()) {
   // The initialization above sets platform_filter_ to a copy of the struct stored on the config.
   // In the typical case, this will represent a filter implementation that needs to be intantiated.
@@ -87,7 +92,19 @@ PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr c
     // Set the instance_context to the result of the initialization call. Cleanup will ultimately
     // occur within the onDestroy() invocation below.
     ENVOY_LOG(trace, "PlatformBridgeFilter({})->init_filter", filter_name_);
+
+    auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+        config_->stats().init_callback_latency_, timeSource());
+
     platform_filter_.instance_context = platform_filter_.init_filter(&platform_filter_);
+
+    callback_time_ms->complete();
+    auto elapsed = callback_time_ms->elapsed();
+    if (elapsed > SlowCallbackWarningThreshold) {
+      ENVOY_LOG_EVENT(warn, "slow_init_cb",
+                      filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    }
+
     ASSERT(platform_filter_.instance_context,
            fmt::format("PlatformBridgeFilter({}): init_filter unsuccessful", filter_name_));
   } else {
@@ -158,13 +175,35 @@ void PlatformBridgeFilter::onDestroy() {
     envoy_data error_message = Data::Utility::copyToBridgeData("Stream idle timeout");
     auto& info = decoder_callbacks_->streamInfo();
     int32_t attempts = static_cast<int32_t>(info.attemptCount().value_or(0));
+
+    auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+        config_->stats().on_error_callback_latency_, timeSource());
+
     platform_filter_.on_error({ENVOY_REQUEST_TIMEOUT, error_message, attempts}, streamIntel(),
                               finalStreamIntel(), platform_filter_.instance_context);
+
+    callback_time_ms->complete();
+    auto elapsed = callback_time_ms->elapsed();
+    if (elapsed > SlowCallbackWarningThreshold) {
+      ENVOY_LOG_EVENT(warn, "slow_on_error_cb",
+                      filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    }
   } else if (!response_filter_base_->state_.stream_complete_ && platform_filter_.on_cancel) {
     // If the filter chain is destroyed before a response is received, treat as cancellation.
     ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_cancel", filter_name_);
+
+    auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+        config_->stats().on_cancel_callback_latency_, timeSource());
+
     platform_filter_.on_cancel(streamIntel(), finalStreamIntel(),
                                platform_filter_.instance_context);
+
+    callback_time_ms->complete();
+    auto elapsed = callback_time_ms->elapsed();
+    if (elapsed > SlowCallbackWarningThreshold) {
+      ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb",
+                      filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    }
   }
 
   // Allow nullptr as no-op only if nothing was initialized.
@@ -256,9 +295,21 @@ Http::FilterHeadersStatus PlatformBridgeFilter::FilterBase::onHeaders(Http::Head
   }
 
   envoy_headers in_headers = Http::Utility::toBridgeHeaders(headers);
-  ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_*_headers", parent_.filter_name_);
+  ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_{}_headers", parent_.filter_name_, direction_);
+
+  auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      on_headers_callback_latency_, parent_.timeSource());
+
   envoy_filter_headers_status result =
       on_headers_(in_headers, end_stream, streamIntel(), parent_.platform_filter_.instance_context);
+
+  callback_time_ms->complete();
+  auto elapsed = callback_time_ms->elapsed();
+  if (elapsed > SlowCallbackWarningThreshold) {
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_headers_cb",
+                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+  }
+
   state_.on_headers_called_ = true;
 
   switch (result.status) {
@@ -305,9 +356,21 @@ Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance
     in_data = Data::Utility::copyToBridgeData(data);
   }
 
-  ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_*_data", parent_.filter_name_);
+  ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_{}_data", parent_.filter_name_, direction_);
+
+  auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      on_data_callback_latency_, parent_.timeSource());
+
   envoy_filter_data_status result =
       on_data_(in_data, end_stream, streamIntel(), parent_.platform_filter_.instance_context);
+
+  callback_time_ms->complete();
+  auto elapsed = callback_time_ms->elapsed();
+  if (elapsed > SlowCallbackWarningThreshold) {
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_data_cb",
+                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+  }
+
   state_.on_data_called_ = true;
 
   switch (result.status) {
@@ -388,9 +451,21 @@ Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::He
 
   auto internal_buffer = buffer();
   envoy_headers in_trailers = Http::Utility::toBridgeHeaders(trailers);
-  ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_*_trailers", parent_.filter_name_);
+  ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_{}_trailers", parent_.filter_name_, direction_);
+
+  auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      on_trailers_callback_latency_, parent_.timeSource());
+
   envoy_filter_trailers_status result =
       on_trailers_(in_trailers, streamIntel(), parent_.platform_filter_.instance_context);
+
+  callback_time_ms->complete();
+  auto elapsed = callback_time_ms->elapsed();
+  if (elapsed > SlowCallbackWarningThreshold) {
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_trailers_cb",
+                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+  }
+
   state_.on_trailers_called_ = true;
 
   switch (result.status) {
@@ -614,10 +689,22 @@ void PlatformBridgeFilter::FilterBase::onResume() {
     pending_trailers = &bridged_trailers;
   }
 
-  ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_resume_*", parent_.filter_name_);
+  ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_resume_{}", parent_.filter_name_, direction_);
+
+  auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      on_resume_callback_latency_, parent_.timeSource());
+
   envoy_filter_resume_status result =
       on_resume_(pending_headers, pending_data, pending_trailers, state_.stream_complete_,
                  streamIntel(), parent_.platform_filter_.instance_context);
+
+  callback_time_ms->complete();
+  auto elapsed = callback_time_ms->elapsed();
+  if (elapsed > SlowCallbackWarningThreshold) {
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_resume_cb",
+                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+  }
+
   state_.on_resume_called_ = true;
 
   if (result.status == kEnvoyFilterResumeStatusStopIteration) {
