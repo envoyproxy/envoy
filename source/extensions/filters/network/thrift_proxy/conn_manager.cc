@@ -471,15 +471,13 @@ FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(DecoderEvent stat
 
   if (local_response_sent_) {
     filter_action_ = nullptr;
-    filter_context_ = absl::monostate();
     return FilterStatus::Continue;
   }
 
   if (upgrade_handler_) {
     // Divert events to the current protocol upgrade handler.
-    const FilterStatus status = filter_action_(upgrade_handler_.get(), filter_context_);
+    const FilterStatus status = filter_action_(upgrade_handler_.get());
     filter_action_ = nullptr;
-    filter_context_ = absl::monostate();
     return status;
   }
 
@@ -510,7 +508,7 @@ ConnectionManager::ActiveRpc::applyFilters(FilterType* filter,
   typename std::list<std::unique_ptr<FilterType>>::iterator entry =
       !filter ? filter_list.begin() : std::next(filter->entry());
   for (; entry != filter_list.end(); entry++) {
-    const FilterStatus status = filter_action_((*entry)->decodeEventHandler(), filter_context_);
+    const FilterStatus status = filter_action_((*entry)->decodeEventHandler());
     if (local_response_sent_) {
       // The filter called sendLocalReply but _did not_ close the connection.
       // We return FilterStatus::Continue irrespective of the current result,
@@ -538,11 +536,10 @@ ConnectionManager::ActiveRpc::applyFilters(FilterType* filter,
 
   // The protocol converter writes the data to a buffer for response.
   if (protocol_converter) {
-    filter_action_(protocol_converter.get(), filter_context_);
+    filter_action_(protocol_converter.get());
   }
 
   filter_action_ = nullptr;
-  filter_context_ = absl::monostate();
 
   return FilterStatus::Continue;
 }
@@ -553,55 +550,54 @@ void ConnectionManager::ActiveRpc::prepareFilterAction(DecoderEvent event, Filte
   if (event == DecoderEvent::ContinueDecode) {
     return;
   }
-  filter_context_ = std::move(data);
 
   switch (event) {
   case DecoderEvent::TransportBegin:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) -> FilterStatus {
       MessageMetadataSharedPtr metadata = absl::get<MessageMetadataSharedPtr>(filter_context);
       return filter->transportBegin(metadata);
     };
     break;
   case DecoderEvent::TransportEnd:
-    filter_action_ = [](DecoderEventHandler* filter, FilterContext&) -> FilterStatus {
+    filter_action_ = [](DecoderEventHandler* filter) -> FilterStatus {
       return filter->transportEnd();
     };
     break;
   case DecoderEvent::PassthroughData:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) -> FilterStatus {
       Buffer::Instance* data = absl::get<Buffer::Instance*>(filter_context);
       return filter->passthroughData(*data);
     };
     break;
   case DecoderEvent::MessageBegin:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) -> FilterStatus {
       MessageMetadataSharedPtr metadata = absl::get<MessageMetadataSharedPtr>(filter_context);
       return filter->messageBegin(metadata);
     };
     break;
   case DecoderEvent::MessageEnd:
-    filter_action_ = [](DecoderEventHandler* filter, FilterContext&) -> FilterStatus {
+    filter_action_ = [](DecoderEventHandler* filter) -> FilterStatus {
       return filter->messageEnd();
     };
     break;
   case DecoderEvent::StructBegin:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
-      absl::string_view name = absl::get<std::string>(filter_context);
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
+      std::string& name = absl::get<std::string>(filter_context);
       return filter->structBegin(name);
     };
     break;
   case DecoderEvent::StructEnd:
-    filter_action_ = [](DecoderEventHandler* filter, FilterContext&) -> FilterStatus {
+    filter_action_ = [](DecoderEventHandler* filter) -> FilterStatus {
       return filter->structEnd();
     };
     break;
   case DecoderEvent::FieldBegin:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       std::tuple<std::string, FieldType, int16_t>& t =
           absl::get<std::tuple<std::string, FieldType, int16_t>>(filter_context);
       std::string& name = std::get<0>(t);
@@ -611,62 +607,60 @@ void ConnectionManager::ActiveRpc::prepareFilterAction(DecoderEvent event, Filte
     };
     break;
   case DecoderEvent::FieldEnd:
-    filter_action_ = [](DecoderEventHandler* filter, FilterContext&) -> FilterStatus {
-      return filter->fieldEnd();
-    };
+    filter_action_ = [](DecoderEventHandler* filter) -> FilterStatus { return filter->fieldEnd(); };
     break;
   case DecoderEvent::BoolValue:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       bool& value = absl::get<bool>(filter_context);
       return filter->boolValue(value);
     };
     break;
   case DecoderEvent::ByteValue:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       uint8_t& value = absl::get<uint8_t>(filter_context);
       return filter->byteValue(value);
     };
     break;
   case DecoderEvent::Int16Value:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       int16_t& value = absl::get<int16_t>(filter_context);
       return filter->int16Value(value);
     };
     break;
   case DecoderEvent::Int32Value:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       int32_t& value = absl::get<int32_t>(filter_context);
       return filter->int32Value(value);
     };
     break;
   case DecoderEvent::Int64Value:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       int64_t& value = absl::get<int64_t>(filter_context);
       return filter->int64Value(value);
     };
     break;
   case DecoderEvent::DoubleValue:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       double& value = absl::get<double>(filter_context);
       return filter->doubleValue(value);
     };
     break;
   case DecoderEvent::StringValue:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       std::string& value = absl::get<std::string>(filter_context);
       return filter->stringValue(value);
     };
     break;
   case DecoderEvent::MapBegin:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       std::tuple<FieldType, FieldType, uint32_t>& t =
           absl::get<std::tuple<FieldType, FieldType, uint32_t>>(filter_context);
       FieldType& key_type = std::get<0>(t);
@@ -676,13 +670,11 @@ void ConnectionManager::ActiveRpc::prepareFilterAction(DecoderEvent event, Filte
     };
     break;
   case DecoderEvent::MapEnd:
-    filter_action_ = [](DecoderEventHandler* filter, FilterContext&) -> FilterStatus {
-      return filter->mapEnd();
-    };
+    filter_action_ = [](DecoderEventHandler* filter) -> FilterStatus { return filter->mapEnd(); };
     break;
   case DecoderEvent::ListBegin:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       std::tuple<FieldType, uint32_t>& t =
           absl::get<std::tuple<FieldType, uint32_t>>(filter_context);
       FieldType& elem_type = std::get<0>(t);
@@ -691,13 +683,11 @@ void ConnectionManager::ActiveRpc::prepareFilterAction(DecoderEvent event, Filte
     };
     break;
   case DecoderEvent::ListEnd:
-    filter_action_ = [](DecoderEventHandler* filter, FilterContext&) -> FilterStatus {
-      return filter->listEnd();
-    };
+    filter_action_ = [](DecoderEventHandler* filter) -> FilterStatus { return filter->listEnd(); };
     break;
   case DecoderEvent::SetBegin:
-    filter_action_ = [](DecoderEventHandler* filter,
-                        FilterContext& filter_context) -> FilterStatus {
+    filter_action_ = [filter_context =
+                          std::move(data)](DecoderEventHandler* filter) mutable -> FilterStatus {
       std::tuple<FieldType, uint32_t>& t =
           absl::get<std::tuple<FieldType, uint32_t>>(filter_context);
       FieldType& elem_type = std::get<0>(t);
@@ -706,9 +696,7 @@ void ConnectionManager::ActiveRpc::prepareFilterAction(DecoderEvent event, Filte
     };
     break;
   case DecoderEvent::SetEnd:
-    filter_action_ = [](DecoderEventHandler* filter, FilterContext&) -> FilterStatus {
-      return filter->setEnd();
-    };
+    filter_action_ = [](DecoderEventHandler* filter) -> FilterStatus { return filter->setEnd(); };
     break;
   default:
     PANIC_DUE_TO_CORRUPT_ENUM;

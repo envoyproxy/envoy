@@ -329,7 +329,7 @@ private:
                               std::list<std::unique_ptr<FilterType>>& filter_list,
                               ProtocolConverterSharedPtr protocol_converter = nullptr);
 
-    // Helper to setup filter_action_ and filter_context_
+    // Helper to setup filter_action_
     void prepareFilterAction(DecoderEvent event, FilterContext&& data);
 
     void finalizeRequest();
@@ -351,8 +351,7 @@ private:
     Buffer::OwnedImpl response_buffer_;
     int32_t original_sequence_id_{0};
     MessageType original_msg_type_{MessageType::Call};
-    std::function<FilterStatus(DecoderEventHandler*, FilterContext&)> filter_action_;
-    FilterContext filter_context_;
+    std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
     bool local_response_sent_ : 1;
     bool pending_transport_end_ : 1;
     bool passthrough_ : 1;
