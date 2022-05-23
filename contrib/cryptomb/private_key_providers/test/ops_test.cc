@@ -395,16 +395,6 @@ TEST_F(CryptoMbProviderRsaTest, TestRSAQueueSizeStatistics) {
   EXPECT_EQ(histogram_values[0], CryptoMbQueue::MULTIBUFF_BATCH);
 }
 
-TEST_F(CryptoMbProviderTest, TestMinimumPollDelay) {
-  CryptoMbQueue queue_1ms(std::chrono::milliseconds(1), KeyType::Rsa, 1024, fakeIpp_, *dispatcher_,
-                          stats_);
-  CryptoMbQueue queue_0ms(std::chrono::milliseconds(0), KeyType::Rsa, 1024, fakeIpp_, *dispatcher_,
-                          stats_);
-  // The minimum value for the poll delay should be 1 millisecond.
-  EXPECT_EQ(queue_1ms.getPollDelayForTest(), std::chrono::microseconds(1000));
-  EXPECT_EQ(queue_0ms.getPollDelayForTest(), std::chrono::microseconds(1000));
-}
-
 } // namespace
 } // namespace CryptoMb
 } // namespace PrivateKeyMethodProvider

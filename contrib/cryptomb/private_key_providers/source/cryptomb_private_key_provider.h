@@ -170,6 +170,10 @@ public:
 
   static int connectionIndex();
 
+  const std::chrono::microseconds& getPollDelayForTest() const {
+    return tls_->get()->queue_.getPollDelayForTest();
+  }
+
 private:
   // Thread local data containing a single queue per worker thread.
   struct ThreadLocalData : public ThreadLocal::ThreadLocalObject {
