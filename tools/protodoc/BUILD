@@ -38,6 +38,7 @@ py_binary(
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
         requirement("envoy.base.utils"),
+        requirement("envoy.code.check"),
         requirement("Jinja2"),
     ],
 )

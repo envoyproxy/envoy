@@ -57,6 +57,9 @@ minor_behavior_changes:
     get route config factories by the configuration proto full names by default. This behavior change
     can be reverted by setting the ``envoy.reloadable_features.get_route_config_factory_by_type``
     runtime flag to false.
+  change: |
+    add an ignore_port_in_host_matching config entry in RouteConfiguration. When set to true, port number(if any) in host
+    header is ignored during host matching.
 
 bug_fixes:
 - area: runtime
@@ -67,6 +70,10 @@ bug_fixes:
 - area: tcp_proxy
   change: |
     Fixed an issue using the cluster wide CONNECT termination so it will successfully proxy payloads.
+- area: listener
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`
+    is properly extracted.
 
 removed_config_or_runtime:
 - area: compressor
