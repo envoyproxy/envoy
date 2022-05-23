@@ -18,10 +18,10 @@ enum class ParserType { Legacy };
 
 enum class MessageType { Request, Response };
 
-// CallbackResult is used to send signals to the parser.  See
+// CallbackResult is used to send signals to the parser. See
 // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
 enum class CallbackResult {
-  // An error has happened.  Further data must not be fed to the parser.
+  // An error has happened. Further data must not be fed to the parser.
   Error = -1,
   // Operation successful.
   Success = 0,
@@ -123,7 +123,7 @@ public:
   // Unpauses the parser.
   virtual void resume() PURE;
 
-  // Pauses the parser.  Returns CallbackResult::Success, which can be returned
+  // Pauses the parser. Returns CallbackResult::Success, which can be returned
   // directly in ParserCallback implementations for brevity.
   virtual CallbackResult pause() PURE;
 

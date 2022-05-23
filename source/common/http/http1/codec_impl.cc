@@ -887,8 +887,7 @@ StatusOr<CallbackResult> ConnectionImpl::onMessageCompleteImpl() {
 }
 
 void ConnectionImpl::dispatchBufferedBody() {
-  ASSERT(parser_->getStatus() == ParserStatus::Ok ||
-         parser_->getStatus() == ParserStatus::Paused);
+  ASSERT(parser_->getStatus() == ParserStatus::Ok || parser_->getStatus() == ParserStatus::Paused);
   ASSERT(codec_status_.ok());
   if (buffered_body_.length() > 0) {
     onBody(buffered_body_);
