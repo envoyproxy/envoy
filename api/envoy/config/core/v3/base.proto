@@ -121,7 +121,7 @@ message Extension {
   // [#not-implemented-hide:] Type descriptor of extension configuration proto.
   // [#comment:TODO(yanavlasov): Link to the doc with existing configuration protos.]
   // [#comment:TODO(yanavlasov): Add tests when PR #9391 lands.]
-  string type_descriptor = 3;
+  string type_descriptor = 3 [deprecated = true];
 
   // The version is a property of the extension and maintained independently
   // of other extensions and the Envoy API.
