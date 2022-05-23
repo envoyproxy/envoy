@@ -17,23 +17,30 @@ TEST(Coverage, StatusToString) {
   EXPECT_EQ(lookupStatusToString(LookupStatus::StaleHitWithFailedValidation),
             "StaleHitWithFailedValidation");
   EXPECT_EQ(lookupStatusToString(LookupStatus::NotModifiedHit), "NotModifiedHit");
-  EXPECT_EQ(lookupStatusToString(LookupStatus::RequestNotCacheable),
-            "RequestNotCacheable");
+  EXPECT_EQ(lookupStatusToString(LookupStatus::RequestNotCacheable), "RequestNotCacheable");
   EXPECT_EQ(lookupStatusToString(LookupStatus::RequestIncomplete), "RequestIncomplete");
   EXPECT_EQ(lookupStatusToString(LookupStatus::LookupError), "LookupError");
 
   EXPECT_EQ(insertStatusToString(InsertStatus::InsertSucceeded), "InsertSucceeded");
   EXPECT_EQ(insertStatusToString(InsertStatus::InsertAbortedByCache), "InsertAbortedByCache");
-  EXPECT_EQ(insertStatusToString(InsertStatus::InsertAbortedCacheCongested), "InsertAbortedCacheCongested");
-  EXPECT_EQ(insertStatusToString(InsertStatus::InsertAbortedResponseIncomplete), "InsertAbortedResponseIncomplete");
+  EXPECT_EQ(insertStatusToString(InsertStatus::InsertAbortedCacheCongested),
+            "InsertAbortedCacheCongested");
+  EXPECT_EQ(insertStatusToString(InsertStatus::InsertAbortedResponseIncomplete),
+            "InsertAbortedResponseIncomplete");
   EXPECT_EQ(insertStatusToString(InsertStatus::HeaderUpdate), "HeaderUpdate");
   EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertCacheHit), "NoInsertCacheHit");
-  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertRequestNotCacheable), "NoInsertRequestNotCacheable");
-  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertResponseNotCacheable), "NoInsertResponseNotCacheable");
-  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertRequestIncomplete), "NoInsertRequestIncomplete");
-  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertResponseValidatorsMismatch), "NoInsertResponseValidatorsMismatch");
-  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertResponseVaryMismatch), "NoInsertResponseVaryMismatch");
-  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertResponseVaryDisallowed), "NoInsertResponseVaryDisallowed");
+  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertRequestNotCacheable),
+            "NoInsertRequestNotCacheable");
+  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertResponseNotCacheable),
+            "NoInsertResponseNotCacheable");
+  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertRequestIncomplete),
+            "NoInsertRequestIncomplete");
+  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertResponseValidatorsMismatch),
+            "NoInsertResponseValidatorsMismatch");
+  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertResponseVaryMismatch),
+            "NoInsertResponseVaryMismatch");
+  EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertResponseVaryDisallowed),
+            "NoInsertResponseVaryDisallowed");
   EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertLookupError), "NoInsertLookupError");
 }
 

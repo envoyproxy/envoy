@@ -309,7 +309,7 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     return;
   }
   ENVOY_LOG(error, "Unhandled CacheEntryStatus in CacheFilter::onHeaders: {}",
-              cacheEntryStatusString(lookup_result_->cache_entry_status_));
+            cacheEntryStatusString(lookup_result_->cache_entry_status_));
   // Treat unhandled status as a cache miss.
   decoder_callbacks_->continueDecoding();
 }
@@ -601,14 +601,14 @@ LookupStatus CacheFilter::lookupStatus() const {
         return LookupStatus::StaleHitWithSuccessfulValidation;
       case FilterState::NotServingFromCache:
         return LookupStatus::StaleHitWithFailedValidation;
-        case FilterState::Initial:
-          ABSL_FALLTHROUGH_INTENDED;
-        case FilterState::DecodeServingFromCache:
-          ABSL_FALLTHROUGH_INTENDED;
-        case FilterState::Destroyed:
-          IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
-                                    "response required validation, but filter state is ",
-                                    filter_state_));
+      case FilterState::Initial:
+        ABSL_FALLTHROUGH_INTENDED;
+      case FilterState::DecodeServingFromCache:
+        ABSL_FALLTHROUGH_INTENDED;
+      case FilterState::Destroyed:
+        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
+                                  "response required validation, but filter state is ",
+                                  filter_state_));
       }
       return LookupStatus::Unknown;
     }
@@ -632,15 +632,15 @@ LookupStatus CacheFilter::lookupStatus() const {
     return LookupStatus::RequestIncomplete;
   case FilterState::NotServingFromCache:
     return LookupStatus::RequestNotCacheable;
-    case FilterState::ValidatingCachedResponse:
-      ABSL_FALLTHROUGH_INTENDED;
-    case FilterState::DecodeServingFromCache:
-            ABSL_FALLTHROUGH_INTENDED;
-                case FilterState::EncodeServingFromCache:
-                  ABSL_FALLTHROUGH_INTENDED;
-    case FilterState::ResponseServedFromCache:
-            ABSL_FALLTHROUGH_INTENDED;
-    case FilterState::Destroyed:
+  case FilterState::ValidatingCachedResponse:
+    ABSL_FALLTHROUGH_INTENDED;
+  case FilterState::DecodeServingFromCache:
+    ABSL_FALLTHROUGH_INTENDED;
+  case FilterState::EncodeServingFromCache:
+    ABSL_FALLTHROUGH_INTENDED;
+  case FilterState::ResponseServedFromCache:
+    ABSL_FALLTHROUGH_INTENDED;
+  case FilterState::Destroyed:
     IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: "
                               "lookup_result_ is empty but filter state is ",
                               filter_state_));

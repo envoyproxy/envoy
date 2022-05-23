@@ -51,7 +51,8 @@ protected:
     if (!filter_state_->hasData<CacheFilterLoggingInfo>(CacheFilterLoggingInfo::FilterStateKey)) {
       return absl::NotFoundError("cacheFilterLoggingInfo not found");
     }
-    return *filter_state_->getDataReadOnly<CacheFilterLoggingInfo>(CacheFilterLoggingInfo::FilterStateKey);
+    return *filter_state_->getDataReadOnly<CacheFilterLoggingInfo>(
+        CacheFilterLoggingInfo::FilterStateKey);
   }
 
   absl::StatusOr<LookupStatus> lookupStatus() {

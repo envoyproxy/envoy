@@ -78,7 +78,8 @@ enum class InsertStatus {
   // The CacheFilter got a 304 validation response not matching the vary header
   // fields. The cached variant set needs to be removed.
   NoInsertResponseVaryMismatch,
-  // The CacheFilter got a 304 validation response, but the vary header was disallowed by the vary allow list
+  // The CacheFilter got a 304 validation response, but the vary header was disallowed by the vary
+  // allow list
   NoInsertResponseVaryDisallowed,
   // The CacheFilter couldn't determine whether the request was in cache and
   // didn't try to insert it.
