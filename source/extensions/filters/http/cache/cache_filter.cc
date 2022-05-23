@@ -632,12 +632,20 @@ LookupStatus CacheFilter::lookupStatus() const {
     return LookupStatus::RequestIncomplete;
   case FilterState::NotServingFromCache:
     return LookupStatus::RequestNotCacheable;
-  default:
+    case FilterState::ValidatingCachedResponse:
+      ABSL_FALLTHROUGH_INTENDED;
+    case FilterState::DecodeServingFromCache:
+            ABSL_FALLTHROUGH_INTENDED;
+                case FilterState::EncodeServingFromCache:
+                  ABSL_FALLTHROUGH_INTENDED;
+    case FilterState::ResponseServedFromCache:
+            ABSL_FALLTHROUGH_INTENDED;
+    case FilterState::Destroyed:
     IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: "
                               "lookup_result_ is empty but filter state is ",
                               filter_state_));
-    return LookupStatus::Unknown;
   }
+  return LookupStatus::Unknown;
 }
 
 InsertStatus CacheFilter::insertStatus() const {
