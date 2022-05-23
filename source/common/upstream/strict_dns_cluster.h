@@ -26,7 +26,7 @@ public:
 private:
   struct ResolveTarget {
     ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
-                  const std::string& url,
+                  const std::string& dns_address, const uint32_t dns_port,
                   const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
                   const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
     ~ResolveTarget();
