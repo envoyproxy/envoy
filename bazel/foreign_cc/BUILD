@@ -493,7 +493,7 @@ envoy_cmake(
         # Workaround for the -DDEBUG flag added in fastbuild on macOS,
         # which conflicts with DEBUG macro used in LLVM.
         "CFLAGS": "-UDEBUG",
-        "CXXFLAGS": "-UDEBUG",
+        "CXXFLAGS": "-UDEBUG -Wno-error=unused-but-set-variable",
         "ASMFLAGS": "-UDEBUG",
     },
     lib_source = "@com_github_wavm_wavm//:all",

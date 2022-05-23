@@ -471,12 +471,12 @@ public:
                                Server::Configuration::TransportSocketFactoryContext&) override {
     return std::make_unique<AlpnSocketFactory>();
   }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
 };
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   AlpnTestConfigFactory alpn_factory;
   Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
       registered_factory(alpn_factory);
@@ -495,6 +495,8 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
             http_protocol_options: {}
       transport_socket:
         name: envoy.transport_sockets.alpn
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
   create(parseBootstrapFromV3Yaml(yaml));
 }

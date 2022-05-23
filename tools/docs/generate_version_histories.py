@@ -3,7 +3,6 @@ import re
 import sys
 import tarfile
 from functools import cached_property
-from typing import Tuple
 
 from frozendict import frozendict
 import jinja2
@@ -11,7 +10,8 @@ from packaging import version
 
 from aio.run import runner
 
-from project import minor_version_for, Project, VERSION_HISTORY_SECTIONS
+from envoy.base import utils
+from envoy.base.utils import IProject, Project
 
 # TODO(phlax): Move all of this to pytooling
 
@@ -95,21 +95,21 @@ Initial release date:
 """
 
 VERSION_HISTORY_TPL = """
-.. _version_history_{{ changelog.version }}:
+.. _version_history_{{ changelog.base_version }}:
 
-{{ changelog.version }} ({{ changelog.release_date }})
-{{ "=" * (changelog.version|length + changelog.release_date|length + 4) }}
+{{ changelog.base_version }} ({{ changelog.release_date }})
+{{ "=" * (changelog.base_version|length + changelog.release_date|length + 4) }}
 
 {% for name, section in sections.items() %}
 {% if changelog.data[name] %}
 {{ section.title }}
 {{ "-" * section.title|length }}
 {% if section.description %}
-{{ section.description | versionize(minor_version, current_minor_version) }}
+{{ section.description | versionize(mapped_version) }}
 {% endif %}
 
 {% for item in changelog.entries(name) -%}
-* **{{ item.area }}**: {{ item.change | versionize(minor_version, current_minor_version) | indent(width=2, first=false) }}
+* **{{ item.area }}**: {{ item.change | versionize(mapped_version) | indent(width=2, first=false) }}
 {%- endfor %}
 {% endif %}
 {%- endfor %}
@@ -117,11 +117,11 @@ VERSION_HISTORY_TPL = """
 """
 
 
-def versionize_filter(text, minor_version, current_minor_version):
+def versionize_filter(text, mapped_version):
     """Replace refinks with versioned reflinks."""
-    if minor_version >= current_minor_version:
+    if not mapped_version:
         return text
-    version_prefix = f"v{minor_version.base_version}:"
+    version_prefix = f"v{mapped_version.base_version}:"
     matches = set(REFLINK_RE.findall(text))
     replacements = []
 
@@ -139,10 +139,6 @@ def versionize_filter(text, minor_version, current_minor_version):
 
 class VersionHistories(runner.Runner):
 
-    @property
-    def changelogs(self) -> Tuple[pathlib.Path, ...]:
-        return tuple(pathlib.Path(p) for p in self.args.changelogs)
-
     @cached_property
     def jinja_env(self) -> jinja2.Environment:
         env = jinja2.Environment()
@@ -150,12 +146,12 @@ class VersionHistories(runner.Runner):
         return env
 
     @cached_property
-    def project(self) -> Project:
-        return Project(self.version_path, self.changelogs)
+    def project(self) -> IProject:
+        return Project()
 
     @cached_property
     def sections(self) -> frozendict:
-        return VERSION_HISTORY_SECTIONS
+        return self.project.changelogs.sections
 
     @cached_property
     def tpath(self) -> pathlib.Path:
@@ -173,15 +169,9 @@ class VersionHistories(runner.Runner):
     def version_history_tpl(self):
         return self.jinja_env.from_string(VERSION_HISTORY_TPL)
 
-    @cached_property
-    def version_path(self) -> pathlib.Path:
-        return pathlib.Path(self.args.version_path)
-
     def add_arguments(self, parser) -> None:
         super().add_arguments(parser)
-        parser.add_argument("version_path")
         parser.add_argument("output_file")
-        parser.add_argument("changelogs", nargs="+")
 
     def minor_index_path(self, minor_version) -> pathlib.Path:
         return self.tpath.joinpath(f"v{minor_version.base_version}").joinpath(
@@ -203,13 +193,14 @@ class VersionHistories(runner.Runner):
             self.write_version_history(changelog_version)
 
     def write_version_history(self, changelog_version: version.Version) -> None:
-        minor_version = minor_version_for(changelog_version)
+        minor_version = utils.minor_version_for(changelog_version)
         root_path = self.tpath.joinpath(f"v{minor_version.base_version}")
         root_path.mkdir(parents=True, exist_ok=True)
+        map_version = (
+            minor_version < self.project.minor_version
+            and (minor_version in self.project.inventories.versions))
         version_history = self.version_history_tpl.render(
-            current_minor_version=self.project.current_minor_version,
-            minor_version=minor_version,
-            current_version=self.project.current_version,
+            mapped_version=(minor_version if map_version else None),
             sections=self.sections,
             changelog=self.project.changelogs[changelog_version])
         version_path = root_path.joinpath(f"v{changelog_version}.rst")
@@ -255,9 +246,9 @@ class VersionHistories(runner.Runner):
             f"{version_history_minor_index.strip()}\n\n")
 
 
-def main():
-    VersionHistories(*sys.argv[1:])()
+def main(*args):
+    return VersionHistories(*args)()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(*sys.argv[1:]))

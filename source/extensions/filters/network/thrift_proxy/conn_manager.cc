@@ -51,6 +51,14 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   return Network::FilterStatus::StopIteration;
 }
 
+void ConnectionManager::emitLogEntry(const Http::RequestHeaderMap* request_headers,
+                                     const Http::ResponseHeaderMap* response_headers,
+                                     const StreamInfo::StreamInfo& stream_info) {
+  for (const auto& access_log : config_.accessLogs()) {
+    access_log->log(request_headers, response_headers, nullptr, stream_info);
+  }
+}
+
 void ConnectionManager::dispatch() {
   if (stopped_) {
     ENVOY_CONN_LOG(debug, "thrift filter stopped", read_callbacks_->connection());
@@ -256,10 +264,9 @@ void ConnectionManager::ResponseDecoder::finalizeResponse() {
   // Use the factory to get the concrete transport from the decoder transport (as opposed to
   // potentially pre-detection auto transport).
   TransportPtr transport =
-      NamedTransportConfigFactory::getFactory(parent_.parent_.decoder_->transportType())
-          .createTransport();
+      NamedTransportConfigFactory::getFactory(cm.decoder_->transportType()).createTransport();
 
-  metadata_->setProtocol(parent_.parent_.decoder_->protocolType());
+  metadata_->setProtocol(cm.decoder_->protocolType());
   transport->encodeFrame(buffer, *metadata_, parent_.response_buffer_);
   complete_ = true;
 
@@ -308,6 +315,8 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
     success_ = metadata->replyType() == ReplyType::Success;
   }
 
+  ConnectionManager& cm = parent_.parent_;
+
   // Check if the upstream host is draining.
   //
   // Note: the drain header needs to be checked here in messageBegin, and not transportBegin, so
@@ -315,8 +324,8 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   // metadata in messageBegin when reading the response from upstream. Therefore detecting a drain
   // should happen here.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
-    metadata_->setDraining(!metadata->headers().get(Headers::get().Drain).empty());
-    metadata->headers().remove(Headers::get().Drain);
+    metadata_->setDraining(!metadata->responseHeaders().get(Headers::get().Drain).empty());
+    metadata->responseHeaders().remove(Headers::get().Drain);
 
     // Check if this host itself is draining.
     //
@@ -324,14 +333,28 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
     // should be set before the encodeFrame() call. It should be set at or after the messageBegin
     // call so that the header is added after all upstream headers passed, due to messageBegin
     // possibly not getting headers in transportBegin.
-    ConnectionManager& cm = parent_.parent_;
     if (cm.drain_decision_.drainClose()) {
       // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
       // over)?
-      metadata->headers().addReferenceKey(Headers::get().Drain, "true");
-      parent_.parent_.stats_.downstream_response_drain_close_.inc();
+      metadata->responseHeaders().addReferenceKey(Headers::get().Drain, "true");
+      cm.stats_.downstream_response_drain_close_.inc();
     }
   }
+
+  ProtobufWkt::Struct stats_obj;
+  auto& fields_map = *stats_obj.mutable_fields();
+  auto& response_fields_map = *fields_map["response"].mutable_struct_value()->mutable_fields();
+
+  response_fields_map["transport_type"] =
+      ValueUtil::stringValue(TransportNames::get().fromType(decoder_->transportType()));
+  response_fields_map["protocol_type"] =
+      ValueUtil::stringValue(ProtocolNames::get().fromType(decoder_->protocolType()));
+  response_fields_map["message_type"] = ValueUtil::stringValue(
+      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
+  response_fields_map["reply_type"] = ValueUtil::stringValue(
+      metadata->hasReplyType() ? ReplyTypeNames::get().fromType(metadata->replyType()) : "-");
+
+  parent_.streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
 
   return parent_.applyEncoderFilters(DecoderEvent::MessageBegin, metadata, protocol_converter_);
 }
@@ -770,14 +793,35 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
   original_sequence_id_ = metadata_->sequenceId();
   original_msg_type_ = metadata_->messageType();
 
+  auto& connection = parent_.read_callbacks_->connection();
+
   if (metadata_->isProtocolUpgradeMessage()) {
     ASSERT(parent_.protocol_->supportsUpgrade());
 
-    ENVOY_CONN_LOG(debug, "thrift: decoding protocol upgrade request",
-                   parent_.read_callbacks_->connection());
+    ENVOY_CONN_LOG(debug, "thrift: decoding protocol upgrade request", connection);
     upgrade_handler_ = parent_.protocol_->upgradeRequestDecoder();
     ASSERT(upgrade_handler_ != nullptr);
   }
+
+  const auto& route_ptr = route();
+
+  ProtobufWkt::Struct stats_obj;
+  auto& fields_map = *stats_obj.mutable_fields();
+  fields_map["cluster"] =
+      ValueUtil::stringValue(route_ptr ? route_ptr->routeEntry()->clusterName() : "-");
+  fields_map["method"] =
+      ValueUtil::stringValue(metadata->hasMethodName() ? metadata->methodName() : "-");
+  fields_map["passthrough"] = ValueUtil::stringValue(passthroughSupported() ? "true" : "false");
+
+  auto& request_fields_map = *fields_map["request"].mutable_struct_value()->mutable_fields();
+  request_fields_map["transport_type"] =
+      ValueUtil::stringValue(TransportNames::get().fromType(downstreamTransportType()));
+  request_fields_map["protocol_type"] =
+      ValueUtil::stringValue(ProtocolNames::get().fromType(parent_.decoder_->protocolType()));
+  request_fields_map["message_type"] = ValueUtil::stringValue(
+      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
+
+  streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
 
   return applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
 }

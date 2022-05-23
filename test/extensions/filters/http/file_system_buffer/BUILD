@@ -1,17 +1,20 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# TODO(ravenblack): switch all of these to extension targets when extension is named
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "fragment_test",
     srcs = ["fragment_test.cc"],
+    extension_names = ["envoy.filters.http.file_system_buffer"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:fragment",
@@ -21,12 +24,13 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "file_system_buffer_test",
     srcs = [
         "config_test.cc",
         "filter_test.cc",
     ],
+    extension_names = ["envoy.filters.http.file_system_buffer"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:config",
@@ -36,11 +40,12 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "file_system_buffer_integration_test",
     srcs = [
         "filter_integration_test.cc",
     ],
+    extension_names = ["envoy.filters.http.file_system_buffer"],
     shard_count = 2,
     tags = ["skip_on_windows"],
     deps = [
