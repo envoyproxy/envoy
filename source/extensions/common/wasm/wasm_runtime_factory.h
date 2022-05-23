@@ -12,14 +12,12 @@ namespace Wasm {
 
 using WasmVmPtr = std::unique_ptr<proxy_wasm::WasmVm>;
 
-class WasmRuntimeFactory {
+class WasmRuntimeFactory : public Config::UntypedFactory {
 public:
   virtual ~WasmRuntimeFactory() = default;
   virtual WasmVmPtr createWasmVm() PURE;
 
-  virtual absl::string_view name() PURE;
-
-  std::string category() { return "envoy.wasm.runtime"; }
+  std::string category() const override { return "envoy.wasm.runtime"; }
 };
 
 } // namespace Wasm

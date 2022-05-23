@@ -16,7 +16,7 @@ namespace Tls {
 
 std::string getCertValidatorName(const Envoy::Ssl::CertificateValidationContextConfig* config);
 
-class CertValidatorFactory {
+class CertValidatorFactory : public Config::UntypedFactory {
 public:
   virtual ~CertValidatorFactory() = default;
 
@@ -24,9 +24,7 @@ public:
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       TimeSource& time_source) PURE;
 
-  virtual absl::string_view name() PURE;
-
-  std::string category() { return "envoy.tls.cert_validator"; }
+  std::string category() const override { return "envoy.tls.cert_validator"; }
 };
 
 } // namespace Tls

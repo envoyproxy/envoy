@@ -132,8 +132,6 @@ message Extension {
   bool disabled = 5;
 
   // Type URLs of extension configuration proto.
-  // [#comment:TODO(yanavlasov): Link to the doc with existing configuration protos.]
-  // [#comment:TODO(yanavlasov): Add tests when PR #9391 lands.]
   repeated string type_urls = 6;
 }
 
