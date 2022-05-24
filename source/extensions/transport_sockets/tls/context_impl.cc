@@ -487,13 +487,12 @@ ContextImpl::customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_s
                                    const Network::TransportSocketOptions* transport_socket_options,
                                    SSL* ssl, std::string* error_details, uint8_t* out_alert) {
   ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation"));
+  ASSERT(extended_socket_info);
   STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
   if (cert_chain == nullptr) {
     *out_alert = SSL_AD_INTERNAL_ERROR;
-    if (extended_socket_info) {
-      extended_socket_info->setCertificateValidationStatus(
-          Envoy::Ssl::ClientValidationStatus::NotValidated);
-    }
+    extended_socket_info->setCertificateValidationStatus(
+        Envoy::Ssl::ClientValidationStatus::NotValidated);
     stats_.fail_verify_error_.inc();
     ENVOY_LOG(debug, "verify cert failed: no cert chain");
     return Ssl::ValidateResult::Failed;
@@ -504,11 +503,11 @@ ContextImpl::customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_s
   absl::string_view ech_name_override(name, name_len);
   ASSERT(cert_validator_);
   // Do not provide async callback here, but defer its creation to extended_socket_info if the
-  // vadlidation is async.
+  // validation is async.
   Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
       *cert_chain, nullptr, extended_socket_info, transport_socket_options, SSL_get_SSL_CTX(ssl),
       ech_name_override, SSL_is_server(ssl), error_details, out_alert);
-  if (result != Ssl::ValidateResult::Pending && extended_socket_info != nullptr) {
+  if (result != Ssl::ValidateResult::Pending) {
     extended_socket_info->onCertificateValidationCompleted(result ==
                                                            Ssl::ValidateResult::Successful);
   }
