@@ -148,10 +148,6 @@ public:
 enum class LocalErrorStatus {
   // Continue sending the local reply after onLocalError has been sent to all filters.
   Continue,
-
-  // Continue sending onLocalReply to all filters, but reset the stream once all filters have been
-  // informed rather than sending the local reply.
-  ContinueAndResetStream,
 };
 
 /**
@@ -171,12 +167,11 @@ public:
    * from onLocalReply, as that has the potential for looping.
    *
    * @param metadata response metadata.
-   * @param reset_imminent True if a reset will occur rather than the local reply (some prior filter
-   *                       has returned ContinueAndResetStream)
+   * @param reset_imminent True if the downstream connection should be closed after this response
    * @param LocalErrorStatus the action to take after onLocalError completes.
    */
   virtual LocalErrorStatus onLocalReply([[maybe_unused]] const MessageMetadata& metadata,
-                                        [[maybe_unused]] bool reset_imminent) {
+                                        [[maybe_unused]] bool end_stream) {
     return LocalErrorStatus::Continue;
   }
 

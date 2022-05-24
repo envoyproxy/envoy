@@ -270,7 +270,7 @@ private:
     ProtocolType downstreamProtocolType() const override {
       return parent_.decoder_->protocolType();
     }
-    bool onLocalReply(const MessageMetadata& metadata, bool reset_imminent);
+    void onLocalReply(const MessageMetadata& metadata, bool end_stream);
     void sendLocalReply(const DirectResponse& response, bool end_stream) override;
     void startUpstreamResponse(Transport& transport, Protocol& protocol) override;
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
