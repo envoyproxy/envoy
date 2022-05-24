@@ -18,7 +18,8 @@ enum class LookupStatus {
   // The CacheFilter didn't find a response in cache.
   CacheMiss,
   // The CacheFilter found a stale response, and sent a validation request to
-  // the upstream; the upstream responded with a 304 Not Modified.
+  // the upstream; the upstream responded with a 304 Not Modified. This is
+  // functionally a cache hit. It is differentiated for metrics reporting.
   StaleHitWithSuccessfulValidation,
   // The CacheFilter found a stale response, and sent a validation request to
   // the upstream; the upstream responded with anything other than a 304 Not

@@ -127,6 +127,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
     }
+    // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the insertion yet.
   } else {
     insert_status_ = InsertStatus::NoInsertResponseNotCacheable;
   }
@@ -152,6 +153,7 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
     }
+    // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the insertion yet.
   }
   return Http::FilterDataStatus::Continue;
 }
@@ -597,7 +599,9 @@ LookupStatus CacheFilter::lookupStatus() const {
       case FilterState::ValidatingCachedResponse:
         return LookupStatus::RequestIncomplete;
       case FilterState::EncodeServingFromCache:
+        ABSL_FALLTHROUGH_INTENDED;
       case FilterState::ResponseServedFromCache:
+        // Functionally a cache hit, this is differentiated for metrics reporting.
         return LookupStatus::StaleHitWithSuccessfulValidation;
       case FilterState::NotServingFromCache:
         return LookupStatus::StaleHitWithFailedValidation;
