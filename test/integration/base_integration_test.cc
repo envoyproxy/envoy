@@ -698,11 +698,27 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
   return AssertionSuccess();
 }
 
+// Attempt to heuristically discover missing tag-extraction rules when new stats are added.
+// This is done by looking through the entire config for fields named `stat_prefix`, and then
+// validating that those values do not appear in the tag-extracted name of any stat.
+//
+// To add a rule, see `source/common/config/well_known_names.cc`.
+//
+// This is done in all integration tests because it is testing new stats and scopes that are created
+// for which the author isn't aware that tag extraction rules need to be written, and thus the
+// author wouldn't think to write tests for that themselves.
 void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
   ASSERT_TRUE(response->complete());
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  Json::ObjectSharedPtr json;
+  try {
+    json = Json::Factory::loadFromString(response->body());
+  } catch (const std::exception&) {
+    // There are a few integration tests that result in the output being an error message instead of
+    // valid JSON. Skip this test for those cases.
+    return;
+  }
   std::vector<std::string> stat_prefixes;
   Json::ObjectCallback find_stat_prefix = [&](const std::string& name,
                                               const Json::Object& root) -> bool {
@@ -724,19 +740,18 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   find_stat_prefix("", *json);
   ENVOY_LOG_MISC(debug, "discovered stat_prefixes {}", stat_prefixes);
 
-  auto check_metric_array = [&](auto vec) {
-    for (const auto& metric : vec) {
-      const std::string tag_extracted_name = metric->tagExtractedName();
-      for (const std::string& stat_prefix : stat_prefixes) {
-        EXPECT_EQ(tag_extracted_name.find(stat_prefix), std::string::npos)
-            << "Missing stat tag-extraction rule for stat '" << tag_extracted_name
-            << "' and stat_prefix '" << stat_prefix << "'";
-      }
+  auto check_metric = [&](auto& metric) {
+    // Validate that the `stat_prefix` string doesn't appear in the tag-extracted name, indicating
+    // that it wasn't extracted.
+    const std::string tag_extracted_name = metric.tagExtractedName();
+    for (const std::string& stat_prefix : stat_prefixes) {
+      EXPECT_EQ(tag_extracted_name.find(stat_prefix), std::string::npos)
+          << "Missing stat tag-extraction rule for stat '" << tag_extracted_name
+          << "' and stat_prefix '" << stat_prefix << "'";
     }
   };
-  check_metric_array(test_server_->counters());
-  check_metric_array(test_server_->gauges());
-  check_metric_array(test_server_->histograms());
+  test_server_->statStore().forEachCounter(nullptr, check_metric);
+  test_server_->statStore().forEachGauge(nullptr, check_metric);
+  test_server_->statStore().forEachHistogram(nullptr, check_metric);
 }
-
 } // namespace Envoy
