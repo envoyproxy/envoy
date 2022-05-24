@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 
 #include "gtest/gtest.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -8,7 +9,7 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-TEST(Coverage, StatusToString) {
+TEST(Coverage, LookupStatusToString) {
   EXPECT_EQ(lookupStatusToString(LookupStatus::Unknown), "Unknown");
   EXPECT_EQ(lookupStatusToString(LookupStatus::CacheHit), "CacheHit");
   EXPECT_EQ(lookupStatusToString(LookupStatus::CacheMiss), "CacheMiss");
@@ -20,7 +21,10 @@ TEST(Coverage, StatusToString) {
   EXPECT_EQ(lookupStatusToString(LookupStatus::RequestNotCacheable), "RequestNotCacheable");
   EXPECT_EQ(lookupStatusToString(LookupStatus::RequestIncomplete), "RequestIncomplete");
   EXPECT_EQ(lookupStatusToString(LookupStatus::LookupError), "LookupError");
+  EXPECT_ENVOY_BUG(lookupStatusToString(static_cast<LookupStatus>(99)), "Unexpected LookupStatus");
+}
 
+TEST(Coverage, InsertStatusToString) {
   EXPECT_EQ(insertStatusToString(InsertStatus::InsertSucceeded), "InsertSucceeded");
   EXPECT_EQ(insertStatusToString(InsertStatus::InsertAbortedByCache), "InsertAbortedByCache");
   EXPECT_EQ(insertStatusToString(InsertStatus::InsertAbortedCacheCongested),
@@ -42,6 +46,7 @@ TEST(Coverage, StatusToString) {
   EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertResponseVaryDisallowed),
             "NoInsertResponseVaryDisallowed");
   EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertLookupError), "NoInsertLookupError");
+  EXPECT_ENVOY_BUG(insertStatusToString(static_cast<InsertStatus>(99)), "Unexpected InsertStatus");
 }
 
 TEST(Coverage, StatusStream) {

@@ -28,7 +28,8 @@ absl::string_view lookupStatusToString(LookupStatus status) {
   case LookupStatus::LookupError:
     return "LookupError";
   }
-  return "UnknownLookupStatus";
+  IS_ENVOY_BUG(absl::StrCat("Unexpected LookupStatus: ", status));
+  return "UnexpectedLookupStatus";
 }
 
 std::ostream& operator<<(std::ostream& os, const LookupStatus& request_cache_status) {
@@ -64,7 +65,8 @@ absl::string_view insertStatusToString(InsertStatus status) {
   case InsertStatus::NoInsertLookupError:
     return "NoInsertLookupError";
   }
-  return "UnknownInsertStatus";
+  IS_ENVOY_BUG(absl::StrCat("Unexpected InsertStatus: ", status));
+  return "UnexpectedInsertStatus";
 }
 
 std::ostream& operator<<(std::ostream& os, const InsertStatus& cache_insert_status) {

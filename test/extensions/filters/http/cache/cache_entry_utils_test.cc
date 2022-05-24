@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 
 #include "gtest/gtest.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,6 +15,7 @@ TEST(Coverage, CacheEntryStatusString) {
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::RequiresValidation), "RequiresValidation");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::FoundNotModified), "FoundNotModified");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::LookupError), "LookupError");
+  EXPECT_ENVOY_BUG(cacheEntryStatusString(static_cast<CacheEntryStatus>(99)), "Unexpected CacheEntryStatus");
 }
 
 TEST(Coverage, CacheEntryStatusStream) {
