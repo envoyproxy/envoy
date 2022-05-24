@@ -6377,6 +6377,10 @@ TEST_P(SslSocketTest, Sni) {
 }
 
 TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+    return;
+  }
+
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -6416,6 +6420,10 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
 }
 
 TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+    return;
+  }
+
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:

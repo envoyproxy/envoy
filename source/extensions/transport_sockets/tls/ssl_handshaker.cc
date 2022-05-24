@@ -5,6 +5,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
 
 using Envoy::Network::PostIoAction;
@@ -47,6 +48,7 @@ void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded)
   cert_validation_result_ =
       succeeded ? Ssl::ValidateResult::Successful : Ssl::ValidateResult::Failed;
   if (cert_validate_result_callback_.has_value()) {
+    ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation"));
     // This is an async cert validation.
     cert_validate_result_callback_.reset();
     // Resume handshake.

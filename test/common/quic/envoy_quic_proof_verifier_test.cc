@@ -124,6 +124,9 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainSuccess) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+    return;
+  }
   custom_validator_config_ = envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
@@ -232,6 +235,10 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainFailureInvalidHost) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+    return;
+  }
+
   custom_validator_config_ = envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"

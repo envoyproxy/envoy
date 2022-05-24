@@ -173,8 +173,13 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   if (!capabilities_.verifies_peer_certificates) {
     for (auto ctx : ssl_contexts) {
       if (verify_mode != SSL_VERIFY_NONE) {
-        SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
-        SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+          SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
+          SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
+        } else {
+          SSL_CTX_set_verify(ctx, verify_mode, nullptr);
+          SSL_CTX_set_cert_verify_callback(ctx, verifyCallback, this);
+        }
       }
     }
   }
@@ -481,6 +486,7 @@ Ssl::ValidateResult
 ContextImpl::customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
                                    const Network::TransportSocketOptions* transport_socket_options,
                                    SSL* ssl, std::string* error_details, uint8_t* out_alert) {
+  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation"));
   STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
   if (cert_chain == nullptr) {
     *out_alert = SSL_AD_INTERNAL_ERROR;
@@ -1251,6 +1257,7 @@ Ssl::ValidateResult ContextImpl::customVerifyCertChainForQuic(
     STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
     const Network::TransportSocketOptions* transport_socket_options,
     absl::string_view ech_name_override, std::string* error_details, uint8_t* out_alert) {
+  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation"));
   Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
       cert_chain, std::move(callback), /*extended_socket_info=*/nullptr, transport_socket_options,
       tls_contexts_[0].ssl_ctx_.get(), ech_name_override, is_server, error_details, out_alert);

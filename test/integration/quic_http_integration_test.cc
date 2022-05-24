@@ -906,6 +906,10 @@ TEST_P(QuicHttpIntegrationTest, NoStreams) {
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationSucceeds) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+    return;
+  }
+
   // Config the client to defer cert validation by 5ms.
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
@@ -922,6 +926,10 @@ typed_config:
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationAfterDisconnect) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+    return;
+  }
+
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
@@ -959,6 +967,10 @@ typed_config:
 }
 
 TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationAfterTearDown) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+    return;
+  }
+
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
       new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
