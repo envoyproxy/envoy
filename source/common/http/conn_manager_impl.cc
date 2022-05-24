@@ -251,7 +251,8 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   bool connection_close = stream.state_.saw_connection_close_;
   bool request_complete = stream.filter_manager_.remoteDecodeComplete();
 
-  checkForDeferredClose((connection_close && (request_complete || http_10_sans_cl)) || stream.state_.is_tunneling_);
+  checkForDeferredClose((connection_close && (request_complete || http_10_sans_cl)) ||
+                        stream.state_.is_tunneling_);
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
