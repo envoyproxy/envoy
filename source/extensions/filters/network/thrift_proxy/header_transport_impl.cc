@@ -133,7 +133,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
   }
 
   const bool is_request = metadata.isRequest();
-  Envoy::Http::StatefulHeaderKeyFormatterOptRef formatter =
+  auto formatter =
       is_request ? metadata.requestHeaders().formatter() : metadata.responseHeaders().formatter();
 
   while (header_size > 0) {
@@ -228,7 +228,8 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
     // Num headers
     BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers_size));
 
-    const auto formatter = headers.formatter();
+    auto formatter = metadata.isRequest() ? metadata.requestHeaders().formatter()
+                                          : metadata.responseHeaders().formatter();
 
     auto header_writer = [&header_buffer,
                           formatter](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
