@@ -41,7 +41,8 @@ public:
                                 Event::Dispatcher& dispatcher,
                                 Network::ConnectionSocketPtr&& connection_socket)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
-                                  supported_versions, dispatcher, std::move(connection_socket)) {
+                                  supported_versions, dispatcher, std::move(connection_socket),
+                                  nullptr) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
@@ -76,7 +77,7 @@ public:
                             quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
                             *dispatcher_,
                             /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_,
-                            quic_stat_names_, {}, store_),
+                            quic_stat_names_, {}, store_, nullptr),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}),
         http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,

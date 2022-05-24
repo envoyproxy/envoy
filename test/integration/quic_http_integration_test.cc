@@ -150,12 +150,12 @@ public:
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
     // Setting socket options is not supported.
-    ASSERT(!options);
-    return makeClientConnectionWithHost(port, "");
+    return makeClientConnectionWithHost(port, "", options);
   }
 
-  Network::ClientConnectionPtr makeClientConnectionWithHost(uint32_t port,
-                                                            const std::string& host) {
+  Network::ClientConnectionPtr
+  makeClientConnectionWithHost(uint32_t port, const std::string& host,
+                               const Network::ConnectionSocket::OptionConstSharedPtr& options) {
     // Setting socket options is not supported.
     server_addr_ = Network::Utility::resolveUrl(
         fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -183,7 +183,7 @@ public:
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
-        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_);
+        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_, nullptr);
     return session;
   }
 
