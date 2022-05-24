@@ -12,7 +12,7 @@ namespace Http {
 namespace Matching {
 
 TEST(MatchingData, HttpRequestHeadersDataInput) {
-  HttpRequestHeadersDataInput<HttpMatchingData> input("header");
+  HttpRequestHeadersDataInput input("header");
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
@@ -36,7 +36,7 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
 }
 
 TEST(MatchingData, HttpRequestTrailersDataInput) {
-  HttpRequestTrailersDataInput<HttpMatchingData> input("header");
+  HttpRequestTrailersDataInput input("header");
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
@@ -60,7 +60,7 @@ TEST(MatchingData, HttpRequestTrailersDataInput) {
 }
 
 TEST(MatchingData, HttpResponseHeadersDataInput) {
-  HttpResponseHeadersDataInput<HttpMatchingData> input("header");
+  HttpResponseHeadersDataInput input("header");
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
@@ -84,7 +84,7 @@ TEST(MatchingData, HttpResponseHeadersDataInput) {
 }
 
 TEST(MatchingData, HttpResponseTrailersDataInput) {
-  HttpResponseTrailersDataInput<HttpMatchingData> input("header");
+  HttpResponseTrailersDataInput input("header");
   Network::ConnectionInfoSetterImpl connection_info_provider(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
