@@ -61,6 +61,10 @@ public:
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
+    ON_CALL(file_system_, fileReadToEnd(_))
+        .WillByDefault(Invoke([&](const std::string& file) -> std::string {
+          return api_->fileSystem().fileReadToEnd(file);
+        }));
     ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
     // Here we setup runtime to mimic the actual deprecated feature list used in the
