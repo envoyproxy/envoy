@@ -41,6 +41,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
+#include "source/extensions/early_data/default_early_data_policy.h"
 
 namespace Envoy {
 namespace Http {
@@ -282,6 +283,8 @@ private:
     bool includeAttemptCountInResponse() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     const std::string& routeName() const override { return route_name_; }
+    const Router::EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
+
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
     std::unique_ptr<Router::RetryPolicy> retry_policy_;
 
@@ -298,6 +301,9 @@ private:
     absl::optional<std::chrono::milliseconds> timeout_;
     static const absl::optional<ConnectConfig> connect_config_nullopt_;
     const std::string route_name_;
+    // Pass early data option config through StreamOptions.
+    std::unique_ptr<Router::EarlyDataPolicy> early_data_policy_{
+        new Router::DefaultEarlyDataPolicy(true)};
   };
 
   struct RouteImpl : public Router::Route {
