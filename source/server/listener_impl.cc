@@ -823,7 +823,8 @@ bool ListenerImpl::createNetworkFilterChain(
 }
 
 bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {
-  return Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_);
+  return Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_,
+                                                             listenerScope());
 }
 
 void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManager& manager,

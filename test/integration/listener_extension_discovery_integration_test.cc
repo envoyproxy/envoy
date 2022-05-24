@@ -24,8 +24,10 @@ public:
                         bool set_default_config = true, bool rate_limit = false) {
     config_helper_.addConfigModifier([name, apply_without_warming, set_default_config, rate_limit,
                                       this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* listener_filter =
-          bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      listener->set_stat_prefix("listener_stat");
+      auto* listener_filter = listener->add_listener_filters();
+
       listener_filter->set_name(name);
 
       auto* discovery = listener_filter->mutable_config_discovery();
@@ -210,13 +212,21 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   // The missing config listener filter will be installed to handle the connection.
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 2);
-  EXPECT_LOG_CONTAINS("warn", "Close socket and stop the iteration onAccept.", {
-    IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
-    auto result = tcp_client->write(data_);
-    if (result) {
-      tcp_client->waitForDisconnect();
-    }
-  });
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
+  auto result = tcp_client->write(data_);
+  if (result) {
+    tcp_client->waitForDisconnect();
+  }
+  // The config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.config_missing", 1);
+
+  // Send the data again. The config_missing stats counter increases to 2.
+  tcp_client = makeTcpConnection(lookupPort(port_name_));
+  result = tcp_client->write(data_);
+  if (result) {
+    tcp_client->waitForDisconnect();
+  }
+  test_server_->waitForCounterGe("listener.listener_stat.config_missing", 2);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
@@ -267,13 +277,13 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", 1);
   // The missing config filter will be installed and close the connection when a correction is
   // created.
-  EXPECT_LOG_CONTAINS("warn", "Close socket and stop the iteration onAccept.", {
-    IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
-    auto result = tcp_client->write(data_);
-    if (result) {
-      tcp_client->waitForDisconnect();
-    }
-  });
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
+  auto result = tcp_client->write(data_);
+  if (result) {
+    tcp_client->waitForDisconnect();
+  }
+  // The config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.config_missing", 1);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {

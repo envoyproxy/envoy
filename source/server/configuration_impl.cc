@@ -38,16 +38,29 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
   return filter_manager.initializeReadFilters();
 }
 
+/**
+ * All missing listener config stats. @see stats_macros.h
+ */
+#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(config_missing)
+/**
+ * Struct definition for all missing listener config stats. @see stats_macros.h
+ */
+struct MissingListenerConfigStats {
+  ALL_MISSING_LISTENER_CONFIG_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 class MissingConfigTcpListenerFilter : public Network::ListenerFilter,
                                        public Logger::Loggable<Logger::Id::filter> {
 public:
-  MissingConfigTcpListenerFilter() = default;
+  MissingConfigTcpListenerFilter(Stats::Scope& stats_scope)
+      : scope_(stats_scope), stats_({ALL_MISSING_LISTENER_CONFIG_STATS(POOL_COUNTER(scope_))}) {}
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
-    ENVOY_LOG(warn, "Listener filter: new connection accepted while missing configuration. "
-                    "Close socket and stop the iteration onAccept.");
+    ENVOY_LOG(debug, "Listener filter: new connection accepted while missing configuration. "
+                     "Close socket and stop the iteration onAccept.");
     cb.socket().ioHandle().close();
+    stats_.config_missing_.inc();
     return Network::FilterStatus::StopIteration;
   }
   Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
@@ -55,10 +68,15 @@ public:
     return Network::FilterStatus::StopIteration;
   }
   size_t maxReadBytes() const override { return 0; }
+
+private:
+  Stats::Scope& scope_;
+  MissingListenerConfigStats stats_;
 };
 
 bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter_manager,
-                                          const Filter::ListenerFilterFactoriesList& factories) {
+                                          const Filter::ListenerFilterFactoriesList& factories,
+                                          Stats::Scope& stats_scope) {
   bool added_missing_config_filter = false;
   for (const auto& filter_config_provider : factories) {
     auto config = filter_config_provider->config();
@@ -67,14 +85,12 @@ bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter
       config_value(filter_manager);
       continue;
     }
+
     // If a filter config is missing after warming, stop iteration.
     if (!added_missing_config_filter) {
-      ENVOY_LOG_MISC(trace, "Missing filter config for a provider {}",
-                     filter_config_provider->name());
-      filter_manager.addAcceptFilter(nullptr, std::make_unique<MissingConfigTcpListenerFilter>());
+      filter_manager.addAcceptFilter(nullptr,
+                                     std::make_unique<MissingConfigTcpListenerFilter>(stats_scope));
       added_missing_config_filter = true;
-    } else {
-      ENVOY_LOG_MISC(trace, "Provider {} missing a filter config", filter_config_provider->name());
     }
   }
 
