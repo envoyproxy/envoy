@@ -43,6 +43,7 @@ public:
   virtual bool payloadPassthrough() const PURE;
   virtual uint64_t maxRequestsPerConnection() const PURE;
   virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
+  virtual bool headerKeysPreserveCase() const PURE;
 };
 
 /**
@@ -71,6 +72,7 @@ public:
   DecoderEventHandler& newDecoderEventHandler() override;
   bool passthroughEnabled() const override;
   bool isRequest() const override { return true; }
+  bool headerKeysPreserveCase() const override;
 
 private:
   struct ActiveRpc;
@@ -116,6 +118,7 @@ private:
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
     bool passthroughEnabled() const override;
     bool isRequest() const override { return false; }
+    bool headerKeysPreserveCase() const override;
 
     void finalizeResponse();
 
