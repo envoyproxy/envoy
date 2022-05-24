@@ -28,7 +28,13 @@ public:
 
   std::shared_ptr<Context> createFilter() {
     Wasm* wasm = nullptr;
+    if (!tls_slot_->currentThreadRegistered()) {
+      return nullptr;
+    }
     PluginHandleSharedPtr handle = tls_slot_->get()->handle();
+    if (!handle) {
+      return nullptr;
+    }
     if (handle->wasmHandle()) {
       wasm = handle->wasmHandle()->wasm().get();
     }
