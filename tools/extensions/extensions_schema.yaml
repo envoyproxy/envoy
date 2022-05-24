@@ -82,6 +82,7 @@ categories:
 - envoy.transport_sockets.upstream
 - envoy.tls.cert_validator
 - envoy.upstreams
+- envoy.udp_packet_writer
 - envoy.wasm.runtime
 - envoy.common.key_value
 - envoy.network.dns_resolver
