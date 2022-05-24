@@ -41,7 +41,7 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
 /**
  * All missing listener config stats. @see stats_macros.h
  */
-#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(config_missing)
+#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(extension_config_missing)
 /**
  * Struct definition for all missing listener config stats. @see stats_macros.h
  */
@@ -60,7 +60,7 @@ public:
     ENVOY_LOG(debug, "Listener filter: new connection accepted while missing configuration. "
                      "Close socket and stop the iteration onAccept.");
     cb.socket().ioHandle().close();
-    stats_.config_missing_.inc();
+    stats_.extension_config_missing_.inc();
     return Network::FilterStatus::StopIteration;
   }
   Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {

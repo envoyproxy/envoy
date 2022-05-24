@@ -158,7 +158,7 @@ public:
   }
 
   virtual const std::string getFilterType() const PURE;
-  virtual const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const PURE;
+  virtual const Network::ListenerFilterMatcherSharedPtr getFilterMatcher() const { return nullptr; }
   virtual const std::string getConfigReloadCounter() const PURE;
   virtual const std::string getConfigFailCounter() const PURE;
 
@@ -175,20 +175,13 @@ class HttpFilterConfigDiscoveryImplTest
                                            HttpFilterConfigProviderManagerImpl,
                                            envoy::extensions::filters::http::router::v3::Router> {
 public:
-  HttpFilterConfigDiscoveryImplTest() : matcher_(nullptr) {}
-
   const std::string getFilterType() const override { return "http"; }
-  const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
-    return matcher_;
-  }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.http_filter.foo.config_reload";
   }
   const std::string getConfigFailCounter() const override {
     return "extension_config_discovery.http_filter.foo.config_fail";
   }
-
-  const Network::ListenerFilterMatcherSharedPtr matcher_;
 };
 
 // TCP listener filter test
@@ -198,20 +191,13 @@ class TcpListenerFilterConfigDiscoveryImplTest
           TcpListenerFilterConfigProviderManagerImpl,
           ::test::integration::filters::TestInspectorFilterConfig> {
 public:
-  TcpListenerFilterConfigDiscoveryImplTest() : matcher_(nullptr) {}
-
   const std::string getFilterType() const override { return "listener"; }
-  const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
-    return matcher_;
-  }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.tcp_listener_filter.foo.config_reload";
   }
   const std::string getConfigFailCounter() const override {
     return "extension_config_discovery.tcp_listener_filter.foo.config_fail";
   }
-
-  const Network::ListenerFilterMatcherSharedPtr matcher_;
 };
 
 // UDP listener filter test
@@ -221,20 +207,13 @@ class UdpListenerFilterConfigDiscoveryImplTest
           UdpListenerFilterConfigProviderManagerImpl,
           test::integration::filters::TestUdpListenerFilterConfig> {
 public:
-  UdpListenerFilterConfigDiscoveryImplTest() : matcher_(nullptr) {}
-
   const std::string getFilterType() const override { return "listener"; }
-  const Network::ListenerFilterMatcherSharedPtr& getFilterMatcher() const override {
-    return matcher_;
-  }
   const std::string getConfigReloadCounter() const override {
     return "extension_config_discovery.udp_listener_filter.foo.config_reload";
   }
   const std::string getConfigFailCounter() const override {
     return "extension_config_discovery.udp_listener_filter.foo.config_fail";
   }
-
-  const Network::ListenerFilterMatcherSharedPtr matcher_;
 };
 
 /***************************************************************************************

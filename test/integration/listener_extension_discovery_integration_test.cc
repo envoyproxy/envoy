@@ -217,16 +217,16 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   if (result) {
     tcp_client->waitForDisconnect();
   }
-  // The config_missing stats counter increases by 1.
-  test_server_->waitForCounterGe("listener.listener_stat.config_missing", 1);
+  // The extension_config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 1);
 
-  // Send the data again. The config_missing stats counter increases to 2.
+  // Send the data again. The extension_config_missing stats counter increases to 2.
   tcp_client = makeTcpConnection(lookupPort(port_name_));
   result = tcp_client->write(data_);
   if (result) {
     tcp_client->waitForDisconnect();
   }
-  test_server_->waitForCounterGe("listener.listener_stat.config_missing", 2);
+  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 2);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
@@ -282,8 +282,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   if (result) {
     tcp_client->waitForDisconnect();
   }
-  // The config_missing stats counter increases by 1.
-  test_server_->waitForCounterGe("listener.listener_stat.config_missing", 1);
+  // The extension_config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 1);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {

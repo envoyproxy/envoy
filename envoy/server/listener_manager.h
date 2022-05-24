@@ -20,7 +20,6 @@
 
 namespace Envoy {
 namespace Filter {
-
 class TcpListenerFilterConfigProviderManagerImpl;
 } // namespace Filter
 
