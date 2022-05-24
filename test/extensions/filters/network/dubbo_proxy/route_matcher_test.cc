@@ -1186,7 +1186,8 @@ routes:
     EXPECT_EQ(hv2, mmc[1]->value());
   }
 
-  // 'metadata_match' of both weighted cluster and route action are configured and with same metadata entry key.
+  // 'metadata_match' of both weighted cluster and route action are configured and with same
+  // metadata entry key.
   {
     RouteConstSharedPtr route = matcher.route(metadata, 5001);
     EXPECT_NE(nullptr, route);
