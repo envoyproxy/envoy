@@ -41,4 +41,4 @@ done
 # shellcheck disable=SC2035
 # TODO(mattklein123): I can't make this work when using the shellcheck suggestions. Try
 # to fix this.
-(cd "$OUT_DIR"; tar -hcvf example_configs.tar -- $(ls *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.wasm lib/*.lua 2>/dev/null)) &> /dev/null
+(cd "$OUT_DIR"; tar -hcf example_configs.tar -- $(ls *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.wasm lib/*.lua 2>/dev/null))
