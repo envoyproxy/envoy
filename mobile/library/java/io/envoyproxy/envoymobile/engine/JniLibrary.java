@@ -340,4 +340,30 @@ public class JniLibrary {
    * @return The resulting status of the operation.
    */
   protected static native int setPreferredNetwork(long engine, int network);
+
+  /**
+   * Mimic a call to AndroidNetworkLibrary#verifyServerCertificates from native code.
+   * To be used for testing only.
+   *
+   * @param certChain The ASN.1 DER encoded bytes for certificates.
+   * @param authType The key exchange algorithm name (e.g. RSA).
+   * @param host The hostname of the server.
+   * @return Android certificate verification result code.
+   */
+  public static native Object callCertificateVerificationFromNative(byte[][] certChain,
+                                                                    byte[] authType, byte[] host);
+  /**
+   * Mimic a call to AndroidNetworkLibrary#addTestRootCertificate from native code.
+   * To be used for testing only.
+   *
+   * @param rootCert DER encoded bytes of the certificate.
+   */
+  public static native void callAddTestRootCertificateFromNative(byte[] cert);
+
+  /**
+   * Mimic a call to AndroidNetworkLibrary#clearTestRootCertificate from native code.
+   * To be used for testing only.
+   *
+   */
+  public static native void callClearTestRootCertificateFromNative();
 }
