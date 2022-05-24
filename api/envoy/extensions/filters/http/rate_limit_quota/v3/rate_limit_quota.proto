@@ -3,8 +3,8 @@ syntax = "proto3";
 package envoy.extensions.filters.http.rate_limit_quota.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/type/v3/http_status.proto";
 import "envoy/type/v3/ratelimit_strategy.proto";
 
@@ -27,24 +27,106 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#not-implemented-hide:]
 // [#protodoc-title: Rate Limit Quota]
-// Rate limit :ref:`configuration overview <config_http_filters_rate_limit_quota>`.
+// Rate Limit Quota :ref:`configuration overview <config_http_filters_rate_limit_quota>`.
 // [#extension: envoy.filters.http.rate_limit_quota]
 
+// Configures the Rate Limit Quota filter.
+//
+// Can be overridden in the per-route and per-host configurations.
+// The more specific definition completely overrides the less specific definition.
 message RateLimitQuotaFilterConfig {
-  // [#comment:TODO(sergiitk): preview mode matchers]
+  // Configures the gRPC Rate Limit Quota Service (RLQS) RateLimitQuotaService.
+  // If not specified, all requests are allowed.
+  config.core.v3.GrpcService rlqs_server = 1;
 
-  // Configuration for the gRPC service that hosts an external rate limit
-  // provider. If not specified, any calls to the rate limit service will
-  // immediately return success.
-  config.core.v3.ConfigSource rlqs_server = 1;
+  // The application domain to use when calling the service. This enables sharing the quota
+  // server between different applications without fear of overlap.
+  // E.g., "envoy".
+  string domain = 2 [(validate.rules).string = {min_len: 1}];
 
-  // The application domain to use when calling the service.
-  string domain = 2;
-
-  // Unified matchers.
-  xds.type.matcher.v3.Matcher bucket_matchers = 3;
+  // The match tree to use for grouping incoming requests into buckets.
+  //
+  // Example:
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: xds.type.matcher.v3.Matcher
+  //
+  //   matcher_list:
+  //     matchers:
+  //     # assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
+  //     - predicate:
+  //         single_predicate:
+  //           input:
+  //             typed_config:
+  //               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+  //               header_name: env
+  //           value_match:
+  //             exact: staging
+  //       on_match:
+  //         action:
+  //           typed_config:
+  //             '@type': type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+  //             bucket_id_builder:
+  //               bucket_id_builder:
+  //                 name:
+  //                   string_value: staging
+  //
+  //     # Assign requests with header['user_group'] set to 'admin' to the bucket { name: 'staging' }
+  //     - predicate:
+  //         single_predicate:
+  //           input:
+  //             typed_config:
+  //               '@type': type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+  //           custom_match:
+  //             typed_config:
+  //               '@type': type.googleapis.com/xds.type.matcher.v3.CelMatcher
+  //               expr_match:
+  //                 # Shortened for illustration purposes. Here should be parsed CEL expression:
+  //                 # request.headers['user_group'] == 'admin'
+  //                 parsed_expr: {}
+  //       on_match:
+  //         action:
+  //           typed_config:
+  //             '@type': type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+  //             bucket_id_builder:
+  //               bucket_id_builder:
+  //                 name:
+  //                   string_value: admin_users
+  //
+  // .. attention::
+  //  The first matched group wins. Once the request is matched into a bucket, matcher
+  //  evaluation ends.
+  //
+  // Refer to :ref:`Unified Matcher API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`
+  // documentation for more information on the matcher trees.
+  xds.type.matcher.v3.Matcher bucket_matchers = 3 [(validate.rules).message = {required: true}];
 }
 
+// Per-route and per-host configuration overrides. The more specific definition completely
+// overrides the less specific definition.
+message RateLimitQuotaOverride {
+  // The application domain to use when calling the service. This enables sharing the quota
+  // server between different applications without fear of overlap.
+  // E.g., "envoy".
+  //
+  // If empty, inherits the value from the less specific definition.
+  string domain = 1;
+
+  // Unified matchers.
+  //
+  // If set, fully overrides the bucket matchers provided on the less specific definition.
+  // If not set, inherits the value from the less specific definition.
+  //
+  // See usage example: :ref:`RateLimitQuotaFilterConfig.bucket_matchers
+  // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.bucket_matchers>`.
+  xds.type.matcher.v3.Matcher bucket_matchers = 2;
+}
+
+// Configures Quota Bucket.
+//
+// To be used as the action in the `on_match` field of Unified Matchers API. Usage example:
+// :ref:`RateLimitQuotaFilterConfig.bucket_matchers
+// <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.bucket_matchers>`.
 // [#next-free-field: 6]
 message RateLimitQuotaBucketSettings {
   // Configures the behavior after the first request has been matched to the bucket, and before the
@@ -112,7 +194,8 @@ message RateLimitQuotaBucketSettings {
     // it's applied until the server returns a new assignment.
     //
     // .. attention::
-    //   Zero-second ``Duration`` expires **immediately**, while unset Duration **doesn't expire**.
+    //   Zero-second ``Duration`` expires **immediately**, while unset ``Duration``
+    //   **has no expiration date**.
     google.protobuf.Duration expired_assignment_behavior_timeout = 1
         [(validate.rules).duration = {gte {}}];
 
@@ -246,7 +329,14 @@ message RateLimitQuotaBucketSettings {
   // In this example, the value of ``BucketId`` key ``env`` is substituted from the ``environment``
   // request header.
   //
-  // For the request with the HTTP header ``env`` set to ``staging``, the builder will produce
+  // This is equivalent to the following *pseudo-code*:
+  //
+  // .. code-block:: yaml
+  //
+  //    name: 'my_bucket'
+  //    env: $header['environment']
+  //
+  // For example, the request with the HTTP header ``env`` set to ``staging`` will produce
   // the following ``BucketId``:
   //
   // .. validated-code-block:: yaml
@@ -265,6 +355,9 @@ message RateLimitQuotaBucketSettings {
   //     name: my_bucket
   //     env: prod
   //
+  // .. note::
+  //   The order of ``BucketId`` keys do not matter. Buckets ``{ a: 'A', b: 'B' }`` and
+  //   ``{ b: 'B', a: 'A' }`` are identical.
   BucketIdBuilder bucket_id_builder = 1;
 
   // The interval at which the data plane is to report quota usage for
@@ -300,8 +393,4 @@ message RateLimitQuotaBucketSettings {
   // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
   // configuration takes over.
   ExpiredAssignmentBehavior expired_assignment_behavior = 5;
-}
-
-message RateLimitQuotaPerRoute {
-  // [#comment:TODO(sergiitk): finish]
 }
