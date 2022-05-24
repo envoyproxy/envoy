@@ -60,6 +60,12 @@ minor_behavior_changes:
   change: |
     add an ignore_port_in_host_matching config entry in RouteConfiguration. When set to true, port number(if any) in host
     header is ignored during host matching.
+- area: lua
+  change: |
+    lua ``respond`` api will call ``sendLocalReply`` instead of ``encodeHeaders`` and ``encodeData``.
+    This means that encoder filters will be correctly invoked, including adding configured response
+    headers, etc. This behavioral change can be reverted by setting runtime guard
+    envoy.reloadable_features.lua_respond_with_send_local_reply to false.
 
 bug_fixes:
 - area: runtime
