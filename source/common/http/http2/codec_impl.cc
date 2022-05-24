@@ -1092,7 +1092,7 @@ const ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) c
   return const_cast<ConnectionImpl*>(this)->getStream(stream_id);
 }
 
-ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id) const {
+ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id) {
   StreamImpl* stream;
   if (use_new_codec_wrapper_) {
     stream = static_cast<StreamImpl*>(adapter_->GetStreamUserData(stream_id));
