@@ -389,6 +389,7 @@ public:
       ENVOY_LOG_MISC(debug, "Request stream action on {} in state {} {}", stream_index_,
                      static_cast<int>(request_.stream_state_),
                      static_cast<int>(response_.stream_state_));
+      stream_action_active_ = true;
       if (stream_action.has_dispatching_action()) {
         // Simulate some response action while dispatching request headers, data, or trailers. This
         // may happen as a result of a filter sending a direct response.
@@ -403,8 +404,18 @@ public:
         } else if (request_action == test::common::http::DirectionalAction::kData) {
           EXPECT_CALL(request_.request_decoder_, decodeData(_, _))
               .Times(testing::AtLeast(1))
-              .WillRepeatedly(InvokeWithoutArgs(
-                  [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+              .WillRepeatedly(InvokeWithoutArgs([&] {
+                // Only simulate response action if the stream action is active
+                // otherwise the expectation could trigger in other moments
+                // causing the fuzzer to OOM.
+                // TODO(kbaichoo): In the future if the fuzzer invokes
+                // decodeData from deferred processing callbacks as part of
+                // a request data step, we should allow response data
+                // generation.
+                if (stream_action_active_) {
+                  directionalAction(response_, stream_action.dispatching_action());
+                }
+              }));
         } else if (request_action == test::common::http::DirectionalAction::kTrailers) {
           EXPECT_CALL(request_.request_decoder_, decodeTrailers_(_))
               .WillOnce(InvokeWithoutArgs(
@@ -419,6 +430,7 @@ public:
       if (response_.stream_state_ != HttpStream::StreamState::Closed) {
         directionalAction(request_, stream_action.request());
       }
+      stream_action_active_ = false;
       break;
     }
     case test::common::http::StreamAction::kResponse: {
@@ -442,6 +454,8 @@ public:
 
   Protocol http_protocol_;
   int32_t stream_index_{-1};
+  // Whether we're currently dispatching a stream action.
+  bool stream_action_active_{false};
   StreamResetCallbackFn stream_reset_callback_;
   ConnectionContext context_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;

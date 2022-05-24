@@ -36,9 +36,16 @@ private:
     mutable std::atomic<uint32_t> tokens_;
     MonotonicTime fill_time_;
   };
+  // Refill counter is incremented per each refill timer hit.
+  uint64_t refill_counter_{0};
   struct LocalDescriptorImpl : public RateLimit::LocalDescriptor {
     std::shared_ptr<TokenState> token_state_;
     RateLimit::TokenBucket token_bucket_;
+    // Descriptor refill interval is a multiple of the timer refill interval.
+    // For example, if the descriptor refill interval is 150ms and the global
+    // refill interval is 50ms, the value is 3. Every 3rd invocation of
+    // the global timer, the descriptor is refilled.
+    uint64_t multiplier_;
     std::string toString() const {
       std::vector<std::string> entries;
       entries.reserve(entries_.size());
