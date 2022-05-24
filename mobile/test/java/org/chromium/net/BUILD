@@ -37,6 +37,22 @@ envoy_mobile_android_test(
 )
 
 envoy_mobile_android_test(
+    name = "certificate_verification_tests",
+    srcs = [
+        "CertificateVerificationTest.java",
+    ],
+    native_deps = [
+        "//library/common/jni:libndk_envoy_jni.so",
+        "//library/common/jni:libndk_envoy_jni.jnilib",
+    ],
+    deps = [
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
+        "//library/java/org/chromium/net",
+    ],
+)
+
+envoy_mobile_android_test(
     name = "cronet_url_request_context_test",
     srcs = [
         "CronetUrlRequestContextTest.java",

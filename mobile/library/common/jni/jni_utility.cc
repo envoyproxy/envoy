@@ -254,3 +254,65 @@ envoy_map to_native_map(JNIEnv* env, jobjectArray entries) {
   envoy_map native_map = {length / 2, entry_array};
   return native_map;
 }
+
+jobjectArray ToJavaArrayOfByteArray(JNIEnv* env, const std::vector<std::string>& v) {
+  jclass jcls_byte_array = env->FindClass("[B");
+  jobjectArray joa = env->NewObjectArray(v.size(), jcls_byte_array, nullptr);
+
+  for (size_t i = 0; i < v.size(); ++i) {
+    jbyteArray byte_array =
+        ToJavaByteArray(env, reinterpret_cast<const uint8_t*>(v[i].data()), v[i].length());
+    env->SetObjectArrayElement(joa, i, byte_array);
+  }
+  return joa;
+}
+
+jbyteArray ToJavaByteArray(JNIEnv* env, const uint8_t* bytes, size_t len) {
+  jbyteArray byte_array = env->NewByteArray(len);
+  const jbyte* jbytes = reinterpret_cast<const jbyte*>(bytes);
+  env->SetByteArrayRegion(byte_array, /*start=*/0, len, jbytes);
+  return byte_array;
+}
+
+jbyteArray ToJavaByteArray(JNIEnv* env, const std::string& str) {
+  const uint8_t* str_bytes = reinterpret_cast<const uint8_t*>(str.data());
+  return ToJavaByteArray(env, str_bytes, str.size());
+}
+
+void JavaArrayOfByteArrayToStringVector(JNIEnv* env, jobjectArray array,
+                                        std::vector<std::string>* out) {
+  size_t len = env->GetArrayLength(array);
+  out->resize(len);
+
+  for (size_t i = 0; i < len; ++i) {
+    jbyteArray bytes_array = static_cast<jbyteArray>(env->GetObjectArrayElement(array, i));
+    jsize bytes_len = env->GetArrayLength(bytes_array);
+    // It doesn't matter if the array returned by GetByteArrayElements is a copy
+    // or not, as the data will be simply be copied into C++ owned memory below.
+    jbyte* bytes = env->GetByteArrayElements(bytes_array, /*isCopy=*/nullptr);
+    (*out)[i].assign(reinterpret_cast<const char*>(bytes), bytes_len);
+    // There is nothing to write back, it is always safe to JNI_ABORT.
+    env->ReleaseByteArrayElements(bytes_array, bytes, JNI_ABORT);
+    // Explicitly delete to keep the local ref count low.
+    env->DeleteLocalRef(bytes_array);
+  }
+}
+
+void JavaArrayOfByteToString(JNIEnv* env, jbyteArray jbytes, std::string* out) {
+  std::vector<uint8_t> bytes;
+  JavaArrayOfByteToBytesVector(env, jbytes, &bytes);
+  *out = std::string(bytes.begin(), bytes.end());
+}
+
+void JavaArrayOfByteToBytesVector(JNIEnv* env, jbyteArray array, std::vector<uint8_t>* out) {
+  const size_t len = env->GetArrayLength(array);
+  out->resize(len);
+
+  // It doesn't matter if the array returned by GetByteArrayElements is a copy
+  // or not, as the data will be simply be copied into C++ owned memory below.
+  jbyte* jbytes = env->GetByteArrayElements(array, /*isCopy=*/nullptr);
+  uint8_t* bytes = reinterpret_cast<uint8_t*>(jbytes);
+  std::copy(bytes, bytes + len, out->begin());
+  // There is nothing to write back, it is always safe to JNI_ABORT.
+  env->ReleaseByteArrayElements(array, jbytes, JNI_ABORT);
+}

@@ -498,3 +498,27 @@ typedef struct {
   // Context passed through to callbacks to provide dispatch and execution state.
   const void* context;
 } envoy_event_tracker;
+
+/**
+ * The list of certificate verification results returned from Java side to the
+ * C++ side.
+ * A Java counterpart lives in org.chromium.net.CertVerifyStatusAndroid.java
+ */
+typedef enum {
+  // Certificate is trusted.
+  CERT_VERIFY_STATUS_OK = 0,
+  // Certificate verification could not be conducted.
+  CERT_VERIFY_STATUS_FAILED = -1,
+  // Certificate is not trusted due to non-trusted root of the certificate
+  // chain.
+  CERT_VERIFY_STATUS_NO_TRUSTED_ROOT = -2,
+  // Certificate is not trusted because it has expired.
+  CERT_VERIFY_STATUS_EXPIRED = -3,
+  // Certificate is not trusted because it is not valid yet.
+  CERT_VERIFY_STATUS_NOT_YET_VALID = -4,
+  // Certificate is not trusted because it could not be parsed.
+  CERT_VERIFY_STATUS_UNABLE_TO_PARSE = -5,
+  // Certificate is not trusted because it has an extendedKeyUsage field, but
+  // its value is not correct for a web server.
+  CERT_VERIFY_STATUS_INCORRECT_KEY_USAGE = -6,
+} envoy_cert_verify_status_t;
