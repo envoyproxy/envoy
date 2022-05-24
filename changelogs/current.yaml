@@ -4,6 +4,9 @@ behavior_changes:
 - area: tls-inspector
   change: |
     the listener filter tls inspector's stats ``connection_closed`` and ``read_error`` are removed. The new stats are introduced for listener, ``downstream_peek_remote_close`` and ``read_error`` :ref:`listener stats <config_listener_stats>`.
+- area: tls
+  change: |
+    Change TLS transport socket and Quic transport socket to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_aync_cert_validation`` to false.
 
 minor_behavior_changes:
 - area: thrift
