@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/ssl/context_config.h"
 
 #include "source/common/common/utility.h"
@@ -18,7 +19,7 @@ std::string getCertValidatorName(const Envoy::Ssl::CertificateValidationContextC
 
 class CertValidatorFactory : public Config::UntypedFactory {
 public:
-  virtual ~CertValidatorFactory() = default;
+  ~CertValidatorFactory() override = default;
 
   virtual CertValidatorPtr
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
