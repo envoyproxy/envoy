@@ -135,8 +135,8 @@ TagNameValues::TagNameValues() {
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
-  // listener.(<address>.)*
-  addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>)\.))");
+  // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
+  addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>|<TAG_VALUE>)\.))", "", "admin");
 
   // vhost.(<virtual host name>.)*
   addTokenized(VIRTUAL_HOST, "vhost.$.**");
@@ -154,8 +154,9 @@ TagNameValues::TagNameValues() {
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
-                           const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor{name, expandRegex(regex), substr, Regex::Type::Re2});
+                           const std::string& substr, const std::string& negative_matching_value) {
+  descriptor_vec_.emplace_back(
+      Descriptor{name, expandRegex(regex), substr, negative_matching_value, Regex::Type::Re2});
 }
 
 void TagNameValues::addTokenized(const std::string& name, const std::string& tokens) {
