@@ -147,6 +147,9 @@ new_features:
 - area: proxy_protcol
   change: |
     added :ref:`allow_requests_without_proxy_protocol<envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>` to allow requests without proxy protocol on the listener from trusted downstreams as an opt-in flag.
+- area: udp
+  change: |
+    added config to specify the UDP packet writer factory. See :ref:`udp_packet_packet_writer_config <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.udp_packet_packet_writer_config>`.
 - area: build
   change: |
     enabled building arm64 envoy-distroless and envoy-tools :ref:`docker images <install_binaries>`.
