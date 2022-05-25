@@ -51,7 +51,7 @@ minor_behavior_changes:
   change: |
     local_ratelimit will consume tokens of all matched descriptors sorted by tokens per second.
     This behavioral change can be reverted by setting runtime guard
-    envoy.reloadable_features.http_local_ratelimit_match_all_descriptors to false.
+    ``envoy.reloadable_features.http_local_ratelimit_match_all_descriptors`` to false.
 - area: router
   change: |
     get route config factories by the configuration proto full names by default. This behavior change
@@ -60,6 +60,12 @@ minor_behavior_changes:
   change: |
     add an ignore_port_in_host_matching config entry in RouteConfiguration. When set to true, port number(if any) in host
     header is ignored during host matching.
+- area: lua
+  change: |
+    lua ``respond`` api will call ``sendLocalReply`` instead of ``encodeHeaders`` and ``encodeData``.
+    This means that encoder filters will be correctly invoked, including adding configured response
+    headers, etc. This behavioral change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.lua_respond_with_send_local_reply`` to false.
 
 bug_fixes:
 - area: runtime
@@ -140,6 +146,9 @@ new_features:
     added support for access logging.
 - area: thrift
   change: |
+    added support for preserving header keys.
+- area: thrift
+  change: |
     introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
 - area: on_demand
   change: |
@@ -147,6 +156,9 @@ new_features:
 - area: proxy_protcol
   change: |
     added :ref:`allow_requests_without_proxy_protocol<envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>` to allow requests without proxy protocol on the listener from trusted downstreams as an opt-in flag.
+- area: udp
+  change: |
+    added config to specify the UDP packet writer factory. See :ref:`udp_packet_packet_writer_config <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.udp_packet_packet_writer_config>`.
 - area: build
   change: |
     enabled building arm64 envoy-distroless and envoy-tools :ref:`docker images <install_binaries>`.
