@@ -43,7 +43,8 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   auto spdy_headers = envoyHeadersToSpdyHeaderBlock(headers);
   if (headers.Method()) {
-    if (headers.Method()->value() == "CONNECT") {
+    if (headers.Method()->value() == "CONNECT" &&
+        !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
       // It is a bytestream connect and should have :path and :protocol set accordingly
       // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
       // if shifting codecs. For now, default to "/" - this can be made
