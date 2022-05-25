@@ -17,7 +17,9 @@ namespace Quic {
 
 namespace {
 
-bool verifyLeafCertMatchesHostName(quic::CertificateView& cert_view, const std::string& hostname,
+// Returns true if hostname matches one of the Subject Alt Names in cert_view. Returns false and
+// sets error_details otherwise
+bool verifyLeafCertMatchesHostname(quic::CertificateView& cert_view, const std::string& hostname,
                                    std::string* error_details) {
   for (const absl::string_view& config_san : cert_view.subject_alt_name_domains()) {
     if (Extensions::TransportSockets::Tls::Utility::dnsNameMatch(hostname, config_san)) {
@@ -48,7 +50,7 @@ public:
 
     std::unique_ptr<quic::CertificateView> cert_view =
         quic::CertificateView::ParseSingleCertificate(leaf_cert_);
-    succeeded = verifyLeafCertMatchesHostName(*cert_view, hostname_, &error);
+    succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);
     std::unique_ptr<quic::ProofVerifyDetails> details =
         std::make_unique<CertVerifyResult>(succeeded);
     quic_callback_->Run(succeeded, error, &details);
@@ -106,11 +108,13 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     return quic::QUIC_FAILURE;
   }
 
-  auto* verify_context = static_cast<const EnvoyQuicProofVerifyContext*>(context);
-  ASSERT(verify_context);
-  auto* envoy_callback = new QuicValidateResultCallback(
-      const_cast<EnvoyQuicProofVerifyContext*>(verify_context)->dispatcher(), std::move(callback),
-      hostname);
+  auto* verify_context = dynamic_cast<const EnvoyQuicProofVerifyContext*>(context);
+  if (verify_context == nullptr) {
+    ENVOY_BUG(false, "QUIC proof verify context was not setup correctly.");
+    return quic::QUIC_FAILURE;
+  }
+  auto* envoy_callback =
+      new QuicValidateResultCallback(verify_context->dispatcher(), std::move(callback), hostname);
   // We down cast rather than add verifyCertChain to Envoy::Ssl::Context because
   // verifyCertChain uses a bunch of SSL-specific structs which we want to keep
   // out of the interface definition.
@@ -127,7 +131,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     return quic::QUIC_PENDING;
   }
   if (result == Ssl::ValidateResult::Successful) {
-    if (verifyLeafCertMatchesHostName(*cert_view, hostname, error_details)) {
+    if (verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
       *details = std::make_unique<CertVerifyResult>(true);
       return quic::QUIC_SUCCESS;
     }
@@ -169,7 +173,7 @@ bool EnvoyQuicProofVerifier::doVerifyCertChain(
   if (!success) {
     return false;
   }
-  if (verifyLeafCertMatchesHostName(*cert_view, hostname, error_details)) {
+  if (verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
     return true;
   }
   *error_details = absl::StrCat("Leaf certificate doesn't match hostname: ", hostname);

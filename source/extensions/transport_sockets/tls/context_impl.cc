@@ -1257,9 +1257,17 @@ Ssl::ValidateResult ContextImpl::customVerifyCertChainForQuic(
     const Network::TransportSocketOptions* transport_socket_options,
     absl::string_view ech_name_override, std::string* error_details, uint8_t* out_alert) {
   ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation"));
+  ASSERT(!tls_contexts_.empty());
+  // It doesn't matter which SSL context is used, because they share the same cert validation
+  // config.
+  SSL_CTX* ssl_ctx = tls_contexts_[0].ssl_ctx_.get();
+  if (SSL_CTX_get_verify_mode(ssl_ctx) == SSL_VERIFY_NONE) {
+    // Skip validation if the tls is configured SSL_VERIFY_NONE.
+    return Ssl::ValidateResult::Successful;
+  }
   Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
       cert_chain, std::move(callback), /*extended_socket_info=*/nullptr, transport_socket_options,
-      tls_contexts_[0].ssl_ctx_.get(), ech_name_override, is_server, error_details, out_alert);
+      ssl_ctx, ech_name_override, is_server, error_details, out_alert);
   return result;
 }
 

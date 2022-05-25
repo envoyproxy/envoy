@@ -208,13 +208,13 @@ int DefaultCertValidator::doVerifyCertChain(
       return allow_untrusted_certificate_ ? 1 : ret;
     }
   }
-  return VerifyCertAndUpdateStatus(ssl_extended_info, &leaf_cert, transport_socket_options, nullptr,
+  return verifyCertAndUpdateStatus(ssl_extended_info, &leaf_cert, transport_socket_options, nullptr,
                                    nullptr)
              ? 1
              : 0;
 }
 
-bool DefaultCertValidator::VerifyCertAndUpdateStatus(
+bool DefaultCertValidator::verifyCertAndUpdateStatus(
     Ssl::SslExtendedSocketInfo* ssl_extended_info, X509* leaf_cert,
     const Network::TransportSocketOptions* transport_socket_options, std::string* error_details,
     uint8_t* out_alert) {
@@ -238,9 +238,9 @@ bool DefaultCertValidator::VerifyCertAndUpdateStatus(
   // sure the verification for other validation context configurations doesn't fail (i.e. either
   // `NotValidated` or `Validated`). If `trusted_ca` doesn't exist, we will need to make sure
   // other configurations are verified and the verification succeed.
-  bool validation_status = verify_trusted_ca_
-                               ? validated != Envoy::Ssl::ClientValidationStatus::Failed
-                               : validated == Envoy::Ssl::ClientValidationStatus::Validated;
+  const bool validation_status = verify_trusted_ca_
+                                     ? validated != Envoy::Ssl::ClientValidationStatus::Failed
+                                     : validated == Envoy::Ssl::ClientValidationStatus::Validated;
 
   return allow_untrusted_certificate_ || validation_status;
 }
@@ -378,7 +378,7 @@ Ssl::ValidateResult DefaultCertValidator::doCustomVerifyCertChain(
                                           : Ssl::ValidateResult::Failed;
     }
   }
-  bool succeeded = VerifyCertAndUpdateStatus(ssl_extended_info, leaf_cert, transport_socket_options,
+  bool succeeded = verifyCertAndUpdateStatus(ssl_extended_info, leaf_cert, transport_socket_options,
                                              error_details, out_alert);
   return succeeded ? Ssl::ValidateResult::Successful : Ssl::ValidateResult::Failed;
 }

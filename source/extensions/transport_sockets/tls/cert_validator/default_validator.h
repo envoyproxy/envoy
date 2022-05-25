@@ -108,7 +108,7 @@ public:
                                   const std::vector<SanMatcherPtr>& subject_alt_name_matchers);
 
 private:
-  bool VerifyCertAndUpdateStatus(Ssl::SslExtendedSocketInfo* ssl_extended_info, X509* leaf_cert,
+  bool verifyCertAndUpdateStatus(Ssl::SslExtendedSocketInfo* ssl_extended_info, X509* leaf_cert,
                                  const Network::TransportSocketOptions* transport_socket_options,
                                  std::string* error_details, uint8_t* out_alert);
 

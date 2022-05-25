@@ -29,7 +29,7 @@ using CertVerifyResultPtr = std::unique_ptr<CertVerifyResult>();
 class EnvoyQuicProofVerifyContext : public quic::ProofVerifyContext {
 public:
   virtual absl::string_view getEchNameOverrride() const PURE;
-  virtual Event::Dispatcher& dispatcher() PURE;
+  virtual Event::Dispatcher& dispatcher() const PURE;
   virtual bool isServer() const PURE;
 };
 
@@ -41,7 +41,7 @@ public:
       : ssl_info_(ssl_info), dispatcher_(dispatcher), is_server_(is_server) {}
 
   absl::string_view getEchNameOverrride() const override;
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& dispatcher() const override { return dispatcher_; }
   bool isServer() const override { return is_server_; }
 
 private:
