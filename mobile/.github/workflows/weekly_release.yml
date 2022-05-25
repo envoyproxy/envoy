@@ -28,5 +28,7 @@ jobs:
       - name: Create tag
         run: |
           version="v$(cat VERSION)"
+          git checkout -b release-${version}
+          git push origin release-${version}
           git tag -a ${version} -m ${version}
           git push origin ${version}
