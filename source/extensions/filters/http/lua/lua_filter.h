@@ -10,6 +10,8 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/lua/wrappers.h"
 
+#include "wrappers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -287,7 +289,7 @@ private:
   int doSynchronousHttpCall(lua_State* state, Tracing::Span& span);
   int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span);
 
-  int timestamp(int timestamp, absl::uint128 resolution);
+  enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {

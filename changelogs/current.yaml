@@ -31,6 +31,10 @@ minor_behavior_changes:
     `PR21114 <https://github.com/envoyproxy/envoy/pull/21114>`_ for example.
 - area: lua
   change: |
+    added microsecond resolution in timestamp function. The return value is a string representing the 
+    integer value of selected time resolution since epoch.
+- area: lua
+  change: |
     export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
     that loads shared object libraries, such as those installed via luarocks.
 - area: admin

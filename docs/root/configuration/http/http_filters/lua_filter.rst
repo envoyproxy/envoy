@@ -515,8 +515,9 @@ timestamp()
 
   timestamp = handle:timestamp(format)
 
-High resolution timestamp function. *format* is an optional enum parameter to indicate the format of the timestamp.
-*EnvoyTimestampResolution.MILLISECOND* is supported
+High resolution timestamp function. Timestamp is returned as string representing the integer value of the selected resolution.
+*format* is an optional enum parameter to indicate the format of the timestamp.
+*EnvoyTimestampResolution.MILLISECOND* and *EnvoyTimestampResolution.MICROSECOND* is supported.
 The function returns timestamp in milliseconds since epoch by default if format is not set.
 
 .. _config_http_filters_lua_header_wrapper:
