@@ -436,10 +436,11 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
   }
 }
 
-TEST(HeaderTransportTest, InfoBlock) {
+MessageMetadata testInfoBlock(bool preserve_keys, const std::string& key,
+                              const std::string& value) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
-  MessageMetadata metadata(true);
+  MessageMetadata metadata(true, preserve_keys);
 
   metadata.requestHeaders().addCopy(Http::LowerCaseString("not"), "empty");
 
@@ -449,10 +450,10 @@ TEST(HeaderTransportTest, InfoBlock) {
   buffer.writeBEInt<int32_t>(1);  // sequence number
   buffer.writeBEInt<int16_t>(38); // size 152
   addSeq(buffer, {0, 0, 1, 3}); // 0 = binary proto, 0 = num transforms, 1 = key value, 3 = num kvs
-  buffer.writeByte(3);
-  buffer.add("key");
-  buffer.writeByte(5);
-  buffer.add("value");
+  buffer.writeByte(key.size());
+  buffer.add(key);
+  buffer.writeByte(value.size());
+  buffer.add(value);
   buffer.writeByte(4);
   buffer.add("key2");
   addSeq(buffer, {0x80, 0x01}); // var int 128
@@ -463,7 +464,9 @@ TEST(HeaderTransportTest, InfoBlock) {
 
   Http::TestRequestHeaderMapImpl expected_headers;
   expected_headers.addCopy(Http::LowerCaseString("not"), "empty");
-  expected_headers.addCopy(Http::LowerCaseString("key"), "value");
+  expected_headers.addCopy(Http::LowerCaseString(absl::StrReplaceAll(
+                               key, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}})),
+                           value);
   expected_headers.addCopy(Http::LowerCaseString("key2"), std::string(128, 'x'));
   expected_headers.addCopy(Http::LowerCaseString(""), "");
 
@@ -472,6 +475,43 @@ TEST(HeaderTransportTest, InfoBlock) {
 
   EXPECT_EQ(expected_headers, metadata.requestHeaders());
   EXPECT_EQ(buffer.length(), 0);
+
+  return metadata;
+}
+
+TEST(HeaderTransportTest, InfoBlock) { testInfoBlock(false /* preserve-keys */, "key", "value"); }
+
+TEST(HeaderTransportTest, InfoBlockCaseSensitive) {
+  auto metadata = testInfoBlock(true /* preserve-keys */, "Key", "Value");
+  HeaderTransportImpl transport;
+  Buffer::OwnedImpl buffer;
+  Buffer::OwnedImpl msg;
+  msg.add("fake message");
+  transport.encodeFrame(buffer, metadata, msg);
+  EXPECT_EQ(0, msg.length());
+  EXPECT_EQ(std::string("\0\0\0\xBA\xF\xFF\0\0\0\0\0\x1\0)\0\0\x1\x4\x3not\x5"
+                        "empty\x3Key\x5Value\x4key2\x80\x1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                        "xxxxxxxxxxxxx\0\0\0\0\0fake message",
+                        190),
+            buffer.toString());
+}
+
+TEST(HeaderTransportTest, InfoBlockCaseSensitiveNewline) {
+  auto metadata = testInfoBlock(true /* preserve-keys */, "K\ny", "Value");
+  HeaderTransportImpl transport;
+  Buffer::OwnedImpl buffer;
+  Buffer::OwnedImpl msg;
+  msg.add("fake message");
+  transport.encodeFrame(buffer, metadata, msg);
+  EXPECT_EQ(0, msg.length());
+  EXPECT_EQ(
+      std::string("\0\0\0\xBA\xF\xFF\0\0\0\0\0\x1\0)\0\0\x1\x4\x3not\x5"
+                  "empty\x3K\ny\x5Value\x4key2\x80\x1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  "xxxxxxxxxxxxx\0\0\0\0\0fake message",
+                  190),
+      buffer.toString());
 }
 
 TEST(HeaderTransportTest, DecodeFrameEnd) {
