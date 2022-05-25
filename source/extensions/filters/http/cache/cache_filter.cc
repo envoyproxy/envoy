@@ -127,7 +127,8 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
     }
-    // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the insertion yet.
+    // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the
+    // insertion yet.
   } else {
     insert_status_ = InsertStatus::NoInsertResponseNotCacheable;
   }
@@ -153,7 +154,8 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
     }
-    // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the insertion yet.
+    // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the
+    // insertion yet.
   }
   return Http::FilterDataStatus::Continue;
 }

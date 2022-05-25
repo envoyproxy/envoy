@@ -1,7 +1,8 @@
 #include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 
-#include "gtest/gtest.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
