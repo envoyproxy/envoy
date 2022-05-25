@@ -153,9 +153,9 @@ public:
     return makeClientConnectionWithHost(port, "", options);
   }
 
-  Network::ClientConnectionPtr
-  makeClientConnectionWithHost(uint32_t port, const std::string& host,
-                               const Network::ConnectionSocket::OptionConstSharedPtr& options) {
+  Network::ClientConnectionPtr makeClientConnectionWithHost(
+      uint32_t port, const std::string& host,
+      const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr) {
     // Setting socket options is not supported.
     server_addr_ = Network::Utility::resolveUrl(
         fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -167,7 +167,7 @@ public:
     // different version set on server side to test that.
     auto connection = std::make_unique<TestEnvoyQuicClientConnection>(
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
-        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr,
+        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, options,
         validation_failure_on_path_response_);
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
