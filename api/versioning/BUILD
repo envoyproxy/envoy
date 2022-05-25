@@ -159,6 +159,7 @@ proto_library(
         "//envoy/extensions/formatter/req_without_query/v3:pkg",
         "//envoy/extensions/health_checkers/redis/v3:pkg",
         "//envoy/extensions/http/header_formatters/preserve_case/v3:pkg",
+        "//envoy/extensions/http/header_validators/envoy_default/v3:pkg",
         "//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg",
         "//envoy/extensions/http/original_ip_detection/xff/v3:pkg",
         "//envoy/extensions/http/stateful_session/cookie/v3:pkg",
