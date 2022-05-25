@@ -480,7 +480,6 @@ layered_runtime:
         envoy:
           reloadable_features:
             allow_multiple_dns_addresses: *dns_multiple_addresses
-            override_request_timeout_by_gateway_timeout: false
             http2_delay_keepalive_timeout: *h2_delay_keepalive_timeout
 )"
 // Needed due to warning in

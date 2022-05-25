@@ -156,6 +156,9 @@ public:
   }
 
   void TearDown() override {
+    // Right now each test does one request - if this changes, make the 1
+    // configurable.
+    ASSERT_EQ(cc_.on_complete_calls + cc_.on_cancel_calls + cc_.on_error_calls, 1);
     test_server_.reset();
     fake_upstreams_.clear();
   }
@@ -466,7 +469,7 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
   test_server_->waitForCounterEq("http.client.stream_success", 1);
 }
 
-TEST_P(ClientIntegrationTest, Timeout) {
+TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* em_hcm = listener->mutable_api_listener()->mutable_api_listener();
@@ -496,6 +499,52 @@ TEST_P(ClientIntegrationTest, Timeout) {
   dispatcher_->post([&]() -> void {
     http_client_->startStream(stream_, bridge_callbacks_, false);
     http_client_->sendHeaders(stream_, c_headers, false);
+  });
+
+  Envoy::FakeRawConnectionPtr upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
+
+  std::string upstream_request;
+  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
+                                               &upstream_request));
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls, 0);
+  ASSERT_EQ(cc_.on_data_calls, 0);
+  ASSERT_EQ(cc_.on_complete_calls, 0);
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* em_hcm = listener->mutable_api_listener()->mutable_api_listener();
+    auto hcm =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::http_connection_manager::v3::
+                                    EnvoyMobileHttpConnectionManager>(*em_hcm);
+    hcm.mutable_config()->mutable_stream_idle_timeout()->set_seconds(1);
+    em_hcm->PackFrom(hcm);
+  });
+
+  autonomous_upstream_ = false;
+  initialize();
+
+  bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, envoy_stream_intel,
+                                    void* context) -> void* {
+    Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+    callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+    cc_->on_headers_calls++;
+    cc_->status = response_headers->Status()->value().getStringView();
+    return nullptr;
+  };
+
+  // Build a set of request headers.
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(default_request_headers_);
+
+  // Create a stream.
+  dispatcher_->post([&]() -> void {
+    http_client_->startStream(stream_, bridge_callbacks_, false);
+    http_client_->sendHeaders(stream_, c_headers, true);
   });
 
   Envoy::FakeRawConnectionPtr upstream_connection;
