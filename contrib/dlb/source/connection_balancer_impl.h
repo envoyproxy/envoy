@@ -66,11 +66,10 @@ public:
   dlb_dev_cap_t cap;
 
   // Share those cross worker threads.
-  std::vector<dlb_port_hdl_t> tx_ports, rx_ports ABSL_GUARDED_BY(lock);
-  absl::Mutex lock;
-  std::vector<int> efds ABSL_GUARDED_BY(lock);
-  std::vector<std::shared_ptr<DlbBalancedConnectionHandlerImpl>> dlb_handlers ABSL_GUARDED_BY(lock);
-  std::vector<Envoy::Event::FileEventPtr> file_events ABSL_GUARDED_BY(lock);
+  std::vector<dlb_port_hdl_t> tx_ports, rx_ports;
+  std::vector<int> efds;
+  std::vector<std::shared_ptr<DlbBalancedConnectionHandlerImpl>> dlb_handlers;
+  std::vector<Envoy::Event::FileEventPtr> file_events;
 
   const static int cq_depth = 8;
   static int createLdbPort(dlb_domain_hdl_t domain, dlb_dev_cap_t cap, int ldb_pool, int dir_pool) {

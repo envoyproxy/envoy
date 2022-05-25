@@ -192,7 +192,6 @@ DLBConnectionBalanceFactory::~DLBConnectionBalanceFactory() {
 void DlbBalancedConnectionHandlerImpl::setDlbEvent() {
   auto listener = dynamic_cast<Envoy::Server::ActiveTcpListener*>(&handler_);
 
-  absl::MutexLock lock(&DlbConnectionBalanceFactorySingleton::get().lock);
   dlb_event_ = listener->dispatcher().createFileEvent(
       DlbConnectionBalanceFactorySingleton::get().efds[index_],
       [this](uint32_t events) -> void { onDlbEvents(events); }, Event::FileTriggerType::Level,
@@ -201,7 +200,6 @@ void DlbBalancedConnectionHandlerImpl::setDlbEvent() {
 }
 
 void DlbBalancedConnectionHandlerImpl::post(Network::ConnectionSocketPtr&& socket) {
-  absl::MutexLock lock(&DlbConnectionBalanceFactorySingleton::get().lock);
 
   // The pointer will be casted to unique_ptr in onDlbEvents(), no need to consider free.
   auto s = socket.release();
@@ -220,8 +218,6 @@ void DlbBalancedConnectionHandlerImpl::post(Network::ConnectionSocketPtr&& socke
 
 void DlbBalancedConnectionHandlerImpl::onDlbEvents(uint32_t flags) {
   ASSERT(flags & (Event::FileReadyType::Read));
-
-  absl::MutexLock lock(&DlbConnectionBalanceFactorySingleton::get().lock);
 
   dlb_event_t dlb_events[32];
   int num_rx = dlb_recv(DlbConnectionBalanceFactorySingleton::get().rx_ports.at(index_), 32, false,
@@ -269,7 +265,6 @@ void DlbConnectionBalancerImpl::registerHandler(
       std::make_shared<DlbBalancedConnectionHandlerImpl>(handler, index, worker_name);
   dlb_handler->setDlbEvent();
 
-  absl::MutexLock lock(&DlbConnectionBalanceFactorySingleton::get().lock);
   DlbConnectionBalanceFactorySingleton::get().dlb_handlers.push_back(dlb_handler);
 }
 
@@ -281,7 +276,6 @@ void DlbConnectionBalancerImpl::unregisterHandler(
 
   // Now DLB does not support change config when running, clean DLB related config in
   // DlbBalancedConnectionHandlerImpl
-  absl::MutexLock lock(&DlbConnectionBalanceFactorySingleton::get().lock);
   auto dlb_handlers = DlbConnectionBalanceFactorySingleton::get().dlb_handlers;
   dlb_handlers.erase(dlb_handlers.begin() + index);
 }
@@ -292,7 +286,6 @@ Envoy::Network::BalancedConnectionHandler& DlbConnectionBalancerImpl::pickTarget
   auto worker_name = listener->dispatcher().name();
   const int index =
       std::stoi(worker_name.substr(worker_name.find_first_of('_') + 1, worker_name.size()));
-  absl::MutexLock lock(&DlbConnectionBalanceFactorySingleton::get().lock);
   return *DlbConnectionBalanceFactorySingleton::get().dlb_handlers[index];
 }
 
