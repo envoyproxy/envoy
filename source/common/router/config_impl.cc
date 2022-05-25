@@ -654,8 +654,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               "not be stripped: {}",
               path_redirect_);
   }
-  std::cout << "route has stat prefix..." << route.stat_prefix()
-            << "::" << route.stat_prefix().empty() << "\n";
   if (!route.stat_prefix().empty()) {
     path_stats_scope_ = Stats::Utility::scopeFromStatNames(
         *factory_context.scope().scopeFromStatName(
