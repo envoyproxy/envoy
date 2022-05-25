@@ -68,6 +68,7 @@ public:
    */
   static TagExtractorPtr createTagExtractor(absl::string_view name, absl::string_view regex,
                                             absl::string_view substr = "",
+                                            absl::string_view negative_match = "",
                                             Regex::Type re_type = Regex::Type::StdRegex);
 
   TagExtractorImplBase(absl::string_view name, absl::string_view regex,
@@ -128,13 +129,14 @@ private:
 class TagExtractorRe2Impl : public TagExtractorImplBase {
 public:
   TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
-                      absl::string_view substr = "");
+                      absl::string_view substr = "", absl::string_view negative_match = "");
 
   bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
 
 private:
   const re2::RE2 regex_;
+  const std::string negative_match_;
 };
 
 /**

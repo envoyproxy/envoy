@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 50]
+// [#next-free-field: 51]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -403,6 +403,10 @@ message HttpConnectionManager {
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
+  // [#comment:TODO: The following fields are ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present:
+  // 1. :ref:`allow_chunked_length <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.allow_chunked_length>`]
   config.core.v3.Http1ProtocolOptions http_protocol_options = 8;
 
   // Additional HTTP/2 settings that are passed directly to the HTTP/2 codec.
@@ -660,6 +664,9 @@ message HttpConnectionManager {
   // for details of normalization.
   // Note that Envoy does not perform
   // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
+  // [#comment:TODO: This field is ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present.]
   google.protobuf.BoolValue normalize_path = 30;
 
   // Determines if adjacent slashes in the path are merged into one before any processing of
@@ -667,6 +674,9 @@ message HttpConnectionManager {
   // setting this option, incoming requests with path `//dir///file` will not match against route
   // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
+  // [#comment:TODO: This field is ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present.]
   bool merge_slashes = 33;
 
   // Action to take when request URL path contains escaped slash sequences (%2F, %2f, %5C and %5c).
@@ -674,6 +684,9 @@ message HttpConnectionManager {
   // runtime variable.
   // The :ref:`http_connection_manager.path_with_escaped_slashes_action_sampling<config_http_conn_man_runtime_path_with_escaped_slashes_action_enabled>` runtime
   // variable can be used to apply the action to a portion of all requests.
+  // [#comment:TODO: This field is ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present.]
   PathWithEscapedSlashesAction path_with_escaped_slashes_action = 45;
 
   // The configuration of the request ID extension. This includes operations such as
@@ -765,6 +778,30 @@ message HttpConnectionManager {
   // If this config is set, the Proxy-Status HTTP response header field is
   // populated. By default, it is not.
   ProxyStatusConfig proxy_status_config = 49;
+
+  // Configuration options for Header Validation (UHV).
+  // UHV is an extensible mechanism for checking validity of HTTP requests as well as providing
+  // normalization for request attributes, such as URI path.
+  // If the typed_header_validation_config is present it overrides the following options:
+  // ``normalize_path``, ``merge_slashes``, ``path_with_escaped_slashes_action``
+  // ``http_protocol_options.allow_chunked_length``.
+  //
+  // The default UHV checks the following:
+  //
+  // #. HTTP/1 header map validity according to `RFC 7230 section 3.2<https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_
+  // #. Syntax of HTTP/1 request target URI and response status
+  // #. HTTP/2 header map validity according to `RFC 7540 section 8.1.2<https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2`_
+  // #. Syntax of HTTP/2 pseudo headers
+  // #. HTTP/3 header map validity according to `draft standard <https://datatracker.ietf.org/doc/html/draft-ietf-quic-http-34>`_
+  // #. Syntax of HTTP/3 pseudo headers
+  // #. Syntax of ``Content-Length`` and ``Transfer-Encoding``
+  // #. Validation of HTTP/1 requests with both ``Content-Length`` and ``Transfer-Encoding`` headers
+  // #. Normalization of the URI path according to `Normalization and Comparison <https://datatracker.ietf.org/doc/html/rfc3986#section-6>`_
+  //    without `case normalization <https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1>`_
+  //
+  // [#not-implemented-hide:]
+  // [#extension-category: envoy.http.header_validators]
+  config.core.v3.TypedExtensionConfig typed_header_validation_config = 50;
 }
 
 // The configuration to customize local reply returned by Envoy.
