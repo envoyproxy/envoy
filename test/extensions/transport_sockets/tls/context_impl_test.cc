@@ -154,6 +154,7 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
   auto cert_expiry = TestUtility::parseTime(TEST_UNITTEST_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
   int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
   EXPECT_EQ(context->daysUntilFirstCertExpires().value(), days_until_expiry);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires().value(), days_until_expiry);
 }
 
 TEST_F(SslContextImplTest, TestExpiredCert) {
@@ -171,7 +172,8 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
   auto cleanup = cleanUpHelper(context);
-  EXPECT_EQ(absl::nullopt, context->daysUntilFirstCertExpires());
+  EXPECT_EQ(absl::make_optional(0), context->daysUntilFirstCertExpires());
+  EXPECT_EQ(absl::make_optional(0), manager_.daysUntilFirstCertExpires());
 }
 
 // Validate that when the context is updated, the daysUntilFirstCertExpires returns the current
@@ -191,7 +193,8 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(expired_yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
-  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::nullopt);
+  EXPECT_EQ(context->daysUntilFirstCertExpires(), absl::make_optional(0));
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::make_optional(0));
 
   const std::string expiring_yaml = R"EOF(
   common_tls_context:
@@ -224,8 +227,8 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
   manager_.removeContext(new_context);
   auto cleanup = cleanUpHelper(updated_context);
 
-  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), absl::nullopt);
-  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::nullopt);
+  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), absl::make_optional(0));
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), absl::make_optional(0));
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformation) {
