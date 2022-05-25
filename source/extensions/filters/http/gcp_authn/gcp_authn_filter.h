@@ -9,10 +9,7 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_impl.h"
-
-#include "jwt_verify_lib/jwt.h"
-#include "jwt_verify_lib/verify.h"
-#include "simple_lru_cache/simple_lru_cache_inl.h"
+#include "source/extensions/filters/http/gcp_authn/token_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,58 +34,6 @@ struct GcpAuthnFilterStats {
 
 using FilterConfigProtoSharedPtr =
     std::shared_ptr<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>;
-
-template <typename TokenType>
-using LRUCache = ::google::simple_lru_cache::SimpleLRUCache<std::string, TokenType>;
-using JwtToken = ::google::jwt_verify::Jwt;
-
-template <typename TokenType> class TokenCacheImpl : public Logger::Loggable<Logger::Id::init> {
-public:
-  TokenCacheImpl(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& config,
-                 TimeSource& time_source)
-      : time_source_(time_source) {
-    lru_cache_ = std::make_unique<LRUCache<TokenType>>(config.cache_size());
-  }
-
-  TokenCacheImpl() = delete;
-  TokenType* lookUp(const std::string& key);
-  void insert(const std::string& key, std::unique_ptr<TokenType>&& token);
-
-  LRUCache<TokenType>& lruCache() { return *lru_cache_; }
-
-  ~TokenCacheImpl() {
-    ASSERT(lru_cache_ != nullptr);
-    // Remove all entries from the cache.
-    lru_cache_->clear();
-  }
-
-private:
-  std::unique_ptr<LRUCache<TokenType>> lru_cache_;
-  TimeSource& time_source_;
-};
-
-class ThreadLocalCache : public Envoy::ThreadLocal::ThreadLocalObject {
-public:
-  ThreadLocalCache(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& config,
-                   TimeSource& time_source)
-      : cache_(config, time_source) {}
-  TokenCacheImpl<JwtToken>& cache() { return cache_; }
-
-private:
-  // The lifetime and ownership of cache object is tied to ThreadLocalCache object.
-  TokenCacheImpl<JwtToken> cache_;
-};
-
-struct TokenCache {
-  TokenCache(const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
-             Envoy::Server::Configuration::FactoryContext& context)
-      : tls(context.threadLocal()) {
-    tls.set([config](Envoy::Event::Dispatcher& dispatcher) {
-      return std::make_shared<ThreadLocalCache>(config.cache_config(), dispatcher.timeSource());
-    });
-  }
-  Envoy::ThreadLocal::TypedSlot<ThreadLocalCache> tls;
-};
 
 class GcpAuthnFilter : public Http::PassThroughFilter,
                        public RequestCallbacks,

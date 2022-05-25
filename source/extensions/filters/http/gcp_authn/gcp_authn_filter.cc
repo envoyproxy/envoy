@@ -22,35 +22,6 @@ void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str
   hdrs.addCopy(authorizationHeaderKey(), id_token);
 }
 
-template <typename TokenType> TokenType* TokenCacheImpl<TokenType>::lookUp(const std::string& key) {
-  ASSERT(lru_cache_ != nullptr);
-  typename LRUCache<TokenType>::ScopedLookup lookup(lru_cache_.get(), key);
-  if (lookup.found()) {
-    TokenType* const found_token = lookup.value();
-    if constexpr (std::is_same<TokenType, JwtToken>::value) {
-      ASSERT(found_token != nullptr);
-      // Verify the validness of the token by checking its expiration time field.
-      if (found_token->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) ==
-          ::google::jwt_verify::Status::JwtExpired) {
-        // Remove the expired entry.
-        lru_cache_->remove(key);
-      } else {
-        // Return the found token.
-        return found_token;
-      }
-    }
-  }
-  // Return `nullptr` if no entry is found.
-  return nullptr;
-}
-
-template <typename TokenType>
-void TokenCacheImpl<TokenType>::insert(const std::string& key, std::unique_ptr<TokenType>&& token) {
-  ASSERT(lru_cache_ != nullptr);
-  // Release the token to transfer the ownership of token.
-  lru_cache_->insert(key, token.release(), 1);
-}
-
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& hdrs, bool) {
   Envoy::Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {

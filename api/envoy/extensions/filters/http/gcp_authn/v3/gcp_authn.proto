@@ -39,5 +39,6 @@ message Audience {
 
 // Token Cache configuration.
 message TokenCacheConfig {
+  // Cache size. Default value is 0, which means the cache is disabled by default.
   uint32 cache_size = 1;
 }
