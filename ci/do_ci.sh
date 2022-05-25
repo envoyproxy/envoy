@@ -517,14 +517,10 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 elif [[ "$CI_TARGET" == "tooling" ]]; then
   setup_clang_toolchain
 
-  # TODO(phlax): move this to a bazel rule
-
-  echo "Run pytest tooling tests..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
-
   echo "Run protoxform test"
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
 
+  # TODO(phlax): move this to a bazel rule
   echo "check_format_test..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
 

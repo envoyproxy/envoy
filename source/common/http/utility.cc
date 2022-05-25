@@ -1129,7 +1129,7 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
   return route_retry_policy;
 }
 
-bool Utility::isSafeRequest(Http::RequestHeaderMap& request_headers) {
+bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
   absl::string_view method = request_headers.getMethodValue();
   return method == Http::Headers::get().MethodValues.Get ||
          method == Http::Headers::get().MethodValues.Head ||
