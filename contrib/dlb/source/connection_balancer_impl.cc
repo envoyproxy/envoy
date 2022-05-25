@@ -8,7 +8,9 @@
 #include <cstdlib>
 #include <memory>
 
+#ifndef DLB_DISABLED
 #include "dlb.h"
+#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +19,10 @@ namespace Dlb {
 Envoy::Network::ConnectionBalancerSharedPtr
 DLBConnectionBalanceFactory::createConnectionBalancerFromProto(
     const Protobuf::Message&, Server::Configuration::FactoryContext& context) {
-  // dlb init
+#ifdef DLB_DISABLED
+  context.localInfo();
+  throw EnvoyException("X86_64 architecture is required for Dlb.");
+#else
   dlb_resources_t rsrcs;
   if (dlb_open(1, &dlb) == -1) {
     ExceptionUtil::throwEnvoyException(fmt::format("dlb_open {}", errorDetails(errno)));
@@ -147,13 +152,13 @@ DLBConnectionBalanceFactory::createConnectionBalancerFromProto(
         fmt::format("dlb_start_sched_domain {}", errorDetails(errno)));
   }
 #endif
-
   DlbConnectionBalanceFactorySingleton::initialize(this);
 
   return std::make_shared<DlbConnectionBalancerImpl>();
 }
 
 DLBConnectionBalanceFactory::~DLBConnectionBalanceFactory() {
+#ifndef DLB_DISABLED
   for (dlb_port_hdl_t port : rx_ports) {
     if (dlb_disable_port(port)) {
       ENVOY_LOG(error, "dlb_disable_port {}", errorDetails(errno));
@@ -181,7 +186,7 @@ DLBConnectionBalanceFactory::~DLBConnectionBalanceFactory() {
   if (dlb_close(dlb) == -1) {
     ENVOY_LOG(error, "dlb_close {}", errorDetails(errno));
   }
-
+#endif
   for (int fd : efds) {
     if (close(fd) == -1) {
       ENVOY_LOG(error, "dlb close fd {}", errorDetails(errno));
@@ -200,10 +205,12 @@ void DlbBalancedConnectionHandlerImpl::setDlbEvent() {
 }
 
 void DlbBalancedConnectionHandlerImpl::post(Network::ConnectionSocketPtr&& socket) {
-
+#ifdef DLB_DISABLED
+  socket->isOpen();
+  throw EnvoyException("X86_64 architecture is required for Dlb.");
+#else
   // The pointer will be casted to unique_ptr in onDlbEvents(), no need to consider free.
   auto s = socket.release();
-
   dlb_event_t events[1];
   events[0].send.queue_id = DlbConnectionBalanceFactorySingleton::get().tx_queue_id;
   events[0].send.sched_type = SCHED_UNORDERED;
@@ -214,11 +221,14 @@ void DlbBalancedConnectionHandlerImpl::post(Network::ConnectionSocketPtr&& socke
   } else {
     ENVOY_LOG(debug, "{} dlb send fd {}", name_, s->ioHandle().fdDoNotUse());
   }
+#endif
 }
 
 void DlbBalancedConnectionHandlerImpl::onDlbEvents(uint32_t flags) {
   ASSERT(flags & (Event::FileReadyType::Read));
-
+#ifdef DLB_DISABLED
+  throw EnvoyException("X86_64 architecture is required for Dlb.");
+#else
   dlb_event_t dlb_events[32];
   int num_rx = dlb_recv(DlbConnectionBalanceFactorySingleton::get().rx_ports.at(index_), 32, false,
                         dlb_events);
@@ -245,11 +255,14 @@ void DlbBalancedConnectionHandlerImpl::onDlbEvents(uint32_t flags) {
 
       ENVOY_LOG(debug, "{} dlb recv {}", name_, socket->ioHandle().fdDoNotUse());
       auto listener = dynamic_cast<Envoy::Server::ActiveTcpListener*>(&handler_);
-      listener->onAcceptWorker(std::unique_ptr<Network::ConnectionSocket>(socket),
-                               listener->config_->handOffRestoredDestinationConnections(), true);
+      auto active_socket = std::make_unique<Envoy::Server::ActiveTcpSocket>(
+          *listener, std::unique_ptr<Network::ConnectionSocket>(socket),
+          listener->config_->handOffRestoredDestinationConnections());
+      listener->onSocketAccepted(std::move(active_socket));
       listener->incNumConnections();
     }
   }
+#endif
 }
 
 void DlbConnectionBalancerImpl::registerHandler(

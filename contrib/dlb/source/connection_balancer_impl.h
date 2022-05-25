@@ -11,7 +11,10 @@
 #include "source/server/active_tcp_listener.h"
 
 #include "contrib/envoy/extensions/dlb/v3alpha/dlb.pb.h"
+
+#ifndef DLB_DISABLED
 #include "dlb.h"
+#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -61,16 +64,18 @@ public:
 
   // Init those only when Envoy start.
   int domain_id, ldb_pool_id, dir_pool_id, tx_queue_id;
+#ifndef DLB_DISABLED
   dlb_domain_hdl_t domain;
   dlb_hdl_t dlb;
   dlb_dev_cap_t cap;
 
   // Share those cross worker threads.
   std::vector<dlb_port_hdl_t> tx_ports, rx_ports;
+#endif
   std::vector<int> efds;
   std::vector<std::shared_ptr<DlbBalancedConnectionHandlerImpl>> dlb_handlers;
   std::vector<Envoy::Event::FileEventPtr> file_events;
-
+#ifndef DLB_DISABLED
   const static int cq_depth = 8;
   static int createLdbPort(dlb_domain_hdl_t domain, dlb_dev_cap_t cap, int ldb_pool, int dir_pool) {
     dlb_create_port_t args;
@@ -121,6 +126,7 @@ public:
 
     return dlb_create_ldb_queue(domain, &args);
   }
+#endif
 };
 
 REGISTER_FACTORY(DLBConnectionBalanceFactory, Envoy::Network::ConnectionBalanceFactory);

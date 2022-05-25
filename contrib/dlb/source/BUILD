@@ -3,6 +3,7 @@ load(
     "envoy_cc_contrib_extension",
     "envoy_contrib_package",
 )
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_foreign_cc//foreign_cc:defs.bzl", "make")
 
 licenses(["notice"])  # Apache 2
@@ -20,15 +21,28 @@ make(
     visibility = ["//visibility:public"],
 )
 
+selects.config_setting_group(
+    name = "linux_x86_64_gcc_build",
+    match_all = [
+        "//bazel:linux_x86_64",
+        "//bazel:gcc_build",
+    ],
+)
+
 envoy_cc_contrib_extension(
     name = "connection_balancer",
     srcs = [
         "connection_balancer_impl.cc",
     ],
     hdrs = ["connection_balancer_impl.h"],
+    defines = select({
+        ":linux_x86_64_gcc_build": [],
+        "//conditions:default": [
+            "DLB_DISABLED=0",
+        ],
+    }),
     visibility = ["//visibility:public"],
     deps = [
-        ":dlb",
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",
@@ -37,5 +51,11 @@ envoy_cc_contrib_extension(
         "//source/common/protobuf:utility_lib",
         "//source/server:active_tcp_listener",
         "@envoy_api//contrib/envoy/extensions/dlb/v3alpha:pkg_cc_proto",
-    ],
+    ] + select({
+        ":linux_x86_64_gcc_build": [
+            ":dlb",
+        ],
+        "//conditions:default": [
+        ],
+    }),
 )
