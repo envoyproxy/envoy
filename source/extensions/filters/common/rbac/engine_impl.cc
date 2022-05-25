@@ -116,7 +116,7 @@ RoleBasedAccessControlMatcherEngineImpl::RoleBasedAccessControlMatcherEngineImpl
   has_log_ = context.has_log_;
 
   if (!validation_visitor.errors().empty()) {
-    throw EnvoyException(fmt::format("requirement violation while creating route match tree: {}",
+    throw EnvoyException(fmt::format("requirement violation while creating RBAC match tree: {}",
                                      validation_visitor.errors()[0]));
   }
 }
