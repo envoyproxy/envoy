@@ -40,7 +40,8 @@ filter can also be configured with the :ref:`matching API <envoy_v3_api_msg_.xds
 network filter and HTTP filter, and :ref:`HTTP inputs <extension_category_envoy.matching.http.input>`
 are only available in HTTP filter.
 
-RBAC matchers are not compatible with the :ref:`matching API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`.
+:ref:`RBAC matcher extensions <api-v3_config_rbac_matchers>` are not compatible with the
+:ref:`matching API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`.
 
 Shadow Policy and Shadow Matcher
 --------------------------------
