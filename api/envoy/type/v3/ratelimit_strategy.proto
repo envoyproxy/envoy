@@ -5,9 +5,9 @@ package envoy.type.v3;
 import "envoy/type/v3/ratelimit_unit.proto";
 import "envoy/type/v3/token_bucket.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "google/protobuf/duration.proto";
+
+import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
