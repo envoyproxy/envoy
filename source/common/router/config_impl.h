@@ -528,8 +528,11 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const absl::optional<std::string> statPrefix() const override {
-        return stat_prefix_;
+  const absl::optional<PathStatsConfig>& pathStatsConfig() const override {
+    return path_stats_config_;
+  }
+  static PathStats generatePathStats(Stats::Scope& scope, const PathStatNames& stat_names) {
+    return PathStats{stat_names, scope};
   }
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
@@ -634,9 +637,6 @@ public:
     const std::string& routeName() const override { return parent_->routeName(); }
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
-      const absl::optional<std::string> statPrefix() const override {
-        return parent_->statPrefix();
-  }
     Http::Code clusterNotFoundResponseCode() const override {
       return parent_->clusterNotFoundResponseCode();
     }
@@ -736,6 +736,9 @@ public:
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return parent_->connectConfig();
     }
+    const absl::optional<PathStatsConfig>& pathStatsConfig() const override {
+      return parent_->pathStatsConfig();
+    }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
 
     // Router::Route
@@ -775,8 +778,6 @@ public:
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
     }
-
-        const absl::optional<std::string> statPrefix() const override { return absl::optional<std::string>();}
 
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
       if (cluster_metadata_match_criteria_) {
@@ -934,7 +935,9 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const bool append_xfh_;
   const std::string cluster_name_;
-  const absl::optional<std::string> stat_prefix_;
+  absl::optional<PathStatsConfig> path_stats_config_;
+  Stats::ScopeSharedPtr path_stats_scope_;
+  Stats::StatNameManagedStorage path_stat_name_storage_;
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;

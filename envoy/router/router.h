@@ -531,10 +531,41 @@ using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
   STATNAME(vhost)
 
 /**
+ * All path level stats. @see stats_macro.h
+ */
+#define ALL_PATH_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                          \
+  COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
+  COUNTER(upstream_rq_retry_overflow)                                                              \
+  COUNTER(upstream_rq_retry_success)                                                               \
+  COUNTER(upstream_rq_timeout)                                                                     \
+  COUNTER(upstream_rq_total)                                                                       \
+  STATNAME(path)                                                                                   \
+  STATNAME(vhost)
+
+/**
  * Struct definition for all virtual cluster stats. @see stats_macro.h
  */
 MAKE_STAT_NAMES_STRUCT(VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
+
+/**
+ * Struct definition for all path level stats. @see stats_macro.h
+ */
+MAKE_STAT_NAMES_STRUCT(PathStatNames, ALL_PATH_STATS);
+MAKE_STATS_STRUCT(PathStats, PathStatNames, ALL_PATH_STATS);
+
+/**
+ * PathStatsConfig defines config needed to generate all path level stats.
+ */
+struct PathStatsConfig {
+  Stats::StatName path_stat_name_;
+  mutable PathStats path_stats_;
+
+public:
+  PathStatsConfig(Stats::StatName stat_name, const PathStats& path_stats)
+      : path_stat_name_(stat_name), path_stats_(path_stats) {}
+};
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -997,10 +1028,10 @@ public:
    */
   virtual const std::string& routeName() const PURE;
 
-    /**
-   * @return std::string& the stats prefix of the route.
+  /**
+   * @return PathStatsConfig the config needed to generate path level stats.
    */
-  virtual const absl::optional<std::string> statPrefix() const PURE;
+  virtual const absl::optional<PathStatsConfig>& pathStatsConfig() const PURE;
 };
 
 /**

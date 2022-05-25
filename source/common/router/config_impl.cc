@@ -482,7 +482,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
       append_xfh_(route.route().append_x_forwarded_host()), cluster_name_(route.route().cluster()),
-             stat_prefix_(route.name()),
+      path_stat_name_storage_(route.stat_prefix(), factory_context.scope().symbolTable()),
       cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -536,8 +536,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
                           validator),
-      route_name_(route.name()),
-      time_source_(factory_context.mainThreadDispatcher().timeSource()),
+      route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
       random_value_header_name_(route.route().weighted_clusters().header_name()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -654,6 +653,17 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
               path_redirect_);
+  }
+  std::cout << "route has stat prefix..." << route.stat_prefix()
+            << "::" << route.stat_prefix().empty() << "\n";
+  if (!route.stat_prefix().empty()) {
+    path_stats_scope_ = Stats::Utility::scopeFromStatNames(
+        *factory_context.scope().scopeFromStatName(
+            factory_context.routerContext().pathStatNames().vhost_),
+        {vhost.statName(), factory_context.routerContext().pathStatNames().path_});
+    path_stats_config_.emplace(PathStatsConfig{
+        path_stat_name_storage_.statName(),
+        generatePathStats(*path_stats_scope_, factory_context.routerContext().pathStatNames())});
   }
 }
 
@@ -1072,6 +1082,8 @@ RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
       factory_context.singletonManager());
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
+    std::cout << "Setting retry policy...." << route_config.retry_policy().num_retries().value()
+              << "\n";
     return RetryPolicyImpl(route_config.retry_policy(), validation_visitor, retry_factory_context);
   }
 

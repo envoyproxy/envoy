@@ -196,7 +196,9 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
-    const absl::optional<std::string> statPrefix() const override { return absl::optional<std::string>();}
+    const absl::optional<Router::PathStatsConfig>& pathStatsConfig() const override {
+      return path_stats_config_nullopt_;
+    }
     Http::Code clusterNotFoundResponseCode() const override {
       return Http::Code::InternalServerError;
     }
@@ -298,6 +300,7 @@ private:
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
     static const absl::optional<ConnectConfig> connect_config_nullopt_;
+    static const absl::optional<Router::PathStatsConfig> path_stats_config_nullopt_;
     const std::string route_name_;
   };
 

@@ -322,17 +322,18 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
     Stats::StatName upstream_zone = upstreamZone(upstream_host);
-    Http::CodeStats::ResponseStatInfo info{config_.scope_,
-                                           cluster_->statsScope(),
-                                           config_.empty_stat_name_,
-                                           response_status_code,
-                                           internal_request,
-                                           route_entry_->virtualHost().statName(),
-                                           request_vcluster_ ? request_vcluster_->statName()
-                                                             : config_.empty_stat_name_,
-                                           config_.zone_name_,
-                                           upstream_zone,
-                                           is_canary};
+    Http::CodeStats::ResponseStatInfo info{
+        config_.scope_,
+        cluster_->statsScope(),
+        config_.empty_stat_name_,
+        response_status_code,
+        internal_request,
+        route_entry_->virtualHost().statName(),
+        request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
+        path_stats_config_ ? path_stats_config_->path_stat_name_ : config_.empty_stat_name_,
+        config_.zone_name_,
+        upstream_zone,
+        is_canary};
 
     Http::CodeStats& code_stats = httpContext().codeStats();
     code_stats.chargeResponseStat(info, exclude_http_code_stats_);
@@ -343,6 +344,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                                  alt_stat_prefix_->statName(),
                                                  response_status_code,
                                                  internal_request,
+                                                 config_.empty_stat_name_,
                                                  config_.empty_stat_name_,
                                                  config_.empty_stat_name_,
                                                  config_.zone_name_,
@@ -462,6 +464,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   request_vcluster_ = route_entry_->virtualCluster(headers);
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
+  }
+  if (route_entry_->pathStatsConfig().has_value()) {
+    path_stats_config_ = &route_entry_->pathStatsConfig().value();
   }
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.getPathValue());
@@ -1566,17 +1571,18 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
     Http::CodeStats& code_stats = httpContext().codeStats();
-    Http::CodeStats::ResponseTimingInfo info{config_.scope_,
-                                             cluster_->statsScope(),
-                                             config_.empty_stat_name_,
-                                             response_time,
-                                             upstream_request.upstreamCanary(),
-                                             internal_request,
-                                             route_entry_->virtualHost().statName(),
-                                             request_vcluster_ ? request_vcluster_->statName()
-                                                               : config_.empty_stat_name_,
-                                             config_.zone_name_,
-                                             upstreamZone(upstream_request.upstreamHost())};
+    Http::CodeStats::ResponseTimingInfo info{
+        config_.scope_,
+        cluster_->statsScope(),
+        config_.empty_stat_name_,
+        response_time,
+        upstream_request.upstreamCanary(),
+        internal_request,
+        route_entry_->virtualHost().statName(),
+        request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
+        path_stats_config_ ? path_stats_config_->path_stat_name_ : config_.empty_stat_name_,
+        config_.zone_name_,
+        upstreamZone(upstream_request.upstreamHost())};
 
     code_stats.chargeResponseTiming(info);
 
@@ -1587,6 +1593,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
                                                response_time,
                                                upstream_request.upstreamCanary(),
                                                internal_request,
+                                               config_.empty_stat_name_,
                                                config_.empty_stat_name_,
                                                config_.empty_stat_name_,
                                                config_.zone_name_,
