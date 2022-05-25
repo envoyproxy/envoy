@@ -70,7 +70,7 @@ message RateLimitQuotaFilterConfig {
   //                 name:
   //                   string_value: staging
   //
-  //     # Assign requests with header['user_group'] set to 'admin' to the bucket { name: 'staging' }
+  //     # Assign requests with header['user_group'] set to 'admin' to the bucket { acl: 'admin_users' }
   //     - predicate:
   //         single_predicate:
   //           input:
@@ -89,7 +89,7 @@ message RateLimitQuotaFilterConfig {
   //             '@type': type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
   //             bucket_id_builder:
   //               bucket_id_builder:
-  //                 name:
+  //                 acl:
   //                   string_value: admin_users
   //
   // .. attention::
