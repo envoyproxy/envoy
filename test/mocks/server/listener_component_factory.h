@@ -43,7 +43,7 @@ public:
   MOCK_METHOD(DrainManager*, createDrainManager_,
               (envoy::config::listener::v3::Listener::DrainType drain_type));
   MOCK_METHOD(uint64_t, nextListenerTag, ());
-  MOCK_METHOD(const std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>&,
+  MOCK_METHOD(Filter::TcpListenerFilterConfigProviderManagerImpl*,
               getTcpListenerConfigProviderManager, ());
 
   std::shared_ptr<Network::MockListenSocket> socket_;

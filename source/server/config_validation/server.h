@@ -152,7 +152,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
-        filters, context, *tcp_listener_config_provider_manager_);
+        filters, context, tcp_listener_config_provider_manager_);
   }
   std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
@@ -173,9 +173,9 @@ public:
     return nullptr;
   }
   uint64_t nextListenerTag() override { return 0; }
-  const std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>&
+  Filter::TcpListenerFilterConfigProviderManagerImpl*
   getTcpListenerConfigProviderManager() override {
-    return tcp_listener_config_provider_manager_;
+    return &tcp_listener_config_provider_manager_;
   }
 
   // Server::WorkerFactory
@@ -235,8 +235,7 @@ private:
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
   Quic::QuicStatNames quic_stat_names_;
-  const std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
-      tcp_listener_config_provider_manager_;
+  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 
 } // namespace Server

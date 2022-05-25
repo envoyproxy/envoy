@@ -122,10 +122,10 @@ public:
   virtual uint64_t nextListenerTag() PURE;
 
   /**
-   * @return std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl> the TCP listener
+   * @return Filter::TcpListenerFilterConfigProviderManagerImpl* the pointer of the TCP listener
    * config provider manager.
    */
-  virtual const std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>&
+  virtual Filter::TcpListenerFilterConfigProviderManagerImpl*
   getTcpListenerConfigProviderManager() PURE;
 };
 

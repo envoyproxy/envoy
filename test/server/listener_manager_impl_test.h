@@ -65,9 +65,7 @@ public:
 
 protected:
   ListenerManagerImplTest()
-      : api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()),
-        tcp_listener_config_provider_manager_(
-            std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {}
+      : api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -90,7 +88,7 @@ protected:
                   filters, filter_chain_factory_context);
             }));
     ON_CALL(listener_factory_, getTcpListenerConfigProviderManager())
-        .WillByDefault(ReturnRef(tcp_listener_config_provider_manager_));
+        .WillByDefault(Return(&tcp_listener_config_provider_manager_));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
@@ -368,8 +366,7 @@ protected:
   NiceMock<testing::MockFunction<void()>> callback_;
   // Test parameter indicating whether the unified filter chain matcher is enabled.
   bool use_matcher_;
-  const std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
-      tcp_listener_config_provider_manager_;
+  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 } // namespace Server
 } // namespace Envoy

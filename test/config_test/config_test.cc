@@ -56,9 +56,7 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 class ConfigTest {
 public:
   ConfigTest(const OptionsImpl& options)
-      : api_(Api::createApiForTest(time_system_)), options_(options),
-        tcp_listener_config_provider_manager_(
-            std::make_unique<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {
+      : api_(Api::createApiForTest(time_system_)), options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
@@ -114,7 +112,7 @@ public:
                   filters, context);
             }));
     ON_CALL(component_factory_, getTcpListenerConfigProviderManager())
-        .WillByDefault(ReturnRef(tcp_listener_config_provider_manager_));
+        .WillByDefault(Return(&tcp_listener_config_provider_manager_));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
@@ -162,8 +160,7 @@ public:
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
-  const std::unique_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
-      tcp_listener_config_provider_manager_;
+  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 
 void testMerge() {
