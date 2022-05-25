@@ -71,8 +71,8 @@ bug_fixes:
 - area: http
   change: |
     Fixed HTTP/2 CONNECT to be RFC compliant, rather than following the abandoned extended connect draft.
-     This behavioral change can be reverted by setting runtime guard
-    ``envoy.reloadable_features.use_rfc_connect`` to false.
+    This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.use_rfc_connect`` to false.
+
 - area: runtime
   change: |
     Fixed a bug where was ``envoy.restart_features.no_runtime_singleton`` was inverted.
