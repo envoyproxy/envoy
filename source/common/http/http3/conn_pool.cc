@@ -40,10 +40,18 @@ std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
     : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
+                                  getMaxStreams(parent.host()->cluster()),
                                   parent.host()->cluster().stats().upstream_cx_http3_total_, data),
       async_connect_callback_(parent_.dispatcher().createSchedulableCallback([this]() {
-        if (state() == Envoy::ConnectionPool::ActiveClient::State::Connecting) {
-          codec_client_->connect();
+        if (state() != Envoy::ConnectionPool::ActiveClient::State::Connecting) {
+          return;
+        }
+        codec_client_->connect();
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data") &&
+            readyForStream()) {
+          // This client can send early data, so check if there are any pending streams can be sent
+          // as early data.
+          parent_.onUpstreamReadyForEarlyData(*this);
         }
       })) {
   ASSERT(codec_client_);
@@ -58,10 +66,11 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   updateCapacity(num_streams);
   if (state() == ActiveClient::State::Busy && currentUnusedCapacity() != 0) {
+    ENVOY_BUG(hasHandshakeCompleted(), "Received MAX_STREAM frame before handshake completed.");
     parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
     // If there's waiting streams, make sure the pool will now serve them.
     parent_.onUpstreamReady();
-  } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::Ready) {
+  } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::ReadyForEarlyData) {
     // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
     parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
   }
@@ -83,7 +92,7 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
     OptRef<PoolConnectResultCallback> connect_callback, Http::PersistentQuicInfo& quic_info)
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
-                            random_generator, state, client_fn, codec_fn, protocol),
+                            random_generator, state, client_fn, codec_fn, protocol, {}, nullptr),
       quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
       server_id_(sni(transport_socket_options, host),
                  static_cast<uint16_t>(host_->address()->ip()->port()), false),
@@ -92,6 +101,13 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
 void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
   if (connect_callback_ != absl::nullopt) {
     connect_callback_->onHandshakeComplete();
+  }
+}
+
+void Http3ConnPoolImpl::onConnectFailed(Envoy::ConnectionPool::ActiveClient& client) {
+  ASSERT(client.numActiveStreams() == 0);
+  if (static_cast<ActiveClient&>(client).hasCreatedStream() && connect_callback_ != absl::nullopt) {
+    connect_callback_->onZeroRttHandshakeFailed();
   }
 }
 

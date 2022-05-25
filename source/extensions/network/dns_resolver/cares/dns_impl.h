@@ -37,6 +37,10 @@ public:
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
+  void resetNetworking() override {
+    // Dirty the channel so that the next query will recreate it.
+    dirty_channel_ = true;
+  }
 
 private:
   friend class DnsResolverImplPeer;
@@ -111,6 +115,7 @@ private:
 
   private:
     void startResolutionImpl(int family);
+    bool isResponseWithNoRecords(int status);
 
     // Holds the availability of non-loopback network interfaces for the system.
     struct AvailableInterfaces {
@@ -137,6 +142,7 @@ private:
     const DnsLookupFamily dns_lookup_family_;
     // Queried for at construction time.
     const AvailableInterfaces available_interfaces_;
+    const bool accept_nodata_;
   };
 
   struct AresOptions {

@@ -8,6 +8,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.file_system_buffer",
     "envoy.filters.http.language",
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
@@ -78,11 +79,11 @@ def _envoy_repo_impl(repository_ctx):
     constraints of a `genquery`.
 
     """
-    repo_path = repository_ctx.path(repository_ctx.attr.envoy_root).dirname
-    version = repository_ctx.read(repo_path.get_child("VERSION.txt")).strip()
+    repo_path = repository_ctx.path(repository_ctx.attr.envoy_version)
+    version = repository_ctx.read(repo_path.dirname.get_child(repo_path.basename)).strip()
     repository_ctx.file("version.bzl", "VERSION = '%s'" % version)
-    repository_ctx.file("path.bzl", "PATH = '%s'" % repo_path)
-    repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path, version))
+    repository_ctx.file("path.bzl", "PATH = '%s'" % repo_path.dirname)
+    repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path.dirname, version))
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", """
 load("@rules_python//python:defs.bzl", "py_library")
@@ -94,7 +95,7 @@ py_library(name = "envoy_repo", srcs = ["__init__.py"], visibility = ["//visibil
 _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
     attrs = {
-        "envoy_root": attr.label(default = "@envoy//:BUILD"),
+        "envoy_version": attr.label(default = "@envoy//:VERSION.txt"),
     },
 )
 
@@ -222,7 +223,6 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
-    external_http_archive("rules_cc")
     external_http_archive("rules_pkg")
     _com_github_fdio_vpp_vcl()
 
@@ -888,6 +888,7 @@ def _com_googlesource_chromium_zlib():
 def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
+        patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(
@@ -897,10 +898,6 @@ def _com_github_google_quiche():
     native.bind(
         name = "quiche_http2_adapter",
         actual = "@com_github_google_quiche//:http2_adapter",
-    )
-    native.bind(
-        name = "quiche_http2_platform",
-        actual = "@com_github_google_quiche//:http2_platform",
     )
     native.bind(
         name = "quiche_spdy_platform",

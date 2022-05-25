@@ -17,8 +17,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
 
-using TrafficRoutingAssistantMap = std::map<std::string, std::map<std::string, std::string>>;
-
 class StateNameValues {
 public:
   static const std::string& name(State state) {
@@ -43,16 +41,12 @@ public:
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes
-   * the decoding state machine. Returns ProtocolState::WaitForData if more data
-   * is required to complete processing of a message. Returns
-   * ProtocolState::Done when the end of a message is successfully processed.
+   * the decoding state machine.
    * Once the Done state is reached, further invocations of run return
    * immediately with Done.
    *
    * @param buffer a buffer containing the remaining data to be processed
-   * @return ProtocolState returns with ProtocolState::WaitForData or
-   * ProtocolState::Done
-   * @throw Envoy Exception if thrown by the underlying Protocol
+   * @return State returns with State::Done
    */
   State run();
 
@@ -67,9 +61,6 @@ private:
     absl::optional<FilterStatus> filter_status_;
   };
 
-  // These functions map directly to the matching ProtocolState values. Each
-  // returns the next state or ProtocolState::WaitForData if more data is
-  // required.
   DecoderStatus transportBegin();
   DecoderStatus messageBegin();
   DecoderStatus messageEnd();

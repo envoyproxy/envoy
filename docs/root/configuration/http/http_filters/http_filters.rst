@@ -23,6 +23,7 @@ HTTP filters
   ext_authz_filter
   ext_proc_filter
   fault_filter
+  file_system_buffer_filter
   gcp_authn_filter
   grpc_http1_bridge_filter
   grpc_http1_reverse_bridge_filter

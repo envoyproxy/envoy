@@ -26,33 +26,6 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-TEST(NetworkUtility, Url) {
-  EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));
-  EXPECT_EQ(1234U, Utility::portFromTcpUrl("tcp://foo:1234"));
-  EXPECT_THROW(Utility::hostFromTcpUrl("bogus://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("bogus://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromTcpUrl("abc://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("abc://foo"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromTcpUrl("tcp://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:bar"), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("tcp://https://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromTcpUrl(""), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:999999999999"), EnvoyException);
-}
-
-TEST(NetworkUtility, udpUrl) {
-  EXPECT_EQ("foo", Utility::hostFromUdpUrl("udp://foo:1234"));
-  EXPECT_EQ(1234U, Utility::portFromUdpUrl("udp://foo:1234"));
-  EXPECT_THROW(Utility::hostFromUdpUrl("bogus://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::portFromUdpUrl("bogus://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromUdpUrl("tcp://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromUdpUrl("tcp://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::portFromUdpUrl("udp://https://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromUdpUrl(""), EnvoyException);
-  EXPECT_THROW(Utility::portFromUdpUrl("udp://foo:999999999999"), EnvoyException);
-}
-
 TEST(NetworkUtility, resolveUrl) {
   EXPECT_THROW(Utility::resolveUrl("foo"), EnvoyException);
   EXPECT_THROW(Utility::resolveUrl("abc://foo"), EnvoyException);

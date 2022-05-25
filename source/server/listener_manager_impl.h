@@ -46,21 +46,21 @@ public:
   /**
    * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList_(
+  static std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryListImpl(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Configuration::FilterChainFactoryContext& filter_chain_factory_context);
 
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList_(
+  static std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryListImpl(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
 
   /**
    * Static worker for createUdpListenerFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList_(
+  static std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryListImpl(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
 
@@ -78,17 +78,17 @@ public:
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
-    return createNetworkFilterFactoryList_(filters, filter_chain_factory_context);
+    return createNetworkFilterFactoryListImpl(filters, filter_chain_factory_context);
   }
   std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return createListenerFilterFactoryList_(filters, context);
+    return createListenerFilterFactoryListImpl(filters, context);
   }
   std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return createUdpListenerFilterFactoryList_(filters, context);
+    return createUdpListenerFilterFactoryListImpl(filters, context);
   }
 
   Network::SocketSharedPtr createListenSocket(

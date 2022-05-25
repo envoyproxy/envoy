@@ -22,11 +22,11 @@ namespace {
 
 class SimpleHttpCacheTestDelegate : public HttpCacheTestDelegate {
 public:
-  HttpCache& cache() override { return cache_; }
+  std::shared_ptr<HttpCache> cache() override { return cache_; }
   bool validationEnabled() const override { return true; }
 
 private:
-  SimpleHttpCache cache_;
+  std::shared_ptr<SimpleHttpCache> cache_ = std::make_shared<SimpleHttpCache>();
 };
 
 INSTANTIATE_TEST_SUITE_P(SimpleHttpCacheTest, HttpCacheImplementationTest,
@@ -42,7 +42,7 @@ TEST(Registration, GetFactory) {
   envoy::extensions::filters::http::cache::v3::CacheConfig config;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
-  EXPECT_EQ(factory->getCache(config, factory_context).cacheInfo().name_,
+  EXPECT_EQ(factory->getCache(config, factory_context)->cacheInfo().name_,
             "envoy.extensions.http.cache.simple");
 }
 

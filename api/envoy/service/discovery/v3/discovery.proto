@@ -10,6 +10,7 @@ import "google/rpc/status.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.discovery.v3";
 option java_outer_classname = "DiscoveryProto";
@@ -19,9 +20,30 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common discovery API components]
 
+// Specifies a resource to be subscribed to.
+message ResourceLocator {
+  // The resource name to subscribe to.
+  string name = 1;
+
+  // A set of dynamic parameters used to match against the dynamic parameter
+  // constraints on the resource. This allows clients to select between
+  // multiple variants of the same resource.
+  map<string, string> dynamic_parameters = 2;
+}
+
+// Specifies a concrete resource name.
+message ResourceName {
+  // The name of the resource.
+  string name = 1;
+
+  // Dynamic parameter constraints associated with this resource. To be used by client-side caches
+  // (including xDS proxies) when matching subscribed resource locators.
+  DynamicParameterConstraints dynamic_parameter_constraints = 2;
+}
+
 // A DiscoveryRequest requests a set of versioned resources of the same type for
 // a given Envoy node on some API.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryRequest";
 
@@ -44,6 +66,15 @@ message DiscoveryRequest {
   // will then imply a number of resources that need to be fetched via EDS/RDS,
   // which will be explicitly enumerated in resource_names.
   repeated string resource_names = 3;
+
+  // [#not-implemented-hide:]
+  // Alternative to *resource_names* field that allows specifying dynamic
+  // parameters along with each resource name. Clients that populate this
+  // field must be able to handle responses from the server where resources
+  // are wrapped in a Resource message.
+  // Note that it is legal for a request to have some resources listed
+  // in *resource_names* and others in *resource_locators*.
+  repeated ResourceLocator resource_locators = 7;
 
   // Type of the resource that is being requested, e.g.
   // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This is implicit
@@ -141,7 +172,7 @@ message DiscoveryResponse {
 // In particular, initial_resource_versions being sent at the "start" of every
 // gRPC stream actually entails a message for each type_url, each with its own
 // initial_resource_versions.
-// [#next-free-field: 8]
+// [#next-free-field: 10]
 message DeltaDiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DeltaDiscoveryRequest";
 
@@ -180,6 +211,20 @@ message DeltaDiscoveryRequest {
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
 
+  // [#not-implemented-hide:]
+  // Alternative to *resource_names_subscribe* field that allows specifying dynamic parameters
+  // along with each resource name.
+  // Note that it is legal for a request to have some resources listed
+  // in *resource_names_subscribe* and others in *resource_locators_subscribe*.
+  repeated ResourceLocator resource_locators_subscribe = 8;
+
+  // [#not-implemented-hide:]
+  // Alternative to *resource_names_unsubscribe* field that allows specifying dynamic parameters
+  // along with each resource name.
+  // Note that it is legal for a request to have some resources listed
+  // in *resource_names_unsubscribe* and others in *resource_locators_unsubscribe*.
+  repeated ResourceLocator resource_locators_unsubscribe = 9;
+
   // Informs the server of the versions of the resources the xDS client knows of, to enable the
   // client to continue the same logical xDS session even in the face of gRPC stream reconnection.
   // It will not be populated: [1] in the very first stream of a session, since the client will
@@ -202,7 +247,7 @@ message DeltaDiscoveryRequest {
   google.rpc.Status error_detail = 7;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message DeltaDiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.DeltaDiscoveryResponse";
@@ -224,6 +269,11 @@ message DeltaDiscoveryResponse {
   // Removed resources for missing resources can be ignored.
   repeated string removed_resources = 6;
 
+  // Alternative to removed_resources that allows specifying which variant of
+  // a resource is being removed. This variant must be used for any resource
+  // for which dynamic parameter constraints were sent to the client.
+  repeated ResourceName removed_resource_names = 8;
+
   // The nonce provides a way for DeltaDiscoveryRequests to uniquely
   // reference a DeltaDiscoveryResponse when (N)ACKing. The nonce is required.
   string nonce = 5;
@@ -233,7 +283,56 @@ message DeltaDiscoveryResponse {
   config.core.v3.ControlPlane control_plane = 7;
 }
 
-// [#next-free-field: 8]
+// A set of dynamic parameter constraints associated with a variant of an individual xDS resource.
+// These constraints determine whether the resource matches a subscription based on the set of
+// dynamic parameters in the subscription, as specified in the
+// :ref:`ResourceLocator.dynamic_parameters<envoy_v3_api_field_service.discovery.v3.ResourceLocator.dynamic_parameters>`
+// field. This allows xDS implementations (clients, servers, and caching proxies) to determine
+// which variant of a resource is appropriate for a given client.
+message DynamicParameterConstraints {
+  // A single constraint for a given key.
+  message SingleConstraint {
+    message Exists {
+    }
+
+    // The key to match against.
+    string key = 1;
+
+    oneof constraint_type {
+      option (validate.required) = true;
+
+      // Matches this exact value.
+      string value = 2;
+
+      // Key is present (matches any value except for the key being absent).
+      // This allows setting a default constraint for clients that do
+      // not send a key at all, while there may be other clients that need
+      // special configuration based on that key.
+      Exists exists = 3;
+    }
+  }
+
+  message ConstraintList {
+    repeated DynamicParameterConstraints constraints = 1;
+  }
+
+  oneof type {
+    // A single constraint to evaluate.
+    SingleConstraint constraint = 1;
+
+    // A list of constraints that match if any one constraint in the list
+    // matches.
+    ConstraintList or_constraints = 2;
+
+    // A list of constraints that must all match.
+    ConstraintList and_constraints = 3;
+
+    // The inverse (NOT) of a set of constraints.
+    DynamicParameterConstraints not_constraints = 4;
+  }
+}
+
+// [#next-free-field: 9]
 message Resource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Resource";
 
@@ -247,7 +346,14 @@ message Resource {
   }
 
   // The resource's name, to distinguish it from others of the same type of resource.
+  // Only one of *name* or *resource_name* may be set.
   string name = 3;
+
+  // Alternative to the *name* field, to be used when the server supports
+  // multiple variants of the named resource that are differentiated by
+  // dynamic parameter constraints.
+  // Only one of *name* or *resource_name* may be set.
+  ResourceName resource_name = 8;
 
   // The aliases are a list of other names that this resource can go by.
   repeated string aliases = 4;

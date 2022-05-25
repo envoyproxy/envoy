@@ -19,4 +19,3 @@ layered_runtime {
     }
   }
 }
-use_tcp_for_dns_lookups: true
