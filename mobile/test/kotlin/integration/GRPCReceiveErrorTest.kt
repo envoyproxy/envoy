@@ -136,10 +136,10 @@ class GRPCReceiveErrorTest {
       .sendHeaders(requestHeader, false)
       .sendMessage(ByteBuffer.wrap(ByteArray(5)))
 
-    engine.terminate()
     filterReceivedError.await(10, TimeUnit.SECONDS)
     filterNotCancelled.await(1, TimeUnit.SECONDS)
     callbackReceivedError.await(10, TimeUnit.SECONDS)
+    engine.terminate()
 
     assertThat(filterReceivedError.count)
       .withFailMessage("Missing call to onError filter callback")
