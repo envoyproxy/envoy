@@ -154,7 +154,7 @@ TEST(StartTlsTest, CallbackProxy) {
 
   // Check const version of ioHandle
   EXPECT_CALL(testing::Const(transport_callbacks), ioHandle()).WillOnce(testing::ReturnRef(handle));
-  const_cast<const Network::TransportSocketCallbacks*>(proxy)->ioHandle();
+  static_cast<const Network::TransportSocketCallbacks*>(proxy)->ioHandle();
 
   Network::MockConnection connection;
   EXPECT_CALL(transport_callbacks, connection()).WillOnce(testing::ReturnRef(connection));
