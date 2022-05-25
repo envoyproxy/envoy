@@ -83,17 +83,6 @@ public:
       // The default stats config has overenthusiastic filters.
       bootstrap.clear_stats_config();
     });
-    // TODO(alyssawilk) upstream has an issue with logical DNS ipv6 clusters -
-    // remove this once #21359 lands.
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* static_resources = bootstrap.mutable_static_resources();
-      for (int i = 0; i < static_resources->clusters_size(); ++i) {
-        auto* cluster = static_resources->mutable_clusters(i);
-        if (cluster->type() == envoy::config::cluster::v3::Cluster::LOGICAL_DNS) {
-          cluster->clear_type();
-        }
-      }
-    });
   }
 
   void initialize() override {
