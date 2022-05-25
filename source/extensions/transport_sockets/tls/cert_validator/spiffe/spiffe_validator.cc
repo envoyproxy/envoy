@@ -273,7 +273,7 @@ absl::optional<uint32_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
   for (auto& cert : ca_certs_) {
     const absl::optional<uint32_t> tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
     if (!tmp.has_value()) {
-      return absl::make_optional(0);
+      return absl::nullopt;
     } else if (tmp.value() < ret.value()) {
       ret = tmp;
     }

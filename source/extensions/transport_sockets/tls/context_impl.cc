@@ -488,13 +488,13 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
 absl::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
   absl::optional<uint32_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
   if (!daysUntilExpiration.has_value()) {
-    return absl::make_optional(0);
+    return absl::nullopt;
   }
   for (auto& ctx : tls_contexts_) {
     const absl::optional<uint32_t> tmp =
         Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_);
     if (!tmp.has_value()) {
-      return absl::make_optional(0);
+      return absl::nullopt;
     }
     daysUntilExpiration = std::min<uint32_t>(tmp.value(), daysUntilExpiration.value());
   }

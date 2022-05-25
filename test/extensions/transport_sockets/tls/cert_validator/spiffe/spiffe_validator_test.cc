@@ -563,7 +563,7 @@ typed_config:
   EXPECT_EQ(19221, validator().daysUntilFirstCertExpires().value());
 }
 
-TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpired) {
+TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpiresExpired) {
   Event::SimulatedTimeSystem time_system;
   // 2033-05-18 03:33:20 UTC
   const time_t known_date_time = 2000000000;
@@ -580,7 +580,7 @@ typed_config:
   )EOF"),
              time_system);
 
-  EXPECT_EQ(absl::make_optional(0), validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(absl::nullopt, validator().daysUntilFirstCertExpires());
 }
 
 TEST_F(TestSPIFFEValidator, TestAddClientValidationContext) {
