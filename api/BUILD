@@ -280,6 +280,7 @@ proto_library(
         "//envoy/service/listener/v3:pkg",
         "//envoy/service/load_stats/v3:pkg",
         "//envoy/service/metrics/v3:pkg",
+        "//envoy/service/rate_limit_quota/v3:pkg",
         "//envoy/service/ratelimit/v3:pkg",
         "//envoy/service/route/v3:pkg",
         "//envoy/service/runtime/v3:pkg",

@@ -11,6 +11,7 @@ Services
   health/v3/*
   metrics/v3/*
   ratelimit/v3/*
+  rate_limit_quota/v3/*
   runtime/v3/*
   status/v3/*
   tap/v3/*
