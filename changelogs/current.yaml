@@ -146,8 +146,10 @@ new_features:
     added support for access logging.
 - area: thrift
   change: |
-    added support onLocalReply to inform filters of local replies.
     added support for preserving header keys.
+- area: thrift
+  change: |
+    added support onLocalReply to inform filters of local replies.
 - area: thrift
   change: |
     introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
