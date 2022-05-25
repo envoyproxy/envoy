@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: git checkout
         uses: actions/checkout@v2
+        with:
+          ssh-key: "${{ secrets.CREDENTIALS_GITHUB_RELEASE_DEPLOY_KEY }}"
       - name: 'Configure envoy-bot git user'
         run: |
           # Switch global user to be envoy-bot for deployment
@@ -30,5 +32,3 @@ jobs:
           version="v$(cat VERSION)"
           git tag -a ${version} -m ${version}
           git push origin ${version}
-        env:
-          GITHUB_TOKEN: ${{ secrets.CREDENTIALS_GITHUB_PUSH_TOKEN }}
