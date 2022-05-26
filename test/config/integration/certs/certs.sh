@@ -108,5 +108,9 @@ generate_x509_cert upstream upstreamca
 generate_rsa_key upstreamlocalhost upstreamca
 generate_x509_cert upstreamlocalhost upstreamca
 
+# Generate expired_cert.pem as a self-signed, expired cert (will fail on macOS 10.13+ because of negative days value).
+generate_rsa_key expired_
+generate_x509_cert expired_ ca -365
+
 rm ./*.csr
 rm ./*.srl
