@@ -77,8 +77,9 @@ private:
 template <typename T> class TypedFlag : public Flag {
 public:
   TypedFlag(const char* name, T default_value, const char* help)
-      : Flag(name, help), value_(default_value), explicit_value_(default_value), default_value_(default_value) {
-    ASSERT(std::atomic_is_lock_free(&value_));
+      : Flag(name, help), value_(default_value), explicit_value_(default_value),
+        default_value_(default_value) {
+    ASSERT(value_.is_lock_free());
   }
 
   bool setValueFromString(const std::string& value_str) override;
@@ -95,22 +96,16 @@ public:
   }
 
   // Return flag value.
-  T value() const {
-    return value_;
-  }
+  T value() const { return value_; }
 
-  void setReloadedValue(T value) {
-    value_.store(value, std::memory_order_relaxed);
-  }
+  void setReloadedValue(T value) { value_.store(value, std::memory_order_relaxed); }
 
-  void resetReloadedValue() override {
-    value_.store(explicit_value_, std::memory_order_relaxed);
-  }
+  void resetReloadedValue() override { value_.store(explicit_value_, std::memory_order_relaxed); }
 
 private:
-  std::atomic<T> value_;  // Current value of the flag.
-  std::atomic<T> explicit_value_;  // Most recent value set from setValue().
-  const T default_value_;  // Default value for the flag if not otherwise.
+  std::atomic<T> value_;          // Current value of the flag.
+  std::atomic<T> explicit_value_; // Most recent value set from setValue().
+  const T default_value_;         // Default value for the flag if not otherwise.
 };
 
 // SetValueFromString specializations
