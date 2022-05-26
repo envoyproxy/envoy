@@ -633,6 +633,27 @@ int StreamHandleWrapper::luaTimestamp(lua_State* state) {
   auto now = time_source_.systemTime().time_since_epoch();
 
   absl::string_view unit_parameter = luaL_optstring(state, 2, "");
+
+  auto milliseconds_since_epoch =
+      std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+
+  absl::uint128 resolution_as_int_from_state = 0;
+  if (unit_parameter.empty()) {
+    lua_pushnumber(state, milliseconds_since_epoch);
+  } else if (absl::SimpleAtoi(unit_parameter, &resolution_as_int_from_state) &&
+             resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Millisecond)) {
+    lua_pushnumber(state, milliseconds_since_epoch);
+  } else {
+    luaL_error(state, "timestamp format must be MILLISECOND.");
+  }
+
+  return 1;
+}
+
+int StreamHandleWrapper::luaTimestampString(lua_State* state) {
+  auto now = time_source_.systemTime().time_since_epoch();
+
+  absl::string_view unit_parameter = luaL_optstring(state, 2, "");
   auto resolution = getTimestampResolution(unit_parameter);
   if (resolution == Timestamp::Resolution::Millisecond) {
     auto milliseconds_since_epoch =

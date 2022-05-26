@@ -2304,7 +2304,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
 }
 
-TEST_F(LuaHttpFilterTest, Timestamp_ReturnsMilliFormatSet) {
+TEST_F(LuaHttpFilterTest, Timestamp_ReturnsFormatSet) {
   const std::string SCRIPT{R"EOF(
       function envoy_on_request(request_handle)
         request_handle:logTrace(request_handle:timestamp(EnvoyTimestampResolution.MILLISECOND))
@@ -2321,23 +2321,7 @@ TEST_F(LuaHttpFilterTest, Timestamp_ReturnsMilliFormatSet) {
   // Invalid format
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::err,
-                        HasSubstr("timestamp format must be MILLISECOND or MICROSECOND.")));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-}
-
-TEST_F(LuaHttpFilterTest, Timestamp_ReturnsMicroFormatSet) {
-  const std::string SCRIPT{R"EOF(
-      function envoy_on_request(request_handle)
-        request_handle:logTrace(request_handle:timestamp(EnvoyTimestampResolution.MICROSECOND))
-      end
-    )EOF"};
-
-  InSequence s;
-  setup(SCRIPT);
-
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  // Explicitly set to microseconds
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572237")));
+                        HasSubstr("timestamp format must be MILLISECOND.")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -2353,6 +2337,42 @@ TEST_F(LuaHttpFilterTest, Timestamp_DefaultsToMilliseconds_WhenNoFormatSet) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, TimestampString) {
+  const std::string SCRIPT{R"EOF(
+      function envoy_on_request(request_handle)
+        request_handle:logTrace(request_handle:timestampString(EnvoyTimestampResolution.MILLISECOND))
+        request_handle:logTrace(request_handle:timestampString(EnvoyTimestampResolution.MICROSECOND))
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572237")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, TimestampString_DefaultsToMilliseconds) {
+  const std::string SCRIPT{R"EOF(
+      function envoy_on_request(request_handle)
+        request_handle:logTrace(request_handle:timestampString())
+        request_handle:logTrace(request_handle:timestampString("invalid_format"))
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572")));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::err,
+                        HasSubstr("timestamp format must be MILLISECOND or MICROSECOND.")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
