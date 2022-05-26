@@ -208,3 +208,14 @@ envoy_cc_library(
     name = "persistent_quic_info_interface",
     hdrs = ["persistent_quic_info.h"],
 )
+
+envoy_cc_library(
+    name = "header_validator_interface",
+    hdrs = ["header_validator.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stream_info:stream_info_interface",
+    ],
+)
