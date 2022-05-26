@@ -539,6 +539,13 @@ config_setting(
 )
 
 config_setting(
+    name = "android",
+    constraint_values = [
+        "@platforms//os:android",
+    ],
+)
+
+config_setting(
     name = "android_logger",
     values = {"define": "logger=android"},
 )
