@@ -126,8 +126,11 @@ jobs:
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //:ios_xcframework
-      - name: 'Move Envoy.xcframework.zip'
-        run: mv bazel-bin/library/swift/Envoy.xcframework.zip .
+      - name: 'Recompress Envoy.xcframework.zip' # Recompress as bazel uses zip as a container with no compression
+        run: |
+          unzip bazel-bin/library/swift/Envoy.xcframework.zip
+          zip -r Envoy.xcframework.zip Envoy.xcframework
+          rm -rf Envoy.xcframework
       - uses: actions/upload-artifact@v2
         with:
           name: ios_framework
