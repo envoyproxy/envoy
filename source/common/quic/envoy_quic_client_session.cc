@@ -160,7 +160,8 @@ std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::Create
   // TODO(danzh) pass around transport_socket_options_ via context.
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
       server_id(), this,
-      std::make_unique<EnvoyQuicProofVerifyContextImpl>(dispatcher_, transport_socket_options_),
+      std::make_unique<EnvoyQuicProofVerifyContextImpl>(dispatcher_, /*is_server=*/false,
+                                                        transport_socket_options_),
       crypto_config(), this, /*has_application_state = */ version().UsesHttp3());
 }
 

@@ -22,6 +22,7 @@ private:
 class EnvoyQuicProofVerifyContext : public quic::ProofVerifyContext {
 public:
   virtual Event::Dispatcher& dispatcher() const PURE;
+  virtual bool isServer() const PURE;
   virtual const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() const PURE;
 };
 
@@ -29,10 +30,13 @@ public:
 class EnvoyQuicProofVerifyContextImpl : public EnvoyQuicProofVerifyContext {
 public:
   EnvoyQuicProofVerifyContextImpl(
-      Event::Dispatcher& dispatcher,
+      Event::Dispatcher& dispatcher, const bool is_server,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options)
-      : dispatcher_(dispatcher), transport_socket_options_(transport_socket_options) {}
+      : dispatcher_(dispatcher), is_server_(is_server),
+        transport_socket_options_(transport_socket_options) {}
 
+  // EnvoyQuicProofVerifyContext
+  bool isServer() const override { return is_server_; }
   Event::Dispatcher& dispatcher() const override { return dispatcher_; }
   const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() const override {
     return transport_socket_options_;
@@ -40,6 +44,7 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
+  const bool is_server_;
   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options_;
 };
 

@@ -271,6 +271,7 @@ std::string testParamsToString(
 class MockProofVerifyContext : public EnvoyQuicProofVerifyContext {
 public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (const));
+  MOCK_METHOD(bool, isServer, (), (const));
   MOCK_METHOD(const Network::TransportSocketOptionsConstSharedPtr&, transportSocketOptions, (),
               (const));
 };
