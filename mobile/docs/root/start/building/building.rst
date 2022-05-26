@@ -101,8 +101,8 @@ This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and 
 
 Upon completion of the build, you'll see a ``ios_framework.zip`` file at output in a path bazel picks.
 
-Alternatively, you can use the prebuilt artifact from Envoy Mobile's releases_ (envoy_android_aar_sources.zip)
-or from :ref:`CocoaPods <cocoapods>`.
+Alternatively, you can use the prebuilt artifact from Envoy Mobile's releases_ (Envoy.xcframework.zip)
+or from :ref:`SwiftPM <swiftpm>`.
 
 **When building the artifact for release** (usage outside of development), be sure to include the
 ``--config=release-ios`` option, along with the architectures for which the artifact is being built:
@@ -120,16 +120,23 @@ Maven
 Envoy Mobile Android artifacts are also uploaded to Maven, and can be accessed/downloaded
 `here <https://mvnrepository.com/artifact/io.envoyproxy.envoymobile/envoy>`_.
 
-.. _cocoapods:
+.. _swiftpm:
 
----------
-CocoaPods
----------
+---------------------
+Swift Package Manager
+---------------------
 
-If you use CocoaPods on iOS, you can add the following to your ``Podfile`` to use the latest version
-of the prebuilt Envoy Mobile framework.
+If you use the Swift Package Manager on iOS, you can add the following to your ``Package.swift`` to
+use a version of the prebuilt Envoy Mobile framework.
 
-``pod 'EnvoyMobile'``
+.. code-block:: swift
+
+  .binaryTarget(
+    name: "Envoy",
+    url: "https://github.com/envoyproxy/envoy-mobile/releases/download/<version>/Envoy.xcframework.zip",
+    checksum: "..."
+  )
+
 
 ---------------------------------------------
 Building Envoy Mobile with private Extensions
