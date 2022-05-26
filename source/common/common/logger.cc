@@ -199,8 +199,8 @@ bool Context::useFancyLogger() {
 }
 
 void Context::enableFancyLogger() {
-  current_context->enable_fine_grain_logging_ = true;
   if (current_context) {
+    current_context->enable_fine_grain_logging_ = true;
     getFancyContext().setDefaultFancyLevelFormat(current_context->log_level_,
                                                  current_context->log_format_);
     current_context->fancy_default_level_ = current_context->log_level_;
