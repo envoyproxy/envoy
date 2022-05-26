@@ -287,7 +287,7 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestamp);
 
-    /**
+  /**
    * TimestampString.
    * @param1 (string) optional format (e.g. milliseconds_from_epoch, microseconds_from_epoch).
    * Defaults to milliseconds_from_epoch.

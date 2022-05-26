@@ -2320,8 +2320,7 @@ TEST_F(LuaHttpFilterTest, Timestamp_ReturnsFormatSet) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572")));
   // Invalid format
   EXPECT_CALL(*filter_,
-              scriptLog(spdlog::level::err,
-                        HasSubstr("timestamp format must be MILLISECOND.")));
+              scriptLog(spdlog::level::err, HasSubstr("timestamp format must be MILLISECOND.")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
