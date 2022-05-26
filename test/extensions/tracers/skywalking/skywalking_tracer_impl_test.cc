@@ -70,6 +70,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   setupSkyWalkingDriver(yaml_string);
 
   Tracing::Decision decision;
+  decision.reason = Tracing::Reason::Sampling;
   decision.traced = true;
   auto& factory_context = context_.server_factory_context_;
 
@@ -170,6 +171,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
   setupSkyWalkingDriver(yaml_string);
 
   Tracing::Decision decision;
+  decision.reason = Tracing::Reason::Sampling;
   decision.traced = true;
 
   Http::TestRequestHeaderMapImpl request_headers{
