@@ -6,6 +6,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include <atomic>
 #include <string>
 
 #include "absl/container/flat_hash_map.h"
@@ -76,47 +77,40 @@ private:
 template <typename T> class TypedFlag : public Flag {
 public:
   TypedFlag(const char* name, T default_value, const char* help)
-      : Flag(name, help), value_(default_value), default_value_(default_value) {}
+      : Flag(name, help), value_(default_value), explicit_value_(default_value), default_value_(default_value) {
+    ASSERT(std::atomic_is_lock_free(&value_));
+  }
 
   bool setValueFromString(const std::string& value_str) override;
 
   void resetValue() override {
-    absl::MutexLock lock(&mutex_);
-    value_ = default_value_;
+    explicit_value_.store(default_value_, std::memory_order_relaxed);
+    value_.store(default_value_, std::memory_order_relaxed);
   }
 
   // Set flag value.
   void setValue(T value) {
-    absl::MutexLock lock(&mutex_);
-    value_ = value;
+    explicit_value_.store(value, std::memory_order_relaxed);
+    value_.store(value, std::memory_order_relaxed);
   }
 
   // Return flag value.
   T value() const {
-    absl::MutexLock lock(&mutex_);
-    if (has_reloaded_value_) {
-      return reloaded_value_;
-    }
     return value_;
   }
 
   void setReloadedValue(T value) {
-    absl::MutexLock lock(&mutex_);
-    has_reloaded_value_ = true;
-    reloaded_value_ = value;
+    value_.store(value, std::memory_order_relaxed);
   }
 
   void resetReloadedValue() override {
-    absl::MutexLock lock(&mutex_);
-    has_reloaded_value_ = false;
+    value_.store(explicit_value_, std::memory_order_relaxed);
   }
 
 private:
-  mutable absl::Mutex mutex_;
-  T value_ ABSL_GUARDED_BY(mutex_);
+  std::atomic<T> value_;
+  std::atomic<T> explicit_value_;
   const T default_value_;
-  bool has_reloaded_value_ ABSL_GUARDED_BY(mutex_) = false;
-  T reloaded_value_ ABSL_GUARDED_BY(mutex_);
 };
 
 // SetValueFromString specializations
@@ -124,7 +118,6 @@ template <> bool TypedFlag<bool>::setValueFromString(const std::string& value_st
 template <> bool TypedFlag<int32_t>::setValueFromString(const std::string& value_str);
 template <> bool TypedFlag<int64_t>::setValueFromString(const std::string& value_str);
 template <> bool TypedFlag<double>::setValueFromString(const std::string& value_str);
-template <> bool TypedFlag<std::string>::setValueFromString(const std::string& value_str);
 template <> bool TypedFlag<unsigned long>::setValueFromString(const std::string& value_str);
 template <> bool TypedFlag<unsigned long long>::setValueFromString(const std::string& value_str);
 

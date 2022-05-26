@@ -70,10 +70,11 @@ void FlagRegistry::updateReloadableFlags(
     const absl::flat_hash_map<std::string, bool>& quiche_flags_override) {
   for (auto& kv : flags_) {
     const auto it = quiche_flags_override.find(kv.first);
+    auto flag = static_cast<TypedFlag<bool>*>(kv.second);
     if (it != quiche_flags_override.end()) {
-      static_cast<TypedFlag<bool>*>(kv.second)->setReloadedValue(it->second);
+      flag->setReloadedValue(it->second);
     } else {
-      kv.second->resetReloadedValue();
+      flag->resetReloadedValue();
     }
   }
 }
@@ -118,11 +119,6 @@ template <> bool TypedFlag<double>::setValueFromString(const std::string& value_
     return true;
   }
   return false;
-}
-
-template <> bool TypedFlag<std::string>::setValueFromString(const std::string& value_str) {
-  setValue(value_str);
-  return true;
 }
 
 template <> bool TypedFlag<unsigned long>::setValueFromString(const std::string& value_str) {
