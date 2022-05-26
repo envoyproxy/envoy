@@ -157,10 +157,10 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
-  // TODO(danzh) pass around transport_socket_options_ via context.
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
-      server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
-      this, /*has_application_state = */ version().UsesHttp3());
+      server_id(), this,
+      std::make_unique<EnvoyQuicProofVerifyContextImpl>(dispatcher_, transport_socket_options_),
+      crypto_config(), this, /*has_application_state = */ version().UsesHttp3());
 }
 
 void EnvoyQuicClientSession::setHttp3Options(

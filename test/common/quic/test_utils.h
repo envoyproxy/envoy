@@ -2,6 +2,7 @@
 
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
@@ -266,6 +267,13 @@ std::string testParamsToString(
   std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
   return absl::StrCat(ip_version, quic::QuicVersionToString(params.param.second.transport_version));
 }
+
+class MockProofVerifyContext : public EnvoyQuicProofVerifyContext {
+public:
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (const));
+  MOCK_METHOD(const Network::TransportSocketOptionsConstSharedPtr&, transportSocketOptions, (),
+              (const));
+};
 
 } // namespace Quic
 } // namespace Envoy

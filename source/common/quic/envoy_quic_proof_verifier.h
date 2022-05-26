@@ -18,6 +18,31 @@ private:
   bool is_valid_{false};
 };
 
+// An interface for the Envoy specific QUICHE verify context.
+class EnvoyQuicProofVerifyContext : public quic::ProofVerifyContext {
+public:
+  virtual Event::Dispatcher& dispatcher() const PURE;
+  virtual const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() const PURE;
+};
+
+// An implementation of the verify context interface.
+class EnvoyQuicProofVerifyContextImpl : public EnvoyQuicProofVerifyContext {
+public:
+  EnvoyQuicProofVerifyContextImpl(
+      Event::Dispatcher& dispatcher,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options)
+      : dispatcher_(dispatcher), transport_socket_options_(transport_socket_options) {}
+
+  Event::Dispatcher& dispatcher() const override { return dispatcher_; }
+  const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() const override {
+    return transport_socket_options_;
+  }
+
+private:
+  Event::Dispatcher& dispatcher_;
+  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options_;
+};
+
 // A quic::ProofVerifier implementation which verifies cert chain using SSL
 // client context config.
 class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {
