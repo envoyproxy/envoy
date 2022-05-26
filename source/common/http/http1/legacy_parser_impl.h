@@ -16,7 +16,7 @@ public:
   // Http1::Parser
   size_t execute(const char* slice, int len) override;
   void resume() override;
-  ParserStatus pause() override;
+  CallbackResult pause() override;
   ParserStatus getStatus() override;
   uint16_t statusCode() const override;
   int httpMajor() const override;
