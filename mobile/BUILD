@@ -50,17 +50,8 @@ aar_import(
 )
 
 alias(
-    name = "android_dist_ci",
-    actual = "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_with_artifacts",
-)
-
-filegroup(
     name = "android_dist",
-    srcs = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar",
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_objdump_collector",
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_pom_xml",
-    ],
+    actual = "//library/kotlin/io/envoyproxy/envoymobile:envoy_aar_with_artifacts",
 )
 
 define_kt_toolchain(

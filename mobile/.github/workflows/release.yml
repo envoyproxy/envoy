@@ -35,7 +35,7 @@ jobs:
               --define=pom_version="${current_release_version:1}" \
               --config=remote-ci-macos \
               --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-              //:android_dist_ci
+              //:android_dist
       - name: 'Tar artifacts'
         run: tar -czvf envoy_android_aar_sources.tar.gz bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar
       - uses: actions/upload-artifact@v2
