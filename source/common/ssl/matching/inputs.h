@@ -65,10 +65,10 @@ public:
     if (!ssl) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
     }
-    const auto& uri = ssl->dnsSansPeerCertificate();
-    if (!uri.empty()) {
+    const auto& dns = ssl->dnsSansPeerCertificate();
+    if (!dns.empty()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              absl::StrJoin(uri, ",")};
+              absl::StrJoin(dns, ",")};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
@@ -93,9 +93,10 @@ public:
     if (!ssl) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
     }
-    const auto& uri = ssl->subjectPeerCertificate();
-    if (!uri.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, std::string(uri)};
+    const auto& subject = ssl->subjectPeerCertificate();
+    if (!subject.empty()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              std::string(subject)};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
