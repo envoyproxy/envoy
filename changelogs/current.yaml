@@ -51,7 +51,7 @@ minor_behavior_changes:
   change: |
     local_ratelimit will consume tokens of all matched descriptors sorted by tokens per second.
     This behavioral change can be reverted by setting runtime guard
-    envoy.reloadable_features.http_local_ratelimit_match_all_descriptors to false.
+    ``envoy.reloadable_features.http_local_ratelimit_match_all_descriptors`` to false.
 - area: router
   change: |
     get route config factories by the configuration proto full names by default. This behavior change
@@ -65,7 +65,7 @@ minor_behavior_changes:
     lua ``respond`` api will call ``sendLocalReply`` instead of ``encodeHeaders`` and ``encodeData``.
     This means that encoder filters will be correctly invoked, including adding configured response
     headers, etc. This behavioral change can be reverted by setting runtime guard
-    envoy.reloadable_features.lua_respond_with_send_local_reply to false.
+    ``envoy.reloadable_features.lua_respond_with_send_local_reply`` to false.
 
 bug_fixes:
 - area: runtime
@@ -144,6 +144,12 @@ new_features:
 - area: thrift
   change: |
     added support for access logging.
+- area: thrift
+  change: |
+    added support for preserving header keys.
+- area: thrift
+  change: |
+    added support onLocalReply to inform filters of local replies.
 - area: thrift
   change: |
     introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
