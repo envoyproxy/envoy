@@ -30,7 +30,7 @@ jobs:
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
-            //:android_dist_ci
+            //:android_dist
   javahelloworld:
     name: java_helloworld
     runs-on: macos-12
