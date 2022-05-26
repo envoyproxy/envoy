@@ -70,12 +70,12 @@ def upstream_envoy_overrides():
     )
 
 def swift_repos():
-    # https://github.com/bazelbuild/rules_apple/pull/1478
+    # https://github.com/bazelbuild/rules_apple/pull/1484
     http_archive(
         name = "build_bazel_rules_apple",
-        sha256 = "4ffc44ccf28a694e5b494e0de5ff5b38e7cbbdf4b03795c22079265e545fc850",
-        strip_prefix = "rules_apple-012fc127012ed2c81f6b765afc571de9b4755169",
-        url = "https://github.com/bazelbuild/rules_apple/archive/012fc127012ed2c81f6b765afc571de9b4755169.tar.gz",
+        sha256 = "d8f91d033f8fe5a8026f56941172fb3a11d11748138b47abd04c81091e203109",
+        strip_prefix = "rules_apple-29f5b63d702f1d071f95343be29d4c23045e0e84",
+        url = "https://github.com/bazelbuild/rules_apple/archive/29f5b63d702f1d071f95343be29d4c23045e0e84.tar.gz",
     )
 
     # TODO(jpsim): Update to the next release which includes https://github.com/bazelbuild/rules_swift/pull/818
