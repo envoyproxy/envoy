@@ -43,6 +43,7 @@ public:
   virtual bool payloadPassthrough() const PURE;
   virtual uint64_t maxRequestsPerConnection() const PURE;
   virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
+  virtual bool headerKeysPreserveCase() const PURE;
 };
 
 /**
@@ -70,6 +71,8 @@ public:
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override;
   bool passthroughEnabled() const override;
+  bool isRequest() const override { return true; }
+  bool headerKeysPreserveCase() const override;
 
 private:
   struct ActiveRpc;
@@ -114,6 +117,8 @@ private:
     // DecoderCallbacks
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
     bool passthroughEnabled() const override;
+    bool isRequest() const override { return false; }
+    bool headerKeysPreserveCase() const override;
 
     void finalizeResponse();
 
@@ -213,7 +218,11 @@ private:
       stream_info_.onRequestComplete();
       parent_.stats_.request_active_.dec();
 
-      parent_.emitLogEntry(stream_info_);
+      parent_.emitLogEntry(metadata_ ? &metadata_->requestHeaders() : nullptr,
+                           response_decoder_ && response_decoder_->metadata_
+                               ? &response_decoder_->metadata_->responseHeaders()
+                               : nullptr,
+                           stream_info_);
 
       for (auto& filter : base_filters_) {
         filter->onDestroy();
@@ -353,7 +362,9 @@ private:
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs(bool local_reset);
-  void emitLogEntry(const StreamInfo::StreamInfo& stream_info);
+  void emitLogEntry(const Http::RequestHeaderMap* request_headers,
+                    const Http::ResponseHeaderMap* response_headers,
+                    const StreamInfo::StreamInfo& stream_info);
 
   Config& config_;
   ThriftFilterStats& stats_;

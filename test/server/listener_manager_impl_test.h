@@ -84,7 +84,7 @@ protected:
             [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
                 -> std::vector<Network::FilterFactoryCb> {
-              return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+              return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
                   filters, filter_chain_factory_context);
             }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
@@ -93,8 +93,8 @@ protected:
                           filters,
                       Configuration::ListenerFactoryContext& context)
                        -> std::vector<Network::ListenerFilterFactoryCb> {
-              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
-                                                                                    context);
+              return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(filters,
+                                                                                       context);
             }));
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(
@@ -102,8 +102,8 @@ protected:
                           filters,
                       Configuration::ListenerFactoryContext& context)
                        -> std::vector<Network::UdpListenerFilterFactoryCb> {
-              return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
-                                                                                       context);
+              return ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(filters,
+                                                                                          context);
             }));
     ON_CALL(listener_factory_, nextListenerTag()).WillByDefault(Invoke([this]() {
       return listener_tag_++;
