@@ -50,18 +50,18 @@ aio-core==0.8.6 \
     #   envoy-github-abstract
     #   envoy-github-release
     #   envoy-gpg-identity
-aio-run-checker==0.5.4 \
-    --hash=sha256:5d6ac7563e3121e2199a80396bb2ab6f0d1acd888dc83ff969db3aa3ef98d1d7 \
-    --hash=sha256:6de3811e663844bf4b674baec3461edc2ccb210215b3fa4f148dfac3e62208a2
+aio-run-checker==0.5.5 \
+    --hash=sha256:2422af633b4851551fbdd721d87d48f3cd5a852a19cb0a411284708834258307 \
+    --hash=sha256:e4a5d6c7bf138825ac4bb048cd28747a08eecad6d5bb1aa572ed78f27e14c4e3
     # via
     #   envoy-code-check
     #   envoy-dependency-check
     #   envoy-dependency-pip-check
     #   envoy-distribution-distrotest
     #   envoy-distribution-verify
-aio-run-runner==0.3.2 \
-    --hash=sha256:75ad35f9090d7dade92846d6700b6afbfe5751afdd97c7cf5fd8e2cf4b45d8f9 \
-    --hash=sha256:a19aa3607fb0b585f695c264df72d043658c5cf7d19b4f34f29cdf4af8b39fa1
+aio-run-runner==0.3.3 \
+    --hash=sha256:0a783260838a660b4df085d163781fdb35991febf4818524e8f2a13d9f999e07 \
+    --hash=sha256:ce904917303723b5495b951e3b6aaacbac2373d92b7a0bd8f562f1d920cfac22
     # via
     #   aio-run-checker
     #   envoy-base-utils
@@ -307,9 +307,9 @@ envoy-base-utils==0.3.2 \
     #   envoy-docs-sphinx-runner
     #   envoy-github-release
     #   envoy-gpg-sign
-envoy-code-check==0.1.4 \
-    --hash=sha256:4046039c285eb4cb6a60274a3197d7163c712e375d3d73abbdd8689cdcb00e07 \
-    --hash=sha256:907db703429672a61439da2a34c53e98ecdc8563c7c0d570303f564ed621a03a
+envoy-code-check==0.1.5 \
+    --hash=sha256:3877a2c6824974dad8c320b297ff0082745571f38f33ef9d3ca35c1d64fa6ed4 \
+    --hash=sha256:911187c410643011aab3d4b69327b953ae412edead318bb05deea6d81a41df05
     # via -r requirements.in
 envoy-dependency-check==0.1.1 \
     --hash=sha256:a33c16559315561f6eadd3176eebb3a7c5a232b9dafe9b420864a24950cdbad7 \
