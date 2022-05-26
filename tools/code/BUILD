@@ -1,6 +1,7 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@com_github_aignas_rules_shellcheck//:def.bzl", "shellcheck")
 
 licenses(["notice"])  # Apache 2
 
@@ -26,9 +27,22 @@ envoy_entry_point(
     args = [
         "--extensions_build_config=$(location :extensions_build_config)",
         "--path=%s" % PATH,
+        "-b shellcheck:$(location :shellcheck)",
     ],
     data = [
         ":extensions_build_config",
+        ":shellcheck",
     ],
     pkg = "envoy.code.check",
+)
+
+shellcheck(name = "_shellcheck")
+
+sh_binary(
+    name = "shellcheck",
+    srcs = [":run_shellcheck.sh"],
+    args = [
+        "$(location :_shellcheck)",
+    ],
+    data = [":_shellcheck"],
 )

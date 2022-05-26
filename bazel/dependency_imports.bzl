@@ -10,6 +10,7 @@ load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
+load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies")
 
 # go version for rules_go
 GO_VERSION = "1.17.5"
@@ -38,6 +39,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
             "x86_64-linux-android",
         ],
     )
+    shellcheck_dependencies()
     upb_deps()
     antlr_dependencies(472)
     proxy_wasm_rust_sdk_dependencies()
