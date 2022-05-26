@@ -111,7 +111,7 @@ message RateLimitQuotaOverride {
   // If empty, inherits the value from the less specific definition.
   string domain = 1;
 
-  // Unified matchers.
+  // The match tree to use for grouping incoming requests into buckets.
   //
   // If set, fully overrides the bucket matchers provided on the less specific definition.
   // If not set, inherits the value from the less specific definition.
@@ -121,10 +121,12 @@ message RateLimitQuotaOverride {
   xds.type.matcher.v3.Matcher bucket_matchers = 2;
 }
 
-// Configures Quota Bucket.
+// Rate Limit Quota Bucket Settings to apply on the successful ``bucket_matchers`` match.
 //
-// To be used as the action in the `on_match` field of Unified Matchers API. Usage example:
-// :ref:`RateLimitQuotaFilterConfig.bucket_matchers
+// Specify this message in the :ref:`Matcher.OnMatch.action
+// <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.OnMatch.action>` field of the
+// ``bucket_matchers`` matcher tree to assign the matched requests to the Quota Bucket.
+// Usage example: :ref:`RateLimitQuotaFilterConfig.bucket_matchers
 // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.bucket_matchers>`.
 // [#next-free-field: 6]
 message RateLimitQuotaBucketSettings {

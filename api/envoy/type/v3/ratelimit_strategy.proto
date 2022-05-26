@@ -29,6 +29,16 @@ message RateLimitStrategy {
   }
 
   // Limit the number of requests per second.
+  //
+  // ``RequestsPerTimeUnit`` strategy does not demand any specific rate limiting algorithm to be
+  // used (in contrast to the :ref:`TokenBucket <envoy_v3_api_msg_type.v3.TokenBucket>`,
+  // for example). It implies that the implementation details of rate limiting algorithm are
+  // irrelevant as long as the configured number of "requests per time unit" is achieved.
+  //
+  // Note that the ``TokenBucket`` is still a valid implementation of the ``RequestsPerTimeUnit``
+  // strategy, and may be chosen to enforce it. However, there's no guarantee that it will be
+  // the ``TokenBucket`` in particular, and not the Leaky Bucket, the Sliding Window, or any other
+  // rate limiting algorithm that fulfills the requirements.
   message RequestsPerTimeUnit {
     // The number of requests per unit of time to allow. Requests over the limit
     // are denied.
