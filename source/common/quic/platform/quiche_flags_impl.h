@@ -108,9 +108,9 @@ public:
   }
 
 private:
-  std::atomic<T> value_;
-  std::atomic<T> explicit_value_;
-  const T default_value_;
+  std::atomic<T> value_;  // Current value of the flag.
+  std::atomic<T> explicit_value_;  // Most recent value set from setValue().
+  const T default_value_;  // Default value for the flag if not otherwise.
 };
 
 // SetValueFromString specializations
