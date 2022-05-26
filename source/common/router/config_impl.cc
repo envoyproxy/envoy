@@ -674,6 +674,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
 }
+      }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
   return !runtime_ ? true
