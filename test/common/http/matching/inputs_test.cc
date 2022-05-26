@@ -62,7 +62,11 @@ TEST(MatchingData, HttpRequestTrailersDataInput) {
 TEST(HttpRequestCookiesDataInput, Idempotence) {
   HttpRequestCookiesDataInput input("mycookie");
 
-  HttpMatchingDataImpl data;
+  Network::ConnectionInfoSetterImpl connection_info_provider(
+      std::make_shared<Network::Address::Ipv4Instance>(80),
+      std::make_shared<Network::Address::Ipv4Instance>(80));
+  HttpMatchingDataImpl data(connection_info_provider);
+
   TestRequestHeaderMapImpl request_headers({{"Cookie", "mycookie=foo;mycookie=bar"}});
   data.onRequestHeaders(request_headers);
 

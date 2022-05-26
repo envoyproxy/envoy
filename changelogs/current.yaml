@@ -66,14 +66,6 @@ minor_behavior_changes:
     This means that encoder filters will be correctly invoked, including adding configured response
     headers, etc. This behavioral change can be reverted by setting runtime guard
     ``envoy.reloadable_features.lua_respond_with_send_local_reply`` to false.
-- area: http
-  change: |
-    the order in which cookie values are parsed for a given key has changed. It happens when there
-    are multiple values for that key in the last cookie header (e.g.: ``Cookie: mykey=v0; mykey=v1;
-    mykey=v2``). In this case, envoy used to consider the first value (``v0``), it now considers the
-    last one (``v2``). This behavior can be reverted by setting
-    ``envoy.reloadable_features.cookies_get_last_value_header`` to false.
-
 
 bug_fixes:
 - area: runtime

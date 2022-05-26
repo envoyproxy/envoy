@@ -157,10 +157,9 @@ public:
 
   Matcher::DataInputFactoryCb<HttpMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
-                           Server::Configuration::FactoryContext& factory_context) override {
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<
-        const envoy::type::matcher::v3::HttpRequestCookieMatchInput&>(
-        config, factory_context.messageValidationVisitor());
+        const envoy::type::matcher::v3::HttpRequestCookieMatchInput&>(config, validation_visitor);
 
     return [cookie_name = typed_config.cookie_name()] {
       return std::make_unique<HttpRequestCookiesDataInput>(cookie_name);

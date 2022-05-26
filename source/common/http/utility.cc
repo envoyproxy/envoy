@@ -254,9 +254,9 @@ bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64
   return true;
 }
 
-void forEachCookie(
-    const HeaderMap& headers, const LowerCaseString& cookie_header,
-    const std::function<bool(absl::string_view, absl::string_view)>& cookie_consumer) {
+static void
+forEachCookie(const HeaderMap& headers, const LowerCaseString& cookie_header,
+              const std::function<bool(absl::string_view, absl::string_view)>& cookie_consumer) {
   const Http::HeaderMap::GetResult cookie_headers = headers.get(cookie_header);
 
   for (size_t index = 0; index < cookie_headers.size(); index++) {
@@ -288,14 +288,14 @@ void forEachCookie(
   }
 }
 
-std::string parseCookie(const HeaderMap& headers, const std::string& key,
-                        const LowerCaseString& cookie) {
-  std::string value;
+absl::string_view parseCookie(const HeaderMap& headers, const absl::string_view key,
+                              const LowerCaseString& cookie) {
+  absl::string_view value;
 
   // Iterate over each cookie & return if its value is not empty.
   forEachCookie(headers, cookie, [&key, &value](absl::string_view k, absl::string_view v) -> bool {
     if (key == k) {
-      value = std::string{v};
+      value = v;
       return false;
     }
 
@@ -327,6 +327,29 @@ Utility::parseCookies(const RequestHeaderMap& headers,
                 });
 
   return cookies;
+}
+
+absl::InlinedVector<absl::string_view, 2> Utility::parseCookieValues(const HeaderMap& headers,
+                                                                     const absl::string_view key,
+                                                                     const size_t max_vals) {
+  absl::InlinedVector<absl::string_view, 2> ret;
+
+  forEachCookie(headers, Http::Headers::get().Cookie,
+                [&ret, &key, &max_vals](absl::string_view k, absl::string_view v) -> bool {
+                  if (k == key) {
+                    ret.push_back(v);
+                    // max_vals == 0 => infinity, so the condition above will never be true
+                    // in this case.
+                    if (ret.size() == max_vals) {
+                      return false;
+                    }
+                  }
+
+                  // continue iterating until all cookies are processed.
+                  return true;
+                });
+
+  return ret;
 }
 
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
@@ -483,12 +506,13 @@ std::string Utility::replaceQueryString(const HeaderString& path,
   return new_path;
 }
 
-std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
+absl::string_view Utility::parseCookieValue(const HeaderMap& headers, const absl::string_view key) {
   // TODO(wbpcode): Modify the headers parameter type to 'RequestHeaderMap'.
   return parseCookie(headers, key, Http::Headers::get().Cookie);
 }
 
-std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const std::string& key) {
+absl::string_view Utility::parseSetCookieValue(const Http::HeaderMap& headers,
+                                               const absl::string_view key) {
   return parseCookie(headers, key, Http::Headers::get().SetCookie);
 }
 

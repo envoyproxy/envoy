@@ -698,15 +698,6 @@ TEST(HttpUtility, TestParseCookie) {
   EXPECT_EQ(value, "abc123");
 }
 
-TEST(HttpUtility, TestParseCookieOldBehavior) {
-  TestRequestHeaderMapImpl headers{{"cookie", "key=v0"}, {"cookie", "key=v1; key=v2"}};
-
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy_reloadable_features_cookies_get_last_value_header", "false"}});
-  EXPECT_EQ(Utility::parseCookieValue(headers, "key"), "v1");
-}
-
 TEST(HttpUtility, TestParseCookieDuplicates) {
   TestRequestHeaderMapImpl headers{{"someheader", "10.0.0.1"},
                                    {"cookie", "a=; b=1; a=2"},
@@ -766,51 +757,40 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
 }
 
-<<<<<<< HEAD
 TEST(HttpUtility, TestParseCookieMultipleValues) {
   TestRequestHeaderMapImpl headers{{"cookie", "somekey=foo"},
                                    {"cookie", "somekey=bar; somekey=toto"}};
 
   absl::string_view key{"somekey"};
 
-  auto values = Utility::parseCookieValues(headers, key, 0, false /* reversed_order */);
+  auto values = Utility::parseCookieValues(headers, key, 0);
   EXPECT_THAT(values, testing::ElementsAre("foo", "bar", "toto"));
 
-  values = Utility::parseCookieValues(headers, key, 1, false /* reversed_order */);
+  values = Utility::parseCookieValues(headers, key, 1);
   EXPECT_THAT(values, testing::ElementsAre("foo"));
 
-  values = Utility::parseCookieValues(headers, key, 2, false /* reversed_order */);
+  values = Utility::parseCookieValues(headers, key, 2);
   EXPECT_THAT(values, testing::ElementsAre("foo", "bar"));
-
-  values = Utility::parseCookieValues(headers, key, 0, true /* reversed_order */);
-  EXPECT_THAT(values, testing::ElementsAre("toto", "bar", "foo"));
-
-  values = Utility::parseCookieValues(headers, key, 1, true /* reversed_order */);
-  EXPECT_THAT(values, testing::ElementsAre("toto"));
-
-  values = Utility::parseCookieValues(headers, key, 2, true /* reversed_order */);
-  EXPECT_THAT(values, testing::ElementsAre("toto", "bar"));
 }
 
 TEST(HttpUtility, TestParseCookieNoValue) {
   {
     TestRequestHeaderMapImpl headers{{"cookie", "foo=bar"}};
-    EXPECT_TRUE(Utility::parseCookieValues(headers, "key0", 0, false /* reversed_order */).empty());
-    EXPECT_TRUE(Utility::parseCookieValues(headers, "key1", 0, false /* reversed_order */).empty());
+    EXPECT_TRUE(Utility::parseCookieValues(headers, "key0", 0).empty());
+    EXPECT_TRUE(Utility::parseCookieValues(headers, "key1", 0).empty());
   }
 
   {
     TestRequestHeaderMapImpl headers;
-    EXPECT_TRUE(
-        Utility::parseCookieValues(headers, "somekey", 0, false /* reversed_order */).empty());
+    EXPECT_TRUE(Utility::parseCookieValues(headers, "somekey", 0).empty());
   }
 
   {
     TestRequestHeaderMapImpl headers{{"myheader", "somekey=bar"}};
-    EXPECT_TRUE(
-        Utility::parseCookieValues(headers, "somekey", 0, false /* reversed_order */).empty());
+    EXPECT_TRUE(Utility::parseCookieValues(headers, "somekey", 0).empty());
   }
-=======
+}
+
 TEST(HttpUtility, TestParseCookies) {
   TestRequestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
@@ -836,7 +816,6 @@ TEST(HttpUtility, TestParseCookiesDuplicates) {
 
   EXPECT_EQ(cookies.at("a"), "");
   EXPECT_EQ(cookies.at("b"), "1");
->>>>>>> main
 }
 
 TEST(HttpUtility, TestParseSetCookieWithQuotes) {
