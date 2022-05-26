@@ -43,16 +43,6 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
   EXPECT_NE(dynamic_cast<OriginalSrcFilter*>(added_filter.get()), nullptr);
 }
 
-// Test that the deprecated extension name still functions.
-TEST(OriginalSrcConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.listener.original_src";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<
-          Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));
-}
-
 } // namespace
 } // namespace OriginalSrc
 } // namespace ListenerFilters

@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/network/connection.h"
@@ -16,13 +17,14 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
-#include "source/common/http/http3/quic_client_connection_factory.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #endif
 
 #include "test/common/upstream/utility.h"
@@ -74,7 +76,7 @@ void BufferingStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream)
 }
 
 void BufferingStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 void BufferingStreamDecoder::onComplete() {
@@ -182,13 +184,16 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& body, Http::CodecType type,
                                    const std::string& host, const std::string& content_type) {
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
+  Quic::QuicStatNames quic_stat_names(mock_stats_store.symbolTable());
   NiceMock<Random::MockRandomGenerator> random;
   Event::GlobalTimeSystem time_system;
   NiceMock<Random::MockRandomGenerator> random_generator;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
-                Filesystem::fileSystemForTest(), random_generator);
+                Filesystem::fileSystemForTest(), random_generator, bootstrap);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   TestConnectionCallbacks connection_callbacks(*dispatcher);
+
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp")),
@@ -209,10 +214,9 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Network::TransportSocketFactoryPtr transport_socket_factory =
       createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
                                                "spiffe://lyft.com/backend-team");
-  quic::QuicConfig config;
-  std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
-  persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher, *transport_socket_factory, time_system, addr, config, 0);
+  auto& quic_transport_socket_factory =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
+  auto persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher, 0);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {
@@ -221,8 +225,11 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     // Docker only works with loopback v6 address.
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
-  Network::ClientConnectionPtr connection =
-      Quic::createQuicNetworkConnection(*persistent_info, *dispatcher, addr, local_address);
+  Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
+      *persistent_info, quic_transport_socket_factory.getCryptoConfig(),
+      quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
+                         static_cast<uint16_t>(addr->ip()->port())),
+      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store, nullptr, nullptr);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.
@@ -260,12 +267,14 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
     : dispatcher_(dispatcher), remaining_bytes_to_send_(0) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
-  callbacks_ = std::make_unique<ConnectionCallbacks>([this, write_request_callback]() {
-    Buffer::OwnedImpl buffer;
-    const bool close_after = write_request_callback(buffer);
-    remaining_bytes_to_send_ += buffer.length();
-    client_->write(buffer, close_after);
-  });
+  callbacks_ = std::make_unique<ConnectionCallbacks>(
+      [this, write_request_callback]() {
+        Buffer::OwnedImpl buffer;
+        const bool close_after = write_request_callback(buffer);
+        remaining_bytes_to_send_ += buffer.length();
+        client_->write(buffer, close_after);
+      },
+      dispatcher);
 
   if (transport_socket == nullptr) {
     transport_socket = Network::Test::createRawBufferSocket();
@@ -300,7 +309,19 @@ void RawConnectionDriver::waitForConnection() {
   }
 }
 
-void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_.run(run_type); }
+testing::AssertionResult RawConnectionDriver::run(Event::Dispatcher::RunType run_type,
+                                                  std::chrono::milliseconds timeout) {
+  Event::TimerPtr timeout_timer = dispatcher_.createTimer([this]() -> void { dispatcher_.exit(); });
+  timeout_timer->enableTimer(timeout);
+
+  dispatcher_.run(run_type);
+
+  if (timeout_timer->enabled()) {
+    timeout_timer->disableTimer();
+    return testing::AssertionSuccess();
+  }
+  return testing::AssertionFailure();
+}
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
 

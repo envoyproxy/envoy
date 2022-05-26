@@ -147,20 +147,20 @@ protected:
    * @return Protobuf::Message* the config proto corresponding to the Config instantiated by the
    *         provider.
    */
-  virtual const Protobuf::Message* getConfigProto() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual const Protobuf::Message* getConfigProto() const { return nullptr; }
 
   /**
    * Returns the config protos associated with the provider.
    * @return const ConfigProtoVector the config protos corresponding to the Config instantiated by
    *         the provider.
    */
-  virtual ConfigProtoVector getConfigProtos() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual ConfigProtoVector getConfigProtos() const { PANIC("not implemented"); }
 
   /**
    * Returns the config version associated with the provider.
    * @return std::string the config version.
    */
-  virtual std::string getConfigVersion() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual std::string getConfigVersion() const { return ""; }
 
   /**
    * Returns the config implementation associated with the provider.

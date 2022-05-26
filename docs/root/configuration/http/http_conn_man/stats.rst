@@ -37,6 +37,7 @@ statistics:
    downstream_cx_drain_close, Counter, Total connections closed due to draining
    downstream_cx_idle_timeout, Counter, Total connections closed due to idle timeout
    downstream_cx_max_duration_reached, Counter, Total connections closed due to max connection duration
+   downstream_cx_max_requests_reached, Counter, Total connections closed due to max requests per connection
    downstream_cx_overload_disable_keepalive, Counter, Total connections for which HTTP 1.x keepalive has been disabled due to Envoy overload
    downstream_flow_control_paused_reading_total, Counter, Total number of times reads were disabled due to flow control
    downstream_flow_control_resumed_reading_total, Counter, Total number of times reads were enabled on the connection due to flow control
@@ -172,7 +173,7 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
    keepalive_timeout, Counter, Total number of connections closed due to :ref:`keepalive timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
    streams_active, Gauge, Active streams as observed by the codec
    pending_send_bytes, Gauge, Currently buffered body data in bytes waiting to be written when stream/connection window is opened.
-
+   deferred_stream_close, Gauge, Number of HTTP/2 streams where the stream has been closed but processing of the stream close has been deferred due to network backup. This is expected to be incremented when a downstream stream is backed up and the corresponding upstream stream has received end stream but we defer processing of the upstream stream close due to downstream backup. This is decremented as we finally delete the stream when either the deferred close stream has its buffered data drained or receives a reset.
 .. attention::
 
   The HTTP/2 `streams_active` gauge may be greater than the HTTP connection manager
@@ -195,11 +196,7 @@ On the upstream side all http3 statistics are rooted at *cluster.<name>.http3.*
    rx_reset, Counter, Total number of reset stream frames received by Envoy
    tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
    metadata_not_supported_error, Counter, Total number of metadata dropped during HTTP/3 encoding
-   quic_version_43, Counter, Total number of quic connections that use transport version 43. This is expected to be removed when this version is deprecated.
-   quic_version_46, Counter, Total number of quic connections that use transport version 46. This is expected to be removed when this version is deprecated.
-   quic_version_50, Counter, Total number of quic connections that use transport version 50. This is expected to be removed when this version is deprecated.
-   quic_version_51, Counter, Total number of quic connections that use transport version 51. This is expected to be removed when this version is deprecated.
-   quic_version_h3_29, Counter, Total number of quic connections that use transport version h3-29. This is expected to be removed when this version is deprecated.
+   quic_version_h3_29, Counter, Total number of quic connections that use transport version h3-29. QUIC h3-29 is unsupported by default and this counter will be removed when h3-29 support is completely removed.
    quic_version_rfc_v1, Counter, Total number of quic connections that use transport version rfc-v1.
 
 

@@ -1,3 +1,4 @@
+#include "envoy/grpc/async_client.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
 
 #include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
@@ -8,6 +9,8 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+
+#include "io/prometheus/client/metrics.pb.h"
 
 using namespace std::chrono_literals;
 using testing::_;
@@ -28,12 +31,8 @@ public:
       Grpc::AsyncStreamCallbacks<envoy::service::metrics::v3::StreamMetricsResponse>;
 
   GrpcMetricsStreamerImplTest() {
-    EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
-      return Grpc::RawAsyncClientPtr{async_client_};
-    }));
     streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(
-        Grpc::AsyncClientFactoryPtr{factory_}, local_info_,
-        envoy::config::core::v3::ApiVersion::AUTO);
+        Grpc::RawAsyncClientSharedPtr{async_client_}, local_info_);
   }
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
@@ -48,7 +47,6 @@ public:
 
   LocalInfo::MockLocalInfo local_info_;
   Grpc::MockAsyncClient* async_client_{new NiceMock<Grpc::MockAsyncClient>};
-  Grpc::MockAsyncClientFactory* factory_{new Grpc::MockAsyncClientFactory};
   GrpcMetricsStreamerImplPtr streamer_;
 };
 
@@ -91,9 +89,9 @@ class MockGrpcMetricsStreamer
     : public GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
                                  envoy::service::metrics::v3::StreamMetricsResponse> {
 public:
-  MockGrpcMetricsStreamer(Grpc::AsyncClientFactoryPtr&& factory)
+  MockGrpcMetricsStreamer(Grpc::RawAsyncClientSharedPtr async_client)
       : GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
-                            envoy::service::metrics::v3::StreamMetricsResponse>(*factory) {}
+                            envoy::service::metrics::v3::StreamMetricsResponse>(async_client) {}
 
   // GrpcMetricsStreamer
   MOCK_METHOD(void, send, (MetricsPtr && metrics));
@@ -131,7 +129,7 @@ public:
   std::vector<std::unique_ptr<NiceMock<Stats::MockGauge>>> gauge_storage_;
   std::vector<std::unique_ptr<NiceMock<Stats::MockParentHistogram>>> histogram_storage_;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer(
-      Grpc::AsyncClientFactoryPtr{new NiceMock<Grpc::MockAsyncClientFactory>()})};
+      Grpc::RawAsyncClientSharedPtr{new NiceMock<Grpc::MockAsyncClient>()})};
 };
 
 TEST_F(MetricsServiceSinkTest, CheckSendCall) {
@@ -186,17 +184,43 @@ TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
 
 // Test that verifies counters are reported as the delta between flushes when configured to do so.
 TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
-  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
-                     envoy::service::metrics::v3::StreamMetricsResponse>
-      sink(streamer_, true, false);
-
   addCounterToSnapshot("test_counter", 1, 100);
+  counter_storage_.back()->setTagExtractedName("tag-counter-name");
+  counter_storage_.back()->setTags({{"a", "b"}});
 
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
-    EXPECT_EQ(1, metrics->size());
-    EXPECT_EQ(1, (*metrics)[0].metric(0).counter().value());
-  }));
-  sink.flush(snapshot_);
+  {
+    // This test won't emit any labels.
+    MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                       envoy::service::metrics::v3::StreamMetricsResponse>
+        sink(streamer_, true, false);
+
+    EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+      ASSERT_EQ(1, metrics->size());
+      EXPECT_EQ("test_counter", (*metrics)[0].name());
+
+      const auto& metric = (*metrics)[0].metric(0);
+      EXPECT_EQ(1, metric.counter().value());
+      EXPECT_EQ(0, metric.label().size());
+    }));
+    sink.flush(snapshot_);
+  }
+
+  {
+    // This test will emit labels.
+    MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                       envoy::service::metrics::v3::StreamMetricsResponse>
+        sink(streamer_, true, true);
+
+    EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+      ASSERT_EQ(1, metrics->size());
+      EXPECT_EQ("tag-counter-name", (*metrics)[0].name());
+
+      const auto& metric = (*metrics)[0].metric(0);
+      EXPECT_EQ(1, metric.counter().value());
+      EXPECT_EQ(1, metric.label().size());
+    }));
+    sink.flush(snapshot_);
+  }
 }
 
 // Test the behavior of tag emission based on the emit_tags_as_label flag.
@@ -217,7 +241,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
     // When the emit_tags flag is false, we don't emit the tags and use the full name.
     MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                        envoy::service::metrics::v3::StreamMetricsResponse>
-        sink(streamer_, true, false);
+        sink(streamer_, false, false);
 
     EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
       EXPECT_EQ(4, metrics->size());
@@ -244,7 +268,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
   // When the emit_tags flag is true, we emit the tags as labels and use the tag extracted name.
   MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                      envoy::service::metrics::v3::StreamMetricsResponse>
-      sink(streamer_, true, true);
+      sink(streamer_, false, true);
 
   EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([&expected_label_pair](MetricsPtr&& metrics) {
     EXPECT_EQ(4, metrics->size());

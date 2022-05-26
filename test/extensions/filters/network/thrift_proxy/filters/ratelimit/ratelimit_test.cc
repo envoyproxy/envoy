@@ -53,7 +53,7 @@ public:
   void setupTest(const std::string& yaml) {
     envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit
         proto_config{};
-    TestUtility::loadFromYaml(yaml, proto_config, false, true);
+    TestUtility::loadFromYaml(yaml, proto_config);
 
     config_ = std::make_shared<Config>(proto_config, local_info_, stats_store_, runtime_, cm_);
 
@@ -217,7 +217,7 @@ TEST_F(ThriftRateLimitFilterTest, OkResponse) {
             request_callbacks_ = &callbacks;
           })));
 
-  request_metadata_->headers().addCopy(ThriftProxy::Headers::get().ClientId, "clientid");
+  request_metadata_->requestHeaders().addCopy(ThriftProxy::Headers::get().ClientId, "clientid");
 
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 

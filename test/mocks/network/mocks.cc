@@ -37,10 +37,8 @@ MockListenerConfig::MockListenerConfig()
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
   ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
   ON_CALL(socket_factory_, localAddress())
-      .WillByDefault(ReturnRef(socket_->addressProvider().localAddress()));
-  ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(socket_));
-  ON_CALL(socket_factory_, sharedSocket())
-      .WillByDefault(Return(std::reference_wrapper<Socket>(*socket_)));
+      .WillByDefault(ReturnRef(socket_->connectionInfoProvider().localAddress()));
+  ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(socket_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
 }
@@ -111,7 +109,6 @@ MockUdpListenerCallbacks::~MockUdpListenerCallbacks() = default;
 MockDrainDecision::MockDrainDecision() = default;
 MockDrainDecision::~MockDrainDecision() = default;
 
-MockListenerFilter::MockListenerFilter() = default;
 MockListenerFilter::~MockListenerFilter() { destroy_(); }
 
 MockListenerFilterCallbacks::MockListenerFilterCallbacks() {
@@ -134,8 +131,8 @@ MockFilterChainFactory::MockFilterChainFactory() {
 MockFilterChainFactory::~MockFilterChainFactory() = default;
 
 MockListenSocket::MockListenSocket()
-    : io_handle_(std::make_unique<IoSocketHandleImpl>()),
-      address_provider_(std::make_shared<SocketAddressSetterImpl>(
+    : io_handle_(std::make_unique<NiceMock<MockIoHandle>>()),
+      connection_info_provider_(std::make_shared<ConnectionInfoSetterImpl>(
           std::make_shared<Address::Ipv4Instance>(80), nullptr)) {
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
@@ -145,7 +142,10 @@ MockListenSocket::MockListenSocket()
     return socket_is_open_;
   }));
   ON_CALL(*this, ipVersion())
-      .WillByDefault(Return(address_provider_->localAddress()->ip()->version()));
+      .WillByDefault(Return(connection_info_provider_->localAddress()->ip()->version()));
+  ON_CALL(*this, duplicate()).WillByDefault(Invoke([]() {
+    return std::make_unique<NiceMock<MockListenSocket>>();
+  }));
 }
 
 MockSocketOption::MockSocketOption() {
@@ -156,13 +156,13 @@ MockSocketOption::~MockSocketOption() = default;
 
 MockConnectionSocket::MockConnectionSocket()
     : io_handle_(std::make_unique<IoSocketHandleImpl>()),
-      address_provider_(
-          std::make_shared<SocketAddressSetterImpl>(std::make_shared<Address::Ipv4Instance>(80),
-                                                    std::make_shared<Address::Ipv4Instance>(80))) {
+      connection_info_provider_(
+          std::make_shared<ConnectionInfoSetterImpl>(std::make_shared<Address::Ipv4Instance>(80),
+                                                     std::make_shared<Address::Ipv4Instance>(80))) {
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(*this, ipVersion())
-      .WillByDefault(Return(address_provider_->localAddress()->ip()->version()));
+      .WillByDefault(Return(connection_info_provider_->localAddress()->ip()->version()));
 }
 
 MockConnectionSocket::~MockConnectionSocket() = default;

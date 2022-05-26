@@ -12,12 +12,14 @@
 #include "source/common/config/grpc_subscription_impl.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/eds.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
+#include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -39,18 +41,25 @@ namespace Upstream {
 
 class EdsSpeedTest {
 public:
-  EdsSpeedTest(State& state, bool v2_config)
-      : state_(state), v2_config_(v2_config),
-        type_url_(v2_config_
-                      ? "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment"
-                      : "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
+  EdsSpeedTest(State& state, bool use_unified_mux)
+      : state_(state), use_unified_mux_(use_unified_mux),
+        type_url_("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
         subscription_stats_(Config::Utility::generateStats(stats_)),
         api_(Api::createApiForTest(stats_)), async_client_(new Grpc::MockAsyncClient()),
-        grpc_mux_(new Config::GrpcMuxImpl(
-            local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
-            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-            envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, {}, true)) {
+        config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>()) {
+    if (use_unified_mux_) {
+      grpc_mux_.reset(new Config::XdsMux::GrpcMuxSotw(
+          std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+              "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
+          random_, stats_, {}, local_info_, true, std::move(config_validators_)));
+    } else {
+      grpc_mux_.reset(new Config::GrpcMuxImpl(
+          local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+              "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
+          random_, stats_, {}, true, std::move(config_validators_)));
+    }
     resetCluster(R"EOF(
       name: name
       connect_timeout: 0.25s
@@ -74,12 +83,12 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
                                                 std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
@@ -129,21 +138,22 @@ public:
     response->set_version_info(fmt::format("version-{}", version_++));
     auto* resource = response->mutable_resources()->Add();
     resource->PackFrom(cluster_load_assignment);
-    if (v2_config_) {
-      RELEASE_ASSERT(resource->type_url() ==
-                         "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
-                     "");
-      resource->set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
-    }
     state_.ResumeTiming();
-    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
+    if (use_unified_mux_) {
+      dynamic_cast<Config::XdsMux::GrpcMuxSotw&>(*grpc_mux_)
+          .grpcStreamForTest()
+          .onReceiveMessage(std::move(response));
+    } else {
+      dynamic_cast<Config::GrpcMuxImpl&>(*grpc_mux_)
+          .grpcStreamForTest()
+          .onReceiveMessage(std::move(response));
+    }
     ASSERT(cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get()[0].size() ==
            num_hosts);
   }
 
-  TestDeprecatedV2Api _deprecated_v2_api_;
   State& state_;
-  const bool v2_config_;
+  bool use_unified_mux_;
   const std::string type_url_;
   uint64_t version_{};
   bool initialized_{};
@@ -167,9 +177,11 @@ public:
   Api::ApiPtr api_;
   Server::MockOptions options_;
   Grpc::MockAsyncClient* async_client_;
+  Config::CustomConfigValidatorsPtr config_validators_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
-  Config::GrpcMuxImplSharedPtr grpc_mux_;
+  Config::GrpcMuxSharedPtr grpc_mux_;
   Config::GrpcSubscriptionImplPtr subscription_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
 } // namespace Upstream
@@ -179,17 +191,17 @@ static void priorityAndLocalityWeighted(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
-  for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(0));
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(2));
     // if we've been instructed to skip tests, only run once no matter the argument:
-    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(2);
+    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(1);
 
-    speed_test.priorityAndLocalityWeightedHelper(state.range(1), endpoints, true);
+    speed_test.priorityAndLocalityWeightedHelper(state.range(0), endpoints, true);
   }
 }
 
 BENCHMARK(priorityAndLocalityWeighted)
-    ->Ranges({{false, true}, {false, true}, {1, 100000}})
+    ->Ranges({{false, true}, {1, 100000}, {false, true}})
     ->Unit(benchmark::kMillisecond);
 
 static void duplicateUpdate(State& state) {
@@ -197,8 +209,8 @@ static void duplicateUpdate(State& state) {
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
 
-  for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test(state, false);
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
@@ -206,14 +218,14 @@ static void duplicateUpdate(State& state) {
   }
 }
 
-BENCHMARK(duplicateUpdate)->Range(1, 100000)->Unit(benchmark::kMillisecond);
+BENCHMARK(duplicateUpdate)->Ranges({{1, 100000}, {false, true}})->Unit(benchmark::kMillisecond);
 
 static void healthOnlyUpdate(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
-  for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test(state, false);
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
@@ -221,4 +233,4 @@ static void healthOnlyUpdate(State& state) {
   }
 }
 
-BENCHMARK(healthOnlyUpdate)->Range(1, 100000)->Unit(benchmark::kMillisecond);
+BENCHMARK(healthOnlyUpdate)->Ranges({{1, 100000}, {false, true}})->Unit(benchmark::kMillisecond);

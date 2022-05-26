@@ -47,6 +47,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         ":connection_mocks",
+        ":io_handle_mocks",
         ":transport_socket_mocks",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:connection_interface",
@@ -56,7 +57,9 @@ envoy_cc_mock(
         "//envoy/network:transport_socket_interface",
         "//envoy/server:listener_manager_interface",
         "//source/common/network:address_lib",
+        "//source/common/network:socket_interface_lib",
         "//source/common/network:utility_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

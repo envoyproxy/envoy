@@ -52,7 +52,8 @@ public:
       config.set_enforcement_type(envoy::extensions::filters::network::rbac::v3::RBAC::CONTINUOUS);
     }
 
-    return std::make_shared<RoleBasedAccessControlFilterConfig>(config, store_);
+    return std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, store_, ProtobufMessage::getStrictValidationVisitor());
   }
 
   RoleBasedAccessControlNetworkFilterTest() : config_(setupConfig()) {
@@ -65,7 +66,7 @@ public:
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    stream_info_.downstream_address_provider_->setLocalAddress(address_);
+    stream_info_.downstream_connection_info_provider_->setLocalAddress(address_);
   }
 
   void setRequestedServerName(std::string server_name) {

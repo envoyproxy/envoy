@@ -72,7 +72,7 @@ transportTypeToProto(TransportType transport_type) {
   case TransportType::Header:
     return envoy::extensions::filters::network::thrift_proxy::v3::HEADER;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 
@@ -84,7 +84,7 @@ protocolTypeToProto(ProtocolType protocol_type) {
   case ProtocolType::Compact:
     return envoy::extensions::filters::network::thrift_proxy::v3::COMPACT;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 
@@ -121,8 +121,12 @@ MATCHER(IsEmptyMetadata, "") {
     *result_listener << "has a message type of " << static_cast<int>(arg.messageType());
     return false;
   }
-  if (arg.headers().size() > 0) {
-    *result_listener << "has " << arg.headers().size() << " headers";
+  if (arg.isRequest() && arg.requestHeaders().size() > 0) {
+    *result_listener << "has " << arg.requestHeaders().size() << " request headers";
+    return false;
+  }
+  if (!arg.isRequest() && arg.responseHeaders().size() > 0) {
+    *result_listener << "has " << arg.responseHeaders().size() << " response headers";
     return false;
   }
   if (arg.hasAppException()) {
@@ -133,8 +137,10 @@ MATCHER(IsEmptyMetadata, "") {
 }
 
 MATCHER_P(HasOnlyFrameSize, n, "") {
+  const auto headers_size =
+      arg.isRequest() ? arg.requestHeaders().size() : arg.responseHeaders().size();
   return arg.hasFrameSize() && arg.frameSize() == n && !arg.hasProtocol() && !arg.hasMethodName() &&
-         !arg.hasSequenceId() && !arg.hasMessageType() && arg.headers().size() == 0 &&
+         !arg.hasSequenceId() && !arg.hasMessageType() && headers_size == 0 &&
          !arg.hasAppException();
 }
 
@@ -149,7 +155,9 @@ MATCHER_P(HasFrameSize, n, "") {
 
 MATCHER_P(HasProtocol, p, "") { return arg.hasProtocol() && arg.protocol() == p; }
 MATCHER_P(HasSequenceId, id, "") { return arg.hasSequenceId() && arg.sequenceId() == id; }
-MATCHER(HasNoHeaders, "") { return arg.headers().size() == 0; }
+MATCHER_P(HasHeaderFlags, flags, "") { return arg.hasHeaderFlags() && arg.headerFlags() == flags; }
+MATCHER(HasNoRequestHeaders, "") { return arg.requestHeaders().size() == 0; }
+MATCHER(HasNoResponseHeaders, "") { return arg.responseHeaders().size() == 0; }
 
 MATCHER_P2(HasAppException, t, m, "") {
   if (!arg.hasAppException()) {

@@ -176,7 +176,7 @@ public:
 };
 
 void StartTlsIntegrationTest::initialize() {
-  EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
+  EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       // Connection constructor will first create write buffer.
       // Test tracks how many bytes are sent.
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
@@ -258,7 +258,6 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_THAT(test_server_->server().listenerManager().numConnections(), 1);
 
   Buffer::OwnedImpl buffer;
   buffer.add("hello");
@@ -326,7 +325,6 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromUpstream) {
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_THAT(test_server_->server().listenerManager().numConnections(), 1);
 
   Buffer::OwnedImpl buffer;
   buffer.add("hello");

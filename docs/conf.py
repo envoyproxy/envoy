@@ -22,7 +22,7 @@ from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
 
 
-class SphinxConfigException(Exception):
+class SphinxConfigError(Exception):
     pass
 
 
@@ -60,7 +60,7 @@ missing_config = (
     or not os.path.exists(os.environ["ENVOY_DOCS_BUILD_CONFIG"]))
 
 if missing_config:
-    raise SphinxConfigException(
+    raise SphinxConfigError(
         "`ENVOY_DOCS_BUILD_CONFIG` env var must be defined, "
         "and point to a valid yaml file")
 
@@ -70,7 +70,7 @@ with open(os.environ["ENVOY_DOCS_BUILD_CONFIG"]) as f:
 
 def _config(key):
     if not configs.get(key):
-        raise SphinxConfigException(f"`{key}` config var must be defined")
+        raise SphinxConfigError(f"`{key}` config var must be defined")
     return configs[key]
 
 
@@ -91,9 +91,9 @@ def _config(key):
 sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
-    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'intersphinx_custom',
-    'sphinx_tabs.tabs', 'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe',
-    'powershell_lexer'
+    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig',
+    'sphinx.ext.intersphinx', 'sphinx_tabs.tabs', 'sphinx_copybutton', 'validating_code_block',
+    'sphinxext.rediraffe', 'powershell_lexer'
 ]
 
 release_level = _config('release_level')
@@ -103,6 +103,10 @@ extlinks = {
     'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
     'api': ('https://github.com/envoyproxy/envoy/blob/{}/api/%s'.format(blob_sha), ''),
 }
+
+# Only lookup intersphinx for explicitly prefixed in cross-references
+# This makes docs versioning work
+intersphinx_disabled_reftypes = ['*']
 
 # Setup global substitutions
 if 'pre-release' in release_level:
@@ -227,7 +231,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = '_static/img/envoy-logo.png'
+html_logo = 'img/envoy-logo.png'
 
 # The name of an image file (relative to this directory) to use as a favicon of
 # the docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -309,39 +313,6 @@ htmlhelp_basename = 'envoydoc'
 # TODO(phlax): add redirect diff (`rediraffe_branch` setting)
 #  - not sure how diffing will work with main merging in PRs - might need
 #    to be injected dynamically, somehow
-rediraffe_redirects = "envoy-redirects.txt"
+rediraffe_redirects = "redirects.txt"
 
-intersphinx_mapping = {
-    'v1.5.0': ('https://www.envoyproxy.io/docs/envoy/v1.5.0', None),
-    'v1.6.0': ('https://www.envoyproxy.io/docs/envoy/v1.6.0', None),
-    'v1.7.0': ('https://www.envoyproxy.io/docs/envoy/v1.7.1', None),
-    'v1.8.0': ('https://www.envoyproxy.io/docs/envoy/v1.8.0', None),
-    'v1.9.0': ('https://www.envoyproxy.io/docs/envoy/v1.9.0', None),
-    'v1.9.1': ('https://www.envoyproxy.io/docs/envoy/v1.9.1', None),
-    'v1.10.0': ('https://www.envoyproxy.io/docs/envoy/v1.10.0', None),
-    'v1.11.0': ('https://www.envoyproxy.io/docs/envoy/v1.11.0', None),
-    'v1.11.1': ('https://www.envoyproxy.io/docs/envoy/v1.11.1', None),
-    'v1.11.2': ('https://www.envoyproxy.io/docs/envoy/v1.11.2', None),
-    'v1.12.0': ('https://www.envoyproxy.io/docs/envoy/v1.12.0', None),
-    'v1.12.2': ('https://www.envoyproxy.io/docs/envoy/v1.12.2', None),
-    'v1.12.3': ('https://www.envoyproxy.io/docs/envoy/v1.12.3', None),
-    'v1.12.4': ('https://www.envoyproxy.io/docs/envoy/v1.12.4', None),
-    'v1.12.5': ('https://www.envoyproxy.io/docs/envoy/v1.12.5', None),
-    'v1.12.6': ('https://www.envoyproxy.io/docs/envoy/v1.12.6', None),
-    'v1.13.0': ('https://www.envoyproxy.io/docs/envoy/v1.13.0', None),
-    'v1.13.1': ('https://www.envoyproxy.io/docs/envoy/v1.13.1', None),
-    'v1.13.2': ('https://www.envoyproxy.io/docs/envoy/v1.13.2', None),
-    'v1.13.3': ('https://www.envoyproxy.io/docs/envoy/v1.13.3', None),
-    'v1.14.0': ('https://www.envoyproxy.io/docs/envoy/v1.14.0', None),
-    'v1.14.2': ('https://www.envoyproxy.io/docs/envoy/v1.14.2', None),
-    'v1.14.3': ('https://www.envoyproxy.io/docs/envoy/v1.14.3', None),
-    'v1.14.7': ('https://www.envoyproxy.io/docs/envoy/v1.14.7', None),
-    'v1.15.0': ('https://www.envoyproxy.io/docs/envoy/v1.15.0', None),
-    'v1.15.4': ('https://www.envoyproxy.io/docs/envoy/v1.15.4', None),
-    'v1.16.0': ('https://www.envoyproxy.io/docs/envoy/v1.16.0', None),
-    'v1.16.3': ('https://www.envoyproxy.io/docs/envoy/v1.16.3', None),
-    'v1.17.0': ('https://www.envoyproxy.io/docs/envoy/v1.17.0', None),
-    'v1.17.1': ('https://www.envoyproxy.io/docs/envoy/v1.17.1', None),
-    'v1.17.2': ('https://www.envoyproxy.io/docs/envoy/v1.17.2', None),
-    'v1.18.0': ('https://www.envoyproxy.io/docs/envoy/v1.18.2', None)
-}
+intersphinx_mapping = _config("intersphinx_mapping")

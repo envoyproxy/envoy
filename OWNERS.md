@@ -24,17 +24,11 @@ routing PRs, questions, etc. to the right place.
   * Upstream, host/priority sets, load balancing, and retry plugins.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+  * Data plane, codecs, security, configuration.
 
 # Maintainers
 
-* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
-  * Fuzzing, security, headers, HTTP/gRPC, router, access log, tests.
-* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
-  * Data plane, codecs, security, configuration.
-* Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
-  * Outlier detection, HTTP routing, xDS, configuration/operational questions.
-* Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
-  * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
@@ -43,11 +37,59 @@ routing PRs, questions, etc. to the right place.
   * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
   * Event management, security, performance, data plane.
+* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
+  * HTTP/3, upstream connection management.
+* Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
+  * xDS APIs, configuration, control plane, fuzzing.
+* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
+  * Data plane, overload management, flow control.
+* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
+  * Performance, Dubbo.
+* Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
+  * Bazel, CI, compilers, linkers, general build issues, etc.
+* Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)
+  * Listeners, RBAC, CEL, matching, Istio.
+
+# Senior extension maintainers
+
+The following extension maintainers have final say over the extensions mentioned below. Once they
+approve an extension PR, it will be merged by the maintainer on-call (or any other maintainer)
+without further review.
+
+* Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
+  * Wasm
+* Raúl Gutiérrez Segalés ([rgs1](https://github.com/rgs1)) (rgs@pinterest.com)
+  * Thrift
+* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
+  * HTTP/3
+* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
+  * Dubbo
 
 # Envoy security team
 
-* All maintainers
-* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tallen@lyft.com)
+* All senior maintainers
+* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
+* Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
+* Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
+* Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
+* Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
+* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
+
+In addition to the permanent Envoy security team, we have additional temporary
+contributors to envoy-setec and relevant Slack channels from:
+
+* [Trail of Bits](https://www.trailofbits.com/) expiring 9/30/2022.
+  * Adam Meily ([ameily](https://github.com/ameily))
+  * Alessandro Gario ([alessandrogario](https://github.com/alessandrogario))
+  * Mike Myers ([mike-myers-tob](https://github.com/mike-myers-tob))
+* [X41 D-Sec](https://x41-dsec.de/) expiring 12/31/2022. Triage and fixes for OSS-Fuzz bugs.
+  * Markus Vervier ([markusx41](https://github.com/markusx41))
+  * Eric Sesterhenn ([ericsesterhennx41](https://github.com/ericsesterhennx41))
+  * Ralf Weinmann ([rpw-x41](https://github.com/rpw-x41))
+  * Dr. Andre Vehreschild ([vehre-x41](https://github.com/vehre-x41))
+* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) expiring 12/31/2022. Review fixes for OSS-Fuzz bugs.
 
 # Emeritus maintainers
 
@@ -55,6 +97,11 @@ routing PRs, questions, etc. to the right place.
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
+* Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
+* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
+* Jose Nino ([junr03](https://github.com/junr03)) (recruiting@junr03.com)
+* Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
+* Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
 
 # Friends of Envoy
 
@@ -65,5 +112,3 @@ matter expert reviews. Feel free to loop them in as needed.
   * v2 xDS, listeners, filter chain discovery service.
 * Michael Payne ([moderation](https://github.com/moderation)) (m@m17e.org)
   * External dependencies, Envoy's supply chain and documentation.
-* Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
-  * Scalability and performance.

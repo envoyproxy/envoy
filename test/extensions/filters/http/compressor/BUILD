@@ -20,7 +20,7 @@ envoy_extension_cc_test(
     srcs = [
         "compressor_filter_test.cc",
     ],
-    extension_name = "envoy.filters.http.compressor",
+    extension_names = ["envoy.filters.http.compressor"],
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/filters/http/compressor:compressor_filter_lib",
@@ -37,7 +37,7 @@ envoy_extension_cc_test(
     srcs = [
         "compressor_filter_integration_test.cc",
     ],
-    extension_name = "envoy.filters.http.compressor",
+    extension_names = ["envoy.filters.http.compressor"],
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/compression/gzip/decompressor:config",
@@ -58,7 +58,7 @@ envoy_extension_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    extension_name = "envoy.filters.http.compressor",
+    extension_names = ["envoy.filters.http.compressor"],
     deps = [
         ":mock_config_cc_proto",
         "//source/extensions/filters/http/compressor:config",
@@ -79,6 +79,7 @@ envoy_cc_benchmark_binary(
         "//envoy/compression/compressor:compressor_factory_interface",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/compression/gzip/compressor:compressor_lib",
+        "//source/extensions/compression/zstd/compressor:config",
         "//source/extensions/filters/http/compressor:compressor_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/protobuf:protobuf_mocks",

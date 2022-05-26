@@ -16,8 +16,7 @@ namespace Http1 {
  */
 class ActiveClient : public Envoy::Http::ActiveClient {
 public:
-  ActiveClient(HttpConnPoolImplBase& parent);
-  ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data);
+  ActiveClient(HttpConnPoolImplBase& parent, OptRef<Upstream::Host::CreateConnectionData> data);
   ~ActiveClient() override;
 
   // ConnPoolImplBase::ActiveClient
@@ -73,7 +72,7 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state);
 
 } // namespace Http1

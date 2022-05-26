@@ -1,0 +1,11 @@
+FROM envoyproxy/envoy-dev:latest
+RUN apt-get update && apt-get install -y bash curl python3
+
+COPY ./envoy-proxy.yaml /etc/envoy.yaml
+COPY ./client.py /client.py
+
+RUN chmod go+r /etc/envoy.yaml
+
+EXPOSE 8001
+
+CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml", "--service-node", "${HOSTNAME}", "--service-cluster", "client"]

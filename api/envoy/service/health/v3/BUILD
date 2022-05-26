@@ -11,7 +11,6 @@ api_proto_package(
         "//envoy/config/cluster/v3:pkg",
         "//envoy/config/core/v3:pkg",
         "//envoy/config/endpoint/v3:pkg",
-        "//envoy/service/discovery/v2:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

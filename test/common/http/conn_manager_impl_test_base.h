@@ -4,6 +4,7 @@
 #include "source/common/http/context_impl.h"
 #include "source/common/http/date_provider_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -28,19 +29,6 @@ namespace Http {
 
 class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
 public:
-  struct RouteConfigProvider : public Router::RouteConfigProvider {
-    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
-
-    // Router::RouteConfigProvider
-    Router::ConfigConstSharedPtr config() override { return route_config_; }
-    absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-    void onConfigUpdate() override {}
-
-    TimeSource& time_source_;
-    std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
-  };
-
   HttpConnectionManagerImplTest();
   ~HttpConnectionManagerImplTest() override;
   Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header);
@@ -58,7 +46,10 @@ public:
 
   Event::MockTimer* setUpTimer();
   void sendRequestHeadersAndData();
-  ResponseHeaderMap* sendResponseHeaders(ResponseHeaderMapPtr&& response_headers);
+  ResponseHeaderMap*
+  sendResponseHeaders(ResponseHeaderMapPtr&& response_headers,
+                      absl::optional<StreamInfo::ResponseFlag> response_flag = absl::nullopt,
+                      std::string response_code_details = "details");
   void expectOnDestroy(bool deferred = true);
   void doRemoteClose(bool deferred = true);
   void testPathNormalization(const RequestHeaderMap& request_headers,
@@ -110,6 +101,7 @@ public:
   serverHeaderTransformation() const override {
     return server_transformation_;
   }
+  const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return use_remote_address_; }
@@ -152,6 +144,10 @@ public:
   originalIpDetectionExtensions() const override {
     return ip_detection_extensions_;
   }
+  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
+    return proxy_status_config_.get();
+  }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -173,6 +169,7 @@ public:
   std::string server_name_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
+  absl::optional<std::string> scheme_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   bool use_remote_address_{true};
   Http::DefaultInternalAddressConfig internal_address_config_;
@@ -181,6 +178,7 @@ public:
   absl::optional<std::string> user_agent_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
+  uint64_t max_requests_per_connection_{};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   std::chrono::milliseconds stream_idle_timeout_{};
@@ -231,6 +229,7 @@ public:
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
               KEEP_UNCHANGED};
   bool strip_trailing_host_dot_ = false;
+  std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 };
 
 } // namespace Http

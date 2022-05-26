@@ -17,7 +17,7 @@ StreamRateLimiter::StreamRateLimiter(
     uint64_t max_kbps, uint64_t max_buffered_data, std::function<void()> pause_data_cb,
     std::function<void()> resume_data_cb,
     std::function<void(Buffer::Instance&, bool)> write_data_cb, std::function<void()> continue_cb,
-    std::function<void(uint64_t)> write_stats_cb, TimeSource& time_source,
+    std::function<void(uint64_t, bool)> write_stats_cb, TimeSource& time_source,
     Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
     std::shared_ptr<TokenBucket> token_bucket, std::chrono::milliseconds fill_interval)
     : fill_interval_(std::move(fill_interval)), write_data_cb_(write_data_cb),
@@ -63,7 +63,7 @@ void StreamRateLimiter::onTokenTimer() {
   // Move the data to write into the output buffer with as little copying as possible.
   // NOTE: This might be moving zero bytes, but that should work fine.
   data_to_write.move(buffer_, bytes_to_write);
-  write_stats_cb_(bytes_to_write);
+  write_stats_cb_(bytes_to_write, buffer_.length() > 0);
 
   // If the buffer still contains data in it, we couldn't get enough tokens, so schedule the next
   // token available time.
@@ -88,10 +88,18 @@ void StreamRateLimiter::onTokenTimer() {
   }
 }
 
-void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_stream) {
+void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_stream,
+                                  bool trailer_added) {
   auto len = incoming_buffer.length();
   buffer_.move(incoming_buffer);
   saw_end_stream_ = end_stream;
+  // If trailer_added is true, set saw_trailers_ to true to continue encode trailers, added
+  // after buffer_.move to ensure buffer has data and won't invoke continue_cb_ before
+  // processing the data in last data frame.
+  if (trailer_added) {
+    saw_trailers_ = true;
+  }
+
   ENVOY_LOG(debug,
             "StreamRateLimiter <writeData>: got new {} bytes of data. token "
             "timer {} scheduled.",

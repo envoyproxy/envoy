@@ -25,7 +25,7 @@ To flush a logger, `FANCY_FLUSH_LOG()` can be used.
 ### Enable Fancy Logger using Command Line Option
 A command line option is provided to enable Fancy Logger: `--enable-fine-grain-logging`. It enables Fancy Logger for Envoy, i.e. replaces most Envoy's log macros (`ENVOY_LOG, ENVOY_FLUSH_LOG, ENVOY_CONN_LOG, ENVOY_STREAM_LOG`) with corresponding Fancy Logger's macros.
 
-If Fancy Logger is enabled, the default log format is `"[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v"`, where the logger name is omitted compared to Envoy's default as it's the same as file name. The default log level is info, if not specidfied by user of any logging context.
+If Fancy Logger is enabled, the default log format is `"[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v"`, where the logger name is omitted compared to Envoy's default as it's the same as file name. The default log level is info, if not specified by user of any logging context.
 
 Note that Envoy's logger can still be used in Fancy mode. These macros are not replaced: `GET_MISC_LOGGER, ENVOY_LOG_MISC, ENVOY_LOGGER, ENVOY_LOG_TO_LOGGER, ENVOY_CONN_LOG_TO_LOGGER, ENVOY_STREAM_LOG_TO_LOGGER`. For example, `ENVOY_LOG_LOGGER(ENVOY_LOGGER(), LEVEL, ...)` is equivalent to `ENVOY_LOG` in Envoy mode.
 
@@ -36,7 +36,8 @@ Runtime update of Fancy Logger is supported with administration interface, i.e. 
 
 1. `POST /logging`: List all names (i.e. file paths) of all active loggers and their levels;
 2. `POST /logging?<file_path>=<level>`: Given the current file path, change the log level of the file;
-3. `POST /logging?level=<level>`: Change levels of all loggers.
+3. `POST /logging?paths=file_path1:level1,file_path2:level2...`: Change log level of multiple file paths at once;
+4. `POST /logging?level=<level>`: Change levels of all loggers.
 
 Users can view and change the log level in a granularity of file in runtime through admin page. Note that `file_path` is determined by `__FILE__` macro, which is the path seen by preprocessor.
 

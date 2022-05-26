@@ -11,6 +11,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
+#include "envoy/http/stream_reset_handler.h"
 #include "envoy/network/address.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -139,10 +140,11 @@ public:
 class ResponseEncoder : public virtual StreamEncoder {
 public:
   /**
-   * Encode 100-Continue headers.
-   * @param headers supplies the 100-Continue header map to encode.
+   * Encode supported 1xx headers.
+   * Currently 100-Continue, 102-Processing, and 103-Early-Data headers are supported.
+   * @param headers supplies the 1xx header map to encode.
    */
-  virtual void encode100ContinueHeaders(const ResponseHeaderMap& headers) PURE;
+  virtual void encode1xxHeaders(const ResponseHeaderMap& headers) PURE;
 
   /**
    * Encode headers, optionally indicating end of stream. Response headers must
@@ -224,7 +226,7 @@ public:
   /**
    * @return StreamInfo::StreamInfo& the stream_info for this stream.
    */
-  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 };
 
 /**
@@ -234,10 +236,11 @@ public:
 class ResponseDecoder : public virtual StreamDecoder {
 public:
   /**
-   * Called with decoded 100-Continue headers.
-   * @param headers supplies the decoded 100-Continue headers map.
+   * Called with decoded 1xx headers.
+   * Currently 100-Continue, 102-Processing, and 103-Early-Data headers are supported.
+   * @param headers supplies the decoded 1xx headers map.
    */
-  virtual void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
+  virtual void decode1xxHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -261,32 +264,6 @@ public:
    * This function is called on Envoy fatal errors so should avoid memory allocation.
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
-};
-
-/**
- * Stream reset reasons.
- */
-enum class StreamResetReason {
-  // If a local codec level reset was sent on the stream.
-  LocalReset,
-  // If a local codec level refused stream reset was sent on the stream (allowing for retry).
-  LocalRefusedStreamReset,
-  // If a remote codec level reset was received on the stream.
-  RemoteReset,
-  // If a remote codec level refused stream reset was received on the stream (allowing for retry).
-  RemoteRefusedStreamReset,
-  // If the stream was locally reset by a connection pool due to an initial connection failure.
-  ConnectionFailure,
-  // If the stream was locally reset due to connection termination.
-  ConnectionTermination,
-  // The stream was reset because of a resource overflow.
-  Overflow,
-  // Either there was an early TCP error for a CONNECT request or the peer reset with CONNECT_ERROR
-  ConnectError,
-  // Received payload did not conform to HTTP protocol.
-  ProtocolError,
-  // If the stream was locally reset by the Overload Manager.
-  OverloadManager
 };
 
 /**
@@ -319,10 +296,8 @@ public:
 /**
  * An HTTP stream (request, response, and push).
  */
-class Stream {
+class Stream : public StreamResetHandler {
 public:
-  virtual ~Stream() = default;
-
   /**
    * Add stream callbacks.
    * @param callbacks supplies the callbacks to fire on stream events.
@@ -334,12 +309,6 @@ public:
    * @param callbacks supplies the callbacks to remove.
    */
   virtual void removeCallbacks(StreamCallbacks& callbacks) PURE;
-
-  /**
-   * Reset the stream. No events will fire beyond this point.
-   * @param reason supplies the reset reason.
-   */
-  virtual void resetStream(StreamResetReason reason) PURE;
 
   /**
    * Enable/disable further data from this stream.
@@ -360,7 +329,7 @@ public:
    * configured.
    * @return uint32_t the stream's configured buffer limits.
    */
-  virtual uint32_t bufferLimit() PURE;
+  virtual uint32_t bufferLimit() const PURE;
 
   /**
    * @return string_view optionally return the reason behind codec level errors.
@@ -389,6 +358,11 @@ public:
    * @param the account to assign this stream.
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
+
+  /**
+   * Get the bytes meter for this stream.
+   */
+  virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 };
 
 /**
@@ -422,6 +396,14 @@ public:
    * @param ReceivedSettings the settings received from the peer.
    */
   virtual void onSettings(ReceivedSettings& settings) { UNREFERENCED_PARAMETER(settings); }
+
+  /**
+   * Fires when the MAX_STREAMS frame is received from the peer.
+   * This is an HTTP/3 frame, indicating the new maximum stream ID which can be opened.
+   * This may occur multiple times across the lifetime of an HTTP/3 connection.
+   * @param num_streams the number of streams now allowed to be opened.
+   */
+  virtual void onMaxStreamsChanged(uint32_t num_streams) { UNREFERENCED_PARAMETER(num_streams); }
 };
 
 /**

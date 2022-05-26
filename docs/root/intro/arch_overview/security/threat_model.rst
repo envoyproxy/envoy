@@ -83,6 +83,11 @@ and do not qualify for treatment under the threat model below. As a consequence,
 with this model in mind. Security issues related to core code will usually trigger the security release process as
 described in this document.
 
+.. note::
+
+  :ref:`contrib <install_contrib>` extensions are noted below and are not officially covered by
+  the threat model or the Envoy security team. All indications below are best effort.
+
 The following extensions are intended to be hardened against untrusted downstream and upstreams:
 
 .. include:: secpos_robust_to_untrusted_downstream_and_upstream.rst

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/access_log/access_log.h"
@@ -31,6 +32,11 @@
 #include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
+
+namespace Stats {
+class SinkPredicates;
+}
+
 namespace Server {
 
 /**
@@ -54,6 +60,11 @@ public:
    * @return Upstream::ClusterManager& singleton for use by the entire server.
    */
   virtual Upstream::ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return const Upstream::ClusterManager& singleton for use by the entire server.
+   */
+  virtual const Upstream::ClusterManager& clusterManager() const PURE;
 
   /**
    * @return Ssl::ContextManager& singleton for use by the entire server.
@@ -236,6 +247,11 @@ public:
   virtual Configuration::StatsConfig& statsConfig() PURE;
 
   /**
+   * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
+   */
+  virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
+
+  /**
    * @return Configuration::ServerFactoryContext& factory context for filters.
    */
   virtual Configuration::ServerFactoryContext& serverFactoryContext() PURE;
@@ -255,6 +271,21 @@ public:
    */
   virtual void
   setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) PURE;
+
+  /**
+   * Return the default for whether reuse_port is enabled or not. This was added as part of
+   * fixing https://github.com/envoyproxy/envoy/issues/15794. It is required to know what the
+   * default was of parent processes during hot restart was, because otherwise switching the
+   * default on the fly will break existing deployments.
+   * TODO(mattklein123): This can be removed when version 1.20.0 is no longer supported.
+   */
+  virtual bool enableReusePortDefault() PURE;
+
+  /**
+   * Set predicates for filtering counters, gauges and text readouts to be flushed to sinks.
+   */
+  virtual void
+  setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) PURE;
 };
 
 } // namespace Server

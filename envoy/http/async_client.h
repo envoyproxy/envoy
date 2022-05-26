@@ -213,6 +213,12 @@ public:
       return *this;
     }
 
+    // this should be done with setBufferedBodyForRetry=true ?
+    StreamOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
+      retry_policy = p;
+      return *this;
+    }
+
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
@@ -239,6 +245,8 @@ public:
     ParentContext parent_context;
 
     envoy::config::core::v3::Metadata metadata;
+
+    absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
   };
 
   /**
@@ -274,6 +282,10 @@ public:
       StreamOptions::setMetadata(m);
       return *this;
     }
+    RequestOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
+      StreamOptions::setRetryPolicy(p);
+      return *this;
+    }
     RequestOptions& setParentSpan(Tracing::Span& parent_span) {
       parent_span_ = &parent_span;
       return *this;
@@ -282,7 +294,7 @@ public:
       child_span_name_ = child_span_name;
       return *this;
     }
-    RequestOptions& setSampled(bool sampled) {
+    RequestOptions& setSampled(absl::optional<bool> sampled) {
       sampled_ = sampled;
       return *this;
     }
@@ -301,7 +313,7 @@ public:
     // Only used if parent_span_ is set.
     std::string child_span_name_{""};
     // Sampling decision for the tracing span. The span is sampled by default.
-    bool sampled_{true};
+    absl::optional<bool> sampled_{true};
   };
 
   /**

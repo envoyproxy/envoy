@@ -51,19 +51,11 @@ void QuicHttpServerConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
 }
 
 void QuicHttpServerConnectionImpl::shutdownNotice() {
-  if (quic::VersionUsesHttp3(quic_server_session_.transport_version())) {
-    quic_server_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server shutdown");
-  } else {
-    ENVOY_CONN_LOG(debug, "Shutdown notice is not propagated to QUIC.", quic_server_session_);
-  }
+  quic_server_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server shutdown");
 }
 
 void QuicHttpServerConnectionImpl::goAway() {
-  if (quic::VersionUsesHttp3(quic_server_session_.transport_version())) {
-    quic_server_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
-  } else {
-    quic_server_session_.SendGoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
-  }
+  quic_server_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
 }
 
 QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
@@ -79,13 +71,14 @@ QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
   session.set_max_inbound_header_list_size(max_request_headers_kb * 1024);
 }
 
+void QuicHttpClientConnectionImpl::goAway() {
+  quic_client_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "client goaway");
+}
+
 Http::RequestEncoder&
 QuicHttpClientConnectionImpl::newStream(Http::ResponseDecoder& response_decoder) {
   EnvoyQuicClientStream* stream =
       quicStreamToEnvoyClientStream(quic_client_session_.CreateOutgoingBidirectionalStream());
-  // TODO(danzh) handle stream creation failure gracefully. This can happen when
-  // there are already 100 open streams. In such case, caller should hold back
-  // the stream creation till an existing stream is closed.
   ASSERT(stream != nullptr, "Fail to create QUIC stream.");
   stream->setResponseDecoder(response_decoder);
   if (quic_client_session_.aboveHighWatermark()) {

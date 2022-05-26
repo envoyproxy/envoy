@@ -72,7 +72,6 @@ public:
   SerializationType downstreamSerializationType() const { return protocol_->serializer()->type(); }
   ProtocolType downstreamProtocolType() const { return protocol_->type(); }
 
-  void continueDecoding();
   void deferredMessage(ActiveMessage& message);
   void sendLocalReply(MessageMetadata& metadata, const DubboFilters::DirectResponse& response,
                       bool end_stream);
@@ -86,9 +85,6 @@ private:
 
   Buffer::OwnedImpl request_buffer_;
   std::list<ActiveMessagePtr> active_message_list_;
-
-  bool stopped_{false};
-  bool half_closed_{false};
 
   Config& config_;
   TimeSource& time_system_;

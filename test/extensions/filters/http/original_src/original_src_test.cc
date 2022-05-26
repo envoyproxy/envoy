@@ -49,7 +49,7 @@ public:
   }
 
   void setAddressToReturn(const std::string& address) {
-    callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(
+    callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
         Network::Utility::resolveUrl(address));
   }
 
@@ -94,8 +94,8 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressAddsOption) {
   for (const auto& option : *options) {
     option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
-  EXPECT_EQ(*socket.addressProvider().localAddress(),
-            *callbacks_.stream_info_.downstream_address_provider_->remoteAddress());
+  EXPECT_EQ(*socket.connectionInfoProvider().localAddress(),
+            *callbacks_.stream_info_.downstream_connection_info_provider_->remoteAddress());
 }
 
 TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressUsesCorrectAddress) {
@@ -110,9 +110,17 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressUsesCorrectAddress) {
     option->hashKey(key);
   }
 
-  std::vector<uint8_t> expected_key = {1, 2, 3, 4};
-
-  EXPECT_EQ(key, expected_key);
+  // The first part of the hash is the address. Then come the other options. On Windows there are
+  // is only the single option. On other platforms there are more that get hashed.
+  EXPECT_EQ(key[0], 1);
+  EXPECT_EQ(key[1], 2);
+  EXPECT_EQ(key[2], 3);
+  EXPECT_EQ(key[3], 4);
+#ifndef WIN32
+  EXPECT_GT(key.size(), 4);
+#else
+  EXPECT_EQ(key.size(), 4);
+#endif
 }
 
 TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
@@ -129,7 +137,7 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
   for (const auto& option : *options) {
     option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
-  EXPECT_EQ(*socket.addressProvider().localAddress(), *expected_address);
+  EXPECT_EQ(*socket.connectionInfoProvider().localAddress(), *expected_address);
 }
 
 TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {
@@ -200,7 +208,7 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataEndStreamDoNothing) {
   // This will be invoked in decodeHeaders.
   EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
   EXPECT_CALL(callbacks, streamInfo());
-  callbacks.stream_info_.downstream_address_provider_->setRemoteAddress(
+  callbacks.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       Network::Utility::parseInternetAddress("1.2.3.4"));
   filter->decodeHeaders(headers_, true);
 
@@ -217,7 +225,7 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
   // This will be invoked in decodeHeaders.
   EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
   EXPECT_CALL(callbacks, streamInfo());
-  callbacks.stream_info_.downstream_address_provider_->setRemoteAddress(
+  callbacks.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       Network::Utility::parseInternetAddress("1.2.3.4"));
   filter->decodeHeaders(headers_, false);
 

@@ -88,11 +88,14 @@ with custom retry plugins similar to how custom filters can be added.
 For example, to configure retries to prefer hosts that haven't been attempted already, the built-in
 ``envoy.retry_host_predicates.previous_hosts`` predicate can be used:
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.route.v3.VirtualHost
 
   retry_policy:
     retry_host_predicate:
     - name: envoy.retry_host_predicates.previous_hosts
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.retry.host.previous_hosts.v3.PreviousHostsPredicate
     host_selection_retry_max_attempts: 3
 
 This will reject hosts previously attempted, retrying host selection a maximum of 3 times. The bound
@@ -134,11 +137,14 @@ often the priority load should be recalculated.
 These plugins can be combined, which will exclude both previously attempted hosts as well as
 previously attempted priorities.
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.route.v3.VirtualHost
 
   retry_policy:
     retry_host_predicate:
     - name: envoy.retry_host_predicates.previous_hosts
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.retry.host.previous_hosts.v3.PreviousHostsPredicate
     host_selection_retry_max_attempts: 3
     retry_priority:
       name: envoy.retry_priorities.previous_priorities
@@ -245,3 +251,16 @@ Timeouts
 Various configurable timeouts apply to an HTTP connection and its constituent streams. Please see
 :ref:`this FAQ entry <faq_configuration_timeouts>` for an overview of important timeout
 configuration.
+
+.. _arch_overview_http_header_map_settings:
+
+HTTP header map settings
+------------------------
+
+Envoy maintains the insertion order of headers (and pseudo headers that begin with ":") in the
+HTTP header map using a linked list data-structure, which is very fast when the number of headers
+is small. In addition it can use a map data-structure to ensure fast access to the various headers.
+The map will be used once the number of headers in a HTTP request/response reaches the value of the
+``envoy.http.headermap.lazy_map_min_size`` runtime feature. The default threshold value is set to
+3, as previous experiments empirically showed that this value provides good performance for many
+use-cases.

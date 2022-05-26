@@ -5,17 +5,41 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Api {
 
 struct EnvoyTcpInfo {
   std::chrono::microseconds tcpi_rtt;
+  // Congestion window, in bytes. Note that posix's TCP_INFO socket option returns cwnd in packets,
+  // we multiply it by MSS to get bytes.
+  uint32_t tcpi_snd_cwnd = 0;
 };
+
+// Small struct to avoid exposing ifaddrs -- which is not defined in all platforms -- to the
+// codebase.
+struct InterfaceAddress {
+  InterfaceAddress(absl::string_view interface_name, unsigned int interface_flags,
+                   Envoy::Network::Address::InstanceConstSharedPtr interface_addr)
+      : interface_name_(interface_name), interface_flags_(interface_flags),
+        interface_addr_(interface_addr) {}
+
+  std::string interface_name_;
+  unsigned int interface_flags_;
+  Envoy::Network::Address::InstanceConstSharedPtr interface_addr_;
+};
+
+using InterfaceAddressVector = std::vector<InterfaceAddress>;
+
+using AlternateGetifaddrs = std::function<SysCallIntResult(InterfaceAddressVector& interfaces)>;
 
 class OsSysCalls {
 public:
@@ -52,6 +76,17 @@ public:
   virtual SysCallSizeResult readv(os_fd_t fd, const iovec* iov, int num_iov) PURE;
 
   /**
+   * @see man 2 pwrite
+   */
+  virtual SysCallSizeResult pwrite(os_fd_t fd, const void* buffer, size_t length,
+                                   off_t offset) const PURE;
+
+  /**
+   * @see man 2 pread
+   */
+  virtual SysCallSizeResult pread(os_fd_t fd, void* buffer, size_t length, off_t offset) const PURE;
+
+  /**
    * @see recv (man 2 recv)
    */
   virtual SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) PURE;
@@ -86,6 +121,11 @@ public:
    * return true if the OS support both IP_TRANSPARENT and IPV6_TRANSPARENT options
    */
   virtual bool supportsIpTransparent() const PURE;
+
+  /**
+   * return true if the OS supports multi-path TCP
+   */
+  virtual bool supportsMptcp() const PURE;
 
   /**
    * Release all resources allocated for fd.
@@ -157,6 +197,37 @@ public:
   virtual SysCallIntResult connect(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
 
   /**
+   * @see man 2 open
+   */
+  virtual SysCallIntResult open(const char* pathname, int flags) const PURE;
+
+  /**
+   * @see man 2 open
+   */
+  virtual SysCallIntResult open(const char* pathname, int flags, mode_t mode) const PURE;
+
+  /**
+   * @see man 2 unlink
+   */
+  virtual SysCallIntResult unlink(const char* pathname) const PURE;
+
+  /**
+   * @see man 2 unlink
+   */
+  virtual SysCallIntResult linkat(os_fd_t olddirfd, const char* oldpath, os_fd_t newdirfd,
+                                  const char* newpath, int flags) const PURE;
+
+  /**
+   * @see man 2 mkstemp
+   */
+  virtual SysCallIntResult mkstemp(char* tmplate) const PURE;
+
+  /**
+   * Returns true if mkstemp, linkat, unlink, open, close, pread and pwrite are fully supported.
+   */
+  virtual bool supportsAllPosixFileOperations() const PURE;
+
+  /**
    * @see man 2 shutdown
    */
   virtual SysCallIntResult shutdown(os_fd_t sockfd, int how) PURE;
@@ -190,6 +261,29 @@ public:
    * @see man TCP_INFO. Get the tcp info for the socket.
    */
   virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) PURE;
+
+  /**
+   * return true if the OS supports getifaddrs.
+   */
+  virtual bool supportsGetifaddrs() const PURE;
+
+  /**
+   * @see man getifaddrs
+   */
+  virtual SysCallIntResult getifaddrs(InterfaceAddressVector& interfaces) PURE;
+
+  /**
+   * allows a platform to override getifaddrs or provide an implementation if one does not exist
+   * natively.
+   *
+   * @arg alternate_getifaddrs function pointer to implementation.
+   */
+  virtual void setAlternateGetifaddrs(AlternateGetifaddrs alternate_getifaddrs) {
+    alternate_getifaddrs_ = alternate_getifaddrs;
+  }
+
+protected:
+  absl::optional<AlternateGetifaddrs> alternate_getifaddrs_{};
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

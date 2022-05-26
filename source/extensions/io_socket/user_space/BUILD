@@ -12,7 +12,10 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "config",
     srcs = ["config.h"],
+    # for integration tests and bootstrap.internal_listener
+    visibility = ["//visibility:public"],
     deps = [
+        ":io_handle_impl_lib",
     ],
 )
 

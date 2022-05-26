@@ -73,6 +73,7 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
   case Http::StreamResetReason::LocalReset:
+  case Http::StreamResetReason::OverloadManager:
     return quic::QUIC_STREAM_CANCELLED;
   default:
     return quic::QUIC_BAD_APPLICATION_PAYLOAD;
@@ -103,11 +104,16 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   }
 }
 
-Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode error) {
+Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode error,
+                                                             bool connected) {
   switch (error) {
   case quic::QUIC_HANDSHAKE_FAILED:
   case quic::QUIC_HANDSHAKE_TIMEOUT:
     return Http::StreamResetReason::ConnectionFailure;
+  case quic::QUIC_PACKET_WRITE_ERROR:
+  case quic::QUIC_NETWORK_IDLE_TIMEOUT:
+    return connected ? Http::StreamResetReason::ConnectionTermination
+                     : Http::StreamResetReason::ConnectionFailure;
   case quic::QUIC_HTTP_FRAME_ERROR:
     return Http::StreamResetReason::ProtocolError;
   default:
@@ -125,24 +131,15 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
   }
 }
 
-Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept {
-  switch (error) {
-  case quic::QUIC_NO_ERROR:
-    return Http::GoAwayErrorCode::NoError;
-  default:
-    return Http::GoAwayErrorCode::Other;
-  }
-}
-
 Network::ConnectionSocketPtr
-createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
+createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
   if (local_addr == nullptr) {
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram, local_addr, peer_addr);
+      Network::Socket::Type::Datagram, local_addr, peer_addr, Network::SocketCreationOptions{});
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   if (options != nullptr) {
@@ -156,7 +153,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
   }
   connection_socket->bind(local_addr);
   ASSERT(local_addr->ip());
-  local_addr = connection_socket->addressProvider().localAddress();
+  local_addr = connection_socket->connectionInfoProvider().localAddress();
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
@@ -184,6 +181,10 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes,
 
 int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details) {
   int sign_alg = 0;
+  if (public_key == nullptr) {
+    *error_details = "Invalid leaf cert, bad public key";
+    return sign_alg;
+  }
   const int pkey_id = EVP_PKEY_id(public_key);
   switch (pkey_id) {
   case EVP_PKEY_EC: {
@@ -239,6 +240,14 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
   connection_socket->setRequestedServerName(hostname);
   connection_socket->setRequestedApplicationProtocols({alpn});
   return connection_socket;
+}
+
+void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& config,
+                       quic::QuicConfig& quic_config) {
+  int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
+  quic_config.SetMaxBidirectionalStreamsToSend(max_streams);
+  quic_config.SetMaxUnidirectionalStreamsToSend(max_streams);
+  configQuicInitialFlowControlWindow(config, quic_config);
 }
 
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,

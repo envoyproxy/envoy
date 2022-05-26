@@ -3,7 +3,8 @@
 set -e
 
 readonly DEFAULT_VALIDITY_DAYS=${DEFAULT_VALIDITY_DAYS:-730}
-readonly HERE=$(cd "$(dirname "$0")" && pwd)
+HERE=$(cd "$(dirname "$0")" && pwd)
+readonly HERE
 
 cd "$HERE" || exit 1
 trap cleanup EXIT
@@ -98,6 +99,29 @@ generate_selfsigned_x509_cert() {
     generate_info_header "$output_prefix"
 }
 
+# $1=<CA name>
+# Generates a chain of 3 intermediate certs in test_long_cert_chain
+# and a cert signed by this in test_random_cert.pem
+generate_cert_chain() {
+    local certname
+    local ca_name="${1}"
+    rm test_long_cert_chain.pem
+    touch test_long_cert_chain.pem
+    for x in {1..4}; do
+        certname="i$x"
+        if [[ $x -gt 1 ]]
+        then
+            ca_name="i$((x - 1))"
+        fi
+        echo "$x: $certname $ca_name"
+        generate_ca $certname $ca_name
+    done
+    for x in {1..3}; do
+        cat "i${x}_cert.pem" >> test_long_cert_chain.pem
+    done
+    mv i4_cert.pem test_random_cert.pem
+}
+
 # Generate ca_cert.pem.
 generate_ca ca
 
@@ -106,6 +130,9 @@ generate_ca intermediate_ca ca
 
 # Concatenate intermediate_ca_cert.pem and ca_cert.pem to create valid certificate chain.
 cat intermediate_ca_cert.pem ca_cert.pem > intermediate_ca_cert_chain.pem
+
+# Generate a cert-chain with 4 intermediate certs
+generate_cert_chain ca
 
 # Generate fake_ca_cert.pem.
 generate_ca fake_ca
@@ -138,6 +165,9 @@ rm -f san_dns3_cert.cfg
 
 # Concatenate san_dns3_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
 cat san_dns3_cert.pem intermediate_ca_cert.pem > san_dns3_chain.pem
+
+# Generate san_dns3_certkeychain.p12 with no password.
+openssl pkcs12 -export -out san_dns3_certkeychain.p12 -inkey san_dns3_key.pem -in san_dns3_cert.pem -certfile san_dns3_chain.pem -keypbe NONE -certpbe NONE -nomaciter -passout pass:
 
 # Generate san_dns4_cert.pm (signed by intermediate_ca_cert.pem).
 cp -f san_dns_cert.cfg san_dns4_cert.cfg
@@ -174,6 +204,9 @@ generate_rsa_key password_protected "" "p4ssw0rd"
 generate_x509_cert password_protected ca
 rm -f password_protected_cert.cfg
 
+# Generate password_protected_certkey.p12.
+openssl pkcs12 -export -out password_protected_certkey.p12 -inkey password_protected_key.pem -in password_protected_cert.pem -passout "file:password_protected_password.txt" -passin "pass:p4ssw0rd"
+
 # Generate selfsigned*_cert.pem.
 generate_rsa_key selfsigned
 generate_selfsigned_x509_cert selfsigned
@@ -184,6 +217,9 @@ cp -f selfsigned_cert.cfg selfsigned_rsa_1024_cert.cfg
 generate_rsa_key selfsigned_rsa_1024 1024
 generate_selfsigned_x509_cert selfsigned_rsa_1024
 rm -f selfsigned_rsa_1024_cert.cfg
+
+# Generate selfsigned_rsa_1024_certkey.p12 with no password.
+openssl pkcs12 -export -out selfsigned_rsa_1024_certkey.p12 -inkey selfsigned_rsa_1024_key.pem -in selfsigned_rsa_1024_cert.pem -keypbe NONE -certpbe NONE -nomaciter -passout pass:
 
 # Generate selfsigned_rsa_3072.pem
 cp -f selfsigned_cert.cfg selfsigned_rsa_3072_cert.cfg
@@ -209,6 +245,9 @@ cp -f selfsigned_cert.cfg selfsigned_ecdsa_p384_cert.cfg
 generate_ecdsa_key selfsigned_ecdsa_p384 secp384r1
 generate_selfsigned_x509_cert selfsigned_ecdsa_p384
 rm -f selfsigned_ecdsa_p384_cert.cfg
+
+# Generate selfsigned_ecdsa_p384_certkey.p12 with no password.
+openssl pkcs12 -export -out selfsigned_ecdsa_p384_certkey.p12 -inkey selfsigned_ecdsa_p384_key.pem -in selfsigned_ecdsa_p384_cert.pem -keypbe NONE -certpbe NONE -nomaciter -passout pass:
 
 # Generate long_validity_cert.pem as a self-signed, with expiry that exceeds 32bit time_t.
 cp -f selfsigned_cert.cfg long_validity_cert.cfg
@@ -277,3 +316,8 @@ cp -f spiffe_san_cert.cfg expired_spiffe_san_cert.cfg
 generate_rsa_key expired_spiffe_san
 generate_x509_cert expired_spiffe_san ca -365
 rm -f expired_spiffe_san_cert.cfg
+
+cp -f spiffe_san_cert.cfg spiffe_san_signed_by_intermediate_cert.cfg
+generate_rsa_key spiffe_san_signed_by_intermediate
+generate_x509_cert spiffe_san_signed_by_intermediate intermediate_ca
+rm -f spiffe_san_signed_by_intermediate_cert.cfg

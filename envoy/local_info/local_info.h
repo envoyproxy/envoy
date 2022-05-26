@@ -6,7 +6,7 @@
 #include "envoy/config/context_provider.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
-#include "envoy/stats/symbol_table.h"
+#include "envoy/stats/stats.h"
 
 namespace Envoy {
 namespace LocalInfo {

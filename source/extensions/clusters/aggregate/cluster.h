@@ -44,7 +44,7 @@ public:
           Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
           Random::RandomGenerator& random,
           Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-          Stats::ScopePtr&& stats_scope, bool added_via_api);
+          Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -78,10 +78,12 @@ public:
 
   // Upstream::LoadBalancer
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
-  // Preconnecting not yet implemented for extensions.
-  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
-    return nullptr;
-  }
+  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override;
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                           const Upstream::Host& /*host*/,
+                           std::vector<uint8_t>& /*hash_key*/) override;
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
 
 private:
   // Use inner class to extend LoadBalancerBase. When initializing AggregateClusterLoadBalancer, the
@@ -101,10 +103,14 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-
-    // Upstream::LoadBalancerBase
-    Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                             const Upstream::Host& /*host*/,
+                             std::vector<uint8_t>& /*hash_key*/) override {
+      return {};
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
     }
 
     absl::optional<uint32_t> hostToLinearizedPriority(const Upstream::HostDescription& host) const;
@@ -168,7 +174,7 @@ private:
       const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) override;
+      Stats::ScopeSharedPtr&& stats_scope) override;
 };
 
 DECLARE_FACTORY(ClusterFactory);

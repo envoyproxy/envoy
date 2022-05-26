@@ -8,7 +8,6 @@
 
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,17 +34,17 @@ StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
     return std::make_unique<Common::Statsd::TcpStatsdSink>(
         server.localInfo(), statsd_sink.tcp_cluster_name(), server.threadLocal(),
         server.clusterManager(), server.scope(), statsd_sink.prefix());
-  default:
-    // Verified by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::metrics::v3::StatsdSink::StatsdSpecifierCase::STATSD_SPECIFIER_NOT_SET:
+    break; // Fall through to PANIC
   }
+  throw EnvoyException("unexpected statsd specifier case num");
 }
 
 ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::metrics::v3::StatsdSink>();
 }
 
-std::string StatsdSinkFactory::name() const { return StatsSinkNames::get().Statsd; }
+std::string StatsdSinkFactory::name() const { return StatsdName; }
 
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.

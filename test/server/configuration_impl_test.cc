@@ -12,7 +12,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/cluster_manager_impl.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
+#include "source/extensions/stat_sinks/statsd/config.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -26,7 +26,7 @@
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "udpa/type/v1/typed_struct.pb.h"
+#include "xds/type/v3/typed_struct.pb.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -65,7 +65,8 @@ protected:
             server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
             server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
             server_.httpContext(), server_.grpcContext(), server_.routerContext(),
-            server_.accessLogManager(), server_.singletonManager(), server_.options()) {}
+            server_.accessLogManager(), server_.singletonManager(), server_.options(),
+            server_.quic_stat_names_, server_) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -401,7 +402,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
       "http": {
         "name": "invalid",
         "typed_config": {
-          "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+          "@type": "type.googleapis.com/xds.type.v3.TypedStruct",
           "type_url": "type.googleapis.com/envoy.config.trace.v2.BlackHoleConfig",
           "value": {
             "collector_cluster": "cluster_0",
@@ -434,7 +435,8 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
-                            "Didn't find a registered implementation for name: 'invalid'");
+                            "Didn't find a registered implementation for 'invalid' with type URL: "
+                            "'envoy.config.trace.v2.BlackHoleConfig'");
 }
 
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
@@ -467,7 +469,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
+  sink.set_name(Extensions::StatSinks::Statsd::StatsdName);
   addStatsdFakeClusterConfig(sink);
   server_.server_factory_context_->cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
@@ -510,9 +512,9 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
   sink.set_name("envoy.invalid");
 
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
-                            EnvoyException,
-                            "Didn't find a registered implementation for name: 'envoy.invalid'");
+  EXPECT_THROW_WITH_MESSAGE(
+      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      "Didn't find a registered implementation for 'envoy.invalid' with type URL: ''");
 }
 
 TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
@@ -549,7 +551,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
-                            "Provided name for static registration lookup was empty.");
+                            "Didn't find a registered implementation for '' with type URL: ''");
 }
 
 TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
@@ -582,7 +584,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  udpa::type::v1::TypedStruct typed_struct;
+  xds::type::v3::TypedStruct typed_struct;
   auto untyped_struct = typed_struct.mutable_value();
   (*untyped_struct->mutable_fields())["foo"].set_string_value("bar");
   sink.mutable_typed_config()->PackFrom(typed_struct);
@@ -590,7 +592,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
-                            "Provided name for static registration lookup was empty.");
+                            "Didn't find a registered implementation for '' with type URL: ''");
 }
 
 // An explicit non-empty LayeredRuntime is available to the server with no
@@ -611,9 +613,8 @@ TEST(InitialImplTest, LayeredRuntime) {
       admin_layer: {}
   )EOF";
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server);
+  InitialImpl config(bootstrap);
   EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
 }
 
@@ -624,9 +625,8 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   )EOF";
   const auto bootstrap =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server);
+  InitialImpl config(bootstrap);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -675,9 +675,9 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server_);
+  InitialImpl config(bootstrap);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
@@ -715,9 +715,9 @@ TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server_);
+  InitialImpl config(bootstrap);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
@@ -1038,12 +1038,95 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server_);
+  InitialImpl config(bootstrap);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
+}
+
+TEST_F(ConfigurationImplTest, AccessLogWithFilter) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          },
+          "filter": {
+            "not_health_check_filter":{
+            }
+          }
+        }
+      ],
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  InitialImpl config(bootstrap);
+  config.initAdminAccessLog(bootstrap, server_);
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 1);
+}
+
+TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWithFilter)) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          },
+          "filter": {
+            "not_health_check_filter":{
+            }
+          }
+        }
+      ],
+      access_log_path: "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  InitialImpl config(bootstrap);
+  config.initAdminAccessLog(bootstrap, server_);
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 2);
+}
+
+TEST_F(ConfigurationImplTest, EmptyAdmin) {
+  std::string json = R"EOF(
+  {
+    "admin": {}
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  InitialImpl config(bootstrap);
+  config.initAdminAccessLog(bootstrap, server_);
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 0);
 }
 
 TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) {
@@ -1062,9 +1145,9 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) 
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server_);
+  InitialImpl config(bootstrap);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);

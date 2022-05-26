@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 
 # Redis proxy L4 network filter. Implements consistent hashing and observability for large redis
 # clusters.
-# Public docs: docs/root/configuration/network_filters/redis_proxy_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/redis_proxy_filter
 
 envoy_extension_package()
 
@@ -120,11 +120,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/integration:__subpackages__",
-    ],
     deps = [
+        ":command_splitter_lib",
+        ":conn_pool_lib",
+        ":proxy_filter_lib",
+        ":router_lib",
         "//envoy/upstream:upstream_interface",
         "//source/extensions/common/redis:cluster_refresh_manager_lib",
         "//source/extensions/filters/network:well_known_names",
@@ -132,10 +132,6 @@ envoy_cc_extension(
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:redis_command_stats_lib",
-        "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
-        "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
-        "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
-        "//source/extensions/filters/network/redis_proxy:router_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
@@ -146,13 +142,13 @@ envoy_cc_library(
     srcs = ["router_impl.cc"],
     hdrs = ["router_impl.h"],
     deps = [
+        ":conn_pool_lib",
         ":router_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
-        "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],

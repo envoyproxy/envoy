@@ -31,7 +31,7 @@ There are 15 identities:
   field of URI type. *san_uri_key.pem* is its private key.
 - **Password-protected**: The password-protected certificate *password_protected_cert.pem*,
   using the config *san_uri_cert.cfg*. *password_protected_key.pem* is
-  its private key encrypted using the password supplied in *password_protectted_password.txt*.
+  its private key encrypted using the password supplied in *password_protected_password.txt*.
 - **Self-signed**: The self-signed certificate *selfsigned_cert.pem*, using the
   config *selfsigned_cert.cfg*. *selfsigned_key.pem* is its private key.
 - **Self-signed RSA 1024**: The self-signed certificate *selfsigned_rsa_1024_cert.pem*,

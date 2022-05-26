@@ -129,11 +129,12 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
 const std::string TestSubjectPeer =
     "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US";
 
-inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamInfo& stream_info) {
+inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamInfo& stream_info,
+                                                      TimeSource& time_source) {
   // Set mocks' default string return value to be an empty string.
   // TODO(asraa): Speed up this function, which is slowed because of the use of mocks.
   testing::DefaultValue<const std::string&>::Set(EMPTY_STRING);
-  auto test_stream_info = std::make_unique<TestStreamInfo>();
+  auto test_stream_info = std::make_unique<TestStreamInfo>(time_source);
   test_stream_info->metadata_ = stream_info.dynamic_metadata();
   // Truncate recursive filter metadata fields.
   // TODO(asraa): Resolve MessageToJsonString failure on recursive filter metadata.
@@ -152,26 +153,41 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   if (stream_info.has_response_code()) {
     test_stream_info->response_code_ = stream_info.response_code().value();
   }
-  test_stream_info->setRequestedServerName(stream_info.requested_server_name());
   auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   auto upstream_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
       replaceInvalidStringValues(stream_info.upstream_metadata()));
   ON_CALL(*upstream_host, metadata()).WillByDefault(testing::Return(upstream_metadata));
-  test_stream_info->upstream_host_ = upstream_host;
-  auto address = stream_info.has_address()
-                     ? Envoy::Network::Address::resolveProtoAddress(stream_info.address())
-                     : Network::Utility::resolveUrl("tcp://10.0.0.1:443");
+  test_stream_info->setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  test_stream_info->upstreamInfo()->setUpstreamHost(upstream_host);
+  Envoy::Network::Address::InstanceConstSharedPtr address;
+  if (stream_info.has_address()) {
+    if (stream_info.address().address_case() ==
+            envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress &&
+        stream_info.address().envoy_internal_address().address_name_specifier_case() ==
+            envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
+                kServerListenerName) {
+      address = std::make_shared<Envoy::Network::Address::EnvoyInternalInstance>(
+          replaceInvalidHostCharacters(
+              stream_info.address().envoy_internal_address().server_listener_name()));
+    } else {
+      address = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+    }
+  } else {
+    address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
+  }
   auto upstream_local_address =
       stream_info.has_upstream_local_address()
           ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
           : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
-  test_stream_info->upstream_local_address_ = upstream_local_address;
-  test_stream_info->downstream_address_provider_ =
-      std::make_shared<Network::SocketAddressSetterImpl>(address, address);
+  test_stream_info->upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
+  test_stream_info->downstream_connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+  test_stream_info->downstream_connection_info_provider_->setRequestedServerName(
+      stream_info.requested_server_name());
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, subjectPeerCertificate())
       .WillByDefault(testing::ReturnRef(TestSubjectPeer));
-  test_stream_info->setDownstreamSslConnection(connection_info);
+  test_stream_info->downstream_connection_info_provider_->setSslConnection(connection_info);
   return test_stream_info;
 }
 
@@ -191,6 +207,17 @@ inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) 
 
   return data_chunks;
 }
+
+// Returns a vector of differences between expected and actual. An empty array indicates
+// expected==actual
+std::vector<std::string> fuzzFindDiffs(absl::string_view expected, absl::string_view actual);
+
+#define FUZZ_ASSERT_EQ(expected, actual, annotation)                                               \
+  {                                                                                                \
+    std::vector<std::string> diffs = fuzzFindDiffs(expected, actual);                              \
+    RELEASE_ASSERT(expected == actual, absl::StrCat(annotation, ": ", expected, " != ", actual,    \
+                                                    "\n  ", absl::StrJoin(diffs, "\n  ")));        \
+  }
 
 } // namespace Fuzz
 } // namespace Envoy

@@ -573,6 +573,13 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
 }
 #endif
 
+TEST_F(StaticLoaderImplTest, RemovedFlags) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    envoy.reloadable_features.removed_foo: true
+  )EOF");
+  EXPECT_ENVOY_BUG(setup(), "envoy.reloadable_features.removed_foo");
+}
+
 // Validate proto parsing sanity.
 TEST_F(StaticLoaderImplTest, ProtoParsing) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
@@ -841,9 +848,10 @@ TEST(NoRuntime, DefaultIntValues) {
   ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
 
   // Feature defaults should still work.
-  EXPECT_EQ(0x1230000ABCDULL,
-            getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL));
-  EXPECT_EQ(0, getInteger("envoy.reloadable_features.test_int_feature_zero", 0));
+  EXPECT_ENVOY_BUG(
+      EXPECT_EQ(0x1230000ABCDULL,
+                getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL)),
+      "requested an unsupported integer");
 }
 
 // Test RTDS layer(s).

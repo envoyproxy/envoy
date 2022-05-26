@@ -10,8 +10,8 @@
 namespace Envoy {
 namespace Http {
 
-Network::TransportSocketOptionsSharedPtr
-wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options,
+Network::TransportSocketOptionsConstSharedPtr
+wrapTransportSocketOptions(Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                            std::vector<Protocol> protocols) {
   std::vector<std::string> fallbacks;
   for (auto protocol : protocols) {
@@ -19,7 +19,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
     // selected protocol.
     switch (protocol) {
     case Http::Protocol::Http10:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("not imlemented");
     case Http::Protocol::Http11:
       fallbacks.push_back(Http::Utility::AlpnNames::get().Http11);
       break;
@@ -44,7 +44,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
 HttpConnPoolImplBase::HttpConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     std::vector<Http::Protocol> protocols)
     : Envoy::ConnectionPool::ConnPoolImplBase(
@@ -58,9 +58,10 @@ HttpConnPoolImplBase::~HttpConnPoolImplBase() { destructAllConnections(); }
 
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
-                                Http::ConnectionPool::Callbacks& callbacks) {
+                                Http::ConnectionPool::Callbacks& callbacks,
+                                const Instance::StreamOptions& options) {
   HttpAttachContext context({&response_decoder, &callbacks});
-  return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
+  return newStreamImpl(context, options.can_send_early_data_);
 }
 
 bool HttpConnPoolImplBase::hasActiveConnections() const {
@@ -68,12 +69,15 @@ bool HttpConnPoolImplBase::hasActiveConnections() const {
 }
 
 ConnectionPool::Cancellable*
-HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& context) {
+HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& context,
+                                       bool can_send_early_data) {
   Http::ResponseDecoder& decoder = *typedContext<HttpAttachContext>(context).decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *typedContext<HttpAttachContext>(context).callbacks_;
-  ENVOY_LOG(debug, "queueing stream due to no available connections");
+  ENVOY_LOG(debug,
+            "queueing stream due to no available connections (ready={} busy={} connecting={})",
+            ready_clients_.size(), busy_clients_.size(), connecting_clients_.size());
   Envoy::ConnectionPool::PendingStreamPtr pending_stream(
-      new HttpPendingStream(*this, decoder, callbacks));
+      new HttpPendingStream(*this, decoder, callbacks, can_send_early_data));
   return addPendingStream(std::move(pending_stream));
 }
 
@@ -96,11 +100,11 @@ static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
   parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
-  if (state() != ActiveClient::State::DRAINING) {
+  if (state() != ActiveClient::State::Draining) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
     } else {
-      parent_.transitionActiveClientState(*this, ActiveClient::State::DRAINING);
+      parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);
     }
   }
 }
@@ -113,24 +117,55 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
 // not considering http/2 connections connected until the SETTINGS frame is
 // received, but that would result in a latency penalty instead.
 void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.improved_stream_limit_handling") &&
-      settings.maxConcurrentStreams().has_value() &&
-      settings.maxConcurrentStreams().value() < concurrent_stream_limit_) {
-    int64_t old_unused_capacity = currentUnusedCapacity();
-    // Given config limits old_unused_capacity should never exceed int32_t.
-    // TODO(alyssawilk) move remaining_streams_, concurrent_stream_limit_ and
-    // currentUnusedCapacity() to be explicit int32_t
-    ASSERT(std::numeric_limits<int32_t>::max() >= old_unused_capacity);
-    concurrent_stream_limit_ = settings.maxConcurrentStreams().value();
-    int64_t delta = old_unused_capacity - currentUnusedCapacity();
-    parent_.decrClusterStreamCapacity(delta);
-    ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, delta);
-    negative_capacity_ += delta;
-  }
-  // As we don't increase stream limits when maxConcurrentStreams goes up, treat
-  // a stream limit of 0 as a GOAWAY.
-  if (concurrent_stream_limit_ == 0) {
-    parent_.transitionActiveClientState(*this, ActiveClient::State::DRAINING);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_allow_capacity_increase_by_settings")) {
+    if (settings.maxConcurrentStreams().has_value()) {
+      int64_t old_unused_capacity = currentUnusedCapacity();
+      // Given config limits old_unused_capacity should never exceed int32_t.
+      ASSERT(std::numeric_limits<int32_t>::max() >= old_unused_capacity);
+      if (parent().cache() && parent().origin().has_value()) {
+        parent().cache()->setConcurrentStreams(*parent().origin(),
+                                               settings.maxConcurrentStreams().value());
+      }
+      concurrent_stream_limit_ =
+          std::min(settings.maxConcurrentStreams().value(), configured_stream_limit_);
+
+      int64_t delta = old_unused_capacity - currentUnusedCapacity();
+      if (state() == ActiveClient::State::Ready && currentUnusedCapacity() <= 0) {
+        parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
+      } else if (state() == ActiveClient::State::Busy && currentUnusedCapacity() > 0) {
+        parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
+      }
+
+      if (delta > 0) {
+        parent_.decrClusterStreamCapacity(delta);
+        ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, delta);
+      } else if (delta < 0) {
+        parent_.incrClusterStreamCapacity(-delta);
+        ENVOY_CONN_LOG(trace, "Increasing stream capacity by {}", *codec_client_, -delta);
+      }
+    }
+  } else {
+    if (settings.maxConcurrentStreams().has_value() &&
+        settings.maxConcurrentStreams().value() < concurrent_stream_limit_) {
+      int64_t old_unused_capacity = currentUnusedCapacity();
+      // Given config limits old_unused_capacity should never exceed int32_t.
+      // TODO(alyssawilk) move remaining_streams_, concurrent_stream_limit_ and
+      // currentUnusedCapacity() to be explicit int32_t
+      ASSERT(std::numeric_limits<int32_t>::max() >= old_unused_capacity);
+      concurrent_stream_limit_ = settings.maxConcurrentStreams().value();
+      int64_t delta = old_unused_capacity - currentUnusedCapacity();
+      if (state() == ActiveClient::State::Ready && currentUnusedCapacity() <= 0) {
+        parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
+      }
+      parent_.decrClusterStreamCapacity(delta);
+      ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, delta);
+    }
+    // As we don't increase stream limits when maxConcurrentStreams goes up, treat
+    // a stream limit of 0 as a GOAWAY.
+    if (concurrent_stream_limit_ == 0) {
+      parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);
+    }
   }
 }
 
@@ -141,7 +176,7 @@ void MultiplexedActiveClientBase::onStreamDestroy() {
   // wait until the connection has been fully drained of streams and then check in the connection
   // event callback.
   if (!closed_with_active_rq_) {
-    parent().checkForDrained();
+    parent().checkForIdleAndCloseIdleConnsIfDraining();
   }
 }
 
@@ -168,40 +203,17 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
   }
 }
 
-uint64_t maxStreamsPerConnection(uint64_t max_streams_config) {
+uint64_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint64_t max_streams_config) {
   return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
 }
 
-MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& parent,
-                                                         uint32_t max_concurrent_streams,
-                                                         Stats::Counter& cx_total)
+MultiplexedActiveClientBase::MultiplexedActiveClientBase(
+    HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
+    uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
+    OptRef<Upstream::Host::CreateConnectionData> data)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          max_concurrent_streams) {
-  codec_client_->setCodecClientCallbacks(*this);
-  codec_client_->setCodecConnectionCallbacks(*this);
-  cx_total.inc();
-}
-
-MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& parent,
-                                                         uint32_t max_concurrent_streams,
-                                                         Stats::Counter& cx_total,
-                                                         Upstream::Host::CreateConnectionData& data)
-    : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          max_concurrent_streams, data) {
-  codec_client_->setCodecClientCallbacks(*this);
-  codec_client_->setCodecConnectionCallbacks(*this);
-  cx_total.inc();
-}
-
-MultiplexedActiveClientBase::MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
-                                                         Upstream::Host::CreateConnectionData& data,
-                                                         uint32_t max_concurrent_streams,
-                                                         Stats::Counter& cx_total)
-    : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          max_concurrent_streams, data) {
+          effective_concurrent_streams, max_configured_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
   cx_total.inc();

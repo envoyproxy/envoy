@@ -9,10 +9,11 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "alternate_protocols_cache_interface",
-    hdrs = ["alternate_protocols_cache.h"],
+    name = "http_server_properties_cache_interface",
+    hdrs = ["http_server_properties_cache.h"],
     deps = [
         "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -32,6 +33,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/tracing:http_tracer_interface",
         "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -43,12 +45,18 @@ envoy_cc_library(
         ":header_map_interface",
         ":metadata_interface",
         ":protocol_interface",
+        ":stream_reset_handler_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/grpc:status",
         "//envoy/network:address_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/http:status_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "stream_reset_handler_interface",
+    hdrs = ["stream_reset_handler.h"],
 )
 
 envoy_cc_library(
@@ -93,6 +101,7 @@ envoy_cc_library(
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tracing:http_tracer_interface",
+        "//envoy/upstream:load_balancer_interface",
         "//source/common/common:scope_tracked_object_stack",
     ],
 )
@@ -115,6 +124,7 @@ envoy_cc_library(
     ],
     deps = [
         ":header_formatter_interface",
+        "//envoy/tracing:trace_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
     ],
@@ -171,5 +181,41 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "//envoy/network:address_interface",
         "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_evaluator",
+    hdrs = ["header_evaluator.h"],
+    deps = [
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "stateful_session_interface",
+    hdrs = ["stateful_session.h"],
+    deps = [
+        ":header_map_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "persistent_quic_info_interface",
+    hdrs = ["persistent_quic_info.h"],
+)
+
+envoy_cc_library(
+    name = "header_validator_interface",
+    hdrs = ["header_validator.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stream_info:stream_info_interface",
     ],
 )

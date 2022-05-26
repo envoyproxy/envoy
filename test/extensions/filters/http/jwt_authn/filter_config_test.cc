@@ -175,7 +175,8 @@ rules:
     // The threadLocal, dispatcher and api that are used by the filter config, actually belong to
     // the server factory context that who's lifetime is longer. We simulate that by returning
     // their instances from outside the scope.
-    ON_CALL(context, dispatcher()).WillByDefault(ReturnRef(server_context.dispatcher()));
+    ON_CALL(context, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(server_context.mainThreadDispatcher()));
     ON_CALL(context, api()).WillByDefault(ReturnRef(server_context.api()));
     ON_CALL(context, threadLocal()).WillByDefault(ReturnRef(server_context.threadLocal()));
 

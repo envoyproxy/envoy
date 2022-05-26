@@ -11,12 +11,13 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "xds/type/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
 
 namespace Server {
 namespace Configuration {
-class FactoryContext;
+class ServerFactoryContext;
 }
 } // namespace Server
 
@@ -49,6 +50,8 @@ namespace Matcher {
 template <class DataType> class MatchTree;
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
+template <class DataType> using MatchTreePtr = std::unique_ptr<MatchTree<DataType>>;
+template <class DataType> using MatchTreeFactoryCb = std::function<MatchTreePtr<DataType>()>;
 
 /**
  * Action provides the interface for actions to perform when a match occurs. It provides no
@@ -76,11 +79,12 @@ public:
 using ActionPtr = std::unique_ptr<Action>;
 using ActionFactoryCb = std::function<ActionPtr()>;
 
-class ActionFactory : public Config::TypedFactory {
+template <class ActionFactoryContext> class ActionFactory : public Config::TypedFactory {
 public:
   virtual ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, const std::string& stats_prefix,
-                        Server::Configuration::FactoryContext& context) PURE;
+  createActionFactoryCb(const Protobuf::Message& config,
+                        ActionFactoryContext& action_factory_context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };
@@ -89,6 +93,21 @@ public:
 template <class DataType> struct OnMatch {
   const ActionFactoryCb action_cb_;
   const MatchTreeSharedPtr<DataType> matcher_;
+};
+template <class DataType> using OnMatchFactoryCb = std::function<OnMatch<DataType>()>;
+
+template <class DataType> class OnMatchFactory {
+public:
+  virtual ~OnMatchFactory() = default;
+
+  // Instantiates a nested matcher sub-tree or an action.
+  // Returns absl::nullopt if neither sub-tree or action is specified.
+  virtual absl::optional<OnMatchFactoryCb<DataType>>
+  createOnMatch(const xds::type::matcher::v3::Matcher::OnMatch&) PURE;
+  // Instantiates a nested matcher sub-tree or an action.
+  // Returns absl::nullopt if neither sub-tree or action is specified.
+  virtual absl::optional<OnMatchFactoryCb<DataType>>
+  createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch&) PURE;
 };
 
 /**
@@ -155,7 +174,7 @@ class InputMatcherFactory : public Config::TypedFactory {
 public:
   virtual InputMatcherFactoryCb
   createInputMatcherFactoryCb(const Protobuf::Message& config,
-                              Server::Configuration::FactoryContext& factory_context) PURE;
+                              Server::Configuration::ServerFactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.input_matchers"; }
 };
@@ -226,7 +245,7 @@ public:
    */
   virtual DataInputFactoryCb<DataType>
   createDataInputFactoryCb(const Protobuf::Message& config,
-                           Server::Configuration::FactoryContext& factory_context) PURE;
+                           ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist
@@ -262,9 +281,28 @@ public:
    */
   virtual CommonProtocolInputFactoryCb
   createCommonProtocolInputFactoryCb(const Protobuf::Message& config,
-                                     Server::Configuration::FactoryContext& factory_context) PURE;
+                                     ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.matching.common_inputs"; }
+};
+
+/**
+ * Factory for registering custom matchers.
+ */
+template <class DataType> class CustomMatcherFactory : public Config::TypedFactory {
+public:
+  virtual MatchTreeFactoryCb<DataType>
+  createCustomMatcherFactoryCb(const Protobuf::Message& config,
+                               Server::Configuration::ServerFactoryContext& factory_context,
+                               DataInputFactoryCb<DataType> data_input,
+                               absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
+                               OnMatchFactory<DataType>& on_match_factory) PURE;
+  std::string category() const override {
+    // Static assert to guide implementors to understand what is required.
+    static_assert(std::is_convertible<absl::string_view, decltype(DataType::name())>(),
+                  "DataType must implement valid name() function");
+    return fmt::format("envoy.matching.{}.custom_matchers", DataType::name());
+  }
 };
 
 } // namespace Matcher

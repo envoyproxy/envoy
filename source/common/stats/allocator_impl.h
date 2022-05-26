@@ -2,9 +2,10 @@
 
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/stats/allocator.h"
+#include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
-#include "envoy/stats/symbol_table.h"
 
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/stats/metric_impl.h"
@@ -33,6 +34,17 @@ public:
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
+  void forEachCounter(SizeFn, StatFn<Counter>) const override;
+
+  void forEachGauge(SizeFn, StatFn<Gauge>) const override;
+
+  void forEachTextReadout(SizeFn, StatFn<TextReadout>) const override;
+
+  void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
+  void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
+  void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+
+  void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override;
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
 #endif
@@ -47,6 +59,10 @@ public:
    */
   bool isMutexLockedForTest();
 
+  void markCounterForDeletion(const CounterSharedPtr& counter) override;
+  void markGaugeForDeletion(const GaugeSharedPtr& gauge) override;
+  void markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout) override;
+
 protected:
   virtual Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
                                        const StatNameTagVector& stat_name_tags);
@@ -58,21 +74,37 @@ private:
   friend class TextReadoutImpl;
   friend class NotifyingAllocatorImpl;
 
-  void removeCounterFromSetLockHeld(Counter* counter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeGaugeFromSetLockHeld(Gauge* gauge) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeTextReadoutFromSetLockHeld(Counter* counter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  // A mutex is needed here to protect both the stats_ object from both
+  // alloc() and free() operations. Although alloc() operations are called under existing locking,
+  // free() operations are made from the destructors of the individual stat objects, which are not
+  // protected by locks.
+  mutable Thread::MutexBasicLockable mutex_;
 
   StatSet<Counter> counters_ ABSL_GUARDED_BY(mutex_);
   StatSet<Gauge> gauges_ ABSL_GUARDED_BY(mutex_);
   StatSet<TextReadout> text_readouts_ ABSL_GUARDED_BY(mutex_);
 
-  SymbolTable& symbol_table_;
+  // Retain storage for deleted stats; these are no longer in maps because
+  // the matcher-pattern was established after they were created. Since the
+  // stats are held by reference in code that expects them to be there, we
+  // can't actually delete the stats.
+  //
+  // It seems like it would be better to have each client that expects a stat
+  // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
+  // but that would be fairly complex to change.
+  std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(mutex_);
+  std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(mutex_);
+  std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(mutex_);
 
-  // A mutex is needed here to protect both the stats_ object from both
-  // alloc() and free() operations. Although alloc() operations are called under existing locking,
-  // free() operations are made from the destructors of the individual stat objects, which are not
-  // protected by locks.
-  Thread::MutexBasicLockable mutex_;
+  template <typename StatType> using StatPointerSet = absl::flat_hash_set<StatType*>;
+  // Stat pointers that participate in the flush to sink process.
+  StatPointerSet<Counter> sinked_counters_ ABSL_GUARDED_BY(mutex_);
+  StatPointerSet<Gauge> sinked_gauges_ ABSL_GUARDED_BY(mutex_);
+  StatPointerSet<TextReadout> sinked_text_readouts_ ABSL_GUARDED_BY(mutex_);
+
+  // Predicates used to filter stats to be flushed.
+  std::unique_ptr<SinkPredicates> sink_predicates_;
+  SymbolTable& symbol_table_;
 
   Thread::ThreadSynchronizer sync_;
 };

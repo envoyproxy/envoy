@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 namespace Envoy {
 namespace Http {
@@ -12,6 +13,7 @@ namespace Utility {
 // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/query_params.h
 
 using QueryParams = std::map<std::string, std::string>;
+using QueryParamsVector = std::vector<std::pair<std::string, std::string>>;
 
 } // namespace Utility
 } // namespace Http

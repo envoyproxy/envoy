@@ -9,12 +9,14 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.alts.v3";
 option java_outer_classname = "AltsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/alts/v3;altsv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: ALTS]
 // [#extension: envoy.transport_sockets.alts]
 
 // Configuration for ALTS transport socket. This provides Google's ALTS protocol to Envoy.
+// Store the peer identity in dynamic metadata, namespace is "envoy.transport_socket.peer_information", key is "peer_identity".
 // https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security/
 message Alts {
   option (udpa.annotations.versioning).previous_message_type =

@@ -9,6 +9,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.request_id.uuid.v3";
 option java_outer_classname = "UuidProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/request_id/uuid/v3;uuidv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: UUID]
@@ -40,4 +41,9 @@ message UuidRequestIdConfig {
   // stable sampling of traces, access logs, etc. will no longer work and only random sampling will
   // be possible.
   google.protobuf.BoolValue pack_trace_reason = 1;
+
+  // Set whether to use :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` for sampling or not.
+  // This defaults to true. See the :ref:`context propagation <arch_overview_tracing_context_propagation>`
+  // overview for more information.
+  google.protobuf.BoolValue use_request_id_for_trace_sampling = 2;
 }

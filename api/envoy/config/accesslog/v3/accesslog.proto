@@ -17,6 +17,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.accesslog.v3";
 option java_outer_classname = "AccesslogProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v3;accesslogv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common access log types]
@@ -29,9 +30,7 @@ message AccessLog {
 
   reserved "config";
 
-  // The name of the access log extension to instantiate.
-  // The name must match one of the compiled in loggers.
-  // See the :ref:`extensions listed in typed_config below <extension_category_envoy.access_loggers>` for the default list of available loggers.
+  // The name of the access log extension configuration.
   string name = 1;
 
   // Filter which is used to determine if the access log needs to be written.
@@ -83,6 +82,7 @@ message AccessLogFilter {
     GrpcStatusFilter grpc_status_filter = 10;
 
     // Extension filter.
+    // [#extension-category: envoy.access_loggers.extension_filters]
     ExtensionFilter extension_filter = 11;
 
     // Metadata Filter
@@ -110,7 +110,7 @@ message ComparisonFilter {
   Op op = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Value to compare against.
-  core.v3.RuntimeUInt32 value = 2;
+  core.v3.RuntimeUInt32 value = 2 [(validate.rules).message = {required: true}];
 }
 
 // Filters on HTTP response/status code.

@@ -22,18 +22,17 @@ public:
    */
   Envoy::Http::ConnectionPool::Cancellable*
   newStream(Http::ResponseDecoder& response_decoder,
-            Envoy::Http::ConnectionPool::Callbacks& callbacks) {
+            Envoy::Http::ConnectionPool::Callbacks& callbacks,
+            const Http::ConnectionPool::Instance::StreamOptions& stream_options) {
     on_new_stream_();
-    return pool_->newStream(response_decoder, callbacks);
+    return pool_->newStream(response_decoder, callbacks, stream_options);
   }
   bool hasActiveConnections() const { return pool_->hasActiveConnections(); };
 
   /**
    * See documentation of Envoy::ConnectionPool::Instance.
    */
-  void addDrainedCallback(ConnectionPool::Instance::DrainedCb cb) {
-    pool_->addDrainedCallback(cb);
-  };
+  void addIdleCallback(ConnectionPool::Instance::IdleCb cb) { pool_->addIdleCallback(cb); };
 
   Upstream::HostDescriptionConstSharedPtr host() const { return pool_->host(); }
 

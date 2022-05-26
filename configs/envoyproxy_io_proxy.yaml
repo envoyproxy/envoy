@@ -17,6 +17,8 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          scheme_header_transformation:
+            scheme_to_overwrite: https
           stat_prefix: ingress_http
           route_config:
             name: local_route
@@ -31,6 +33,8 @@ static_resources:
                   cluster: service_envoyproxy_io
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: service_envoyproxy_io
     connect_timeout: 30s

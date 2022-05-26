@@ -3,20 +3,11 @@
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_network_connection.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
 #include "quiche/quic/core/quic_connection.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
 namespace Envoy {
 namespace Quic {
@@ -68,12 +59,61 @@ public:
   }
 
   // Register file event and apply socket options.
-  void setUpConnectionSocket(OptRef<PacketsToReadDelegate> delegate);
+  void setUpConnectionSocket(Network::ConnectionSocket& connection_socket,
+                             OptRef<PacketsToReadDelegate> delegate);
 
   // Switch underlying socket with the given one. This is used in connection migration.
   void switchConnectionSocket(Network::ConnectionSocketPtr&& connection_socket);
 
+  // Potentially trigger migration.
+  void OnPathDegradingDetected() override;
+
+  // Called when port migration probing succeeds. Attempts to migrate this connection onto the new
+  // socket extracted from context.
+  void onPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context);
+
+  // Called when port migration probing fails. The probing socket from context will go out of scope
+  // and be destructed.
+  void onPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context);
+
+  void setNumPtosForPortMigration(uint32_t num_ptos_for_path_degrading);
+
 private:
+  // Holds all components needed for a QUIC connection probing/migration.
+  class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
+  public:
+    EnvoyQuicPathValidationContext(quic::QuicSocketAddress& self_address,
+                                   quic::QuicSocketAddress& peer_address,
+                                   std::unique_ptr<EnvoyQuicPacketWriter> writer,
+                                   std::unique_ptr<Network::ConnectionSocket> probing_socket);
+
+    ~EnvoyQuicPathValidationContext() override;
+
+    quic::QuicPacketWriter* WriterToUse() override;
+
+    EnvoyQuicPacketWriter* releaseWriter();
+
+    Network::ConnectionSocket& probingSocket();
+
+    std::unique_ptr<Network::ConnectionSocket> releaseSocket();
+
+  private:
+    std::unique_ptr<EnvoyQuicPacketWriter> writer_;
+    Network::ConnectionSocketPtr socket_;
+  };
+
+  // Receives notifications from the Quiche layer on path validation results.
+  class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
+  public:
+    explicit EnvoyPathValidationResultDelegate(EnvoyQuicClientConnection& connection);
+
+    void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) override;
+
+    void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context) override;
+
+  private:
+    EnvoyQuicClientConnection& connection_;
+  };
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory,
@@ -81,11 +121,14 @@ private:
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket);
 
-  void onFileEvent(uint32_t events);
+  void onFileEvent(uint32_t events, Network::ConnectionSocket& connection_socket);
+
+  void maybeMigratePort();
 
   OptRef<PacketsToReadDelegate> delegate_;
   uint32_t packets_dropped_{0};
   Event::Dispatcher& dispatcher_;
+  bool migrate_port_on_path_degrading_{false};
 };
 
 } // namespace Quic

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/runtime/runtime.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -56,6 +58,17 @@ public:
    * throw an exception.
    */
   virtual void onDeprecatedField(absl::string_view description, bool soft_deprecation) PURE;
+
+  /**
+   * Called when a message or field is marked as work in progress or a message is contained in a
+   * proto file marked as work in progress.
+   */
+  virtual void onWorkInProgress(absl::string_view description) PURE;
+
+  /**
+   * Called to update runtime stats on deprecated fields.
+   */
+  virtual OptRef<Runtime::Loader> runtime() PURE;
 };
 
 class ValidationContext {

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <sstream>
 #include <vector>
 
@@ -6,6 +7,7 @@
 #include "source/common/common/macros.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
+#include "test/integration/ads_integration.h"
 #include "test/integration/integration.h"
 
 using testing::Return;
@@ -149,13 +151,16 @@ public:
 
   void initialize() override {
     setUpstreamCount(num_upstreams_);
-    setDeterministic();
+    setDeterministicValue();
     config_helper_.renameListener("redis_proxy");
 
     // Change the port for each of the discovery host in cluster_0.
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       uint32_t upstream_idx = 0;
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      if (version_ == Network::Address::IpVersion::v4) {
+        cluster_0->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
+      }
       for (int j = 0; j < cluster_0->load_assignment().endpoints_size(); ++j) {
         auto locality_lb = cluster_0->mutable_load_assignment()->mutable_endpoints(j);
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
@@ -318,6 +323,22 @@ protected:
     return resp.str();
   }
 
+  std::string singleSlotPrimaryReplicaHostnames(const std::string primary_hostname,
+                                                const uint32_t primary_port,
+                                                const std::string replica_hostname,
+                                                const uint32_t replica_port) {
+    int64_t start_slot = 0;
+    int64_t end_slot = 16383;
+
+    std::stringstream resp;
+    resp << "*1\r\n"
+         << "*4\r\n"
+         << ":" << start_slot << "\r\n"
+         << ":" << end_slot << "\r\n"
+         << makeIp(primary_hostname, primary_port) << makeIp(replica_hostname, replica_port);
+    return resp.str();
+  }
+
   /**
    * Simple response for 2 slot redis cluster with 2 nodes.
    * @param slot1 the ip of the primary node of slot1.
@@ -423,6 +444,27 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplica) {
   simpleRequestAndResponse(0, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
 }
 
+// This test is the same as SingleSlotPrimaryReplica, the only
+// difference being that it has the primary and replica identified
+// by hostname instead of IP address.
+TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplicaHostnames) {
+  random_index_ = 0;
+
+  on_server_init_function_ = [this]() {
+    std::string cluster_slot_response = singleSlotPrimaryReplicaHostnames(
+        "localhost", fake_upstreams_[0]->localAddress()->ip()->port(), "localhost",
+        fake_upstreams_[1]->localAddress()->ip()->port());
+
+    expectCallClusterSlot(random_index_, cluster_slot_response);
+  };
+
+  initialize();
+
+  // foo hashes to slot 12182 which is in upstream 0
+  simpleRequestAndResponse(0, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+}
+
+// This test sends a simple "get foo" command from a fake
 // This test sends a simple "get foo" command from a fake
 // downstream client through the proxy to a fake upstream
 // Redis cluster with 2 slots. The fake server sends a valid response
@@ -624,5 +666,53 @@ TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
   EXPECT_TRUE(fake_upstream_connection_2->close());
   redis_client->close();
 }
+
+// Reuse the code in AdsIntegrationTest but have a new test name so
+// INSTANTIATE_TEST_SUITE_P works.
+using RedisAdsIntegrationTest = AdsIntegrationTest;
+
+// Validates that removing a redis cluster does not crash Envoy.
+// Regression test for issue https://github.com/envoyproxy/envoy/issues/7990.
+TEST_P(RedisAdsIntegrationTest, RedisClusterRemoval) {
+  initialize();
+
+  // Send initial configuration with a redis cluster and a redis proxy listener.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {buildRedisCluster("redis_cluster")},
+      {buildRedisCluster("redis_cluster")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"redis_cluster"}, {"redis_cluster"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("redis_cluster")},
+      {buildClusterLoadAssignment("redis_cluster")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener, {buildRedisListener("listener_0", "redis_cluster")},
+      {buildRedisListener("listener_0", "redis_cluster")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"redis_cluster"}, {}, {}));
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
+
+  // Validate that redis listener is successfully created.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Now send a CDS update, removing redis cluster added above.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {buildCluster("cluster_2")}, {buildCluster("cluster_2")},
+      {"redis_cluster"}, "2");
+
+  // Validate that the cluster is removed successfully.
+  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, RedisAdsIntegrationTest,
+                         ADS_INTEGRATION_PARAMS);
+
 } // namespace
 } // namespace Envoy

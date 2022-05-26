@@ -72,24 +72,26 @@ public:
   ~MockClusterInfo() override;
 
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry,
-                            uint64_t conn_pool) {
+                            uint64_t conn_pool, uint64_t conn_per_host = 100) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
-        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_,
-        absl::nullopt, absl::nullopt);
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, conn_per_host,
+        circuit_breakers_stats_, absl::nullopt, absl::nullopt);
   }
 
   void resetResourceManagerWithRetryBudget(uint64_t cx, uint64_t rq_pending, uint64_t rq,
                                            uint64_t rq_retry, uint64_t conn_pool,
-                                           double budget_percent, uint32_t min_retry_concurrency) {
+                                           double budget_percent, uint32_t min_retry_concurrency,
+                                           uint64_t conn_per_host = 100) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
-        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_,
-        budget_percent, min_retry_concurrency);
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, conn_per_host,
+        circuit_breakers_stats_, budget_percent, min_retry_concurrency);
   }
 
   // Upstream::ClusterInfo
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (),
@@ -105,6 +107,9 @@ public:
               (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
+  MOCK_METHOD(const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&, loadBalancingPolicy,
+              (), (const));
+  MOCK_METHOD(TypedLoadBalancerFactory*, loadBalancerFactory, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
@@ -114,6 +119,8 @@ public:
               lbRingHashConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&,
               lbMaglevConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&,
+              lbRoundRobinConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&,
               lbLeastRequestConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&,
@@ -141,6 +148,7 @@ public:
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
   MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));
+  MOCK_METHOD(bool, setLocalInterfaceNameOnUpstreamConnections, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&,
               upstreamHttpProtocolOptions, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&,
@@ -191,6 +199,7 @@ public:
       upstream_http_protocol_options_;
   absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocols_cache_options_;
+  absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
@@ -200,7 +209,7 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
@@ -210,6 +219,12 @@ class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
 public:
   MockIdleTimeEnabledClusterInfo();
   ~MockIdleTimeEnabledClusterInfo() override;
+};
+
+class MockMaxConnectionDurationEnabledClusterInfo : public MockClusterInfo {
+public:
+  MockMaxConnectionDurationEnabledClusterInfo();
+  ~MockMaxConnectionDurationEnabledClusterInfo() override;
 };
 
 } // namespace Upstream

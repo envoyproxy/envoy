@@ -11,10 +11,8 @@
 #include "source/common/memory/stats.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
-#include "source/common/quic/platform/quiche_flags_impl.h"
 
 #include "test/common/buffer/utility.h"
-#include "test/common/quic/platform/quic_epoll_clock.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
@@ -27,31 +25,26 @@
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/common/platform/api/quiche_mem_slice.h"
+#include "quiche/common/platform/api/quiche_stream_buffer_allocator.h"
+#include "quiche/common/platform/api/quiche_system_event_loop.h"
+#include "quiche/common/quiche_mem_slice_storage.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
+#include "quiche/quic/core/quic_epoll_clock.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
-#include "quiche/quic/platform/api/quic_containers.h"
-#include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_expect_bug.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
-#include "quiche/quic/platform/api/quic_file_utils.h"
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_map_util.h"
-#include "quiche/quic/platform/api/quic_mem_slice.h"
-#include "quiche/quic/platform/api/quic_mem_slice_span.h"
-#include "quiche/quic/platform/api/quic_mem_slice_storage.h"
-#include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
-#include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
-#include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
-#include "quiche/quic/platform/api/quic_system_event_loop.h"
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 
 // Basic tests to validate functioning of the QUICHE quic platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -59,6 +52,9 @@
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
+using quiche::GetLogger;
+using quiche::getVerbosityLogThreshold;
+using quiche::setVerbosityLogThreshold;
 using testing::_;
 using testing::HasSubstr;
 
@@ -73,21 +69,30 @@ protected:
     GetLogger().set_level(spdlog::level::err);
   }
 
+  void SetUp() override { Envoy::Assert::resetEnvoyBugCountersForTest(); }
   ~QuicPlatformTest() override {
     setVerbosityLogThreshold(verbosity_log_threshold_);
     GetLogger().set_level(log_level_);
   }
 
-  const QuicLogLevel log_level_;
+  const quiche::QuicheLogLevel log_level_;
   const int verbosity_log_threshold_;
 };
 
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
 TEST_F(QuicPlatformTest, QuicBugTracker) {
-  EXPECT_DEBUG_DEATH(QUIC_BUG(bug_id) << "Here is a bug,", " bug");
-  EXPECT_DEBUG_DEATH(QUIC_BUG_IF(bug_id, true) << "There is a bug,", " bug");
-  EXPECT_LOG_NOT_CONTAINS("error", "", QUIC_BUG_IF(bug_id, false) << "A feature is not a bug.");
+  EXPECT_ENVOY_BUG(QUIC_BUG(bug_id) << "Here is a bug,", " bug");
+  EXPECT_ENVOY_BUG(QUIC_BUG_IF(bug_id, 1 == 1) << "There is a bug,", " bug");
+  bool evaluated = false;
+  EXPECT_LOG_NOT_CONTAINS(
+      "error", "", QUIC_BUG_IF(bug_id_1, false) << "A feature is not a bug." << (evaluated = true));
+  EXPECT_FALSE(evaluated);
+
+  {
+    ScopedDisableExitOnQuicheBug no_crash_quiche_bug;
+    QUIC_BUG(bug_id_2) << "No crash bug";
+  }
 
   EXPECT_LOG_CONTAINS("error", " bug", QUIC_PEER_BUG(bug_id) << "Everywhere's a bug,");
   EXPECT_LOG_CONTAINS("error", " here", QUIC_PEER_BUG_IF(bug_id, true) << "Including here.");
@@ -112,9 +117,14 @@ TEST_F(QuicPlatformTest, QuicExpectBug) {
   auto bug = [](const char* error_message) { QUIC_BUG(bug_id) << error_message; };
 
   auto peer_bug = [](const char* error_message) { QUIC_PEER_BUG(bug_id) << error_message; };
-
   EXPECT_QUIC_BUG(bug("bug one is expected"), "bug one");
   EXPECT_QUIC_BUG(bug("bug two is expected"), "bug two");
+#ifdef NDEBUG
+  // The 3rd triggering in release mode should not be logged.
+  EXPECT_LOG_NOT_CONTAINS("error", "bug three", bug("bug three is expected"));
+#else
+  EXPECT_QUIC_BUG(bug("bug three is expected"), "bug three");
+#endif
 
   EXPECT_QUIC_PEER_BUG(peer_bug("peer_bug_1 is expected"), "peer_bug_1");
   EXPECT_QUIC_PEER_BUG(peer_bug("peer_bug_2 is expected"), "peer_bug_2");
@@ -132,62 +142,12 @@ TEST_F(QuicPlatformTest, QuicExportedStats) {
 
 TEST_F(QuicPlatformTest, QuicHostnameUtils) {
   EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("!!"));
-  EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("envoyproxy"));
+  // SNI without dot is valid as per RFC 2396.
+  EXPECT_TRUE(QuicHostnameUtils::IsValidSNI("envoyproxy"));
   EXPECT_TRUE(QuicHostnameUtils::IsValidSNI("www.envoyproxy.io"));
   EXPECT_EQ("lyft.com", QuicHostnameUtils::NormalizeHostname("lyft.com"));
   EXPECT_EQ("google.com", QuicHostnameUtils::NormalizeHostname("google.com..."));
   EXPECT_EQ("quicwg.org", QuicHostnameUtils::NormalizeHostname("QUICWG.ORG"));
-}
-
-TEST_F(QuicPlatformTest, QuicInlinedVector) {
-  QuicInlinedVector<int, 5> vec;
-  vec.push_back(3);
-  EXPECT_EQ(3, vec[0]);
-}
-
-TEST_F(QuicPlatformTest, QuicEstimateMemoryUsage) {
-  std::string s = "foo";
-  // Stubbed out to always return 0.
-  EXPECT_EQ(0, QuicEstimateMemoryUsage(s));
-}
-
-TEST_F(QuicPlatformTest, QuicMapUtil) {
-  std::map<std::string, int> stdmap = {{"one", 1}, {"two", 2}, {"three", 3}};
-  EXPECT_TRUE(QuicContainsKey(stdmap, "one"));
-  EXPECT_FALSE(QuicContainsKey(stdmap, "zero"));
-
-  std::vector<int> stdvec = {1, 2, 3};
-  EXPECT_TRUE(QuicContainsValue(stdvec, 1));
-  EXPECT_FALSE(QuicContainsValue(stdvec, 0));
-}
-
-TEST_F(QuicPlatformTest, QuicMockLog) {
-  ASSERT_EQ(spdlog::level::err, GetLogger().level());
-
-  {
-    // Test a mock log that is not capturing logs.
-    CREATE_QUIC_MOCK_LOG(log);
-    EXPECT_QUIC_LOG_CALL(log).Times(0);
-    QUIC_LOG(ERROR) << "This should be logged but not captured by the mock.";
-  }
-
-  // Test nested mock logs.
-  CREATE_QUIC_MOCK_LOG(outer_log);
-  outer_log.StartCapturingLogs();
-
-  {
-    // Test a mock log that captures logs.
-    CREATE_QUIC_MOCK_LOG(inner_log);
-    inner_log.StartCapturingLogs();
-
-    EXPECT_QUIC_LOG_CALL_CONTAINS(inner_log, ERROR, "Inner log message");
-    QUIC_LOG(ERROR) << "Inner log message should be captured.";
-
-    // Destruction of inner_log should restore the QUIC log sink to outer_log.
-  }
-
-  EXPECT_QUIC_LOG_CALL_CONTAINS(outer_log, ERROR, "Outer log message");
-  QUIC_LOG(ERROR) << "Outer log message should be captured.";
 }
 
 TEST_F(QuicPlatformTest, QuicServerStats) {
@@ -209,8 +169,6 @@ TEST_F(QuicPlatformTest, QuicStackTraceTest) {
 #endif
 }
 
-TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
-
 TEST_F(QuicPlatformTest, QuicThread) {
   class AdderThread : public QuicThread {
   public:
@@ -219,12 +177,24 @@ TEST_F(QuicPlatformTest, QuicThread) {
 
     ~AdderThread() override = default;
 
+    void waitForRun() {
+      // Wait for Run() to finish.
+      absl::MutexLock lk(&m_);
+      cv_.Wait(&m_);
+    }
+
   protected:
-    void Run() override { *value_ += increment_; }
+    void Run() override {
+      absl::MutexLock lk(&m_);
+      *value_ += increment_;
+      cv_.Signal();
+    }
 
   private:
     int* value_;
     int increment_;
+    absl::Mutex m_;
+    absl::CondVar cv_;
   };
 
   int value = 0;
@@ -242,8 +212,13 @@ TEST_F(QuicPlatformTest, QuicThread) {
   EXPECT_EQ(1, value);
 
   // QuicThread will panic if it's started but not joined.
-  EXPECT_DEATH({ AdderThread(&value, 2).Start(); },
-               "QuicThread should be joined before destruction");
+  EXPECT_DEATH(
+      {
+        AdderThread t3(&value, 2);
+        t3.Start();
+        t3.waitForRun();
+      },
+      "QuicheThread should be joined before destruction");
 }
 
 TEST_F(QuicPlatformTest, QuicLog) {
@@ -353,17 +328,17 @@ TEST_F(QuicPlatformTest, QuicheCheck) {
   QUICHE_CHECK(1 == 1) << " 1 == 1 is forever true.";
 
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false) << " Supposed to fail in debug mode."; },
-                     "CHECK failed:.* Supposed to fail in debug mode.");
-  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "CHECK failed");
+                     "Check failed:.* Supposed to fail in debug mode.");
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "Check failed");
 
   EXPECT_DEATH({ QUICHE_CHECK(false) << " Supposed to fail in all modes."; },
-               "CHECK failed:.* Supposed to fail in all modes.");
-  EXPECT_DEATH({ QUICHE_CHECK(false); }, "CHECK failed");
-  EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "CHECK failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
+               "Check failed:.* Supposed to fail in all modes.");
+  EXPECT_DEATH({ QUICHE_CHECK(false); }, "Check failed");
+  EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "Check failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(1 + 1, 2); },
-                     "CHECK failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
+                     "Check failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(nullptr, nullptr); },
-                     "CHECK failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
+                     "Check failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
 }
 
 // Test the behaviors of the cross products of
@@ -385,21 +360,11 @@ TEST_F(QuicPlatformTest, QuicFatalLog) {
 #endif
 }
 
-TEST_F(QuicPlatformTest, QuicBranchPrediction) {
-  GetLogger().set_level(spdlog::level::info);
-
-  if (QUIC_PREDICT_FALSE(rand() % RAND_MAX == 123456789)) {
-    QUIC_LOG(INFO) << "Go buy some lottery tickets.";
-  } else {
-    QUIC_LOG(INFO) << "As predicted.";
-  }
-}
-
 TEST_F(QuicPlatformTest, QuicNotReached) {
 #ifdef NDEBUG
-  QUIC_NOTREACHED(); // Expect no-op.
+  QUICHE_NOTREACHED(); // Expect no-op.
 #else
-  EXPECT_DEATH(QUIC_NOTREACHED(), "not reached");
+  EXPECT_DEATH(QUICHE_NOTREACHED(), "reached unexpected code");
 #endif
 }
 
@@ -425,7 +390,7 @@ TEST_F(QuicPlatformTest, QuicNotification) {
 }
 
 TEST_F(QuicPlatformTest, QuicTestOutput) {
-  Envoy::TestEnvironment::setEnvVar("QUIC_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
+  Envoy::TestEnvironment::setEnvVar("QUICHE_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
 
   // Set log level to INFO to see the test output path in log.
   GetLogger().set_level(spdlog::level::info);
@@ -510,6 +475,7 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 
 TEST_F(QuicPlatformTest, QuicFlags) {
   auto& flag_registry = quiche::FlagRegistry::getInstance();
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr));
   flag_registry.resetFlags();
 
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
@@ -577,27 +543,8 @@ protected:
   std::stack<std::string> files_to_remove_;
 };
 
-TEST_F(FileUtilsTest, ReadDirContents) {
-  addSubDirs({"sub_dir1", "sub_dir2", "sub_dir1/sub_dir1_1"});
-  addFiles({"file", "sub_dir1/sub_file1", "sub_dir1/sub_dir1_1/sub_file1_1", "sub_dir2/sub_file2"});
-
-  EXPECT_THAT(ReadFileContents(dir_path_),
-              testing::UnorderedElementsAre(dir_path_ + "/file", dir_path_ + "/sub_dir1/sub_file1",
-                                            dir_path_ + "/sub_dir1/sub_dir1_1/sub_file1_1",
-                                            dir_path_ + "/sub_dir2/sub_file2"));
-}
-
-TEST_F(FileUtilsTest, ReadFileContents) {
-  const std::string data = "test string\ntest";
-  const std::string file_path =
-      Envoy::TestEnvironment::writeStringToFileForTest("test_envoy", data);
-  std::string output;
-  ReadFileContents(file_path, &output);
-  EXPECT_EQ(data, output);
-}
-
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
-  QuicStreamBufferAllocator allocator;
+  quiche::QuicheStreamBufferAllocator allocator;
   Envoy::Stats::TestUtil::MemoryTest memory_test;
   if (memory_test.mode() == Envoy::Stats::TestUtil::MemoryTest::Mode::Disabled) {
     return;
@@ -613,11 +560,11 @@ TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
 TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   // These two interfaces are no-op in Envoy. The test just makes sure they
   // build.
-  QuicRunSystemEventLoopIteration();
-  QuicSystemEventLoop("dummy");
+  quiche::QuicheRunSystemEventLoopIteration();
+  quiche::QuicheSystemEventLoop("dummy");
 }
 
-TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
+TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
   bool fragment_releaser_called = false;
@@ -628,14 +575,14 @@ TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
         fragment_releaser_called = true;
       });
   Envoy::Buffer::OwnedImpl buffer;
-  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
+  EXPECT_DEBUG_DEATH(quiche::QuicheMemSlice slice0{quiche::QuicheMemSliceImpl(buffer, 0)}, "");
   std::string str2(1024, 'a');
   // str2 is copied.
   buffer.add(str2);
   EXPECT_EQ(1u, buffer.getRawSlices().size());
   buffer.addBufferFragment(fragment);
 
-  quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};
+  quiche::QuicheMemSlice slice1{quiche::QuicheMemSliceImpl(buffer, str2.length())};
   EXPECT_EQ(str.length(), buffer.length());
   EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
   std::string str2_old = str2; // NOLINT(performance-unnecessary-copy-initialization)
@@ -645,7 +592,7 @@ TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_EQ(nullptr, slice1.data());
   EXPECT_EQ(str2_old, str2);
 
-  quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer, str.length())};
+  quiche::QuicheMemSlice slice2{quiche::QuicheMemSliceImpl(buffer, str.length())};
   EXPECT_EQ(0, buffer.length());
   EXPECT_EQ(str.data(), slice2.data());
   EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));
@@ -653,34 +600,6 @@ TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_TRUE(slice2.empty());
   EXPECT_EQ(nullptr, slice2.data());
   EXPECT_TRUE(fragment_releaser_called);
-}
-
-TEST(EnvoyQuicMemSliceTest, ConstructQuicMemSliceSpan) {
-  Envoy::Buffer::OwnedImpl buffer;
-  std::string str(1024, 'a');
-  buffer.add(str);
-  quic::QuicMemSlice slice{quic::QuicMemSliceImpl(buffer, str.length())};
-
-  QuicMemSliceSpan span(&slice);
-  EXPECT_EQ(1024u, span.total_length());
-  EXPECT_EQ(str, span.GetData(0));
-}
-
-TEST(EnvoyQuicMemSliceTest, QuicMemSliceStorage) {
-  std::string str(512, 'a');
-  iovec iov = {const_cast<char*>(str.data()), str.length()};
-  SimpleBufferAllocator allocator;
-  QuicMemSliceStorage storage(&iov, 1, &allocator, 1024);
-  // Test copy constructor.
-  QuicMemSliceStorage other = storage;
-  QuicMemSliceSpan span = storage.ToSpan();
-  EXPECT_EQ(1u, span.NumSlices());
-  EXPECT_EQ(str.length(), span.total_length());
-  EXPECT_EQ(str, span.GetData(0));
-  QuicMemSliceSpan span_other = other.ToSpan();
-  EXPECT_EQ(1u, span_other.NumSlices());
-  EXPECT_EQ(str, span_other.GetData(0));
-  EXPECT_NE(span_other.GetData(0).data(), span.GetData(0).data());
 }
 
 } // namespace

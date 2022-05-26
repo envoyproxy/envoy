@@ -49,6 +49,6 @@ envoy_proto_library(
     srcs = [":sensitive.proto"],
     deps = [
         "@com_github_cncf_udpa//udpa/annotations:pkg",
-        "@com_github_cncf_udpa//udpa/type/v1:pkg",
+        "@com_github_cncf_udpa//xds/type/v3:pkg",
     ],
 )

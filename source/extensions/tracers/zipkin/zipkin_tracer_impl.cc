@@ -39,20 +39,21 @@ void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
 void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
 std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 
-void ZipkinSpan::injectContext(Http::RequestHeaderMap& request_headers) {
+void ZipkinSpan::injectContext(Tracing::TraceContext& trace_context,
+                               const Upstream::HostDescriptionConstSharedPtr&) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
-  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
+  trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                   span_.traceIdAsHexString());
-  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
+  trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
 
   // Set the parent-span header properly, based on the newly-created span structure.
   if (span_.isSetParentId()) {
-    request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
+    trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
                                     span_.parentIdAsHexString());
   }
 
   // Set the sampled header.
-  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
+  trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
                                   span_.sampled() ? SAMPLED : NOT_SAMPLED);
 }
 
@@ -87,7 +88,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
   if (!zipkin_config.collector_endpoint().empty()) {
     collector.endpoint_ = zipkin_config.collector_endpoint();
   }
-  // The current default version of collector_endpoint_version is HTTP_JSON_V1.
+  // The current default version of collector_endpoint_version is HTTP_JSON.
   collector.version_ = zipkin_config.collector_endpoint_version();
   const bool trace_id_128bit = zipkin_config.trace_id_128bit();
 
@@ -107,23 +108,23 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Http::RequestHeaderMap& request_headers, const std::string&,
+                                   Tracing::TraceContext& trace_context, const std::string&,
                                    SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
-  SpanContextExtractor extractor(request_headers);
+  SpanContextExtractor extractor(trace_context);
   bool sampled{extractor.extractSampled(tracing_decision)};
   try {
     auto ret_span_context = extractor.extractSpanContext(sampled);
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
       new_zipkin_span =
-          tracer.startSpan(config, std::string(request_headers.getHostValue()), start_time);
+          tracer.startSpan(config, std::string(trace_context.authority()), start_time);
       new_zipkin_span->setSampled(sampled);
     } else {
-      new_zipkin_span = tracer.startSpan(config, std::string(request_headers.getHostValue()),
-                                         start_time, ret_span_context.first);
+      new_zipkin_span = tracer.startSpan(config, std::string(trace_context.authority()), start_time,
+                                         ret_span_context.first);
     }
 
   } catch (const ExtractorException& e) {

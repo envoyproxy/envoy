@@ -12,6 +12,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.service.auth.v2";
 option java_outer_classname = "AttributeContextProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2;authv2";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Attribute Context ]

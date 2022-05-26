@@ -19,11 +19,12 @@ public:
                                     Singleton::Manager& singleton_manager,
                                     ThreadLocal::SlotAllocator& tls,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
-                                    Api::Api& api, const Server::Options& options)
+                                    Api::Api& api, const Server::Options& options,
+                                    AccessLog::AccessLogManager& access_log_manager)
       : admin_(admin), context_manager_(context_manager), stats_scope_(stats_scope),
         cluster_manager_(cm), local_info_(local_info), dispatcher_(dispatcher), stats_(stats),
         singleton_manager_(singleton_manager), tls_(tls), validation_visitor_(validation_visitor),
-        api_(api), options_(options) {}
+        api_(api), options_(options), access_log_manager_(access_log_manager) {}
 
   /**
    * Pass an init manager to register dynamic secret provider.
@@ -40,7 +41,7 @@ public:
   }
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
   Stats::Store& stats() override { return stats_; }
   Init::Manager& initManager() override {
     ASSERT(init_manager_ != nullptr);
@@ -53,6 +54,7 @@ public:
   }
   Api::Api& api() override { return api_; }
   const Server::Options& options() override { return options_; }
+  AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
 
 private:
   Server::Admin& admin_;
@@ -68,6 +70,7 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
   const Server::Options& options_;
+  AccessLog::AccessLogManager& access_log_manager_;
 };
 
 } // namespace Configuration

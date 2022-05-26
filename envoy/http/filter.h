@@ -16,6 +16,7 @@
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/scope_tracked_object_stack.h"
@@ -296,6 +297,11 @@ public:
    * added to.
    */
   virtual void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) PURE;
+
+  /**
+   * Called when filter activity indicates that the stream idle timeout should be reset.
+   */
+  virtual void resetIdleTimer() PURE;
 };
 
 /**
@@ -443,22 +449,25 @@ public:
   virtual MetadataMapVector& addDecodedMetadata() PURE;
 
   /**
-   * Called with 100-Continue headers to be encoded.
+   * Called with 1xx headers to be encoded.
+   *
+   * Currently supported codes for this function include 100.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters will not be proxying
-   * 100-continue and with it split out, can ignore the complexity of multiple encodeHeaders calls.
+   * 1xx headers and with it split out, can ignore the complexity of multiple encodeHeaders calls.
    *
-   * This must not be invoked more than once per request.
+   * This is currently only called once per request but implementations should
+   * handle multiple calls as multiple 1xx headers are legal.
    *
    * @param headers supplies the headers to be encoded.
    */
-  virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
+  virtual void encode1xxHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
-   * Returns the 100-Continue headers provided to encode100ContinueHeaders. Returns absl::nullopt if
+   * Returns the headers provided to encode1xxHeaders. Returns absl::nullopt if
    * no headers have been provided yet.
    */
-  virtual ResponseHeaderMapOptRef continueHeaders() const PURE;
+  virtual ResponseHeaderMapOptRef informationalHeaders() const PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -602,6 +611,19 @@ public:
    */
   virtual void
   requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+
+  /**
+   * Set override host to be used by the upstream load balancing. If the target host exists in the
+   * host list of the routed cluster, the host should be selected first.
+   * @param host The override host address.
+   */
+  virtual void setUpstreamOverrideHost(absl::string_view host) PURE;
+
+  /**
+   * @return absl::optional<absl::string_view> optional override host for the upstream
+   * load balancing.
+   */
+  virtual absl::optional<absl::string_view> upstreamOverrideHost() const PURE;
 };
 
 /**
@@ -898,19 +920,19 @@ public:
 class StreamEncoderFilter : public StreamFilterBase {
 public:
   /**
-   * Called with 100-continue headers.
+   * Called with supported 1xx headers.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters
-   * will not be proxying 100-continue and with it split out, can ignore the
+   * will not be proxying 1xxs and with it split out, can ignore the
    * complexity of multiple encodeHeaders calls.
    *
    * This will only be invoked once per request.
    *
-   * @param headers supplies the 100-continue response headers to be encoded.
+   * @param headers supplies the 1xx response headers to be encoded.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    *
    */
-  virtual FilterHeadersStatus encode100ContinueHeaders(ResponseHeaderMap& headers) PURE;
+  virtual FilterHeadersStatus encode1xxHeaders(ResponseHeaderMap& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -979,6 +1001,15 @@ public:
   virtual RequestTrailerMapOptConstRef requestTrailers() const PURE;
   virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
   virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
+  virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
+
+  const Network::Address::Instance& localAddress() const {
+    return *connectionInfoProvider().localAddress();
+  }
+
+  const Network::Address::Instance& remoteAddress() const {
+    return *connectionInfoProvider().remoteAddress();
+  }
 };
 
 /**
@@ -1038,6 +1069,12 @@ public:
    * @param handler supplies the handler to add.
    */
   virtual void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
+
+  /**
+   * Allows filters to access the thread local dispatcher.
+   * @param return the worker thread's dispatcher.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
 };
 
 /**

@@ -50,10 +50,12 @@ struct ExtAuthzFilterStats {
  * Configuration for the External Authorization (ext_authz) filter.
  */
 class FilterConfig {
+  using LabelsMap = Protobuf::Map<std::string, std::string>;
+
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                Stats::Scope& scope, Runtime::Loader& runtime, Http::Context& http_context,
-               const std::string& stats_prefix)
+               const std::string& stats_prefix, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
@@ -76,13 +78,23 @@ public:
         pool_(scope_.symbolTable()),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
+        typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
+                                           config.typed_metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
         ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
         ext_authz_failure_mode_allowed_(
-            pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {}
+            pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
+    auto labels_key_it =
+        bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
+    if (labels_key_it != bootstrap.node().metadata().fields().end()) {
+      for (const auto& labels_it : labels_key_it->second.struct_value().fields()) {
+        destination_labels_[labels_it.first] = labels_it.second.string_value();
+      }
+    }
+  }
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -117,6 +129,10 @@ public:
     return metadata_context_namespaces_;
   }
 
+  const std::vector<std::string>& typedMetadataContextNamespaces() {
+    return typed_metadata_context_namespaces_;
+  }
+
   const ExtAuthzFilterStats& stats() const { return stats_; }
 
   void incCounter(Stats::Scope& scope, Stats::StatName name) {
@@ -124,6 +140,7 @@ public:
   }
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  const LabelsMap& destinationLabels() const { return destination_labels_; }
 
 private:
   static Http::Code toErrorCode(uint64_t status) {
@@ -159,6 +176,7 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
+  LabelsMap destination_labels_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
@@ -168,6 +186,7 @@ private:
   Stats::StatNamePool pool_;
 
   const std::vector<std::string> metadata_context_namespaces_;
+  const std::vector<std::string> typed_metadata_context_namespaces_;
 
   const bool include_peer_certificate_;
 
@@ -245,7 +264,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap& headers) override;
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap& headers) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -257,6 +276,7 @@ public:
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
+  absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers,
                     const Router::RouteConstSharedPtr& route);
@@ -287,6 +307,7 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::RequestHeaderMap* request_headers_;
   Http::HeaderVector response_headers_to_add_{};
+  Http::HeaderVector response_headers_to_set_{};
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;

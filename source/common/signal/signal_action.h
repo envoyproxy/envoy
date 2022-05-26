@@ -128,7 +128,11 @@ private:
   void unmapStackMemory();
   char* altstack_{};
   std::array<struct sigaction, sizeof(FATAL_SIGS) / sizeof(int)> previous_handlers_;
+// sigaltstack and backtrace() are incompatible on Apple platforms
+// https://reviews.llvm.org/D28265
+#if !defined(__APPLE__)
   stack_t previous_altstack_;
+#endif
 };
 
 } // namespace Envoy

@@ -48,8 +48,8 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
     return std::make_unique<FormatterImpl>(
         Config::DataSource::read(config.text_format_source(), true, context.api()), false,
         commands);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::core::v3::SubstitutionFormatString::FormatCase::FORMAT_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
 
   return nullptr;

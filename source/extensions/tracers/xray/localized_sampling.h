@@ -138,33 +138,21 @@ class LocalizedSamplingStrategy : public SamplingStrategy {
 public:
   LocalizedSamplingStrategy(const std::string& sampling_rules_json, Random::RandomGenerator& rng,
                             TimeSource& time_source)
-      : SamplingStrategy(rng), default_manifest_(LocalizedSamplingManifest::createDefault()),
-        custom_manifest_(sampling_rules_json), time_source_(time_source),
-        use_default_(!custom_manifest_.hasCustomRules()) {}
+      : SamplingStrategy(rng), manifest_(sampling_rules_json), time_source_(time_source) {}
 
   /**
-   * Determines if an incoming request matches one of the sampling rules in the local manifests.
+   * Determines if an incoming request matches one of the sampling rules in the local manifest.
    * If a match is found, then the request might be traced based on the sampling percentages etc.
    * determined by the matching rule.
    */
   bool shouldTrace(const SamplingRequest& sampling_request) override;
 
-  /**
-   * Determines whether default rules are in effect. Mainly for unit testing purposes.
-   */
-  bool usingDefaultManifest() const { return use_default_; }
-
-  /**
-   * @return the default manifest. Mainly for unit testing purposes.
-   */
-  const LocalizedSamplingManifest& defaultManifest() const { return default_manifest_; }
+  const LocalizedSamplingManifest manifest() const { return manifest_; }
 
 private:
   bool shouldTrace(LocalizedSamplingRule& rule);
-  LocalizedSamplingManifest default_manifest_;
-  LocalizedSamplingManifest custom_manifest_;
+  LocalizedSamplingManifest manifest_;
   TimeSource& time_source_;
-  bool use_default_;
 };
 
 } // namespace XRay

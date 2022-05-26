@@ -54,7 +54,11 @@ bool TestRootContext::onStart(size_t configuration_size) {
   return true;
 }
 
-bool TestRootContext::onConfigure(size_t) {
+bool TestRootContext::onConfigure(size_t size) {
+  if (size > 0 &&
+      getBufferBytes(WasmBufferType::PluginConfiguration, 0, size)->toString() == "invalid") {
+    return false;
+  }
   if (test_ == "property") {
     {
       // Many properties are not available in the root context.
@@ -175,8 +179,8 @@ FilterHeadersStatus TestContext::onRequestHeaders(uint32_t, bool) {
     {
       // Validate a valid CEL expression
       const std::string expr = R"(
-  envoy.api.v2.core.GrpcService{
-    envoy_grpc: envoy.api.v2.core.GrpcService.EnvoyGrpc {
+  envoy.config.core.v3.GrpcService{
+    envoy_grpc: envoy.config.core.v3.GrpcService.EnvoyGrpc {
       cluster_name: "test"
     }
   })";

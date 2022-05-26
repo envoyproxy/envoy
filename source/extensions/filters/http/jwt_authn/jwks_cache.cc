@@ -1,9 +1,11 @@
 #include "source/extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include <chrono>
+#include <memory>
 
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
@@ -34,8 +36,11 @@ public:
       audiences.push_back(aud);
     }
     audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
-
-    tls_.set([](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalCache>(); });
+    bool enable_jwt_cache = jwt_provider_.has_jwt_cache_config();
+    const auto& config = jwt_provider_.jwt_cache_config();
+    tls_.set([enable_jwt_cache, config](Envoy::Event::Dispatcher& dispatcher) {
+      return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource());
+    });
 
     const auto inline_jwks =
         Config::DataSource::read(jwt_provider_.local_jwks(), true, context.api());
@@ -77,10 +82,19 @@ public:
     return shared_jwks.get();
   }
 
+  JwtCache& getJwtCache() override { return *tls_->jwt_cache_; }
+
 private:
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
+    ThreadLocalCache(bool enable_jwt_cache,
+                     const envoy::extensions::filters::http::jwt_authn::v3::JwtCacheConfig& config,
+                     TimeSource& time_source)
+        : jwt_cache_(JwtCache::create(enable_jwt_cache, config, time_source)) {}
+
     // The jwks object.
     JwksConstSharedPtr jwks_;
+    // The JwtCache object
+    const JwtCachePtr jwt_cache_;
     // The pubkey expiration time.
     MonotonicTime expire_;
   };
@@ -114,13 +128,12 @@ public:
   JwksCacheImpl(const JwtAuthentication& config, Server::Configuration::FactoryContext& context,
                 CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats)
       : stats_(stats) {
-    for (const auto& it : config.providers()) {
-      const auto& provider = it.second;
+    for (const auto& [name, provider] : config.providers()) {
       auto jwks_data = std::make_unique<JwksDataImpl>(provider, context, fetcher_fn, stats);
       if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
         issuer_ptr_map_.emplace(provider.issuer(), jwks_data.get());
       }
-      jwks_data_map_.emplace(it.first, std::move(jwks_data));
+      jwks_data_map_.emplace(name, std::move(jwks_data));
     }
   }
 
@@ -139,7 +152,7 @@ public:
       return it->second.get();
     }
     // Verifier::innerCreate function makes sure that all provider names are defined.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
   }
 
   JwtAuthnFilterStats& stats() override { return stats_; }

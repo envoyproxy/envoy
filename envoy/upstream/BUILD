@@ -26,6 +26,7 @@ envoy_cc_library(
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/http:async_client_interface",
         "//envoy/http:conn_pool_interface",
+        "//envoy/http:persistent_quic_info_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/secret:secret_manager_interface",
@@ -60,6 +61,7 @@ envoy_cc_library(
     deps = [
         ":health_check_host_monitor_interface",
         ":outlier_detection_interface",
+        ":resource_manager_interface",
         "//envoy/network:address_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/stats:primitive_stats_macros",
@@ -184,5 +186,12 @@ envoy_cc_library(
         "//envoy/ssl:context_interface",
         "//envoy/ssl:context_manager_interface",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "scheduler_interface",
+    hdrs = ["scheduler.h"],
+    deps = [
     ],
 )

@@ -9,13 +9,12 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-# Public docs: docs/root/configuration/http_filters/wasm_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/wasm_filter
 
 envoy_cc_library(
     name = "wasm_filter_lib",
     srcs = ["wasm_filter.cc"],
     hdrs = ["wasm_filter.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/server:filter_config_interface",

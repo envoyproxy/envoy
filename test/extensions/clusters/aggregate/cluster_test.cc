@@ -95,12 +95,11 @@ public:
         Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::aggregate::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
-    Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");
+    Stats::ScopeSharedPtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
 
     cluster_ =
         std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, api_->randomGenerator(),
@@ -150,6 +149,7 @@ public:
   NiceMock<Upstream::MockThreadLocalCluster> primary_, secondary_;
   Upstream::PrioritySetImpl primary_ps_, secondary_ps_;
   NiceMock<Upstream::MockLoadBalancer> primary_load_balancer_, secondary_load_balancer_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 
   const std::string default_yaml_config_ = R"EOF(
     name: aggregate_cluster
@@ -183,6 +183,13 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
     EXPECT_TRUE(lb_->peekAnotherHost(nullptr) == nullptr);
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
+        lb_->lifetimeCallbacks();
+    EXPECT_FALSE(lifetime_callbacks.has_value());
+    std::vector<uint8_t> hash_key = {1, 2, 3};
+    absl::optional<Upstream::SelectedPoolAndConnection> selection =
+        lb_->selectExistingConnection(nullptr, *host, hash_key);
+    EXPECT_FALSE(selection.has_value());
     EXPECT_EQ(host.get(), target.get());
   }
 

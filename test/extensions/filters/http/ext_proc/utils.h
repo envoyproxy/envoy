@@ -16,6 +16,11 @@ public:
   // Compare a reference header map to a proto
   static bool headerProtosEqualIgnoreOrder(const Http::HeaderMap& expected,
                                            const envoy::config::core::v3::HeaderMap& actual);
+
+private:
+  // These headers are present in the actual, but cannot be specified in the expected
+  // ignoredHeaders should not be used for equal comparison
+  static const absl::flat_hash_set<std::string> ignoredHeaders();
 };
 
 MATCHER_P(HeaderProtosEqual, expected, "HTTP header protos match") {
@@ -33,6 +38,16 @@ MATCHER_P2(SingleHeaderValueIs, key, value,
     return false;
   }
   return hdr[0]->value() == value;
+}
+
+MATCHER_P2(SingleProtoHeaderValueIs, key, value,
+           absl::StrFormat("Header \"%s\" equals \"%s\"", key, value)) {
+  for (const auto& hdr : arg.headers()) {
+    if (key == hdr.key()) {
+      return value == hdr.value();
+    }
+  }
+  return false;
 }
 
 } // namespace ExternalProcessing

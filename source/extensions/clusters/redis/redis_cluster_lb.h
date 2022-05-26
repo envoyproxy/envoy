@@ -25,6 +25,8 @@ namespace Redis {
 
 static const uint64_t MaxSlot = 16384;
 
+using ReplicaToResolve = std::pair<std::string, uint16_t>;
+
 class ClusterSlot {
 public:
   ClusterSlot(int64_t start, int64_t end, Network::Address::InstanceConstSharedPtr primary)
@@ -36,11 +38,23 @@ public:
   const absl::btree_map<std::string, Network::Address::InstanceConstSharedPtr>& replicas() const {
     return replicas_;
   }
+
+  void setPrimary(Network::Address::InstanceConstSharedPtr address) {
+    primary_ = std::move(address);
+  }
   void addReplica(Network::Address::InstanceConstSharedPtr replica_address) {
     replicas_.emplace(replica_address->asString(), std::move(replica_address));
   }
+  void addReplicaToResolve(const std::string& host, uint16_t port) {
+    replicas_to_resolve_.emplace_back(host, port);
+  }
 
   bool operator==(const ClusterSlot& rhs) const;
+
+  // In case of primary slot address is hostname and needs to be resolved
+  std::string primary_hostname_;
+  uint16_t primary_port_;
+  std::vector<ReplicaToResolve> replicas_to_resolve_;
 
 private:
   int64_t start_;
@@ -109,7 +123,8 @@ public:
    * @param all_hosts provides the updated hosts.
    * @return indicate if the cluster slot is updated or not.
    */
-  virtual bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap all_hosts) PURE;
+  virtual bool onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
+                                   Upstream::HostMap& all_hosts) PURE;
 
   /**
    * Callback when a host's health status is updated
@@ -129,7 +144,7 @@ public:
   RedisClusterLoadBalancerFactory(Random::RandomGenerator& random) : random_(random) {}
 
   // ClusterSlotUpdateCallBack
-  bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap all_hosts) override;
+  bool onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots, Upstream::HostMap& all_hosts) override;
 
   void onHostHealthUpdate() override;
 
@@ -187,6 +202,17 @@ private:
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override;
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
+    }
+    // Pool selection not implemented.
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                             const Upstream::Host& /*host*/,
+                             std::vector<uint8_t>& /*hash_key*/) override {
+      return absl::nullopt;
+    }
+    // Lifetime tracking not implemented.
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
     }
 
   private:

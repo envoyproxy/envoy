@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
@@ -93,12 +94,57 @@ public:
 using RetryHostPredicateSharedPtr = std::shared_ptr<RetryHostPredicate>;
 
 /**
+ * A predicate that is applied prior to retrying a request. Each predicate can customize request
+ * behavior prior to the request being retried.
+ */
+class RetryOptionsPredicate {
+public:
+  struct UpdateOptionsParameters {
+    // Stream info for the previous request attempt that is about to be retried.
+    StreamInfo::StreamInfo& retriable_request_stream_info_;
+    // The current upstream socket options that were used for connection pool selection on the
+    // previous attempt, or the result of an updated set of options from a previously run
+    // retry options predicate.
+    Network::Socket::OptionsSharedPtr current_upstream_socket_options_;
+  };
+
+  struct UpdateOptionsReturn {
+    // New upstream socket options to apply to the next request attempt. If changed, will affect
+    // connection pool selection similar to that which was done for the initial request.
+    absl::optional<Network::Socket::OptionsSharedPtr> new_upstream_socket_options_;
+  };
+
+  virtual ~RetryOptionsPredicate() = default;
+
+  /**
+   * Update request options.
+   * @param parameters supplies the update parameters.
+   * @return the new options to apply. Each option is wrapped in an optional and is only applied
+   *         if valid.
+   */
+  virtual UpdateOptionsReturn updateOptions(const UpdateOptionsParameters& parameters) const PURE;
+};
+
+using RetryOptionsPredicateConstSharedPtr = std::shared_ptr<const RetryOptionsPredicate>;
+
+/**
+ * Context for all retry extensions.
+ */
+class RetryExtensionFactoryContext {
+public:
+  virtual ~RetryExtensionFactoryContext() = default;
+
+  /**
+   * @return Singleton::Manager& the server-wide singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
+};
+
+/**
  * Factory for RetryPriority.
  */
 class RetryPriorityFactory : public Config::TypedFactory {
 public:
-  ~RetryPriorityFactory() override = default;
-
   virtual RetryPrioritySharedPtr
   createRetryPriority(const Protobuf::Message& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -112,12 +158,22 @@ public:
  */
 class RetryHostPredicateFactory : public Config::TypedFactory {
 public:
-  ~RetryHostPredicateFactory() override = default;
-
   virtual RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message& config,
                                                           uint32_t retry_count) PURE;
 
   std::string category() const override { return "envoy.retry_host_predicates"; }
+};
+
+/**
+ * Factory for RetryOptionsPredicate.
+ */
+class RetryOptionsPredicateFactory : public Config::TypedFactory {
+public:
+  virtual RetryOptionsPredicateConstSharedPtr
+  createOptionsPredicate(const Protobuf::Message& config,
+                         RetryExtensionFactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.retry_options_predicates"; }
 };
 
 } // namespace Upstream

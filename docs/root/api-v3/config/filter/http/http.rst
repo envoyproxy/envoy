@@ -7,3 +7,5 @@ HTTP filters
 
   */empty/*
   ../../../extensions/filters/http/*/v3*/*
+  ../../../extensions/cache/*/v3*/*
+

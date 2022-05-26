@@ -13,6 +13,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.validate.h"
+#include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
@@ -23,13 +25,14 @@
 #include "source/common/config/metadata.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/matcher/matcher.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/router/header_formatter.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
@@ -77,7 +80,6 @@ using OptionalHttpFilters = absl::flat_hash_set<std::string>;
 class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-                   const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
                    const OptionalHttpFilters& optional_http_filters,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator);
@@ -87,7 +89,6 @@ public:
 private:
   RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                                  const ProtobufWkt::Struct& config,
                                   const OptionalHttpFilters& optional_http_filters,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);
@@ -127,12 +128,20 @@ public:
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
   const RouteTracing* tracingConfig() const override { return nullptr; }
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
+  const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override {
     return nullptr;
   }
+  void traversePerFilterConfig(
+      const std::string&,
+      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+  const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
+  static const envoy::config::core::v3::Metadata metadata_;
+  static const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
+      typed_metadata_;
 };
 
 /**
@@ -157,7 +166,7 @@ public:
       return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
                                                filter_enabled.default_value());
     }
-    return legacy_enabled_;
+    return true;
   };
   bool shadowEnabled() const override {
     if (config_.has_shadow_enabled()) {
@@ -177,14 +186,13 @@ private:
   const std::string expose_headers_;
   const std::string max_age_;
   absl::optional<bool> allow_credentials_{};
-  const bool legacy_enabled_;
 };
 
 class ConfigImpl;
 /**
  * Holds all routing configuration for an entire virtual host.
  */
-class VirtualHostImpl : public VirtualHost {
+class VirtualHostImpl : public VirtualHost, Logger::Loggable<Logger::Id::router> {
 public:
   VirtualHostImpl(
       const envoy::config::route::v3::VirtualHost& virtual_host,
@@ -207,9 +215,10 @@ public:
   Stats::StatName statName() const override { return stat_name_storage_.statName(); }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
+  const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
   const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
     return retry_policy_;
   }
@@ -229,18 +238,22 @@ private:
 
   struct VirtualClusterBase : public VirtualCluster {
   public:
-    VirtualClusterBase(Stats::StatName stat_name, Stats::ScopePtr&& scope,
-                       const VirtualClusterStatNames& stat_names)
-        : stat_name_(stat_name), scope_(std::move(scope)),
+    VirtualClusterBase(const absl::optional<std::string>& name, Stats::StatName stat_name,
+                       Stats::ScopeSharedPtr&& scope, const VirtualClusterStatNames& stat_names)
+        : name_(name), stat_name_(stat_name), scope_(std::move(scope)),
           stats_(generateStats(*scope_, stat_names)) {}
 
     // Router::VirtualCluster
+    // name_ and stat_name_ are two different representations for the same string, retained in
+    // memory to avoid symbol-table locks that would be needed when converting on-the-fly.
+    const absl::optional<std::string>& name() const override { return name_; }
     Stats::StatName statName() const override { return stat_name_; }
     VirtualClusterStats& stats() const override { return stats_; }
 
   private:
+    const absl::optional<std::string> name_;
     const Stats::StatName stat_name_;
-    Stats::ScopePtr scope_;
+    Stats::ScopeSharedPtr scope_;
     mutable VirtualClusterStats stats_;
   };
 
@@ -252,18 +265,19 @@ private:
 
   struct CatchAllVirtualCluster : public VirtualClusterBase {
     CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
-        : VirtualClusterBase(stat_names.other_, scope.scopeFromStatName(stat_names.other_),
-                             stat_names) {}
+        : VirtualClusterBase(absl::nullopt, stat_names.other_,
+                             scope.scopeFromStatName(stat_names.other_), stat_names) {}
   };
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
   const Stats::StatNameManagedStorage stat_name_storage_;
-  Stats::ScopePtr vcluster_scope_;
+  Stats::ScopeSharedPtr vcluster_scope_;
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
   const RateLimitPolicyImpl rate_limit_policy_;
+  std::vector<ShadowPolicyPtr> shadow_policies_;
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
                                           // raw ref to the top level config is currently safe.
@@ -276,6 +290,7 @@ private:
   absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
   absl::optional<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   const CatchAllVirtualCluster virtual_cluster_catch_all_;
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
 };
 
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
@@ -287,15 +302,21 @@ class RetryPolicyImpl : public RetryPolicy {
 
 public:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                  ProtobufMessage::ValidationVisitor& validation_visitor);
+                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                  Upstream::RetryExtensionFactoryContext& factory_context);
   RetryPolicyImpl() = default;
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
+  std::chrono::milliseconds perTryIdleTimeout() const override { return per_try_idle_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
   std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override;
   Upstream::RetryPrioritySharedPtr retryPriority() const override;
+  absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
+  retryOptionsPredicates() const override {
+    return retry_options_predicates_;
+  }
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
@@ -315,6 +336,7 @@ public:
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
+  std::chrono::milliseconds per_try_idle_timeout_{0};
   // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
   // set) so that when retries get enabled through the x-envoy-retry-on header we default to 1
   // retry.
@@ -337,6 +359,7 @@ private:
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{300000};
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
+  std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
 };
 
 /**
@@ -349,12 +372,14 @@ public:
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
+  const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
   bool traceSampled() const override { return trace_sampled_; }
 
 private:
-  std::string cluster_;
+  const std::string cluster_;
+  const Http::LowerCaseString cluster_header_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
   bool trace_sampled_;
@@ -511,6 +536,8 @@ public:
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
+  Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                 bool do_formatting = true) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
@@ -556,6 +583,7 @@ public:
   }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
+  bool appendXfh() const override { return append_xfh_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -571,6 +599,7 @@ public:
   }
   const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
+  const EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
@@ -586,42 +615,14 @@ public:
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
-
-protected:
-  const bool case_sensitive_;
-  const std::string prefix_rewrite_;
-  Regex::CompiledMatcherPtr regex_rewrite_;
-  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
-  std::string regex_rewrite_substitution_;
-  std::string regex_rewrite_redirect_substitution_;
-  const std::string host_rewrite_;
-  bool include_vh_rate_limits_;
-  absl::optional<ConnectConfig> connect_config_;
-
-  RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
-
-  /**
-   * Returns the correct path rewrite string for this route.
-   *
-   * The provided container may be used to store memory backing the return value
-   * therefore it must outlive any use of the return value.
-   */
-  const std::string& getPathRewrite(const Http::RequestHeaderMap& headers,
-                                    absl::optional<std::string>& container) const;
-
-  void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
-                          bool insert_envoy_original_path) const;
-
-  absl::optional<std::string>
-  currentUrlPathAfterRewriteWithMatchedPath(const Http::RequestHeaderMap& headers,
-                                            absl::string_view matched_path) const;
-
-private:
-  struct RuntimeData {
-    std::string fractional_runtime_key_{};
-    envoy::type::v3::FractionalPercent fractional_runtime_default_{};
-  };
+  const RouteSpecificFilterConfig*
+  mostSpecificPerFilterConfig(const std::string& name) const override {
+    auto* config = per_filter_configs_.get(name);
+    return config ? config : vhost_.perFilterConfig(name);
+  }
+  void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
   class DynamicRouteEntry : public RouteEntry, public Route {
   public:
@@ -643,6 +644,10 @@ private:
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
       return parent_->finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
+    }
+    Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                   bool do_formatting = true) const override {
+      return parent_->requestHeaderTransforms(stream_info, do_formatting);
     }
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
@@ -703,6 +708,7 @@ private:
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
+    bool appendXfh() const override { return parent_->appendXfh(); }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
@@ -726,15 +732,21 @@ private:
       return parent_->connectConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
+    const EarlyDataPolicy& earlyDataPolicy() const override { return parent_->earlyDataPolicy(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
     const RouteTracing* tracingConfig() const override { return parent_->tracingConfig(); }
-
-    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override {
-      return parent_->perFilterConfig(name);
+    const RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string& name) const override {
+      return parent_->mostSpecificPerFilterConfig(name);
+    }
+    void traversePerFilterConfig(
+        const std::string& filter_name,
+        std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
+      parent_->traversePerFilterConfig(filter_name, cb);
     };
 
   private:
@@ -771,8 +783,13 @@ private:
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
       request_headers_parser_->evaluateHeaders(headers, stream_info);
+      if (!host_rewrite_.empty()) {
+        headers.setHost(host_rewrite_);
+      }
       DynamicRouteEntry::finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
     }
+    Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                   bool do_formatting = true) const override;
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
       response_headers_parser_->evaluateHeaders(headers, stream_info);
@@ -781,7 +798,17 @@ private:
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                     bool do_formatting = true) const override;
 
-    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
+    const RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string& name) const override {
+      auto* config = per_filter_configs_.get(name);
+      return config ? config : DynamicRouteEntry::mostSpecificPerFilterConfig(name);
+    }
+
+    void traversePerFilterConfig(
+        const std::string& filter_name,
+        std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+
+    const Http::LowerCaseString& clusterHeaderName() const { return cluster_header_name_; }
 
   private:
     const std::string runtime_key_;
@@ -791,9 +818,69 @@ private:
     HeaderParserPtr request_headers_parser_;
     HeaderParserPtr response_headers_parser_;
     PerFilterConfigs per_filter_configs_;
+    const std::string host_rewrite_;
+    const Http::LowerCaseString cluster_header_name_;
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
+
+protected:
+  const bool case_sensitive_;
+  const std::string prefix_rewrite_;
+  Regex::CompiledMatcherPtr regex_rewrite_;
+  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
+  std::string regex_rewrite_substitution_;
+  std::string regex_rewrite_redirect_substitution_;
+  const std::string host_rewrite_;
+  bool include_vh_rate_limits_;
+  absl::optional<ConnectConfig> connect_config_;
+
+  RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
+                                   uint64_t random_value) const;
+
+  /**
+   * Returns the correct path rewrite string for this route.
+   *
+   * The provided container may be used to store memory backing the return value
+   * therefore it must outlive any use of the return value.
+   */
+  const std::string& getPathRewrite(const Http::RequestHeaderMap& headers,
+                                    absl::optional<std::string>& container) const;
+
+  void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
+                          bool insert_envoy_original_path) const;
+
+  absl::optional<std::string>
+  currentUrlPathAfterRewriteWithMatchedPath(const Http::RequestHeaderMap& headers,
+                                            absl::string_view matched_path) const;
+
+private:
+  struct RuntimeData {
+    std::string fractional_runtime_key_{};
+    envoy::type::v3::FractionalPercent fractional_runtime_default_{};
+  };
+
+  /**
+   * Returns a vector of request header parsers which applied or will apply header transformations
+   * to the request in this route.
+   * @param specificity_ascend specifies whether the returned parsers will be sorted from least
+   *        specific to most specific (global connection manager level header parser, virtual host
+   *        level header parser and finally route-level parser.) or the reverse.
+   * @return a vector of request header parsers.
+   */
+  absl::InlinedVector<const HeaderParser*, 3>
+  getRequestHeaderParsers(bool specificity_ascend) const;
+
+  /**
+   * Returns a vector of response header parsers which applied or will apply header transformations
+   * to the response in this route.
+   * @param specificity_ascend specifies whether the returned parsers will be sorted from least
+   *        specific to most specific (global connection manager level header parser, virtual host
+   *        level header parser and finally route-level parser.) or the reverse.
+   * @return a vector of request header parsers.
+   */
+  absl::InlinedVector<const HeaderParser*, 3>
+  getResponseHeaderParsers(bool specificity_ascend) const;
 
   absl::optional<RuntimeData> loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
 
@@ -815,12 +902,19 @@ private:
   RetryPolicyImpl
   buildRetryPolicy(const absl::optional<envoy::config::route::v3::RetryPolicy>& vhost_retry_policy,
                    const envoy::config::route::v3::RouteAction& route_config,
-                   ProtobufMessage::ValidationVisitor& validation_visitor) const;
+                   ProtobufMessage::ValidationVisitor& validation_visitor,
+                   Server::Configuration::ServerFactoryContext& factory_context) const;
 
   InternalRedirectPolicyImpl
   buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
+
+  RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
+                                                  const Http::HeaderMap& headers) const;
+
+  RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers, uint64_t random_value,
+                                          bool ignore_overflow) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
@@ -832,8 +926,10 @@ private:
   const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
   const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
   const std::string host_rewrite_path_regex_substitution_;
+  const bool append_xfh_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
+  ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
@@ -874,6 +970,7 @@ private:
   envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
   const bool match_grpc_;
+  const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
@@ -885,6 +982,8 @@ private:
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
+  const std::string random_value_header_name_;
+  EarlyDataPolicyPtr early_data_policy_;
 };
 
 /**
@@ -1011,6 +1110,70 @@ public:
 
   bool supportsPathlessHeaders() const override { return true; }
 };
+
+/**
+ * Route entry implementation for path separated prefix match routing.
+ */
+class PathSeparatedPrefixRouteEntryImpl : public RouteEntryImplBase {
+public:
+  PathSeparatedPrefixRouteEntryImpl(const VirtualHostImpl& vhost,
+                                    const envoy::config::route::v3::Route& route,
+                                    const OptionalHttpFilters& optional_http_filters,
+                                    Server::Configuration::ServerFactoryContext& factory_context,
+                                    ProtobufMessage::ValidationVisitor& validator);
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return prefix_; }
+  PathMatchType matchType() const override { return PathMatchType::PathSeparatedPrefix; }
+
+  // Router::Matchable
+  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
+
+  // Router::DirectResponseEntry
+  void rewritePathHeader(Http::RequestHeaderMap& headers,
+                         bool insert_envoy_original_path) const override;
+
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+
+private:
+  const std::string prefix_;
+  const Matchers::PathMatcherConstSharedPtr path_matcher_;
+};
+
+// Contextual information used to construct the route actions for a match tree.
+struct RouteActionContext {
+  const VirtualHostImpl& vhost;
+  const OptionalHttpFilters& optional_http_filters;
+  Server::Configuration::ServerFactoryContext& factory_context;
+};
+
+// Action used with the matching tree to specify route to use for an incoming stream.
+class RouteMatchAction : public Matcher::ActionBase<envoy::config::route::v3::Route> {
+public:
+  explicit RouteMatchAction(RouteEntryImplBaseConstSharedPtr route) : route_(std::move(route)) {}
+
+  RouteEntryImplBaseConstSharedPtr route() const { return route_; }
+
+private:
+  const RouteEntryImplBaseConstSharedPtr route_;
+};
+
+// Registered factory for RouteMatchAction.
+class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
+public:
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  std::string name() const override { return "route"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::route::v3::Route>();
+  }
+};
+
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
  * This is split out mainly to help with unit testing.
@@ -1035,8 +1198,9 @@ private:
   const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
+  bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
-  Stats::ScopePtr vhost_scope_;
+  Stats::ScopeSharedPtr vhost_scope_;
   absl::node_hash_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
@@ -1051,6 +1215,7 @@ private:
   WildcardVirtualHosts wildcard_virtual_host_prefixes_;
 
   VirtualHostSharedPtr default_virtual_host_;
+  const bool ignore_port_in_host_matching_{false};
 };
 
 /**
@@ -1097,6 +1262,10 @@ public:
     return max_direct_response_body_size_bytes_;
   }
 
+  const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
+
+  ClusterSpecifierPluginSharedPtr clusterSpecifierPlugin(absl::string_view provider) const;
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -1107,6 +1276,9 @@ private:
   const bool uses_vhds_;
   const bool most_specific_header_mutations_wins_;
   const uint32_t max_direct_response_body_size_bytes_;
+  std::vector<ShadowPolicyPtr> shadow_policies_;
+  // Cluster specifier plugins/providers.
+  absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
 };
 
 /**

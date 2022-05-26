@@ -3,6 +3,8 @@
 namespace Envoy {
 namespace Quic {
 
+#ifdef ENVOY_ENABLE_QUIC
+
 // TODO(renjietang): Currently these stats are only available in downstream. Wire it up to upstream
 // QUIC also.
 QuicStatNames::QuicStatNames(Stats::SymbolTable& symbol_table)
@@ -43,15 +45,16 @@ void QuicStatNames::chargeQuicConnectionCloseStats(Stats::Scope& scope,
 }
 
 void QuicStatNames::chargeQuicResetStreamErrorStats(Stats::Scope& scope,
-                                                    quic::QuicRstStreamErrorCode error_code,
+                                                    quic::QuicResetStreamError error_code,
                                                     bool from_self, bool is_upstream) {
   ASSERT(&symbol_table_ == &scope.symbolTable());
 
-  if (error_code > quic::QUIC_STREAM_LAST_ERROR) {
-    error_code = quic::QUIC_STREAM_LAST_ERROR;
+  auto internal_code = error_code.internal_code();
+  if (internal_code > quic::QUIC_STREAM_LAST_ERROR) {
+    internal_code = quic::QUIC_STREAM_LAST_ERROR;
   }
 
-  const Stats::StatName stream_error = resetStreamErrorStatName(error_code);
+  const Stats::StatName stream_error = resetStreamErrorStatName(internal_code);
   incCounter(scope, {http3_prefix_, (is_upstream ? upstream_ : downstream_),
                      (from_self ? from_self_ : from_peer_), stream_error});
 }
@@ -75,6 +78,11 @@ Stats::StatName QuicStatNames::resetStreamErrorStatName(quic::QuicRstStreamError
             "quic_reset_stream_error_code_", QuicRstStreamErrorCodeToString(error_code)));
       }));
 }
+
+#else
+QuicStatNames::QuicStatNames(Stats::SymbolTable& /*symbol_table*/) {}
+
+#endif
 
 } // namespace Quic
 } // namespace Envoy

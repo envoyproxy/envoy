@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha/sni_dynamic_forward_proxy.pb.h"
-#include "envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha/sni_dynamic_forward_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3/sni_dynamic_forward_proxy.pb.h"
+#include "envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3/sni_dynamic_forward_proxy.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"
@@ -12,7 +12,7 @@ namespace NetworkFilters {
 namespace SniDynamicForwardProxy {
 
 using FilterConfig =
-    envoy::extensions::filters::network::sni_dynamic_forward_proxy::v3alpha::FilterConfig;
+    envoy::extensions::filters::network::sni_dynamic_forward_proxy::v3::FilterConfig;
 
 /**
  * Config registration for the sni_dynamic_forward_proxy filter. @see

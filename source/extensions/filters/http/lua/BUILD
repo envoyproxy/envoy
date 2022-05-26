@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Lua scripting L7 HTTP filter (https://www.lua.org/, http://luajit.org/)
-# Public docs: docs/root/configuration/http_filters/lua_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/lua_filter
 
 envoy_extension_package()
 
@@ -26,7 +26,6 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
-        "//source/extensions/common:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
@@ -44,7 +43,6 @@ envoy_cc_library(
         "//source/common/crypto:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
-        "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
     ],

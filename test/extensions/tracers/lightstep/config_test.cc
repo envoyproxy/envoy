@@ -70,14 +70,6 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracerAccessToken) {
   EXPECT_NE(nullptr, lightstep_tracer);
 }
 
-// Test that the deprecated extension name still functions.
-TEST(LightstepTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.lightstep";
-
-  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
-                         deprecated_name));
-}
-
 } // namespace
 } // namespace Lightstep
 } // namespace Tracers

@@ -79,7 +79,8 @@ RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
   validateRbacRules(proto_config.rules());
   validateRbacRules(proto_config.shadow_rules());
   RoleBasedAccessControlFilterConfigSharedPtr config(
-      std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, context.scope()));
+      std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, context.scope(),
+                                                           context.messageValidationVisitor()));
   return [config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<RoleBasedAccessControlFilter>(config));
   };

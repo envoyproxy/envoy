@@ -31,8 +31,8 @@ public:
 
 private:
   // Following two functions are for Verifier::Callbacks interface.
-  // Pass the payload as Struct.
-  void setPayload(const ProtobufWkt::Struct& payload) override;
+  // Pass the extracted data from a verified JWT as an opaque ProtobufWkt::Struct.
+  void setExtractedData(const ProtobufWkt::Struct& extracted_data) override;
   // It will be called when its verify() call is completed.
   void onComplete(const ::google::jwt_verify::Status& status) override;
 
@@ -49,6 +49,8 @@ private:
   FilterConfigSharedPtr config_;
   // Verify context for current request.
   ContextSharedPtr context_;
+
+  std::string original_uri_;
 };
 
 } // namespace JwtAuthn

@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include "envoy/extensions/watchdog/profile_action/v3alpha/profile_action.pb.h"
+#include "envoy/extensions/watchdog/profile_action/v3/profile_action.pb.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
 
@@ -18,7 +18,7 @@ namespace ProfileAction {
  */
 class ProfileAction : public Server::Configuration::GuardDogAction {
 public:
-  ProfileAction(envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig& config,
+  ProfileAction(envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig& config,
                 Server::Configuration::GuardDogActionFactoryContext& context);
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,

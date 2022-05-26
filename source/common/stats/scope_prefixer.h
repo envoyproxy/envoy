@@ -2,7 +2,7 @@
 
 #include "envoy/stats/scope.h"
 
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -16,8 +16,8 @@ public:
   ~ScopePrefixer() override;
 
   // Scope
-  ScopePtr createScope(const std::string& name) override;
-  ScopePtr scopeFromStatName(StatName name) override;
+  ScopeSharedPtr createScope(const std::string& name) override;
+  ScopeSharedPtr scopeFromStatName(StatName name) override;
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
@@ -59,6 +59,8 @@ public:
   bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
+
+  StatName prefix() const override { return prefix_.statName(); }
 
 private:
   template <class StatType> bool iterHelper(const IterateFn<StatType>& fn) const {

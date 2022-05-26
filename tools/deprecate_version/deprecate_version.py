@@ -1,14 +1,6 @@
-# Script for automating cleanup PR creation for deprecated runtime features
+# Bazel usage
 #
-# sh tools/deprecate_version/deprecate_version.sh
-#
-# Direct usage (not recommended):
-#
-# python tools/deprecate_version/deprecate_version.py
-#
-# e.g
-#
-#  python tools/deprecate_version/deprecate_version.py
+# bazel run //tools/deprecate_version:deprecate_version
 #
 # A GitHub access token must be set in GITHUB_TOKEN. To create one, go to
 # Settings -> Developer settings -> Personal access tokens in GitHub and create
@@ -30,6 +22,8 @@ import sys
 
 import github
 from git import Repo
+
+import envoy_repo
 
 try:
     input = raw_input  # Python 2
@@ -85,7 +79,7 @@ def create_issues(access_token, runtime_and_pr):
             email = commit.author.email
             # Use the commit author's email to search through users for their login.
             search_user = git.search_users(email.split('@')[0] + " in:email")
-            login = search_user[0].login if search_user else None
+            login = search_user[0].login if search_user and search_user.totalCount else None
 
         title = '%s deprecation' % (runtime_guard)
         body = (
@@ -134,24 +128,27 @@ def create_issues(access_token, runtime_and_pr):
 def get_runtime_and_pr():
     """Returns a list of tuples of [runtime features to deprecate, PR, commit the feature was added]
     """
-    repo = Repo(os.getcwd())
+    repo = Repo(envoy_repo.PATH)
 
     # grep source code looking for reloadable features which are true to find the
     # PR they were added.
     features_to_flip = []
 
-    runtime_features = re.compile(r'.*"(envoy.reloadable_features..*)",.*')
+    runtime_features = re.compile(r'.*RUNTIME_GUARD.(envoy_reloadable_features_.*).;')
 
     removal_date = date.today() - datetime.timedelta(days=183)
     found_test_feature_true = False
 
     # Walk the blame of runtime_features and look for true runtime features older than 6 months.
-    for commit, lines in repo.blame('HEAD', 'source/common/runtime/runtime_features.cc'):
+    # Ignore #19880, the PR where we migrated from old style to new style flags as it
+    # shouldn't change deprecation dates or ownership.
+    for commit, lines in repo.blame(rev='HEAD', file='source/common/runtime/runtime_features.cc',
+                                    **{"ignore-rev": "93cd7c7835a"}):
         for line in lines:
             match = runtime_features.match(line)
             if match:
                 runtime_guard = match.group(1)
-                if runtime_guard == 'envoy.reloadable_features.test_feature_false':
+                if runtime_guard == 'envoy_reloadable_features_test_feature_false':
                     print("Found end sentinel\n")
                     if not found_test_feature_true:
                         # The script depends on the cc file having the true runtime block
@@ -159,7 +156,7 @@ def get_runtime_and_pr():
                         print('Failed to find test_feature_true.  Script needs fixing')
                         sys.exit(1)
                     return features_to_flip
-                if runtime_guard == 'envoy.reloadable_features.test_feature_true':
+                if runtime_guard == 'envoy_reloadable_features_test_feature_true':
                     found_test_feature_true = True
                     continue
                 pr_num = re.search('\(#(\d+)\)', commit.message)

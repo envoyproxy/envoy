@@ -55,7 +55,7 @@ public:
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
              Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-             const Server::Options& options);
+             const Server::Options& options, AccessLog::AccessLogManager& access_log_manager);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -108,6 +108,7 @@ private:
   HealthCheckerMap health_checkers_map_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   TimeSource& time_source_;
+  AccessLog::AccessLogManager& access_log_manager_;
 
   void updateHealthchecks(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,
@@ -148,7 +149,6 @@ class HdsDelegate : Grpc::AsyncStreamCallbacks<envoy::service::health::v3::Healt
                     Logger::Loggable<Logger::Id::upstream> {
 public:
   HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
-              envoy::config::core::v3::ApiVersion transport_api_version,
               Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Envoy::Stats::Store& stats,
               Ssl::ContextManager& ssl_context_manager, ClusterInfoFactory& info_factory,
               AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
@@ -188,7 +188,6 @@ private:
   Grpc::AsyncClient<envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse,
                     envoy::service::health::v3::HealthCheckSpecifier>
       async_client_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
   Grpc::AsyncStream<envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse>
       stream_{};
   Event::Dispatcher& dispatcher_;

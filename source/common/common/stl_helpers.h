@@ -28,7 +28,8 @@ std::string accumulateToString(const ContainerT& source,
   if (source.empty()) {
     return "[]";
   }
-  return std::accumulate(std::next(source.begin()), source.end(), "[" + string_func(source[0]),
+  return std::accumulate(std::next(source.begin()), source.end(),
+                         "[" + string_func(*source.begin()),
                          [string_func](std::string acc, const T& element) {
                            return acc + ", " + string_func(element);
                          }) +
@@ -58,4 +59,10 @@ template <class T> std::ostream& operator<<(std::ostream& out, const std::vector
   return out;
 }
 
+// Overload std::operator<< to output a pair.
+template <class T1, class T2>
+std::ostream& operator<<(std::ostream& out, const std::pair<T1, T2>& v) {
+  out << "pair(" << v.first << ", " << v.second << ")";
+  return out;
+}
 } // namespace std

@@ -173,6 +173,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 
   // Sane enough, add the key/value.
   switch (type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::http::header_to_metadata::v3::Config::STRING:
     val.set_string_value(std::move(value));
     break;
@@ -193,8 +194,6 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
     }
     break;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   // Have we seen this namespace before?

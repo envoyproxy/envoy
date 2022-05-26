@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -7,6 +8,8 @@
 #include "envoy/network/address.h"
 
 #include "source/common/protobuf/protobuf.h"
+
+#include "xds/core/v3/cidr.pb.h"
 
 namespace Envoy {
 namespace Network {
@@ -25,10 +28,8 @@ public:
    */
   CidrRange();
 
-  /**
-   * Copies an existing CidrRange.
-   */
-  CidrRange(const CidrRange& other);
+  CidrRange(const CidrRange& other) = default;
+  CidrRange(CidrRange&& other) = default;
 
   /**
    * Overwrites this with other.
@@ -100,6 +101,12 @@ public:
   static CidrRange create(const envoy::config::core::v3::CidrRange& cidr);
 
   /**
+   * Constructs a CidrRange from xds::core::v3::CidrRange.
+   * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
+   */
+  static CidrRange create(const xds::core::v3::CidrRange& cidr);
+
+  /**
    * Given an IP address and a length of high order bits to keep, returns an address
    * where those high order bits are unmodified, and the remaining bits are all zero.
    * length_io is reduced to be at most 32 for IPv4 address and at most 128 for IPv6
@@ -129,7 +136,7 @@ public:
   IpList() = default;
 
   bool contains(const Instance& address) const;
-  bool empty() const { return ip_list_.empty(); }
+  size_t getIpListSize() const { return ip_list_.size(); };
 
 private:
   std::vector<CidrRange> ip_list_;

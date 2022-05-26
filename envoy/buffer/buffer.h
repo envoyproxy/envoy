@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/http/stream_reset_handler.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/byte_order.h"
@@ -27,6 +28,17 @@ namespace Buffer {
  */
 struct RawSlice {
   void* mem_ = nullptr;
+  size_t len_ = 0;
+
+  bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
+  bool operator!=(const RawSlice& rhs) const { return !(*this == rhs); }
+};
+
+/**
+ * A const raw memory data slice including the location and length.
+ */
+struct ConstRawSlice {
+  const void* mem_ = nullptr;
   size_t len_ = 0;
 
   bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
@@ -109,6 +121,19 @@ public:
    * @param amount the amount to credit.
    */
   virtual void credit(uint64_t amount) PURE;
+
+  /**
+   * Clears the associated downstream with this account.
+   * After this has been called, calls to reset the downstream become no-ops.
+   * Must be called before downstream is deleted.
+   */
+  virtual void clearDownstream() PURE;
+
+  /**
+   * Reset the downstream stream associated with this account. Resetting the downstream stream
+   * should trigger a reset of the corresponding upstream stream if it exists.
+   */
+  virtual void resetDownstream() PURE;
 };
 
 using BufferMemoryAccountSharedPtr = std::shared_ptr<BufferMemoryAccount>;
@@ -186,6 +211,16 @@ public:
    * @param data supplies the output buffer to fill.
    */
   virtual void copyOut(size_t start, uint64_t size, void* data) const PURE;
+
+  /**
+   * Copy out a section of the buffer to  dynamic array of slices.
+   * @param size supplies the size of the data that will be copied.
+   * @param slices supplies the output slices to fill.
+   * @param num_slice supplies the number of slices to fill.
+   * @return the number of bytes copied.
+   */
+  virtual uint64_t copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
+                                   uint64_t num_slice) const PURE;
 
   /**
    * Drain data from the buffer.
@@ -445,11 +480,21 @@ public:
   }
 
   /**
+   * Copy multiple string type fragments to the buffer.
+   * @param fragments A sequence of string views with variable length.
+   * @return The total size of the data copied to the buffer.
+   */
+  virtual size_t addFragments(absl::Span<const absl::string_view> fragments) PURE;
+
+  /**
    * Set the buffer's high watermark. The buffer's low watermark is implicitly set to half the high
    * watermark. Setting the high watermark to 0 disables watermark functionality.
    * @param watermark supplies the buffer high watermark size threshold, in bytes.
+   * @param watermark supplies the overflow multiplier, in bytes.
+   *        If set to non-zero, overflow callbacks will be called if the
+   *        buffered data exceeds watermark * overflow_multiplier.
    */
-  virtual void setWatermarks(uint32_t watermark) PURE;
+  virtual void setWatermarks(uint32_t watermark, uint32_t overflow_multiplier = 0) PURE;
 
   /**
    * Returns the configured high watermark. A return value of 0 indicates that watermark
@@ -480,7 +525,8 @@ private:
 using InstancePtr = std::unique_ptr<Instance>;
 
 /**
- * A factory for creating buffers which call callbacks when reaching high and low watermarks.
+ * An abstract factory for creating watermarked buffers and buffer memory
+ * accounts. The factory also supports tracking active memory accounts.
  */
 class WatermarkFactory {
 public:
@@ -494,9 +540,29 @@ public:
    *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr create(std::function<void()> below_low_watermark,
-                             std::function<void()> above_high_watermark,
-                             std::function<void()> above_overflow_watermark) PURE;
+  virtual InstancePtr createBuffer(std::function<void()> below_low_watermark,
+                                   std::function<void()> above_high_watermark,
+                                   std::function<void()> above_overflow_watermark) PURE;
+
+  /**
+   * Create and returns a buffer memory account.
+   *
+   * @param reset_handler supplies the stream_reset_handler the account will
+   * invoke to reset the stream.
+   * @return a BufferMemoryAccountSharedPtr of the newly created account or
+   * nullptr if tracking is disabled.
+   */
+  virtual BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) PURE;
+
+  /**
+   * Goes through the tracked accounts, resetting the accounts and their
+   * corresponding stream depending on the pressure.
+   *
+   * @param pressure scaled threshold pressure used to compute the buckets to
+   *  reset internally.
+   * @return the number of streams reset
+   */
+  virtual uint64_t resetAccountsGivenPressure(float pressure) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;

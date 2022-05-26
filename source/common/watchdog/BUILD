@@ -19,7 +19,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/thread:terminate_thread_lib",
-        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
 )
 
@@ -33,6 +33,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",
-        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
 )

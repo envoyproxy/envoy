@@ -121,6 +121,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/server:drain_manager_interface",
         "//envoy/server:listener_manager_interface",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -182,6 +183,7 @@ envoy_cc_mock(
         "//envoy/server:instance_interface",
         "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
+        "//source/common/quic:quic_stat_names_lib",
         "//source/common/router:context_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
@@ -240,8 +242,10 @@ envoy_cc_mock(
     deps = [
         "//envoy/server:tracer_config_interface",
         "//source/common/secret:secret_manager_impl_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/server:config_tracker_mocks",
+        "//test/mocks/server:options_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
     ],

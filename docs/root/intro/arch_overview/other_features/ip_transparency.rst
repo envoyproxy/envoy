@@ -56,10 +56,6 @@ conjunction with the
 :ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`. Finally,
 Envoy supports generating this header using the :ref:`Proxy Protocol Transport Socket <extension_envoy.transport_sockets.upstream_proxy_protocol>`.
 
-IMPORTANT: There is currently a memory `issue <https://github.com/envoyproxy/envoy/issues/16682>`_ in Envoy where upstream connection pools are
-not cleaned up after they are created. This heavily affects the usage of this transport socket as new pools are created for every downstream client
-IP and port pair. Removing a cluster will clean up its associated connection pools, which could be used to mitigate this issue in the current state.
-
 Here is an example config for setting up the socket:
 
 .. code-block:: yaml
@@ -77,6 +73,8 @@ Here is an example config for setting up the socket:
             version: V1
           transport_socket:
             name: envoy.transport_sockets.raw_buffer
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
       ...
 
 There are several things to consider if you plan to use this socket in conjunction with the

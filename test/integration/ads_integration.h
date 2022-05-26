@@ -15,12 +15,36 @@
 
 namespace Envoy {
 
-class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
+// Support parameterizing over old DSS vs new DSS. Can be dropped when old DSS goes away.
+enum class OldDssOrNewDss { Old, New };
+
+// Base class that supports parameterizing over old DSS vs new DSS. Can be replaced with
+// Grpc::BaseGrpcClientIntegrationParamTest when old DSS is removed.
+class AdsDeltaSotwIntegrationSubStateParamTest
+    : public Grpc::BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Grpc::ClientType,
+                                               Grpc::SotwOrDelta, OldDssOrNewDss>> {
 public:
-  AdsIntegrationTest(envoy::config::core::v3::ApiVersion resource_api_version,
-                     envoy::config::core::v3::ApiVersion transport_api_version =
-                         envoy::config::core::v3::ApiVersion::AUTO);
-  AdsIntegrationTest() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V3) {}
+  ~AdsDeltaSotwIntegrationSubStateParamTest() override = default;
+  static std::string protocolTestParamsToString(
+      const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Grpc::ClientType,
+                                                Grpc::SotwOrDelta, OldDssOrNewDss>>& p) {
+    return fmt::format(
+        "{}_{}_{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+        std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+        std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld",
+        std::get<3>(p.param) == OldDssOrNewDss::Old ? "OldDSS" : "NewDSS");
+  }
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
+  Grpc::SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
+  OldDssOrNewDss oldDssOrNewDss() const { return std::get<3>(GetParam()); }
+};
+
+class AdsIntegrationTest : public AdsDeltaSotwIntegrationSubStateParamTest,
+                           public HttpIntegrationTest {
+public:
+  AdsIntegrationTest();
 
   void TearDown() override;
 
@@ -36,6 +60,12 @@ public:
 
   envoy::config::endpoint::v3::ClusterLoadAssignment
   buildTlsClusterLoadAssignment(const std::string& name);
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignmentWithLeds(const std::string& name, const std::string& collection_name);
+
+  envoy::service::discovery::v3::Resource
+  buildLbEndpointResource(const std::string& lb_endpoint_resource_name, const std::string& version);
 
   envoy::config::listener::v3::Listener buildListener(const std::string& name,
                                                       const std::string& route_config,
@@ -57,11 +87,14 @@ public:
   envoy::admin::v3::ClustersConfigDump getClustersConfigDump();
   envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
   envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
-
-  // If API version is v2, fatal-by-default is disabled unless fatal_by_default_v2_override_ is set.
-  envoy::config::core::v3::ApiVersion api_version_;
-  // Set to force fatal-by-default v2 even if API version is v2.
-  bool fatal_by_default_v2_override_{false};
 };
+
+// When old delta subscription state goes away, we could replace this macro back with
+// DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS.
+#define ADS_INTEGRATION_PARAMS                                                                     \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
+                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta),             \
+                   testing::Values(OldDssOrNewDss::Old, OldDssOrNewDss::New))
 
 } // namespace Envoy

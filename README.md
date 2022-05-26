@@ -17,7 +17,7 @@ involved and how Envoy plays a role, read the CNCF
 
 * [Official documentation](https://www.envoyproxy.io/)
 * [FAQ](https://www.envoyproxy.io/docs/envoy/latest/faq/overview)
-* [Unofficial Chinese documentation](https://www.servicemesher.com/envoy/)
+* [Unofficial Chinese documentation](https://cloudnative.to/envoy/)
 * Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
 ([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
 to find out more about the origin story and design philosophy of Envoy
@@ -47,7 +47,7 @@ to find out more about the origin story and design philosophy of Envoy
 * [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-maintainers): Use this list
   to reach all core Envoy maintainers.
 * [Twitter](https://twitter.com/EnvoyProxy/): Follow along on Twitter!
-* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](https://envoyslack.cncf.io).
+* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](https://envoyproxy.io/slack).
   We have the IRC/XMPP gateways enabled if you prefer either of those. Once an account is created,
   connection instructions for IRC/XMPP can be found [here](https://envoyproxy.slack.com/account/gateways).
   * NOTE: Response to user questions is best effort on Slack. For a "guaranteed" response please email
@@ -74,7 +74,7 @@ The Envoy team meets twice per month on Tuesday at 9am PT. The public
 Google calendar is here: https://goo.gl/PkDijT
 
 * Meeting minutes are [here](https://goo.gl/5Cergb)
-* Recorded videos are posted [here](https://www.youtube.com/channel/UCvqbFHwN-nwalWPjPUKpvTA/videos?view=0&sort=dd&shelf_id=1)
+* Recorded videos are posted [here](https://www.youtube.com/channel/UC5z5mvPgqMs1xo5VuIWzYTA)
 
 ## Security
 

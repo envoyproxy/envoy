@@ -11,6 +11,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_formatter.h"
+#include "envoy/tracing/trace_context.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
@@ -64,7 +65,7 @@ public:
     return *this;
   }
 
-  explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
+  explicit LowerCaseString(absl::string_view new_string) : string_(new_string) {
     ASSERT(valid());
     lower();
   }
@@ -77,6 +78,9 @@ public:
   friend std::ostream& operator<<(std::ostream& os, const LowerCaseString& lower_case_string) {
     return os << lower_case_string.string_;
   }
+
+  // Implicit conversion to absl::string_view.
+  operator absl::string_view() const { return string_; }
 
 private:
   void lower() {
@@ -220,6 +224,9 @@ public:
   }
   bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
 
+  // Test only method that does not have validation and allows setting arbitrary values.
+  void setCopyUnvalidatedForTestOnly(absl::string_view view);
+
 private:
   enum class Type { Reference, Inline };
 
@@ -300,6 +307,7 @@ private:
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedClientCert)                                                                 \
   HEADER_FUNC(ForwardedFor)                                                                        \
+  HEADER_FUNC(ForwardedHost)                                                                       \
   HEADER_FUNC(ForwardedProto)                                                                      \
   HEADER_FUNC(GrpcTimeout)                                                                         \
   HEADER_FUNC(Host)                                                                                \
@@ -314,7 +322,8 @@ private:
   HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
-  HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)
+  HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)                                                 \
+  HEADER_FUNC(EnvoyUpstreamStreamDurationMs)
 
 #define INLINE_REQ_HEADERS(HEADER_FUNC)                                                            \
   INLINE_REQ_STRING_HEADERS(HEADER_FUNC)                                                           \
@@ -350,6 +359,7 @@ private:
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(ProxyConnection)                                                                     \
+  HEADER_FUNC(ProxyStatus)                                                                         \
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \
@@ -537,15 +547,14 @@ public:
 
   /**
    * Replaces a header value by copying the value. Copies the key if the key does not exist.
+   * If there are multiple values for one header, this removes all existing values and add
+   * the new one.
    *
    * Calling setCopy multiple times for the same header will result in only the last header
    * being present in the HeaderMap.
    *
    * @param key specifies the name of the header to set; it WILL be copied.
    * @param value specifies the value of the header to set; it WILL be copied.
-   *
-   * Caution: This iterates over the HeaderMap to find the header to set. This will modify only the
-   * first occurrence of the header.
    * TODO(asraa): Investigate whether necessary to set all headers with the key.
    */
   virtual void setCopy(const LowerCaseString& key, absl::string_view value) PURE;
@@ -817,7 +826,8 @@ public:
 // Request headers.
 class RequestHeaderMap
     : public RequestOrResponseHeaderMap,
-      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders> {
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders>,
+      public Tracing::TraceContext {
 public:
   INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)

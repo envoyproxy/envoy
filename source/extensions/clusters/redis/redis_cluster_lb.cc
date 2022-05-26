@@ -17,8 +17,8 @@ bool ClusterSlot::operator==(const Envoy::Extensions::Clusters::Redis::ClusterSl
 }
 
 // RedisClusterLoadBalancerFactory
-bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsPtr&& slots,
-                                                          Envoy::Upstream::HostMap all_hosts) {
+bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
+                                                          Envoy::Upstream::HostMap& all_hosts) {
   // The slots is sorted, allowing for a quick comparison to make sure we need to update the slot
   // array sort based on start and end to enable efficient comparison
   std::sort(

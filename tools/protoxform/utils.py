@@ -4,6 +4,12 @@ from tools.type_whisperer.api_type_db_pb2 import TypeDb
 
 from google.protobuf import text_format
 
+PROTO_FILES = (
+    "google.api.annotations", "validate.validate", "envoy.annotations.deprecation",
+    "envoy.annotations.resource", "udpa.annotations.migrate", "udpa.annotations.security",
+    "udpa.annotations.status", "udpa.annotations.sensitive", "udpa.annotations.versioning",
+    "xds.annotations.v3.status")
+
 _typedb = None
 
 
@@ -19,6 +25,6 @@ def load_type_db(type_db_path):
         text_format.Merge(f.read(), _typedb)
 
 
-def load_protos(packages):
-    for package in packages:
+def load_protos():
+    for package in PROTO_FILES:
         importlib.import_module(f"{package}_pb2")

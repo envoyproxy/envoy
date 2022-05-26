@@ -41,16 +41,6 @@ TEST(LuaFilterConfigTest, LuaFilterInJson) {
   cb(filter_callback);
 }
 
-// Test that the deprecated extension name still functions.
-TEST(LuaFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.lua";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
-
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters

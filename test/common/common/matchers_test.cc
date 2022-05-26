@@ -280,6 +280,22 @@ TEST(MetadataTest, MatchDoubleListValue) {
   metadataValue.Clear();
 }
 
+TEST(MetadataTest, InvertMatch) {
+  envoy::config::core::v3::Metadata metadata;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.x", "label")
+      .set_string_value("prod");
+
+  envoy::type::matcher::v3::MetadataMatcher matcher;
+  matcher.set_filter("envoy.filter.x");
+  matcher.add_path()->set_key("label");
+  matcher.set_invert(true);
+
+  matcher.mutable_value()->mutable_string_match()->set_exact("test");
+  EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+  matcher.mutable_value()->mutable_string_match()->set_exact("prod");
+  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+}
+
 TEST(StringMatcher, ExactMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("exact");

@@ -21,7 +21,7 @@ envoy_extension_cc_test(
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/access_loggers/wasm/test_data:test_cpp.wasm",
     ]),
-    extension_name = "envoy.access_loggers.wasm",
+    extension_names = ["envoy.access_loggers.wasm"],
     deps = [
         "//source/extensions/access_loggers/wasm:config",
         "//test/extensions/access_loggers/wasm/test_data:test_cpp_plugin",

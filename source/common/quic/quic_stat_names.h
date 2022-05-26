@@ -1,9 +1,11 @@
 #pragma once
 
+#ifdef ENVOY_ENABLE_QUIC
+
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/thread.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/core/quic_types.h"
@@ -19,7 +21,7 @@ public:
   void chargeQuicConnectionCloseStats(Stats::Scope& scope, quic::QuicErrorCode error_code,
                                       quic::ConnectionCloseSource source, bool is_upstream);
 
-  void chargeQuicResetStreamErrorStats(Stats::Scope& scope, quic::QuicRstStreamErrorCode error_code,
+  void chargeQuicResetStreamErrorStats(Stats::Scope& scope, quic::QuicResetStreamError error_code,
                                        bool from_self, bool is_upstream);
 
 private:
@@ -45,6 +47,19 @@ private:
                          Thread::AtomicPtrAllocMode::DoNotDelete>
       reset_stream_error_stat_names_;
 };
+
+#else
+
+#include "source/common/stats/symbol_table.h"
+namespace Envoy {
+namespace Quic {
+
+class QuicStatNames {
+public:
+  explicit QuicStatNames(Stats::SymbolTable& symbol_table);
+};
+
+#endif
 
 } // namespace Quic
 } // namespace Envoy

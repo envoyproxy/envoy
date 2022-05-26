@@ -1,0 +1,65 @@
+# 1. Use already imported python dependencies.
+# 2. Fix the include path for //external:zlib.
+# 3. Add support for --define=no_debug_info=1.
+# 4. Disable pointer compression (https://crbug.com/v8/12592).
+# 5. Add M1 CPU support https://chromium-review.googlesource.com/c/v8/v8/+/3502848
+
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 13f2a5bebf..2197568c48 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -4,7 +4,7 @@
+ 
+ load("@bazel_skylib//lib:selects.bzl", "selects")
+ load("@rules_python//python:defs.bzl", "py_binary")
+-load("@v8_python_deps//:requirements.bzl", "requirement")
++load("@base_pip3//:requirements.bzl", "requirement")
+ load(
+     "@v8//:bazel/defs.bzl",
+     "v8_binary",
+@@ -157,7 +157,7 @@ v8_int(
+ # If no explicit value for v8_enable_pointer_compression, we set it to 'none'.
+ v8_string(
+     name = "v8_enable_pointer_compression",
+-    default = "none",
++    default = "False",
+ )
+ 
+ # Default setting for v8_enable_pointer_compression.
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+index dee5e69cc4..d0b5a3c49a 100644
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
+@@ -151,6 +151,11 @@ def _default_args():
+                 "-fno-integrated-as",
+             ],
+             "//conditions:default": [],
++        }) + select({
++            "@envoy//bazel:no_debug_info": [
++                "-g0",
++            ],
++            "//conditions:default": [],
+         }),
+         includes = ["include"],
+         linkopts = select({
+@@ -383,6 +388,7 @@ def _v8_target_cpu_transition_impl(settings, attr):
+         "k8": "x64",
+         "x86_64": "x64",
+         "darwin": "x64",
++        "darwin_arm64": "arm64",
+         "darwin_x86_64": "x64",
+         "x64_windows": "x64",
+         "x86": "ia32",
+diff --git a/src/snapshot/snapshot-utils.cc b/src/snapshot/snapshot-utils.cc
+index 6db6698d7e..b56d31085f 100644
+--- a/src/snapshot/snapshot-utils.cc
++++ b/src/snapshot/snapshot-utils.cc
+@@ -5,7 +5,7 @@
+ #include "src/snapshot/snapshot-utils.h"
+ 
+ #include "src/base/sanitizer/msan.h"
+-#include "third_party/zlib/zlib.h"
++#include "zlib.h"
+ 
+ namespace v8 {
+ namespace internal {

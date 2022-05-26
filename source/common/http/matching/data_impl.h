@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/server/factory_context.h"
 
 namespace Envoy {
 namespace Http {
@@ -12,6 +13,9 @@ namespace Matching {
  */
 class HttpMatchingDataImpl : public HttpMatchingData {
 public:
+  explicit HttpMatchingDataImpl(const Network::ConnectionInfoProvider& connection_info_provider)
+      : connection_info_provider_(connection_info_provider) {}
+
   static absl::string_view name() { return "http"; }
 
   void onRequestHeaders(const RequestHeaderMap& request_headers) {
@@ -46,7 +50,12 @@ public:
     return makeOptRefFromPtr(response_trailers_);
   }
 
+  const Network::ConnectionInfoProvider& connectionInfoProvider() const override {
+    return connection_info_provider_;
+  }
+
 private:
+  const Network::ConnectionInfoProvider& connection_info_provider_;
   const RequestHeaderMap* request_headers_{};
   const ResponseHeaderMap* response_headers_{};
   const RequestTrailerMap* request_trailers_{};
@@ -55,6 +64,10 @@ private:
 
 using HttpMatchingDataImplSharedPtr = std::shared_ptr<HttpMatchingDataImpl>;
 
+struct HttpFilterActionContext {
+  const std::string& stat_prefix_;
+  Server::Configuration::FactoryContext& factory_context_;
+};
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

@@ -44,7 +44,7 @@ public:
    * Note, decoded string may contain '\0' at any position, it should be treated as a sequence of
    * bytes.
    */
-  static std::string decode(const std::string& input);
+  static std::string decode(absl::string_view input);
 
   /**
    * Base64 decode an input string. Padding is not required.
@@ -54,6 +54,12 @@ public:
    * bytes.
    */
   static std::string decodeWithoutPadding(absl::string_view input);
+
+  /**
+   * Add the padding in the base64 encoded binary if the padding is missing.
+   * @param encoded is the target to complete the padding.
+   */
+  static void completePadding(std::string& encoded);
 };
 
 /**
@@ -76,7 +82,7 @@ public:
    * Note, decoded string may contain '\0' at any position, it should be treated as a sequence of
    * bytes.
    */
-  static std::string decode(const std::string& input);
+  static std::string decode(absl::string_view input);
 };
 
 } // namespace Envoy

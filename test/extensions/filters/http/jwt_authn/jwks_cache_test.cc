@@ -12,6 +12,7 @@
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 using ::google::jwt_verify::Status;
 using ::testing::MockFunction;
 
@@ -31,7 +32,7 @@ protected:
 
   void SetUp() override {
     // fetcher is only called at async_fetch. In this test, it is never called.
-    EXPECT_CALL(mock_fetcher_, Call(_)).Times(0);
+    EXPECT_CALL(mock_fetcher_, Call(_, _)).Times(0);
     setupCache(ExampleConfig);
     jwks_ = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
   }
@@ -42,10 +43,10 @@ protected:
   }
 
   JwtAuthentication config_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   JwksCachePtr cache_;
   google::jwt_verify::JwksPtr jwks_;
-  MockFunction<Common::JwksFetcherPtr(Upstream::ClusterManager&)> mock_fetcher_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  MockFunction<Common::JwksFetcherPtr(Upstream::ClusterManager&, const RemoteJwks&)> mock_fetcher_;
   JwtAuthnFilterStats stats_;
 };
 

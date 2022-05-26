@@ -16,7 +16,9 @@ The following Envoy filters emit dynamic metadata that other filters can leverag
 * :ref:`External Authorization Filter <config_http_filters_ext_authz_dynamic_metadata>`
 * :ref:`External Authorization Network Filter <config_network_filters_ext_authz_dynamic_metadata>`
 * :ref:`Header-To-Metadata Filter <config_http_filters_header_to_metadata>`
-* :ref:`JWT Authentication Filter <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+* :ref:`JWT Authentication Filter <config_http_filters_jwt_authn>` for the extracted
+  :ref:`header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  and :ref:`payload <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
 * :ref:`Mongo Proxy Filter <config_network_filters_mongo_proxy_dynamic_metadata>`
 * :ref:`MySQL Proxy Filter <config_network_filters_mysql_proxy_dynamic_metadata>`
 * :ref:`Postgres Proxy Filter <config_network_filters_postgres_proxy_dynamic_metadata>`

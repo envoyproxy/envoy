@@ -30,6 +30,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "config_validator_interface",
+    hdrs = ["config_validator.h"],
+    deps = [
+        "//envoy/server:instance_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "context_provider_interface",
     hdrs = ["context_provider.h"],
     deps = [
@@ -70,7 +79,6 @@ envoy_cc_library(
     hdrs = ["subscription.h"],
     deps = [
         "//envoy/stats:stats_macros",
-        "//source/common/config:api_type_oracle_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],

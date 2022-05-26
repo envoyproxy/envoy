@@ -3,6 +3,11 @@ envoy.access_loggers.file:
   - envoy.access_loggers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.access_loggers.extension_filters.cel:
+  categories:
+  - envoy.access_loggers.extension_filters
+  security_posture: unknown
+  status: alpha
 envoy.access_loggers.http_grpc:
   categories:
   - envoy.access_loggers
@@ -28,6 +33,11 @@ envoy.access_loggers.wasm:
   - envoy.access_loggers
   security_posture: unknown
   status: alpha
+envoy.bootstrap.internal_listener:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
 envoy.bootstrap.wasm:
   categories:
   - envoy.bootstrap
@@ -73,16 +83,31 @@ envoy.compression.gzip.decompressor:
   - envoy.compression.decompressor
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.compression.zstd.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+envoy.compression.zstd.decompressor:
+  categories:
+  - envoy.compression.decompressor
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+envoy.config.validators.minimum_clusters:
+  categories:
+  - envoy.config.validators
+  security_posture: unknown
+  status: stable
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
+  status: stable
 envoy.filters.http.admission_control:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
+  status: stable
 envoy.filters.http.alternate_protocols_cache:
   categories:
   - envoy.filters.http
@@ -168,6 +193,16 @@ envoy.filters.http.fault:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.filters.http.file_system_buffer:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+envoy.filters.http.gcp_authn:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
 envoy.filters.http.grpc_http1_bridge:
   categories:
   - envoy.filters.http
@@ -263,17 +298,17 @@ envoy.filters.http.set_metadata:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
-envoy.filters.http.squash:
-  categories:
-  - envoy.filters.http
-  security_posture: requires_trusted_downstream_and_upstream
-  status: stable
 envoy.filters.http.tap:
   categories:
   - envoy.filters.http
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
 envoy.filters.http.wasm:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+envoy.filters.http.stateful_session:
   categories:
   - envoy.filters.http
   security_posture: unknown
@@ -338,27 +373,17 @@ envoy.filters.network.http_connection_manager:
   - envoy.filters.network
   security_posture: robust_to_untrusted_downstream
   status: stable
-envoy.filters.network.kafka_broker:
+envoy.filters.network.envoy_mobile_http_connection_manager:
   categories:
   - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: wip
+  security_posture: robust_to_untrusted_downstream
+  status: stable
 envoy.filters.network.local_ratelimit:
   categories:
   - envoy.filters.network
   security_posture: robust_to_untrusted_downstream
   status: stable
 envoy.filters.network.mongo_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: stable
-envoy.filters.network.mysql_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
-envoy.filters.network.postgres_proxy:
   categories:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
@@ -378,11 +403,6 @@ envoy.filters.network.redis_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
-envoy.filters.network.rocketmq_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
 envoy.filters.network.sni_cluster:
   categories:
   - envoy.filters.network
@@ -413,6 +433,11 @@ envoy.filters.network.zookeeper_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.thrift.header_to_metadata:
+  categories:
+  - envoy.thrift_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.filters.thrift.ratelimit:
   categories:
   - envoy.thrift_proxy.filters
@@ -433,6 +458,11 @@ envoy.filters.udp_listener.udp_proxy:
   - envoy.filters.udp_listener
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.formatter.metadata:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.formatter.req_without_query:
   categories:
   - envoy.formatter
@@ -468,6 +498,11 @@ envoy.http.stateful_header_formatters.preserve_case:
   - envoy.http.stateful_header_formatters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.http.header_validators.envoy_default:
+  categories:
+  - envoy.http.header_validators
+  security_posture: unknown
+  status: wip
 envoy.internal_redirect_predicates.allow_listed_routes:
   categories:
   - envoy.internal_redirect_predicates
@@ -499,11 +534,26 @@ envoy.matching.input_matchers.consistent_hashing:
   - envoy.matching.input_matchers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.matching.input_matchers.ip:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
   security_posture: robust_to_untrusted_downstream
   status: alpha
+envoy.udp_packet_writer.default:
+  categories:
+  - envoy.udp_packet_writer
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.udp_packet_writer.gso:
+  categories:
+  - envoy.udp_packet_writer
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.quic.crypto_stream.server.quiche:
   categories:
   - envoy.quic.server.crypto_stream
@@ -549,6 +599,11 @@ envoy.retry_priorities.previous_priorities:
   - envoy.retry_priorities
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.route.early_data_policy.default:
+  categories:
+  - envoy.route.early_data_policy
+  security_posture: robust_to_untrusted_downstream
+  status: stable
 envoy.stat_sinks.dog_statsd:
   categories:
   - envoy.stats_sinks
@@ -582,8 +637,8 @@ envoy.stat_sinks.wasm:
 envoy.tls.cert_validator.spiffe:
   categories:
   - envoy.tls.cert_validator
-  security_posture: unknown
-  status: wip
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.tracers.datadog:
   categories:
   - envoy.tracers
@@ -643,6 +698,12 @@ envoy.transport_sockets.tap:
   - envoy.transport_sockets.upstream
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.transport_sockets.tcp_stats:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.transport_sockets.tls:
   categories:
   - envoy.transport_sockets.downstream
@@ -692,20 +753,122 @@ envoy.wasm.runtime.v8:
 envoy.wasm.runtime.wamr:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wasmtime:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wavm:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown  # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.watchdog.profile_action:
   categories:
   - envoy.guarddog_actions
   security_posture: data_plane_agnostic
+  status: alpha
+envoy.key_value.file_based:
+  categories:
+  - envoy.common.key_value
+  security_posture: data_plane_agnostic
+  status: alpha
+envoy.network.dns_resolver.cares:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.network.dns_resolver.apple:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.rbac.matchers.upstream_ip_port:
+  categories:
+  - envoy.rbac.matchers
+  security_posture: unknown
+  status: alpha
+envoy.http.stateful_session.cookie:
+  categories:
+  - envoy.http.stateful_session
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.request_headers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.request_trailers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.response_headers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.response_trailers:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.destination_ip:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.destination_port:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.source_ip:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.source_port:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.direct_source_ip:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.source_type:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.server_name:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.transport_protocol:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.inputs.application_protocol:
+  categories:
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: alpha
+envoy.matching.custom_matchers.trie_matcher:
+  categories:
+  - envoy.matching.network.custom_matchers
+  security_posture: unknown
   status: alpha

@@ -32,7 +32,7 @@ public:
      * This function is called before onComplete() function.
      * It will not be called if no payload to write.
      */
-    virtual void setPayload(const ProtobufWkt::Struct& payload) PURE;
+    virtual void setExtractedData(const ProtobufWkt::Struct& payload) PURE;
 
     /**
      * Called on completion of request.

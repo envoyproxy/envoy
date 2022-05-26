@@ -22,10 +22,9 @@ namespace Tcp {
 
 class TcpConnPool : public Router::GenericConnPool, public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
+  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool,
               const Router::RouteEntry& route_entry, absl::optional<Envoy::Http::Protocol>,
               Upstream::LoadBalancerContext* ctx) {
-    ASSERT(is_connect);
     conn_pool_data_ = thread_local_cluster.tcpConnPool(route_entry.priority(), ctx);
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
@@ -84,10 +83,12 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
+  const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
 private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+  StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 };
 
 } // namespace Tcp

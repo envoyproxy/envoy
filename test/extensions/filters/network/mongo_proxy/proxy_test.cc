@@ -61,7 +61,8 @@ class MongoProxyFilterTest : public testing::Test {
 public:
   MongoProxyFilterTest()
       : mongo_stats_(std::make_shared<MongoStats>(store_, "test",
-                                                  std::vector<std::string>{"insert", "count"})) {
+                                                  std::vector<std::string>{"insert", "count"})),
+        stream_info_(time_source_) {
     setup();
   }
 
@@ -127,6 +128,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
+  NiceMock<MockTimeSystem> time_source_;
   TestStreamInfo stream_info_;
 };
 

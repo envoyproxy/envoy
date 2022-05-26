@@ -14,7 +14,8 @@ class Filter;
 // the lifetime of this wrapper by appending them to the errors_ field. This should be checked
 // afterwards to determine whether invalid callbacks were called.
 struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
-  explicit FactoryCallbacksWrapper(Filter& filter) : filter_(filter) {}
+  FactoryCallbacksWrapper(Filter& filter, Event::Dispatcher& dispatcher)
+      : filter_(filter), dispatcher_(dispatcher) {}
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override;
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr,
@@ -26,8 +27,10 @@ struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
   void addStreamFilter(Http::StreamFilterSharedPtr,
                        Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override;
   void addAccessLogHandler(AccessLog::InstanceSharedPtr) override;
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
   Filter& filter_;
+  Event::Dispatcher& dispatcher_;
 
   using FilterAlternative =
       absl::variant<Http::StreamDecoderFilterSharedPtr, Http::StreamEncoderFilterSharedPtr,

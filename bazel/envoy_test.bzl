@@ -1,7 +1,6 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(":envoy_library.bzl", "tcmalloc_external_deps")
@@ -42,7 +41,7 @@ def _envoy_cc_test_infrastructure_library(
         extra_deps = [repository + "//test:test_pch"]
         pch_copts = envoy_pch_copts(repository, "//test:test_pch")
 
-    cc_library(
+    native.cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
@@ -60,11 +59,7 @@ def _envoy_cc_test_infrastructure_library(
 # Compute the test linkopts based on various options.
 def _envoy_test_linkopts():
     return select({
-        "@envoy//bazel:apple": [
-            # See note here: https://luajit.org/install.html
-            "-pagezero_size 10000",
-            "-image_base 100000000",
-        ],
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:windows_x86_64": [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",
@@ -107,7 +102,7 @@ def envoy_cc_fuzz_test(
         **kwargs
     )
 
-    cc_test(
+    native.cc_test(
         name = name,
         copts = envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts() + select({
@@ -160,10 +155,12 @@ def envoy_cc_test(
         coverage = True,
         local = False,
         size = "medium",
-        flaky = False):
+        flaky = False,
+        env = {},
+        exec_properties = {}):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
 
-    cc_test(
+    native.cc_test(
         name = name,
         srcs = srcs,
         data = data,
@@ -172,10 +169,12 @@ def envoy_cc_test(
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
-            repository + "//test:test_pch",
             repository + "//test:main",
             repository + "//test/test_common:test_version_linkstamp",
-        ],
+        ] + select({
+            repository + "//bazel:clang_pch_build": [repository + "//test:test_pch"],
+            "//conditions:default": [],
+        }),
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
         # 2 - by default, mocks act as StrictMocks.
         args = args + ["--gmock_default_mock_behavior=2"],
@@ -184,6 +183,8 @@ def envoy_cc_test(
         shard_count = shard_count,
         size = size,
         flaky = flaky,
+        env = env,
+        exec_properties = exec_properties,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -258,10 +259,11 @@ def envoy_benchmark_test(
         benchmark_binary,
         data = [],
         tags = [],
+        repository = "",
         **kargs):
     native.sh_test(
         name = name,
-        srcs = ["//bazel:test_for_benchmark_wrapper.sh"],
+        srcs = [repository + "//bazel:test_for_benchmark_wrapper.sh"],
         data = [":" + benchmark_binary] + data,
         args = ["%s/%s" % (native.package_name(), benchmark_binary)],
         tags = tags + ["nocoverage"],

@@ -1,16 +1,6 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
 #include "quiche/quic/core/quic_stream.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
 namespace Envoy {
 namespace Quic {
@@ -32,7 +22,6 @@ public:
     ~ScopedWatermarkBufferUpdater();
 
   private:
-    bool count_bytes_{false};
     quic::QuicStream* quic_stream_{nullptr};
     uint64_t old_buffered_bytes_{0};
     SendBufferMonitor* send_buffer_monitor_{nullptr};

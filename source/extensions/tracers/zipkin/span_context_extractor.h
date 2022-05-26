@@ -21,7 +21,7 @@ struct ExtractorException : public EnvoyException {
  */
 class SpanContextExtractor {
 public:
-  SpanContextExtractor(Http::RequestHeaderMap& request_headers);
+  SpanContextExtractor(Tracing::TraceContext& trace_context);
   ~SpanContextExtractor();
   bool extractSampled(const Tracing::Decision tracing_decision);
   std::pair<SpanContext, bool> extractSpanContext(bool is_sampled);
@@ -34,7 +34,7 @@ private:
    */
   std::pair<SpanContext, bool> extractSpanContextFromB3SingleFormat(bool is_sampled);
   bool tryExtractSampledFromB3SingleFormat();
-  const Http::RequestHeaderMap& request_headers_;
+  const Tracing::TraceContext& trace_context_;
 };
 
 } // namespace Zipkin

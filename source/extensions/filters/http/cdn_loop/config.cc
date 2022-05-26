@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "envoy/common/exception.h"
-#include "envoy/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.pb.h"
+#include "envoy/extensions/filters/http/cdn_loop/v3/cdn_loop.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
@@ -22,7 +22,7 @@ using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::ParseContext;
 using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::ParsedCdnId;
 
 Http::FilterFactoryCb CdnLoopFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig& config,
+    const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
     const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& /*context*/) {
   StatusOr<ParsedCdnId> context = parseCdnId(ParseContext(config.cdn_id()));
   if (!context.ok() || !context->context().atEnd()) {

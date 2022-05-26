@@ -11,6 +11,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/protobuf/protobuf.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
@@ -42,11 +43,7 @@ http_filters:
   - name: envoy.filters.http.router
 codec_type: HTTP1
 use_remote_address: false
-original_ip_detection_extensions:
-- name: envoy.http.original_ip_detection.xff
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
-    xff_num_trusted_hops: 1
+xff_num_trusted_hops: 1
 stat_prefix: header_test
 route_config:
   virtual_hosts:
@@ -122,6 +119,9 @@ route_config:
             - header:
                 key: "x-route-response"
                 value: "route"
+            - header:
+                key: "details"
+                value: "%RESPONSE_CODE_DETAILS%"
           response_headers_to_remove: ["x-route-response-remove"]
           route:
             cluster: cluster_0
@@ -596,6 +596,7 @@ TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
           {"server", "envoy"},
           {"x-route-response", "upstream"},
           {"x-route-response", "route"},
+          {"details", "via_upstream"},
           {":status", "200"},
       });
 }
@@ -632,6 +633,7 @@ TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
           {"server", "envoy"},
           {"x-unmodified", "upstream"},
           {"x-route-response", "route"},
+          {"details", "via_upstream"},
           {":status", "200"},
       });
 }

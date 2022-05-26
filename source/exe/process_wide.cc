@@ -9,14 +9,27 @@
 
 namespace Envoy {
 namespace {
+
+struct InitData {
+  uint32_t count_ ABSL_GUARDED_BY(mutex_){};
+  absl::Mutex mutex_;
+};
+
 // Static variable to count initialization pairs. For tests like
 // main_common_test, we need to count to avoid double initialization or
 // shutdown.
-uint32_t process_wide_initialized;
+InitData& processWideInitData() { MUTABLE_CONSTRUCT_ON_FIRST_USE(InitData); };
 } // namespace
 
-ProcessWide::ProcessWide() : initialization_depth_(process_wide_initialized) {
-  if (process_wide_initialized++ == 0) {
+ProcessWide::ProcessWide() {
+  // Note that the following lock has the dual use of making sure that initialization is complete
+  // before a second caller can enter and leave this function.
+  auto& init_data = processWideInitData();
+  absl::MutexLock lock(&init_data.mutex_);
+
+  if (init_data.count_++ == 0) {
+    // TODO(mattklein123): Audit the following as not all of these have to be re-initialized in the
+    // edge case where something does init/destroy/init/destroy.
     ares_library_init(ARES_LIB_INIT_ALL);
     Event::Libevent::Global::initialize();
     Envoy::Server::validateProtoDescriptors();
@@ -40,12 +53,13 @@ ProcessWide::ProcessWide() : initialization_depth_(process_wide_initialized) {
 }
 
 ProcessWide::~ProcessWide() {
-  ASSERT(process_wide_initialized > 0);
-  if (--process_wide_initialized == 0) {
-    process_wide_initialized = false;
+  auto& init_data = processWideInitData();
+  absl::MutexLock lock(&init_data.mutex_);
+
+  ASSERT(init_data.count_ > 0);
+  if (--init_data.count_ == 0) {
     ares_library_cleanup();
   }
-  ASSERT(process_wide_initialized == initialization_depth_);
 }
 
 } // namespace Envoy

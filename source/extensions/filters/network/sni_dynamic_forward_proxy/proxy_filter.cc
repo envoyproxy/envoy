@@ -51,26 +51,23 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
   }
 
   switch (result.status_) {
-  case LoadDnsCacheEntryStatus::InCache: {
+  case LoadDnsCacheEntryStatus::InCache:
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_CONN_LOG(debug, "DNS cache entry already loaded, continuing",
                    read_callbacks_->connection());
     return Network::FilterStatus::Continue;
-  }
-  case LoadDnsCacheEntryStatus::Loading: {
+  case LoadDnsCacheEntryStatus::Loading:
     ASSERT(cache_load_handle_ != nullptr);
     ENVOY_CONN_LOG(debug, "waiting to load DNS cache entry", read_callbacks_->connection());
     return Network::FilterStatus::StopIteration;
-  }
-  case LoadDnsCacheEntryStatus::Overflow: {
+  case LoadDnsCacheEntryStatus::Overflow:
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_CONN_LOG(debug, "DNS cache overflow", read_callbacks_->connection());
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
-  }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {

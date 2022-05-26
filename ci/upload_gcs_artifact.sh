@@ -18,9 +18,13 @@ if [ ! -d "${SOURCE_DIRECTORY}" ]; then
     exit 1
 fi
 
-if [[ "$BUILD_REASON" == "PullRequest" ]]; then
-    # non-main upload to the last commit sha (first 7 chars) in the developers branch
-    UPLOAD_PATH="$(git log --pretty=%P -n 1 | cut -d' ' -f2 | head -c7)"
+if [[ "$BUILD_REASON" == "PullRequest" ]] || [[ "$TARGET_SUFFIX" == "docs" ]]; then
+    # upload to the last commit sha (first 7 chars), either
+    # - docs build on main
+    #      -> https://storage.googleapis.com/envoy-postsubmit/$UPLOAD_PATH/docs/envoy-docs-rst.tar.gz
+    # - PR build (commit sha from the developers branch)
+    #      -> https://storage.googleapis.com/envoy-pr/$UPLOAD_PATH/$TARGET_SUFFIX
+    UPLOAD_PATH="$(git rev-parse HEAD | head -c7)"
 else
     UPLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
 fi

@@ -1,22 +1,12 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#endif
-
-#include "quiche/quic/test_tools/test_certificates.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include <memory>
 
-#include "test/mocks/network/mocks.h"
 #include "source/common/quic/envoy_quic_proof_source_base.h"
+
+#include "test/mocks/network/mocks.h"
+
+#include "quiche/quic/test_tools/test_certificates.h"
 
 namespace Envoy {
 namespace Quic {
@@ -25,10 +15,11 @@ namespace Quic {
 // QUICHE and a fake signature.
 class TestProofSource : public EnvoyQuicProofSourceBase {
 public:
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
   GetCertChain(const quic::QuicSocketAddress& /*server_address*/,
-               const quic::QuicSocketAddress& /*client_address*/,
-               const std::string& /*hostname*/) override {
+               const quic::QuicSocketAddress& /*client_address*/, const std::string& /*hostname*/,
+               bool* cert_matched_sni) override {
+    *cert_matched_sni = true;
     return cert_chain_;
   }
 
@@ -45,7 +36,7 @@ protected:
   }
 
 private:
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> cert_chain_{
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_chain_{
       new quic::ProofSource::Chain(
           std::vector<std::string>{std::string(quic::test::kTestCertificate)})};
 

@@ -49,8 +49,8 @@ void Filter::decodeComplete() {
   }
 }
 
-Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
-  return delegateFilterActionOr(delegated_filter_, &StreamEncoderFilter::encode100ContinueHeaders,
+Http::FilterHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
+  return delegateFilterActionOr(delegated_filter_, &StreamEncoderFilter::encode1xxHeaders,
                                 Http::FilterHeadersStatus::Continue, headers);
 }
 
@@ -78,7 +78,7 @@ void Filter::encodeComplete() {
 void Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<ExecuteFilterAction>();
 
-  FactoryCallbacksWrapper wrapper(*this);
+  FactoryCallbacksWrapper wrapper(*this, dispatcher_);
   composite_action.createFilters(wrapper);
 
   if (!wrapper.errors_.empty()) {
@@ -147,8 +147,8 @@ void Filter::StreamFilterWrapper::decodeComplete() {
 }
 
 Http::FilterHeadersStatus
-Filter::StreamFilterWrapper::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
-  return delegateFilterActionOr(encoder_filter_, &StreamEncoderFilter::encode100ContinueHeaders,
+Filter::StreamFilterWrapper::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
+  return delegateFilterActionOr(encoder_filter_, &StreamEncoderFilter::encode1xxHeaders,
                                 Http::FilterHeadersStatus::Continue, headers);
 }
 Http::FilterHeadersStatus

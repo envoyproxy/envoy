@@ -8,6 +8,7 @@
 #include "source/extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/rds_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
@@ -36,8 +37,9 @@ class ConnectionManagerTest;
 class TestConfigImpl : public ConfigImpl {
 public:
   TestConfigImpl(ConfigDubboProxy proto_config, Server::Configuration::MockFactoryContext& context,
+                 Router::RouteConfigProviderManager& route_config_provider_manager,
                  DubboFilterStats& stats)
-      : ConfigImpl(proto_config, context), stats_(stats) {}
+      : ConfigImpl(proto_config, context, route_config_provider_manager), stats_(stats) {}
 
   // ConfigImpl
   DubboFilterStats& stats() override { return stats_; }
@@ -115,12 +117,16 @@ public:
 
 class ConnectionManagerTest : public testing::Test {
 public:
-  ConnectionManagerTest() : stats_(DubboFilterStats::generateStats("test.", store_)) {}
+  ConnectionManagerTest() : stats_(DubboFilterStats::generateStats("test.", store_)) {
+
+    route_config_provider_manager_ =
+        std::make_unique<Router::RouteConfigProviderManagerImpl>(factory_context_.admin_);
+  }
   ~ConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  TimeSource& timeSystem() { return factory_context_.dispatcher().timeSource(); }
+  TimeSource& timeSystem() { return factory_context_.mainThreadDispatcher().timeSource(); }
 
   void initializeFilter() { initializeFilter(""); }
 
@@ -135,7 +141,8 @@ public:
     }
 
     proto_config_.set_stat_prefix("test");
-    config_ = std::make_unique<TestConfigImpl>(proto_config_, factory_context_, stats_);
+    config_ = std::make_unique<TestConfigImpl>(proto_config_, factory_context_,
+                                               *route_config_provider_manager_, stats_);
     if (custom_serializer_) {
       config_->serializer_ = custom_serializer_;
     }
@@ -312,6 +319,7 @@ public:
   DubboFilterStats stats_;
   ConfigDubboProxy proto_config_;
 
+  std::unique_ptr<Router::RouteConfigProviderManagerImpl> route_config_provider_manager_;
   std::unique_ptr<TestConfigImpl> config_;
 
   Buffer::OwnedImpl buffer_;
@@ -832,7 +840,7 @@ TEST_F(ConnectionManagerTest, ResponseWithUnknownSequenceID) {
 
 TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   initializeFilter();
-  writeHessianRequestMessage(buffer_, false, false, 1);
+  writeHessianRequestMessage(buffer_, false, false, 233333);
 
   config_->setupFilterChain(2, 0);
   config_->expectOnDestroy();
@@ -847,8 +855,10 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   const std::string fake_response("mock dubbo response");
   NiceMock<DubboFilters::MockDirectResponse> direct_response;
   EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
+      .WillOnce(Invoke([&](MessageMetadata& metadata, Protocol&,
                            Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+        // Validate request id.
+        EXPECT_EQ(metadata.requestId(), 233333);
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::SuccessReply;
       }));
@@ -878,7 +888,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
 
 TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   initializeFilter();
-  writeHessianRequestMessage(buffer_, false, false, 1);
+  writeHessianRequestMessage(buffer_, false, false, 233334);
 
   config_->setupFilterChain(2, 0);
   config_->expectOnDestroy();
@@ -893,8 +903,10 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   const std::string fake_response("mock dubbo response");
   NiceMock<DubboFilters::MockDirectResponse> direct_response;
   EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
+      .WillOnce(Invoke([&](MessageMetadata& metadata, Protocol&,
                            Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+        // Validate request id.
+        EXPECT_EQ(metadata.requestId(), 233334);
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::ErrorReply;
       }));
@@ -1023,26 +1035,6 @@ TEST_F(ConnectionManagerTest, SendsLocalReplyWithCloseConnection) {
   conn_manager_->sendLocalReply(metadata, direct_response, true);
 }
 
-TEST_F(ConnectionManagerTest, ContinueDecodingWithHalfClose) {
-  initializeFilter();
-  writeHessianRequestMessage(buffer_, true, false, 0x0F);
-
-  config_->setupFilterChain(1, 0);
-  config_->expectOnDestroy();
-  auto& decoder_filter = config_->decoder_filters_[0];
-
-  EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
-        return FilterStatus::StopIteration;
-      }));
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
-  EXPECT_EQ(conn_manager_->onData(buffer_, true), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
-
-  conn_manager_->continueDecoding();
-}
-
 TEST_F(ConnectionManagerTest, RoutingSuccess) {
   initializeFilter();
   writeHessianRequestMessage(buffer_, false, false, 0x0F);
@@ -1154,18 +1146,20 @@ TEST_F(ConnectionManagerTest, Routing) {
 stat_prefix: test
 protocol_type: Dubbo
 serialization_type: Hessian2
-route_config:
-  - name: test1
-    interface: org.apache.dubbo.demo.DemoService
-    routes:
-      - match:
-          method:
-            name:
-              safe_regex:
-                google_re2: {}
-                regex: "(.*?)"
-        route:
-            cluster: user_service_dubbo_server
+multiple_route_config:
+  name: test_routes
+  route_config:
+    - name: test1
+      interface: org.apache.dubbo.demo.DemoService
+      routes:
+        - match:
+            method:
+              name:
+                safe_regex:
+                  google_re2: {}
+                  regex: "(.*?)"
+          route:
+              cluster: user_service_dubbo_server
 )EOF";
 
   initializeFilter(yaml);

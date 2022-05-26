@@ -1,13 +1,15 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
-#include "envoy/thread_local/thread_local.h"
 
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
 #include "source/extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
+#include "source/extensions/filters/http/jwt_authn/jwt_cache.h"
 #include "source/extensions/filters/http/jwt_authn/stats.h"
 
 #include "jwt_verify_lib/jwks.h"
@@ -65,6 +67,9 @@ public:
 
     // Set a remote Jwks.
     virtual const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) PURE;
+
+    // Get Token Cache.
+    virtual JwtCache& getJwtCache() PURE;
   };
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.

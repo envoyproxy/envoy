@@ -10,7 +10,6 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
 #include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,20 +25,21 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::MetricsServiceConfig&>(
           config, server.messageValidationContext().staticValidationVisitor());
   const auto& grpc_service = sink_config.grpc_service();
-  const auto transport_api_version = Config::Utility::getAndCheckTransportVersion(sink_config);
+  Config::Utility::checkTransportVersion(sink_config);
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
   std::shared_ptr<GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
                                       envoy::service::metrics::v3::StreamMetricsResponse>>
       grpc_metrics_streamer = std::make_shared<GrpcMetricsStreamerImpl>(
-          server.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-              grpc_service, server.scope(), false),
-          server.localInfo(), transport_api_version);
+          server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+              grpc_service, server.scope(), false, Grpc::CacheOption::CacheWhenRuntimeEnabled),
+          server.localInfo());
 
   return std::make_unique<MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                                              envoy::service::metrics::v3::StreamMetricsResponse>>(
-      grpc_metrics_streamer, sink_config.emit_tags_as_labels(),
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false));
+      grpc_metrics_streamer,
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false),
+      sink_config.emit_tags_as_labels());
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
@@ -47,7 +47,7 @@ ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
       std::make_unique<envoy::config::metrics::v3::MetricsServiceConfig>());
 }
 
-std::string MetricsServiceSinkFactory::name() const { return StatsSinkNames::get().MetricsService; }
+std::string MetricsServiceSinkFactory::name() const { return MetricsServiceName; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

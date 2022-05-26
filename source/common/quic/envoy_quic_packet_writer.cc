@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
@@ -11,12 +12,12 @@ namespace {
 
 quic::WriteResult convertToQuicWriteResult(Api::IoCallUint64Result& result) {
   if (result.ok()) {
-    return {quic::WRITE_STATUS_OK, static_cast<int>(result.rc_)};
+    return {quic::WRITE_STATUS_OK, static_cast<int>(result.return_value_)};
   }
   quic::WriteStatus status = result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again
                                  ? quic::WRITE_STATUS_BLOCKED
                                  : quic::WRITE_STATUS_ERROR;
-  return {status, static_cast<int>(result.err_->getErrorCode())};
+  return {status, static_cast<int>(result.err_->getSystemErrorCode())};
 }
 
 } // namespace
@@ -45,6 +46,8 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t 
 
   return convertToQuicWriteResult(result);
 }
+
+absl::optional<int> EnvoyQuicPacketWriter::MessageTooBigErrorCode() const { return EMSGSIZE; }
 
 quic::QuicByteCount
 EnvoyQuicPacketWriter::GetMaxPacketSize(const quic::QuicSocketAddress& peer_address) const {

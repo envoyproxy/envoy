@@ -15,7 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "kill_request_filter_test",
     srcs = ["kill_request_filter_test.cc"],
-    extension_name = "envoy.filters.http.kill_request",
+    extension_names = ["envoy.filters.http.kill_request"],
     deps = [
         "//envoy/http:metadata_interface",
         "//source/common/buffer:buffer_lib",
@@ -31,7 +31,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "kill_request_config_test",
     srcs = ["kill_request_config_test.cc"],
-    extension_name = "envoy.filters.http.kill_request",
+    extension_names = ["envoy.filters.http.kill_request"],
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
         "//test/mocks/server:factory_context_mocks",
@@ -43,7 +43,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "kill_request_filter_integration_test",
     srcs = ["kill_request_filter_integration_test.cc"],
-    extension_name = "envoy.filters.http.kill_request",
+    extension_names = ["envoy.filters.http.kill_request"],
+    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
         "//test/integration:http_protocol_integration_lib",
@@ -54,7 +55,7 @@ envoy_cc_test(
     name = "crash_integration_test",
     size = "large",
     srcs = ["crash_integration_test.cc"],
-    shard_count = 2,
+    shard_count = 16,  # This is really slow on coverage.
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
         "//test/integration:http_protocol_integration_lib",

@@ -10,6 +10,7 @@
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
@@ -25,6 +26,9 @@ namespace Network {
 class ActiveUdpListenerFactory;
 class UdpListenerWorkerRouter;
 
+class ListenSocketFactory;
+using ListenSocketFactoryPtr = std::unique_ptr<ListenSocketFactory>;
+
 /**
  * ListenSocketFactory is a member of ListenConfig to provide listen socket.
  * Listeners created from the same ListenConfig instance have listening sockets
@@ -36,10 +40,12 @@ public:
 
   /**
    * Called during actual listener creation.
+   * @param worker_index supplies the worker index to get the socket for. All sockets are created
+   *        ahead of time.
    * @return the socket to be used for a certain listener, which might be shared
    * with other listeners of the same config on other worker threads.
    */
-  virtual SocketSharedPtr getListenSocket() PURE;
+  virtual SocketSharedPtr getListenSocket(uint32_t worker_index) PURE;
 
   /**
    * @return the type of the socket getListenSocket() returns.
@@ -53,12 +59,23 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return the socket shared by worker threads if any; otherwise return null.
+   * Clone this socket factory so it can be used by a new listener (e.g., if the address is shared).
    */
-  virtual SocketOptRef sharedSocket() const PURE;
-};
+  virtual ListenSocketFactoryPtr clone() const PURE;
 
-using ListenSocketFactorySharedPtr = std::shared_ptr<ListenSocketFactory>;
+  /**
+   * Close all sockets. This is used during draining scenarios.
+   */
+  virtual void closeAllSockets() PURE;
+
+  /**
+   * Perform any initialization that must occur immediately prior to using the listen socket on
+   * workers. For example, the actual listen() call, post listen socket options, etc. This is done
+   * so that all error handling can occur on the main thread and the gap between performing these
+   * actions and using the socket is minimized.
+   */
+  virtual void doFinalPreWorkerInit() PURE;
+};
 
 /**
  * Configuration for a UDP listener.
@@ -89,6 +106,25 @@ public:
 };
 
 using UdpListenerConfigOptRef = OptRef<UdpListenerConfig>;
+
+// Forward declare.
+class InternalListenerRegistry;
+
+/**
+ * Configuration for an internal listener.
+ */
+class InternalListenerConfig {
+public:
+  virtual ~InternalListenerConfig() = default;
+
+  /**
+   * @return InternalListenerRegistry& The internal registry of this internal listener config. The
+   *         registry outlives this listener config.
+   */
+  virtual InternalListenerRegistry& internalListenerRegistry() PURE;
+};
+
+using InternalListenerConfigOptRef = OptRef<InternalListenerConfig>;
 
 /**
  * A configuration for an individual listener.
@@ -169,6 +205,11 @@ public:
   virtual UdpListenerConfigOptRef udpListenerConfig() PURE;
 
   /**
+   * @return the internal configuration for the listener IFF it is an internal listener.
+   */
+  virtual InternalListenerConfigOptRef internalListenerConfig() PURE;
+
+  /**
    * @return traffic direction of the listener.
    */
   virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
@@ -198,6 +239,12 @@ public:
    * @return init manager of the listener.
    */
   virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return bool whether the listener should avoid blocking connections based on the globally set
+   * limit.
+   */
+  virtual bool ignoreGlobalConnLimit() const PURE;
 };
 
 /**
@@ -412,6 +459,64 @@ public:
 using UdpListenerPtr = std::unique_ptr<UdpListener>;
 
 /**
+ * Internal listener callbacks.
+ */
+class InternalListener {
+public:
+  virtual ~InternalListener() = default;
+
+  /**
+   * Called when a new connection is accepted.
+   * @param socket supplies the socket that is moved into the callee.
+   */
+  virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
+};
+using InternalListenerOptRef = OptRef<InternalListener>;
+
+/**
+ * The query interface of the registered internal listener callbacks.
+ */
+class InternalListenerManager {
+public:
+  virtual ~InternalListenerManager() = default;
+
+  /**
+   * Return the internal listener binding the listener address.
+   *
+   * @param listen_address the internal address of the expected internal listener.
+   */
+  virtual InternalListenerOptRef
+  findByAddress(const Address::InstanceConstSharedPtr& listen_address) PURE;
+};
+
+using InternalListenerManagerOptRef =
+    absl::optional<std::reference_wrapper<InternalListenerManager>>;
+
+// The thread local registry.
+class LocalInternalListenerRegistry {
+public:
+  virtual ~LocalInternalListenerRegistry() = default;
+
+  // Set the internal listener manager which maintains life of internal listeners. Called by
+  // connection handler.
+  virtual void setInternalListenerManager(InternalListenerManager& internal_listener_manager) PURE;
+
+  // Get the internal listener manager to obtain a listener. Called by client connection factory.
+  virtual Network::InternalListenerManagerOptRef getInternalListenerManager() PURE;
+};
+
+// The central internal listener registry interface providing the thread local accessor.
+class InternalListenerRegistry {
+public:
+  virtual ~InternalListenerRegistry() = default;
+
+  /**
+   * @return The thread local registry.
+   */
+  virtual LocalInternalListenerRegistry* getLocalRegistry() PURE;
+};
+
+/**
  * Handles delivering datagrams to the correct worker.
  */
 class UdpListenerWorkerRouter {
@@ -437,6 +542,11 @@ public:
 };
 
 using UdpListenerWorkerRouterPtr = std::unique_ptr<UdpListenerWorkerRouter>;
+
+/**
+ * Base class for all listener typed metadata factories.
+ */
+class ListenerTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
 } // namespace Network
 } // namespace Envoy

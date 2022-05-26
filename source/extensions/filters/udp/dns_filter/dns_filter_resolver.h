@@ -3,6 +3,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
 namespace Envoy {
@@ -18,12 +19,13 @@ enum class DnsFilterResolverStatus { Pending, Complete, TimedOut };
  */
 class DnsFilterResolver : Logger::Loggable<Logger::Id::filter> {
 public:
-  DnsFilterResolver(DnsFilterResolverCallback& callback, AddressConstPtrVec resolvers,
-                    std::chrono::milliseconds timeout, Event::Dispatcher& dispatcher,
-                    uint64_t max_pending_lookups,
-                    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options)
+  DnsFilterResolver(DnsFilterResolverCallback& callback, std::chrono::milliseconds timeout,
+                    Event::Dispatcher& dispatcher, uint64_t max_pending_lookups,
+                    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+                    const Network::DnsResolverFactory& dns_resolver_factory, Api::Api& api)
       : timeout_(timeout), dispatcher_(dispatcher),
-        resolver_(dispatcher.createDnsResolver(resolvers, dns_resolver_options)),
+        resolver_(
+            dns_resolver_factory.createDnsResolver(dispatcher, api, typed_dns_resolver_config)),
         callback_(callback), max_pending_lookups_(max_pending_lookups) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord

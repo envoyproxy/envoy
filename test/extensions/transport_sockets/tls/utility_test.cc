@@ -1,6 +1,8 @@
+#include <cstdint>
 #include <string>
 #include <vector>
 
+#include "source/common/common/c_smart_ptr.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
@@ -20,6 +22,41 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 namespace {
+
+using X509StoreContextPtr = CSmartPtr<X509_STORE_CTX, X509_STORE_CTX_free>;
+using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
+
+TEST(UtilityTest, TestDnsNameMatching) {
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("a.lyft.com", "*.lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("a.LYFT.com", "*.lyft.COM"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "*yft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("LYFT.com", "*yft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "*lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyf*.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyft*.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "l*ft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("t.lyft.com", "t*.lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("test.lyft.com", "t*.lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("l-lots-of-stuff-ft.com", "l*ft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("t.lyft.com", "t*t.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "l*ft.co"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "ly?t.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "lf*t.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch(".lyft.com", "*lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "**lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "lyft**.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "ly**ft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "lyft.c*m"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*yft.c*m"));
+  EXPECT_FALSE(Utility::dnsNameMatch("test.lyft.com.extra", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("foo.test.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("alyft.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("", "*lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", ""));
+}
 
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
@@ -86,17 +123,13 @@ TEST(UtilityTest, TestDaysUntilExpiration) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  // Get expiration time from the certificate info.
-  const absl::Time expiration =
-      TestUtility::parseTime(TEST_SAN_DNS_CERT_NOT_AFTER, "%b %e %H:%M:%S %Y GMT");
-
-  int days = std::difftime(absl::ToTimeT(expiration), known_date_time) / (60 * 60 * 24);
-  EXPECT_EQ(days, Utility::getDaysUntilExpiration(cert.get(), time_source));
+  EXPECT_EQ(absl::nullopt, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
   Event::SimulatedTimeSystem time_source;
-  EXPECT_EQ(std::numeric_limits<int>::max(), Utility::getDaysUntilExpiration(nullptr, time_source));
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
+            Utility::getDaysUntilExpiration(nullptr, time_source).value());
 }
 
 TEST(UtilityTest, TestValidFrom) {
@@ -162,6 +195,18 @@ TEST(UtilityTest, SslErrorDescriptionTest) {
 
   EXPECT_ENVOY_BUG(EXPECT_EQ(Utility::getErrorDescription(-1), "UNKNOWN_ERROR"),
                    "Unknown BoringSSL error had occurred");
+}
+
+TEST(UtilityTest, TestGetX509ErrorInfo) {
+  auto cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
+  X509StorePtr ssl_ctx = X509_STORE_new();
+  EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
+  X509_STORE_CTX_set_error(store_ctx.get(), X509_V_ERR_UNSPECIFIED);
+  EXPECT_EQ(Utility::getX509VerificationErrorInfo(store_ctx.get()),
+            "X509_verify_cert: certificate verification error at depth 0: unknown certificate "
+            "verification error");
 }
 
 } // namespace

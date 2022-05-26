@@ -61,7 +61,7 @@ TEST_P(SocketInterfaceIntegrationTest, Basic) {
         response.append(data.toString());
         conn.close(Network::ConnectionCloseType::FlushWrite);
       });
-  connection->run();
+  ASSERT_TRUE(connection->run());
   EXPECT_EQ("hello", response);
 }
 
@@ -89,8 +89,8 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
   client_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
-// Test that connecting to internal address will crash.
-// TODO(lambdai): Add internal connection implementation to enable the connection creation.
+// Test that connecting to internal address will crash if the user space socket extension is not
+// linked.
 TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
@@ -104,11 +104,11 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
                    address, Network::Address::InstanceConstSharedPtr(),
                    Network::Test::createRawBufferSocket(), nullptr),
-               "panic: not implemented");
+               "" /* Nullptr dereference */);
 }
 
 // Test that recv from internal address will crash.
-// TODO(lambdai): Add internal socket implementation to enable the io path.
+// TODO(lambdai): Add UDP internal listener implementation to enable the io path.
 TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
@@ -117,8 +117,9 @@ TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInter
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
 
-  ASSERT_DEATH(
-      std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address, nullptr), "");
+  ASSERT_DEATH(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address,
+                                                     nullptr, Network::SocketCreationOptions{}),
+               "");
 }
 
 // Test that send to internal address will return io error.
@@ -132,8 +133,9 @@ TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterfa
   Network::Address::InstanceConstSharedPtr local_valid_address =
       Network::Test::getCanonicalLoopbackAddress(version_);
 
-  auto socket = std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
-                                                      local_valid_address, nullptr);
+  auto socket =
+      std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_valid_address,
+                                            nullptr, Network::SocketCreationOptions{});
 
   Buffer::OwnedImpl buffer;
   auto reservation = buffer.reserveSingleSlice(100);

@@ -8,6 +8,7 @@ import "udpa/annotations/versioning.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_http1_bridge.v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/grpc_http1_bridge/v3;grpc_http1_bridgev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: gRPC HTTP/1.1 Bridge]
@@ -18,4 +19,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.grpc_http1_bridge.v2.Config";
+
+  // If true then requests with content type set to `application/x-protobuf` will be automatically converted to gRPC.
+  // This works by prepending the payload data with the gRPC header frame, as defined by the wiring format, and
+  // Content-Type will be updated accordingly before sending the request.
+  // For the requests that went through this upgrade the filter will also strip the frame before forwarding the
+  // response to the client.
+  bool upgrade_protobuf_to_grpc = 1;
 }

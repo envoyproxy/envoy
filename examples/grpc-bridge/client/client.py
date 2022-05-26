@@ -19,7 +19,7 @@ grpc-client usage [{host}]:
   """.format(host=HOST)
 
 
-class KVClient():
+class KVClient:
 
     def get(self, key):
         r = kv.GetRequest(key=key)
@@ -40,7 +40,7 @@ class KVClient():
         return requests.post(HOST + "/kv.KV/Set", data=data, headers=HEADERS)
 
 
-def run():
+def main():
     if len(sys.argv) == 1:
         print(USAGE)
 
@@ -82,4 +82,4 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    main()

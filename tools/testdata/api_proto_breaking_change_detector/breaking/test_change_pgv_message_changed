@@ -1,0 +1,10 @@
+syntax = "proto3";
+package test.protos.breaking;
+
+import "validate/validate.proto";
+
+message ChangePGVMessageMessage {
+    option (validate.disabled) = false;
+
+    ChangePGVMessageMessage q = 543;
+}

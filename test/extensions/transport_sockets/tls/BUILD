@@ -200,6 +200,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.s2a.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.s2a.v3";
+option java_outer_classname = "S2aProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/s2a/v3;s2av3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#not-implemented-hide:]
+// Configuration for S2A transport socket. This allows Envoy clients to
+// configure how to offload mTLS handshakes to the S2A service.
+// https://github.com/google/s2a-core#readme
+message S2AConfiguration {
+  // The address of the S2A. This can be an IP address or a hostname,
+  // followed by a port number.
+  string s2a_address = 1 [(validate.rules).string = {min_len: 1}];
+}

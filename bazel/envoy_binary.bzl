@@ -1,5 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary")
-
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy binary targets
 load(
@@ -22,17 +20,21 @@ def envoy_cc_binary(
         stamped = False,
         deps = [],
         linkopts = [],
-        tags = []):
+        tags = [],
+        features = []):
+    linker_inputs = _envoy_exported_symbols_input()
+
     if not linkopts:
         linkopts = _envoy_linkopts()
     if stamped:
         linkopts = linkopts + _envoy_stamped_linkopts()
         deps = deps + _envoy_stamped_deps()
     deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + envoy_stdlib_deps()
-    cc_binary(
+    native.cc_binary(
         name = name,
         srcs = srcs,
         data = data,
+        additional_linker_inputs = linker_inputs,
         copts = envoy_copts(repository),
         linkopts = linkopts,
         testonly = testonly,
@@ -42,24 +44,33 @@ def envoy_cc_binary(
         stamp = 1,
         deps = deps,
         tags = tags,
+        features = features,
     )
+
+def _envoy_exported_symbols_input():
+    return ["@envoy//bazel:exported_symbols.txt"]
+
+# Default symbols to be exported.
+# TODO(wbpcode): make this work correctly for apple/darwin.
+def _envoy_default_exported_symbols():
+    return select({
+        "@envoy//bazel:linux": [
+            "-Wl,--dynamic-list=$(location @envoy//bazel:exported_symbols.txt)",
+        ],
+        "//conditions:default": [],
+    })
 
 # Select the given values if exporting is enabled in the current build.
 def _envoy_select_exported_symbols(xs):
     return select({
         "@envoy//bazel:enable_exported_symbols": xs,
         "//conditions:default": [],
-    })
+    }) + _envoy_default_exported_symbols()
 
 # Compute the final linkopts based on various options.
 def _envoy_linkopts():
     return select({
-        # The macOS system library transitively links common libraries (e.g., pthread).
-        "@envoy//bazel:apple": [
-            # See note here: https://luajit.org/install.html
-            "-pagezero_size 10000",
-            "-image_base 100000000",
-        ],
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:windows_opt_build": [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",
@@ -81,6 +92,7 @@ def _envoy_linkopts():
             "-Wl,--hash-style=gnu",
         ],
     }) + select({
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:boringssl_fips": [],
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": ["-pie"],

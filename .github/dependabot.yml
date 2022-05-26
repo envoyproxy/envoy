@@ -7,57 +7,32 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/test/extensions/filters/network/thrift_proxy"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/source/extensions/filters/network/kafka"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/examples/grpc-bridge/client"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/docs"
+  directory: "/examples/cache"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/github"
+  directory: "/examples/double-proxy"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/config_validation"
+  directory: "/examples/shared/flask"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/dependency"
+  directory: "/examples/shared/tracing"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/deprecate_version"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/extensions"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/protodoc"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/deprecate_features"
+  directory: "/tools/base"
   schedule:
     interval: "daily"
 
@@ -67,17 +42,7 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/ci/flaky_test"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/configs"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/testing"
+  directory: "/tools/dependency"
   schedule:
     interval: "daily"
 
@@ -95,3 +60,24 @@ updates:
   directory: "/"
   schedule:
     interval: daily
+
+- package-ecosystem: "gomod"
+  directory: "/examples/ext_authz/auth/grpc-service"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "gomod"
+  directory: "/examples/grpc-bridge/server"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "gomod"
+  directory: "/examples/grpc-bridge/server/kv"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "gomod"
+  directory: "/examples/load-reporting-service"
+  schedule:
+    interval: daily
+

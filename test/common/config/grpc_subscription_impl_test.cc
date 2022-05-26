@@ -8,10 +8,17 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class GrpcSubscriptionImplTest : public testing::Test, public GrpcSubscriptionTestHarness {};
+class GrpcSubscriptionImplTest : public testing::TestWithParam<LegacyOrUnified>,
+                                 public GrpcSubscriptionTestHarness {
+public:
+  GrpcSubscriptionImplTest() : GrpcSubscriptionTestHarness(GetParam()) {}
+};
+
+INSTANTIATE_TEST_SUITE_P(GrpcSubscriptionImplTest, GrpcSubscriptionImplTest,
+                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
 
 // Validate that stream creation results in a timer based retry and can recover.
-TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
+TEST_P(GrpcSubscriptionImplTest, StreamCreationFailure) {
   InSequence s;
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
 
@@ -37,7 +44,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
 }
 
 // Validate that the client can recover from a remote stream closure via retry.
-TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
+TEST_P(GrpcSubscriptionImplTest, RemoteStreamClose) {
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
@@ -46,7 +53,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
       .Times(0);
   EXPECT_CALL(*timer_, enableTimer(_, _));
   EXPECT_CALL(random_, random());
-  mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+  onRemoteClose();
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, ""));
   verifyControlPlaneStats(0);
 
@@ -59,7 +66,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
 
 // Validate that When the management server gets multiple requests for the same version, it can
 // ignore later ones. This allows the nonce to be used.
-TEST_F(GrpcSubscriptionImplTest, RepeatedNonce) {
+TEST_P(GrpcSubscriptionImplTest, RepeatedNonce) {
   InSequence s;
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
@@ -79,7 +86,7 @@ TEST_F(GrpcSubscriptionImplTest, RepeatedNonce) {
   EXPECT_TRUE(statsAre(7, 2, 2, 0, 0, TEST_TIME_MILLIS, 7919287270473417401, "42"));
 }
 
-TEST_F(GrpcSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
+TEST_P(GrpcSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
   InSequence s;
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
@@ -87,7 +94,7 @@ TEST_F(GrpcSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
   EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, 0, 0, ""));
 }
 
-TEST_F(GrpcSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
+TEST_P(GrpcSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
   InSequence s;
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));

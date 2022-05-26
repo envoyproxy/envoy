@@ -7,18 +7,18 @@
 namespace Envoy {
 namespace Filesystem {
 
-WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
-    : api_(api), os_sys_calls_(Api::OsSysCallsSingleton::get()) {
+WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& file_system)
+    : file_system_(file_system), os_sys_calls_(Api::OsSysCallsSingleton::get()) {
   os_fd_t socks[2];
   Api::SysCallIntResult result = os_sys_calls_.socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
-  ASSERT(result.rc_ == 0);
+  ASSERT(result.return_value_ == 0);
 
   read_handle_ = std::make_unique<Network::IoSocketHandleImpl>(socks[0], false, AF_INET);
   result = read_handle_->setBlocking(false);
-  ASSERT(result.rc_ == 0);
+  ASSERT(result.return_value_ == 0);
   write_handle_ = std::make_unique<Network::IoSocketHandleImpl>(socks[1], false, AF_INET);
   result = write_handle_->setBlocking(false);
-  ASSERT(result.rc_ == 0);
+  ASSERT(result.return_value_ == 0);
 
   read_handle_->initializeFileEvent(
       dispatcher,
@@ -55,7 +55,7 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
     return;
   }
 
-  const PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
+  const PathSplitResult result = file_system_.splitPathFromFilename(path);
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here
   const std::wstring directory = wstring_converter_.from_bytes(std::string(result.directory_));
@@ -154,7 +154,7 @@ void WatcherImpl::endDirectoryWatch(Network::IoHandle& io_handle, HANDLE event_h
   constexpr absl::string_view data{"a"};
   buffer.add(data);
   auto result = io_handle.write(buffer);
-  RELEASE_ASSERT(result.rc_ == 1,
+  RELEASE_ASSERT(result.return_value_ == 1,
                  fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
 }
 
@@ -207,7 +207,7 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
         // not in this completion routine
         Buffer::RawSlice buffer{(void*)data.data(), 1};
         auto result = watcher->write_handle_->writev(&buffer, 1);
-        RELEASE_ASSERT(result.rc_ == 1,
+        RELEASE_ASSERT(result.return_value_ == 1,
                        fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
       }
     }

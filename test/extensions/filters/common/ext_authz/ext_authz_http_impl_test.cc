@@ -102,6 +102,52 @@ public:
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
+  void dynamicMetadataTest(CheckStatus status, const std::string& http_status) {
+    const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+      authorization_response:
+        dynamic_metadata_from_headers:
+          patterns:
+          - prefix: "X-Metadata-"
+            ignore_case: true
+    failure_mode_allow: true
+    )EOF";
+
+    initialize(yaml);
+    envoy::service::auth::v3::CheckRequest request;
+    client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+    ProtobufWkt::Struct expected_dynamic_metadata;
+    auto* metadata_fields = expected_dynamic_metadata.mutable_fields();
+    (*metadata_fields)["x-metadata-header-0"] = ValueUtil::stringValue("zero");
+    (*metadata_fields)["x-metadata-header-1"] = ValueUtil::stringValue("2");
+    (*metadata_fields)["x-metadata-header-2"] = ValueUtil::stringValue("4");
+
+    // When we call onSuccess() at the bottom of the test we expect that all the
+    // dynamic metadata values that we set above to be present in the authz Response
+    // below.
+    Response authz_response;
+    authz_response.status = status;
+    authz_response.dynamic_metadata = expected_dynamic_metadata;
+    EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                        AuthzResponseNoAttributes(authz_response))));
+
+    const HeaderValueOptionVector http_response_headers = TestCommon::makeHeaderValueOption({
+        {":status", http_status, false},
+        {"bar", "nope", false},
+        {"x-metadata-header-0", "zero", false},
+        {"x-metadata-header-1", "2", false},
+        {"x-foo", "nah", false},
+        {"x-metadata-header-2", "4", false},
+    });
+    Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
+    client_->onSuccess(async_request_, std::move(http_response));
+  }
+
   Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers) {
     envoy::service::auth::v3::CheckRequest request{};
     auto mutable_headers =
@@ -303,7 +349,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
       {{":status", "200", false}, {"x-downstream-ok", "1", false}, {"x-upstream-ok", "1", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::OK, Http::Code::OK, EMPTY_STRING, TestCommon::makeHeaderValueOption({}),
-      TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", false}}));
+      // By default, the value of envoy.config.core.v3.HeaderValueOption.append is true.
+      TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", true}}));
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
   auto mutable_headers =
@@ -417,6 +464,16 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
   });
   Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
   client_->onSuccess(async_request_, std::move(http_response));
+}
+
+// Test the client when an OK response is received with dynamic metadata in that OK response.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithDynamicMetadata) {
+  dynamicMetadataTest(CheckStatus::OK, "200");
+}
+
+// Test the client when a denied response is received with dynamic metadata in the denied response.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithDynamicMetadata) {
+  dynamicMetadataTest(CheckStatus::Denied, "403");
 }
 
 // Test the client when a denied response is received.

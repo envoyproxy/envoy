@@ -18,7 +18,7 @@ public:
   StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                        Network::DnsResolverSharedPtr dns_resolver,
                        Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                       Stats::ScopePtr&& stats_scope, bool added_via_api);
+                       Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -26,7 +26,7 @@ public:
 private:
   struct ResolveTarget {
     ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
-                  const std::string& url,
+                  const std::string& dns_address, const uint32_t dns_port,
                   const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
                   const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
     ~ResolveTarget();
@@ -41,6 +41,13 @@ private:
     const uint32_t port_;
     const Event::TimerPtr resolve_timer_;
     HostVector hosts_;
+
+    // Host map for current resolve target. When we have multiple resolve targets, multiple targets
+    // may contain two different hosts with the same address. This has two effects:
+    // 1) This host map cannot be replaced by the cross-priority global host map in the priority
+    // set.
+    // 2) Cross-priority global host map may not be able to search for the expected host based on
+    // the address.
     HostMap all_hosts_;
   };
 
@@ -76,7 +83,7 @@ private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) override;
+      Stats::ScopeSharedPtr&& stats_scope) override;
 };
 
 } // namespace Upstream

@@ -9,6 +9,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.listener.proxy_protocol.v3";
 option java_outer_classname = "ProxyProtocolProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/listener/proxy_protocol/v3;proxy_protocolv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Proxy Protocol Filter]
@@ -40,4 +41,21 @@ message ProxyProtocol {
 
   // The list of rules to apply to requests.
   repeated Rule rules = 1;
+
+  // Allow requests through that don't use proxy protocol. Defaults to false.
+  //
+  // .. attention::
+  //
+  //   This breaks conformance with the specification.
+  //   Only enable if ALL traffic to the listener comes from a trusted source.
+  //   For more information on the security implications of this feature, see
+  //   https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt
+  //
+  // .. attention::
+  //
+  //   Requests of 12 or fewer bytes that match the proxy protocol v2 signature
+  //   and requests of 6 or fewer bytes that match the proxy protocol v1
+  //   signature will timeout (Envoy is unable to differentiate these requests
+  //   from incomplete proxy protocol requests).
+  bool allow_requests_without_proxy_protocol = 2;
 }

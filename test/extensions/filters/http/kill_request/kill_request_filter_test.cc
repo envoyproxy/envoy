@@ -99,8 +99,8 @@ TEST_F(KillRequestFilterTest, KillRequestEnabledFromRouteLevelConfiguration) {
   KillSettings kill_settings = KillSettings(route_level_kill_request);
 
   ON_CALL(random_generator_, random()).WillByDefault(Return(0));
-  ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
-          perFilterConfig("envoy.filters.http.kill_request"))
+  ON_CALL(*decoder_filter_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.kill_request"))
       .WillByDefault(Return(&kill_settings));
   EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
 }
@@ -114,8 +114,8 @@ TEST_F(KillRequestFilterTest, KillRequestDisabledRouteLevelConfiguration) {
   request_headers_.addCopy("x-envoy-kill-request", "true");
 
   ON_CALL(random_generator_, random()).WillByDefault(Return(0));
-  ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
-          perFilterConfig("envoy.filters.http.kill_request"))
+  ON_CALL(*decoder_filter_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.kill_request"))
       .WillByDefault(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
@@ -153,12 +153,11 @@ TEST_F(KillRequestFilterTest, DecodeTrailersReturnsContinue) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-TEST_F(KillRequestFilterTest, Encode100ContinueHeadersReturnsContinue) {
+TEST_F(KillRequestFilterTest, Encode1xxHeadersReturnsContinue) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   setUpTest(kill_request);
   Http::TestResponseHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->encode100ContinueHeaders(response_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers));
 }
 
 TEST_F(KillRequestFilterTest, EncodeTrailersReturnsContinue) {
@@ -219,8 +218,8 @@ TEST_F(KillRequestFilterTest, PerRouteKillSettingFound) {
 
   // Return valid kill setting on the REQUEST direction
   const KillSettings kill_settings(route_level_kill_request);
-  ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
-          perFilterConfig("envoy.filters.http.kill_request"))
+  ON_CALL(*decoder_filter_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.kill_request"))
       .WillByDefault(Return(&kill_settings));
   ASSERT_EQ(filter_->decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
 }

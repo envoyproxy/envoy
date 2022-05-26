@@ -25,6 +25,7 @@ envoy_cc_library(
     deps = [
         "//envoy/event:scaled_range_timer_manager_interface",
         "//envoy/event:timer_interface",
+        "//envoy/server:proactive_resource_monitor_interface",
         "//envoy/thread_local:thread_local_object",
         "//source/common/common:interval_value",
     ],

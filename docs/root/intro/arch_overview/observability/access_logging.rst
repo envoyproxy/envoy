@@ -3,9 +3,10 @@
 Access logging
 ==============
 
-The :ref:`HTTP connection manager <arch_overview_http_conn_man>` and
-:ref:`tcp proxy <arch_overview_tcp_proxy>` support extensible access logging with the following
-features:
+The :ref:`HTTP connection manager <arch_overview_http_conn_man>`, the
+:ref:`tcp proxy <arch_overview_tcp_proxy>` and the
+:ref:`thrift proxy <config_network_filters_thrift_proxy>`
+support extensible access logging with the following features:
 
 * Any number of access logs per a connection stream.
 * Customizable access log filters that allow different types of requests and responses to be written
@@ -73,6 +74,6 @@ Further reading
 * File :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.file.v3.FileAccessLog>`.
 * gRPC :ref:`Access Log Service (ALS) <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`
   sink.
-* OpenTelemetry (gRPC) :ref:`LogsService <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3alpha.OpenTelemetryAccessLogConfig>`
+* OpenTelemetry (gRPC) :ref:`LogsService <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig>`
 * Stdout :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StdoutAccessLog>`
 * Stderr :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StderrAccessLog>`

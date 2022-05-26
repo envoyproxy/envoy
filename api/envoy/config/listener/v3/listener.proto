@@ -13,7 +13,9 @@ import "envoy/config/listener/v3/udp_listener_config.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
 import "xds/core/v3/collection_entry.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
@@ -24,6 +26,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3;listenerv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Listener configuration]
@@ -35,7 +38,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 29]
+// [#next-free-field: 33]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -103,7 +106,8 @@ message Listener {
   // The address that the listener should listen on. In general, the address must be unique, though
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
   // Linux as the actual port will be allocated by the OS.
-  core.v3.Address address = 2 [(validate.rules).message = {required: true}];
+  // Required unless *api_listener* or *listener_specifier* is populated.
+  core.v3.Address address = 2;
 
   // Optional prefix to use on listener stats. If empty, the stats will be rooted at
   // `listener.<address as string>.`. If non-empty, stats will be rooted at
@@ -118,6 +122,25 @@ message Listener {
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
+
+  // :ref:`Matcher API <arch_overview_matching_listener>` resolving the filter chain name from the
+  // network properties. This matcher is used as a replacement for the filter chain match condition
+  // :ref:`filter_chain_match
+  // <envoy_v3_api_field_config.listener.v3.FilterChain.filter_chain_match>`. If specified, all
+  // :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` must have a
+  // non-empty and unique :ref:`name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` field
+  // and not specify :ref:`filter_chain_match
+  // <envoy_v3_api_field_config.listener.v3.FilterChain.filter_chain_match>` field.
+  //
+  // .. note::
+  //
+  //  Once matched, each connection is permanently bound to its filter chain.
+  //  If the matcher changes but the filter chain remains the same, the
+  //  connections bound to the filter chain are not drained. If, however, the
+  //  filter chain is removed or structurally modified, then the drain for its
+  //  connections is initiated.
+  xds.type.matcher.v3.Matcher filter_chain_matcher = 32
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
@@ -153,7 +176,6 @@ message Listener {
   // UDP Listener filters can be specified when the protocol in the listener socket address in
   // :ref:`protocol <envoy_v3_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
   // <envoy_v3_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`.
-  // UDP listeners currently support a single filter.
   repeated ListenerFilter listener_filters = 9;
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
@@ -255,17 +277,30 @@ message Listener {
   // enable the balance config in Y1 and Y2 to balance the connections among the workers.
   ConnectionBalanceConfig connection_balance_config = 20;
 
+  // Deprecated. Use `enable_reuse_port` instead.
+  bool reuse_port = 21 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
   // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and
   // create one socket for each worker thread. This makes inbound connections
   // distribute among worker threads roughly evenly in cases where there are a high number
-  // of connections. When this flag is set to false, all worker threads share one socket.
+  // of connections. When this flag is set to false, all worker threads share one socket. This field
+  // defaults to true.
   //
-  // Before Linux v4.19-rc1, new TCP connections may be rejected during hot restart
-  // (see `3rd paragraph in 'soreuseport' commit message
-  // <https://github.com/torvalds/linux/commit/c617f398edd4db2b8567a28e89>`_).
-  // This issue was fixed by `tcp: Avoid TCP syncookie rejected by SO_REUSEPORT socket
-  // <https://github.com/torvalds/linux/commit/40a1227ea845a37ab197dd1caffb60b047fa36b1>`_.
-  bool reuse_port = 21;
+  // .. attention::
+  //
+  //   Although this field defaults to true, it has different behavior on different platforms. See
+  //   the following text for more information.
+  //
+  // * On Linux, reuse_port is respected for both TCP and UDP listeners. It also works correctly
+  //   with hot restart.
+  // * On macOS, reuse_port for TCP does not do what it does on Linux. Instead of load balancing,
+  //   the last socket wins and receives all connections/packets. For TCP, reuse_port is force
+  //   disabled and the user is warned. For UDP, it is enabled, but only one worker will receive
+  //   packets. For QUIC/H3, SW routing will send packets to other workers. For "raw" UDP, only
+  //   a single worker will currently receive packets.
+  // * On Windows, reuse_port for TCP has undefined behavior. It is force disabled and the user
+  //   is warned similar to macOS. It is left enabled for UDP with undefined behavior currently.
+  google.protobuf.BoolValue enable_reuse_port = 29;
 
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by this listener.
@@ -302,4 +337,12 @@ message Listener {
     // [#not-implemented-hide:]
     InternalListenerConfig internal_listener = 27;
   }
+
+  // Enable MPTCP (multi-path TCP) on this listener. Clients will be allowed to establish
+  // MPTCP connections. Non-MPTCP clients will fall back to regular TCP.
+  bool enable_mptcp = 30;
+
+  // Whether the listener should limit connections based upon the value of
+  // :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`.
+  bool ignore_global_conn_limit = 31;
 }

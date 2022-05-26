@@ -20,7 +20,7 @@ class UpstreamProxyProtocolSocket : public TransportSockets::PassthroughSocket,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
   UpstreamProxyProtocolSocket(Network::TransportSocketPtr&& transport_socket,
-                              Network::TransportSocketOptionsSharedPtr options,
+                              Network::TransportSocketOptionsConstSharedPtr options,
                               ProxyProtocolConfig_Version version);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -33,25 +33,24 @@ private:
   void generateHeaderV2();
   Network::IoResult writeHeader();
 
-  Network::TransportSocketOptionsSharedPtr options_;
+  Network::TransportSocketOptionsConstSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
   ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
 };
 
-class UpstreamProxyProtocolSocketFactory : public Network::TransportSocketFactory {
+class UpstreamProxyProtocolSocketFactory : public PassthroughFactory {
 public:
   UpstreamProxyProtocolSocketFactory(Network::TransportSocketFactoryPtr transport_socket_factory,
                                      ProxyProtocolConfig config);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
-  bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return true; }
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  void hashKey(std::vector<uint8_t>& key,
+               Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 private:
-  Network::TransportSocketFactoryPtr transport_socket_factory_;
   ProxyProtocolConfig config_;
 };
 

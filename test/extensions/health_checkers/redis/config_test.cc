@@ -21,31 +21,6 @@ namespace {
 
 using CustomRedisHealthChecker = Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker;
 
-TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisDeprecated)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-    timeout: 1s
-    interval: 1s
-    no_traffic_interval: 5s
-    interval_jitter: 1s
-    unhealthy_threshold: 1
-    healthy_threshold: 1
-    custom_health_check:
-      name: envoy.health_checkers.redis
-      config:
-        key: foo
-    )EOF";
-
-  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
-
-  RedisHealthCheckerFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
-                         factory
-                             .createCustomHealthChecker(
-                                 Upstream::parseHealthCheckFromV3Yaml(yaml, false), context)
-                             .get()));
-}
-
 TEST(HealthCheckerFactoryTest, CreateRedis) {
   const std::string yaml = R"EOF(
     timeout: 1s
@@ -69,30 +44,6 @@ TEST(HealthCheckerFactoryTest, CreateRedis) {
       dynamic_cast<CustomRedisHealthChecker*>(
           factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context)
               .get()));
-}
-
-TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisWithoutKeyDeprecated)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-    timeout: 1s
-    interval: 1s
-    no_traffic_interval: 5s
-    interval_jitter: 1s
-    unhealthy_threshold: 1
-    healthy_threshold: 1
-    custom_health_check:
-      name: envoy.health_checkers.redis
-      config:
-    )EOF";
-
-  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
-
-  RedisHealthCheckerFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
-                         factory
-                             .createCustomHealthChecker(
-                                 Upstream::parseHealthCheckFromV3Yaml(yaml, false), context)
-                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {

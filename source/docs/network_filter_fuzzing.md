@@ -33,9 +33,8 @@ envoy_cc_fuzz_test(
     deps = [
         ":uber_writefilter_lib",
         "//source/common/config:utility_lib",
-        "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
         "//source/extensions/filters/network/mongo_proxy:config",
-        "//source/extensions/filters/network/mysql_proxy:config",
+        "//contrib/mysql_proxy/filters/network/source:config",
         "//source/extensions/filters/network/zookeeper_proxy:config",
         "//source/extensions/filters/network/the_new_filter_created_by_you:config", // <---Add the filter config module here
         "//test/config:utility_lib",

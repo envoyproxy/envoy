@@ -56,9 +56,10 @@ void TsiSocket::doHandshakeNext() {
                  raw_read_buffer_.length());
 
   if (!handshaker_) {
-    handshaker_ = handshaker_factory_(callbacks_->connection().dispatcher(),
-                                      callbacks_->connection().addressProvider().localAddress(),
-                                      callbacks_->connection().addressProvider().remoteAddress());
+    handshaker_ =
+        handshaker_factory_(callbacks_->connection().dispatcher(),
+                            callbacks_->connection().connectionInfoProvider().localAddress(),
+                            callbacks_->connection().connectionInfoProvider().remoteAddress());
     if (!handshaker_) {
       ENVOY_CONN_LOG(warn, "TSI: failed to create handshaker", callbacks_->connection());
       callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
@@ -106,7 +107,8 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     }
     if (handshake_validator_) {
       std::string err;
-      const bool peer_validated = handshake_validator_(peer, err);
+      TsiInfo tsi_info;
+      const bool peer_validated = handshake_validator_(peer, tsi_info, err);
       if (peer_validated) {
         ENVOY_CONN_LOG(debug, "TSI: Handshake validation succeeded.", callbacks_->connection());
       } else {
@@ -114,6 +116,13 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
                        err);
         return Network::PostIoAction::Close;
       }
+      ProtobufWkt::Struct dynamic_metadata;
+      ProtobufWkt::Value val;
+      val.set_string_value(tsi_info.name_);
+      dynamic_metadata.mutable_fields()->insert({std::string("peer_identity"), val});
+      callbacks_->connection().streamInfo().setDynamicMetadata(
+          "envoy.transport_sockets.peer_information", dynamic_metadata);
+      ENVOY_CONN_LOG(debug, "TSI hanshake with peer: {}", callbacks_->connection(), tsi_info.name_);
     } else {
       ENVOY_CONN_LOG(debug, "TSI: Handshake validation skipped.", callbacks_->connection());
     }
@@ -372,7 +381,7 @@ TsiSocketFactory::TsiSocketFactory(HandshakerFactory handshaker_factory,
 bool TsiSocketFactory::implementsSecureTransport() const { return true; }
 
 Network::TransportSocketPtr
-TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr) const {
+TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr) const {
   return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_);
 }
 

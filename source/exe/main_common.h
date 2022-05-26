@@ -7,7 +7,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/event/real_time_system.h"
 #include "source/common/grpc/google_grpc_context.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/exe/process_wide.h"
@@ -138,6 +138,8 @@ public:
   static int main(int argc, char** argv, PostServerHook hook = nullptr);
 
 private:
+  Thread::MainThread main_thread_;
+
 #ifdef ENVOY_HANDLE_SIGNALS
   Envoy::SignalAction handle_sigs_;
   Envoy::TerminateHandler log_on_terminate_;

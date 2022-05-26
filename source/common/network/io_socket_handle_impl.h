@@ -80,14 +80,16 @@ public:
 
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
+  absl::optional<std::string> interfaceName() override;
 
 protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.
   template <typename T>
   Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallResult<T>& result) {
-    if (result.rc_ >= 0) {
+    if (result.return_value_ >= 0) {
       // Return nullptr as IoError upon success.
-      return Api::IoCallUint64Result(result.rc_,
+      return Api::IoCallUint64Result(result.return_value_,
                                      Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
     }
     RELEASE_ASSERT(result.errno_ != SOCKET_ERROR_INVAL, "Invalid argument passed in.");

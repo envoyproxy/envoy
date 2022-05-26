@@ -101,16 +101,6 @@ TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
       ProtoValidationException);
 }
 
-// Test that the deprecated extension name still functions.
-TEST(ClientSslAuthConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.client_ssl_auth";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
-          deprecated_name));
-}
-
 } // namespace ClientSslAuth
 } // namespace NetworkFilters
 } // namespace Extensions

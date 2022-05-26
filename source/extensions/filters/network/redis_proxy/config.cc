@@ -38,7 +38,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager =
       Extensions::Common::Redis::getClusterRefreshManager(
-          context.singletonManager(), context.dispatcher(), context.clusterManager(),
+          context.singletonManager(), context.mainThreadDispatcher(), context.clusterManager(),
           context.timeSource());
 
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
@@ -47,20 +47,9 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
 
-  // Set the catch-all route from the deprecated cluster and settings parameters.
-  if (prefix_routes.hidden_envoy_deprecated_catch_all_cluster().empty() &&
-      prefix_routes.routes_size() == 0 && !prefix_routes.has_catch_all_route()) {
-    if (proto_config.hidden_envoy_deprecated_cluster().empty()) {
-      throw EnvoyException("cannot configure a redis-proxy without any upstream");
-    }
-
-    prefix_routes.mutable_catch_all_route()->set_cluster(
-        proto_config.hidden_envoy_deprecated_cluster());
-  } else if (!prefix_routes.hidden_envoy_deprecated_catch_all_cluster().empty() &&
-             !prefix_routes.has_catch_all_route()) {
-    // Set the catch-all route from the deprecated catch-all cluster.
-    prefix_routes.mutable_catch_all_route()->set_cluster(
-        prefix_routes.hidden_envoy_deprecated_catch_all_cluster());
+  // Set the catch-all route from the settings parameters.
+  if (prefix_routes.routes_size() == 0 && !prefix_routes.has_catch_all_route()) {
+    throw EnvoyException("cannot configure a redis-proxy without any upstream");
   }
 
   absl::flat_hash_set<std::string> unique_clusters;
@@ -74,7 +63,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
-    Stats::ScopePtr stats_scope =
+    Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, context.clusterManager(), Common::Redis::Client::ClientFactoryImpl::instance_,

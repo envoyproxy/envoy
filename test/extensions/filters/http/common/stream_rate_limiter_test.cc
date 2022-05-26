@@ -40,7 +40,7 @@ public:
           decoder_callbacks_.injectDecodedDataToFilterChain(data, end_stream);
         },
         [this] { decoder_callbacks_.continueDecoding(); },
-        [](uint64_t /*len*/) {
+        [](uint64_t /*len*/, bool) {
           // config->stats().decode_allowed_size_.set(len);
         },
         time_system_, decoder_callbacks_.dispatcher_, decoder_callbacks_.scope(), token_bucket,
@@ -59,7 +59,7 @@ public:
           decoder_callbacks_.injectDecodedDataToFilterChain(data, end_stream);
         },
         [this] { decoder_callbacks_.continueDecoding(); },
-        [](uint64_t /*len*/) {
+        [](uint64_t /*len*/, bool) {
           // config->stats().decode_allowed_size_.set(len);
         },
         time_system_, decoder_callbacks_.dispatcher_, decoder_callbacks_.scope());

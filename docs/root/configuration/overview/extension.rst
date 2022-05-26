@@ -4,9 +4,8 @@ Extension configuration
 -----------------------
 
 Each configuration resource in Envoy has a type URL in the ``typed_config``. This
-type corresponds to a versioned schema. If the type URL uniquely identifies an
-extension capable of interpreting the configuration, then the extension is
-selected regardless of the ``name`` field. In this case the ``name`` field becomes
+type corresponds to a versioned schema. The type URL uniquely identifies an
+extension capable of interpreting the configuration. The ``name`` field is
 optional and can be used as an identifier or as an annotation for the
 particular instance of the extension configuration. For example, the following
 filter configuration snippet is permitted:
@@ -35,7 +34,7 @@ filter configuration snippet is permitted:
         dynamic_stats: true
 
 In case the control plane lacks the schema definitions for an extension,
-``udpa.type.v1.TypedStruct`` should be used as a generic container. The type URL
+``xds.type.v3.TypedStruct`` should be used as a generic container. The type URL
 inside it is then used by a client to convert the contents to a typed
 configuration resource. For example, the above example could be written as
 follows:
@@ -44,7 +43,7 @@ follows:
 
   name: front-http-proxy
   typed_config:
-    "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+    "@type": type.googleapis.com/xds.type.v3.TypedStruct
     type_url: type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
     value:
       stat_prefix: ingress_http
@@ -62,7 +61,7 @@ follows:
       http_filters:
       - name: front-router
         typed_config:
-          "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
           type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3Router
 
 .. _config_overview_extension_discovery:
@@ -80,8 +79,9 @@ for HTTP filters.
 
 Extension config discovery service has a :ref:`statistics
 <subscription_statistics>` tree rooted at
-*<stat_prefix>.extension_config_discovery.<extension_config_name>*. In addition
-to the common subscription statistics, it also provides the following:
+*extension_config_discovery.<stat_prefix>.<extension_config_name>*. For HTTP
+filters, the value of *<stat_prefix>* is *http_filter*. In addition to the
+common subscription statistics, it also provides the following:
 
 .. csv-table::
   :header: Name, Type, Description

@@ -126,8 +126,22 @@ Http2Frame Http2Frame::makePingFrame(absl::string_view data) {
 }
 
 Http2Frame Http2Frame::makeEmptySettingsFrame(SettingsFlags flags) {
+  return makeSettingsFrame(flags, {});
+}
+
+Http2Frame Http2Frame::makeSettingsFrame(SettingsFlags flags,
+                                         std::list<std::pair<uint16_t, uint32_t>> settings) {
   Http2Frame frame;
   frame.buildHeader(Type::Settings, 0, static_cast<uint8_t>(flags));
+  for (auto& item : settings) {
+    frame.data_.push_back((item.first >> 8) & 0xff);
+    frame.data_.push_back(item.first & 0xff);
+    frame.data_.push_back((item.second >> 24) & 0xff);
+    frame.data_.push_back((item.second >> 16) & 0xff);
+    frame.data_.push_back((item.second >> 8) & 0xff);
+    frame.data_.push_back(item.second & 0xff);
+  }
+  frame.setPayloadSize(6 * settings.size());
   return frame;
 }
 
@@ -302,7 +316,7 @@ Http2Frame Http2Frame::makeMalformedRequestWithZerolenHeader(uint32_t stream_ind
   frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Authority, host);
   frame.appendEmptyHeader();
   frame.adjustPayloadSize();
   return frame;
@@ -326,7 +340,7 @@ Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host
   frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Authority, host);
   frame.adjustPayloadSize();
   return frame;
 }
@@ -350,7 +364,7 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
   frame.appendStaticHeader(StaticHeaderIndex::MethodPost);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Authority, host);
   frame.adjustPayloadSize();
   return frame;
 }

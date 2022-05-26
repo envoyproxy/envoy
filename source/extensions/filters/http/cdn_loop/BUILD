@@ -53,6 +53,6 @@ envoy_cc_extension(
         "//envoy/server:factory_context_interface",
         "//source/common/common:statusor_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/cdn_loop/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/cdn_loop/v3:pkg_cc_proto",
     ],
 )

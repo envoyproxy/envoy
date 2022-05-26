@@ -27,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -50,15 +51,6 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 #endif
 };
 
-class ScopedRuntimeInjector {
-public:
-  ScopedRuntimeInjector(Runtime::Loader& runtime) {
-    Runtime::LoaderSingleton::initialize(&runtime);
-  } // namespace
-
-  ~ScopedRuntimeInjector() { Runtime::LoaderSingleton::clear(); }
-}; // namespace ConfigTest
-
 } // namespace
 
 class ConfigTest {
@@ -81,25 +73,23 @@ public:
     // production code. Note that this test is actually more strict than production because
     // in production runtime is not setup until after the bootstrap config is loaded. This seems
     // better for configuration tests.
-    ScopedRuntimeInjector scoped_runtime(server_.runtime());
     ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
         .WillByDefault(Invoke([](absl::string_view, bool default_value) { return default_value; }));
 
-    // TODO(snowp): There's no way to override runtime flags per example file (since we mock out the
-    // runtime loader), so temporarily enable this flag explicitly here until we flip the default.
-    // This should allow the existing configuration examples to continue working despite the feature
-    // being disabled by default.
-    ON_CALL(*snapshot_,
-            runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api"))
-        .WillByDefault(Return(true));
     ON_CALL(server_.runtime_loader_, threadsafeSnapshot()).WillByDefault(Invoke([this]() {
       return snapshot_;
     }));
 
+    // For configuration/example tests we don't fail if WIP APIs are used.
+    EXPECT_CALL(server_.validation_context_.static_validation_visitor_, onWorkInProgress(_))
+        .Times(AtLeast(0));
+    EXPECT_CALL(server_.validation_context_.dynamic_validation_visitor_, onWorkInProgress(_))
+        .Times(AtLeast(0));
+
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
-    Server::Configuration::InitialImpl initial_config(bootstrap, options, server_);
+    Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
@@ -107,7 +97,7 @@ public:
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
         server_.secretManager(), server_.messageValidationContext(), *api_, server_.httpContext(),
         server_.grpcContext(), server_.routerContext(), server_.accessLogManager(),
-        server_.singletonManager(), server_.options());
+        server_.singletonManager(), server_.options(), server_.quic_stat_names_, server_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -118,8 +108,8 @@ public:
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                 Server::Configuration::FilterChainFactoryContext& context)
                 -> std::vector<Network::FilterFactoryCb> {
-              return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
-                                                                                           context);
+              return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
+                  filters, context);
             }));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -127,7 +117,7 @@ public:
                     filters,
                 Server::Configuration::ListenerFactoryContext& context)
                 -> std::vector<Network::ListenerFilterFactoryCb> {
-              return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
+              return Server::ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
                   filters, context);
             }));
     ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
@@ -136,7 +126,7 @@ public:
                     filters,
                 Server::Configuration::ListenerFactoryContext& context)
                 -> std::vector<Network::UdpListenerFilterFactoryCb> {
-              return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+              return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
                   filters, context);
             }));
     ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
@@ -160,8 +150,8 @@ public:
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
-                                                false};
+  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_, false,
+                                                server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
@@ -228,33 +218,5 @@ uint32_t run(const std::string& directory) {
   }
   return num_tested;
 }
-
-void loadVersionedBootstrapFile(const std::string& filename,
-                                envoy::config::bootstrap::v3::Bootstrap& bootstrap_message,
-                                absl::optional<uint32_t> bootstrap_version) {
-  Api::ApiPtr api = Api::createApiForTest();
-  OptionsImpl options(
-      Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
-  // Avoid contention issues with other tests over the hot restart domain socket.
-  options.setHotRestartDisabled(true);
-  if (bootstrap_version.has_value()) {
-    options.setBootstrapVersion(*bootstrap_version);
-  }
-  Server::InstanceUtil::loadBootstrapConfig(bootstrap_message, options,
-                                            ProtobufMessage::getStrictValidationVisitor(), *api);
-}
-
-void loadBootstrapConfigProto(const envoy::config::bootstrap::v3::Bootstrap& in_proto,
-                              envoy::config::bootstrap::v3::Bootstrap& bootstrap_message) {
-  Api::ApiPtr api = Api::createApiForTest();
-  OptionsImpl options(
-      Envoy::Server::createTestOptionsImpl("", "", Network::Address::IpVersion::v6));
-  options.setConfigProto(in_proto);
-  // Avoid contention issues with other tests over the hot restart domain socket.
-  options.setHotRestartDisabled(true);
-  Server::InstanceUtil::loadBootstrapConfig(bootstrap_message, options,
-                                            ProtobufMessage::getStrictValidationVisitor(), *api);
-}
-
 } // namespace ConfigTest
 } // namespace Envoy

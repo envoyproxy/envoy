@@ -37,6 +37,21 @@ public:
 };
 
 /**
+ * Controls the behavior when draining a connection pool.
+ */
+enum class DrainBehavior {
+  // Starts draining a pool, by gracefully completing all requests and gracefully closing all
+  // connections, in preparation for deletion. It is invalid to create new streams or
+  // connections from this pool after draining a pool with this behavior.
+  DrainAndDelete,
+  // Actively drain all existing connection pool connections. This can be used in cases where
+  // the connection pool is not being destroyed, but the caller wishes to make sure that
+  // all new streams take place on a new connection. For example, when a health check failure
+  // occurs.
+  DrainExistingConnections,
+};
+
+/**
  * An instance of a generic connection pool.
  */
 class Instance {
@@ -44,25 +59,25 @@ public:
   virtual ~Instance() = default;
 
   /**
-   * Called when a connection pool has been drained of pending streams, busy connections, and
-   * ready connections.
+   * Called when a connection pool has no pending streams, busy connections, or ready connections.
    */
-  using DrainedCb = std::function<void()>;
+  using IdleCb = std::function<void()>;
 
   /**
-   * Register a callback that gets called when the connection pool is fully drained and kicks
-   * off a drain. The owner of the connection pool is responsible for not creating any
-   * new streams.
+   * Register a callback that gets called when the connection pool is fully idle.
    */
-  virtual void addDrainedCallback(DrainedCb cb) PURE;
+  virtual void addIdleCallback(IdleCb cb) PURE;
 
   /**
-   * Actively drain all existing connection pool connections. This method can be used in cases
-   * where the connection pool is not being destroyed, but the caller wishes to make sure that
-   * all new streams take place on a new connection. For example, when a health check failure
-   * occurs.
+   * Returns true if the pool does not have any connections or pending requests.
    */
-  virtual void drainConnections() PURE;
+  virtual bool isIdle() const PURE;
+
+  /**
+   * Drains the connections in a pool.
+   * @param drain_behavior A DrainBehavior that controls the behavior of the draining.
+   */
+  virtual void drainConnections(DrainBehavior drain_behavior) PURE;
 
   /**
    * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.

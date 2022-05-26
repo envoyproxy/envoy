@@ -21,6 +21,19 @@ via the :ref:`virtual host's typed_per_filter_config <envoy_v3_api_field_config.
 the host header with the provided value before DNS lookup, thus allowing to route traffic to the rewritten
 host when forwarding. See the example below within the configured routes.
 
+.. warning::
+
+  Servers operating dynamic forward proxy in environments where either client or destination are
+  untrusted are subject to confused deputy attacks. For example, a client may attempt to use the
+  dynamic forward capability to access a port on the server's localhost, link-local addresses,
+  Cloud-provider metadata server or the private network in which the proxy is operating. Similarly,
+  an untrusted network endpoint might establish DNS records that point to any of the forementioned
+  locations. Dynamic forward proxy servers should be protected by network firewalls, default-deny RBAC and
+  other restrictions on container or kernel networking; the details are setup specific. Please
+  consider carefully auditing the dynamic forward proxy server's networking configuration with the
+  understanding that any address reachable from the proxy is potentially accessible by untrusted
+  clients.
+
 .. note::
 
   Configuring a :ref:`transport_socket with name envoy.transport_sockets.tls <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>` on the cluster with
@@ -36,6 +49,12 @@ host when forwarding. See the example below within the configured routes.
 .. literalinclude:: _include/dns-cache-circuit-breaker.yaml
     :language: yaml
 
+Above example is using typed config :ref:`CaresDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`.
+To use :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>` (iOS/macOS only), follow below example:
+
+.. literalinclude:: _include/dns-cache-circuit-breaker-apple.yaml
+    :language: yaml
+
 Statistics
 ----------
 
@@ -49,6 +68,7 @@ namespace.
   dns_query_attempt, Counter, Number of DNS query attempts.
   dns_query_success, Counter, Number of DNS query successes.
   dns_query_failure, Counter, Number of DNS query failures.
+  dns_query_timeout, Counter, Number of DNS query :ref:`timeouts <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>`.
   host_address_changed, Counter, Number of DNS queries that resulted in a host address change.
   host_added, Counter, Number of hosts that have been added to the cache.
   host_removed, Counter, Number of hosts that have been removed from the cache.

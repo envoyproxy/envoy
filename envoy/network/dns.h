@@ -9,6 +9,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -19,24 +21,58 @@ class ActiveDnsQuery {
 public:
   virtual ~ActiveDnsQuery() = default;
 
+  enum class CancelReason {
+    // The caller no longer needs the answer to the query.
+    QueryAbandoned,
+    // The query timed out from the perspective of the caller. The DNS implementation may take
+    // a different action in this case (e.g., destroying existing DNS connections) in an effort
+    // to get an answer to future queries.
+    Timeout
+  };
+
   /**
    * Cancel an outstanding DNS request.
+   * @param reason supplies the cancel reason.
    */
-  virtual void cancel() PURE;
+  virtual void cancel(CancelReason reason) PURE;
 };
 
 /**
- * DNS response.
+ * DNS A/AAAA record response.
  */
-struct DnsResponse {
-  DnsResponse(const Address::InstanceConstSharedPtr& address, const std::chrono::seconds ttl)
-      : address_(address), ttl_(ttl) {}
-
+struct AddrInfoResponse {
   const Address::InstanceConstSharedPtr address_;
   const std::chrono::seconds ttl_;
 };
 
-enum class DnsLookupFamily { V4Only, V6Only, Auto };
+/**
+ * DNS SRV record response.
+ */
+struct SrvResponse {
+  const std::string host_;
+  const uint16_t port_;
+  const uint16_t priority_;
+  const uint16_t weight_;
+};
+
+enum class RecordType { A, AAAA, SRV };
+
+enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
+
+class DnsResponse {
+public:
+  DnsResponse(const Address::InstanceConstSharedPtr& address, const std::chrono::seconds ttl)
+      : response_(AddrInfoResponse{address, ttl}) {}
+  DnsResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
+      : response_(SrvResponse{host, port, priority, weight}) {}
+
+  const AddrInfoResponse& addrInfo() const { return absl::get<AddrInfoResponse>(response_); }
+
+  const SrvResponse& srv() const { return absl::get<SrvResponse>(response_); }
+
+private:
+  absl::variant<AddrInfoResponse, SrvResponse> response_;
+};
 
 /**
  * An asynchronous DNS resolver.
@@ -67,6 +103,13 @@ public:
    */
   virtual ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                                   ResolveCb callback) PURE;
+
+  /**
+   * Tell the resolver to reset networking, typically in response to a network switch (e.g., from
+   * WiFi to cellular). What the resolver does is resolver dependent but might involve creating
+   * new resolver connections, re-reading resolver targets, etc.
+   */
+  virtual void resetNetworking() PURE;
 };
 
 using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;

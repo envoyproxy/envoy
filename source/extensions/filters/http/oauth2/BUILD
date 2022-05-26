@@ -11,7 +11,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 # HTTP L7 filter that performs oauth.
-# Public docs: docs/root/configuration/http_filters/oauth_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter
 
 envoy_cc_library(
     name = "oauth_callback_interface",
@@ -49,13 +49,13 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
+        "//source/common/crypto:utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/oauth2/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )
 
@@ -67,7 +67,6 @@ envoy_cc_extension(
         ":oauth_lib",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/oauth2/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )

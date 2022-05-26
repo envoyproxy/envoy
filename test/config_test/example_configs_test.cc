@@ -1,5 +1,6 @@
 #include "source/common/filesystem/filesystem_impl.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/config_test/config_test.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -27,7 +28,9 @@ TEST(ExampleConfigsTest, All) {
 
   EXPECT_EQ(config_file_count, ConfigTest::run(directory));
 
-  ConfigTest::testMerge();
+  if (std::getenv("DISABLE_TEST_MERGE") == nullptr) {
+    ConfigTest::testMerge();
+  }
 
   // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
   RELEASE_ASSERT(::chdir(cwd) == 0, "");

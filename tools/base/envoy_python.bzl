@@ -1,65 +1,57 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary")
+load("@base_pip3//:requirements.bzl", base_entry_point = "entry_point")
 
-def envoy_py_test(name, package, visibility):
+def envoy_entry_point(
+        name,
+        pkg,
+        main = "//tools/base:entry_point.py",
+        entry_point = base_entry_point,
+        script = None,
+        data = None,
+        args = None,
+        envoy_prefix = "@envoy"):
+    """This macro provides the convenience of using an `entry_point` while
+    also being able to create a rule with associated `args` and `data`, as is
+    possible with the normal `py_binary` rule.
+
+    We may wish to remove this macro should https://github.com/bazelbuild/rules_python/issues/600
+    be resolved.
+
+    The `script` and `pkg` args are passed directly to the `entry_point`.
+
+    By default, the pip `entry_point` from `@base_pip3` is used. You can provide
+    a custom `entry_point` if eg you want to provide an `entry_point` with dev
+    requirements, or from some other requirements set.
+
+    A `py_binary` is dynamically created to wrap the `entry_point` with provided
+    `args` and `data`.
+    """
+    actual_entry_point = entry_point(
+        pkg = pkg,
+        script = script or pkg,
+    )
+    entry_point_script = "%s%s" % (envoy_prefix, main)
+    entry_point_py = "entry_point_%s_main.py" % name
+    entry_point_wrapper = "entry_point_%s_wrapper" % name
+    entry_point_path = "$(location %s)" % entry_point_script
+    entry_point_alias = "$(location %s)" % actual_entry_point
+
     native.genrule(
-        name = "generate_pytest_" + name,
-        cmd = "sed s/_PACKAGE_NAME_/" + package + "/ $(location //tools/testing:base_pytest_runner.py) > \"$(@D)/pytest_" + name + ".py\"",
-        tools = ["//tools/testing:base_pytest_runner.py"],
-        outs = ["pytest_" + name + ".py"],
-    )
-
-    test_deps = [
-        ":" + name,
-    ]
-
-    if name != "python_pytest":
-        test_deps.append("//tools/testing:python_pytest")
-
-    py_binary(
-        name = "pytest_" + name,
-        srcs = [
-            "pytest_" + name + ".py",
-            "tests/test_" + name + ".py",
+        name = entry_point_wrapper,
+        cmd = """
+        sed s#_ENTRY_POINT_ALIAS_#%s# %s > \"$@\"
+        """ % (entry_point_alias, entry_point_path),
+        tools = [
+            actual_entry_point,
+            entry_point_script,
         ],
-        data = [":generate_pytest_" + name],
-        deps = test_deps,
-        visibility = visibility,
+        outs = [entry_point_py],
     )
-
-def envoy_py_library(
-        name = None,
-        deps = [],
-        data = [],
-        visibility = ["//visibility:public"]):
-    _parts = name.split(".")
-    package = ".".join(_parts[:-1])
-    name = _parts[-1]
-
-    py_library(
-        name = name,
-        srcs = [name + ".py"],
-        deps = deps,
-        data = data,
-        visibility = visibility,
-    )
-
-    envoy_py_test(name, package, visibility)
-
-def envoy_py_binary(
-        name = None,
-        deps = [],
-        data = [],
-        visibility = ["//visibility:public"]):
-    _parts = name.split(".")
-    package = ".".join(_parts[:-1])
-    name = _parts[-1]
 
     py_binary(
         name = name,
-        srcs = [name + ".py"],
-        deps = deps,
-        data = data,
-        visibility = visibility,
+        srcs = [entry_point_wrapper, actual_entry_point],
+        main = entry_point_py,
+        args = (args or []),
+        data = (data or []),
     )
-
-    envoy_py_test(name, package, visibility)

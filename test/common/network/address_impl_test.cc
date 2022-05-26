@@ -49,29 +49,32 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  SocketImpl sock(Socket::Type::Stream, addr_port, nullptr);
+  SocketImpl sock(Socket::Type::Stream, addr_port, nullptr, {});
   EXPECT_TRUE(sock.ioHandle().isOpen()) << addr_port->asString();
 
   // Check that IPv6 sockets accept IPv6 connections only.
   if (addr_port->ip()->version() == IpVersion::v6) {
     int socket_v6only = 0;
     socklen_t size_int = sizeof(socket_v6only);
-    ASSERT_GE(sock.getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int).rc_, 0);
+    ASSERT_GE(
+        sock.getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int).return_value_,
+        0);
     EXPECT_EQ(v6only, socket_v6only != 0);
   }
 
   // Bind the socket to the desired address and port.
   const Api::SysCallIntResult result = sock.bind(addr_port);
-  ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
-                           << "\nerrno: " << result.errno_;
+  ASSERT_EQ(result.return_value_, 0)
+      << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
+      << "\nerrno: " << result.errno_;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
   // require another thread.
-  ASSERT_EQ(sock.listen(128).rc_, 0);
+  ASSERT_EQ(sock.listen(128).return_value_, 0);
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    SocketImpl client_sock(Socket::Type::Stream, addr_port, nullptr);
+    SocketImpl client_sock(Socket::Type::Stream, addr_port, nullptr, {});
 
     EXPECT_TRUE(client_sock.ioHandle().isOpen()) << addr_port->asString();
 
@@ -79,12 +82,13 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
     // handshake can complete. For testing convenience, re-enable blocking on the socket
     // so that connect will wait for the handshake to complete.
-    ASSERT_EQ(client_sock.setBlockingForTest(true).rc_, 0);
+    ASSERT_EQ(client_sock.setBlockingForTest(true).return_value_, 0);
 
     // Connect to the server.
     const Api::SysCallIntResult result = client_sock.connect(addr_port);
-    ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
-                             << "\nerrno: " << result.errno_;
+    ASSERT_EQ(result.return_value_, 0)
+        << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
+        << "\nerrno: " << result.errno_;
   };
 
   auto client_addr_port = Network::Utility::parseInternetAddressAndPort(
@@ -130,6 +134,7 @@ TEST(Ipv4InstanceTest, SockaddrToString) {
 
   for (const auto address : addresses) {
     sockaddr_in addr4;
+    memset(&addr4, 0, sizeof(addr4));
     addr4.sin_family = AF_INET;
     EXPECT_EQ(1, inet_pton(AF_INET, address, &addr4.sin_addr));
     addr4.sin_port = 0;
@@ -139,6 +144,7 @@ TEST(Ipv4InstanceTest, SockaddrToString) {
 
 TEST(Ipv4InstanceTest, SocketAddress) {
   sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
   addr4.sin_family = AF_INET;
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
   addr4.sin_port = htons(6502);
@@ -228,6 +234,7 @@ TEST(Ipv4InstanceTest, BadAddress) {
 
 TEST(Ipv6InstanceTest, SocketAddress) {
   sockaddr_in6 addr6;
+  memset(&addr6, 0, sizeof(addr6));
   addr6.sin6_family = AF_INET6;
   EXPECT_EQ(1, inet_pton(AF_INET6, "01:023::00Ef", &addr6.sin6_addr));
   addr6.sin6_port = htons(32000);
@@ -344,18 +351,19 @@ TEST(PipeInstanceTest, BasicPermission) {
   const mode_t mode = 0777;
   PipeInstance pipe(path, mode);
   InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-  SocketImpl sock(Socket::Type::Stream, address, nullptr);
+  SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
   EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
   Api::SysCallIntResult result = sock.bind(address);
-  ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
-                           << "\terrno: " << result.errno_;
+  ASSERT_EQ(result.return_value_, 0)
+      << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
+      << "\terrno: " << result.errno_;
 
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   struct stat stat_buf;
   result = os_sys_calls.stat(path.c_str(), &stat_buf);
-  EXPECT_EQ(result.rc_, 0);
+  EXPECT_EQ(result.return_value_, 0);
   // Get file permissions bits
   ASSERT_EQ(stat_buf.st_mode & 07777, mode)
       << path << std::oct << "\t" << (stat_buf.st_mode & 07777) << std::dec << "\t"
@@ -371,7 +379,7 @@ TEST(PipeInstanceTest, PermissionFail) {
   const mode_t mode = 0777;
   PipeInstance pipe(path, mode);
   InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-  SocketImpl sock(Socket::Type::Stream, address, nullptr);
+  SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
   EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
@@ -443,14 +451,15 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance pipe(path);
     InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-    SocketImpl sock(Socket::Type::Stream, address, nullptr);
+    SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
     EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
     const Api::SysCallIntResult result = sock.bind(address);
 
-    ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
-                             << "\nerrno: " << result.errno_;
+    ASSERT_EQ(result.return_value_, 0)
+        << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
+        << "\nerrno: " << result.errno_;
   };
 
   const std::string path = TestEnvironment::unixDomainSocketPath("UnlinksExistingFile.sock");

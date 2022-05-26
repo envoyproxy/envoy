@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 
@@ -15,13 +15,12 @@ namespace AdmissionControl {
  */
 class AdmissionControlFilterFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl> {
+          envoy::extensions::filters::http::admission_control::v3::AdmissionControl> {
 public:
   AdmissionControlFilterFactory() : FactoryBase("envoy.filters.http.admission_control") {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl&
-          proto_config,
+      const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 

@@ -20,7 +20,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/tcp_proxy",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
-        "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -33,6 +33,6 @@ envoy_cc_extension(
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

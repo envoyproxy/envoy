@@ -11,10 +11,21 @@
 namespace Envoy {
 namespace Stats {
 
-TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config) {
+TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config)
+    : TagProducerImpl(config, {}) {}
+
+TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                                 const Stats::TagVector& cli_tags) {
   // To check name conflict.
   reserveResources(config);
   absl::node_hash_set<std::string> names = addDefaultExtractors(config);
+
+  for (const auto& cli_tag : cli_tags) {
+    if (!names.emplace(cli_tag.name_).second) {
+      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", cli_tag.name_));
+    }
+    default_tags_.emplace_back(cli_tag);
+  }
 
   for (const auto& tag_specifier : config.stats_tags()) {
     const std::string& name = tag_specifier.tag_name();
@@ -48,7 +59,7 @@ int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     if (desc.name_ == name) {
       addExtractor(TagExtractorImplBase::createTagExtractor(desc.name_, desc.regex_, desc.substr_,
-                                                            desc.re_type_));
+                                                            desc.negative_match_, desc.re_type_));
       ++num_found;
     }
   }
@@ -112,7 +123,7 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsCon
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
       names.emplace(desc.name_);
       addExtractor(TagExtractorImplBase::createTagExtractor(desc.name_, desc.regex_, desc.substr_,
-                                                            desc.re_type_));
+                                                            desc.negative_match_, desc.re_type_));
     }
     for (const auto& desc : Config::TagNames::get().tokenizedDescriptorVec()) {
       names.emplace(desc.name_);

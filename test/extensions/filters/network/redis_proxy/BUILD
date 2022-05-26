@@ -17,7 +17,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "command_splitter_impl_test",
     srcs = ["command_splitter_impl_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
     # This test takes a while to run specially under tsan.
     # Shard it to avoid test timeout.
     shard_count = 2,
@@ -40,7 +40,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "conn_pool_impl_test",
     srcs = ["conn_pool_impl_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
         "//source/common/event:dispatcher_lib",
@@ -72,7 +72,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "proxy_filter_test",
     srcs = ["proxy_filter_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
         "//source/common/event:dispatcher_lib",
@@ -106,7 +106,7 @@ envoy_cc_mock(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
@@ -119,7 +119,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_benchmark_binary(
     name = "command_lookup_speed_test",
     srcs = ["command_lookup_speed_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
     external_deps = [
         "benchmark",
     ],
@@ -137,13 +137,13 @@ envoy_extension_cc_benchmark_binary(
 envoy_extension_benchmark_test(
     name = "command_lookup_speed_test_benchmark_test",
     benchmark_binary = "command_lookup_speed_test",
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
 )
 
 envoy_extension_cc_test(
     name = "router_impl_test",
     srcs = ["router_impl_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
         "//source/extensions/filters/network/redis_proxy:router_lib",
@@ -158,7 +158,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "redis_proxy_integration_test",
     srcs = ["redis_proxy_integration_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:config",
@@ -169,7 +169,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_benchmark_binary(
     name = "command_split_speed_test",
     srcs = ["command_split_speed_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
     external_deps = [
         "benchmark",
     ],
@@ -187,5 +187,5 @@ envoy_extension_cc_benchmark_binary(
 envoy_extension_benchmark_test(
     name = "command_split_speed_test_benchmark_test",
     benchmark_binary = "command_split_speed_test",
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
 )

@@ -1,6 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
@@ -46,7 +46,7 @@ constexpr char EXPECTED_REQUEST_MESSAGE[] = R"EOF(
 namespace Envoy {
 namespace {
 
-class AccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
+class AccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
@@ -57,9 +57,6 @@ public:
   }
 
   void initialize() override {
-    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
-      config_helper_.enableDeprecatedV2Api();
-    }
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -74,11 +71,11 @@ public:
           auto* access_log = hcm.add_access_log();
           access_log->set_name("grpc_accesslog");
 
-          envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig
+          envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig
               config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
-          common_config->set_transport_api_version(apiVersion());
+          common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
           auto* body_config = config.mutable_body();
@@ -91,14 +88,6 @@ public:
         });
 
     HttpIntegrationTest::initialize();
-  }
-
-  static ProtobufTypes::MessagePtr scrubHiddenEnvoyDeprecated(const Protobuf::Message& message) {
-    ProtobufTypes::MessagePtr mutable_clone;
-    mutable_clone.reset(message.New());
-    mutable_clone->MergeFrom(message);
-    Config::VersionUtil::scrubHiddenEnvoyDeprecated(*mutable_clone);
-    return mutable_clone;
   }
 
   ABSL_MUST_USE_RESULT
@@ -128,8 +117,6 @@ public:
         ->mutable_logs(0)
         ->clear_time_unix_nano();
 
-    Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
-    Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
     EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
                                         /*ignore_repeated_field_ordering=*/false));
     return AssertionSuccess();
@@ -149,12 +136,11 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   testRouterNotFound();
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
@@ -180,7 +166,7 @@ TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
     test_server_->waitForCounterGe("grpc.accesslog.streams_closed_0", 1);
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
                                                 downstream_protocol_, version_);

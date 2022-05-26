@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include "source/common/http/context_impl.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
@@ -36,6 +38,10 @@ public:
       // Set up RetryState to always reject the host
       ON_CALL(*retry_state_, shouldSelectAnotherHost(_)).WillByDefault(Return(true));
     }
+    if (retry_425_response_) {
+      ON_CALL(*retry_state_, wouldRetryFromRetriableStatusCode(Http::Code::TooEarly))
+          .WillByDefault(Return(true));
+    }
     return RetryStatePtr{retry_state_};
   }
 
@@ -46,6 +52,7 @@ public:
   NiceMock<Network::MockConnection> downstream_connection_;
   MockRetryState* retry_state_{};
   bool reject_all_hosts_ = false;
+  bool retry_425_response_ = false;
 };
 
 class RouterTestBase : public testing::Test {
@@ -56,7 +63,8 @@ public:
 
   void expectResponseTimerCreate();
   void expectPerTryTimerCreate();
-  void expectMaxStreamDurationTimerCreate();
+  void expectPerTryIdleTimerCreate(std::chrono::milliseconds timeout);
+  void expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec);
   AssertionResult verifyHostUpstreamStats(uint64_t success, uint64_t error);
   void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match);
   void verifyAttemptCountInRequestBasic(bool set_include_attempt_count_in_request,
@@ -75,6 +83,9 @@ public:
   void testAppendUpstreamHost(absl::optional<Http::LowerCaseString> hostname_header_name,
                               absl::optional<Http::LowerCaseString> host_address_header_name);
   void testDoNotForward(absl::optional<Http::LowerCaseString> not_forwarded_header_name);
+  void expectNewStreamWithImmediateEncoder(Http::RequestEncoder& encoder,
+                                           Http::ResponseDecoder** decoder,
+                                           Http::Protocol protocol);
 
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
@@ -95,6 +106,7 @@ public:
   RouterTestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
+  Event::MockTimer* per_try_idle_timeout_{};
   Event::MockTimer* max_stream_duration_timer_{};
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};

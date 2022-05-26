@@ -4,10 +4,13 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/socket.h"
 #include "envoy/thread/thread.h"
+
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 
 namespace Envoy {
 namespace Api {
@@ -19,6 +22,7 @@ class Impl : public Api {
 public:
   Impl(Thread::ThreadFactory& thread_factory, Stats::Store& store, Event::TimeSystem& time_system,
        Filesystem::Instance& file_system, Random::RandomGenerator& random_generator,
+       const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
        const ProcessContextOptRef& process_context = absl::nullopt,
        Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
@@ -34,6 +38,8 @@ public:
   TimeSource& timeSource() override { return time_system_; }
   Stats::Scope& rootScope() override { return store_; }
   Random::RandomGenerator& randomGenerator() override { return random_generator_; }
+  Stats::CustomStatNamespaces& customStatNamespaces() override { return custom_stat_namespaces_; }
+  const envoy::config::bootstrap::v3::Bootstrap& bootstrap() const override { return bootstrap_; }
   ProcessContextOptRef processContext() override { return process_context_; }
 
 private:
@@ -42,6 +48,8 @@ private:
   Event::TimeSystem& time_system_;
   Filesystem::Instance& file_system_;
   Random::RandomGenerator& random_generator_;
+  const envoy::config::bootstrap::v3::Bootstrap& bootstrap_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
   ProcessContextOptRef process_context_;
   const Buffer::WatermarkFactorySharedPtr watermark_factory_;
 };

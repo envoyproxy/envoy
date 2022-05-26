@@ -8,6 +8,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.type";
 option java_outer_classname = "PercentProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Percent]

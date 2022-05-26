@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package utility_test.message_field_wip;
+
+import "xds/annotations/v3/status.proto";
+
+message Foo {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+}
+
+message Bar {
+  bool test_field = 1 [(xds.annotations.v3.field_status).work_in_progress = true];
+}

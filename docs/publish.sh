@@ -19,7 +19,11 @@ RELEASE_TAG_REGEX="^refs/tags/v.*"
 if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
   PUBLISH_DIR="${CHECKOUT_DIR}"/docs/envoy/"${AZP_BRANCH/refs\/tags\//}"
 elif [[ "$AZP_BRANCH" == "${MAIN_BRANCH}" ]]; then
-  PUBLISH_DIR="${CHECKOUT_DIR}"/docs/envoy/latest
+    if [[ -n "$NETLIFY_TRIGGER_URL" ]]; then
+        echo "Triggering netlify docs build for (${BUILD_SHA})"
+        curl -X POST -d "$BUILD_SHA" "$NETLIFY_TRIGGER_URL"
+    fi
+    exit 0
 else
   echo "Ignoring docs push"
   exit 0
@@ -28,7 +32,7 @@ fi
 DOCS_MAIN_BRANCH="main"
 
 echo 'cloning'
-git clone git@github.com:envoyproxy/envoyproxy.github.io "${CHECKOUT_DIR}" -b "${DOCS_MAIN_BRANCH}" --depth 1
+git clone git@github.com:envoyproxy/envoy-website "${CHECKOUT_DIR}" -b "${DOCS_MAIN_BRANCH}" --depth 1
 
 rm -fr "$PUBLISH_DIR"
 mkdir -p "$PUBLISH_DIR"

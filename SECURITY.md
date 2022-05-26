@@ -48,7 +48,8 @@ necessary and is unlikely to make a public disclosure less damaging.
 
 For each vulnerability a member of the PST will volunteer to lead coordination with the "Fix Team"
 and is responsible for sending disclosure emails to the rest of the community. This lead will be
-referred to as the "Fix Lead."
+referred to as the "Fix Lead." The detailed list of responsibilities is outlined on the
+[Fix Lead Checklist](https://docs.google.com/document/d/1cuU0m9hTQ73Te3i06-8LjQkFVn83IL22FbCoc_4IFEY/edit#heading=h.c6thx0zc0gtz)
 
 The role of Fix Lead should rotate round-robin across the PST.
 
@@ -92,6 +93,8 @@ time after cutting a binary release before distribution or rollout, to allow tim
 detect issues during their execution on ClusterFuzz. A soak period of 7 days provides an even stronger
 guarantee, since we will invoke the security release process for medium or higher severity issues
 for these older bugs.
+
+**NOTE:** Contrib extensions are not eligible for Envoy security team coverage.
 
 ### Threat model
 

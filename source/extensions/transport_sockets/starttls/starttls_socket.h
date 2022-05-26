@@ -8,6 +8,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +19,7 @@ class StartTlsSocket : public Network::TransportSocket, Logger::Loggable<Logger:
 public:
   StartTlsSocket(Network::TransportSocketPtr raw_socket, // RawBufferSocket
                  Network::TransportSocketPtr tls_socket, // TlsSocket
-                 const Network::TransportSocketOptionsSharedPtr&)
+                 const Network::TransportSocketOptionsConstSharedPtr&)
       : active_socket_(std::move(raw_socket)), tls_socket_(std::move(tls_socket)) {}
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
@@ -49,6 +50,11 @@ public:
   // Method to enable TLS.
   bool startSecureTransport() override;
 
+  void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                        std::chrono::microseconds rtt) override {
+    return active_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
+  }
+
 private:
   // Socket used in all transport socket operations.
   // initially it is set to use raw buffer socket but
@@ -63,7 +69,7 @@ private:
   bool using_tls_{false};
 };
 
-class StartTlsSocketFactory : public Network::TransportSocketFactory,
+class StartTlsSocketFactory : public Network::CommonTransportSocketFactory,
                               Logger::Loggable<Logger::Id::config> {
 public:
   ~StartTlsSocketFactory() override = default;
@@ -74,9 +80,9 @@ public:
         tls_socket_factory_(std::move(tls_socket_factory)) {}
 
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override { return false; }
-  bool usesProxyProtocolOptions() const override { return false; }
+  absl::string_view defaultServerNameIndication() const override { return ""; }
 
 private:
   Network::TransportSocketFactoryPtr raw_socket_factory_;

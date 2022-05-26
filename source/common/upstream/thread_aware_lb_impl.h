@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bitset>
+
 #include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
@@ -87,12 +89,21 @@ public:
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
   void initialize() override;
 
-  // Upstream::LoadBalancerBase
-  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  // Upstream::LoadBalancer
+  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { return nullptr; }
   // Preconnect not implemented for hash based load balancing
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+  // Pool selection not implemented.
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                           const Upstream::Host& /*host*/,
+                           std::vector<uint8_t>& /*hash_key*/) override {
+    return absl::nullopt;
+  }
+  // Lifetime tracking not implemented.
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
 
 protected:
   ThreadAwareLoadBalancerBase(
@@ -100,7 +111,7 @@ protected:
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
-        factory_(new LoadBalancerFactoryImpl(stats, random)) {}
+        factory_(new LoadBalancerFactoryImpl(stats, random, override_host_status_)) {}
 
 private:
   struct PerPriorityState {
@@ -117,28 +128,53 @@ private:
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
     // Preconnect not implemented for hash based load balancing
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                             const Upstream::Host& /*host*/,
+                             std::vector<uint8_t>& /*hash_key*/) override {
+      return absl::nullopt;
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;
+    HostStatusSet override_host_status_{};
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
+
+    // Cross priority host map.
+    HostMapConstSharedPtr cross_priority_host_map_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random)
-        : stats_(stats), random_(random) {}
+    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random,
+                            HostStatusSet status)
+        : stats_(stats), random_(random), override_host_status_(status) {}
 
     // Upstream::LoadBalancerFactory
     LoadBalancerPtr create() override;
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;
+    HostStatusSet override_host_status_{};
     absl::Mutex mutex_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ ABSL_GUARDED_BY(mutex_);
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_ ABSL_GUARDED_BY(mutex_);
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_ ABSL_GUARDED_BY(mutex_);
+
+    // Whenever the membership changes, the cross_priority_host_map_ will be updated automatically.
+    // And all workers will create a new worker local load balancer and copy the
+    // cross_priority_host_map_.
+    // This leads to the possibility of simultaneous reading and writing of cross_priority_host_map_
+    // in different threads. For this reason, mutex is necessary to guard cross_priority_host_map_.
+    //
+    // Cross priority host map for fast cross priority host searching. When the priority update
+    // callback is executed, the host map will also be updated.
+    HostMapConstSharedPtr cross_priority_host_map_ ABSL_GUARDED_BY(mutex_);
   };
 
   virtual HashingLoadBalancerSharedPtr

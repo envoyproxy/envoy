@@ -9,6 +9,7 @@
       },
       "validate": {
         "path_redirect": "http://lyft.com/ping",
+        "code_redirect": 200,
         "cluster_name": "",
         "host_rewrite": "",
         "path_rewrite": "",
@@ -17,11 +18,15 @@
         "response_header_matches": [
           {
             "name": "content-type",
-            "exact_match": "text/plain"
+            "string_match": {
+              "exact": "text/plain"
+            }
           },
           {
             "name": "content-length",
-            "exact_match": "8"
+            "string_match": {
+              "exact": "8"
+            }
           }
         ]
       }
@@ -35,6 +40,7 @@
       },
       "validate": {
         "path_redirect": "http://lyft.com/ping-json",
+        "code_redirect": 200,
         "cluster_name": "",
         "host_rewrite": "",
         "path_rewrite": "",
@@ -43,11 +49,15 @@
         "response_header_matches": [
           {
             "name": "content-type",
-            "exact_match": "application/json"
+            "string_match": {
+              "exact": "application/json"
+            }
           },
           {
             "name": "content-length",
-            "exact_match": "25"
+            "string_match": {
+              "exact": "25"
+            }
           }
         ]
       }
@@ -61,6 +71,7 @@
       },
       "validate": {
         "path_redirect": "http://lyft.com/ping-json2",
+        "code_redirect": 200,
         "cluster_name": "",
         "host_rewrite": "",
         "path_rewrite": "",
@@ -69,7 +80,9 @@
         "response_header_matches": [
           {
             "name": "content-type",
-            "exact_match": "text/plain,application/json"
+            "string_match": {
+              "exact": "text/plain,application/json"
+            }
           }
         ]
       }
@@ -83,6 +96,7 @@
       },
       "validate": {
         "path_redirect": "http://lyft.com/ping-empty",
+        "code_redirect": 200,
         "cluster_name": "",
         "host_rewrite": "",
         "path_rewrite": "",

@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    extension_name = "envoy.filters.http.bandwidth_limit",
+    extension_names = ["envoy.filters.http.bandwidth_limit"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/http:header_utility_lib",
@@ -23,14 +23,14 @@ envoy_extension_cc_test(
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http/bandwidth_limit:bandwidth_limit_lib",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3:pkg_cc_proto",
     ],
 )
 
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.bandwidth_limit",
+    extension_names = ["envoy.filters.http.bandwidth_limit"],
     deps = [
         "//source/extensions/filters/http/bandwidth_limit:config",
         "//test/mocks/server:server_mocks",

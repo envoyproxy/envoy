@@ -1,0 +1,105 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+    status: HEADER_STOP_ALL_ITERATION_AND_BUFFER
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":path"
+        value: "//"
+      }
+    }
+    status: HEADER_STOP_ALL_ITERATION_AND_BUFFER
+  }
+}
+actions {
+  stream_action {
+    stream_id: 5
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "/"
+        value: "//"
+      }
+      headers {
+        key: "//"
+        value: "http"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+    status: HEADER_STOP_ALL_ITERATION_AND_BUFFER
+  }
+}
+actions {
+  stream_action {
+    stream_id: 5
+    request {
+      continue_decoding {
+      }
+    }
+  }
+}
+actions {
+  new_suream {
+  }
+}
+actions {
+}
+actions {
+  stream_action {
+    request {
+      continue_decoding {
+      }
+    }
+  }
+}
+actions {
+}
+actions {
+  stream_action {
+    stream_id: 5
+    request {
+      continue_decoding {
+      }
+    }
+  }
+}
+actions {
+}
+actions {
+  stream_action {
+    request {
+      trailers {
+        decoder_filter_callback_action {
+          add_decoded_data {
+          }
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
+forward_client_cert: APPEND_FORWARD

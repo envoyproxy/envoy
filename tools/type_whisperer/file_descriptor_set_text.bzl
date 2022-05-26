@@ -29,7 +29,7 @@ file_descriptor_set_text = rule(
             doc = "List of all proto_library deps to be included.",
         ),
         "proto_repositories": attr.string_list(
-            default = ["envoy_api_canonical"],
+            default = ["envoy_api"],
             allow_empty = False,
         ),
         "with_external_deps": attr.bool(

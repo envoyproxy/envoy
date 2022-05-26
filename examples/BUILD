@@ -18,8 +18,31 @@ filegroup(
             "dynamic-config-fs/**/*",
             "jaeger-native-tracing/*",
             "**/*docker-compose*.yaml",
+            # Contrib extensions tested over in contrib.
+            "mysql/*",
+            "postgres/*",
         ],
     ),
+)
+
+genrule(
+    name = "contrib_configs",
+    srcs = glob(
+        [
+            "mysql/*.yaml",
+            "postgres/*.yaml",
+        ],
+        exclude = [
+            "**/*docker-compose*.yaml",
+        ],
+    ),
+    outs = ["example_configs.tar"],
+    cmd = (
+        "$(location //configs:configgen.sh) NO_CONFIGGEN $(@D) $(SRCS)"
+    ),
+    tools = [
+        "//configs:configgen.sh",
+    ],
 )
 
 filegroup(

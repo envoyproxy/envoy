@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
@@ -24,7 +24,7 @@ class CacheFilter : public Http::PassThroughFilter,
                     public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
-  CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
+  CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
               HttpCache& http_cache);
   // Http::StreamFilterBase
@@ -36,6 +36,7 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
 private:
   // Utility functions; make any necessary checks and call the corresponding lookup_ functions
@@ -47,6 +48,17 @@ private:
   void onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers);
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
+
+  // Set required state in the CacheFilter for handling a cache hit.
+  void handleCacheHit();
+
+  // Set up the required state in the CacheFilter for handling a range
+  // request.
+  void handleCacheHitWithRangeRequest();
+
+  // Set required state in the CacheFilter for handling a cache hit when
+  // validation is required.
+  void handleCacheHitWithValidation(Envoy::Http::RequestHeaderMap& request_headers);
 
   // Precondition: lookup_result_ points to a cache lookup result that requires validation.
   //               filter_state_ is ValidatingCachedResponse.
@@ -89,7 +101,7 @@ private:
   // of doing it per-request. A good example of such config is found in the gzip filter:
   // source/extensions/filters/http/gzip/gzip_filter.h.
   // Stores the allow list rules that decide if a header can be varied upon.
-  VaryHeader vary_allow_list_;
+  VaryAllowList vary_allow_list_;
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.

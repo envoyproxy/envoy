@@ -16,7 +16,8 @@ Http::FilterFactoryCb LocalRateLimitFilterConfig::createFilterFactoryFromProtoTy
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   FilterConfigSharedPtr filter_config = std::make_shared<FilterConfig>(
-      proto_config, context.localInfo(), context.dispatcher(), context.scope(), context.runtime());
+      proto_config, context.localInfo(), context.mainThreadDispatcher(), context.scope(),
+      context.runtime());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
   };
@@ -27,7 +28,7 @@ LocalRateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const FilterConfig>(proto_config, context.localInfo(),
-                                              context.dispatcher(), context.scope(),
+                                              context.mainThreadDispatcher(), context.scope(),
                                               context.runtime(), true);
 }
 

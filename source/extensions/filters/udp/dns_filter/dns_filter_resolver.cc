@@ -90,10 +90,12 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
                        if (status == Network::DnsResolver::ResolutionStatus::Success) {
                          ctx.resolved_hosts.reserve(response.size());
                          for (const auto& resp : response) {
-                           ASSERT(resp.address_ != nullptr);
+                           const auto& addrinfo = resp.addrInfo();
+                           ASSERT(addrinfo.address_ != nullptr);
                            ENVOY_LOG(trace, "Resolved address: {} for {}",
-                                     resp.address_->ip()->addressAsString(), ctx.query_rec->name_);
-                           ctx.resolved_hosts.emplace_back(std::move(resp.address_));
+                                     addrinfo.address_->ip()->addressAsString(),
+                                     ctx.query_rec->name_);
+                           ctx.resolved_hosts.emplace_back(std::move(addrinfo.address_));
                          }
                        }
                        // Invoke the filter callback notifying it of resolved addresses

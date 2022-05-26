@@ -15,6 +15,10 @@ DEFINE_PROTO_FUZZER(const test::common::http::PathUtilityTestCase& input) {
     return;
   }
 
+  // The following log is needed to pass the `check_build` tests of
+  // Cluster-Fuzz for empty inputs.
+  ENVOY_LOG_MISC(trace, "Input: {}", input.DebugString());
+
   switch (input.path_utility_selector_case()) {
   case test::common::http::PathUtilityTestCase::kCanonicalPath: {
     auto request_headers = fromHeaders<Http::TestRequestHeaderMapImpl>(

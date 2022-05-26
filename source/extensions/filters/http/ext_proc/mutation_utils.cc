@@ -6,19 +6,22 @@
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using Filters::Common::MutationRules::Checker;
+using Filters::Common::MutationRules::CheckOperation;
+using Filters::Common::MutationRules::CheckResult;
 using Http::Headers;
 using Http::LowerCaseString;
+using Stats::Counter;
 
-using envoy::service::ext_proc::v3alpha::BodyMutation;
-using envoy::service::ext_proc::v3alpha::BodyResponse;
-using envoy::service::ext_proc::v3alpha::CommonResponse;
-using envoy::service::ext_proc::v3alpha::HeaderMutation;
-using envoy::service::ext_proc::v3alpha::HeadersResponse;
+using envoy::service::ext_proc::v3::BodyMutation;
+using envoy::service::ext_proc::v3::HeaderMutation;
 
 void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
                                    envoy::config::core::v3::HeaderMap& proto_out) {
@@ -30,25 +33,26 @@ void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
   });
 }
 
-void MutationUtils::applyCommonHeaderResponse(const HeadersResponse& response,
-                                              Http::HeaderMap& headers) {
-  if (response.has_response()) {
-    const auto& common_response = response.response();
-    if (common_response.has_header_mutation()) {
-      applyHeaderMutations(common_response.header_mutation(), headers,
-                           common_response.status() == CommonResponse::CONTINUE_AND_REPLACE);
-    }
-  }
-}
-
-void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::HeaderMap& headers,
-                                         bool replacing_message) {
-  for (const auto& remove_header : mutation.remove_headers()) {
-    if (Http::HeaderUtility::isRemovableHeader(remove_header)) {
+absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
+                                                 Http::HeaderMap& headers, bool replacing_message,
+                                                 const Checker& checker,
+                                                 Counter& rejected_mutations) {
+  for (const auto& hdr : mutation.remove_headers()) {
+    const LowerCaseString remove_header(hdr);
+    switch (checker.check(CheckOperation::REMOVE, remove_header, "")) {
+    case CheckResult::OK:
       ENVOY_LOG(trace, "Removing header {}", remove_header);
-      headers.remove(LowerCaseString(remove_header));
-    } else {
-      ENVOY_LOG(debug, "Header {} is not removable", remove_header);
+      headers.remove(remove_header);
+      break;
+    case CheckResult::IGNORE:
+      ENVOY_LOG(debug, "Header {} may not be removed per rules", remove_header);
+      rejected_mutations.inc();
+      break;
+    case CheckResult::FAIL:
+      ENVOY_LOG(debug, "Header {} may not be removed. Returning error", remove_header);
+      rejected_mutations.inc();
+      return absl::InvalidArgumentError(
+          absl::StrCat("Invalid attempt to remove ", remove_header.get()));
     }
   }
 
@@ -56,40 +60,36 @@ void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::H
     if (!sh.has_header()) {
       continue;
     }
-    if (isSettableHeader(sh.header().key(), replacing_message)) {
-      // Make "false" the default. This is logical and matches the ext_authz
-      // filter. However, the router handles this same protobuf and uses "true"
-      // as the default instead.
-      const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
+    const LowerCaseString header_name(sh.header().key());
+    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
+    const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
+                                                                        : CheckOperation::SET;
+    auto check_result = checker.check(check_op, header_name, sh.header().value());
+    if (replacing_message && header_name == Http::Headers::get().Method) {
+      // Special handling to allow changing ":method" when the
+      // CONTINUE_AND_REPLACE option is selected, to stay compatible.
+      check_result = CheckResult::OK;
+    }
+    switch (check_result) {
+    case CheckResult::OK:
       ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append);
       if (append) {
-        headers.addCopy(LowerCaseString(sh.header().key()), sh.header().value());
+        headers.addCopy(header_name, sh.header().value());
       } else {
-        headers.setCopy(LowerCaseString(sh.header().key()), sh.header().value());
+        headers.setCopy(header_name, sh.header().value());
       }
-    } else {
-      ENVOY_LOG(debug, "Header {} is not settable", sh.header().key());
+      break;
+    case CheckResult::IGNORE:
+      ENVOY_LOG(debug, "Header {} may not be modified per rules", header_name);
+      rejected_mutations.inc();
+      break;
+    case CheckResult::FAIL:
+      ENVOY_LOG(debug, "Header {} may not be modified. Returning error", header_name);
+      return absl::InvalidArgumentError(
+          absl::StrCat("Invalid attempt to modify ", static_cast<absl::string_view>(header_name)));
     }
   }
-}
-
-void MutationUtils::applyCommonBodyResponse(const BodyResponse& response,
-                                            Http::RequestOrResponseHeaderMap* headers,
-                                            Buffer::Instance& buffer) {
-  if (response.has_response()) {
-    const auto& common_response = response.response();
-    if (headers != nullptr && common_response.has_header_mutation()) {
-      applyHeaderMutations(common_response.header_mutation(), *headers,
-                           common_response.status() == CommonResponse::CONTINUE_AND_REPLACE);
-    }
-    if (common_response.has_body_mutation()) {
-      if (headers != nullptr) {
-        // Always clear content length if we can before modifying body
-        headers->removeContentLength();
-      }
-      applyBodyMutations(common_response.body_mutation(), buffer);
-    }
-  }
+  return absl::OkStatus();
 }
 
 void MutationUtils::applyBodyMutations(const BodyMutation& mutation, Buffer::Instance& buffer) {
@@ -112,17 +112,7 @@ void MutationUtils::applyBodyMutations(const BodyMutation& mutation, Buffer::Ins
   }
 }
 
-// Ignore attempts to set certain sensitive headers that can break later processing.
-// We may re-enable some of these after further testing. This logic is specific
-// to the ext_proc filter so it is not shared with HeaderUtils.
-bool MutationUtils::isSettableHeader(absl::string_view key, bool replacing_message) {
-  const auto& headers = Headers::get();
-  return !absl::EqualsIgnoreCase(key, headers.HostLegacy.get()) &&
-         !absl::EqualsIgnoreCase(key, headers.Host.get()) &&
-         (!absl::EqualsIgnoreCase(key, headers.Method.get()) || replacing_message) &&
-         !absl::EqualsIgnoreCase(key, headers.Scheme.get()) &&
-         !absl::StartsWithIgnoreCase(key, headers.prefix());
-}
+bool MutationUtils::isValidHttpStatus(int code) { return (code >= 200); }
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "envoy/common/matchers.h"
 #include "envoy/common/regex.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -20,7 +21,16 @@ namespace Http {
  */
 class HeaderUtility {
 public:
-  enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix, Contains };
+  enum class HeaderMatchType {
+    Value,
+    Regex,
+    Range,
+    Present,
+    Prefix,
+    Suffix,
+    Contains,
+    StringMatch
+  };
 
   /**
    * Get all header values as a single string. Multiple headers are concatenated with ','.
@@ -65,6 +75,7 @@ public:
     std::string value_;
     Regex::CompiledMatcherPtr regex_;
     envoy::type::v3::Int64Range range_;
+    Matchers::StringMatcherPtr string_match_;
     const bool invert_match_;
     bool present_;
 
@@ -140,6 +151,11 @@ public:
    * @return bool true if the header values are valid, false otherwise.
    */
   static bool authorityIsValid(const absl::string_view authority_value);
+
+  /**
+   * @brief return if the 1xx should be handled by the [encode|decode]1xx calls.
+   */
+  static bool isSpecial1xx(const ResponseHeaderMap& response_headers);
 
   /**
    * @brief a helper function to determine if the headers represent a CONNECT request.
@@ -239,7 +255,7 @@ public:
    * headers_with_underscores_action.
    */
   static HeaderValidationResult checkHeaderNameForUnderscores(
-      const std::string& header_name,
+      absl::string_view header_name,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action,
       Stats::Counter& dropped_headers_with_underscores,
@@ -247,13 +263,32 @@ public:
 
   /**
    * Check if header_value represents a valid value for HTTP content-length header.
-   * Return HeaderValidationResult and populate should_close_connection
-   * according to override_stream_error_on_invalid_http_message.
+   * Return HeaderValidationResult and populate content_length_output if the value is valid,
+   * otherwise populate should_close_connection according to
+   * override_stream_error_on_invalid_http_message.
    */
   static HeaderValidationResult
   validateContentLength(absl::string_view header_value,
                         bool override_stream_error_on_invalid_http_message,
-                        bool& should_close_connection);
+                        bool& should_close_connection, size_t& content_length_output);
+
+  /**
+   * Parse a comma-separated header string to the individual tokens. Discard empty tokens
+   * and whitespace. Return a vector of the comma-separated tokens.
+   */
+  static std::vector<absl::string_view> parseCommaDelimitedHeader(absl::string_view header_value);
+
+  /**
+   * Return the part of attribute before first ';'-sign. For example,
+   * "foo;bar=1" would return "foo".
+   */
+  static absl::string_view getSemicolonDelimitedAttribute(absl::string_view value);
+
+  /**
+   * Return a new AcceptEncoding header string vector.
+   */
+  static std::string addEncodingToAcceptEncoding(absl::string_view accept_encoding_header,
+                                                 absl::string_view encoding);
 };
 
 } // namespace Http

@@ -3,8 +3,8 @@
 !/ci
 !/configs/google-vrp
 !/configs/*yaml
-!/linux/amd64/build_release*
-!/linux/arm64/build_release*
+!/linux/amd64/build_*release*
+!/linux/arm64/build_*release*
 !/local
 !/test/config/integration/certs
 !/windows

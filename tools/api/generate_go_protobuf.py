@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-from subprocess import check_output
-from subprocess import check_call
+from subprocess import check_output, STDOUT, CalledProcessError
 import argparse
 import glob
 import os
@@ -33,10 +32,15 @@ def generate_protobufs(targets, output, api_repo):
     # Each rule has the form @envoy_api//foo/bar:baz_go_proto.
     # First build all the rules to ensure we have the output files.
     # We preserve source info so comments are retained on generated code.
-    check_call([
-        'bazel', 'build', '-c', 'fastbuild',
-        '--experimental_proto_descriptor_sets_include_source_info'
-    ] + BAZEL_BUILD_OPTIONS + go_protos)
+    try:
+        check_output([
+            'bazel', 'build', '-c', 'fastbuild',
+            '--experimental_proto_descriptor_sets_include_source_info'
+        ] + BAZEL_BUILD_OPTIONS + go_protos,
+                     stderr=STDOUT)
+    except CalledProcessError as e:
+        print(e.output)
+        raise e
 
     for rule in go_protos:
         # Example rule:
@@ -98,13 +102,14 @@ def write_revision_info(repo, sha):
 
 
 def sync_go_protobufs(output, repo):
-    # Sync generated content against repo and return true if there is a commit necessary
-    dst = os.path.join(repo, 'envoy')
-    # Remove subtree at envoy in repo
-    git(repo, 'rm', '-r', 'envoy')
-    # Copy subtree at envoy from output to repo
-    shutil.copytree(os.path.join(output, 'envoy'), dst)
-    git(repo, 'add', 'envoy')
+    for folder in ['envoy', 'contrib']:
+        # Sync generated content against repo and return true if there is a commit necessary
+        dst = os.path.join(repo, folder)
+        # Remove subtree in repo
+        git(repo, 'rm', '-r', '--ignore-unmatch', folder)
+        # Copy subtree from output to repo
+        shutil.copytree(os.path.join(output, folder), dst)
+        git(repo, 'add', folder)
 
 
 def publish_go_protobufs(repo, sha):
@@ -112,6 +117,7 @@ def publish_go_protobufs(repo, sha):
     git(repo, 'config', 'user.name', USER_NAME)
     git(repo, 'config', 'user.email', USER_EMAIL)
     git(repo, 'add', 'envoy')
+    git(repo, 'add', 'contrib')
     git(repo, 'commit', '--allow-empty', '-s', '-m', MIRROR_MSG + sha)
     git(repo, 'push', 'origin', BRANCH)
 

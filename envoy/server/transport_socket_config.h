@@ -62,7 +62,7 @@ public:
   /**
    * @return Event::Dispatcher& the main thread's dispatcher.
    */
-  virtual Event::Dispatcher& dispatcher() PURE;
+  virtual Event::Dispatcher& mainThreadDispatcher() PURE;
 
   /**
    * @return Server::Options& the command-line options that Envoy was started with.
@@ -99,7 +99,14 @@ public:
    * @return reference to the Api object
    */
   virtual Api::Api& api() PURE;
+
+  /**
+   * @return reference to the access log manager object
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
 };
+
+using TransportSocketFactoryContextPtr = std::unique_ptr<TransportSocketFactoryContext>;
 
 class TransportSocketConfigFactory : public Config::TypedFactory {
 public:

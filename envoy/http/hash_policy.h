@@ -9,12 +9,6 @@
 namespace Envoy {
 namespace Http {
 
-class Hashable {
-public:
-  virtual absl::optional<uint64_t> hash() const PURE;
-  virtual ~Hashable() = default;
-};
-
 /**
  * Request hash policy. I.e., if using a hashing load balancer, how a request should be hashed onto
  * an upstream host.

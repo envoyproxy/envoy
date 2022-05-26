@@ -25,6 +25,9 @@ envoy_extension_cc_test(
     ]) + envoy_select_wasm_rust_tests([
         "//test/extensions/filters/http/wasm/test_data:async_call_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
+        "//test/extensions/filters/http/wasm/test_data:close_stream_rust.wasm",
+        "//test/extensions/filters/http/wasm/test_data:grpc_call_rust.wasm",
+        "//test/extensions/filters/http/wasm/test_data:grpc_stream_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:metadata_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:panic_rust.wasm",
@@ -32,7 +35,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:shared_data_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
     ]),
-    extension_name = "envoy.filters.http.wasm",
+    extension_names = ["envoy.filters.http.wasm"],
     shard_count = 50,
     deps = [
         "//source/common/http:message_lib",
@@ -53,14 +56,13 @@ envoy_extension_cc_test(
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
-    extension_name = "envoy.filters.http.wasm",
+    extension_names = ["envoy.filters.http.wasm"],
     shard_count = 50,
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
-        "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/filters/http/wasm:config",
         "//test/extensions/common/wasm:wasm_runtime",

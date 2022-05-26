@@ -46,10 +46,12 @@ using CapabilityRestrictionConfig = envoy::extensions::wasm::v3::CapabilityRestr
 using SanitizationConfig = envoy::extensions::wasm::v3::SanitizationConfig;
 using GrpcService = envoy::config::core::v3::GrpcService;
 
+class PluginHandle;
 class Wasm;
 
 using PluginBaseSharedPtr = std::shared_ptr<PluginBase>;
 using PluginHandleBaseSharedPtr = std::shared_ptr<PluginHandleBase>;
+using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 using WasmHandleBaseSharedPtr = std::shared_ptr<WasmHandleBase>;
 
 // Opaque context object.
@@ -110,10 +112,11 @@ class Context : public proxy_wasm::ContextBase,
                 public google::api::expr::runtime::BaseActivation,
                 public std::enable_shared_from_this<Context> {
 public:
-  Context();                                                                    // Testing.
-  Context(Wasm* wasm);                                                          // Vm Context.
-  Context(Wasm* wasm, const PluginSharedPtr& plugin);                           // Root Context.
-  Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin); // Stream context.
+  Context();                                          // Testing.
+  Context(Wasm* wasm);                                // Vm Context.
+  Context(Wasm* wasm, const PluginSharedPtr& plugin); // Root Context.
+  Context(Wasm* wasm, uint32_t root_context_id,
+          PluginHandleSharedPtr plugin_handle); // Stream context.
   ~Context() override;
 
   Wasm* wasm() const;
@@ -182,7 +185,7 @@ public:
   void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override;
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(::Envoy::Buffer::Instance& data, bool end_stream) override;
@@ -301,12 +304,6 @@ public:
     return dynamic_cast<T*>(it->second.get());
   }
 
-  uint32_t nextGrpcCallToken();
-  uint32_t nextGrpcStreamToken();
-  uint32_t nextHttpCallToken();
-  void setNextGrpcTokenForTesting(uint32_t token) { next_grpc_token_ = token; }
-  void setNextHttpCallTokenForTesting(uint32_t token) { next_http_call_token_ = token; }
-
 protected:
   friend class Wasm;
 
@@ -347,7 +344,7 @@ protected:
 
     Context* context_;
     uint32_t token_;
-    Grpc::RawAsyncClientPtr client_;
+    Grpc::RawAsyncClientSharedPtr client_;
     Grpc::AsyncRequest* request_;
   };
 
@@ -373,7 +370,7 @@ protected:
 
     Context* context_;
     uint32_t token_;
-    Grpc::RawAsyncClientPtr client_;
+    Grpc::RawAsyncClientSharedPtr client_;
     Grpc::RawAsyncStream* stream_;
     bool local_closed_ = false;
     bool remote_closed_ = false;
@@ -389,13 +386,11 @@ protected:
   void onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus& status,
                           const std::string_view message);
 
-  bool isGrpcStreamToken(uint32_t token) { return (token & 1) == 0; }
-  bool isGrpcCallToken(uint32_t token) { return (token & 1) == 1; }
-
   Http::HeaderMap* getMap(WasmHeaderMapType type);
   const Http::HeaderMap* getConstMap(WasmHeaderMapType type);
 
   const LocalInfo::LocalInfo* root_local_info_{nullptr}; // set only for root_context.
+  PluginHandleSharedPtr plugin_handle_{nullptr};
 
   uint32_t next_http_call_token_ = 1;
   uint32_t next_grpc_token_ = 1; // Odd tokens are for Calls even for Streams.
@@ -446,11 +441,12 @@ protected:
   const Http::ResponseTrailerMap* access_log_response_trailers_{};
 
   // Temporary state.
-  ProtobufWkt::Struct temporary_metadata_;
-  bool end_of_stream_;
+  Buffer buffer_;
   bool buffering_request_body_ = false;
   bool buffering_response_body_ = false;
-  Buffer buffer_;
+  bool end_of_stream_ = false;
+  bool local_reply_sent_ = false;
+  ProtobufWkt::Struct temporary_metadata_;
 
   // MB: must be a node-type map as we take persistent references to the entries.
   std::map<uint32_t, AsyncClientHandler> http_request_;

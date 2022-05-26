@@ -13,7 +13,7 @@ Server::Configuration::GuardDogActionPtr AbortActionFactory::createGuardDogActio
     const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
     Server::Configuration::GuardDogActionFactoryContext& context) {
   AbortActionConfig message;
-  Config::Utility::translateOpaqueConfig(config.config().typed_config(), ProtobufWkt::Struct(),
+  Config::Utility::translateOpaqueConfig(config.config().typed_config(),
                                          ProtobufMessage::getStrictValidationVisitor(), message);
   return std::make_unique<AbortAction>(message, context);
 }

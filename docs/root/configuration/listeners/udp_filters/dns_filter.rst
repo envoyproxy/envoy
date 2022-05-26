@@ -7,7 +7,7 @@ DNS Filter
 
   DNS Filter is under active development and should be considered alpha and not production ready.
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`
 * This filter should be configured with the name *envoy.filters.udp_listener.dns_filter*
 
 Overview
@@ -24,7 +24,7 @@ will use for external resolution. Users can disable external DNS resolution by o
 client configuration object.
 
 The filter supports :ref:`per-filter configuration
-<envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`.
+<envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`.
 An Example configuration follows that illustrates how the filter can be used.
 
 Example Configuration
@@ -35,7 +35,7 @@ Example Configuration
   listener_filters:
     name: envoy.filters.udp.dns_filter
     typed_config:
-      "@type": "type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig"
+      "@type": "type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig"
       stat_prefix: "dns_filter_prefix"
       client_config:
         resolution_timeout: 5s
@@ -131,7 +131,7 @@ Example External DnsTable Configuration
     listener_filters:
       name: "envoy.filters.udp.dns_filter"
       typed_config:
-        '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig'
+        '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig'
         stat_prefix: "my_prefix"
         server_config:
           external_dns_table:

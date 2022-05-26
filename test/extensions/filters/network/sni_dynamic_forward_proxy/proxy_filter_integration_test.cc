@@ -32,14 +32,17 @@ public:
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
           envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_dynamic_resources()
+          ->mutable_cds_config()
+          ->mutable_path_config_source()
+          ->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
 
       const std::string filter =
           fmt::format(R"EOF(
 name: envoy.filters.http.dynamic_forward_proxy
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha.FilterConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:
     name: foo
     dns_lookup_family: {}

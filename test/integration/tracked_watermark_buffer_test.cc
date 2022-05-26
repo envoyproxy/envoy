@@ -7,6 +7,7 @@
 
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/mocks/common.h"
+#include "test/mocks/http/stream_reset_handler.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -21,13 +22,11 @@ namespace {
 
 class TrackedWatermarkBufferTest : public testing::Test {
 public:
-  TrackedWatermarkBufferFactory factory_;
+  TrackedWatermarkBufferFactory factory_{absl::bit_width(4096u)};
+  Http::MockStreamResetHandler mock_reset_handler_;
 };
 
 TEST_F(TrackedWatermarkBufferTest, WatermarkFunctions) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "2"}});
-
   InSequence s;
 
   ReadyWatcher low_watermark;
@@ -35,18 +34,19 @@ TEST_F(TrackedWatermarkBufferTest, WatermarkFunctions) {
   ReadyWatcher overflow_watermark;
   ReadyWatcher now;
 
-  auto buffer = factory_.create([&]() { low_watermark.ready(); }, [&]() { high_watermark.ready(); },
-                                [&]() { overflow_watermark.ready(); });
+  auto buffer =
+      factory_.createBuffer([&]() { low_watermark.ready(); }, [&]() { high_watermark.ready(); },
+                            [&]() { overflow_watermark.ready(); });
   // Test highWatermarkRange
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(0, 0));
 
-  buffer->setWatermarks(100);
+  buffer->setWatermarks(100, 2);
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(100, 100));
 
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(100, 0));
 
-  buffer2->setWatermarks(200);
+  buffer2->setWatermarks(200, 2);
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(100, 200));
 
   // Verify that the buffer watermark functions are called.
@@ -64,9 +64,9 @@ TEST_F(TrackedWatermarkBufferTest, WatermarkFunctions) {
 }
 
 TEST_F(TrackedWatermarkBufferTest, BufferSizes) {
-  auto buffer = factory_.create([]() {}, []() {}, []() {});
+  auto buffer = factory_.createBuffer([]() {}, []() {}, []() {});
   buffer->setWatermarks(100);
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
   EXPECT_EQ(2, factory_.numBuffersCreated());
   EXPECT_EQ(2, factory_.numBuffersActive());
   // Add some bytes to the buffers, and verify max and sum(max).
@@ -109,9 +109,9 @@ TEST_F(TrackedWatermarkBufferTest, BufferSizes) {
 }
 
 TEST_F(TrackedWatermarkBufferTest, WaitUntilTotalBufferedExceeds) {
-  auto buffer1 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer3 = factory_.create([]() {}, []() {}, []() {});
+  auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer3 = factory_.createBuffer([]() {}, []() {}, []() {});
 
   auto thread1 = Thread::threadFactoryForTest().createThread([&]() { buffer1->add("a"); });
   auto thread2 = Thread::threadFactoryForTest().createThread([&]() { buffer2->add("b"); });
@@ -127,10 +127,10 @@ TEST_F(TrackedWatermarkBufferTest, WaitUntilTotalBufferedExceeds) {
 }
 
 TEST_F(TrackedWatermarkBufferTest, TracksNumberOfBuffersActivelyBound) {
-  auto buffer1 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer3 = factory_.create([]() {}, []() {}, []() {});
-  BufferMemoryAccountSharedPtr account = std::make_shared<BufferMemoryAccountImpl>();
+  auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer3 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto account = factory_.createAccount(mock_reset_handler_);
   ASSERT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 
   buffer1->bindAccount(account);
@@ -140,7 +140,8 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfBuffersActivelyBound) {
   buffer3->bindAccount(account);
   EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 3));
 
-  // Release test access to the account.
+  // Release test and account access to shared_this.
+  account->clearDownstream();
   account.reset();
 
   buffer3.reset();
@@ -152,10 +153,10 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfBuffersActivelyBound) {
 }
 
 TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
-  auto buffer1 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer3 = factory_.create([]() {}, []() {}, []() {});
-  BufferMemoryAccountSharedPtr account1 = std::make_shared<BufferMemoryAccountImpl>();
+  auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer3 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto account1 = factory_.createAccount(mock_reset_handler_);
   ASSERT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 
   buffer1->bindAccount(account1);
@@ -163,10 +164,12 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
   buffer2->bindAccount(account1);
   EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 2));
 
-  // Release test access to the account.
+  // Release test and account access to shared_this.
+  account1->clearDownstream();
   account1.reset();
 
-  buffer3->bindAccount(std::make_shared<BufferMemoryAccountImpl>());
+  auto account2 = factory_.createAccount(mock_reset_handler_);
+  buffer3->bindAccount(account2);
   EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(2, 3));
 
   buffer2.reset();
@@ -174,15 +177,19 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
   buffer1.reset();
   EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 1));
 
+  // Release test and account access to shared_this.
+  account2->clearDownstream();
+  account2.reset();
+
   buffer3.reset();
   EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 }
 
 TEST_F(TrackedWatermarkBufferTest, WaitForExpectedAccountBalanceShouldReturnTrueWhenConditionsMet) {
-  auto buffer1 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
-  BufferMemoryAccountSharedPtr account1 = std::make_shared<BufferMemoryAccountImpl>();
-  BufferMemoryAccountSharedPtr account2 = std::make_shared<BufferMemoryAccountImpl>();
+  auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto account1 = factory_.createAccount(mock_reset_handler_);
+  auto account2 = factory_.createAccount(mock_reset_handler_);
   buffer1->bindAccount(account1);
   buffer2->bindAccount(account2);
 
@@ -193,6 +200,9 @@ TEST_F(TrackedWatermarkBufferTest, WaitForExpectedAccountBalanceShouldReturnTrue
 
   buffer2->add("Now we have expected balances!");
   EXPECT_TRUE(factory_.waitForExpectedAccountBalanceWithTimeout(std::chrono::seconds(0)));
+
+  account1->clearDownstream();
+  account2->clearDownstream();
 }
 
 } // namespace

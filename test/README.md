@@ -67,7 +67,7 @@ instances of Protobuf::RepeatedPtrField element-by-element.
 Example:
 
 ```cpp
-envoy::api::v2::DeltaDiscoveryRequest expected_request;
+envoy::service::discovery::v3::DeltaDiscoveryRequest expected_request;
 // (not shown: set some fields of expected_request...)
 EXPECT_CALL(async_stream_, sendMessage(ProtoEqIgnoringField(expected_request, "response_nonce"), false));
 

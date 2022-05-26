@@ -8,7 +8,7 @@ namespace HttpFilters {
 namespace Cache {
 
 Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
+    const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   HttpCacheFactory* const http_cache_factory =
@@ -18,11 +18,12 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
         fmt::format("Didn't find a registered implementation for type: '{}'", type));
   }
 
+  auto cache = http_cache_factory->getCache(config, context);
+
   return [config, stats_prefix, &context,
-          http_cache_factory](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          cache](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CacheFilter>(config, stats_prefix, context.scope(),
-                                                            context.timeSource(),
-                                                            http_cache_factory->getCache(config)));
+                                                            context.timeSource(), *cache));
   };
 }
 

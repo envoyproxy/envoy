@@ -132,12 +132,12 @@ protected:
 
 private:
   using FlushEpochId = uint64_t;
-  class Resource : public ResourceMonitor::Callbacks {
+  class Resource : public ResourceUpdateCallbacks {
   public:
     Resource(const std::string& name, ResourceMonitorPtr monitor, OverloadManagerImpl& manager,
              Stats::Scope& stats_scope);
 
-    // ResourceMonitor::Callbacks
+    // ResourceMonitor::ResourceUpdateCallbacks
     void onSuccess(const ResourceUsage& usage) override;
     void onFailure(const EnvoyException& error) override;
 
@@ -173,6 +173,9 @@ private:
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
   absl::node_hash_map<std::string, Resource> resources_;
+  std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>
+      proactive_resources_;
+
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 
   Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;

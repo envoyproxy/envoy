@@ -32,8 +32,8 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 Currently there are three build images for Linux and one for Windows:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 10 compiler.
-* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 10 compiler, this image is experimental and not well tested.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 14 compiler.
+* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 14 compiler, this image is experimental and not well tested.
 * `envoyproxy/envoy-build-windows2019` &mdash; based on Windows ltsc2019 with VS 2019 Build Tools, as well as LLVM.
 
 The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
@@ -61,7 +61,13 @@ In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the 
 invoking the build.
 
 ```bash
-IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>'
+IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+```
+
+Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the defualt GOPROXY in China.
+
+```bash
+IMAGE_NAME=envoyproxy/envoy-build-ubuntu go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 ## On Linux
@@ -115,6 +121,8 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
 * `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
 * `bazel.dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
+* `bazel.dev.contrib` &mdash; build Envoy static binary with contrib and run tests under `-c fastbuild` with clang.
+* `bazel.dev.contrib <test>` &mdash; build Envoy static binary with contrib and run a specified test or test dir under `-c fastbuild` with clang.
 * `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with clang.
 * `bazel.release <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt` with clang.
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with clang.
@@ -122,7 +130,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
 * `bazel.sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
-* `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
+* `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`. Specify `//contrib/...` to get contrib coverage.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
 * `bazel.msan` &mdash; build and run tests under `-c dbg --config=clang-msan` with clang.
 * `bazel.msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-msan` with clang.
@@ -135,7 +143,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
 * `check_format`&mdash; run `clang-format` and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format` and `buildifier` on entire source tree.
-* `check_spelling_pedantic`&mdash; run `aspell` on C++ and proto comments.
+* `format_pre`&mdash; run validation and linting tools.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 ## On Windows

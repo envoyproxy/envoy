@@ -29,9 +29,8 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/crypto:utility_lib",
-        "//source/common/http:headers_lib",
+        "//source/common/http:message_lib",
         "//source/common/singleton:const_singleton",
-        "//source/extensions/common/crypto:utility_lib",
     ],
 )
 
@@ -48,6 +47,7 @@ envoy_cc_library(
     external_deps = ["abseil_time"],
     deps = [
         ":credentials_provider_interface",
+        ":utility_lib",
         "//envoy/api:api_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
@@ -62,6 +62,9 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     external_deps = ["curl"],
     deps = [
+        "//envoy/http:message_interface",
+        "//source/common/common:empty_string",
+        "//source/common/common:matchers_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
     ],

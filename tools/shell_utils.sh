@@ -7,7 +7,7 @@ source_venv() {
     if [[ ! -d "${VENV_DIR}"/venv ]]; then
       virtualenv "${VENV_DIR}"/venv --python=python3
     fi
-    # shellcheck disable=SC1090
+    # shellcheck disable=SC1090 disable=1091
     source "${VENV_DIR}/venv/bin/activate"
   else
     echo "Found existing virtualenv"
@@ -25,5 +25,5 @@ python_venv() {
   pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 
   shift
-  python3 "${SCRIPT_DIR}/${PY_NAME}.py" "$*"
+  python3 "${SCRIPT_DIR}/${PY_NAME}.py" "$@"
 }

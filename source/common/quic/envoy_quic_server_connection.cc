@@ -29,7 +29,7 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   }
   // Update local address if QUICHE has updated the self address.
   ASSERT(self_address().IsInitialized());
-  connectionSocket()->addressProvider().setLocalAddress(
+  connectionSocket()->connectionInfoProvider().setLocalAddress(
       quicAddressToEnvoyAddressInstance(self_address()));
 
   return true;
@@ -38,7 +38,8 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
 std::unique_ptr<quic::QuicSelfIssuedConnectionIdManager>
 EnvoyQuicServerConnection::MakeSelfIssuedConnectionIdManager() {
   return std::make_unique<EnvoyQuicSelfIssuedConnectionIdManager>(
-      quic::kMinNumOfActiveConnectionIds, connection_id(), clock(), alarm_factory(), this);
+      quic::kMinNumOfActiveConnectionIds, connection_id(), clock(), alarm_factory(), this,
+      context());
 }
 
 quic::QuicConnectionId EnvoyQuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(

@@ -5,79 +5,13 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/stream_info/stream_info.h"
-#include "envoy/tracing/trace_reason.h"
+#include "envoy/tracing/trace_config.h"
 
 namespace Envoy {
 namespace Tracing {
 
 class Span;
 using SpanPtr = std::unique_ptr<Span>;
-
-constexpr uint32_t DefaultMaxPathTagLength = 256;
-
-enum class OperationName { Ingress, Egress };
-
-/**
- * The context for the custom tag to obtain the tag value.
- */
-struct CustomTagContext {
-  const Http::RequestHeaderMap* request_headers;
-  const StreamInfo::StreamInfo& stream_info;
-};
-
-/**
- * Tracing custom tag, with tag name and how it would be applied to the span.
- */
-class CustomTag {
-public:
-  virtual ~CustomTag() = default;
-
-  /**
-   * @return the tag name view.
-   */
-  virtual absl::string_view tag() const PURE;
-
-  /**
-   * The way how to apply the custom tag to the span,
-   * generally obtain the tag value from the context and attached it to the span.
-   * @param span the active span.
-   * @param ctx the custom tag context.
-   */
-  virtual void apply(Span& span, const CustomTagContext& ctx) const PURE;
-};
-
-using CustomTagConstSharedPtr = std::shared_ptr<const CustomTag>;
-using CustomTagMap = absl::flat_hash_map<std::string, CustomTagConstSharedPtr>;
-
-/**
- * Tracing configuration, it carries additional data needed to populate the span.
- */
-class Config {
-public:
-  virtual ~Config() = default;
-
-  /**
-   * @return operation name for tracing, e.g., ingress.
-   */
-  virtual OperationName operationName() const PURE;
-
-  /**
-   * @return custom tags to be attached to the active span.
-   */
-  virtual const CustomTagMap* customTags() const PURE;
-
-  /**
-   * @return true if spans should be annotated with more detailed information.
-   */
-  virtual bool verbose() const PURE;
-
-  /**
-   * @return the maximum length allowed for paths in the extracted HttpUrl tag. This is only used
-   * for HTTP protocol tracing.
-   */
-  virtual uint32_t maxPathTagLength() const PURE;
-};
 
 /**
  * Basic abstraction for span.
@@ -116,8 +50,10 @@ public:
    * Mutate the provided headers with the context necessary to propagate this
    * (implementation-specific) trace.
    * @param request_headers the headers to which propagation context will be added
+   * @param upstream connecting host description
    */
-  virtual void injectContext(Http::RequestHeaderMap& request_headers) PURE;
+  virtual void injectContext(TraceContext& trace_conext,
+                             const Upstream::HostDescriptionConstSharedPtr& upstream) PURE;
 
   /**
    * Create and start a child Span, with this Span as its parent in the trace.
@@ -171,7 +107,7 @@ public:
   /**
    * Start driver specific span.
    */
-  virtual SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+  virtual SpanPtr startSpan(const Config& config, TraceContext& trace_conext,
                             const std::string& operation_name, SystemTime start_time,
                             const Tracing::Decision tracing_decision) PURE;
 };

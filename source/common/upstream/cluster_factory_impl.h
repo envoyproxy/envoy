@@ -43,6 +43,7 @@
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -69,13 +70,13 @@ public:
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
   Stats::Store& stats() override { return stats_; }
-  ThreadLocal::SlotAllocator& tls() override { return tls_; }
+  ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
   Runtime::Loader& runtime() override { return runtime_; }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
   AccessLog::AccessLogManager& logManager() override { return log_manager_; }
-  const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   const Server::Options& options() override { return options_; }
   Server::Admin& admin() override { return admin_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
@@ -149,7 +150,7 @@ private:
   virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) PURE;
+      Stats::ScopeSharedPtr&& stats_scope) PURE;
   const std::string name_;
 };
 
@@ -173,11 +174,11 @@ private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) override {
+      Stats::ScopeSharedPtr&& stats_scope) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(
-        cluster.cluster_type().typed_config(), ProtobufWkt::Struct::default_instance(),
-        socket_factory_context.messageValidationVisitor(), *config);
+    Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(),
+                                           socket_factory_context.messageValidationVisitor(),
+                                           *config);
     return createClusterWithConfig(cluster,
                                    MessageUtil::downcastAndValidate<const ConfigProto&>(
                                        *config, context.messageValidationVisitor()),
@@ -188,7 +189,7 @@ private:
       const envoy::config::cluster::v3::Cluster& cluster, const ConfigProto& proto_config,
       ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) PURE;
+      Stats::ScopeSharedPtr&& stats_scope) PURE;
 };
 
 } // namespace Upstream

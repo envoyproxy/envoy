@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <queue>
 #include <string>
+#include <vector>
 
 #include "envoy/http/codec.h"
 
@@ -11,6 +12,8 @@
 #include "source/common/common/logger.h"
 
 #include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/data_source.h"
+#include "quiche/spdy/core/hpack/hpack_encoder.h"
 
 namespace Envoy {
 namespace Http {
@@ -88,6 +91,31 @@ private:
   // so that we know where to delineate between different metadata_maps in the payload_ buffer. The
   // payload size gets updated when the payload is packed into metadata frames.
   std::deque<uint64_t> payload_size_queue_;
+};
+
+/**
+ * A class that creates and sends METADATA payloads. A METADATA payload is a
+ * group of string key value pairs encoded in HTTP/2 header blocks. METADATA
+ * frames are constructed in two steps: first, the stream submits the
+ * MetadataMapVector to the encoder, and later, the MetadataSources generate
+ * frame payloads for transmission on the wire.
+ */
+class NewMetadataEncoder : Logger::Loggable<Logger::Id::http2> {
+public:
+  using MetadataSourceVector = std::vector<std::unique_ptr<http2::adapter::MetadataSource>>;
+  NewMetadataEncoder();
+
+  /**
+   * Creates wire format HTTP/2 header block from a vector of metadata maps.
+   * @param metadata_map_vector supplies the metadata map vector to encode.
+   * @return whether encoding is successful.
+   */
+  MetadataSourceVector createSources(const MetadataMapVector& metadata_map_vector);
+
+private:
+  std::unique_ptr<http2::adapter::MetadataSource> createSource(const MetadataMap& metadata_map);
+
+  spdy::HpackEncoder deflater_;
 };
 
 } // namespace Http2

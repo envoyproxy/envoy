@@ -4,7 +4,6 @@
 #include <memory>
 #include <queue>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
@@ -18,6 +17,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/custom_config_validators.h"
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
@@ -35,9 +35,20 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              envoy::config::core::v3::ApiVersion transport_api_version,
               Random::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
+              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
+              CustomConfigValidatorsPtr&& config_validators);
+
+  ~GrpcMuxImpl() override;
+
+  // Causes all GrpcMuxImpl objects to stop sending any messages on `grpc_stream_` to fix a crash
+  // on Envoy shutdown due to dangling pointers. This may not be the ideal fix; it is probably
+  // preferable for the `ServerImpl` to cause all configuration subscriptions to be shutdown, which
+  // would then cause all `GrpcMuxImpl` to be destructed.
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  static void shutdownAll();
+
+  void shutdown() { shutdown_ = true; }
 
   void start() override;
 
@@ -52,7 +63,6 @@ public:
                            const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   void handleDiscoveryResponse(
@@ -75,7 +85,7 @@ public:
 private:
   void drainRequests();
   void setRetryTimer();
-  void sendDiscoveryRequest(const std::string& type_url);
+  void sendDiscoveryRequest(absl::string_view type_url);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
@@ -160,6 +170,7 @@ private:
       grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
+  CustomConfigValidatorsPtr config_validators_;
   bool first_stream_request_;
 
   // Helper function for looking up and potentially allocating a new ApiState.
@@ -175,10 +186,13 @@ private:
   // store them; rather, they are simply dropped. This string is a type
   // URL.
   std::unique_ptr<std::queue<std::string>> request_queue_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
 
   Event::Dispatcher& dispatcher_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
+
+  // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
+  // true because it may contain dangling pointers.
+  std::atomic<bool> shutdown_{false};
 };
 
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;
@@ -202,7 +216,7 @@ public:
   }
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    ENVOY_BUG(false, "unexpected request for on demand update");
   }
 
   void onWriteable() override {}

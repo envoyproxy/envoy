@@ -4,8 +4,9 @@
 
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -50,6 +51,7 @@ public:
   MOCK_METHOD(Admin&, admin, ());
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
+  MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const));
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Network::DnsResolverSharedPtr, dnsResolver, ());
@@ -85,10 +87,14 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
+  MOCK_METHOD(bool, enableReusePortDefault, ());
+  MOCK_METHOD(void, setSinkPredicates, (std::unique_ptr<Envoy::Stats::SinkPredicates> &&));
 
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
   }
+
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
 
   TimeSource& timeSource() override { return time_system_; }
 
@@ -117,7 +123,9 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Router::ContextImpl router_context_;
+  Quic::QuicStatNames quic_stat_names_;
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockStatsConfig>> stats_config_;
   std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>
@@ -135,6 +143,7 @@ public:
   MOCK_METHOD(const std::list<Stats::SinkPtr>&, sinks, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, flushInterval, (), (const));
   MOCK_METHOD(bool, flushOnAdmin, (), (const));
+  MOCK_METHOD(const Stats::SinkPredicates*, sinkPredicates, (), (const));
 };
 
 class MockServerFactoryContext : public virtual ServerFactoryContext {
@@ -143,12 +152,13 @@ public:
   ~MockServerFactoryContext() override;
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(const Server::Options&, options, ());
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(Server::Admin&, admin, ());
@@ -159,6 +169,7 @@ public:
   MOCK_METHOD(Api::Api&, api, ());
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Router::Context& routerContext() override { return router_context_; }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
@@ -184,6 +195,7 @@ public:
   testing::NiceMock<Api::MockApi> api_;
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
 };
 
 } // namespace Configuration

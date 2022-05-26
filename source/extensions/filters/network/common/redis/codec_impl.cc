@@ -52,7 +52,7 @@ std::string RespValue::toString() const {
     return std::to_string(asInteger());
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 std::vector<RespValue>& RespValue::asArray() {

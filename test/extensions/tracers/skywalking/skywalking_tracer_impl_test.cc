@@ -27,7 +27,8 @@ public:
     mock_stream_ptr_ = std::make_unique<NiceMock<Grpc::MockAsyncStream>>();
 
     EXPECT_CALL(*mock_client, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
-    EXPECT_CALL(*mock_client_factory, create()).WillOnce(Return(ByMove(std::move(mock_client))));
+    EXPECT_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+        .WillOnce(Return(ByMove(std::move(mock_client))));
 
     auto& factory_context = context_.server_factory_context_;
 
@@ -63,7 +64,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   client_config:
     backend_token: "FAKE_FAKE_FAKE_FAKE_FAKE_FAKE"
     service_name: "FAKE_FAKE_FAKE"
-    instance_name: "FAKE_FAKE_FAKE"
+    instance_name: "FAKE_FAKE_FAKE_INSTANCE"
     max_cache_size: 2333
   )EOF";
   setupSkyWalkingDriver(yaml_string);
@@ -88,8 +89,12 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     Span* span = dynamic_cast<Span*>(org_span.get());
     ASSERT(span);
 
+    // "TEST_OP" will be ignored and path of downstream request will be used as the operation name
+    // of ENTRY span.
+    EXPECT_EQ("/path", span->spanEntity()->operationName());
+
     EXPECT_EQ("FAKE_FAKE_FAKE", span->tracingContext()->service());
-    EXPECT_EQ("FAKE_FAKE_FAKE", span->tracingContext()->serviceInstance());
+    EXPECT_EQ("FAKE_FAKE_FAKE_INSTANCE", span->tracingContext()->serviceInstance());
 
     // Tracing decision will be overwrite by skip analysis flag in propagation headers.
     EXPECT_FALSE(span->tracingContext()->skipAnalysis());
@@ -111,6 +116,9 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
 
     Span* span = dynamic_cast<Span*>(org_span.get());
     ASSERT(span);
+
+    // Path of downstream request will be used as the operation name of ENTRY span.
+    EXPECT_EQ("/path", span->spanEntity()->operationName());
 
     EXPECT_FALSE(span->tracingContext()->skipAnalysis());
 

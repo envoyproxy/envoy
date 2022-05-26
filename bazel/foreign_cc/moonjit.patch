@@ -3,7 +3,7 @@ new file mode 100644
 index 00000000..dab3606c
 --- /dev/null
 +++ b/build.py
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,35 @@
 +#!/usr/bin/env python3
 +
 +import argparse
@@ -23,14 +23,10 @@ index 00000000..dab3606c
 +    os.environ["TARGET_CFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
 +    os.environ["TARGET_LDFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
 +    os.environ["CFLAGS"] = ""
-+    # LuaJIT compile process build a tool `buildvm` and use it, building `buildvm` with ASAN
-+    # will cause LSAN detect its leak and fail the build, set exitcode to 0 to make LSAN doesn't
-+    # fail on it.
-+    os.environ["LSAN_OPTIONS"] = "exitcode=0"
++    os.environ["LDFLAGS"] = ""
 +
-+    if "ENVOY_MSAN" in os.environ:
-+      os.environ["HOST_CFLAGS"] = "-fno-sanitize=memory"
-+      os.environ["HOST_LDFLAGS"] = "-fno-sanitize=memory"
++    # Don't strip the binary - it doesn't work when cross-compiling, and we don't use it anyway.
++    os.environ["TARGET_STRIP"] = "@echo"
 +
 +    # Remove LuaJIT from ASAN for now.
 +    # TODO(htuch): Remove this when https://github.com/envoyproxy/envoy/issues/6084 is resolved.
@@ -78,6 +74,15 @@ index dad9aeec..e10b3118 100644
  #
  # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
  #XCFLAGS+= -DLUAJIT_DISABLE_JIT
+@@ -213,7 +213,7 @@ TARGET_STCC= $(STATIC_CC)
+ TARGET_DYNCC= $(DYNAMIC_CC)
+ TARGET_LD= $(CROSS)$(CC)
+ TARGET_AR= $(CROSS)ar rcus
+-TARGET_STRIP= $(CROSS)strip
++TARGET_STRIP?= $(CROSS)strip
+ 
+ TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
+ TARGET_SONAME= libluajit-$(ABIVER).so.$(MAJVER)
 @@ -612,7 +612,7 @@ endif
  
  Q= @

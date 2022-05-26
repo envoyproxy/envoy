@@ -32,7 +32,6 @@ envoy_cc_library(
     external_deps = ["abseil_inlined_vector"],
     deps = [
         ":refcount_ptr_interface",
-        ":symbol_table_interface",
         "//envoy/common:interval_set_interface",
         "//envoy/common:time_interface",
     ],
@@ -46,15 +45,6 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:non_copyable",
-    ],
-)
-
-envoy_cc_library(
-    name = "symbol_table_interface",
-    hdrs = ["symbol_table.h"],
-    external_deps = ["abseil_inlined_vector"],
-    deps = [
-        "//source/common/common:hash_lib",
     ],
 )
 
@@ -77,4 +67,9 @@ envoy_cc_library(
     name = "primitive_stats_macros",
     hdrs = ["primitive_stats_macros.h"],
     deps = [":primitive_stats_interface"],
+)
+
+envoy_cc_library(
+    name = "custom_stat_namespaces_interface",
+    hdrs = ["custom_stat_namespaces.h"],
 )
