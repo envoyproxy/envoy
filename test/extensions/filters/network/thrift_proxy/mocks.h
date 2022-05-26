@@ -214,6 +214,8 @@ public:
 
   // ThriftProxy::ThriftFilters::DecoderFilter
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(ThriftFilters::LocalErrorStatus, onLocalReply,
+              (const MessageMetadata& metadata, bool reset_imminent));
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks));
   MOCK_METHOD(bool, passthroughSupported, (), (const));
 
@@ -280,6 +282,8 @@ public:
 
   // ThriftProxy::ThriftFilters::EncoderFilter
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(ThriftFilters::LocalErrorStatus, onLocalReply,
+              (const MessageMetadata& metadata, bool reset_imminent));
   MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallbacks & callbacks));
   MOCK_METHOD(bool, passthroughSupported, (), (const));
 
@@ -343,6 +347,8 @@ public:
 
   // ThriftProxy::ThriftFilters::BidirectionalFilter
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(ThriftFilters::LocalErrorStatus, onLocalReply,
+              (const MessageMetadata& metadata, bool reset_imminent));
   MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallbacks & callbacks));
   MOCK_METHOD(bool, encodePassthroughSupported, (), (const));
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks));

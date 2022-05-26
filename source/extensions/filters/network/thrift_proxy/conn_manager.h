@@ -216,7 +216,8 @@ private:
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
                        parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
-          local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false} {
+          local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false},
+          under_on_local_reply_{false} {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() override {
@@ -275,6 +276,7 @@ private:
     ProtocolType downstreamProtocolType() const override {
       return parent_.decoder_->protocolType();
     }
+    void onLocalReply(const MessageMetadata& metadata, bool end_stream);
     void sendLocalReply(const DirectResponse& response, bool end_stream) override;
     void startUpstreamResponse(Transport& transport, Protocol& protocol) override;
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
@@ -358,6 +360,7 @@ private:
     bool local_response_sent_ : 1;
     bool pending_transport_end_ : 1;
     bool passthrough_ : 1;
+    bool under_on_local_reply_ : 1;
   };
 
   using ActiveRpcPtr = std::unique_ptr<ActiveRpc>;

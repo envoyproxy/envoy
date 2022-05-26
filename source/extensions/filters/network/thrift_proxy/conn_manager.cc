@@ -123,6 +123,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
 
     read_callbacks_->connection().write(response_buffer, end_stream);
   }
+
   if (end_stream) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
@@ -966,8 +967,20 @@ Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
   return cached_route_.value();
 }
 
+void ConnectionManager::ActiveRpc::onLocalReply(const MessageMetadata& metadata, bool end_stream) {
+  under_on_local_reply_ = true;
+  for (auto& filter : base_filters_) {
+    filter->onLocalReply(metadata, end_stream);
+  }
+  under_on_local_reply_ = false;
+}
+
 void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response, bool end_stream) {
+  ASSERT(!under_on_local_reply_);
   metadata_->setSequenceId(original_sequence_id_);
+
+  onLocalReply(*metadata_, end_stream);
+
   parent_.sendLocalReply(*metadata_, response, end_stream);
 
   if (end_stream) {

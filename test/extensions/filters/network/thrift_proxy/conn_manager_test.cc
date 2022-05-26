@@ -1833,6 +1833,14 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
         buffer.add("response");
         return DirectResponse::ResponseType::SuccessReply;
       }));
+  {
+    InSequence s;
+    EXPECT_CALL(*custom_decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*custom_encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*bidirectional_filter_, onLocalReply(_, _));
+  }
 
   // First filter sends local reply.
   EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
@@ -1878,6 +1886,15 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
         buffer.add("response");
         return DirectResponse::ResponseType::ErrorReply;
       }));
+
+  {
+    InSequence s;
+    EXPECT_CALL(*custom_decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*custom_encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*bidirectional_filter_, onLocalReply(_, _));
+  }
 
   // First filter sends local reply.
   EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
