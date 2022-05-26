@@ -52,7 +52,7 @@ public:
   public:
     LoadBalancer(const std::shared_ptr<OriginalDstCluster>& parent)
         : parent_(parent), http_header_name_(parent->httpHeaderName()),
-          host_map_(parent->getCurrentHostMap()) {}
+          port_override_(parent->portOverride()), host_map_(parent->getCurrentHostMap()) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -77,10 +77,12 @@ public:
     const std::shared_ptr<OriginalDstCluster> parent_;
     // The optional original host provider that extracts the address from HTTP header map.
     const absl::optional<Http::LowerCaseString>& http_header_name_;
+    const uint32_t port_override_;
     HostMapConstSharedPtr host_map_;
   };
 
   const absl::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
+  uint32_t portOverride() { return port_override_; }
 
 private:
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
@@ -128,6 +130,7 @@ private:
   absl::Mutex host_map_lock_;
   HostMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
   absl::optional<Http::LowerCaseString> http_header_name_;
+  uint32_t port_override_{};
   friend class OriginalDstClusterFactory;
 };
 

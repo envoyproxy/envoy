@@ -328,8 +328,9 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
     return std::make_shared<Address::Ipv4Instance>(address.ip()->addressAsString(), port);
   case Address::IpVersion::v6:
     return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
+  default:
+    return nullptr;
   }
-  PANIC("not handled");
 }
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
