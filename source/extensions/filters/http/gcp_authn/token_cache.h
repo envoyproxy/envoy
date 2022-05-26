@@ -1,10 +1,11 @@
 #pragma once
-
 #include <memory>
 #include <string>
 
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
+
+#include "source/extensions/filters/http/common/factory_base.h"
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"

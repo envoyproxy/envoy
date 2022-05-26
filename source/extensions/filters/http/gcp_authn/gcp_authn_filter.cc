@@ -12,16 +12,18 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
+namespace {
+void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str) {
+  std::string id_token = absl::StrCat("Bearer ", token_str);
+  hdrs.addCopy(authorizationHeaderKey(), id_token);
+}
+} // namespace
 
 using ::Envoy::Router::RouteConstSharedPtr;
 using ::google::jwt_verify::Status;
 using Http::FilterHeadersStatus;
 
-void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str) {
-  std::string id_token = absl::StrCat("Bearer ", token_str);
-  hdrs.addCopy(authorizationHeaderKey(), id_token);
-}
-
+// TODO(tyxia) Handle the duplicated outstanding requests.
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& hdrs, bool) {
   Envoy::Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
