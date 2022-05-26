@@ -38,6 +38,7 @@ envoy_entry_point(
 
 shellcheck(name = "_shellcheck")
 
+# Workaround for: https://github.com/aignas/rules_shellcheck/issues/5
 sh_binary(
     name = "shellcheck",
     srcs = [":run_shellcheck.sh"],
