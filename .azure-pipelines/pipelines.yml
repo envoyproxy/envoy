@@ -195,7 +195,7 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
 
 - stage: linux_x64
-  dependsOn: ["precheck"]
+  dependsOn: []  # "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
@@ -546,7 +546,7 @@ stages:
         BUILD_URI: $(Build.BuildUri)
 
 - stage: windows
-  dependsOn: ["precheck"]
+  dependsOn: []  # "precheck"]
   jobs:
   - job: release
     timeoutInMinutes: 180

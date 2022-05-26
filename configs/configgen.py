@@ -6,6 +6,8 @@ import sys
 SCRIPT_DIR = os.path.dirname(__file__)
 OUT_DIR = sys.argv[1]
 
+print(f"RUNNING CONFIGGEN_PY -> {OUT_DIR}")
+
 #
 # About this script: Envoy configurations needed for a complete infrastructure are complicated.
 # This script demonstrates how to programatically build Envoy configurations using jinja templates.
@@ -96,6 +98,11 @@ mongos_servers = {
 
 def generate_config(template_path, template, output_file, **context):
     """ Generate a final config file based on a template and some context. """
+    print("CREATING JINJA ENV")
+    print(template_path)
+    import os
+    print(os.listdir(template_path))
+
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(template_path, followlinks=True),
         undefined=jinja2.StrictUndefined)

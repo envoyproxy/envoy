@@ -12,6 +12,7 @@ mkdir -p "$OUT_DIR/lib"
 mkdir -p "$OUT_DIR/protos"
 
 if [[ "$CONFIGGEN" != "NO_CONFIGGEN" ]]; then
+    echo "RUNNING CONFIGGEN: ${CONFIGGEN} -> ${OUT_DIR}"
   "$CONFIGGEN" "$OUT_DIR"
 fi
 
