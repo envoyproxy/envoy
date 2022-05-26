@@ -1,4 +1,4 @@
-#include "source/common/http/match_wrapper/config.h"
+#include "source/common/http/match_delegate/config.h"
 
 #include <memory>
 
@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Common {
 namespace Http {
-namespace MatchWrapper {
+namespace MatchDelegate {
 
 namespace {
 
@@ -243,7 +243,7 @@ void DelegatingStreamFilter::setEncoderFilterCallbacks(
   encoder_filter_->setEncoderFilterCallbacks(callbacks);
 }
 
-Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyped(
+Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
     const std::string& prefix, Server::Configuration::FactoryContext& context) {
 
@@ -285,15 +285,15 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
 }
 
 /**
- * Static registration for the match wrapper filter. @see RegisterFactory.
- * Note that we register this as a filter in order to serve as a drop in wrapper for other HTTP
+ * Static registration for the match delegate filter. @see RegisterFactory.
+ * Note that we register this as a filter in order to serve as a drop in delegate for other HTTP
  * filters. While not a real filter, by being registered as one all the code paths that look up
  * HTTP filters will look up this filter factory instead, which does the work to create and
  * associate a match tree with the underlying filter.
  */
-REGISTER_FACTORY(MatchWrapperConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(MatchDelegateConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
-} // namespace MatchWrapper
+} // namespace MatchDelegate
 } // namespace Http
 } // namespace Common
 } // namespace Envoy

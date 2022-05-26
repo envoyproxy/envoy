@@ -2,7 +2,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/filter_config.h"
 
-#include "source/common/http/match_wrapper/config.h"
+#include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -14,7 +14,7 @@
 namespace Envoy {
 namespace Common {
 namespace Http {
-namespace MatchWrapper {
+namespace MatchDelegate {
 namespace {
 
 struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigFactory {
@@ -74,8 +74,8 @@ xds_matcher:
                         "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
 )EOF");
 
-  MatchWrapperConfig match_wrapper_config;
-  auto cb = match_wrapper_config.createFilterFactoryFromProto(config, "", factory_context);
+  MatchDelegateConfig match_delegate_config;
+  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
 
   Envoy::Http::MockFilterChainFactoryCallbacks factory_callbacks;
   testing::InSequence s;
@@ -126,8 +126,8 @@ matcher:
                         "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
 )EOF");
 
-  MatchWrapperConfig match_wrapper_config;
-  auto cb = match_wrapper_config.createFilterFactoryFromProto(config, "", factory_context);
+  MatchDelegateConfig match_delegate_config;
+  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
 
   Envoy::Http::MockFilterChainFactoryCallbacks factory_callbacks;
   testing::InSequence s;
@@ -164,9 +164,9 @@ extension_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
 )EOF");
 
-  MatchWrapperConfig match_wrapper_config;
+  MatchDelegateConfig match_delegate_config;
   EXPECT_THROW_WITH_REGEX(
-      match_wrapper_config.createFilterFactoryFromProto(config, "", factory_context),
+      match_delegate_config.createFilterFactoryFromProto(config, "", factory_context),
       EnvoyException, "one of `matcher` and `matcher_tree` must be set.");
 }
 
@@ -199,9 +199,9 @@ xds_matcher:
                         "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
 )EOF");
 
-  MatchWrapperConfig match_wrapper_config;
+  MatchDelegateConfig match_delegate_config;
   EXPECT_THROW_WITH_REGEX(
-      match_wrapper_config.createFilterFactoryFromProto(config, "", factory_context),
+      match_delegate_config.createFilterFactoryFromProto(config, "", factory_context),
       EnvoyException,
       "requirement violation while creating match tree: INVALID_ARGUMENT: data input typeUrl "
       "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput not permitted "
@@ -512,7 +512,7 @@ TEST(DelegatingFilterTest, MatchTreeFilterActionEncodingTrailers) {
 }
 
 } // namespace
-} // namespace MatchWrapper
+} // namespace MatchDelegate
 } // namespace Http
 } // namespace Common
 } // namespace Envoy

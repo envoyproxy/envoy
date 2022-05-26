@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Common {
 namespace Http {
-namespace MatchWrapper {
+namespace MatchDelegate {
 
 class SkipAction : public Matcher::ActionBase<
                        envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
@@ -91,10 +91,11 @@ private:
   Envoy::Http::StreamFilterBase* base_filter_{};
 };
 
-class MatchWrapperConfig : public Extensions::HttpFilters::Common::FactoryBase<
-                               envoy::extensions::common::matching::v3::ExtensionWithMatcher> {
+class MatchDelegateConfig : public Extensions::HttpFilters::Common::FactoryBase<
+                                envoy::extensions::common::matching::v3::ExtensionWithMatcher> {
 public:
-  MatchWrapperConfig() : FactoryBase("match-wrapper") {}
+  // TODO(wbpcode): move this filter to 'source/extensions/filters/http'.
+  MatchDelegateConfig() : FactoryBase("envoy.filters.http.match_delegate") {}
 
 private:
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
@@ -102,7 +103,7 @@ private:
       const std::string&, Server::Configuration::FactoryContext& context) override;
 };
 
-} // namespace MatchWrapper
+} // namespace MatchDelegate
 } // namespace Http
 } // namespace Common
 } // namespace Envoy
