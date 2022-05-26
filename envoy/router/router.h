@@ -531,16 +531,16 @@ using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
   STATNAME(vhost)
 
 /**
- * All path level stats. @see stats_macro.h
+ * All route level stats. @see stats_macro.h
  */
-#define ALL_PATH_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                          \
+#define ALL_ROUTE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                          \
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
-  COUNTER(upstream_rq_retry_overflow)                                                              \
+  COUNTER(upstream_rq_retry_overflow)                                                               \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
-  STATNAME(path)                                                                                   \
+  STATNAME(route)                                                                                  \
   STATNAME(vhost)
 
 /**
@@ -550,21 +550,21 @@ MAKE_STAT_NAMES_STRUCT(VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 
 /**
- * Struct definition for all path level stats. @see stats_macro.h
+ * Struct definition for all route level stats. @see stats_macro.h
  */
-MAKE_STAT_NAMES_STRUCT(PathStatNames, ALL_PATH_STATS);
-MAKE_STATS_STRUCT(PathStats, PathStatNames, ALL_PATH_STATS);
+MAKE_STAT_NAMES_STRUCT(RouteStatNames, ALL_ROUTE_STATS);
+MAKE_STATS_STRUCT(RouteStats, RouteStatNames, ALL_ROUTE_STATS);
 
 /**
- * PathStatsConfig defines config needed to generate all path level stats.
+ * RouteStatsConfig defines config needed to generate all route level stats.
  */
-struct PathStatsConfig {
-  Stats::StatName path_stat_name_;
-  mutable PathStats path_stats_;
+struct RouteStatsConfig {
+  Stats::StatName route_stat_name_;
+  mutable RouteStats route_stats_;
 
 public:
-  PathStatsConfig(Stats::StatName stat_name, const PathStats& path_stats)
-      : path_stat_name_(stat_name), path_stats_(path_stats) {}
+  RouteStatsConfig(Stats::StatName stat_name, const RouteStats& route_stats)
+      : route_stat_name_(stat_name), route_stats_(route_stats) {}
 };
 
 /**
@@ -1061,9 +1061,9 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return PathStatsConfig the config needed to generate path level stats.
+   * @return RouteStatsConfig the config needed to generate route level stats.
    */
-  virtual const absl::optional<PathStatsConfig>& pathStatsConfig() const PURE;
+  virtual const absl::optional<RouteStatsConfig>& routeStatsConfig() const PURE;
 
   /**
    * @return EarlyDataPolicy& the configured early data option.

@@ -319,7 +319,7 @@ message Route {
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
 
   // The human readable prefix to use when emitting statistics for this endpoint.
-  // The statistics are rooted at vhost.<<virtual host name>.<stat_prefix>.
+  // The statistics are rooted at vhost.<virtual host name>.route.<stat_prefix>.
   // This should be set for highly critical
   // endpoints that one wishes to get “perfect” statistics on.
   // If not set, endpoint statistics are not generated.

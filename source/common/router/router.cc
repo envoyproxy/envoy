@@ -330,7 +330,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
         internal_request,
         route_entry_->virtualHost().statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
-        path_stats_config_ ? path_stats_config_->path_stat_name_ : config_.empty_stat_name_,
+        route_stats_config_ ? route_stats_config_->route_stat_name_ : config_.empty_stat_name_,
         config_.zone_name_,
         upstream_zone,
         is_canary};
@@ -465,8 +465,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
-  if (route_entry_->pathStatsConfig().has_value()) {
-    path_stats_config_ = &route_entry_->pathStatsConfig().value();
+  if (route_entry_->routeStatsConfig().has_value()) {
+    route_stats_config_ = &route_entry_->routeStatsConfig().value();
   }
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.getPathValue());
@@ -1580,7 +1580,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
         internal_request,
         route_entry_->virtualHost().statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
-        path_stats_config_ ? path_stats_config_->path_stat_name_ : config_.empty_stat_name_,
+        route_stats_config_ ? route_stats_config_->route_stat_name_ : config_.empty_stat_name_,
         config_.zone_name_,
         upstreamZone(upstream_request.upstreamHost())};
 

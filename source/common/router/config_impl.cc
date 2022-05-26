@@ -483,7 +483,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
       append_xfh_(route.route().append_x_forwarded_host()), cluster_name_(route.route().cluster()),
-      path_stat_name_storage_(route.stat_prefix(), factory_context.scope().symbolTable()),
+      route_stat_name_storage_(route.stat_prefix(), factory_context.scope().symbolTable()),
       cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -656,13 +656,13 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               path_redirect_);
   }
   if (!route.stat_prefix().empty()) {
-    path_stats_scope_ = Stats::Utility::scopeFromStatNames(
+    route_stats_scope_ = Stats::Utility::scopeFromStatNames(
         *factory_context.scope().scopeFromStatName(
-            factory_context.routerContext().pathStatNames().vhost_),
-        {vhost.statName(), factory_context.routerContext().pathStatNames().path_});
-    path_stats_config_.emplace(PathStatsConfig{
-        path_stat_name_storage_.statName(),
-        generatePathStats(*path_stats_scope_, factory_context.routerContext().pathStatNames())});
+            factory_context.routerContext().routeStatNames().vhost_),
+        {vhost.statName(), factory_context.routerContext().routeStatNames().route_});
+    route_stats_config_.emplace(RouteStatsConfig{
+        route_stat_name_storage_.statName(),
+        generateRouteStats(*route_stats_scope_, factory_context.routerContext().routeStatNames())});
 
   if (route.route().has_early_data_policy()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<EarlyDataPolicyFactory>(
@@ -1091,8 +1091,6 @@ RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
       factory_context.singletonManager());
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
-    std::cout << "Setting retry policy...." << route_config.retry_policy().num_retries().value()
-              << "\n";
     return RetryPolicyImpl(route_config.retry_policy(), validation_visitor, retry_factory_context);
   }
 

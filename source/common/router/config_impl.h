@@ -528,11 +528,11 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const absl::optional<PathStatsConfig>& pathStatsConfig() const override {
-    return path_stats_config_;
+  const absl::optional<RouteStatsConfig>& routeStatsConfig() const override {
+    return route_stats_config_;
   }
-  static PathStats generatePathStats(Stats::Scope& scope, const PathStatNames& stat_names) {
-    return PathStats{stat_names, scope};
+  static RouteStats generateRouteStats(Stats::Scope& scope, const RouteStatNames& stat_names) {
+    return RouteStats{stat_names, scope};
   }
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
@@ -737,8 +737,8 @@ public:
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return parent_->connectConfig();
     }
-    const absl::optional<PathStatsConfig>& pathStatsConfig() const override {
-      return parent_->pathStatsConfig();
+    const absl::optional<RouteStatsConfig>& routeStatsConfig() const override {
+      return parent_->routeStatsConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
     const EarlyDataPolicy& earlyDataPolicy() const override { return parent_->earlyDataPolicy(); }
@@ -937,9 +937,9 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const bool append_xfh_;
   const std::string cluster_name_;
-  absl::optional<PathStatsConfig> path_stats_config_;
-  Stats::ScopeSharedPtr path_stats_scope_;
-  Stats::StatNameManagedStorage path_stat_name_storage_;
+  absl::optional<RouteStatsConfig> route_stats_config_;
+  Stats::ScopeSharedPtr route_stats_scope_;
+  Stats::StatNameManagedStorage route_stat_name_storage_;
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;
