@@ -109,10 +109,9 @@ message Listener {
   // Required unless *api_listener* or *listener_specifier* is populated.
   core.v3.Address address = 2;
 
-  // The additional addresses the listener should listen on. The address must be unique across all
-  // the listeners, also in the single listener. Multiple addresses with port 0 can be supported,
-  // same as the `address` field described. For multiple addresses in single listener,
-  // all addresses use the same protocol, and multiple internal addresses are not yet supported.
+  // The additional addresses the listener should listen on. The addresses must be unique across all
+  // listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in single listener,
+  // all addresses use the same protocol, and multiple internal addresses are not supported.
   // [#not-implemented-hide:]
   repeated core.v3.Address additional_addresses = 33;
 

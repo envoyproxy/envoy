@@ -35,8 +35,9 @@ message ListenerStatus {
   // to listen on port 0, then this address has the port that was allocated by the OS.
   config.core.v3.Address local_address = 2;
 
-  // The additional actual local addresses that the listener is listening on. If a listener was configured
-  // to listen on port 0, then this address has the port that was allocated by the OS.
+  // This is same with :ref:`local_address
+  // <envoy_v3_api_field_admin.v3.ListenerStatus.local_address>`. Just additional
+  // addresses that listener is listening on.
   // [#not-implemented-hide:]
   repeated config.core.v3.Address additional_local_addresses = 3;
 }
