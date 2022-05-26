@@ -35,7 +35,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
     }
     const auto& uri = ssl->uriSanPeerCertificate();
     if (!uri.empty()) {
@@ -63,7 +63,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
     }
     const auto& dns = ssl->dnsSansPeerCertificate();
     if (!dns.empty()) {
@@ -91,7 +91,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
     }
     const auto& subject = ssl->subjectPeerCertificate();
     if (!subject.empty()) {

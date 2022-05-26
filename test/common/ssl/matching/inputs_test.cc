@@ -48,7 +48,7 @@ TEST(Authentication, UriSanInput) {
 
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
@@ -92,7 +92,7 @@ TEST(Authentication, DnsSanInput) {
 
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
@@ -123,7 +123,7 @@ TEST(Authentication, SubjectInput) {
 
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
