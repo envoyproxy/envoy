@@ -23,6 +23,10 @@ minor_behavior_changes:
     any frame is received the assumption is that the connection is working. This behavior change
     can be reverted by setting the ``envoy.reloadable_features.http2_delay_keepalive_timeout`` runtime
     flag to false.
+- area: http
+  change: |
+    changing the behavior for CONNECT and upgrade requests over HTTP/1.1 to not delay close. This behavioral change
+    can be reverted by setting ``envoy.reloadable_features.no_delay_close_for_upgrades`` to false.
 - area: http-cache
   change: |
     http cache filter ``getCache`` interface changed from returning a reference to

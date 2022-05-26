@@ -251,8 +251,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   bool connection_close = stream.state_.saw_connection_close_;
   bool request_complete = stream.filter_manager_.remoteDecodeComplete();
 
-  checkForDeferredClose((connection_close && (request_complete || http_10_sans_cl)) ||
-                        stream.state_.is_tunneling_);
+  // Don't do delay close for responses which are framed by connection close:
+  // HTTP/1.0 and below, upgrades, and CONNECT responses.
+  checkForDeferredClose(
+      (connection_close && (request_complete || http_10_sans_cl)) ||
+      (stream.state_.is_tunneling_ &&
+       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades")));
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
