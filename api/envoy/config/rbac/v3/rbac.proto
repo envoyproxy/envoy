@@ -313,7 +313,7 @@ message Principal {
 
 // Action defines the result of allowance or denial when a request matches the matcher.
 message Action {
-  // The name indicates the matcher name.
+  // The name indicates the policy name.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The action to take if the matcher matches. Every action either allows or denies a request,
