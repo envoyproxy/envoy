@@ -498,6 +498,11 @@ envoy.http.stateful_header_formatters.preserve_case:
   - envoy.http.stateful_header_formatters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.http.header_validators.envoy_default:
+  categories:
+  - envoy.http.header_validators
+  security_posture: unknown
+  status: wip
 envoy.internal_redirect_predicates.allow_listed_routes:
   categories:
   - envoy.internal_redirect_predicates
@@ -539,6 +544,16 @@ envoy.quic.proof_source.filter_chain:
   - envoy.quic.proof_source
   security_posture: robust_to_untrusted_downstream
   status: alpha
+envoy.udp_packet_writer.default:
+  categories:
+  - envoy.udp_packet_writer
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.udp_packet_writer.gso:
+  categories:
+  - envoy.udp_packet_writer
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.quic.crypto_stream.server.quiche:
   categories:
   - envoy.quic.server.crypto_stream
@@ -582,6 +597,11 @@ envoy.retry_host_predicates.previous_hosts:
 envoy.retry_priorities.previous_priorities:
   categories:
   - envoy.retry_priorities
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+envoy.route.early_data_policy.default:
+  categories:
+  - envoy.route.early_data_policy
   security_posture: robust_to_untrusted_downstream
   status: stable
 envoy.stat_sinks.dog_statsd:

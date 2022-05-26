@@ -136,6 +136,8 @@ public:
   // ThriftProxy::DecoderCallbacks
   MOCK_METHOD(DecoderEventHandler&, newDecoderEventHandler, ());
   MOCK_METHOD(bool, passthroughEnabled, (), (const));
+  MOCK_METHOD(bool, isRequest, (), (const));
+  MOCK_METHOD(bool, headerKeysPreserveCase, (), (const));
 };
 
 class MockDecoderEventHandler : public DecoderEventHandler {

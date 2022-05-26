@@ -51,11 +51,11 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManager::emitLogEntry(const StreamInfo::StreamInfo& stream_info) {
-  // TODO(rgs1): pass along the request/response headers, which requires a small
-  // interface change in the metadata class.
+void ConnectionManager::emitLogEntry(const Http::RequestHeaderMap* request_headers,
+                                     const Http::ResponseHeaderMap* response_headers,
+                                     const StreamInfo::StreamInfo& stream_info) {
   for (const auto& access_log : config_.accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, stream_info);
+    access_log->log(request_headers, response_headers, nullptr, stream_info);
   }
 }
 
@@ -154,6 +154,10 @@ void ConnectionManager::continueDecoding() {
 }
 
 void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) {
+  if (!rpc.inserted()) {
+    return;
+  }
+
   read_callbacks_->connection().dispatcher().deferredDelete(rpc.removeFromList(rpcs_));
   if (requests_overflow_ && rpcs_.empty()) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
@@ -219,6 +223,8 @@ bool ConnectionManager::passthroughEnabled() const {
 
   return (*rpcs_.begin())->passthroughSupported();
 }
+
+bool ConnectionManager::headerKeysPreserveCase() const { return config_.headerKeysPreserveCase(); }
 
 bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
   upstream_buffer_.move(data);
@@ -324,8 +330,8 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   // metadata in messageBegin when reading the response from upstream. Therefore detecting a drain
   // should happen here.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
-    metadata_->setDraining(!metadata->headers().get(Headers::get().Drain).empty());
-    metadata->headers().remove(Headers::get().Drain);
+    metadata_->setDraining(!metadata->responseHeaders().get(Headers::get().Drain).empty());
+    metadata->responseHeaders().remove(Headers::get().Drain);
 
     // Check if this host itself is draining.
     //
@@ -336,7 +342,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
     if (cm.drain_decision_.drainClose()) {
       // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
       // over)?
-      metadata->headers().addReferenceKey(Headers::get().Drain, "true");
+      metadata->responseHeaders().addReferenceKey(Headers::get().Drain, "true");
       cm.stats_.downstream_response_drain_close_.inc();
     }
   }
@@ -438,6 +444,10 @@ FilterStatus ConnectionManager::ResponseDecoder::setBegin(FieldType& elem_type, 
 
 FilterStatus ConnectionManager::ResponseDecoder::setEnd() {
   return parent_.applyEncoderFilters(DecoderEvent::SetEnd, absl::any(), protocol_converter_);
+}
+
+bool ConnectionManager::ResponseDecoder::headerKeysPreserveCase() const {
+  return parent_.parent_.headerKeysPreserveCase();
 }
 
 void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
