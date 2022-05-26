@@ -100,6 +100,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2019-08-08",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
+    aspect_bazel_lib = dict(
+        project_name = "Aspect Bazel helpers",
+        project_desc = "Base Starlark libraries and basic Bazel rules which are useful for constructing rulesets and BUILD files",
+        project_url = "https://github.com/aspect-build/bazel-lib",
+        version = "0.12.0",
+        sha256 = "d1d712d115b908eaaa22aa899fa0e9016d70347debdafe295059e79adda93b02",
+        strip_prefix = "bazel-lib-{version}",
+        urls = ["https://github.com/aspect-build/bazel-lib/archive/v{version}.tar.gz"],
+        use_category = ["build"],
+        release_date = "2022-05-26",
+        cpe = "N/A",
+    ),
     com_google_absl = dict(
         project_name = "Abseil",
         project_desc = "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase",

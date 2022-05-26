@@ -10,11 +10,14 @@ load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
+load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains")
 
 # go version for rules_go
 GO_VERSION = "1.17.5"
 
-def envoy_dependency_imports(go_version = GO_VERSION):
+JQ_VERSION = "1.6"
+
+def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION):
     # TODO: allow building of tools for easier onboarding
     rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
     go_rules_dependencies()
@@ -46,6 +49,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         honggfuzz = False,
     )
     emscripten_deps()
+    register_jq_toolchains(version = jq_version)
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
     go_repository(

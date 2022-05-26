@@ -157,6 +157,7 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
+  // TODO(danzh) pass around transport_socket_options_ via context.
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
       server_id(), this,
       std::make_unique<EnvoyQuicProofVerifyContextImpl>(dispatcher_, transport_socket_options_),
