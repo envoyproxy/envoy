@@ -17,7 +17,7 @@ namespace Extensions {
 namespace Dlb {
 
 Envoy::Network::ConnectionBalancerSharedPtr
-DLBConnectionBalanceFactory::createConnectionBalancerFromProto(
+DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     const Protobuf::Message&, Server::Configuration::FactoryContext& context) {
 #ifdef DLB_DISABLED
   context.localInfo();
@@ -157,7 +157,7 @@ DLBConnectionBalanceFactory::createConnectionBalancerFromProto(
   return std::make_shared<DlbConnectionBalancerImpl>();
 }
 
-DLBConnectionBalanceFactory::~DLBConnectionBalanceFactory() {
+DlbConnectionBalanceFactory::~DlbConnectionBalanceFactory() {
 #ifndef DLB_DISABLED
   for (dlb_port_hdl_t port : rx_ports) {
     if (dlb_disable_port(port)) {
@@ -287,7 +287,7 @@ void DlbConnectionBalancerImpl::unregisterHandler(
   auto worker_name = listener->dispatcher().name();
   int index = std::stoi(worker_name.substr(worker_name.find_first_of('_') + 1, worker_name.size()));
 
-  // Now DLB does not support change config when running, clean DLB related config in
+  // Now Dlb does not support change config when running, clean Dlb related config in
   // DlbBalancedConnectionHandlerImpl
   auto dlb_handlers = DlbConnectionBalanceFactorySingleton::get().dlb_handlers;
   dlb_handlers.erase(dlb_handlers.begin() + index);

@@ -271,7 +271,6 @@ message Listener {
   // can structurally only contain the fields of the relevant type.]
   ApiListener api_listener = 19;
 
-  // [#extension-category: envoy.network.connection_balance]
   // The listener's connection balancer configuration, currently only applicable to TCP listeners.
   // If no configuration is specified, Envoy will not attempt to balance active connections between
   // worker threads.
@@ -281,6 +280,7 @@ message Listener {
   // and :ref:`bind_to_port <envoy_v3_api_field_config.listener.v3.Listener.bind_to_port>` to false in Y1 and Y2,
   // it is recommended to disable the balance config in listener X to avoid the cost of balancing, and
   // enable the balance config in Y1 and Y2 to balance the connections among the workers.
+  // [#extension-category: envoy.network.connection_balance]
   ConnectionBalanceConfig connection_balance_config = 20;
 
   // Deprecated. Use `enable_reuse_port` instead.

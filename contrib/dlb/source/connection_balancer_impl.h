@@ -26,15 +26,15 @@ public:
   DlbBalancedConnectionHandlerImpl(Envoy::Network::BalancedConnectionHandler& handler, int index,
                                    std::string name)
       : handler_(handler), index_(index), name_(name) {}
-  // Post socket to DLB hardware.
+  // Post socket to Dlb hardware.
   void post(Network::ConnectionSocketPtr&& socket) override;
 
   void onAcceptWorker(Network::ConnectionSocketPtr&&, bool, bool) override {}
 
-  // Create dlb event and callback.
+  // Create Dlb event and callback.
   void setDlbEvent();
 
-  // Get socket from DLB hardware and re-use listener onAcceptWorker().
+  // Get socket from Dlb hardware and re-use listener onAcceptWorker().
   void onDlbEvents(uint32_t flags);
 
   // Only for override, those are never used.
@@ -48,10 +48,10 @@ private:
   Envoy::Event::FileEventPtr dlb_event_;
 };
 
-class DLBConnectionBalanceFactory : public Envoy::Network::ConnectionBalanceFactory,
+class DlbConnectionBalanceFactory : public Envoy::Network::ConnectionBalanceFactory,
                                     public Logger::Loggable<Logger::Id::config> {
 public:
-  ~DLBConnectionBalanceFactory() override;
+  ~DlbConnectionBalanceFactory() override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::dlb::v3alpha::Dlb>();
   }
@@ -129,11 +129,11 @@ public:
 #endif
 };
 
-REGISTER_FACTORY(DLBConnectionBalanceFactory, Envoy::Network::ConnectionBalanceFactory);
-using DlbConnectionBalanceFactorySingleton = InjectableSingleton<DLBConnectionBalanceFactory>;
+REGISTER_FACTORY(DlbConnectionBalanceFactory, Envoy::Network::ConnectionBalanceFactory);
+using DlbConnectionBalanceFactorySingleton = InjectableSingleton<DlbConnectionBalanceFactory>;
 
 /**
- * Implementation of connection balancer that does balancing with the help of DLB hardware.
+ * Implementation of connection balancer that does balancing with the help of Dlb hardware.
  */
 class DlbConnectionBalancerImpl : public Envoy::Network::ConnectionBalancer,
                                   public Logger::Loggable<Logger::Id::connection> {
@@ -141,14 +141,14 @@ public:
   /** registerHandler() does following things:
    * - get listener
    * - create DlbBalancedConnectionHandlerImpl
-   * - create DLB event of DlbBalancedConnectionHandlerImpl
+   * - create Dlb event of DlbBalancedConnectionHandlerImpl
    */
   void registerHandler(Envoy::Network::BalancedConnectionHandler&) override;
 
   // Remove DlbBalancedConnectionHandlerImpl by listener.
   void unregisterHandler(Envoy::Network::BalancedConnectionHandler&) override;
 
-  // Return DlbBalancedConnectionHandlerImpl to handle DLB send/recv.
+  // Return DlbBalancedConnectionHandlerImpl to handle Dlb send/recv.
   Envoy::Network::BalancedConnectionHandler&
   pickTargetHandler(Envoy::Network::BalancedConnectionHandler& current_handler) override;
 };
