@@ -1214,7 +1214,7 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   // an outgoing frame of this type, we will return an error code so that we can abort execution.
   ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
                  static_cast<uint64_t>(type), stream_id, length);
-  StreamImpl* stream = getStream(stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (stream != nullptr) {
     if (type != METADATA_FRAME_TYPE) {
       stream->bytes_meter_->addWireBytesSent(length + H2_FRAME_HEADER_SIZE);
