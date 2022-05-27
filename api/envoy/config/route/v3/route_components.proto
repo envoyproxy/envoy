@@ -15,6 +15,7 @@ import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -2227,4 +2228,32 @@ message FilterConfig {
   // not support the specified filter, it may ignore the map entry rather
   // than rejecting the config.
   bool is_optional = 2;
+}
+
+// The policy that used to determine which name or value will be used as the searching key to get per filter config
+// from :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`
+// and :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`
+// at runtime. The ``fallback_policy`` will be used by default.
+// [#not-implemented-hide:]
+message FilterConfigKeyPolicy {
+  oneof key_policy {
+    // Both :ref:`custom filter config names
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>` and canonical
+    // filter names (e.g., envoy.filters.http.router) will be used. The custom filter config names will be used
+    // first. And if no per filter config has been found via these custom names then the canonical filter names
+    // will be used as fallback.
+    google.protobuf.Empty fallback_policy = 1;
+    // Canonical filter names (e.g., envoy.filters.http.router) will be used as the searching key of per filter
+    // config.
+    google.protobuf.Empty filter_name_key = 2;
+    // :ref:`custom filter config names
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>` will be used
+    // as the searching key of per filter config.
+    google.protobuf.Empty custom_name_key = 3;
+
+    // Extendable custom provider that will used to generate a searching key from custom filter config names,
+    // canonical filter names, or even request headers.
+    // [#not-implemented-hide:]
+    core.v3.TypedExtensionConfig custom_provider = 4;
+  }
 }

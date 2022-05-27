@@ -135,6 +135,10 @@ message RouteConfiguration {
   // NOTE: this option will not strip the port number (if any) contained in route config
   // :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.domains field.
   bool ignore_port_in_host_matching = 14;
+
+  // The policy that used to determine which name or value will be used as the searching key to get per filter config.
+  // [#not-implemented-hide:]
+  FilterConfigKeyPolicy filter_config_key_policy = 15;
 }
 
 message Vhds {
