@@ -892,6 +892,10 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
+
+  // Disable for this test because it messes up the connection IDs.
+  skip_tag_extraction_rule_check_ = true;
+
   const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
@@ -918,6 +922,10 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsStringUpstreamTap) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
+
+  // Disable for this test because it messes up the connection IDs.
+  skip_tag_extraction_rule_check_ = true;
+
   const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 2;
   testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
   checkStats();
@@ -949,6 +957,10 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
+
+  // Disable for this test because it messes up the connection IDs.
+  skip_tag_extraction_rule_check_ = true;
+
   const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 2;
   testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
   checkStats();
