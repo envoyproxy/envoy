@@ -55,12 +55,6 @@ FlagRegistry& FlagRegistry::getInstance() {
 
 FlagRegistry::FlagRegistry() : flags_(makeFlagMap()) {}
 
-void FlagRegistry::resetFlags() const {
-  for (auto& kv : flags_) {
-    kv.second->resetValue();
-  }
-}
-
 Flag* FlagRegistry::findFlag(absl::string_view name) const {
   auto it = flags_.find(name);
   return (it != flags_.end()) ? it->second : nullptr;

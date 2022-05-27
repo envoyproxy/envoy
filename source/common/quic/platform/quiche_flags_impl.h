@@ -32,9 +32,6 @@ public:
   // Return singleton instance.
   static FlagRegistry& getInstance();
 
-  // Reset all registered flags to their default values.
-  void resetFlags() const;
-
   // Look up a flag by name.
   Flag* findFlag(absl::string_view name) const;
 
@@ -56,9 +53,6 @@ public:
   // Set flag value from given string, returning true iff successful.
   virtual bool setValueFromString(const std::string& value_str) = 0;
 
-  // Reset flag to default value.
-  virtual void resetValue() = 0;
-
   virtual void resetReloadedValue() = 0;
 
   // Return flag name.
@@ -79,11 +73,6 @@ public:
       : Flag(name, help), value_(default_value), default_value_(default_value) {}
 
   bool setValueFromString(const std::string& value_str) override;
-
-  void resetValue() override {
-    absl::MutexLock lock(&mutex_);
-    value_ = default_value_;
-  }
 
   // Set flag value.
   void setValue(T value) {
