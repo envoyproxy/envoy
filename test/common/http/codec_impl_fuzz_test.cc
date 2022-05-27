@@ -792,7 +792,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     // Prevent oghttp2 from aborting the program.
     // If when disabling the FATAL log abort the fuzzer will create a test that reaches an
     // inconsistent state (and crashes/accesses inconsistent memory), then it will be a bug we'll
-    // need to further evaluate. However, in fuzzing we allow OgHttp2 reaching FATAL states that may
+    // need to further evaluate. However, in fuzzing we allow oghttp2 reaching FATAL states that may
     // happen in production environments.
     quiche::setDFatalExitDisabled(true);
     codecFuzz(input, HttpVersion::Http2Oghttp2);
