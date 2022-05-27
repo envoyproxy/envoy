@@ -314,7 +314,7 @@ routes:
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "x-value-1");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-header-1"), "x-value-1");
   route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
@@ -345,12 +345,12 @@ routes:
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-version"), "0.1");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-version"), "0.1");
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
-  metadata.headers().remove(Http::LowerCaseString("x-version"));
+  metadata.requestHeaders().remove(Http::LowerCaseString("x-version"));
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-version"), "0.8");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-version"), "0.8");
   route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
@@ -380,12 +380,12 @@ routes:
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "50");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-user-id"), "50");
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
-  metadata.headers().remove(Http::LowerCaseString("x-user-id"));
+  metadata.requestHeaders().remove(Http::LowerCaseString("x-user-id"));
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "199");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-user-id"), "199");
   route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
@@ -413,13 +413,13 @@ routes:
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "50");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-user-id"), "50");
   route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
-  metadata.headers().remove(Http::LowerCaseString("x-user-id"));
+  metadata.requestHeaders().remove(Http::LowerCaseString("x-user-id"));
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-user-id"), "");
   route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
@@ -448,12 +448,12 @@ routes:
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "500");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-header-1"), "500");
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
-  metadata.headers().remove(Http::LowerCaseString("x-header-1"));
+  metadata.requestHeaders().remove(Http::LowerCaseString("x-header-1"));
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "user_id:500");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-header-1"), "user_id:500");
   route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
@@ -482,17 +482,17 @@ routes:
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "asdfvalue");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-header-1"), "asdfvalue");
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
-  metadata.headers().remove(Http::LowerCaseString("x-header-1"));
+  metadata.requestHeaders().remove(Http::LowerCaseString("x-header-1"));
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "valueasdfvalue");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-header-1"), "valueasdfvalue");
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
-  metadata.headers().remove(Http::LowerCaseString("x-header-1"));
+  metadata.requestHeaders().remove(Http::LowerCaseString("x-header-1"));
 
-  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "value:asdf");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-header-1"), "value:asdf");
   route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
@@ -522,12 +522,12 @@ routes:
   EXPECT_EQ(nullptr, route);
 
   // The wrong header is present.
-  metadata.headers().addCopy(Http::LowerCaseString("x-something"), "cluster1");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-something"), "cluster1");
   route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   // Header is present.
-  metadata.headers().addCopy(Http::LowerCaseString("x-cluster"), "cluster1");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString("x-cluster"), "cluster1");
   route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
@@ -882,7 +882,7 @@ TEST_F(ThriftRouteMatcherTest, ClusterHeaderMetadataMatch) {
   {
     MessageMetadata metadata;
     metadata.setMethodName("method1");
-    metadata.headers().addCopy(Http::LowerCaseString{"header_name"}, "cluster1");
+    metadata.requestHeaders().addCopy(Http::LowerCaseString{"header_name"}, "cluster1");
     RouteConstSharedPtr route = matcher.route(metadata, 0);
     EXPECT_NE(nullptr, route);
     EXPECT_NE(nullptr, route->routeEntry());
@@ -962,7 +962,7 @@ TEST_F(ThriftRouteMatcherTest, ClusterHeaderWithStripServiceEnabled) {
 
   MessageMetadata metadata;
   metadata.setMethodName("method1");
-  metadata.headers().addCopy(Http::LowerCaseString{"header_name"}, "cluster1");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString{"header_name"}, "cluster1");
 
   EXPECT_TRUE(matcher.route(metadata, 0)->routeEntry()->stripServiceName());
 }

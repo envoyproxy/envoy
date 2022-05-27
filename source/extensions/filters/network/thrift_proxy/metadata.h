@@ -7,18 +7,46 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/http/header_formatter.h"
 
 #include "source/common/common/macros.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/thrift.h"
 #include "source/extensions/filters/network/thrift_proxy/tracing.h"
 
+#include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
+namespace {
+
+// See: https://github.com/apache/thrift/commit/e165fa3c85d00cb984f4d9635ed60909a1266ce1
+class ThriftCaseHeaderFormatter : public Envoy::Http::StatefulHeaderKeyFormatter {
+public:
+  ThriftCaseHeaderFormatter() = default;
+
+  // Envoy::Http::StatefulHeaderKeyFormatter
+  std::string format(absl::string_view key) const override {
+    const auto remembered_key_itr = original_header_keys_.find(key);
+    return remembered_key_itr != original_header_keys_.end() ? remembered_key_itr->second
+                                                             : std::string(key);
+  }
+  void processKey(absl::string_view key) override {
+    std::string s = absl::StrReplaceAll(key, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+    original_header_keys_.try_emplace(std::move(s), std::string(key));
+  }
+  void setReasonPhrase(absl::string_view) override {}
+  absl::string_view getReasonPhrase() const override { return ""; }
+
+private:
+  absl::flat_hash_map<std::string, std::string> original_header_keys_;
+};
+
+} // namespace
 
 /**
  * MessageMetadata encapsulates metadata about Thrift messages. The various fields are considered
@@ -28,10 +56,24 @@ namespace ThriftProxy {
  */
 class MessageMetadata {
 public:
-  MessageMetadata() = default;
+  MessageMetadata(bool is_request = true, bool preserve_keys = false) : is_request_(is_request) {
+    if (is_request) {
+      auto request_headers = Http::RequestHeaderMapImpl::create();
+      if (preserve_keys) {
+        request_headers->setFormatter(std::make_unique<ThriftCaseHeaderFormatter>());
+      }
+      request_headers_ = std::move(request_headers);
+    } else {
+      auto response_headers = Http::ResponseHeaderMapImpl::create();
+      if (preserve_keys) {
+        response_headers->setFormatter(std::make_unique<ThriftCaseHeaderFormatter>());
+      }
+      response_headers_ = std::move(response_headers);
+    }
+  }
 
   std::shared_ptr<MessageMetadata> clone() const {
-    auto copy = std::make_shared<MessageMetadata>();
+    auto copy = std::make_shared<MessageMetadata>(isRequest());
 
     if (hasFrameSize()) {
       copy->setFrameSize(frameSize());
@@ -61,7 +103,12 @@ public:
       copy->setReplyType(replyType());
     }
 
-    Http::HeaderMapImpl::copyFrom(copy->headers(), headers());
+    if (isRequest()) {
+      Http::HeaderMapImpl::copyFrom(copy->requestHeaders(), requestHeaders());
+    } else {
+      Http::HeaderMapImpl::copyFrom(copy->responseHeaders(), responseHeaders());
+    }
+
     copy->mutableSpans().assign(spans().begin(), spans().end());
 
     if (hasAppException()) {
@@ -134,8 +181,22 @@ public:
   /**
    * @return HeaderMap of current headers (never throws)
    */
-  const Http::HeaderMap& headers() const { return *headers_; }
-  Http::HeaderMap& headers() { return *headers_; }
+  const Http::RequestHeaderMap& requestHeaders() const {
+    ASSERT(is_request_);
+    return *request_headers_;
+  }
+  Http::RequestHeaderMap& requestHeaders() {
+    ASSERT(is_request_);
+    return *request_headers_;
+  }
+  const Http::ResponseHeaderMap& responseHeaders() const {
+    ASSERT(!is_request_);
+    return *response_headers_;
+  }
+  Http::ResponseHeaderMap& responseHeaders() {
+    ASSERT(!is_request_);
+    return *response_headers_;
+  }
 
   /**
    * @return SpanList an immutable list of Spans
@@ -163,6 +224,8 @@ public:
   bool isDraining() const { return is_draining_; }
   void setDraining(bool draining) { is_draining_ = draining; }
 
+  bool isRequest() const { return is_request_; }
+
   absl::optional<int64_t> traceId() const { return trace_id_; }
   void setTraceId(int64_t trace_id) { trace_id_ = trace_id; }
 
@@ -189,7 +252,8 @@ private:
   absl::optional<int32_t> seq_id_{};
   absl::optional<MessageType> msg_type_{};
   absl::optional<ReplyType> reply_type_{};
-  Http::HeaderMapPtr headers_{Http::RequestHeaderMapImpl::create()};
+  Http::RequestHeaderMapPtr request_headers_{nullptr};
+  Http::ResponseHeaderMapPtr response_headers_{nullptr};
   absl::optional<AppExceptionType> app_ex_type_;
   absl::optional<std::string> app_ex_msg_;
   bool protocol_upgrade_message_{false};
@@ -201,6 +265,7 @@ private:
   absl::optional<int64_t> parent_span_id_;
   absl::optional<int64_t> flags_;
   absl::optional<bool> sampled_;
+  const bool is_request_;
 };
 
 using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;

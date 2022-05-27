@@ -24,9 +24,8 @@ public:
       absl::optional<HttpServerPropertiesCache::Origin>& origin,
       Upstream::HostDescriptionConstSharedPtr host);
 
-  ActiveClient(HttpConnPoolImplBase& parent);
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
-               Upstream::Host::CreateConnectionData& data);
+               OptRef<Upstream::Host::CreateConnectionData> data);
 };
 
 ConnectionPool::InstancePtr

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -8,6 +9,7 @@
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -647,7 +649,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
+TEST_P(MultiplexedUpstreamIntegrationTest, AutoRetrySafeRequestUponTooEarlyResponse) {
   if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
     return;
   }
@@ -692,7 +694,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, EarlyDataRejected) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
+TEST_P(MultiplexedUpstreamIntegrationTest, DefaultAllowsUpstreamSafeRequestsUsingEarlyData) {
 #ifdef WIN32
   // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
   GTEST_SKIP() << "Skipping on Windows";
@@ -710,6 +712,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
 
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
@@ -721,9 +724,335 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamCachesZeroRttKeys) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     EXPECT_EQ(1u,
               test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+    EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
   }
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* early_data_policy = hcm.mutable_route_config()
+                                      ->mutable_virtual_hosts(0)
+                                      ->mutable_routes(0)
+                                      ->mutable_route()
+                                      ->mutable_early_data_policy();
+        envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
+        early_data_policy->set_name("envoy.route.early_data_policy.default");
+        early_data_policy->mutable_typed_config()->PackFrom(config);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
+  default_request_headers_.addCopy("second_request", "1");
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(upstreamProtocol() == Http::CodecType::HTTP3 ? 1u : 0u,
+            test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+}
+
+// Tests that Envoy will automatically retry a GET request sent over early data if the upstream
+// rejects it with TooEarly response.
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
+      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+    return;
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
+  default_request_headers_.addCopy("second_request", "1");
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+
+  // TooEarly response should be retried automatically.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "425"}}, true);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  // The retry request shouldn't be sent as early data.
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+}
+
+#ifdef ENVOY_ENABLE_QUIC
+class QuicCustomTlsServerHandshaker : public quic::TlsServerHandshaker {
+public:
+  QuicCustomTlsServerHandshaker(quic::QuicSession* session,
+                                const quic::QuicCryptoServerConfig* crypto_config,
+                                bool fail_handshake)
+      : quic::TlsServerHandshaker(session, crypto_config), fail_handshake_(fail_handshake) {}
+
+protected:
+  ssl_select_cert_result_t EarlySelectCertCallback(const SSL_CLIENT_HELLO* client_hello) override {
+    if (fail_handshake_) {
+      ENVOY_LOG_MISC(trace, "Override handshaker return value to error");
+      return ssl_select_cert_error;
+    }
+    return quic::TlsServerHandshaker::EarlySelectCertCallback(client_hello);
+  }
+
+private:
+  bool fail_handshake_;
+};
+
+class QuicFailHandshakeCryptoServerStreamFactory
+    : public Quic::EnvoyQuicCryptoServerStreamFactoryInterface {
+public:
+  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+  std::string name() const override { return "envoy.quic.crypto_stream.server.fail_handshake"; }
+
+  std::unique_ptr<quic::QuicCryptoServerStreamBase>
+  createEnvoyQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
+                                    quic::QuicCompressedCertsCache* /*compressed_certs_cache*/,
+                                    quic::QuicSession* session,
+                                    quic::QuicCryptoServerStreamBase::Helper* /*helper*/,
+                                    Envoy::OptRef<const Envoy::Network::TransportSocketFactory>
+                                    /*transport_socket_factory*/,
+                                    Envoy::Event::Dispatcher& /*dispatcher*/) override {
+    ASSERT(session->connection()->version().handshake_protocol == quic::PROTOCOL_TLS1_3);
+    return std::make_unique<QuicCustomTlsServerHandshaker>(session, crypto_config, fail_handshake_);
+  }
+
+  void setFailHandshake(bool fail_handshake) { fail_handshake_ = fail_handshake; }
+
+private:
+  bool fail_handshake_;
+};
+
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
+      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+    return;
+  }
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.no_extension_lookup_by_name", false);
+
+  // Register and config this factory to control upstream QUIC handshakes.
+  QuicFailHandshakeCryptoServerStreamFactory crypto_stream_factory;
+  Registry::InjectFactory<Quic::EnvoyQuicCryptoServerStreamFactoryInterface> registered_factory(
+      crypto_stream_factory);
+  crypto_stream_factory.setFailHandshake(false);
+
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_crypto_stream_config()->set_name(
+      "envoy.quic.crypto_stream.server.fail_handshake");
+  mergeOptions(options);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
+  // Fail the following upstream connecting attempts.
+  crypto_stream_factory.setFailHandshake(true);
+  default_request_headers_.addCopy("second_request", "1");
+  default_request_headers_.addCopy("x-envoy-retry-on", "connect-failure");
+  default_request_headers_.addCopy("x-forwarded-for", "10.0.0.1");
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // This connection should have failed handshake.
+  waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("503", response2->headers().getStatusValue());
+  EXPECT_EQ(2u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+  EXPECT_LE(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+}
+
+#endif
+
+TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
+      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+    return;
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
+  {
+    // Lock up fake upstream so that it won't process handshake.
+    absl::MutexLock l(&fake_upstreams_[0]->lock());
+    auto response2 = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "sni.lyft.com"},
+                                       {"second-request", "1"}});
+    // Even though the fake upstream is not responding, the 2 GET requests should still be forwarded
+    // as early data.
+    test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 2);
+    EXPECT_EQ(1u,
+              test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+    EXPECT_LE(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+    codec_client_->close();
+    test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_tx_reset", 1);
+  }
+  // Release the upstream lock and finish the handshake.
+  waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  if (upstreamProtocol() != Http::CodecType::HTTP3 ||
+      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+    return;
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
+  IntegrationStreamDecoderPtr response2;
+  IntegrationStreamDecoderPtr response3;
+  IntegrationStreamDecoderPtr response4;
+  {
+    // Lock up fake upstream so that it won't process handshake.
+    absl::MutexLock l(&fake_upstreams_[0]->lock());
+    response2 = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "sni.lyft.com"},
+                                       {"second-request", "1"}});
+
+    response3 = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "sni.lyft.com"},
+                                       {"third-request", "1"}});
+    response4 = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "sni.lyft.com"},
+                                       {"forth-request", "1"}});
+    // Even though the fake upstream is not responding, the 2 GET requests should still be forwarded
+    // as early data.
+    test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 3);
+    EXPECT_EQ(1u,
+              test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+    EXPECT_LE(2u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  }
+  // Release the upstream lock and finish the handshake.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  FakeStreamPtr upstream_request3;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request3));
+  upstream_request3->encodeHeaders(default_response_headers_, true);
+  FakeStreamPtr upstream_request4;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request4));
+  upstream_request4->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  ASSERT_TRUE(response3->waitForEndStream());
+  ASSERT_TRUE(response4->waitForEndStream());
 }
 
 } // namespace Envoy
