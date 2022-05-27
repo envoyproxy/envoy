@@ -37,6 +37,7 @@ static_resources:
     type: LOGICAL_DNS
     # Comment out the following line to test on v6 networks
     dns_lookup_family: V4_ONLY
+    connect_timeout: 30s
     load_assignment:
       cluster_name: service_envoyproxy_io
       endpoints:
