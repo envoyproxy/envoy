@@ -35,9 +35,6 @@ public:
   // Reset all registered flags to their default values.
   void resetFlags() const;
 
-  // Look up a flag by name.
-  Flag* findFlag(absl::string_view name) const;
-
   void updateReloadableFlags(const absl::flat_hash_map<std::string, bool>& quiche_flags_override);
 
 private:

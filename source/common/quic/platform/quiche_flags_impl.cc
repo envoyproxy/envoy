@@ -61,11 +61,6 @@ void FlagRegistry::resetFlags() const {
   }
 }
 
-Flag* FlagRegistry::findFlag(absl::string_view name) const {
-  auto it = flags_.find(name);
-  return (it != flags_.end()) ? it->second : nullptr;
-}
-
 void FlagRegistry::updateReloadableFlags(
     const absl::flat_hash_map<std::string, bool>& quiche_flags_override) {
   for (auto& kv : flags_) {
