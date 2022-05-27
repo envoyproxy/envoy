@@ -24,7 +24,7 @@ public:
     if (manager_ == nullptr) {
       // The internal listener manager is published to this registry when the first internal
       // listener is added through LDS. Return null prior to this moment.
-      return Network::InternalListenerManagerOptRef();
+      return {};
     }
     return {*manager_};
   }

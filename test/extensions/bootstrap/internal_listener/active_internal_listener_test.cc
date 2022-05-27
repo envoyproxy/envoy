@@ -307,12 +307,10 @@ public:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
-    Network::UdpListenerConfigOptRef udpListenerConfig() override {
-      return Network::UdpListenerConfigOptRef();
-    }
+    Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override {
       if (internal_listener_config_ == nullptr) {
-        return Network::InternalListenerConfigOptRef();
+        return {};
       } else {
         return *internal_listener_config_;
       }

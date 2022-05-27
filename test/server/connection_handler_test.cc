@@ -133,9 +133,7 @@ public:
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return *udp_listener_config_; }
-    Network::InternalListenerConfigOptRef internalListenerConfig() override {
-      return Network::InternalListenerConfigOptRef();
-    }
+    Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
     envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
     void setDirection(envoy::config::core::v3::TrafficDirection direction) {
       direction_ = direction;
