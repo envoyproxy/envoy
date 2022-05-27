@@ -26,7 +26,7 @@ public:
       // listener is added through LDS. Return null prior to this moment.
       return Network::InternalListenerManagerOptRef();
     }
-    return Network::InternalListenerManagerOptRef(*manager_);
+    return {*manager_};
   }
 
   Network::InternalListenerPtr

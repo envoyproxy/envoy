@@ -245,10 +245,8 @@ using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;
 /**
  * Internal listener callbacks.
  */
-class InternalListener : public ConnectionHandler::ActiveListener {
+class InternalListener : public virtual ConnectionHandler::ActiveListener {
 public:
-  virtual ~InternalListener() override = default;
-
   /**
    * Called when a new connection is accepted.
    * @param socket supplies the socket that is moved into the callee.

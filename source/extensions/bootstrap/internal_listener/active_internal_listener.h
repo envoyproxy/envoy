@@ -27,8 +27,8 @@ namespace Extensions {
 namespace Bootstrap {
 namespace InternalListener {
 
-class ActiveInternalListener : public Server::OwnedActiveStreamListenerBase,
-                               public Network::InternalListener {
+class ActiveInternalListener : public Network::InternalListener,
+                               public Server::OwnedActiveStreamListenerBase {
 public:
   ActiveInternalListener(Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
                          Network::ListenerConfig& config);
