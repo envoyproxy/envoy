@@ -224,6 +224,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
     external_http_archive("rules_pkg")
+    external_http_archive("aspect_bazel_lib")
     _com_github_fdio_vpp_vcl()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
@@ -888,6 +889,7 @@ def _com_googlesource_chromium_zlib():
 def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
+        patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(

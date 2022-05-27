@@ -256,6 +256,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/ip_tagging @rgs1 @alyssawilk
 # cors
 /*/extensions/filters/http/cors @wbpcode @daixiang0
+# Header Validators
+/*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
