@@ -1,0 +1,34 @@
+diff --git a/bazel/emscripten_deps.bzl b/bazel/emscripten_deps.bzl
+index 95801ba..b2dba14 100644
+--- a/emscripten_deps.bzl
++++ b/emscripten_deps.bzl
+@@ -75,6 +75,7 @@ def emscripten_deps(emscripten_version = "latest"):
+             name = "emscripten_npm_linux",
+             package_json = "@emscripten_bin_linux//:emscripten/package.json",
+             package_lock_json = "@emscripten_bin_linux//:emscripten/package-lock.json",
++            npm_command = "install",
+         )
+ 
+     if "emscripten_npm_mac" not in excludes:
+@@ -82,6 +83,7 @@ def emscripten_deps(emscripten_version = "latest"):
+             name = "emscripten_npm_mac",
+             package_json = "@emscripten_bin_mac//:emscripten/package.json",
+             package_lock_json = "@emscripten_bin_mac//:emscripten/package-lock.json",
++            npm_command = "install",
+         )
+ 
+     if "emscripten_npm_mac_arm64" not in excludes:
+@@ -89,6 +91,7 @@ def emscripten_deps(emscripten_version = "latest"):
+             name = "emscripten_npm_mac",
+             package_json = "@emscripten_bin_mac_arm64//:emscripten/package.json",
+             package_lock_json = "@emscripten_bin_mac_arm64//:emscripten/package-lock.json",
++            npm_command = "install",
+         )
+ 
+     if "emscripten_npm_win" not in excludes:
+@@ -96,4 +99,5 @@ def emscripten_deps(emscripten_version = "latest"):
+             name = "emscripten_npm_win",
+             package_json = "@emscripten_bin_win//:emscripten/package.json",
+             package_lock_json = "@emscripten_bin_win//:emscripten/package-lock.json",
++            npm_command = "install",
+         )
