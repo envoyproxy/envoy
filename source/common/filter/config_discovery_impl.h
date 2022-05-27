@@ -68,16 +68,17 @@ template <class FactoryCb>
 class DynamicFilterConfigProviderImpl : public DynamicFilterConfigProviderImplBase,
                                         public DynamicFilterConfigProvider<FactoryCb> {
 public:
-  DynamicFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
-                                  const absl::flat_hash_set<std::string>& require_type_urls,
-                                  Server::Configuration::FactoryContext& factory_context,
-                                  ProtobufTypes::MessagePtr&& default_config,
-                                  bool last_filter_in_filter_chain,
-                                  const std::string& filter_chain_type,
-                                  absl::string_view stat_prefix)
+  DynamicFilterConfigProviderImpl(
+      FilterConfigSubscriptionSharedPtr& subscription,
+      const absl::flat_hash_set<std::string>& require_type_urls,
+      Server::Configuration::FactoryContext& factory_context,
+      ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type, absl::string_view stat_prefix,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher)
       : DynamicFilterConfigProviderImplBase(subscription, require_type_urls,
                                             last_filter_in_filter_chain, filter_chain_type),
-        stat_prefix_(stat_prefix), main_config_(std::make_shared<MainConfig>()),
+        listener_filter_matcher_(listener_filter_matcher), stat_prefix_(stat_prefix),
+        main_config_(std::make_shared<MainConfig>()),
         default_configuration_(std::move(default_config)), tls_(factory_context.threadLocal()) {
     tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
   };
@@ -120,9 +121,13 @@ public:
       onConfigUpdate(*default_configuration_, "", nullptr);
     }
   }
+  const Network::ListenerFilterMatcherSharedPtr& getListenerFilterMatcher() override {
+    return listener_filter_matcher_;
+  }
 
 protected:
   const std::string& getStatPrefix() const { return stat_prefix_; }
+  const Network::ListenerFilterMatcherSharedPtr listener_filter_matcher_;
 
 private:
   virtual FactoryCb instantiateFilterFactory(const Protobuf::Message& message) const PURE;
@@ -163,17 +168,16 @@ private:
 class HttpDynamicFilterConfigProviderImpl
     : public DynamicFilterConfigProviderImpl<Http::FilterFactoryCb> {
 public:
-  HttpDynamicFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
-                                      const absl::flat_hash_set<std::string>& require_type_urls,
-                                      Server::Configuration::FactoryContext& factory_context,
-                                      ProtobufTypes::MessagePtr&& default_config,
-                                      bool last_filter_in_filter_chain,
-                                      const std::string& filter_chain_type,
-                                      absl::string_view stat_prefix,
-                                      const Network::ListenerFilterMatcherSharedPtr&)
+  HttpDynamicFilterConfigProviderImpl(
+      FilterConfigSubscriptionSharedPtr& subscription,
+      const absl::flat_hash_set<std::string>& require_type_urls,
+      Server::Configuration::FactoryContext& factory_context,
+      ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type, absl::string_view stat_prefix,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher)
       : DynamicFilterConfigProviderImpl(subscription, require_type_urls, factory_context,
                                         std::move(default_config), last_filter_in_filter_chain,
-                                        filter_chain_type, stat_prefix),
+                                        filter_chain_type, stat_prefix, listener_filter_matcher),
         factory_context_(factory_context) {}
   void validateMessage(const std::string& config_name, const Protobuf::Message& message,
                        const std::string& factory_name) const override {
@@ -208,15 +212,14 @@ public:
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher)
       : DynamicFilterConfigProviderImpl<FactoryCb>(
             subscription, require_type_urls, factory_context, std::move(default_config),
-            last_filter_in_filter_chain, filter_chain_type, stat_prefix),
-        factory_context_(factory_context), listener_filter_matcher_(listener_filter_matcher) {}
+            last_filter_in_filter_chain, filter_chain_type, stat_prefix, listener_filter_matcher),
+        factory_context_(factory_context) {}
 
   void validateMessage(const std::string&, const Protobuf::Message&,
                        const std::string&) const override {}
 
 protected:
   Server::Configuration::ListenerFactoryContext& factory_context_;
-  const Network::ListenerFilterMatcherSharedPtr listener_filter_matcher_;
 };
 
 class TcpListenerDynamicFilterConfigProviderImpl
