@@ -496,14 +496,6 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  flag_registry.findFlag("FLAGS_quic_reloadable_flag_quic_testonly_default_false")
-      ->setValueFromString("true");
-  flag_registry.findFlag("FLAGS_quic_restart_flag_quic_testonly_default_true")
-      ->setValueFromString("0");
-  flag_registry.findFlag("FLAGS_quic_time_wait_list_seconds")->setValueFromString("100");
-  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
-  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
 }
 
 class FileUtilsTest : public testing::Test {
