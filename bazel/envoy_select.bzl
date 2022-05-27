@@ -44,7 +44,8 @@ def envoy_select_hot_restart(xs, repository = ""):
 def envoy_select_wasm_cpp_tests(xs):
     return select({
         "@envoy//bazel:not_x86_or_wasm_disabled": [],
-        "//conditions:default": xs,
+        # TODO(PiotrSikora): re-enable once NPM download issues are fixed.
+        "//conditions:default": [],
     })
 
 # Selects the given values depending on the Wasm runtimes enabled in the current build,
