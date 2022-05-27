@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // The Dlb is a hardware managed system of queues and arbiters connecting producers and consumers. It is a PCIE device
 // in the CPU package. It interacts with software running on cores and potentially other devices. The Dlb implements the
-// load balancing features outlined earlier, including the following:
+// following balancing features:
 // -  Lock-free multi-producer/multi-consumer operation.
 // -  Multiple priorities for varying traffic types.
 // -  Various distribution schemes.
