@@ -68,12 +68,6 @@ FlagRegistry& FlagRegistry::getInstance() {
 
 FlagRegistry::FlagRegistry() : flags_(makeFlagMap()) {}
 
-void FlagRegistry::resetFlags() const {
-  for (auto& [flag_name, flag] : flags_) {
-    flag->resetValue();
-  }
-}
-
 void FlagRegistry::updateReloadableFlags(
     const absl::flat_hash_map<std::string, bool>& quiche_flags_override) {
   for (auto& [flag_name, flag] : flags_) {

@@ -75,6 +75,7 @@ protected:
     GetLogger().set_level(log_level_);
   }
 
+  quiche::test::QuicheFlagSaver saver_;
   const quiche::QuicheLogLevel log_level_;
   const int verbosity_log_threshold_;
 };
@@ -476,23 +477,25 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 TEST_F(QuicPlatformTest, QuicFlags) {
   auto& flag_registry = quiche::FlagRegistry::getInstance();
   EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr));
-  flag_registry.resetFlags();
 
-  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
-  SetQuicReloadableFlag(quic_testonly_default_false, true);
-  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  {
+    quiche::test::QuicheFlagSaver saver;
+    EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+    EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
+    SetQuicReloadableFlag(quic_testonly_default_false, true);
+    EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
 
-  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
-  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
-  SetQuicRestartFlag(quic_testonly_default_false, true);
-  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
+    EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
+    EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
+    SetQuicRestartFlag(quic_testonly_default_false, true);
+    EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
 
-  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
-  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+    EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+    SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
+    EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+  }
 
-  flag_registry.resetFlags();
+  // Verify that the saver reset all the flags to their previous values.
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));

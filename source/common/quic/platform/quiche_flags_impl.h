@@ -32,9 +32,6 @@ public:
   // Return singleton instance.
   static FlagRegistry& getInstance();
 
-  // Reset all registered flags to their default values.
-  void resetFlags() const;
-
   void updateReloadableFlags(const absl::flat_hash_map<std::string, bool>& quiche_flags_override);
 
 private:
@@ -49,9 +46,6 @@ public:
   // Construct Flag with the given name and help string.
   Flag(const char* name, const char* help) : name_(name), help_(help) {}
   virtual ~Flag() = default;
-
-  // Reset flag to default value.
-  virtual void resetValue() = 0;
 
   // Return flag name.
   absl::string_view name() const { return name_; }
@@ -69,11 +63,6 @@ template <typename T> class TypedFlag : public Flag {
 public:
   TypedFlag(const char* name, T default_value, const char* help)
       : Flag(name, help), value_(default_value), default_value_(default_value) {}
-
-  void resetValue() override {
-    absl::MutexLock lock(&mutex_);
-    value_ = default_value_;
-  }
 
   // Set flag value.
   void setValue(T value) {
