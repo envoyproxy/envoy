@@ -1,4 +1,4 @@
-.. _config_http_filters_http_cache:
+.. _config_http_filters_cache:
 
 Cache filter
 ============
@@ -21,8 +21,8 @@ For HTTP Responses:
 * HTTP Cache respects ``Cache-Control`` directive from the upstream host. For example, if HTTP response returns status code 200 with ``Cache-Control: max-age=60`` and no ``vary`` header, it will be cached.
 * HTTP Cache only caches responses with status codes: 200, 203, 204, 206, 300, 301, 308, 404, 405, 410, 414, 451, 501.
 
-HTTP Cache delegates the actual storage of HTTP responses to implementations of the ``HttpCache`` interface. These implementations can 
-cover all points on the spectrum of persistence, performance, and distribution, from local RAM caches to globally distributed 
+HTTP Cache delegates the actual storage of HTTP responses to implementations of the ``HttpCache`` interface. These implementations can
+cover all points on the spectrum of persistence, performance, and distribution, from local RAM caches to globally distributed
 persistent caches. They can be fully custom caches, or wrappers/adapters around local or remote open-source or proprietary caches.
 Currently only available cache storage implementation is :ref:`SimpleHTTPCache <envoy_v3_api_msg_extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig>`
 
@@ -37,3 +37,8 @@ Example filter configuration with a ``SimpleHttpCache`` cache implementation:
    :linenos:
    :lineno-start: 29
    :caption: :download:`http-cache-configuration.yaml <_include/http-cache-configuration.yaml>`
+
+.. seealso::
+
+   :ref:`Envoy Cache Sandbox <install_sandboxes_cache_filter>`
+      Learn more about the Envoy Cache filter in the step by step sandbox.
