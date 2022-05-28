@@ -17,12 +17,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The Dlb is a hardware managed system of queues and arbiters connecting producers and consumers. It is a PCIE device
 // in the CPU package. It interacts with software running on cores and potentially other devices. The Dlb implements the
 // following balancing features:
+//
 // -  Lock-free multi-producer/multi-consumer operation.
 // -  Multiple priorities for varying traffic types.
 // -  Various distribution schemes.
 //
-// Dlb connection balancer uses Dlb hardware to balance connections. With it, the latency like P99 significantly reduces.
-// Since Dlb connection balancer needs help of Dlb hardware, it should be used when there are big number connections
-// (e.g., Gateway).
+// Dlb connection balancer uses Dlb hardware to balance connections, and can significantly reduce latency.
+//
+// As the Dlb connection balancer provides assistance from dedicated Dlb hardware, it can be used for a proxy with a large number of connections
+// (e.g., a gateway).
 message Dlb {
 }

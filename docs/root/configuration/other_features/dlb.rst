@@ -1,6 +1,6 @@
 .. _config_connection_balance_dlb:
 
-DLB Connection Balancer
+Dlb Connection Balancer
 =======================
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.dlb.v3alpha.Dlb>`
@@ -8,35 +8,32 @@ DLB Connection Balancer
 
 This connection balancer extension provides Envoy with low latency networking by integrating with `Intel DLB <https://networkbuilders.intel.com/solutionslibrary/queue-management-and-load-balancing-on-intel-architecture>`_ through the libdlb library.
 
-The DLB connection balancer is only included in :ref:`contrib images <install_contrib>`
+The Dlb connection balancer is only included in :ref:`contrib images <install_contrib>`
 
 Example configuration
 ---------------------
 
-.. code-block:: yaml
+An example for Dlb connection balancer configuration is:
 
-  static_resources:
-    listeners:
-      connection_balance_config:
-        extend_balance:
-          name: envoy.network.connection_balance.dlb
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.dlb.v3alpha.Dlb
+.. literalinclude:: _include/dlb.yaml
+    :language: yaml
+
 
 How it works
 ------------
 
-If enabled, the DLB connection balancer will
-- attache DLB hardware
+If enabled, the Dlb connection balancer will:
+
+- attach Dlb hardware
 - create a queue for balancing
 - create one port to send and one port to receive for each worker thread
 - create one eventfd for each worker thread and attach each eventfd to corresponding customer
-- register each eventfd to corresponding customer and DLB hardware
+- register each eventfd to corresponding customer and Dlb hardware
 
-When new connections come, one worker thread will accept it and send it to DLB hardware. DLB hardware
+When new connections come, one worker thread will accept it and send it to Dlb hardware. Dlb hardware
 does balancing then trigger one worker thread to receive via libevent.
 
-Installing and using DLB
+Installing and using Dlb
 ------------------------
 
-For information on how to build/install and use libdlb see the getting started guide `here <https://downloadmirror.intel.com/727424/DLB_Driver_User_Guide.pdf>`_.
+For information on how to build/install and use libdlb see `the getting started guide <https://downloadmirror.intel.com/727424/DLB_Driver_User_Guide.pdf>`_.
