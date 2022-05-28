@@ -5,45 +5,16 @@
 # bazel run //tools/config_validation:validate_fragment -- \
 #   envoy.config.bootstrap.v3.Bootstrap $PWD/configs/envoyproxy_io_proxy.yaml
 
+import argparse
 import json
 import pathlib
 
 import yaml
 
-from google.protobuf import descriptor_pb2
-from google.protobuf import descriptor_pool
 from google.protobuf import json_format
-from google.protobuf import message_factory
-from google.protobuf import text_format
 
-from bazel_tools.tools.python.runfiles import runfiles
-
-import argparse
-
-
-class IgnoredKey(yaml.YAMLObject):
-    """Python support type for Envoy's config !ignore tag."""
-    yaml_tag = '!ignore'
-
-    def __init__(self, strval):
-        self.strval = strval
-
-    def __repr__(self):
-        return f'IgnoredKey({str})'
-
-    def __eq__(self, other):
-        return isinstance(other, IgnoredKey) and self.strval == other.strval
-
-    def __hash__(self):
-        return hash((self.yaml_tag, self.strval))
-
-    @classmethod
-    def from_yaml(cls, loader, node):
-        return IgnoredKey(node.value)
-
-    @classmethod
-    def to_yaml(cls, dumper, data):
-        return dumper.represent_scalar(cls.yaml_tag, data.strval)
+from common import load_pool
+from common import IgnoredKey
 
 
 def validate_yaml(type_name, content, descriptor_path=None):
@@ -65,21 +36,7 @@ def validate_fragment(type_name, fragment, descriptor_path=None):
           fragment.
     """
     json_fragment = json.dumps(fragment, skipkeys=True)
-
-    if not descriptor_path:
-        r = runfiles.Create()
-        descriptor_path = r.Rlocation(
-            'envoy/tools/type_whisperer/all_protos_with_ext_pb_text.pb_text')
-
-    file_desc_set = descriptor_pb2.FileDescriptorSet()
-    text_format.Parse(
-        pathlib.Path(descriptor_path).read_text(), file_desc_set, allow_unknown_extension=True)
-
-    pool = descriptor_pool.DescriptorPool()
-    for f in file_desc_set.file:
-        pool.Add(f)
-    desc = pool.FindMessageTypeByName(type_name)
-    msg = message_factory.MessageFactory(pool=pool).GetPrototype(desc)()
+    msg, pool = load_pool(type_name, descriptor_path=descriptor_path)
     json_format.Parse(json_fragment, msg, descriptor_pool=pool)
 
 
