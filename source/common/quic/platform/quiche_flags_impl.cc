@@ -73,7 +73,7 @@ void FlagRegistry::updateReloadableFlags(
   for (auto& [flag_name, flag] : flags_) {
     const auto it = quiche_flags_override.find(flag_name);
     if (it != quiche_flags_override.end()) {
-      static_cast<TypedFlag<bool>*>(flag)->setReloadedValue(it->second);
+      static_cast<TypedFlag<bool>*>(flag)->setValue(it->second);
     }
   }
 }
