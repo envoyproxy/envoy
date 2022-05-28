@@ -1,4 +1,5 @@
-"""Tests the api version header file generation.
+"""Tests the textproto2yaml helper converting textproto
+to yaml and validated code fragment.
 """
 import os
 import pathlib
