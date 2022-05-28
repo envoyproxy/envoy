@@ -34,3 +34,15 @@ py_library(
         "@com_google_protobuf//:protobuf_python",
     ],
 )
+
+py_test(
+    name = "textproto2yaml_test",
+    srcs = ["textproto2yaml_test.py"],
+    data = [
+        "//tools/testdata/config_validation:textproto2yaml_testdata",
+    ],
+    main = "textproto2yaml_test.py",
+    deps = [
+        ":textproto2yaml",
+    ],
+)

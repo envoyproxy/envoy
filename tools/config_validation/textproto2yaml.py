@@ -2,8 +2,9 @@
 #
 # Example usage:
 #
-# bazel run //tools/config_validation:textproto2yaml -- \
-#   --as_fragment envoy.config.bootstrap.v3.Bootstrap path/to/message.textproto
+# bazel run //tools/config_validation:textproto2yaml -- --as_fragment \
+#   envoy.config.bootstrap.v3.Bootstrap \
+#   $PWD/tools/testdata/config_validation/input.textproto
 
 import argparse
 import json
@@ -14,7 +15,6 @@ import yaml
 
 from google.protobuf import json_format
 from google.protobuf import text_format
-
 
 from common import load_pool
 from common import IgnoredKey

@@ -1,0 +1,68 @@
+# proto-file: xds/type/matcher/v3/matcher.proto
+# proto-message: Matcher
+# proto-import: envoy/type/matcher/v3/http_inputs.proto
+# proto-import: envoy/type/v3/token_bucket.proto
+# proto-import: xds/type/v3/range.proto
+
+# Note: this is just for testing purposes. Features for testing:
+# - typed config
+# - cncf/xds Matchers chosen to verify that messages from the dependencies works
+# - cncf/xds Range used to verify mix-and-match with dependencies works
+
+matcher_list {
+
+  matchers {
+    predicate {
+      single_predicate {
+        input {
+          typed_config {
+            [type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput] {
+              header_name: "env"
+            }
+          }
+        }
+        value_match {
+          exact: "staging"
+        }
+      }
+    }
+    on_match {
+      action {
+        typed_config {
+          [type.googleapis.com/envoy.type.v3.TokenBucket] {
+            max_tokens: 120
+          }
+        }
+      }
+    }
+  }
+
+  matchers {
+    predicate {
+      single_predicate {
+        input {
+          typed_config {
+            [type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput] {
+              header_name: "env"
+            }
+          }
+        }
+        value_match {
+          exact: "prod"
+        }
+      }
+    }
+    on_match {
+      action {
+        typed_config {
+          [type.googleapis.com/xds.type.v3.Int32Range] {
+            start: -100
+            end: 0
+          }
+        }
+      }
+    }
+  }
+
+}
+
