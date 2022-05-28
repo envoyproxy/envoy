@@ -6,9 +6,9 @@
 # enough to consume all memory constrained by cgroup in large host.
 # Limiting JVM heapsize here to let it do GC more when approaching the limit to
 # leave room for compiler/linker.
-# The number 2G is chosen heuristically to both support large VM and small VM with RBE.
+# The number 3G is chosen heuristically to both support large VM and small VM with RBE.
 # Startup options cannot be selected via config.
-startup --host_jvm_args=-Xmx2g
+startup --host_jvm_args=-Xmx3g
 
 run --color=yes
 
@@ -284,7 +284,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:3de483a98c5e24973e710b4f97b2dabcd3cb621f
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
