@@ -38,8 +38,7 @@ private:
 // Concrete class for QUICHE protocol and feature flags, templated by flag type.
 template <typename T> class TypedFlag : public Flag {
 public:
-  TypedFlag(const char* name, T value, const char* help)
-      : Flag(name, help), value_(value) {}
+  TypedFlag(const char* name, T value, const char* help) : Flag(name, help), value_(value) {}
 
   // Set flag value.
   void setValue(T value) {
