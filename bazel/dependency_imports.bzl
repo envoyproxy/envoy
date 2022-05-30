@@ -58,6 +58,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION):
         importpath = "google.golang.org/grpc",
         sum = "h1:raiipEjMOIC/TO2AvyTxP25XFdLxNIBwzDh3FM3XztI=",
         version = "v1.34.0",
+        build_external = "external",
         # project_url = "https://pkg.go.dev/google.golang.org/grpc",
         # last_update = "2020-12-02"
         # use_category = ["api"],
