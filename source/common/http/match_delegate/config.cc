@@ -286,10 +286,9 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
 
 /**
  * Static registration for the match delegate filter. @see RegisterFactory.
- * Note that we register this as a filter in order to serve as a drop in delegate for other HTTP
- * filters. While not a real filter, by being registered as one all the code paths that look up
- * HTTP filters will look up this filter factory instead, which does the work to create and
- * associate a match tree with the underlying filter.
+ * This match delegate filter is designed as delegate of all other HTTP filters. It will create
+ * and associate a match tree with the underlying filter to help the underlying filter consume
+ * match result of match tree.
  */
 REGISTER_FACTORY(MatchDelegateConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
