@@ -1,7 +1,6 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("@envoy_repo//:path.bzl", "PATH")
-load("@com_github_aignas_rules_shellcheck//:def.bzl", "shellcheck")
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 
 licenses(["notice"])  # Apache 2
@@ -24,23 +23,11 @@ envoy_entry_point(
     args = [
         "--extensions_build_config=$(location :extensions_build_config)",
         "--path=%s" % PATH,
-        "-b shellcheck:$(location :shellcheck)",
+        "-b shellcheck:$(location @com_github_aignas_rules_shellcheck//:shellcheck)",
     ],
     data = [
         ":extensions_build_config",
-        ":shellcheck",
+        "@com_github_aignas_rules_shellcheck//:shellcheck",
     ],
     pkg = "envoy.code.check",
-)
-
-shellcheck(name = "_shellcheck")
-
-# Workaround for: https://github.com/aignas/rules_shellcheck/issues/5
-sh_binary(
-    name = "shellcheck",
-    srcs = [":run_shellcheck.sh"],
-    args = [
-        "$(location :_shellcheck)",
-    ],
-    data = [":_shellcheck"],
 )
