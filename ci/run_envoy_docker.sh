@@ -37,7 +37,7 @@ else
   ENVOY_DOCKER_OPTIONS+=(-u root:root)
   ENVOY_DOCKER_OPTIONS+=(-v /var/run/docker.sock:/var/run/docker.sock)
   ENVOY_DOCKER_OPTIONS+=(--cap-add SYS_PTRACE --cap-add NET_RAW --cap-add NET_ADMIN)
-  DEFAULT_ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
+  DEFAULT_ENVOY_DOCKER_BUILD_DIR=${defualt_envoy_docker_build_dir:=/tmp/envoy-docker-build}
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
