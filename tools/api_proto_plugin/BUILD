@@ -2,6 +2,8 @@ load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@rules_python//python:defs.bzl", "py_library")
 load("//tools/type_whisperer:type_database.bzl", "type_database")
 
+load("@dev_pip3//:requirements.bzl", dev_requirement = "requirement")
+
 licenses(["notice"])  # Apache 2
 
 py_library(

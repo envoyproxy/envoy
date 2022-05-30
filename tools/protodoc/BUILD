@@ -8,6 +8,8 @@ load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_genjson", "env
 load("@dev_pip3//:requirements.bzl", dev_entry_point = "entry_point", dev_requirement = "requirement")
 
 
+load("@dev_pip3//:requirements.bzl", dev_requirement = "requirement")
+
 licenses(["notice"])  # Apache 2
 
 envoy_package()
@@ -16,7 +18,10 @@ py_binary(
     name = "generate_empty",
     srcs = ["generate_empty.py"],
     visibility = ["//visibility:public"],
-    deps = [":protodoc"],
+    deps = [
+        ":jinja",
+        ":protodoc",
+    ],
 )
 
 py_proto_library(
@@ -113,6 +118,7 @@ py_binary(
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
         requirement("envoy.code.check"),
+        dev_requirement("remote_pdb"),
     ],
 )
 
@@ -131,18 +137,29 @@ py_library(
 
 envoy_jinja_env(
     name = "jinja",
-    filters = {
-        "rst_anchor": "tools.protodoc.rst_filters.rst_anchor",
-        "rst_header": "tools.protodoc.rst_filters.rst_header",
-    },
     templates = [
+        "templates/comment.rst.tpl",
+        "templates/content.rst.tpl",
         "templates/empty.rst.tpl",
+        "templates/enum.rst.tpl",
         "templates/extension.rst.tpl",
         "templates/extension_category.rst.tpl",
+        "templates/file.rst.tpl",
+        "templates/header.rst.tpl",
+        "templates/message.rst.tpl",
+        "templates/security.rst.tpl",
     ],
     deps = [
         ":rst_filters",
     ],
+    env_kwargs = {
+        "trim_blocks": True,
+        "lstrip_blocks": True,
+    },
+    filters = {
+        "rst_anchor": "tools.protodoc.rst_filters.rst_anchor",
+        "rst_header": "tools.protodoc.rst_filters.rst_header",
+    },
 )
 
 envoy_entry_point(

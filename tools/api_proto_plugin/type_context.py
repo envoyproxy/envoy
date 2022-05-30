@@ -1,6 +1,11 @@
 """Type context for FileDescriptorProto traversal."""
 
+import logging
+from functools import cached_property
+
 from tools.api_proto_plugin import annotations
+
+logger = logging.getLogger(__name__)
 
 
 class Comment(object):
@@ -32,14 +37,11 @@ class SourceCodeInfo(object):
         self.proto = source_code_info
         # Map from path to SourceCodeInfo.Location
         self._locations = {str(location.path): location for location in self.proto.location}
-        self._file_level_comments = None
         self._file_level_annotations = None
 
-    @property
+    @cached_property
     def file_level_comments(self):
         """Obtain inferred file level comment."""
-        if self._file_level_comments:
-            return self._file_level_comments
         comments = []
         # We find the earliest detached comment by first finding the maximum start
         # line for any location and then scanning for any earlier locations with
@@ -47,21 +49,17 @@ class SourceCodeInfo(object):
         earliest_detached_comment = max(location.span[0] for location in self.proto.location) + 1
         for location in self.proto.location:
             if location.leading_detached_comments and location.span[0] < earliest_detached_comment:
-                comments = location.leading_detached_comments
+                comments = [l[1:] for l in location.leading_detached_comments]
                 earliest_detached_comment = location.span[0]
-        self._file_level_comments = comments
         return comments
 
-    @property
+    @cached_property
     def file_level_annotations(self):
         """Obtain inferred file level annotations."""
-        if self._file_level_annotations:
-            return self._file_level_annotations
-        self._file_level_annotations = dict(
+        return dict(
             sum([
                 list(annotations.extract_annotations(c).items()) for c in self.file_level_comments
             ], []))
-        return self._file_level_annotations
 
     def location_path_lookup(self, path):
         """Lookup SourceCodeInfo.Location by path in SourceCodeInfo.
@@ -89,7 +87,8 @@ class SourceCodeInfo(object):
         """
         location = self.location_path_lookup(path)
         if location is not None:
-            return Comment(location.leading_comments, self.file_level_annotations)
+            comments = "\n".join(s[1:] for s in location.leading_comments.split("\n"))
+            return Comment(comments, self.file_level_annotations)
         return Comment('')
 
     def leading_detached_comments_path_lookup(self, path):

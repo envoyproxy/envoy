@@ -2,6 +2,7 @@
 
 import cProfile
 import io
+import logging
 import os
 import pstats
 import sys
@@ -10,6 +11,8 @@ from collections import namedtuple
 from tools.api_proto_plugin import traverse
 
 from google.protobuf.compiler import plugin_pb2
+
+logger = logging.getLogger(__name__)
 
 OutputDescriptor = namedtuple(
     'OutputDescriptor',
