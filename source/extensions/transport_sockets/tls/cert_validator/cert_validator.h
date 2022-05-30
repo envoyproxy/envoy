@@ -62,7 +62,10 @@ public:
                                     bool handshaker_provides_certificates) PURE;
 
   /**
-   * Called when calculation hash for session context ids
+   * Called when calculation hash for session context ids. This hash MUST include all
+   * configuration used to validate a peer certificate, so that if this configuration
+   * is changed, sessions cannot be re-used and must be re-negotiated and re-validated
+   * using the new settings.
    *
    * @param md the store context
    * @param hash_buffer the buffer used for digest calculation
@@ -72,7 +75,7 @@ public:
                                         uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                         unsigned hash_length) PURE;
 
-  virtual size_t daysUntilFirstCertExpires() const PURE;
+  virtual absl::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
   virtual std::string getCaFileName() const PURE;
   virtual Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const PURE;
 };

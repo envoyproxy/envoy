@@ -448,7 +448,7 @@ discussed in the next section.
 The resulting HTTP connection pool is used to build an ``UpstreamRequest`` object in the router, which
 encapsulates the HTTP encoding and decoding callback methods for the upstream HTTP request. Once a
 stream is allocated on a connection in the HTTP connection pool, the request headers are forwarded
-to the upstream endpoint by the invocation of ``UpstreamRequest::encoderHeaders()``.
+to the upstream endpoint by the invocation of ``UpstreamRequest::encodeHeaders``.
 
 The router filter is responsible for all aspects of upstream request lifecycle management on the
 stream allocated from the HTTP connection pool. It also is responsible for request timeouts, retries

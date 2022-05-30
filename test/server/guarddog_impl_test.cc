@@ -573,7 +573,7 @@ protected:
           "config": {
             "name": "LogFactory",
             "typed_config": {
-              "@type": "type.googleapis.com/google.protobuf.Empty"
+              "@type": "type.googleapis.com/google.protobuf.Struct"
             }
           },
           "event": "MEGAMISS"
@@ -584,7 +584,7 @@ protected:
           "config": {
             "name": "LogFactory",
             "typed_config": {
-              "@type": "type.googleapis.com/google.protobuf.Empty"
+              "@type": "type.googleapis.com/google.protobuf.Struct"
             }
           },
           "event": "MISS"
@@ -600,7 +600,7 @@ protected:
 
   std::vector<std::string> actions_;
   std::vector<std::string> events_;
-  RecordGuardDogActionFactory<Envoy::ProtobufWkt::Empty> log_factory_;
+  RecordGuardDogActionFactory<Envoy::ProtobufWkt::Struct> log_factory_;
   Registry::InjectFactory<Configuration::GuardDogActionFactory> register_log_factory_;
   AssertGuardDogActionFactory<Envoy::ProtobufWkt::Empty> assert_factory_;
   Registry::InjectFactory<Configuration::GuardDogActionFactory> register_assert_factory_;

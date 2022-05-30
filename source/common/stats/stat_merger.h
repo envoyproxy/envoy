@@ -96,7 +96,7 @@ private:
   // preserve all stats throughout the hot restart. Then, when the restart completes, dropping
   // the scope will drop exactly those stats whose names have not already been accessed through
   // another store/scope.
-  ScopePtr temp_scope_;
+  ScopeSharedPtr temp_scope_;
 };
 
 } // namespace Stats

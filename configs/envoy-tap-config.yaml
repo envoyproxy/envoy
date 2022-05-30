@@ -35,6 +35,8 @@ static_resources:
                   cluster: service_envoyproxy_io
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: service_envoyproxy_io
     type: LOGICAL_DNS

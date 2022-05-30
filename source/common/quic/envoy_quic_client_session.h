@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/http/alternate_protocols_cache.h"
+#include "envoy/http/http_server_properties_cache.h"
 
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_stream.h"
@@ -25,16 +25,16 @@ class EnvoyQuicClientSession : public QuicFilterManagerConnectionImpl,
                                public Network::ClientConnection,
                                public PacketsToReadDelegate {
 public:
-  EnvoyQuicClientSession(const quic::QuicConfig& config,
-                         const quic::ParsedQuicVersionVector& supported_versions,
-                         std::unique_ptr<EnvoyQuicClientConnection> connection,
-                         const quic::QuicServerId& server_id,
-                         std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
-                         quic::QuicClientPushPromiseIndex* push_promise_index,
-                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                         EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
-                         QuicStatNames& quic_stat_names,
-                         OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope);
+  EnvoyQuicClientSession(
+      const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
+      std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
+      std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
+      quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
+      uint32_t send_buffer_limit,
+      EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
+      QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
+      Stats::Scope& scope,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options);
 
   ~EnvoyQuicClientSession() override;
 
@@ -63,6 +63,8 @@ public:
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
+  void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
+                                   std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
@@ -112,9 +114,10 @@ private:
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
   QuicStatNames& quic_stat_names_;
-  OptRef<Http::AlternateProtocolsCache> rtt_cache_;
+  OptRef<Http::HttpServerPropertiesCache> rtt_cache_;
   Stats::Scope& scope_;
   bool disable_keepalive_{false};
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 };
 
 } // namespace Quic

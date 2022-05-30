@@ -7,8 +7,9 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "docs" ||  \
-          "$1" == "bazel.clang_tidy" || "$1" == "tooling" || "$1" == "deps" || "$1" == "verify_examples" || \
-          "$1" == "verify_build_examples" ]]; then
+          "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" || "$1" == "tooling" \
+          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "verify_build_examples" \
+          || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
 fi
 
@@ -75,11 +76,18 @@ function cp_binary_for_image_build() {
   echo "Copying binary for image build..."
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   cp -f "${FINAL_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
-  # Copy the su-exec utility binary into the image
-  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     cp -f "${FINAL_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   fi
+
+  # Tools for the tools image. Strip to save size.
+  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
+
+  # Copy the su-exec utility binary into the image
+  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+
+  # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
   strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
@@ -115,6 +123,7 @@ function bazel_binary_build() {
 
   echo "Building (type=${BINARY_TYPE} target=${BUILD_TARGET} debug=${BUILD_DEBUG_INFORMATION} name=${EXE_NAME})..."
   ENVOY_BIN=$(echo "${BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
+  echo "ENVOY_BIN=${ENVOY_BIN}"
 
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
@@ -134,8 +143,12 @@ function bazel_binary_build() {
     cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
 
+  # Validation tools for the tools image.
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" \
+    //test/tools/schema_validator:schema_validator_tool ${CONFIG_ARGS}
+
   # Build su-exec utility
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" external:su-exec
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" external:su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -192,6 +205,8 @@ else
   if [[ "$CI_TARGET" == "bazel.release" ]]; then
     # We test contrib on release only.
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
+  elif [[ "${CI_TARGET}" == "bazel.msan" ]]; then
+    COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
   fi
   TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
 fi
@@ -215,6 +230,30 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   echo "bazel contrib release build..."
   bazel_contrib_binary_build release
 
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
+  echo "Building distro packages..."
+
+  setup_clang_toolchain
+
+  # By default the packages will be signed by the first available key.
+  # If there is no key available, a throwaway key is created
+  # and the packages signed with it, for the purpose of testing only.
+  if ! gpg --list-secret-keys "*"; then
+      export PACKAGES_MAINTAINER_NAME="Envoy CI"
+      export PACKAGES_MAINTAINER_EMAIL="envoy-ci@for.testing.only"
+      BAZEL_BUILD_OPTIONS+=(
+          "--action_env=PACKAGES_GEN_KEY=1"
+          "--action_env=PACKAGES_MAINTAINER_NAME"
+          "--action_env=PACKAGES_MAINTAINER_EMAIL")
+  fi
+
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //distribution:packages.tar.gz
+  if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+      cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
+  else
+      cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.arm64.tar.gz"
+  fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
@@ -301,7 +340,7 @@ elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
   BAZEL_BUILD_OPTIONS=("--config=rbe-toolchain-msan" "${BAZEL_BUILD_OPTIONS[@]}" "-c" "dbg" "--build_tests_only")
   echo "bazel MSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -- "${TEST_TARGETS[@]}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   setup_clang_toolchain
@@ -309,6 +348,16 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   echo "bazel fastbuild build with tests..."
   echo "Building..."
   bazel_envoy_binary_build fastbuild
+
+  echo "Testing ${TEST_TARGETS[*]}"
+  bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.dev.contrib" ]]; then
+  setup_clang_toolchain
+  # This doesn't go into CI but is available for developer convenience.
+  echo "bazel fastbuild build with contrib extensions and tests..."
+  echo "Building..."
+  bazel_contrib_binary_build fastbuild
 
   echo "Testing ${TEST_TARGETS[*]}"
   bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
@@ -326,6 +375,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "deprecated_features=disabled"
     "--define" "tcmalloc=gperftools"
     "--define" "zlib=ng"
+    "--define" "uhv=enabled"
     "--@envoy//bazel:http3=False"
     "--@envoy//source/extensions/filters/http/kill_request:enabled"
     "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")
@@ -457,7 +507,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
 
   echo "check dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check -- -v warn
 
   # Run pip requirements tests
   echo "check pip..."
@@ -467,14 +517,10 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 elif [[ "$CI_TARGET" == "tooling" ]]; then
   setup_clang_toolchain
 
-  # TODO(phlax): move this to a bazel rule
-
-  echo "Run pytest tooling tests..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
-
   echo "Run protoxform test"
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
 
+  # TODO(phlax): move this to a bazel rule
   echo "check_format_test..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
 
@@ -483,8 +529,16 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  run_ci_verify "*" "wasm-cc|win32-front-proxy"
+  run_ci_verify "*" "wasm-cc|win32-front-proxy|shared"
   exit 0
+elif [[ "$CI_TARGET" == "verify_distro" ]]; then
+    if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+        PACKAGE_BUILD=/build/bazel.distribution/packages.x64.tar.gz
+    else
+        PACKAGE_BUILD=/build/bazel.distribution.arm64/packages.arm64.tar.gz
+    fi
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
+    exit 0
 elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
   run_ci_verify wasm-cc
   exit 0

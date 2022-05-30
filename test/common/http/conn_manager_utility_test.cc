@@ -240,8 +240,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
@@ -254,8 +253,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
@@ -269,8 +267,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
 
 TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
@@ -1029,15 +1026,16 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
             headers.get_("x-forwarded-client-cert"));
 }
 
-// The server (local) identity is foo.com/be. The client does not set XFCC.
+// The server (local) identity is test://foo.com/be and http://backend.foo.com. The client does not
+// set XFCC.
 TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
   auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be", "http://backend.foo.com"};
   EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
-  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
+  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe", "http://frontend.foo.com"};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
   EXPECT_CALL(*ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
@@ -1060,9 +1058,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("By=test://foo.com/be;"
+  EXPECT_EQ("By=test://foo.com/be;By=http://backend.foo.com;"
             "Hash=abcdefg;"
-            "URI=test://foo.com/fe;"
+            "URI=test://foo.com/fe;URI=http://frontend.foo.com;"
             "Cert=\"%3D%3Dabc%0Ade%3D\";"
             "Chain=\"%3D%3Dabc%0Ade%3D%3D%3Dlmn%0Aop%3D\";"
             "DNS=www.example.com",
@@ -1070,17 +1068,17 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
-// also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
-// calling foo.com/fe).
+// The client identity is test://foo.com/fe and http://frontend.foo.com,
+// and the server (local) identity is test://foo.com/be and http://backend.frontend.com.
+// The client also sends the XFCC header with the authentication result of the previous hop.
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be", "http://backend.foo.com"};
   EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
-  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
+  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe", "http://frontend.foo.com"};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
   EXPECT_CALL(*ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
@@ -1098,16 +1096,19 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   details.push_back(Http::ClientCertDetailsType::Chain);
   details.push_back(Http::ClientCertDetailsType::DNS);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test://foo.com/fe;"
-                                                               "URI=test://bar.com/be;"
-                                                               "DNS=test.com;DNS=test.com"}};
+  TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert",
+                                    "By=test://foo.com/fe;By=http://frontend.foo.com;"
+                                    "URI=test://bar.com/be;"
+                                    "DNS=test.com;DNS=test.com"}};
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ(
-      "By=test://foo.com/fe;URI=test://bar.com/be;DNS=test.com;DNS=test.com,"
-      "By=test://foo.com/be;Hash=abcdefg;URI=test://foo.com/fe;"
+      "By=test://foo.com/fe;By=http://frontend.foo.com;URI=test://bar.com/"
+      "be;DNS=test.com;DNS=test.com,"
+      "By=test://foo.com/be;By=http://backend.foo.com;Hash=abcdefg;URI=test://foo.com/fe;URI=http:/"
+      "/frontend.foo.com;"
       "Cert=\"%3D%3Dabc%0Ade%3D\";Chain=\"%3D%3Dabc%0Ade%3D%3D%3Dlmn%0Aop%3D\";DNS=www.example.com",
       headers.get_("x-forwarded-client-cert"));
 }
@@ -1142,19 +1143,19 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
-// also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
-// calling foo.com/fe).
+// The client identity is test://foo.com/fe and http://frontend.foo.com, and the server
+// (local) identity is test://foo.com/be and http://backend.foo.com. The client
+// also sends the XFCC header with the authentication result of the previous hop.
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be", "http://backend.foo.com"};
   EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
   std::string peer_subject("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com");
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(peer_subject));
-  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
+  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe", "http://frontend.foo.com"};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("abcde=");
   EXPECT_CALL(*ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
@@ -1176,10 +1177,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
-            "Francisco/OU=Lyft/CN=test.lyft.com\";URI=test://foo.com/"
-            "fe;Cert=\"abcde=\";Chain=\"abcde=lmnop=\"",
-            headers.get_("x-forwarded-client-cert"));
+  EXPECT_EQ(
+      "By=test://foo.com/be;By=http://backend.foo.com;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
+      "Francisco/OU=Lyft/CN=test.lyft.com\";URI=test://foo.com/fe;URI=http://frontend.foo.com;"
+      "Cert=\"abcde=\";Chain=\"abcde=lmnop=\"",
+      headers.get_("x-forwarded-client-cert"));
 }
 
 // This test assumes the following scenario:
@@ -1970,7 +1972,7 @@ TEST_F(ConnectionManagerUtilityTest, RejectPathWithFragmentByDefault) {
 
 TEST_F(ConnectionManagerUtilityTest, DropFragmentFromPathWithOverride) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
 
   TestRequestHeaderMapImpl header_map{{":path", "/foo/bar#boom"}};
@@ -2003,9 +2005,9 @@ TEST_F(ConnectionManagerUtilityTest, DropFragmentFromPathWithOverride) {
 
 TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
+  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled", "false"}});
 
   TestRequestHeaderMapImpl header_map{{":path", "/foo/bar#boom"}};

@@ -88,9 +88,7 @@ TEST_F(MaglevLoadBalancerTest, SelectOverrideHost) {
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
   EXPECT_CALL(*mock_host, health()).WillOnce(testing::Return(Host::Health::Degraded));
 
-  LoadBalancerContext::OverrideHost expected_host{
-      "1.2.3.4", 1u << static_cast<size_t>(Host::Health::Healthy) |
-                     1u << static_cast<size_t>(Host::Health::Degraded)};
+  LoadBalancerContext::OverrideHost expected_host{"1.2.3.4"};
   EXPECT_CALL(context, overrideHostToSelect())
       .WillOnce(testing::Return(absl::make_optional(expected_host)));
 

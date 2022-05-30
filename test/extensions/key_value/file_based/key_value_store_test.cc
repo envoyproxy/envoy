@@ -25,10 +25,10 @@ protected:
     createStore();
   }
 
-  void createStore() {
+  void createStore(uint32_t max_entries = 0) {
     flush_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    store_ = std::make_unique<FileBasedKeyValueStore>(dispatcher_, flush_interval_,
-                                                      Filesystem::fileSystemForTest(), filename_);
+    store_ = std::make_unique<FileBasedKeyValueStore>(
+        dispatcher_, flush_interval_, Filesystem::fileSystemForTest(), filename_, max_entries);
   }
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::string filename_;
@@ -45,6 +45,21 @@ TEST_F(KeyValueStoreTest, Basic) {
   EXPECT_EQ("eep", store_->get("foo").value());
   store_->remove("foo");
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
+}
+
+TEST_F(KeyValueStoreTest, MaxEntries) {
+  createStore(2);
+  // Add 2 entries.
+  store_->addOrUpdate("1", "a");
+  store_->addOrUpdate("2", "b");
+  EXPECT_EQ("a", store_->get("1").value());
+  EXPECT_EQ("b", store_->get("2").value());
+
+  // Adding '3' should evict '1'.
+  store_->addOrUpdate("3", "c");
+  EXPECT_EQ("c", store_->get("3").value());
+  EXPECT_EQ("b", store_->get("2").value());
+  EXPECT_EQ(absl::nullopt, store_->get("1"));
 }
 
 TEST_F(KeyValueStoreTest, Persist) {
@@ -103,6 +118,31 @@ TEST_F(KeyValueStoreTest, Iterate) {
   EXPECT_EQ(1, stop_early_counter);
 }
 
+#ifndef NDEBUG
+TEST_F(KeyValueStoreTest, ShouldCrashIfIterateCallbackAddsOrUpdatesStore) {
+  store_->addOrUpdate("foo", "bar");
+  store_->addOrUpdate("baz", "eep");
+  KeyValueStore::ConstIterateCb update_value_callback = [this](const std::string& key,
+                                                               const std::string&) {
+    EXPECT_TRUE(key == "foo" || key == "baz");
+    store_->addOrUpdate("foo", "updated-bar");
+    return KeyValueStore::Iterate::Continue;
+  };
+
+  EXPECT_DEATH(store_->iterate(update_value_callback), "addOrUpdate under the stack of iterate");
+
+  KeyValueStore::ConstIterateCb add_key_callback = [this](const std::string& key,
+                                                          const std::string&) {
+    EXPECT_TRUE(key == "foo" || key == "baz" || key == "new-key");
+    if (key == "foo") {
+      store_->addOrUpdate("new-key", "new-value");
+    }
+    return KeyValueStore::Iterate::Continue;
+  };
+  EXPECT_DEATH(store_->iterate(add_key_callback), "addOrUpdate under the stack of iterate");
+}
+#endif
+
 TEST_F(KeyValueStoreTest, HandleBadFile) {
   auto checkBadFile = [this](std::string file, std::string error) {
     TestEnvironment::writeStringToFileForTest(filename_, file, true);
@@ -119,9 +159,9 @@ TEST_F(KeyValueStoreTest, HandleBadFile) {
 
 #ifndef WIN32
 TEST_F(KeyValueStoreTest, HandleInvalidFile) {
-  filename_ = "/foo";
+  filename_ = TestEnvironment::temporaryPath("some/unlikely/bad/path/bar");
   createStore();
-  EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file /foo", store_->flush());
+  EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file " + filename_, store_->flush());
 }
 #endif
 

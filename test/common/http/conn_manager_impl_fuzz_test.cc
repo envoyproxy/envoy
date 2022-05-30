@@ -49,19 +49,6 @@ namespace Http {
 
 class FuzzConfig : public ConnectionManagerConfig {
 public:
-  struct RouteConfigProvider : public Router::RouteConfigProvider {
-    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
-
-    // Router::RouteConfigProvider
-    Router::ConfigConstSharedPtr config() override { return route_config_; }
-    absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-    void onConfigUpdate() override {}
-
-    TimeSource& time_source_;
-    std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
-  };
-
   FuzzConfig(envoy::extensions::filters::network::http_connection_manager::v3::
                  HttpConnectionManager::ForwardClientCertDetails forward_client_cert)
       : stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
@@ -413,6 +400,7 @@ public:
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = data_action.end_stream() ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+        decoding_done_ = false;
       }
       break;
     }
@@ -436,17 +424,19 @@ public:
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
+        decoding_done_ = false;
       }
       break;
     }
     case test::common::http::RequestAction::kContinueDecoding: {
-      if (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
-          header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
-          (header_status_ == FilterHeadersStatus::StopIteration &&
-           (data_status_ == FilterDataStatus::StopIterationAndBuffer ||
-            data_status_ == FilterDataStatus::StopIterationAndWatermark ||
-            data_status_ == FilterDataStatus::StopIterationNoBuffer))) {
+      if (!decoding_done_ && (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
+                              header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
+                              (header_status_ == FilterHeadersStatus::StopIteration &&
+                               (data_status_ == FilterDataStatus::StopIterationAndBuffer ||
+                                data_status_ == FilterDataStatus::StopIterationAndWatermark ||
+                                data_status_ == FilterDataStatus::StopIterationNoBuffer)))) {
         decoder_filter_->callbacks_->continueDecoding();
+        decoding_done_ = true;
       }
       break;
     }
@@ -459,6 +449,7 @@ public:
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
+        decoding_done_ = true;
       }
       break;
     }
@@ -555,6 +546,7 @@ public:
   StreamState response_state_;
   absl::optional<Http::FilterHeadersStatus> header_status_;
   absl::optional<Http::FilterDataStatus> data_status_;
+  bool decoding_done_{};
 };
 
 using FuzzStreamPtr = std::unique_ptr<FuzzStream>;

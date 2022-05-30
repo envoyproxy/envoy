@@ -4,8 +4,6 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/quic/platform/quiche_flags_impl.h"
-
 #include <set>
 
 #include "source/common/common/assert.h"
@@ -13,6 +11,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 
 namespace quiche {
 
@@ -35,8 +34,6 @@ absl::flat_hash_map<absl::string_view, Flag*> makeFlagMap() {
   // Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by
   // default.
   FLAGS_quic_reloadable_flag_quic_disable_version_draft_29->setValue(true);
-  // This flag fixes a QUICHE issue which may crash Envoy during connection close.
-  FLAGS_quic_reloadable_flag_quic_single_ack_in_packet2->setValue(true);
   // This flag enables BBR, otherwise QUIC will use Cubic which is less performant.
   FLAGS_quic_reloadable_flag_quic_default_to_bbr->setValue(true);
 
@@ -64,11 +61,6 @@ void FlagRegistry::resetFlags() const {
   }
 }
 
-Flag* FlagRegistry::findFlag(absl::string_view name) const {
-  auto it = flags_.find(name);
-  return (it != flags_.end()) ? it->second : nullptr;
-}
-
 void FlagRegistry::updateReloadableFlags(
     const absl::flat_hash_map<std::string, bool>& quiche_flags_override) {
   for (auto& kv : flags_) {
@@ -79,71 +71,6 @@ void FlagRegistry::updateReloadableFlags(
       kv.second->resetReloadedValue();
     }
   }
-}
-
-template <> bool TypedFlag<bool>::setValueFromString(const std::string& value_str) {
-  static const auto* kTrueValues = new std::set<std::string>({"1", "t", "true", "y", "yes"});
-  static const auto* kFalseValues = new std::set<std::string>({"0", "f", "false", "n", "no"});
-  auto lower = absl::AsciiStrToLower(value_str);
-  if (kTrueValues->find(lower) != kTrueValues->end()) {
-    setValue(true);
-    return true;
-  }
-  if (kFalseValues->find(lower) != kFalseValues->end()) {
-    setValue(false);
-    return true;
-  }
-  return false;
-}
-
-template <> bool TypedFlag<int32_t>::setValueFromString(const std::string& value_str) {
-  int32_t value;
-  if (absl::SimpleAtoi(value_str, &value)) {
-    setValue(value);
-    return true;
-  }
-  return false;
-}
-
-template <> bool TypedFlag<int64_t>::setValueFromString(const std::string& value_str) {
-  int64_t value;
-  if (absl::SimpleAtoi(value_str, &value)) {
-    setValue(value);
-    return true;
-  }
-  return false;
-}
-
-template <> bool TypedFlag<double>::setValueFromString(const std::string& value_str) {
-  double value;
-  if (absl::SimpleAtod(value_str, &value)) {
-    setValue(value);
-    return true;
-  }
-  return false;
-}
-
-template <> bool TypedFlag<std::string>::setValueFromString(const std::string& value_str) {
-  setValue(value_str);
-  return true;
-}
-
-template <> bool TypedFlag<unsigned long>::setValueFromString(const std::string& value_str) {
-  unsigned long value;
-  if (absl::SimpleAtoi(value_str, &value)) {
-    setValue(value);
-    return true;
-  }
-  return false;
-}
-
-template <> bool TypedFlag<unsigned long long>::setValueFromString(const std::string& value_str) {
-  unsigned long long value;
-  if (absl::SimpleAtoi(value_str, &value)) {
-    setValue(value);
-    return true;
-  }
-  return false;
 }
 
 // Flag definitions

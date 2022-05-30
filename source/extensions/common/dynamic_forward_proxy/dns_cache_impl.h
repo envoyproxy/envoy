@@ -203,6 +203,9 @@ private:
                      std::list<Network::DnsResponse>&& response,
                      absl::optional<MonotonicTime> resolution_time = {});
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
+  void runResolutionCompleteCallbacks(const std::string& host,
+                                      const DnsHostInfoSharedPtr& host_info,
+                                      Network::DnsResolver::ResolutionStatus status);
   void runRemoveCallbacks(const std::string& host);
   void notifyThreads(const std::string& host, const DnsHostInfoImplSharedPtr& resolved_info);
   void onReResolve(const std::string& host);
@@ -226,7 +229,7 @@ private:
   const Network::DnsLookupFamily dns_lookup_family_;
   const Network::DnsResolverSharedPtr resolver_;
   ThreadLocal::TypedSlot<ThreadLocalHostInfo> tls_slot_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   DnsCacheStats stats_;
   std::list<AddUpdateCallbacksHandleImpl*> update_callbacks_;
   absl::Mutex primary_hosts_lock_;
@@ -235,6 +238,7 @@ private:
   std::unique_ptr<KeyValueStore> key_value_store_;
   DnsCacheResourceManagerImpl resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
+  const std::chrono::milliseconds min_refresh_interval_;
   const std::chrono::milliseconds timeout_interval_;
   Filesystem::Instance& file_system_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;

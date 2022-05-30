@@ -1,3 +1,4 @@
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
@@ -58,7 +59,7 @@ protected:
   void initialize(std::string&& yaml) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
-    EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
+    EXPECT_CALL(*client_, start(_, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -82,7 +83,7 @@ protected:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
-    filter_ = std::make_unique<Filter>(config_, std::move(client_));
+    filter_ = std::make_unique<Filter>(config_, std::move(client_), grpc_service_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -100,7 +101,8 @@ protected:
     }
   }
 
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks, testing::Unused) {
+  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks, testing::Unused,
+                                     testing::Unused) {
     stream_callbacks_ = &callbacks;
 
     auto stream = std::make_unique<MockStream>();
@@ -239,6 +241,7 @@ protected:
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
+  envoy::config::core::v3::GrpcService grpc_service_;
   std::unique_ptr<MockClient> client_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   ProcessingRequest last_request_;
@@ -1112,7 +1115,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -1200,7 +1204,8 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -1995,7 +2000,8 @@ TEST_F(HttpFilterTest, OutOfOrder) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_FALSE(last_request_.async_mode());
@@ -2088,6 +2094,35 @@ TEST(OverrideTest, DisabledThingsAreDisabled) {
   route1.merge(route2);
   EXPECT_TRUE(route1.disabled());
   EXPECT_FALSE(route1.processingMode());
+}
+
+// When merging two configurations, second grpc_service overrides the first.
+TEST(OverrideTest, GrpcServiceOverride) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_1");
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_2");
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  ASSERT_TRUE(route1.grpcService().has_value());
+  EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg2.overrides().grpc_service()));
+}
+
+// When merging two configurations, unset grpc_service is equivalent to no override.
+TEST(OverrideTest, GrpcServiceNonOverride) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_1");
+  ExtProcPerRoute cfg2;
+  // Leave cfg2.grpc_service unset.
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  ASSERT_TRUE(route1.grpcService().has_value());
+  EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
 }
 
 // Verify that attempts to change headers that are not allowed to be changed

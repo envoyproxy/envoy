@@ -505,6 +505,7 @@ absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }
 Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof(ss);
+  memset(&ss, 0, ss_len);
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
@@ -517,7 +518,8 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   sockaddr_storage ss;
-  socklen_t ss_len = sizeof ss;
+  socklen_t ss_len = sizeof(ss);
+  memset(&ss, 0, ss_len);
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
@@ -530,7 +532,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     // For Unix domain sockets, can't find out the peer name, but it should match our own
     // name for the socket (i.e. the path should match, barring any namespace or other
     // mechanisms to hide things, of which there are many).
-    ss_len = sizeof ss;
+    ss_len = sizeof(ss);
     result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
     if (result.return_value_ != 0) {
       throw EnvoyException(
@@ -576,6 +578,15 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime(
   return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
 }
 
+absl::optional<uint64_t> IoSocketHandleImpl::congestionWindowInBytes() const {
+  Api::EnvoyTcpInfo info;
+  auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
+  if (!result.return_value_) {
+    return {};
+  }
+  return info.tcpi_snd_cwnd;
+}
+
 absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
   auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
   if (!os_syscalls_singleton.supportsGetifaddrs()) {
@@ -612,7 +623,8 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
         interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
         break;
       default:
-        ENVOY_BUG(false, fmt::format("unexpected IP family {}", socket_address->ip()->version()));
+        ENVOY_BUG(false, fmt::format("unexpected IP family {}",
+                                     static_cast<int>(socket_address->ip()->version())));
       }
 
       if (socket_address_value == interface_address_value) {

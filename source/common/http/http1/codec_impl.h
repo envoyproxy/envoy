@@ -60,7 +60,7 @@ public:
   // progress may be made with the codec.
   void resetStream(StreamResetReason reason) override;
   void readDisable(bool disable) override;
-  uint32_t bufferLimit() override;
+  uint32_t bufferLimit() const override;
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
   void setFlushTimeout(std::chrono::milliseconds) override {
@@ -80,8 +80,6 @@ public:
   void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
-
-  void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
@@ -258,11 +256,8 @@ protected:
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
-  // ParserCallbacks.
   // This must be protected because it is called through ServerConnectionImpl::sendProtocolError.
-  Status onMessageBegin() override;
-  // Connection specific callback method.
-  virtual Status onMessageBeginBase() PURE;
+  Status onMessageBeginImpl();
 
   /**
    * Get memory used to represent HTTP headers or trailers currently being parsed.
@@ -283,6 +278,7 @@ protected:
   const Http1Settings codec_settings_;
   std::unique_ptr<Parser> parser_;
   Buffer::Instance* current_dispatching_buffer_{};
+  Buffer::Instance* output_buffer_ = nullptr; // Not owned
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterConstPtr encode_only_header_key_formatter_;
   HeaderString current_header_field_;
@@ -345,18 +341,32 @@ private:
   void onDispatch(const Buffer::Instance& data);
 
   // ParserCallbacks.
-  Status onHeaderField(const char* data, size_t length) override;
-  Status onHeaderValue(const char* data, size_t length) override;
-  Envoy::StatusOr<ParserStatus> onHeadersComplete() override;
+  CallbackResult onMessageBegin() override;
+  CallbackResult onUrl(const char* data, size_t length) override;
+  CallbackResult onStatus(const char* data, size_t length) override;
+  CallbackResult onHeaderField(const char* data, size_t length) override;
+  CallbackResult onHeaderValue(const char* data, size_t length) override;
+  CallbackResult onHeadersComplete() override;
   void bufferBody(const char* data, size_t length) override;
-  StatusOr<ParserStatus> onMessageComplete() override;
-  int setAndCheckCallbackStatus(Http::Status&& status) override;
-  int setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) override;
-
-  // Connection specific callback methods.
-  virtual Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() PURE;
-  virtual ParserStatus onMessageCompleteBase() PURE;
+  CallbackResult onMessageComplete() override;
   void onChunkHeader(bool is_final_chunk) override;
+
+  // Internal implementations of ParserCallbacks methods,
+  // and virtual methods for connection-specific implementations.
+  virtual Status onMessageBeginBase() PURE;
+  virtual Status onUrlBase(const char* data, size_t length) PURE;
+  virtual Status onStatusBase(const char* data, size_t length) PURE;
+  Status onHeaderFieldImpl(const char* data, size_t length);
+  Status onHeaderValueImpl(const char* data, size_t length);
+  StatusOr<CallbackResult> onHeadersCompleteImpl();
+  virtual StatusOr<CallbackResult> onHeadersCompleteBase() PURE;
+  StatusOr<CallbackResult> onMessageCompleteImpl();
+  virtual CallbackResult onMessageCompleteBase() PURE;
+
+  // These helpers wrap *Impl() calls in the overrides of non-void
+  // ParserCallbacks methods.
+  CallbackResult setAndCheckCallbackStatus(Status&& status);
+  CallbackResult setAndCheckCallbackStatusOr(StatusOr<CallbackResult>&& statusor);
 
   /**
    * Push the accumulated body through the filter pipeline.
@@ -419,9 +429,6 @@ private:
   // is pushed through the filter pipeline either at the end of the current dispatch call, or when
   // the last byte of the body is processed (whichever happens first).
   Buffer::OwnedImpl buffered_body_;
-  // Buffer used to encode the HTTP message before moving it to the network connection's output
-  // buffer. This buffer is always allocated, never nullptr.
-  Buffer::InstancePtr output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
@@ -457,7 +464,7 @@ protected:
   };
   ActiveRequest* activeRequest() { return active_request_.get(); }
   // ConnectionImpl
-  ParserStatus onMessageCompleteBase() override;
+  CallbackResult onMessageCompleteBase() override;
   // Add the size of the request_url to the reported header size when processing request headers.
   uint32_t getHeadersSize() override;
 
@@ -474,9 +481,10 @@ private:
   Status handlePath(RequestHeaderMap& headers, absl::string_view method);
 
   // ParserCallbacks.
-  Status onUrl(const char* data, size_t length) override;
-  Status onStatus(const char*, size_t) override { return okStatus(); }
+  Status onUrlBase(const char* data, size_t length) override;
+  Status onStatusBase(const char*, size_t) override { return okStatus(); }
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override;
   StreamInfo::BytesMeter& getBytesMeter() override {
     if (active_request_) {
@@ -488,7 +496,7 @@ private:
     return *bytes_meter_before_stream_;
   }
   Status onMessageBeginBase() override;
-  Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
+  Envoy::StatusOr<CallbackResult> onHeadersCompleteBase() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
@@ -531,6 +539,9 @@ private:
   std::unique_ptr<ActiveRequest> active_request_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
   uint32_t outbound_responses_{};
+  // Buffer used to encode the HTTP message before moving it to the network connection's output
+  // buffer. This buffer is always allocated, never nullptr.
+  Buffer::InstancePtr owned_output_buffer_;
   // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
   // populated on message begin. Trailers are populated on the first parsed trailer field (if
@@ -540,6 +551,8 @@ private:
   // The action to take when a request header name contains underscore characters.
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+
+  const bool runtime_lazy_read_disable_{};
 };
 
 /**
@@ -565,8 +578,8 @@ private:
   bool cannotHaveBody();
 
   // ParserCallbacks.
-  Status onUrl(const char*, size_t) override { return okStatus(); }
-  Status onStatus(const char* data, size_t length) override;
+  Status onUrlBase(const char*, size_t) override { return okStatus(); }
+  Status onStatusBase(const char* data, size_t length) override;
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
@@ -580,10 +593,10 @@ private:
     return *bytes_meter_before_stream_;
   }
   Status onMessageBeginBase() override { return okStatus(); }
-  Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
+  Envoy::StatusOr<CallbackResult> onHeadersCompleteBase() override;
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
-  ParserStatus onMessageCompleteBase() override;
+  CallbackResult onMessageCompleteBase() override;
   void onResetStream(StreamResetReason reason) override;
   Status sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
@@ -612,6 +625,10 @@ private:
     }
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
+
+  // Buffer used to encode the HTTP message before moving it to the network connection's output
+  // buffer. This buffer is always allocated, never nullptr.
+  Buffer::InstancePtr owned_output_buffer_;
 
   absl::optional<PendingResponse> pending_response_;
   // TODO(mattklein123): The following bool tracks whether a pending response is complete before

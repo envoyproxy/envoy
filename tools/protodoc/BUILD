@@ -38,6 +38,7 @@ py_binary(
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
         requirement("envoy.base.utils"),
+        requirement("envoy.code.check"),
         requirement("Jinja2"),
     ],
 )
@@ -45,4 +46,9 @@ py_binary(
 protodoc_rule(
     name = "api_v3_protodoc",
     deps = ["@envoy_api//:v3_protos"],
+)
+
+protodoc_rule(
+    name = "xds_protodoc",
+    deps = ["@envoy_api//:xds_protos"],
 )

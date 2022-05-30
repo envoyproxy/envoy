@@ -128,6 +128,7 @@ public:
   }
   Api::SysCallIntResult setBlockingForTest(bool) override { return {0, 0}; }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
+  absl::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
   void dumpState(std::ostream&, int) const override {}
 
 private:
@@ -230,7 +231,7 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
     FilterChainManagerImpl filter_chain_manager{
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
         init_manager_};
-    filter_chain_manager.addFilterChains(filter_chains_, nullptr, dummy_builder_,
+    filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
                                          filter_chain_manager);
   }
 }
@@ -254,7 +255,7 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
       init_manager_};
 
-  filter_chain_manager.addFilterChains(filter_chains_, nullptr, dummy_builder_,
+  filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
                                        filter_chain_manager);
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);

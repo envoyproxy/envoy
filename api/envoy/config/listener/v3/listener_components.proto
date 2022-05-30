@@ -4,12 +4,14 @@ package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -33,8 +35,7 @@ message Filter {
 
   reserved "config";
 
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_network_filters>`.
+  // The name of the filter configuration.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof config_type {
@@ -259,10 +260,11 @@ message FilterChain {
   // establishment, the connection is summarily closed.
   google.protobuf.Duration transport_socket_connect_timeout = 9;
 
-  // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
-  // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter
-  // chain is to be dynamically updated or removed via FCDS a unique name must be provided.
-  string name = 7;
+  // The unique name (or empty) by which this filter chain is known.
+  // Note: :ref:`filter_chain_matcher
+  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
+  // requires that filter chains are uniquely named within a listener.
+  string name = 7 [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // [#not-implemented-hide:] The configuration to specify whether the filter chain will be built on-demand.
   // If this field is not empty, the filter chain will be built on-demand.
@@ -334,6 +336,7 @@ message ListenerFilterChainMatchPredicate {
   }
 }
 
+// [#next-free-field: 6]
 message ListenerFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.ListenerFilter";
@@ -342,8 +345,7 @@ message ListenerFilter {
 
   reserved "config";
 
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_listener_filters>`.
+  // The name of the filter configuration.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof config_type {
@@ -351,6 +353,12 @@ message ListenerFilter {
     // instantiated. See the supported filters for further documentation.
     // [#extension-category: envoy.filters.listener,envoy.filters.udp_listener]
     google.protobuf.Any typed_config = 3;
+
+    // Configuration source specifier for an extension configuration discovery
+    // service. In case of a failure and without the default configuration, the
+    // listener closes the connections.
+    // [#not-implemented-hide:]
+    core.v3.ExtensionConfigSource config_discovery = 5;
   }
 
   // Optional match predicate used to disable the filter. The filter is enabled when this field is empty.

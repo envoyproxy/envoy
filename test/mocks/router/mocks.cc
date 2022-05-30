@@ -112,6 +112,7 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, connectConfig()).WillByDefault(ReturnRef(connect_config_));
+  ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(early_data_policy_));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;
@@ -145,6 +146,7 @@ MockRoute::~MockRoute() = default;
 
 MockRouteConfigProvider::MockRouteConfigProvider() {
   ON_CALL(*this, config()).WillByDefault(Return(route_config_));
+  ON_CALL(*this, configCast()).WillByDefault(Return(route_config_));
 }
 MockRouteConfigProvider::~MockRouteConfigProvider() = default;
 
@@ -166,5 +168,14 @@ MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
 MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
   ON_CALL(*this, upstreamToDownstream()).WillByDefault(ReturnRef(upstream_to_downstream_));
 }
+
+MockClusterSpecifierPlugin::MockClusterSpecifierPlugin() {
+  ON_CALL(*this, route(_, _)).WillByDefault(Return(nullptr));
+}
+
+MockClusterSpecifierPluginFactoryConfig::MockClusterSpecifierPluginFactoryConfig() {
+  ON_CALL(*this, createClusterSpecifierPlugin(_, _)).WillByDefault(Return(nullptr));
+}
+
 } // namespace Router
 } // namespace Envoy

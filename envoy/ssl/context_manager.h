@@ -22,22 +22,21 @@ public:
   /**
    * Builds a ClientContext from a ClientContextConfig.
    */
-  virtual ClientContextSharedPtr
-  createSslClientContext(Stats::Scope& scope, const ClientContextConfig& config,
-                         Envoy::Ssl::ClientContextSharedPtr old_context) PURE;
+  virtual ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
+                                                        const ClientContextConfig& config) PURE;
 
   /**
    * Builds a ServerContext from a ServerContextConfig.
    */
   virtual ServerContextSharedPtr
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
-                         const std::vector<std::string>& server_names,
-                         Envoy::Ssl::ServerContextSharedPtr old_context) PURE;
+                         const std::vector<std::string>& server_names) PURE;
 
   /**
-   * @return the number of days until the next certificate being managed will expire.
+   * @return the number of days until the next certificate being managed will expire, the value is
+   * set when not expired.
    */
-  virtual size_t daysUntilFirstCertExpires() const PURE;
+  virtual absl::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
 
   /**
    * Iterates through the contexts currently attached to a listener.
@@ -55,6 +54,11 @@ public:
    * expire, or `absl::nullopt` if no OCSP responses exist.
    */
   virtual absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
+
+  /**
+   * Remove an existing ssl context.
+   */
+  virtual void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) PURE;
 };
 
 using ContextManagerPtr = std::unique_ptr<ContextManager>;

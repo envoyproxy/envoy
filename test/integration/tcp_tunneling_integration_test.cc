@@ -2,6 +2,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -20,7 +21,7 @@ public:
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          ConfigHelper::setConnectConfig(hcm, true, allow_post_,
+          ConfigHelper::setConnectConfig(hcm, !terminate_via_cluster_config_, allow_post_,
                                          downstream_protocol_ == Http::CodecType::HTTP3);
 
           if (enable_timeout_) {
@@ -92,6 +93,7 @@ public:
 
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
+  bool terminate_via_cluster_config_{};
   bool enable_timeout_{};
   bool exact_match_{};
   bool allow_post_{};
@@ -106,6 +108,22 @@ TEST_P(ConnectTerminationIntegrationTest, OriginalStyle) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, Basic) {
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalDataAndCleanShutdown();
+}
+
+TEST_P(ConnectTerminationIntegrationTest, BasicWithClusterconfig) {
+  terminate_via_cluster_config_ = true;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* upgrade =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_upstream_config();
+    envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
+    upgrade->set_name("envoy.filters.connection_pools.http.tcp");
+    upgrade->mutable_typed_config()->PackFrom(tcp_config);
+  });
+
   initialize();
 
   setUpConnection();
@@ -258,7 +276,7 @@ TEST_P(ConnectTerminationIntegrationTest, IgnoreH11HostField) {
       "",
       "':authority', 'www.foo.com:443'\n"
       "':method', 'CONNECT'",
-      sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false););
+      sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, true););
 }
 
 // For this class, forward the CONNECT request upstream
@@ -624,6 +642,105 @@ TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
   closeConnection(fake_upstream_connection_);
 }
 
+// Verify that the header evaluator is updated without lifetime issue.
+TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+    auto address_header = proxy_config.mutable_tunneling_config()->mutable_headers_to_add()->Add();
+    address_header->mutable_header()->set_key("config-version");
+    address_header->mutable_header()->set_value("1");
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+
+  initialize();
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+
+  EXPECT_EQ(upstream_request_->headers()
+                .get(Envoy::Http::LowerCaseString("config-version"))[0]
+                ->value()
+                .getStringView(),
+            "1");
+
+  // Send upgrade headers downstream, fully establishing the connection.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  ASSERT_TRUE(tcp_client_->write("hello", false));
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* header =
+            proxy_config.mutable_tunneling_config()->mutable_headers_to_add()->Mutable(0);
+        header->mutable_header()->set_value("2");
+
+        auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+        for (auto& listener : *listeners) {
+          if (listener.name() != "tcp_proxy") {
+            continue;
+          }
+          // trigger full listener update.
+          (*(*listener.mutable_metadata()->mutable_filter_metadata())["random_filter_name"]
+                .mutable_fields())["random_key"]
+              .set_number_value(2);
+          auto* filter_chain = listener.mutable_filter_chains(0);
+          auto* filter = filter_chain->mutable_filters(0);
+          filter->mutable_typed_config()->PackFrom(proxy_config);
+          break;
+        }
+      });
+  new_config_helper.setLds("1");
+
+  test_server_->waitForCounterEq("listener_manager.listener_modified", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  auto tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // The upstream http2 or http3 connection is reused.
+  ASSERT_TRUE(fake_upstream_connection_ != nullptr);
+
+  FakeStreamPtr upstream_request_2;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_2));
+  ASSERT_TRUE(upstream_request_2->waitForHeadersComplete());
+  // Verify the tcp proxy new header evaluator is applied.
+  EXPECT_EQ(upstream_request_2->headers()
+                .get(Envoy::Http::LowerCaseString("config-version"))[0]
+                ->value()
+                .getStringView(),
+            "2");
+  upstream_request_2->encodeHeaders(default_response_headers_, false);
+
+  tcp_client_->close();
+  tcp_client_2->close();
+
+  ASSERT_TRUE(upstream_request_2->waitForEndStream(*dispatcher_));
+  // If the upstream now sends 'end stream' the connection is fully closed.
+  upstream_request_2->encodeData(0, true);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNoPost());
+}
+
 TEST_P(TcpTunnelingIntegrationTest, Goaway) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;
@@ -715,6 +832,69 @@ TEST_P(TcpTunnelingIntegrationTest, ResetStreamTest) {
   // Reset the stream.
   upstream_request_->encodeResetStream();
   tcp_client_->waitForDisconnect();
+}
+
+TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+
+#if defined(WIN32)
+  // TODO(ggreenway): figure out why this test fails on Windows and remove this disable.
+  // Failing tests:
+  // IpAndHttpVersions/TcpTunnelingIntegrationTest.UpstreamConnectingDownstreamDisconnect/IPv4_HttpDownstream_Http3UpstreamBareHttp2,
+  // IpAndHttpVersions/TcpTunnelingIntegrationTest.UpstreamConnectingDownstreamDisconnect/IPv6_HttpDownstream_Http2UpstreamWrappedHttp2,
+  // Times out at the end of the test on `ASSERT_TRUE(upstream_request_->waitForReset());`.
+  return;
+#endif
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+
+    // Enable retries. The crash is due to retrying after the downstream connection is closed, which
+    // can't occur if retries are not enabled.
+    proxy_config.mutable_max_connect_attempts()->set_value(2);
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+
+      // Use TLS because it will respond to a TCP half-close during handshake by closing the
+      // connection.
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
+      filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+
+      break;
+    }
+  });
+
+  enableHalfClose(false);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Wait for the request for a connection, but don't send a response back yet. This ensures that
+  // tcp_proxy is stuck in `connecting_`.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Close the client connection. The TLS transport socket will detect this even while
+  // `readDisable(true)` on the connection, and will raise a `RemoteClose` event.
+  tcp_client->close();
+
+  ASSERT_TRUE(upstream_request_->waitForReset());
+  ASSERT_TRUE(fake_upstream_connection_->close());
 }
 
 TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {

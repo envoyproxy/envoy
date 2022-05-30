@@ -255,7 +255,7 @@ REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
 InternalAddressConfig::InternalAddressConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         InternalAddressConfig& config)
-    : unix_sockets_(config.unix_sockets()) {}
+    : unix_sockets_(config.unix_sockets()), cidr_ranges_(config.cidr_ranges()) {}
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -657,7 +657,7 @@ void HttpConnectionManagerConfig::processFilter(
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessageOrError(
-                static_cast<const Protobuf::Message&>(proto_config.typed_config()), true));
+                static_cast<const Protobuf::Message&>(proto_config.typed_config())));
   filter_factories.push_back(std::move(filter_config_provider));
 }
 

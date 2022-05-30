@@ -78,17 +78,17 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   Buffer::RawSliceVector raw_slices = data.getRawSlices();
-  absl::InlinedVector<quic::QuicMemSlice, 4> quic_slices;
+  absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
   quic_slices.reserve(raw_slices.size());
   for (auto& slice : raw_slices) {
     ASSERT(slice.len_ != 0);
     // Move each slice into a stand-alone buffer.
     // TODO(danzh): investigate the cost of allocating one buffer per slice.
     // If it turns out to be expensive, add a new function to free data in the middle in buffer
-    // interface and re-design QuicMemSliceImpl.
-    quic_slices.emplace_back(quic::QuicMemSliceImpl(data, slice.len_));
+    // interface and re-design QuicheMemSliceImpl.
+    quic_slices.emplace_back(quiche::QuicheMemSliceImpl(data, slice.len_));
   }
-  absl::Span<quic::QuicMemSlice> span(quic_slices);
+  absl::Span<quiche::QuicheMemSlice> span(quic_slices);
   // QUIC stream must take all.
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
@@ -312,9 +312,10 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
 void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
                                                quic::ConnectionCloseSource source) {
   if (!end_stream_decoded_) {
-    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
-                          ? quicErrorCodeToEnvoyLocalResetReason(error)
-                          : quicErrorCodeToEnvoyRemoteResetReason(error));
+    runResetCallbacks(
+        source == quic::ConnectionCloseSource::FROM_SELF
+            ? quicErrorCodeToEnvoyLocalResetReason(error, session()->OneRttKeysAvailable())
+            : quicErrorCodeToEnvoyRemoteResetReason(error));
   }
   quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
 }

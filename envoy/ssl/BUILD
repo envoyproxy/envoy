@@ -21,7 +21,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
-    deps = ["@envoy_api//envoy/admin/v3:pkg_cc_proto"],
+    deps = [
+        "//source/common/network:cidr_range_interface",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -31,6 +34,7 @@ envoy_cc_library(
         ":certificate_validation_context_config_interface",
         ":handshaker_interface",
         ":tls_certificate_config_interface",
+        "//source/common/network:cidr_range_interface",
     ],
 )
 

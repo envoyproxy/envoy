@@ -174,7 +174,8 @@ def run_checks():
     errors += check_unfixable_error("steady_clock.cc", real_time_inject_error)
     errors += check_unfixable_error(
         "unpack_to.cc", "Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
-    errors += check_unfixable_error("condvar_wait_for.cc", real_time_inject_error)
+    errors += check_unfixable_error(
+        "condvar_wait_for.cc", "Don't use CondVar::waitFor(); use TimeSystem::waitFor() instead.")
     errors += check_unfixable_error("sleep.cc", real_time_inject_error)
     errors += check_unfixable_error("std_atomic_free_functions.cc", "std::atomic_*")
     errors += check_unfixable_error("std_get_time.cc", "std::get_time")
@@ -307,6 +308,9 @@ def run_checks():
         "term absl::make_unique< should be replaced with standard library term std::make_unique<")
     errors += check_and_fix_error(
         "code_conventions.cc", "term .Times(1); should be replaced with preferred term ;")
+    errors += check_and_fix_error(
+        "code_conventions.cc",
+        "term Stats::ScopePtr should be replaced with preferred term Stats::ScopeSharedPtr")
 
     errors += check_file_expecting_ok("real_time_source_override.cc")
     errors += check_file_expecting_ok("duration_value_zero.cc")

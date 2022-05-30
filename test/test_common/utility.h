@@ -647,8 +647,9 @@ public:
                                          ProtobufMessage::getStrictValidationVisitor());
   }
 
-  template <class MessageType> static void validate(const MessageType& message) {
-    MessageUtil::validate(message, ProtobufMessage::getStrictValidationVisitor());
+  template <class MessageType>
+  static void validate(const MessageType& message, bool recurse_into_any = false) {
+    MessageUtil::validate(message, ProtobufMessage::getStrictValidationVisitor(), recurse_into_any);
   }
 
   template <class MessageType>

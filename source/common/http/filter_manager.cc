@@ -78,7 +78,7 @@ void ActiveStreamFilterBase::commonContinue() {
   allowIteration();
 
   // Only resume with do1xxHeaders() if we've actually seen 1xx headers.
-  if (has1xxheaders()) {
+  if (has1xxHeaders()) {
     continued_1xx_headers_ = true;
     do1xxHeaders();
     // If the response headers have not yet come in, don't continue on with
@@ -98,11 +98,16 @@ void ActiveStreamFilterBase::commonContinue() {
 
   doMetadata();
 
+  // It is possible for trailers to be added during doData(). doData() itself handles continuation
+  // of trailers for the non-continuation case. Thus, we must keep track of whether we had
+  // trailers prior to calling doData(). If we do, then we continue them here, otherwise we rely
+  // on doData() to do so.
+  const bool had_trailers_before_data = hasTrailers();
   if (bufferedData()) {
-    doData(complete() && !hasTrailers());
+    doData(complete() && !had_trailers_before_data);
   }
 
-  if (hasTrailers()) {
+  if (had_trailers_before_data) {
     doTrailers();
   }
 
@@ -303,6 +308,12 @@ bool ActiveStreamDecoderFilter::canContinue() {
   return !parent_.state_.local_complete_;
 }
 
+bool ActiveStreamEncoderFilter::canContinue() {
+  // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
+  // continue if a local reply has been sent.
+  return !parent_.state_.remote_encode_complete_;
+}
+
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
   auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { this->requestDataDrained(); },
@@ -316,7 +327,7 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::complete() { return parent_.state_.remote_complete_; }
+bool ActiveStreamDecoderFilter::complete() { return parent_.state_.remote_decode_complete_; }
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -369,6 +380,10 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(false);
+  }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -604,9 +619,6 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   ScopeTrackerScopeState scope(&*this, dispatcher_);
   filter_manager_callbacks_.resetIdleTimer();
 
-  const bool fix_added_trailers =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_added_trailers");
-
   // If a response is complete or a reset has been sent, filters do not care about further body
   // data. Just drop it.
   if (state_.local_complete_) {
@@ -693,9 +705,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
     if (!trailers_exists_at_start && filter_manager_callbacks_.requestTrailers() &&
         trailers_added_entry == decoder_filters_.end()) {
-      if (fix_added_trailers) {
-        end_stream = false;
-      }
+      end_stream = false;
       trailers_added_entry = entry;
     }
 
@@ -704,11 +714,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added trailers.
-      if (fix_added_trailers) {
-        break;
-      } else {
-        return;
-      }
+      break;
     }
   }
 
@@ -828,8 +834,8 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
 }
 
 void FilterManager::maybeEndDecode(bool end_stream) {
-  ASSERT(!state_.remote_complete_);
-  state_.remote_complete_ = end_stream;
+  ASSERT(!state_.remote_decode_complete_);
+  state_.remote_decode_complete_ = end_stream;
   if (end_stream) {
     stream_info_.downstreamTiming().onLastDownstreamRxByteReceived(dispatcher().timeSource());
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
@@ -905,7 +911,6 @@ void FilterManager::sendLocalReply(
   }
 
   stream_info_.setResponseCodeDetails(details);
-
   StreamFilterBase::LocalReplyData data{code, details, false};
   FilterManager::onLocalReply(data);
   if (data.reset_imminent_) {
@@ -1352,6 +1357,8 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
 
 void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
+    ASSERT(!state_.remote_encode_complete_);
+    state_.remote_encode_complete_ = true;
     filter_manager_callbacks_.endStream();
   }
 }
@@ -1538,7 +1545,7 @@ Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
 bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complete_; }
-bool ActiveStreamEncoderFilter::has1xxheaders() {
+bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }
 void ActiveStreamEncoderFilter::do1xxHeaders() {
@@ -1584,8 +1591,10 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
-  // TODO(yosrym93): Check if this filter had previously stopped headers iteration.
-  // If so, it should be continued before injecting data.
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(false);
+  }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -1640,6 +1649,7 @@ Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOpt
 }
 
 void ActiveStreamEncoderFilter::responseDataTooLarge() {
+  ENVOY_STREAM_LOG(debug, "response data too large watermark exceeded", parent_);
   if (parent_.state_.encoder_filters_streaming_) {
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {

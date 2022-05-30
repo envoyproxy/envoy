@@ -659,6 +659,8 @@ public:
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
   void copyOut(size_t start, uint64_t size, void* data) const override;
+  uint64_t copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
+                           uint64_t num_slice) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
   RawSlice frontSlice() const override;

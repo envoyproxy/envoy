@@ -58,12 +58,10 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
 }
 
 HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                           const TunnelingConfig& config,
+                           const TunnelingConfigHelper& config,
                            const StreamInfo::StreamInfo& downstream_info)
     : config_(config), downstream_info_(downstream_info), response_decoder_(*this),
-      upstream_callbacks_(callbacks) {
-  header_parser_ = Envoy::Router::HeaderParser::configure(config_.headers_to_add());
-}
+      upstream_callbacks_(callbacks) {}
 
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
 
@@ -94,7 +92,8 @@ void HttpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb) {
 
 Tcp::ConnectionPool::ConnectionData*
 HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
-  if (event != Network::ConnectionEvent::Connected) {
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
     resetEncoder(Network::ConnectionEvent::LocalClose, false);
   }
   return nullptr;
@@ -165,7 +164,7 @@ void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
   // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a
   // valid connection handle. If newConnection fails inline it may result in attempting to
-  // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
+  // select a new host, and a recursive call to establishUpstreamConnection. In this case the
   // first call to newConnection will return null and the inner call will persist.
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.value().newConnection(*this);
   if (handle) {
@@ -174,10 +173,11 @@ void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   }
 }
 
-void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                absl::string_view failure_reason,
                                 Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  callbacks_->onGenericPoolFailure(reason, host);
+  callbacks_->onGenericPoolFailure(reason, failure_reason, host);
 }
 
 void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
@@ -194,7 +194,8 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
 }
 
 HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                           Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
+                           Upstream::LoadBalancerContext* context,
+                           const TunnelingConfigHelper& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                            Http::CodecType type)
     : config_(config), type_(type), upstream_callbacks_(upstream_callbacks),
@@ -233,10 +234,11 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   }
 }
 
-void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                 absl::string_view failure_reason,
                                  Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  callbacks_->onGenericPoolFailure(reason, host);
+  callbacks_->onGenericPoolFailure(reason, failure_reason, host);
 }
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
@@ -256,7 +258,7 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                             const TunnelingConfig& config,
+                             const TunnelingConfigHelper& config,
                              const StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(callbacks, config, downstream_info) {}
 
@@ -274,25 +276,25 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   const std::string& scheme =
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, config_.use_post() ? "POST" : "CONNECT"},
+      {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
       {Http::Headers::get().Host, config_.hostname()},
       {Http::Headers::get().Path, "/"},
       {Http::Headers::get().Scheme, scheme},
   });
 
-  if (!config_.use_post()) {
+  if (!config_.usePost()) {
     headers->addReference(Http::Headers::get().Protocol,
                           Http::Headers::get().ProtocolValues.Bytestream);
   }
 
-  header_parser_->evaluateHeaders(*headers, downstream_info_);
+  config_.headerEvaluator().evaluateHeaders(*headers, downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());
 }
 
 Http1Upstream::Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                             const TunnelingConfig& config,
+                             const TunnelingConfigHelper& config,
                              const StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(callbacks, config, downstream_info) {}
 
@@ -303,16 +305,16 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
 
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, config_.use_post() ? "POST" : "CONNECT"},
+      {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
       {Http::Headers::get().Host, config_.hostname()},
   });
 
-  if (config_.use_post()) {
+  if (config_.usePost()) {
     // Path is required for POST requests.
     headers->addReference(Http::Headers::get().Path, "/");
   }
 
-  header_parser_->evaluateHeaders(*headers, downstream_info_);
+  config_.headerEvaluator().evaluateHeaders(*headers, downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());

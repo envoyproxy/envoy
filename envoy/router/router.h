@@ -18,6 +18,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
+#include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
@@ -382,7 +383,7 @@ public:
   /**
    * Determine whether a request should be retried based on the response headers.
    * @param response_headers supplies the response headers.
-   * @param original_request supplies the orignal request headers.
+   * @param original_request supplies the original request headers.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
@@ -400,7 +401,7 @@ public:
    * the information about whether a response is "good" or not is useful, but a retry should
    * not be attempted for other reasons.
    * @param response_headers supplies the response headers.
-   * @param original_request supplies the orignal request headers.
+   * @param original_request supplies the original request headers.
    * @param retry_as_early_data output argument to tell the caller if a retry should be sent as
    *        early data if it is warranted.
    * @return RetryDecision if a retry would be warranted based on the retry policy and if it would
@@ -480,10 +481,18 @@ public:
   virtual ~ShadowPolicy() = default;
 
   /**
-   * @return the name of the cluster that a matching request should be shadowed to. Returns empty
+   * @return the name of the cluster that a matching request should be shadowed to.
+   *         Only one of *cluster* and *cluster_header* can be specified. Returns empty
    *         string if no shadowing should take place.
    */
   virtual const std::string& cluster() const PURE;
+
+  /**
+   * @return the cluster header name that router can get the cluster name from request headers.
+   *         Only one of *cluster* and *cluster_header* can be specified. Returns empty
+   *         string if no shadowing should take place.
+   */
+  virtual const Http::LowerCaseString& clusterHeader() const PURE;
 
   /**
    * @return the runtime key that will be used to determine whether an individual request should
@@ -505,7 +514,7 @@ public:
   virtual bool traceSampled() const PURE;
 };
 
-using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
+using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
 
 /**
  * All virtual cluster stats. @see stats_macro.h
@@ -726,10 +735,13 @@ enum class PathMatchType {
   Prefix,
   Exact,
   Regex,
+  PathSeparatedPrefix,
 };
 
 /**
  * Criterion that a route entry uses for matching a particular path.
+ * Extensions can use this to gain better insights of chosen route paths,
+ * see: https://github.com/envoyproxy/envoy/pull/2531.
  */
 class PathMatchCriterion {
 public:
@@ -750,6 +762,38 @@ public:
  * Base class for all route typed metadata factories.
  */
 class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
+
+/**
+ * Base class for all early data option extensions.
+ */
+class EarlyDataPolicy {
+public:
+  virtual ~EarlyDataPolicy() = default;
+
+  /**
+   * @return bool whether the given request may be sent over early data.
+   */
+  virtual bool allowsEarlyDataForRequest(const Http::RequestHeaderMap& request_headers) const PURE;
+};
+
+using EarlyDataPolicyPtr = std::unique_ptr<EarlyDataPolicy>;
+
+/**
+ * Base class for all early data option factories.
+ */
+class EarlyDataPolicyFactory : public Envoy::Config::TypedFactory {
+public:
+  ~EarlyDataPolicyFactory() override = default;
+
+  /**
+   * @param config the typed config for early data option.
+   * @return EarlyDataIOptionPtr an instance of EarlyDataPolicy.
+   */
+  virtual EarlyDataPolicyPtr createEarlyDataPolicy(const Protobuf::Message& config) PURE;
+
+  // Config::UntypedFactory
+  std::string category() const override { return "envoy.route.early_data_policy"; }
+};
 
 /**
  * An individual resolved route entry.
@@ -984,6 +1028,11 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+
+  /**
+   * @return EarlyDataPolicy& the configured early data option.
+   */
+  virtual const EarlyDataPolicy& earlyDataPolicy() const PURE;
 };
 
 /**
@@ -1149,10 +1198,8 @@ using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteE
 /**
  * The router configuration.
  */
-class Config {
+class Config : public Rds::Config {
 public:
-  virtual ~Config() = default;
-
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
    * route entry or a direct response entry) for the request.

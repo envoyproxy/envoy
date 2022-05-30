@@ -81,6 +81,8 @@ route_config:
       cluster: A
 sip_filters:
   - name: envoy.filters.sip.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.sip_proxy.router.v3alpha.Router
 )EOF";
 
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy config =
@@ -98,6 +100,8 @@ route_config:
   name: local_route
 sip_filters:
   - name: envoy.filters.sip.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.sip_proxy.router.v3alpha.Router
 )EOF";
 
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy config =
@@ -114,6 +118,8 @@ route_config:
 sip_filters:
   - name: no_such_filter
   - name: envoy.filters.sip.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.sip_proxy.router.v3alpha.Router
 )EOF";
 
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy config =
@@ -136,10 +142,12 @@ sip_filters:
       value:
         key: value
   - name: envoy.filters.sip.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.sip_proxy.router.v3alpha.Router
 settings:
   transaction_timeout: 32s
-  own_domain: pcsf-cfed.cncs.svc.cluster.local
-  domain_match_parameter_name: x-suri
+  local_services:
+  - domain: pcsf-cfed.cncs.svc.cluster.local
 )EOF";
 
   SipFilters::MockFilterConfigFactory factory;
@@ -159,6 +167,13 @@ TEST_F(SipFilterConfigTest, SipProtocolOptions) {
   const std::string yaml = R"EOF(
 session_affinity: true
 registration_affinity: true
+customized_affinity:
+  entries:
+  - key_name: test
+    subscribe: true
+    query: true
+  - key_name: test1
+  stop_load_balance: false
 )EOF";
 
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProtocolOptions config;

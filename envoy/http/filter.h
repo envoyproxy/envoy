@@ -620,7 +620,7 @@ public:
   virtual void setUpstreamOverrideHost(absl::string_view host) PURE;
 
   /**
-   * @return absl::optional<absl::string_view> optional overrride host for the upstream
+   * @return absl::optional<absl::string_view> optional override host for the upstream
    * load balancing.
    */
   virtual absl::optional<absl::string_view> upstreamOverrideHost() const PURE;
@@ -1001,6 +1001,15 @@ public:
   virtual RequestTrailerMapOptConstRef requestTrailers() const PURE;
   virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
   virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
+  virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
+
+  const Network::Address::Instance& localAddress() const {
+    return *connectionInfoProvider().localAddress();
+  }
+
+  const Network::Address::Instance& remoteAddress() const {
+    return *connectionInfoProvider().remoteAddress();
+  }
 };
 
 /**

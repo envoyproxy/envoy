@@ -123,6 +123,7 @@ public:
     return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
+  absl::string_view addressType() const override { return "default"; }
 
   /**
    * Convenience function to convert an IPv4 address to canonical string format.
@@ -196,7 +197,7 @@ public:
    * Construct from a string IPv6 address such as "12:34::5" as well as a port.
    */
   Ipv6Instance(const std::string& address, uint32_t port,
-               const SocketInterface* sock_interface = nullptr);
+               const SocketInterface* sock_interface = nullptr, bool v6only = true);
 
   /**
    * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
@@ -213,6 +214,7 @@ public:
     return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
+  absl::string_view addressType() const override { return "default"; }
 
   // Validate that IPv6 is supported on this platform
   static absl::Status validateProtocolSupported();
@@ -232,6 +234,7 @@ private:
     absl::uint128 address() const override;
     bool v6only() const override;
     uint32_t port() const;
+    InstanceConstSharedPtr v4CompatibleAddress() const override;
 
     std::string makeFriendlyAddress() const;
 
@@ -299,6 +302,7 @@ public:
     }
     return sizeof(pipe_.address_);
   }
+  absl::string_view addressType() const override { return "default"; }
 
 private:
   /**
@@ -344,6 +348,7 @@ public:
   // TODO(lambdai): Verify all callers accepts nullptr.
   const sockaddr* sockAddr() const override { return nullptr; }
   socklen_t sockAddrLen() const override { return 0; }
+  absl::string_view addressType() const override { return "envoy_internal"; }
 
 private:
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {

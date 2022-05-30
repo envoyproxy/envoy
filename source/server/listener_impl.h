@@ -156,8 +156,8 @@ private:
   const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
       typed_metadata_;
   envoy::config::core::v3::TrafficDirection direction_;
-  Stats::ScopePtr global_scope_;
-  Stats::ScopePtr listener_scope_; // Stats with listener named scope.
+  Stats::ScopeSharedPtr global_scope_;
+  Stats::ScopeSharedPtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
   bool is_quic_;
@@ -377,11 +377,17 @@ private:
     Network::UdpListenerWorkerRouterPtr listener_worker_router_;
   };
 
-  struct InternalListenerConfigImpl : public Network::InternalListenerConfig {
-    InternalListenerConfigImpl(
-        const envoy::config::listener::v3::Listener_InternalListenerConfig config)
-        : config_(config) {}
-    const envoy::config::listener::v3::Listener_InternalListenerConfig config_;
+  class InternalListenerConfigImpl : public Network::InternalListenerConfig {
+  public:
+    InternalListenerConfigImpl(Network::InternalListenerRegistry& internal_listener_registry)
+        : internal_listener_registry_(internal_listener_registry) {}
+
+    Network::InternalListenerRegistry& internalListenerRegistry() override {
+      return internal_listener_registry_;
+    }
+
+  private:
+    Network::InternalListenerRegistry& internal_listener_registry_;
   };
 
   /**
@@ -435,7 +441,6 @@ private:
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
-  DrainManagerPtr local_drain_manager_;
   const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;

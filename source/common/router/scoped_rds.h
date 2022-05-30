@@ -153,7 +153,7 @@ private:
         parent_.stats_.on_demand_scopes_.dec();
       }
     }
-    ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
+    ConfigConstSharedPtr routeConfig() { return route_provider_->configCast(); }
 
     void addOnDemandUpdateCallback(std::function<void()> callback);
 
@@ -227,7 +227,7 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
   // Stats must outlive subscription.
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   ScopedRdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::

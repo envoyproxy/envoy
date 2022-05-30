@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Server {
 
-AdminFilter::AdminFilter(Admin::GenHandlerCb admin_handler_fn)
+AdminFilter::AdminFilter(Admin::GenRequestFn admin_handler_fn)
     : admin_handler_fn_(admin_handler_fn) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -67,8 +67,8 @@ void AdminFilter::onComplete() {
 
   auto header_map = Http::ResponseHeaderMapImpl::create();
   RELEASE_ASSERT(request_headers_, "");
-  Admin::HandlerPtr handler = admin_handler_fn_(path, *this);
-  Http::Code code = handler->start(/*path, */ *header_map);
+  Admin::RequestPtr handler = admin_handler_fn_(path, *this);
+  Http::Code code = handler->start(*header_map);
   Utility::populateFallbackResponseHeaders(code, *header_map);
   decoder_callbacks_->encodeHeaders(std::move(header_map), false,
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
@@ -78,7 +78,7 @@ void AdminFilter::onComplete() {
     Buffer::OwnedImpl response;
     more_data = handler->nextChunk(response);
     bool end_stream = end_stream_on_complete_ && !more_data;
-    ENVOY_LOG_MISC(error, "nextChunk: response.length={} more_data={} end_stream={}",
+    ENVOY_LOG_MISC(debug, "nextChunk: response.length={} more_data={} end_stream={}",
                    response.length(), more_data, end_stream);
     if (response.length() > 0 || end_stream) {
       decoder_callbacks_->encodeData(response, end_stream);

@@ -1,5 +1,7 @@
 #include "source/server/ssl_context_manager.h"
 
+#include <cstddef>
+
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
 
@@ -14,20 +16,20 @@ namespace Server {
 class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
   Ssl::ClientContextSharedPtr
   createSslClientContext(Stats::Scope& /* scope */,
-                         const Envoy::Ssl::ClientContextConfig& /* config */,
-                         Envoy::Ssl::ClientContextSharedPtr /* old_context */) override {
+                         const Envoy::Ssl::ClientContextConfig& /* config */) override {
     throwException();
   }
 
   Ssl::ServerContextSharedPtr
   createSslServerContext(Stats::Scope& /* scope */,
                          const Envoy::Ssl::ServerContextConfig& /* config */,
-                         const std::vector<std::string>& /* server_names */,
-                         Envoy::Ssl::ServerContextSharedPtr /* old_context */) override {
+                         const std::vector<std::string>& /* server_names */) override {
     throwException();
   }
 
-  size_t daysUntilFirstCertExpires() const override { return std::numeric_limits<int>::max(); }
+  absl::optional<uint32_t> daysUntilFirstCertExpires() const override {
+    return absl::make_optional(std::numeric_limits<uint32_t>::max());
+  }
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override {
     return absl::nullopt;
   }
@@ -35,6 +37,12 @@ class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> /* callback */) override{};
 
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override { throwException(); }
+
+  void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) override {
+    if (old_context) {
+      throw EnvoyException("SSL is not supported in this configuration");
+    }
+  }
 
 private:
   [[noreturn]] void throwException() {

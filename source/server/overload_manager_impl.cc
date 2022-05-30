@@ -256,8 +256,8 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
     case envoy::config::overload::v3::Trigger::TriggerOneofCase::kScaled:
       trigger = std::make_unique<ScaledTriggerImpl>(trigger_config.scaled());
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::overload::v3::Trigger::TriggerOneofCase::TRIGGER_ONEOF_NOT_SET:
+      throw EnvoyException(absl::StrCat("action not set for trigger ", trigger_config.name()));
     }
 
     if (!triggers_.try_emplace(trigger_config.name(), std::move(trigger)).second) {

@@ -128,7 +128,7 @@ INSTANTIATE_TEST_SUITE_P(
          CheckResult::OK, CheckResult::IGNORE, CheckResult::OK},
         // content-type is a normal header that may be modified unless
         // specifically disallowed.
-        {"content_type", CheckOperation::SET, "content-type", "applicaton/foo", CheckResult::OK,
+        {"content_type", CheckOperation::SET, "content-type", "application/foo", CheckResult::OK,
          CheckResult::OK, CheckResult::OK, CheckResult::OK, CheckResult::OK},
         // ":status" is usually settable but it must be valid
         {"status", CheckOperation::SET, ":status", "201", CheckResult::OK, CheckResult::OK,
