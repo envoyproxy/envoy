@@ -1,6 +1,6 @@
 static_resources:
   listeners:
-    connection_balance_config:
+  - connection_balance_config:
       extend_balance:
         name: envoy.network.connection_balance.dlb
         typed_config:
