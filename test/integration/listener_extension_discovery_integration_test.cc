@@ -13,6 +13,8 @@
 namespace Envoy {
 namespace {
 
+enum class ListenerMatcherType { NULLMATCHER, ANYMATCHER, NOTANYMATCHER };
+
 class ListenerExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                                   public BaseIntegrationTest {
 public:
@@ -21,8 +23,10 @@ public:
         data_("HelloWorld"), port_name_("http") {}
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
-                        bool set_default_config = true, bool rate_limit = false) {
+                        bool set_default_config = true, bool rate_limit = false,
+                        ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER) {
     config_helper_.addConfigModifier([name, apply_without_warming, set_default_config, rate_limit,
+                                      matcher,
                                       this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       listener->set_stat_prefix("listener_stat");
@@ -47,6 +51,12 @@ public:
       api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       if (rate_limit) {
         api_config_source->mutable_rate_limit_settings()->mutable_max_tokens()->set_value(10);
+      }
+      // Add listener filter matcher config.
+      if (matcher == ListenerMatcherType::ANYMATCHER) {
+        listener_filter->mutable_filter_disabled()->set_any_match(true);
+      } else if (matcher == ListenerMatcherType::NOTANYMATCHER) {
+        listener_filter->mutable_filter_disabled()->mutable_not_match()->set_any_match(true);
       }
       auto* grpc_service = api_config_source->add_grpc_services();
       setGrpcService(*grpc_service, "ecds_cluster", getEcdsFakeUpstream().localAddress());
@@ -193,6 +203,36 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccess) {
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 2);
   sendDataVerifyResults(3);
+}
+
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithAnyMatcher) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  // Add dynamic filter with any matcher, which effectively disables the filter.
+  addDynamicFilter(filter_name_, false, true, false, ListenerMatcherType::ANYMATCHER);
+  initialize();
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  // Send config update to have listener filter drain 5 bytes of data.
+  sendXdsResponse(filter_name_, "1", 5);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  // Send data, verify the listener filter doesn't drain any data.
+  sendDataVerifyResults(0);
+}
+
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithNotAnyMatcher) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  // Not any matcher negates the any matcher, which effectively enable the filter.
+  addDynamicFilter(filter_name_, false, true, false, ListenerMatcherType::NOTANYMATCHER);
+  initialize();
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  // Send config update to have listener filter drain 5 bytes of data.
+  sendXdsResponse(filter_name_, "1", 5);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  // Send data, verify the listener filter drains five bytes data.
+  sendDataVerifyResults(5);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
@@ -346,7 +386,6 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed
   addDynamicFilter(filter_name_, true);
   addStaticFilter("foobar", 2);
   initialize();
-
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 3);
@@ -363,7 +402,6 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed
   addDynamicFilter(filter_name_, true);
   addDynamicFilter(filter_name_, false);
   initialize();
-
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
   sendXdsResponse(filter_name_, "1", 2);
@@ -371,6 +409,23 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
   // filter drain 2 + 2 + 2 + 2 bytes.
   sendDataVerifyResults(8);
+}
+
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedWithAnyMatcher) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addStaticFilter("bar", 2);
+  addStaticFilter("baz", 2);
+  addDynamicFilter(filter_name_, true);
+  // This filter with any matcher is effectively disabled.
+  addDynamicFilter(filter_name_, false, true, false, ListenerMatcherType::ANYMATCHER);
+  initialize();
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  sendXdsResponse(filter_name_, "1", 3);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  // The filters totally drain 2 + 2 + 3 bytes.
+  sendDataVerifyResults(7);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
