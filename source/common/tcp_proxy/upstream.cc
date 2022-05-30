@@ -164,7 +164,7 @@ void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
   // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a
   // valid connection handle. If newConnection fails inline it may result in attempting to
-  // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
+  // select a new host, and a recursive call to establishUpstreamConnection. In this case the
   // first call to newConnection will return null and the inner call will persist.
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.value().newConnection(*this);
   if (handle) {
@@ -173,10 +173,11 @@ void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   }
 }
 
-void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                absl::string_view failure_reason,
                                 Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  callbacks_->onGenericPoolFailure(reason, host);
+  callbacks_->onGenericPoolFailure(reason, failure_reason, host);
 }
 
 void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
@@ -233,10 +234,11 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   }
 }
 
-void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                 absl::string_view failure_reason,
                                  Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  callbacks_->onGenericPoolFailure(reason, host);
+  callbacks_->onGenericPoolFailure(reason, failure_reason, host);
 }
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,

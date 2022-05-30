@@ -50,6 +50,9 @@ common_tls_context:
     - san_type: URI
       matcher:
         exact: "spiffe://lyft.com/backend-team"
+    - san_type: URI
+      matcher:
+        exact: "http://backend.lyft.com"
     - san_type: DNS
       matcher:
         exact: "lyft.com"
@@ -67,6 +70,9 @@ common_tls_context:
     - san_type: URI
       matcher:
         exact: "spiffe://lyft.com/backend-team"
+    - san_type: URI
+      matcher:
+        exact: "http://backend.lyft.com"
     - san_type: DNS
       matcher:
         exact: "lyft.com"
@@ -418,6 +424,13 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
 
   fcc_ = envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       FORWARD_ONLY;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto listener = config_helper_.buildBaseListener(
+        "with_stat_prefix", Network::Test::getLoopbackAddressString(version_));
+    listener.set_stat_prefix("my_prefix");
+    *listener.mutable_filter_chains() = bootstrap.static_resources().listeners(0).filter_chains();
+    *bootstrap.mutable_static_resources()->add_listeners() = listener;
+  });
   initialize();
 
   // Commented sample code to regenerate the map literals used below in the test log if necessary:
@@ -454,6 +467,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {listenerStatPrefix("server_ssl_socket_factory.downstream_context_secrets_not_ready"),
        "listener.server_ssl_socket_factory.downstream_context_secrets_not_ready"},
       {listenerStatPrefix("downstream_cx_total"), "listener.downstream_cx_total"},
+      {"listener.my_prefix.downstream_cx_total", "listener.downstream_cx_total"},
       {listenerStatPrefix("downstream_cx_destroy"), "listener.downstream_cx_destroy"},
       {listenerStatPrefix("ssl.ocsp_staple_requests"), "listener.ssl.ocsp_staple_requests"},
       {listenerStatPrefix("ssl.handshake"), "listener.ssl.handshake"},

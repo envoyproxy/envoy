@@ -319,6 +319,9 @@ message Http1ProtocolOptions {
   // .. attention::
   //   Enabling this option might lead to request smuggling vulnerability, especially if traffic
   //   is proxied via multiple layers of proxies.
+  // [#comment:TODO: This field is ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present.]
   bool allow_chunked_length = 6;
 
   // Allows invalid HTTP messaging. When this option is false, then Envoy will terminate
@@ -336,7 +339,9 @@ message KeepaliveSettings {
   google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // How long to wait for a response to a keepalive PING. If a response is not received within this
-  // time period, the connection will be aborted.
+  // time period, the connection will be aborted. Note that in order to prevent the influence of
+  // Head-of-line (HOL) blocking the timeout period is extended when *any* frame is received on
+  // the connection, under the assumption that if a frame is received the connection is healthy.
   google.protobuf.Duration timeout = 2 [(validate.rules).duration = {
     required: true
     gte {nanos: 1000000}

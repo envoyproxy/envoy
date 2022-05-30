@@ -33,6 +33,7 @@ envoy_cc_library(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
@@ -56,6 +57,7 @@ envoy_cc_library(
     deps = [
         "//envoy/grpc:status",
         "//envoy/stream_info:stream_info_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )

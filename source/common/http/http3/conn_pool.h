@@ -37,6 +37,7 @@ public:
 
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
     ASSERT(quiche_capacity_ != 0);
+    has_created_stream_ = true;
     // Each time a quic stream is allocated the quic capacity needs to get
     // decremented. See comments by quiche_capacity_.
     updateCapacity(quiche_capacity_ - 1);
@@ -58,6 +59,11 @@ public:
   // early data streams.
   bool hasHandshakeCompleted() const override { return has_handshake_completed_; }
 
+  // Overridden to include ReadyForEarlyData state.
+  bool readyForStream() const override {
+    return state() == State::Ready || state() == State::ReadyForEarlyData;
+  }
+
   void updateCapacity(uint64_t new_quiche_capacity) {
     // Each time we update the capacity make sure to reflect the update in the
     // connection pool.
@@ -77,6 +83,11 @@ public:
       parent_.incrConnectingAndConnectedStreamCapacity(new_capacity - old_capacity, *this);
     }
   }
+
+  bool hasCreatedStream() const { return has_created_stream_; }
+
+protected:
+  bool supportsEarlyData() const override { return true; }
 
 private:
   // Unlike HTTP/2 and HTTP/1, rather than having a cap on the number of active
@@ -104,6 +115,8 @@ private:
   // do 0-RTT during connect(), deferring it to avoid handling network events during CodecClient
   // construction.
   Event::SchedulableCallbackPtr async_connect_callback_;
+  // True if newStream() is ever called.
+  bool has_created_stream_{false};
 };
 
 // An interface to propagate H3 handshake result.
@@ -115,6 +128,10 @@ public:
   // Called when the mandatory handshake is complete. This is when a HTTP/3 connection is regarded
   // as connected and is able to send requests.
   virtual void onHandshakeComplete() PURE;
+  // Called upon connection close event from a client who hasn't finish handshake but already sent
+  // early data.
+  // TODO(danzh) actually call it from h3 pool.
+  virtual void onZeroRttHandshakeFailed() PURE;
 };
 
 // Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
@@ -141,10 +158,11 @@ public:
 
   std::unique_ptr<Network::ClientConnection>
   createClientConnection(Quic::QuicStatNames& quic_stat_names,
-                         OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope);
+                         OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope);
 
 protected:
   void onConnected(Envoy::ConnectionPool::ActiveClient&) override;
+  void onConnectFailed(Envoy::ConnectionPool::ActiveClient&) override;
 
 private:
   friend class Http3ConnPoolImplPeer;
@@ -164,7 +182,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
-                 OptRef<Http::AlternateProtocolsCache> rtt_cache, Stats::Scope& scope,
+                 OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback,
                  Http::PersistentQuicInfo& quic_info);
 

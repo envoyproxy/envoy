@@ -357,6 +357,10 @@ message HeaderValueOption {
   // [#not-implemented-hide:] Describes the action taken to append/overwrite the given value for an existing header
   // or to only add this header if it's absent. Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
   HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // Is the header value allowed to be empty? If false (default), custom headers with empty values are dropped,
+  // otherwise they are added.
+  bool keep_empty_value = 4;
 }
 
 // Wrapper for a set of headers.

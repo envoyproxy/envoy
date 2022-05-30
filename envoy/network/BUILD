@@ -29,6 +29,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "client_connection_factory",
+    hdrs = ["client_connection_factory.h"],
+    deps = [
+        ":address_interface",
+        ":connection_interface",
+        ":listen_socket_interface",
+        ":transport_socket_interface",
+        "//envoy/config:typed_config_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "connection_handler_interface",
     hdrs = ["connection_handler.h"],
     deps = [
@@ -50,8 +62,11 @@ envoy_cc_library(
         ":socket_interface",
         "//envoy/api:io_error_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/config:typed_metadata_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

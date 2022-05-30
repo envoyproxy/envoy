@@ -6,7 +6,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/http/alternate_protocols_cache.h"
+#include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -80,7 +80,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, store_);
+      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, store_, nullptr, nullptr);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
@@ -92,10 +92,32 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
+TEST_P(QuicNetworkConnectionTest, SocketOptions) {
+  initialize();
+
+  auto socket_option = std::make_shared<Network::MockSocketOption>();
+  auto socket_options = std::make_shared<Network::ConnectionSocket::Options>();
+  socket_options->push_back(socket_option);
+  const int port = 30;
+  EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
+  EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND));
+  EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING));
+
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
+      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, store_, socket_options,
+      nullptr);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  client_connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
 TEST_P(QuicNetworkConnectionTest, Srtt) {
   initialize();
 
-  Http::MockAlternateProtocolsCache rtt_cache;
+  Http::MockHttpServerPropertiesCache rtt_cache;
   PersistentQuicInfoImpl info{dispatcher_, 45};
 
   EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
@@ -104,7 +126,8 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       info, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
-      dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_);
+      dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_, nullptr,
+      nullptr);
 
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
 

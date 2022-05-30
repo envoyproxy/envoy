@@ -32,6 +32,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/path_utility.h"
@@ -45,6 +46,7 @@
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
+#include "source/extensions/early_data/default_early_data_policy.h"
 
 #include "absl/strings/match.h"
 
@@ -92,6 +94,11 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
     route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                     factory_context, validator);
     break;
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix: {
+    route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
+        vhost, route_config, optional_http_filters, factory_context, validator);
+    break;
+  }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // throw the error below.
   }
@@ -103,10 +110,12 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
   if (validation_clusters.has_value()) {
     route->validateClusters(*validation_clusters);
     for (const auto& shadow_policy : route->shadowPolicies()) {
-      ASSERT(!shadow_policy->cluster().empty());
-      if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
-        throw EnvoyException(
-            fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
+      if (!shadow_policy->cluster().empty()) {
+        ASSERT(shadow_policy->clusterHeader().get().empty());
+        if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
+          throw EnvoyException(
+              fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
+        }
       }
     }
   }
@@ -156,6 +165,36 @@ getHeaderParsers(const HeaderParser* global_route_config_header_parser,
     // Sorted from most to least specific.
     return {route_header_parser, vhost_header_parser, global_route_config_header_parser};
   }
+}
+
+// If the implementation of a cluster specifier plugin is not provided in current Envoy and the
+// plugin is set to optional, then this null plugin will be used as a placeholder.
+class NullClusterSpecifierPlugin : public ClusterSpecifierPlugin {
+public:
+  RouteConstSharedPtr route(const RouteEntry&, const Http::RequestHeaderMap&) const override {
+    return nullptr;
+  }
+};
+
+ClusterSpecifierPluginSharedPtr
+getClusterSpecifierPluginByTheProto(const envoy::config::route::v3::ClusterSpecifierPlugin& plugin,
+                                    ProtobufMessage::ValidationVisitor& validator,
+                                    Server::Configuration::ServerFactoryContext& factory_context) {
+  auto* factory =
+      Envoy::Config::Utility::getFactory<ClusterSpecifierPluginFactoryConfig>(plugin.extension());
+  if (factory == nullptr) {
+    if (plugin.is_optional()) {
+      return std::make_shared<NullClusterSpecifierPlugin>();
+    }
+    throw EnvoyException(
+        fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
+                    plugin.extension().name(),
+                    Envoy::Config::Utility::getFactoryType(plugin.extension().typed_config())));
+  }
+  ASSERT(factory != nullptr);
+  auto config =
+      Envoy::Config::Utility::translateToFactoryConfig(plugin.extension(), validator, *factory);
+  return factory->createClusterSpecifierPlugin(*config, factory_context);
 }
 
 } // namespace
@@ -341,8 +380,23 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
   }
 }
 
-ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
-  cluster_ = config.cluster();
+void validateMirrorClusterSpecifier(
+    const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
+  if (!config.cluster().empty() && !config.cluster_header().empty()) {
+    throw EnvoyException(fmt::format("Only one of cluster '{}' or cluster_header '{}' "
+                                     "in request mirror policy can be specified",
+                                     config.cluster(), config.cluster_header()));
+  } else if (config.cluster().empty() && config.cluster_header().empty()) {
+    // For shadow policies with `cluster_header_`, we only verify that this field is not
+    // empty because the cluster name is not set yet at config time.
+    throw EnvoyException(
+        "Exactly one of cluster or cluster_header in request mirror policy need to be specified");
+  }
+}
+
+ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config)
+    : cluster_(config.cluster()), cluster_header_(config.cluster_header()) {
+  validateMirrorClusterSpecifier(config);
 
   if (config.has_runtime_fraction()) {
     runtime_key_ = config.runtime_fraction().runtime_key();
@@ -492,6 +546,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
+  shadow_policies_.reserve(route.route().request_mirror_policies().size());
   for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
     shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
@@ -525,6 +580,14 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
                                        total_cluster_weight_));
     }
+  } else if (route.route().cluster_specifier_case() ==
+             envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
+                 kInlineClusterSpecifierPlugin) {
+    cluster_specifier_plugin_ = getClusterSpecifierPluginByTheProto(
+        route.route().inline_cluster_specifier_plugin(), validator, factory_context);
+  } else if (route.route().has_cluster_specifier_plugin()) {
+    cluster_specifier_plugin_ =
+        vhost_.globalRouteConfig().clusterSpecifierPlugin(route.route().cluster_specifier_plugin());
   }
 
   for (const auto& query_parameter : route.match().query_parameters()) {
@@ -590,6 +653,16 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
               path_redirect_);
+  }
+
+  if (route.route().has_early_data_policy()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<EarlyDataPolicyFactory>(
+        route.route().early_data_policy());
+    auto message = Envoy::Config::Utility::translateToFactoryConfig(
+        route.route().early_data_policy(), validator, factory);
+    early_data_policy_ = factory.createEarlyDataPolicy(*message);
+  } else {
+    early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
 }
 
@@ -912,7 +985,7 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   } else {
     // Serve the redirect URL based on the scheme of the original URL, not the
     // security of the underlying connection.
-    final_scheme = Http::Utility::getScheme(headers);
+    final_scheme = headers.getSchemeValue();
   }
 
   if (!port_redirect_.empty()) {
@@ -1096,16 +1169,20 @@ RouteEntryImplBase::pickClusterViaClusterHeader(const Http::LowerCaseString& clu
   return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
 }
 
-RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& headers,
+RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
                                                      uint64_t random_value) const {
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
   if (weighted_clusters_.empty()) {
     if (!cluster_name_.empty() || isDirectResponse()) {
       return shared_from_this();
-    } else {
-      ASSERT(!cluster_header_name_.get().empty());
+    } else if (!cluster_header_name_.get().empty()) {
       return pickClusterViaClusterHeader(cluster_header_name_, headers);
+    } else {
+      // TODO(wbpcode): make the cluster header or weighted clusters an implementation of the
+      // cluster specifier plugin.
+      ASSERT(cluster_specifier_plugin_ != nullptr);
+      return cluster_specifier_plugin_->route(*this, headers);
     }
   }
   return pickWeightedCluster(headers, random_value, true);
@@ -1402,6 +1479,40 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
   return nullptr;
 }
 
+PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    const OptionalHttpFilters& optional_http_filters,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator)
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      prefix_(route.match().path_separated_prefix()),
+      path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
+
+void PathSeparatedPrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
+                                                          bool insert_envoy_original_path) const {
+  finalizePathHeader(headers, prefix_, insert_envoy_original_path);
+}
+
+absl::optional<std::string> PathSeparatedPrefixRouteEntryImpl::currentUrlPathAfterRewrite(
+    const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, prefix_);
+}
+
+RouteConstSharedPtr
+PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                           const StreamInfo::StreamInfo& stream_info,
+                                           uint64_t random_value) const {
+  if (!RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
+    return nullptr;
+  }
+  absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+  if (path.size() >= prefix_.size() && path_matcher_->match(path) &&
+      (path.size() == prefix_.size() || path[prefix_.size()] == '/')) {
+    return clusterEntry(headers, random_value);
+  }
+  return nullptr;
+}
+
 VirtualHostImpl::VirtualHostImpl(
     const envoy::config::route::v3::VirtualHost& virtual_host,
     const OptionalHttpFilters& optional_http_filters, const ConfigImpl& global_route_config,
@@ -1447,6 +1558,7 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
+  shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
   for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
     shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
   }
@@ -1539,7 +1651,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            Server::Configuration::ServerFactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator, bool validate_clusters)
     : vhost_scope_(factory_context.scope().scopeFromStatName(
-          factory_context.routerContext().virtualClusterStatNames().vhost_)) {
+          factory_context.routerContext().virtualClusterStatNames().vhost_)),
+      ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()) {
   absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
   if (validate_clusters) {
     validation_clusters = factory_context.clusterManager().clusters();
@@ -1601,7 +1714,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
   }
 
   if (matcher_) {
-    Http::Matching::HttpMatchingDataImpl data;
+    Http::Matching::HttpMatchingDataImpl data(stream_info.downstreamAddressProvider());
     data.onRequestHeaders(headers);
 
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
@@ -1671,10 +1784,19 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
     return nullptr;
   }
 
+  // If 'ignore_port_in_host_matching' is set, ignore the port number in the host header(if any).
+  absl::string_view host_header_value = headers.getHostValue();
+  if (ignorePortInHostMatching()) {
+    if (const absl::string_view::size_type port_start =
+            Http::HeaderUtility::getPortStart(host_header_value);
+        port_start != absl::string_view::npos) {
+      host_header_value = host_header_value.substr(0, port_start);
+    }
+  }
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
   // Lower-case the value of the host header, as hostnames are case insensitive.
-  const std::string host = absl::AsciiStrToLower(headers.getHostValue());
+  const std::string host = absl::AsciiStrToLower(host_header_value);
   const auto& iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
@@ -1745,9 +1867,17 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
   if (!config.request_mirror_policies().empty()) {
+    shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
       shadow_policies_.push_back(std::make_shared<ShadowPolicyImpl>(mirror_policy_config));
     }
+  }
+
+  // Initialize all cluster specifier plugins before creating route matcher. Because the route may
+  // reference it by name.
+  for (const auto& plugin_proto : config.cluster_specifier_plugins()) {
+    auto plugin = getClusterSpecifierPluginByTheProto(plugin_proto, validator, factory_context);
+    cluster_specifier_plugins_.emplace(plugin_proto.extension().name(), std::move(plugin));
   }
 
   route_matcher_ = std::make_unique<RouteMatcher>(
@@ -1764,6 +1894,16 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
                                                      config.response_headers_to_remove());
 }
 
+ClusterSpecifierPluginSharedPtr
+ConfigImpl::clusterSpecifierPlugin(absl::string_view provider) const {
+  auto iter = cluster_specifier_plugins_.find(provider);
+  if (iter == cluster_specifier_plugins_.end() || iter->second == nullptr) {
+    throw EnvoyException(
+        fmt::format("Unknown cluster specifier plugin name: {} is used in the route", provider));
+  }
+  return iter->second;
+}
+
 RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
                                       const Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
@@ -1777,11 +1917,31 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
-  auto factory = Envoy::Config::Utility::getAndCheckFactoryByName<
-      Server::Configuration::NamedHttpFilterConfigFactory>(name, is_optional);
-  if (factory == nullptr) {
-    ENVOY_LOG(warn, "Can't find a registered implementation for http filter '{}'", name);
-    return nullptr;
+  Server::Configuration::NamedHttpFilterConfigFactory* factory = nullptr;
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.get_route_config_factory_by_type")) {
+    factory = Envoy::Config::Utility::getFactoryByType<
+        Server::Configuration::NamedHttpFilterConfigFactory>(typed_config);
+    if (factory == nullptr) {
+      if (is_optional) {
+        ENVOY_LOG(warn,
+                  "Can't find a registered implementation for http filter '{}' with type URL: '{}'",
+                  name, Envoy::Config::Utility::getFactoryType(typed_config));
+        return nullptr;
+      } else {
+        throw EnvoyException(
+            fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
+                        name, Envoy::Config::Utility::getFactoryType(typed_config)));
+      }
+    }
+  } else {
+    factory = Envoy::Config::Utility::getAndCheckFactoryByName<
+        Server::Configuration::NamedHttpFilterConfigFactory>(name, is_optional);
+    if (factory == nullptr) {
+      ENVOY_LOG(warn, "Can't find a registered implementation for http filter '{}'", name);
+      return nullptr;
+    }
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();

@@ -44,32 +44,6 @@ filegroup(
 )
 
 genrule(
-    name = "v2_redirects",
-    outs = ["v2_redirects.txt"],
-    cmd = """
-    jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/"))
-          | with_entries(.value |= sub("^envoy/";"api-v2/"))
-          | to_entries[]
-          | "\\(.value)\t\t\\(.key)"' \\
-        $(location :v2_mapping.json) > $@
-    """,
-    tools = [":v2_mapping.json"],
-)
-
-genrule(
-    name = "redirects",
-    outs = ["envoy-redirects.txt"],
-    cmd = """
-    cat $(location :redirects.txt) > $@ \\
-    && cat $(location :v2_redirects) >> $@
-    """,
-    tools = [
-        ":redirects.txt",
-        ":v2_redirects",
-    ],
-)
-
-genrule(
     name = "extensions_security_rst",
     srcs = [
         "//source/extensions:extensions_metadata.yaml",
@@ -153,10 +127,13 @@ pkg_files(
     name = "sphinx_base",
     srcs = glob(
         [
-            "conf.py",
             "_ext/*",
         ],
-    ) + [":redirects"],
+    ) + [
+        ":conf.py",
+        ":redirects.txt",
+        ":versions.yaml",
+    ],
     strip_prefix = "/docs",
 )
 
@@ -164,6 +141,27 @@ pkg_files(
     name = "sphinx_root",
     srcs = glob(["root/**/*"]),
     strip_prefix = "/docs/root",
+)
+
+pkg_files(
+    name = "sphinx_inventories",
+    srcs = glob(["inventories/**/*"]),
+    strip_prefix = "",
+)
+
+genrule(
+    name = "version_histories",
+    outs = ["version_histories.tar"],
+    cmd = """
+    $(location //tools/docs:generate_version_histories) $@
+    """,
+    tools = [
+        ":versions.yaml",
+        "//:VERSION.txt",
+        "//changelogs",
+        "//changelogs:sections.yaml",
+        "//tools/docs:generate_version_histories",
+    ],
 )
 
 # TODO(phlax): this appears unused, fix or remove
@@ -186,8 +184,16 @@ pkg_filegroup(
     srcs = [
         ":examples_rst",
         ":sphinx_base",
+        ":sphinx_inventories",
         ":sphinx_root",
     ],
+)
+
+pkg_tar(
+    name = "version_history_rst",
+    extension = "tar",
+    package_dir = "version_history",
+    deps = [":version_histories"],
 )
 
 pkg_tar(
@@ -199,6 +205,7 @@ pkg_tar(
         ":empty_protos_rst",
         ":extensions_security_rst",
         ":external_deps_rst",
+        ":version_history_rst",
         ":xds_rst",
     ],
 )

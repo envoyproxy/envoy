@@ -4,10 +4,12 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
+#include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/access_log/access_log_impl.h"
@@ -484,7 +486,6 @@ void ListenerImpl::buildAccessLog() {
 
 void ListenerImpl::buildInternalListener() {
   if (config_.address().has_envoy_internal_address()) {
-    internal_listener_config_ = std::make_unique<Network::InternalListenerConfig>();
     if (config_.has_api_listener()) {
       throw EnvoyException(
           fmt::format("error adding listener '{}': internal address cannot be used in api listener",
@@ -505,6 +506,16 @@ void ListenerImpl::buildInternalListener() {
       throw EnvoyException(fmt::format("error adding listener '{}': does not support socket option",
                                        address_->asString()));
     }
+    std::shared_ptr<Network::InternalListenerRegistry> internal_listener_registry =
+        parent_.server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
+            "internal_listener_registry_singleton");
+    if (internal_listener_registry == nullptr) {
+      throw EnvoyException(
+          fmt::format("error adding listener '{}': internal listener registry is not initialized.",
+                      address_->asString()));
+    }
+    internal_listener_config_ =
+        std::make_unique<InternalListenerConfigImpl>(*internal_listener_registry);
   } else {
     if (config_.has_internal_listener()) {
       throw EnvoyException(fmt::format("error adding listener '{}': address is not an internal "
@@ -527,6 +538,13 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   }
 
   udp_listener_config_ = std::make_shared<UdpListenerConfigImpl>(config_.udp_listener_config());
+  ProtobufTypes::MessagePtr udp_packet_packet_writer_config;
+  if (config_.udp_listener_config().has_udp_packet_packet_writer_config()) {
+    auto* factory_factory = Config::Utility::getFactory<Network::UdpPacketWriterFactoryFactory>(
+        config_.udp_listener_config().udp_packet_packet_writer_config());
+    udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(
+        config_.udp_listener_config().udp_packet_packet_writer_config());
+  }
   if (config_.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
     if (config_.has_connection_balance_config()) {
@@ -541,7 +559,8 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
     // looking at the GSO code there are substantial copying inefficiency so I don't think it's
     // wise to enable to globally for now. I will circle back and fix both of the above with
     // a non-QUICHE GSO implementation.
-    if (Api::OsSysCallsSingleton::get().supportsUdpGso()) {
+    if (udp_listener_config_->writer_factory_ == nullptr &&
+        Api::OsSysCallsSingleton::get().supportsUdpGso()) {
       udp_listener_config_->writer_factory_ = std::make_unique<Quic::UdpGsoBatchWriterFactory>();
     }
 #endif
@@ -645,6 +664,7 @@ void ListenerImpl::buildFilterChains() {
   transport_factory_context_->setInitManager(*dynamic_init_manager_);
   ListenerFilterChainFactoryBuilder builder(*this, *transport_factory_context_);
   filter_chain_manager_.addFilterChains(
+      config_.has_filter_chain_matcher() ? &config_.filter_chain_matcher() : nullptr,
       config_.filter_chains(),
       config_.has_default_filter_chain() ? &config_.default_filter_chain() : nullptr, builder,
       filter_chain_manager_);
@@ -964,6 +984,8 @@ bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v
       envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName("filter_chains"));
   differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
       "default_filter_chain"));
+  differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
+      "filter_chain_matcher"));
   return differencer.Compare(lhs, rhs);
 }
 

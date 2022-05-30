@@ -61,6 +61,7 @@ public:
   // Network::DnsResolver
   MOCK_METHOD(ActiveDnsQuery*, resolve,
               (const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback));
+  MOCK_METHOD(void, resetNetworking, ());
 
   testing::NiceMock<MockActiveDnsQuery> active_query_;
 };
@@ -527,6 +528,7 @@ public:
   MOCK_METHOD(Address::Type, type, (), (const));
   MOCK_METHOD(const sockaddr*, sockAddr, (), (const));
   MOCK_METHOD(socklen_t, sockAddrLen, (), (const));
+  MOCK_METHOD(absl::string_view, addressType, (), (const));
 
   const std::string& asString() const override { return physical_; }
   absl::string_view asStringView() const override { return physical_; }

@@ -10,6 +10,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -17,6 +18,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "test/config/integration/certs/client2cert_hash.h"
 #include "test/config/integration/certs/client_ecdsacert_hash.h"
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/test_common/environment.h"
@@ -29,7 +31,7 @@
 
 namespace Envoy {
 
-std::string ConfigHelper::baseConfig() {
+std::string ConfigHelper::baseConfigNoListeners() {
   return fmt::format(R"EOF(
 admin:
   access_log:
@@ -67,14 +69,19 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
+)EOF",
+                     Platform::null_device_path, Platform::null_device_path);
+}
+
+std::string ConfigHelper::baseConfig() {
+  return absl::StrCat(baseConfigNoListeners(), R"EOF(
   listeners:
   - name: listener_0
     address:
       socket_address:
         address: 127.0.0.1
         port_value: 0
-)EOF",
-                     Platform::null_device_path, Platform::null_device_path);
+)EOF");
 }
 
 std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address) {
@@ -145,11 +152,20 @@ std::string ConfigHelper::startTlsConfig() {
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
 
+std::string ConfigHelper::testInspectorFilter() {
+  return R"EOF(
+name: "envoy.filters.listener.test"
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+}
+
 std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting) {
   if (!enable_ja3_fingerprinting) {
     return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
 typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
 )EOF";
   }
 
@@ -175,7 +191,9 @@ std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
           delayed_close_timeout:
             nanos: 10000000
           http_filters:
-            name: envoy.filters.http.router
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP1
           access_log:
             name: accesslog
@@ -206,13 +224,17 @@ std::string ConfigHelper::quicHttpProxyConfig() {
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
       filters:
         name: http
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
-            name: envoy.filters.http.router
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP3
           access_log:
             name: file_access_log
@@ -341,7 +363,9 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
-            name: envoy.filters.http.router
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           codec_type: HTTP2
           route_config:
             name: route_config_0
@@ -615,7 +639,10 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
               config_source:
                 resource_api_version: V3
                 ads: {{}}
-            http_filters: [{{ name: envoy.filters.http.router }}]
+            http_filters:
+            - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     )EOF",
       stat_prefix, route_config);
   return buildBaseListener(name, address, hcm);
@@ -854,6 +881,7 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    ASSERT(!old_options.has_auto_config());
     old_options.MergeFrom(protocol_options);
     protocol_options.CopyFrom(old_options);
   }
@@ -1294,10 +1322,24 @@ void ConfigHelper::initializeTls(
   if (options.custom_validator_config_) {
     validation_context->set_allocated_custom_validator_config(options.custom_validator_config_);
   } else {
-    validation_context->mutable_trusted_ca()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-    validation_context->add_verify_certificate_hash(
-        options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
+    if (options.client_with_intermediate_cert_) {
+      validation_context->add_verify_certificate_hash(TEST_CLIENT2_CERT_HASH);
+      std::string cert_yaml = R"EOF(
+        trusted_ca:
+          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_ca_cert_chain.pem"
+      )EOF";
+      if (options.max_verify_depth_) {
+        cert_yaml += R"EOF(
+        max_verify_depth: 1
+      )EOF";
+      }
+      TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
+    } else {
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+      validation_context->add_verify_certificate_hash(
+          options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
+    }
   }
   validation_context->set_allow_expired_certificate(options.allow_expired_certificate_);
 

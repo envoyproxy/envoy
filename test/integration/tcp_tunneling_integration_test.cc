@@ -2,6 +2,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -20,7 +21,7 @@ public:
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          ConfigHelper::setConnectConfig(hcm, true, allow_post_,
+          ConfigHelper::setConnectConfig(hcm, !terminate_via_cluster_config_, allow_post_,
                                          downstream_protocol_ == Http::CodecType::HTTP3);
 
           if (enable_timeout_) {
@@ -92,6 +93,7 @@ public:
 
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
+  bool terminate_via_cluster_config_{};
   bool enable_timeout_{};
   bool exact_match_{};
   bool allow_post_{};
@@ -106,6 +108,22 @@ TEST_P(ConnectTerminationIntegrationTest, OriginalStyle) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, Basic) {
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalDataAndCleanShutdown();
+}
+
+TEST_P(ConnectTerminationIntegrationTest, BasicWithClusterconfig) {
+  terminate_via_cluster_config_ = true;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* upgrade =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_upstream_config();
+    envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
+    upgrade->set_name("envoy.filters.connection_pools.http.tcp");
+    upgrade->mutable_typed_config()->PackFrom(tcp_config);
+  });
+
   initialize();
 
   setUpConnection();

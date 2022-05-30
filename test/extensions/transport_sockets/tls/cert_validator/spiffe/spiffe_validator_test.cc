@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 #include <regex>
 #include <string>
@@ -539,7 +540,7 @@ typed_config:
 
 TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpires) {
   initialize();
-  EXPECT_EQ(0, validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(), validator().daysUntilFirstCertExpires().value());
 
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
@@ -557,9 +558,29 @@ typed_config:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert.pem"
   )EOF"),
              time_system);
-  EXPECT_EQ(19231, validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(19231, validator().daysUntilFirstCertExpires().value());
   time_system.setSystemTime(std::chrono::milliseconds(864000000));
-  EXPECT_EQ(19221, validator().daysUntilFirstCertExpires());
+  EXPECT_EQ(19221, validator().daysUntilFirstCertExpires().value());
+}
+
+TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpiresExpired) {
+  Event::SimulatedTimeSystem time_system;
+  // 2033-05-18 03:33:20 UTC
+  const time_t known_date_time = 2000000000;
+  time_system.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
+
+  initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+  )EOF"),
+             time_system);
+
+  EXPECT_EQ(absl::nullopt, validator().daysUntilFirstCertExpires());
 }
 
 TEST_F(TestSPIFFEValidator, TestAddClientValidationContext) {

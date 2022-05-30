@@ -61,11 +61,6 @@ void FlagRegistry::resetFlags() const {
   }
 }
 
-Flag* FlagRegistry::findFlag(absl::string_view name) const {
-  auto it = flags_.find(name);
-  return (it != flags_.end()) ? it->second : nullptr;
-}
-
 void FlagRegistry::updateReloadableFlags(
     const absl::flat_hash_map<std::string, bool>& quiche_flags_override) {
   for (auto& kv : flags_) {
@@ -76,71 +71,6 @@ void FlagRegistry::updateReloadableFlags(
       kv.second->resetReloadedValue();
     }
   }
-}
-
-template <> bool TypedFlag<bool>::setValueFromString(const std::string& value_str) {
-  static const auto* kTrueValues = new std::set<std::string>({"1", "t", "true", "y", "yes"});
-  static const auto* kFalseValues = new std::set<std::string>({"0", "f", "false", "n", "no"});
-  auto lower = absl::AsciiStrToLower(value_str);
-  if (kTrueValues->find(lower) != kTrueValues->end()) {
-    setValue(true);
-    return true;
-  }
-  if (kFalseValues->find(lower) != kFalseValues->end()) {
-    setValue(false);
-    return true;
-  }
-  return false;
-}
-
-template <> bool TypedFlag<int32_t>::setValueFromString(const std::string& value_str) {
-  int32_t value;
-  if (absl::SimpleAtoi(value_str, &value)) {
-    setValue(value);
-    return true;
-  }
-  return false;
-}
-
-template <> bool TypedFlag<int64_t>::setValueFromString(const std::string& value_str) {
-  int64_t value;
-  if (absl::SimpleAtoi(value_str, &value)) {
-    setValue(value);
-    return true;
-  }
-  return false;
-}
-
-template <> bool TypedFlag<double>::setValueFromString(const std::string& value_str) {
-  double value;
-  if (absl::SimpleAtod(value_str, &value)) {
-    setValue(value);
-    return true;
-  }
-  return false;
-}
-
-template <> bool TypedFlag<std::string>::setValueFromString(const std::string& value_str) {
-  setValue(value_str);
-  return true;
-}
-
-template <> bool TypedFlag<unsigned long>::setValueFromString(const std::string& value_str) {
-  unsigned long value;
-  if (absl::SimpleAtoi(value_str, &value)) {
-    setValue(value);
-    return true;
-  }
-  return false;
-}
-
-template <> bool TypedFlag<unsigned long long>::setValueFromString(const std::string& value_str) {
-  unsigned long long value;
-  if (absl::SimpleAtoi(value_str, &value)) {
-    setValue(value);
-    return true;
-  }
-  return false;
 }
 
 // Flag definitions

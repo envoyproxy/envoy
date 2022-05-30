@@ -52,7 +52,7 @@ public:
         filter_->maxReadBytes());
   }
 
-  void testHttpInspectMultipleReadsSuccess(absl::string_view header, bool http2 = false) {
+  void testHttpInspectMultipleReadsNotFound(absl::string_view header, bool http2 = false) {
     init();
     const std::vector<uint8_t> data = Hex::decode(std::string(header));
     {
@@ -113,21 +113,20 @@ public:
     }
     bool got_continue = false;
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
-    EXPECT_CALL(socket_, close()).WillOnce(InvokeWithoutArgs([&got_continue]() {
-      got_continue = true;
-    }));
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
     while (!got_continue) {
       file_event_callback_(Event::FileReadyType::Read);
       auto status = filter_->onData(*buffer_);
-      EXPECT_EQ(status, Network::FilterStatus::StopIteration);
+      if (status == Network::FilterStatus::Continue) {
+        got_continue = true;
+      }
     }
 
     EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
   }
 
-  void testHttpInspectMultipleReadsSuccess(absl::string_view header, absl::string_view alpn) {
+  void testHttpInspectMultipleReadsFound(absl::string_view header, absl::string_view alpn) {
     init();
     const std::vector<absl::string_view> alpn_protos{alpn};
     const std::vector<uint8_t> data = Hex::decode(std::string(header));
@@ -211,7 +210,7 @@ public:
     }
   }
 
-  void testHttpInspectSuccess(absl::string_view header, absl::string_view alpn) {
+  void testHttpInspectFound(absl::string_view header, absl::string_view alpn) {
     init();
     std::vector<uint8_t> data = Hex::decode(std::string(header));
 #ifdef WIN32
@@ -272,7 +271,7 @@ public:
     }
   }
 
-  void testHttpInspectFail(absl::string_view header, bool http2 = false) {
+  void testHttpInspectNotFound(absl::string_view header, bool http2 = false) {
     init();
     std::vector<uint8_t> data = Hex::decode(std::string(header));
 #ifdef WIN32
@@ -317,10 +316,9 @@ public:
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
-    EXPECT_CALL(socket_, close());
     file_event_callback_(Event::FileReadyType::Read);
     auto status = filter_->onData(*buffer_);
-    EXPECT_EQ(status, Network::FilterStatus::StopIteration);
+    EXPECT_EQ(status, Network::FilterStatus::Continue);
     EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
   }
 
@@ -352,7 +350,7 @@ TEST_F(HttpInspectorTest, InlineReadInspectHttp10) {
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
       "15000\r\ncontent-length: 0\r\n\r\n";
-  testHttpInspectSuccess(header, Http::Utility::AlpnNames::get().Http10);
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http10);
 }
 
 TEST_F(HttpInspectorTest, InlineReadParseError) {
@@ -362,7 +360,7 @@ TEST_F(HttpInspectorTest, InlineReadParseError) {
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
       "15000\r\ncontent-length: 0\r\n\r\n";
-  testHttpInspectFail(header);
+  testHttpInspectNotFound(header);
 }
 
 TEST_F(HttpInspectorTest, InspectHttp10) {
@@ -371,7 +369,7 @@ TEST_F(HttpInspectorTest, InspectHttp10) {
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
       "15000\r\ncontent-length: 0\r\n\r\n";
-  testHttpInspectSuccess(header, Http::Utility::AlpnNames::get().Http10);
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http10);
 }
 
 TEST_F(HttpInspectorTest, InspectHttp11) {
@@ -380,7 +378,7 @@ TEST_F(HttpInspectorTest, InspectHttp11) {
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
       "15000\r\ncontent-length: 0\r\n\r\n";
-  testHttpInspectSuccess(header, Http::Utility::AlpnNames::get().Http11);
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
 }
 
 TEST_F(HttpInspectorTest, InspectHttp11WithNonEmptyRequestBody) {
@@ -389,32 +387,32 @@ TEST_F(HttpInspectorTest, InspectHttp11WithNonEmptyRequestBody) {
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
       "15000\r\ncontent-length: 3\r\n\r\nfoo";
-  testHttpInspectSuccess(header, Http::Utility::AlpnNames::get().Http11);
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
 }
 
 TEST_F(HttpInspectorTest, ExtraSpaceInRequestLine) {
   const absl::string_view header = "GET  /anything  HTTP/1.1\r\n\r\n";
-  testHttpInspectSuccess(header, Http::Utility::AlpnNames::get().Http11);
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
 }
 
 TEST_F(HttpInspectorTest, InvalidHttpMethod) {
   const absl::string_view header = "BAD /anything HTTP/1.1";
-  testHttpInspectFail(header);
+  testHttpInspectNotFound(header);
 }
 
 TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
   const absl::string_view header = "BAD /anything HTTP/1.1\r\n";
-  testHttpInspectFail(header);
+  testHttpInspectNotFound(header);
 }
 
 TEST_F(HttpInspectorTest, OldHttpProtocol) {
   const absl::string_view header = "GET /anything HTTP/0.9\r\n";
-  testHttpInspectSuccess(header, Http::Utility::AlpnNames::get().Http10);
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http10);
 }
 
 TEST_F(HttpInspectorTest, InvalidRequestLine) {
   const absl::string_view header = "GET /anything HTTP/1.1 BadRequestLine\r\n";
-  testHttpInspectFail(header);
+  testHttpInspectNotFound(header);
 }
 
 TEST_F(HttpInspectorTest, InspectHttp2) {
@@ -424,7 +422,7 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
       "8825b650c3abb8d2e053032a2f2a408df2b4a7b3c0ec90b22d5d8749ff839d29af4089f2b585ed6950958d279a18"
       "9e03f1ca5582265f59a75b0ac3111959c7e49004908db6e83f4096f2b16aee7f4b17cd65224b22d6765926a4a7b5"
       "2b528f840b60003f";
-  testHttpInspectSuccess(header, Http::Utility::AlpnNames::get().Http2c);
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http2c);
 }
 
 TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
@@ -465,29 +463,34 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
       "8825b650c3abb8d2e053032a2f2a408df2b4a7b3c0ec90b22d5d8749ff839d29af4089f2b585ed6950958d279a18"
       "9e03f1ca5582265f59a75b0ac3111959c7e49004908db6e83f4096f2b16aee7f4b17cd65224b22d6765926a4a7b5"
       "2b528f840b60003f";
-  testHttpInspectMultipleReadsSuccess(header, Http::Utility::AlpnNames::get().Http2c);
+  testHttpInspectMultipleReadsFound(header, Http::Utility::AlpnNames::get().Http2c);
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
   const std::string header = "505249202a20485454502f322e300d0a0d0c";
-  testHttpInspectMultipleReadsSuccess(header, true);
+  testHttpInspectMultipleReadsNotFound(header, true);
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
   const absl::string_view data = "GET /anything HTTP/1.0\r";
-  testHttpInspectMultipleReadsSuccess(data, Http::Utility::AlpnNames::get().Http10);
+  testHttpInspectMultipleReadsFound(data, Http::Utility::AlpnNames::get().Http10);
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
   const absl::string_view data = "X";
-  testHttpInspectMultipleReadsSuccess(data);
+  testHttpInspectMultipleReadsNotFound(data);
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
+#ifdef ENVOY_ENABLE_UHV
+  // permissive parsing
+  return;
+#endif
+
   const std::string valid_header = "GET /index HTTP/1.1\r";
   //  offset:                       0         10
   const std::string truncate_header = valid_header.substr(0, 14).append("\r");
-  testHttpInspectMultipleReadsSuccess(truncate_header);
+  testHttpInspectMultipleReadsNotFound(truncate_header);
 }
 
 TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {

@@ -17,6 +17,7 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/extensions/filters/http/router:config",
         "//test/integration/filters:add_body_filter_config_lib",
+        "//test/integration/filters:test_listener_filter_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",

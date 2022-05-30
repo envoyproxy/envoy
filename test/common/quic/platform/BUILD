@@ -1,7 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
-    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -12,18 +11,6 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
-
-envoy_cc_test(
-    name = "http2_platform_test",
-    srcs = ["http2_platform_test.cc"],
-    external_deps = ["quiche_http2_platform"],
-    deps = [
-        "//source/common/quic/platform:quiche_flags_impl_lib",
-        "//test/test_common:logging_lib",
-        "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:http2_test_tools_random",
-    ],
-)
 
 envoy_cc_test(
     name = "quic_platform_test",
@@ -53,16 +40,16 @@ envoy_cc_test(
         "@com_github_google_quiche//:quic_core_quic_epoll_clock_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
         "@com_github_google_quiche//:quic_platform_expect_bug",
-        "@com_github_google_quiche//:quic_platform_mock_log",
         "@com_github_google_quiche//:quic_platform_test",
         "@com_github_google_quiche//:quic_platform_test_output",
         "@com_github_google_quiche//:quic_platform_thread",
         "@com_github_google_quiche//:quiche_common_mem_slice_storage",
+        "@com_github_google_quiche//:quiche_common_platform_stream_buffer_allocator",
         "@com_github_google_quiche//:quiche_common_platform_system_event_loop",
     ],
 )
 
-envoy_cc_test_library(
+envoy_quiche_platform_impl_cc_test_library(
     name = "epoll_server_platform_impl_lib",
     hdrs = [
         "epoll_address_test_utils_impl.h",
@@ -98,15 +85,7 @@ envoy_quiche_platform_impl_cc_test_library(
     tags = ["nofips"],
     deps = [
         "@com_github_google_quiche//:quic_platform_base",
-        "@com_github_google_quiche//:quic_platform_mock_log",
     ],
-)
-
-envoy_quiche_platform_impl_cc_test_library(
-    name = "quiche_mock_log_impl_lib",
-    hdrs = ["quiche_mock_log_impl.h"],
-    tags = ["nofips"],
-    deps = ["@com_github_google_quiche//:quic_platform_base"],
 )
 
 envoy_quiche_platform_impl_cc_test_library(

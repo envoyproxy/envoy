@@ -26,23 +26,21 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_mem_slice.h"
+#include "quiche/common/platform/api/quiche_stream_buffer_allocator.h"
 #include "quiche/common/platform/api/quiche_system_event_loop.h"
 #include "quiche/common/quiche_mem_slice_storage.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/core/quic_epoll_clock.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
-#include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_expect_bug.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
-#include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
@@ -144,40 +142,12 @@ TEST_F(QuicPlatformTest, QuicExportedStats) {
 
 TEST_F(QuicPlatformTest, QuicHostnameUtils) {
   EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("!!"));
-  EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("envoyproxy"));
+  // SNI without dot is valid as per RFC 2396.
+  EXPECT_TRUE(QuicHostnameUtils::IsValidSNI("envoyproxy"));
   EXPECT_TRUE(QuicHostnameUtils::IsValidSNI("www.envoyproxy.io"));
   EXPECT_EQ("lyft.com", QuicHostnameUtils::NormalizeHostname("lyft.com"));
   EXPECT_EQ("google.com", QuicHostnameUtils::NormalizeHostname("google.com..."));
   EXPECT_EQ("quicwg.org", QuicHostnameUtils::NormalizeHostname("QUICWG.ORG"));
-}
-
-TEST_F(QuicPlatformTest, QuicMockLog) {
-  ASSERT_EQ(spdlog::level::err, GetLogger().level());
-
-  {
-    // Test a mock log that is not capturing logs.
-    CREATE_QUIC_MOCK_LOG(log);
-    EXPECT_QUIC_LOG_CALL(log).Times(0);
-    QUIC_LOG(ERROR) << "This should be logged but not captured by the mock.";
-  }
-
-  // Test nested mock logs.
-  CREATE_QUIC_MOCK_LOG(outer_log);
-  outer_log.StartCapturingLogs();
-
-  {
-    // Test a mock log that captures logs.
-    CREATE_QUIC_MOCK_LOG(inner_log);
-    inner_log.StartCapturingLogs();
-
-    EXPECT_QUIC_LOG_CALL_CONTAINS(inner_log, ERROR, "Inner log message");
-    QUIC_LOG(ERROR) << "Inner log message should be captured.";
-
-    // Destruction of inner_log should restore the QUIC log sink to outer_log.
-  }
-
-  EXPECT_QUIC_LOG_CALL_CONTAINS(outer_log, ERROR, "Outer log message");
-  QUIC_LOG(ERROR) << "Outer log message should be captured.";
 }
 
 TEST_F(QuicPlatformTest, QuicServerStats) {
@@ -358,17 +328,17 @@ TEST_F(QuicPlatformTest, QuicheCheck) {
   QUICHE_CHECK(1 == 1) << " 1 == 1 is forever true.";
 
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false) << " Supposed to fail in debug mode."; },
-                     "CHECK failed:.* Supposed to fail in debug mode.");
-  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "CHECK failed");
+                     "Check failed:.* Supposed to fail in debug mode.");
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "Check failed");
 
   EXPECT_DEATH({ QUICHE_CHECK(false) << " Supposed to fail in all modes."; },
-               "CHECK failed:.* Supposed to fail in all modes.");
-  EXPECT_DEATH({ QUICHE_CHECK(false); }, "CHECK failed");
-  EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "CHECK failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
+               "Check failed:.* Supposed to fail in all modes.");
+  EXPECT_DEATH({ QUICHE_CHECK(false); }, "Check failed");
+  EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "Check failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(1 + 1, 2); },
-                     "CHECK failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
+                     "Check failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(nullptr, nullptr); },
-                     "CHECK failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
+                     "Check failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
 }
 
 // Test the behaviors of the cross products of
@@ -390,21 +360,11 @@ TEST_F(QuicPlatformTest, QuicFatalLog) {
 #endif
 }
 
-TEST_F(QuicPlatformTest, QuicBranchPrediction) {
-  GetLogger().set_level(spdlog::level::info);
-
-  if (QUIC_PREDICT_FALSE(rand() % RAND_MAX == 123456789)) {
-    QUIC_LOG(INFO) << "Go buy some lottery tickets.";
-  } else {
-    QUIC_LOG(INFO) << "As predicted.";
-  }
-}
-
 TEST_F(QuicPlatformTest, QuicNotReached) {
 #ifdef NDEBUG
-  QUIC_NOTREACHED(); // Expect no-op.
+  QUICHE_NOTREACHED(); // Expect no-op.
 #else
-  EXPECT_DEATH(QUIC_NOTREACHED(), "reached unexpected code");
+  EXPECT_DEATH(QUICHE_NOTREACHED(), "reached unexpected code");
 #endif
 }
 
@@ -536,14 +496,6 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  flag_registry.findFlag("FLAGS_quic_reloadable_flag_quic_testonly_default_false")
-      ->setValueFromString("true");
-  flag_registry.findFlag("FLAGS_quic_restart_flag_quic_testonly_default_true")
-      ->setValueFromString("0");
-  flag_registry.findFlag("FLAGS_quic_time_wait_list_seconds")->setValueFromString("100");
-  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
-  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
 }
 
 class FileUtilsTest : public testing::Test {
@@ -584,7 +536,7 @@ protected:
 };
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
-  QuicStreamBufferAllocator allocator;
+  quiche::QuicheStreamBufferAllocator allocator;
   Envoy::Stats::TestUtil::MemoryTest memory_test;
   if (memory_test.mode() == Envoy::Stats::TestUtil::MemoryTest::Mode::Disabled) {
     return;
