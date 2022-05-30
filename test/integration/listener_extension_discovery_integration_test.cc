@@ -52,27 +52,34 @@ public:
       if (rate_limit) {
         api_config_source->mutable_rate_limit_settings()->mutable_max_tokens()->set_value(10);
       }
-      // Add listener filter matcher config.
-      if (matcher == ListenerMatcherType::ANYMATCHER) {
-        listener_filter->mutable_filter_disabled()->set_any_match(true);
-      } else if (matcher == ListenerMatcherType::NOTANYMATCHER) {
-        listener_filter->mutable_filter_disabled()->mutable_not_match()->set_any_match(true);
-      }
+      addListenerFilterMatcher(listener_filter, matcher);
       auto* grpc_service = api_config_source->add_grpc_services();
       setGrpcService(*grpc_service, "ecds_cluster", getEcdsFakeUpstream().localAddress());
     });
   }
 
-  void addStaticFilter(const std::string& name, uint32_t drain_bytes) {
+  void addStaticFilter(const std::string& name, uint32_t drain_bytes,
+                       ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER) {
     config_helper_.addConfigModifier(
-        [name, drain_bytes](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        [name, drain_bytes, matcher, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
           auto* listener_filter =
               bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
           listener_filter->set_name(name);
           auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
           configuration.set_drain_bytes(drain_bytes);
           listener_filter->mutable_typed_config()->PackFrom(configuration);
+          addListenerFilterMatcher(listener_filter, matcher);
         });
+  }
+
+  // Add listener filter matcher config.
+  void addListenerFilterMatcher(envoy::config::listener::v3::ListenerFilter* listener_filter,
+                                ListenerMatcherType matcher) {
+    if (matcher == ListenerMatcherType::ANYMATCHER) {
+      listener_filter->mutable_filter_disabled()->set_any_match(true);
+    } else if (matcher == ListenerMatcherType::NOTANYMATCHER) {
+      listener_filter->mutable_filter_disabled()->mutable_not_match()->set_any_match(true);
+    }
   }
 
   void initialize() override {
@@ -378,6 +385,16 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoStaticFilters) {
   sendDataVerifyResults(8);
 }
 
+// Static listener filter configuration with matcher config.
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoStaticFiltersWithMatcher) {
+  addStaticFilter("foo", 3, ListenerMatcherType::ANYMATCHER);
+  addStaticFilter("bar", 5, ListenerMatcherType::NOTANYMATCHER);
+  initialize();
+
+  // The filter with any matcher configured is disabled.
+  sendDataVerifyResults(5);
+}
+
 // Testing it works with mixed static/dynamic listener filter configuration.
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
@@ -395,7 +412,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed
   sendDataVerifyResults(10);
 }
 
-TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixedDifferentOrder) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedDifferentOrder) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addStaticFilter("bar", 2);
   addStaticFilter("baz", 2);
@@ -411,12 +428,11 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoDynamicTwoStaticFilterMixed
   sendDataVerifyResults(8);
 }
 
-TEST_P(ListenerExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedWithAnyMatcher) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedWithMatcher) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addStaticFilter("bar", 2);
-  addStaticFilter("baz", 2);
-  addDynamicFilter(filter_name_, true);
-  // This filter with any matcher is effectively disabled.
+  addStaticFilter("bar", 2, ListenerMatcherType::NOTANYMATCHER);
+  addStaticFilter("baz", 2, ListenerMatcherType::ANYMATCHER);
+  addDynamicFilter(filter_name_, true, true, false, ListenerMatcherType::NOTANYMATCHER);
   addDynamicFilter(filter_name_, false, true, false, ListenerMatcherType::ANYMATCHER);
   initialize();
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
@@ -424,8 +440,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, DynamicStaticFilterMixedWithAn
   sendXdsResponse(filter_name_, "1", 3);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
-  // The filters totally drain 2 + 2 + 3 bytes.
-  sendDataVerifyResults(7);
+  // The filters with any matcher configured are disabled. They totally drain 2 + 3 bytes.
+  sendDataVerifyResults(5);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
