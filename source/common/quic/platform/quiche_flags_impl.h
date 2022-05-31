@@ -47,8 +47,6 @@ public:
   Flag(const char* name, const char* help) : name_(name), help_(help) {}
   virtual ~Flag() = default;
 
-  virtual void resetReloadedValue() = 0;
-
   // Return flag name.
   absl::string_view name() const { return name_; }
 
@@ -85,11 +83,6 @@ public:
     absl::MutexLock lock(&mutex_);
     has_reloaded_value_ = true;
     reloaded_value_ = value;
-  }
-
-  void resetReloadedValue() override {
-    absl::MutexLock lock(&mutex_);
-    has_reloaded_value_ = false;
   }
 
 private:
