@@ -1,3 +1,5 @@
+#include <functional>
+
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -37,7 +39,7 @@ cleanRouteConfig(envoy::config::route::v3::RouteConfiguration route_config) {
   return clean_config;
 }
 
-// Check configuration for size and unimplemented options.
+// Check configuration for size and unimplemented/missing options.
 bool validateConfig(const test::common::router::RouteTestCase& input) {
   const auto input_size = input.ByteSizeLong();
   if (input_size > MaxInputSize) {
@@ -49,6 +51,25 @@ bool validateConfig(const test::common::router::RouteTestCase& input) {
     if (virtual_host.has_retry_policy_typed_config()) {
       ENVOY_LOG_MISC(debug, "retry_policy_typed_config: not implemented");
       return false;
+    }
+    if (virtual_host.has_matcher() && virtual_host.matcher().on_no_match().has_action() &&
+        virtual_host.matcher().on_no_match().action().name() ==
+            "type.googleapis.com/envoy.config.route.v3.Route") {
+      envoy::config::route::v3::Route on_no_match_route_action_config;
+      MessageUtil::unpackTo(virtual_host.matcher().on_no_match().action().typed_config(),
+                            on_no_match_route_action_config);
+      ENVOY_LOG_MISC(trace, "typed_config of virtual_host.matcher.on_no_match.action is: {}",
+                     on_no_match_route_action_config.DebugString());
+      if (on_no_match_route_action_config.has_filter_action() ||
+          on_no_match_route_action_config.has_non_forwarding_action() ||
+          (on_no_match_route_action_config.has_route() &&
+           !(on_no_match_route_action_config.route().has_cluster_specifier_plugin() ||
+             on_no_match_route_action_config.route().has_cluster() ||
+             on_no_match_route_action_config.route().has_cluster_header() ||
+             on_no_match_route_action_config.route().has_weighted_clusters()))) {
+        ENVOY_LOG_MISC(debug, "matcher.on_no_match.action not sufficient for processing");
+        return false;
+      }
     }
   }
   return true;
