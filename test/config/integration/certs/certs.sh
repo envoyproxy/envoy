@@ -27,10 +27,11 @@ generate_ecdsa_key() {
   openssl ecparam -name secp256r1 -genkey -out "${1}key.pem"
 }
 
-# $1=<certificate name> $2=<CA name>
+# $1=<certificate name> $2=<CA name> $3=[days]
 generate_x509_cert() {
+  local days="${3:-730}"
   openssl req -new -key "${1}key.pem" -out "${1}cert.csr" -config "${1}cert.cfg" -batch -sha256
-  openssl x509 -req -days 730 -in "${1}cert.csr" -sha256 -CA "${2}cert.pem" -CAkey \
+  openssl x509 -req -days "${days}" -in "${1}cert.csr" -sha256 -CA "${2}cert.pem" -CAkey \
     "${2}key.pem" -CAcreateserial -out "${1}cert.pem" -extensions v3_ca -extfile "${1}cert.cfg"
   echo -e "// NOLINT(namespace-envoy)\nconstexpr char TEST_$(echo "$1" | tr "[:lower:]" "[:upper:]")_CERT_HASH[] = \"$(openssl x509 -in "${1}cert.pem" -noout -fingerprint -sha256 | cut -d"=" -f2)\";" > "${1}cert_hash.h"
 }
@@ -107,6 +108,10 @@ generate_rsa_key upstream upstreamca
 generate_x509_cert upstream upstreamca
 generate_rsa_key upstreamlocalhost upstreamca
 generate_x509_cert upstreamlocalhost upstreamca
+
+# Generate expired_cert.pem as a self-signed, expired cert (will fail on macOS 10.13+ because of negative days value).
+generate_rsa_key expired_
+generate_x509_cert expired_ ca -365
 
 rm ./*.csr
 rm ./*.srl

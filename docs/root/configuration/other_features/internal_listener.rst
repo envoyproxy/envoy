@@ -98,7 +98,7 @@ Encap HTTP GET requests in a HTTP CONNECT request
 
 Currently Envoy :ref:`HTTP connection manager <config_http_conn_man>`
 cannot proxy a GET request in an upstream HTTP CONNECT request. This requirement
-can be acomplished by setting up the upstream endpoint of HTTP connection manager to the internal listener address.
+can be accomplished by setting up the upstream endpoint of HTTP connection manager to the internal listener address.
 Meanwhile, another internal listener binding to the above listener address includes a TCP proxy with :ref:`tunneling config <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>`.
 
 Decap the CONNECT requests

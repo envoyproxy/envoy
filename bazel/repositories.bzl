@@ -224,6 +224,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
     external_http_archive("rules_pkg")
+    external_http_archive("com_github_aignas_rules_shellcheck")
     external_http_archive("aspect_bazel_lib")
     _com_github_fdio_vpp_vcl()
 
@@ -899,10 +900,6 @@ def _com_github_google_quiche():
     native.bind(
         name = "quiche_http2_adapter",
         actual = "@com_github_google_quiche//:http2_adapter",
-    )
-    native.bind(
-        name = "quiche_spdy_platform",
-        actual = "@com_github_google_quiche//:spdy_platform",
     )
     native.bind(
         name = "quiche_quic_platform",
