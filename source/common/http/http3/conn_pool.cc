@@ -130,9 +130,9 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
 
-  return Quic::createQuicNetworkConnection(quic_info_, std::move(crypto_config), server_id_,
-                                           dispatcher(), host()->address(), source_address,
-                                           quic_stat_names, rtt_cache, scope);
+  return Quic::createQuicNetworkConnection(
+      quic_info_, std::move(crypto_config), server_id_, dispatcher(), host()->address(),
+      source_address, quic_stat_names, rtt_cache, scope, socketOptions(), transportSocketOptions());
 }
 
 std::unique_ptr<Http3ConnPoolImpl>

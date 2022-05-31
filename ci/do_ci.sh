@@ -507,7 +507,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
 
   echo "check dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check -- -v warn
 
   # Run pip requirements tests
   echo "check pip..."
