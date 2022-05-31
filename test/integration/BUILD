@@ -324,6 +324,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        ":http_protocol_integration_lib",
         "//source/common/config:api_version_lib",
         "//source/common/protobuf",
         "//source/extensions/http/original_ip_detection/xff:config",
@@ -1064,6 +1065,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stats_integration_test",
     srcs = ["stats_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
     # The symbol table cluster memory tests take a while to run specially under tsan.
     # Shard it to avoid test timeout.
     shard_count = 2,
@@ -1073,10 +1077,12 @@ envoy_cc_test(
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/config/integration/certs:certs_info",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
