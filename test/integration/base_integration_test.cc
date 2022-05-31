@@ -710,7 +710,13 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
 void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
-  ASSERT_TRUE(response->complete());
+  EXPECT_TRUE(response->complete());
+  if (!response->complete()) {
+    // Allow the rest of the test to complete for better diagnostic information about the failure.
+    return;
+  }
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
   Json::ObjectSharedPtr json;
   try {
     json = Json::Factory::loadFromString(response->body());
