@@ -90,7 +90,6 @@ message RouteConfiguration {
   // To allow setting overrides at the route or virtual host level, this order can be reversed
   // by setting this option to true. Defaults to false.
   //
-  // [#next-major-version: In the v3 API, this will default to true.]
   bool most_specific_header_mutations_wins = 10;
 
   // An optional boolean that specifies whether the clusters that the route
