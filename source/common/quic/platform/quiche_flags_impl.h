@@ -46,31 +46,19 @@ private:
 // Abstract class for QUICHE protocol and feature flags.
 class Flag {
 public:
-  // Construct Flag with the given name and help string.
-  Flag(const char* name, const char* help) : name_(name), help_(help) {}
   virtual ~Flag() = default;
 
   // Reset flag to default value.
   virtual void resetValue() = 0;
 
   virtual void resetReloadedValue() = 0;
-
-  // Return flag name.
-  absl::string_view name() const { return name_; }
-
-  // Return flag help string.
-  absl::string_view help() const { return help_; }
-
-private:
-  std::string name_;
-  std::string help_;
 };
 
 // Concrete class for QUICHE protocol and feature flags, templated by flag type.
 template <typename T> class TypedFlag : public Flag {
 public:
-  TypedFlag(const char* name, T default_value, const char* help)
-      : Flag(name, help), value_(default_value), default_value_(default_value) {}
+  TypedFlag(T default_value)
+      : value_(default_value), default_value_(default_value) {}
 
   void resetValue() override {
     absl::MutexLock lock(&mutex_);
