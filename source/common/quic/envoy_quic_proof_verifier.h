@@ -18,7 +18,7 @@ private:
   bool is_valid_{false};
 };
 
-// An interface for the Envoy specific QUICHE verify context.
+// An interface for the Envoy specific QUIC verify context.
 class EnvoyQuicProofVerifyContext : public quic::ProofVerifyContext {
 public:
   virtual Event::Dispatcher& dispatcher() const PURE;

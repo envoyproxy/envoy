@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/optref.h"
+
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
@@ -143,10 +145,16 @@ public:
                                     quic::QuicCryptoClientConfig* crypto_config,
                                     quic::QuicCryptoClientStream::ProofHandler* proof_handler,
                                     bool has_application_state) override {
+    last_verify_context_ = *verify_context;
     return std::make_unique<TestQuicCryptoClientStream>(server_id, session,
                                                         std::move(verify_context), crypto_config,
                                                         proof_handler, has_application_state);
   }
+
+  OptRef<quic::ProofVerifyContext> lastVerifyContext() const { return last_verify_context_; }
+
+private:
+  OptRef<quic::ProofVerifyContext> last_verify_context_;
 };
 
 class MockEnvoyQuicClientSession : public EnvoyQuicClientSession {

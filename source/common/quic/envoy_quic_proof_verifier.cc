@@ -21,7 +21,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     IS_ENVOY_BUG("QUIC proof verify context was not setup correctly.");
     return quic::QUIC_FAILURE;
   }
-  ENVOY_BUG(!verify_context->isServer(), "QUIC client cert is not supported yet");
+  ENVOY_BUG(!verify_context->isServer(), "Client certificates are not supported in QUIC yet.");
 
   if (doVerifyCertChain(hostname, port, certs, ocsp_response, cert_sct, context, error_details,
                         out_alert, std::move(callback))) {
