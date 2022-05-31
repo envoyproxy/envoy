@@ -37,7 +37,7 @@ absl::flat_hash_map<absl::string_view, Flag*> makeFlagMap() {
   // This flag enables BBR, otherwise QUIC will use Cubic which is less performant.
   FLAGS_quic_reloadable_flag_quic_default_to_bbr->setValue(true);
 
-#define QUIC_PROTOCOL_FLAG(type, flag, ...) flags.emplace("FLAGS_"#flag, FLAGS_##flag);
+#define QUIC_PROTOCOL_FLAG(type, flag, ...) flags.emplace("FLAGS_" #flag, FLAGS_##flag);
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
   // Do not include 32-byte per-entry overhead while counting header size.

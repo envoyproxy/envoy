@@ -57,8 +57,7 @@ public:
 // Concrete class for QUICHE protocol and feature flags, templated by flag type.
 template <typename T> class TypedFlag : public Flag {
 public:
-  TypedFlag(T default_value)
-      : value_(default_value), default_value_(default_value) {}
+  TypedFlag(T default_value) : value_(default_value), default_value_(default_value) {}
 
   void resetValue() override {
     absl::MutexLock lock(&mutex_);
