@@ -124,6 +124,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-04-04",
         cpe = "N/A",
     ),
+    com_github_aignas_rules_shellcheck = dict(
+        project_name = "Shellcheck rules for bazel",
+        project_desc = "Now you do not need to depend on the system shellcheck version in your bazel-managed (mono)repos.",
+        project_url = "https://github.com/aignas/rules_shellcheck",
+        version = "0.1.0",
+        sha256 = "180325028cddda58df209765947839e78e75a0cf90b2dc6303bdf7a90c735e0c",
+        strip_prefix = "rules_shellcheck-{version}",
+        urls = ["https://github.com/aignas/rules_shellcheck/archive/v{version}.tar.gz"],
+        release_date = "2022-05-29",
+        use_category = ["build"],
+        cpe = "N/A",
+    ),
     com_github_axboe_liburing = dict(
         project_name = "liburing",
         project_desc = "C helpers to set up and tear down io_uring instances",
