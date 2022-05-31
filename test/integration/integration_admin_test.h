@@ -16,7 +16,7 @@ class IntegrationAdminTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
     // This test doesn't have any configuration that creates stats, and one of the tests is failing
-    // for unknown reason on Windows only, so diable.
+    // for unknown reason on Windows only, so disable.
     skip_tag_extraction_rule_check_ = true;
 
     config_helper_.addConfigModifier(
