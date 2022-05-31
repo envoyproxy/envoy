@@ -45,8 +45,7 @@ def load_pool(type_name, descriptor_path=None):
 
     file_desc_set = descriptor_pb2.FileDescriptorSet()
     text_format.Parse(
-        pathlib.Path(descriptor_path).read_text(), file_desc_set,
-        allow_unknown_extension=True)
+        pathlib.Path(descriptor_path).read_text(), file_desc_set, allow_unknown_extension=True)
 
     pool = descriptor_pool.DescriptorPool()
     for f in file_desc_set.file:
