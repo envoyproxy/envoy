@@ -69,19 +69,17 @@ FlagRegistry& FlagRegistry::getInstance() {
 FlagRegistry::FlagRegistry() : flags_(makeFlagMap()) {}
 
 void FlagRegistry::resetFlags() const {
-  for (auto& kv : flags_) {
-    kv.second->resetValue();
+  for (auto& [flag_name, flag] : flags_) {
+    flag->resetValue();
   }
 }
 
 void FlagRegistry::updateReloadableFlags(
     const absl::flat_hash_map<std::string, bool>& quiche_flags_override) {
-  for (auto& kv : flags_) {
-    const auto it = quiche_flags_override.find(kv.first);
+  for (auto& [flag_name, flag] : flags_) {
+    const auto it = quiche_flags_override.find(flag_name);
     if (it != quiche_flags_override.end()) {
-      static_cast<TypedFlag<bool>*>(kv.second)->setReloadedValue(it->second);
-    } else {
-      kv.second->resetReloadedValue();
+      static_cast<TypedFlag<bool>*>(flag)->setReloadedValue(it->second);
     }
   }
 }
