@@ -52,7 +52,7 @@ message RateLimitQuotaFilterConfig {
   //
   //   matcher_list:
   //     matchers:
-  //     # assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
+  //     # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
   //     - predicate:
   //         single_predicate:
   //           input:
@@ -92,9 +92,23 @@ message RateLimitQuotaFilterConfig {
   //                 acl:
   //                   string_value: admin_users
   //
+  //   # Catch-all clause for the requests not matched by any of the matchers.
+  //   # In this example, deny all requests.
+  //   on_no_match:
+  //     action:
+  //       typed_config:
+  //         '@type': type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+  //         no_assignment_behavior:
+  //           fallback_rate_limit:
+  //             blanket_rule: DENY_ALL
+  //
   // .. attention::
   //  The first matched group wins. Once the request is matched into a bucket, matcher
   //  evaluation ends.
+  //
+  // Use ``on_no_match`` field to assign the catch-all bucket. If a request is not matched
+  // into any bucket, and there's no  ``on_no_match`` field configured, the request will be
+  // ALLOWED by default. It will NOT be reported to the RLQS server.
   //
   // Refer to :ref:`Unified Matcher API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`
   // documentation for more information on the matcher trees.
@@ -279,7 +293,7 @@ message RateLimitQuotaBucketSettings {
     // See usage examples in the docs to :ref:`bucket_id_builder
     // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.bucket_id_builder>`
     // field.
-    map<string, ValueBuilder> bucket_id_builder = 1;
+    map<string, ValueBuilder> bucket_id_builder = 1 [(validate.rules).map = {min_pairs: 1}];
   }
 
   // ``BucketId`` builder.
@@ -359,6 +373,11 @@ message RateLimitQuotaBucketSettings {
   // .. note::
   //   The order of ``BucketId`` keys do not matter. Buckets ``{ a: 'A', b: 'B' }`` and
   //   ``{ b: 'B', a: 'A' }`` are identical.
+  //
+  // If not set, requests will NOT be reported to the server, and will always limited
+  // according to :ref:`no_assignment_behavior
+  // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
+  // configuration.
   BucketIdBuilder bucket_id_builder = 1;
 
   // The interval at which the data plane is to report quota usage for
