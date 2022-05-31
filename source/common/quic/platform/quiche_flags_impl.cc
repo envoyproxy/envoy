@@ -77,7 +77,7 @@ void FlagRegistry::updateReloadableFlags(
 }
 
 // Flag definitions
-#define QUIC_FLAG(flag, value) TypedFlag<bool>* flag = new TypedFlag<bool>(#flag, value, "");
+#define QUIC_FLAG(flag, value) TypedFlag<bool>* flag = new ReloadableFlag(#flag, value, "");
 #include "quiche/quic/core/quic_flags_list.h"
 QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
 QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
