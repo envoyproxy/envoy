@@ -28,17 +28,17 @@ final class EngineBuilderTests: XCTestCase {
     MockEnvoyEngine.onRunWithTemplate = nil
   }
 
-  func testEnableNetworkPathMonitorDefaultsToFalse() {
+  func testEnableNetworkPathMonitorDefaultsToTrue() {
     let builder = EngineBuilder()
-    XCTAssertFalse(builder.enableNetworkPathMonitor)
+    XCTAssertTrue(builder.enableNetworkPathMonitor)
   }
 
   func testEnableNetworkPathMonitorSetsToValue() {
     let builder = EngineBuilder()
-      .enableNetworkPathMonitor(true)
-    XCTAssertTrue(builder.enableNetworkPathMonitor)
-    builder.enableNetworkPathMonitor(false)
+      .enableNetworkPathMonitor(false)
     XCTAssertFalse(builder.enableNetworkPathMonitor)
+    builder.enableNetworkPathMonitor(true)
+    XCTAssertTrue(builder.enableNetworkPathMonitor)
   }
 
   func testCustomConfigTemplateUsesSpecifiedYAMLWhenRunningEnvoy() {

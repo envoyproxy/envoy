@@ -374,11 +374,7 @@ Specify a closure to be called by Envoy to access arbitrary strings from Platfor
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Configure the engine to use ``NWPathMonitor`` rather than ``SCNetworkReachability``
-on supported platforms (iOS 12+) to update the preferred Envoy network cluster (e.g. WLAN vs WWAN).
-
-.. attention::
-
-    Only available on iOS 12 or later.
+to update the preferred Envoy network cluster (e.g. WLAN vs WWAN). Defaults to true.
 
 **Example**::
 
@@ -386,7 +382,7 @@ on supported platforms (iOS 12+) to update the preferred Envoy network cluster (
   // N/A
 
   // Swift
-  builder.enableNetworkPathMonitor()
+  builder.enableNetworkPathMonitor(false)
 
 ~~~~~~~~~~~~~~~~~~~~~~~
 ``enableHappyEyeballs``
