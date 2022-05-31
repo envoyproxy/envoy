@@ -40,7 +40,7 @@ open class EngineBuilder: NSObject {
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
-  private(set) var enableNetworkPathMonitor = false
+  private(set) var enableNetworkPathMonitor = true
   private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
@@ -389,6 +389,7 @@ open class EngineBuilder: NSObject {
   }
 
   /// Configure the engine to use `NWPathMonitor` to observe network reachability.
+  /// Defaults to `true`. Set to `false` to use `SCNetworkReachability`.
   ///
   /// - returns: This builder.
   @discardableResult

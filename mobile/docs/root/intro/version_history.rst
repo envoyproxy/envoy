@@ -6,10 +6,11 @@ Pending Release
 
 Breaking changes:
 
-- api: replace the `drainConnections()` method with a broader `resetConnectivityState()`. (:issue:`#2225 <2225>`).
+- api: replace the ``drainConnections()`` method with a broader ``resetConnectivityState()``. (:issue:`#2225 <2225>`).
 - api: disallow setting 'host' header directly (:issue:`#2275 <2275>`)
 - net: enable happy eyeballs by default (:issue:`#2272 <2272>`)
 - iOS: remove support for installing via CocoaPods, which had not worked since 2020 (:issue:`#2215 <2215>`)
+- iOS: enable usage of ``NWPathMonitor`` by default (:issue:`#2329 <2329>`)
 
 Bugfixes:
 
