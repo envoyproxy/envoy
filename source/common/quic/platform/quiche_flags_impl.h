@@ -35,9 +35,6 @@ public:
   // Reset all registered flags to their default values.
   void resetFlags() const;
 
-  // Look up a flag by name.
-  Flag* findFlag(absl::string_view name) const;
-
   void updateReloadableFlags(const absl::flat_hash_map<std::string, bool>& quiche_flags_override);
 
 private:
@@ -52,9 +49,6 @@ public:
   // Construct Flag with the given name and help string.
   Flag(const char* name, const char* help) : name_(name), help_(help) {}
   virtual ~Flag() = default;
-
-  // Set flag value from given string, returning true iff successful.
-  virtual bool setValueFromString(const std::string& value_str) = 0;
 
   // Reset flag to default value.
   virtual void resetValue() = 0;
@@ -77,8 +71,6 @@ template <typename T> class TypedFlag : public Flag {
 public:
   TypedFlag(const char* name, T default_value, const char* help)
       : Flag(name, help), value_(default_value), default_value_(default_value) {}
-
-  bool setValueFromString(const std::string& value_str) override;
 
   void resetValue() override {
     absl::MutexLock lock(&mutex_);
@@ -118,15 +110,6 @@ private:
   bool has_reloaded_value_ ABSL_GUARDED_BY(mutex_) = false;
   T reloaded_value_ ABSL_GUARDED_BY(mutex_);
 };
-
-// SetValueFromString specializations
-template <> bool TypedFlag<bool>::setValueFromString(const std::string& value_str);
-template <> bool TypedFlag<int32_t>::setValueFromString(const std::string& value_str);
-template <> bool TypedFlag<int64_t>::setValueFromString(const std::string& value_str);
-template <> bool TypedFlag<double>::setValueFromString(const std::string& value_str);
-template <> bool TypedFlag<std::string>::setValueFromString(const std::string& value_str);
-template <> bool TypedFlag<unsigned long>::setValueFromString(const std::string& value_str);
-template <> bool TypedFlag<unsigned long long>::setValueFromString(const std::string& value_str);
 
 // Flag declarations
 #define QUIC_FLAG(flag, ...) extern TypedFlag<bool>* flag;
