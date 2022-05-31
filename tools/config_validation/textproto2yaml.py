@@ -1,10 +1,20 @@
-# Validate a YAML fragment against an Envoy API proto3 type.
-#
-# Example usage:
-#
-# bazel run //tools/config_validation:textproto2yaml -- --as_fragment \
-#   envoy.config.bootstrap.v3.Bootstrap \
-#   $PWD/tools/testdata/config_validation/input.textproto
+"""Validate a YAML fragment against an Envoy API proto3 type.
+
+Usage examples.
+
+Covert textproto to raw yaml. Can be used for `literalinclude` blocks:
+Note that `literalinclude` is generally preferable to `validated-code-block`.
+
+    bazel run //tools/config_validation:textproto2yaml -- \
+      envoy.config.bootstrap.v3.Bootstrap \
+      $PWD/tools/testdata/config_validation/input.textproto
+
+Covert textproto to yaml, and output as a `validated-code-block`:
+
+    bazel run //tools/config_validation:textproto2yaml -- --as_fragment \
+      envoy.config.bootstrap.v3.Bootstrap \
+      $PWD/tools/testdata/config_validation/input.textproto
+"""
 
 import argparse
 import json
