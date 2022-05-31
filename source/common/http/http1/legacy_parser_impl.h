@@ -19,8 +19,7 @@ public:
   CallbackResult pause() override;
   ParserStatus getStatus() override;
   uint16_t statusCode() const override;
-  int httpMajor() const override;
-  int httpMinor() const override;
+  bool isHttp11() const override;
   absl::optional<uint64_t> contentLength() const override;
   bool isChunked() const override;
   absl::string_view methodName() const override;

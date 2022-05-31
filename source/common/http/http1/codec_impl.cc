@@ -769,7 +769,7 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   ENVOY_CONN_LOG(trace, "onHeadersCompleteBase", connection_);
   RETURN_IF_ERROR(completeLastHeader());
 
-  if (!(parser_->httpMajor() == 1 && parser_->httpMinor() == 1)) {
+  if (!parser_->isHttp11()) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
