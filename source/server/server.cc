@@ -276,7 +276,7 @@ void InstanceImpl::updateServerStats() {
   server_stats_->total_connections_.set(listener_manager_->numConnections() +
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
-      sslContextManager().daysUntilFirstCertExpires().value());
+      sslContextManager().daysUntilFirstCertExpires().value_or(0));
 
   auto secs_until_ocsp_response_expires =
       sslContextManager().secondsUntilFirstOcspResponseExpires();
