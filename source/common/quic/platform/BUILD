@@ -46,6 +46,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quic_core_flags_list_lib",
         "@com_github_google_quiche//:quic_core_protocol_flags_list_lib",
     ],
