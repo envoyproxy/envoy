@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {

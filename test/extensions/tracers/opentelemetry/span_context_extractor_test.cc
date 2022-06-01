@@ -14,7 +14,6 @@ namespace OpenTelemetry {
 namespace {
 
 using StatusHelpers::HasStatusMessage;
-using StatusHelpers::IsOk;
 
 constexpr absl::string_view version = "00";
 constexpr absl::string_view trace_id = "00000000000000000000000000000001";
