@@ -17,50 +17,10 @@ const std::string EnvoyQuicheReloadableFlagPrefix =
     "envoy.reloadable_features.FLAGS_quic_reloadable_flag_";
 const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
 
-class Flag;
-
-// TODO: modify flags implementation to be backed by
-// Runtime::runtimeFeatureEnabled(), which is the canonical Envoy way of
-// enabling and disabling features.
-
-// Registry of QUICHE flags. Can be used to reset all flags to default values,
-// and to look up and set flags by name.
-class FlagRegistry {
-public:
-  ~FlagRegistry() = default;
-
-  // Return singleton instance.
-  static FlagRegistry& getInstance();
-
-  // Reset all registered flags to their default values.
-  void resetFlags() const;
-
-  void updateReloadableFlags(const absl::flat_hash_map<std::string, bool>& quiche_flags_override);
-
-private:
-  FlagRegistry();
-
-  const absl::flat_hash_map<absl::string_view, Flag*> flags_;
-};
-
-// Abstract class for QUICHE protocol and feature flags.
-class Flag {
-public:
-  virtual ~Flag() = default;
-
-  // Reset flag to default value.
-  virtual void resetValue() = 0;
-};
-
 // Concrete class for QUICHE protocol and feature flags, templated by flag type.
-template <typename T> class TypedFlag : public Flag {
+template <typename T> class TypedFlag {
 public:
   TypedFlag(T default_value) : value_(default_value), default_value_(default_value) {}
-
-  void resetValue() override {
-    absl::MutexLock lock(&mutex_);
-    value_ = default_value_;
-  }
 
   // Set flag value.
   void setValue(T value) {
@@ -91,8 +51,26 @@ private:
   T reloaded_value_ ABSL_GUARDED_BY(mutex_);
 };
 
+using ReloadableFlag = TypedFlag<bool>;
+
+// Registry of QUICHE flags. Can be used to update reloadable flag values.
+class FlagRegistry {
+public:
+  ~FlagRegistry() = default;
+
+  // Return singleton instance.
+  static FlagRegistry& getInstance();
+
+  void updateReloadableFlags(const absl::flat_hash_map<std::string, bool>& quiche_flags_override);
+
+private:
+  FlagRegistry();
+
+  const absl::flat_hash_map<absl::string_view, ReloadableFlag*> reloadable_flags_;
+};
+
 // Flag declarations
-#define QUIC_FLAG(flag, ...) extern TypedFlag<bool>* flag;
+#define QUIC_FLAG(flag, ...) extern ReloadableFlag* flag;
 #include "quiche/quic/core/quic_flags_list.h"
 QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
 QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
