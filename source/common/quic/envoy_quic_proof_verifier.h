@@ -26,28 +26,6 @@ public:
   virtual const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() const PURE;
 };
 
-// An implementation of the verify context interface.
-class EnvoyQuicProofVerifyContextImpl : public EnvoyQuicProofVerifyContext {
-public:
-  EnvoyQuicProofVerifyContextImpl(
-      Event::Dispatcher& dispatcher, const bool is_server,
-      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options)
-      : dispatcher_(dispatcher), is_server_(is_server),
-        transport_socket_options_(transport_socket_options) {}
-
-  // EnvoyQuicProofVerifyContext
-  bool isServer() const override { return is_server_; }
-  Event::Dispatcher& dispatcher() const override { return dispatcher_; }
-  const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() const override {
-    return transport_socket_options_;
-  }
-
-private:
-  Event::Dispatcher& dispatcher_;
-  const bool is_server_;
-  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options_;
-};
-
 // A quic::ProofVerifier implementation which verifies cert chain using SSL
 // client context config.
 class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {
