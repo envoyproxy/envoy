@@ -66,7 +66,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       IS_ENVOY_BUG("unexpected");
     }
     auto internal_listener = std::make_unique<ActiveInternalListener>(*this, dispatcher(), config);
-    // The internal address doesn't support multiple addresses.
+    // TODO(soulxu): support multiple internal addresses in listener in the future.
     ASSERT(config.listenSocketFactories().size() == 1);
     details->addActiveListener(config, config.listenSocketFactories()[0], listener_reject_fraction_,
                                disable_listeners_, std::move(internal_listener));
