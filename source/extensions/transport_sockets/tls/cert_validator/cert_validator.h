@@ -46,7 +46,7 @@ public:
    * @return 1 to indicate verification success and 0 to indicate verification failure.
    */
   virtual int
-  doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
+  doSynchronousVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
                     X509& leaf_cert,
                     const Network::TransportSocketOptions* transport_socket_options) PURE;
 
