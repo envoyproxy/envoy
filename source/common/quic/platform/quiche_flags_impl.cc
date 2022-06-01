@@ -90,8 +90,6 @@ QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 
 #undef QUIC_FLAG
 
-#define STRINGIFY(X) #X
-
 #define DEFINE_QUIC_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                    \
   TypedFlag<type>* FLAGS_##flag = new TypedFlag<type>(value);
 
