@@ -56,11 +56,12 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     new_open_telemetry_span->setSampled(tracing_decision.traced);
     return new_open_telemetry_span;
   } else {
-    try {
-      // Try to extract the span context. If we can't, just return a null span.
-      SpanContext span_context = extractor.extractSpanContext();
-      return tracer.startSpan(config, operation_name, start_time, span_context);
-    } catch (const ExtractorException& e) {
+    // Try to extract the span context. If we can't, just return a null span.
+    absl::StatusOr<SpanContext> span_context = extractor.extractSpanContext();
+    if (span_context.ok()) {
+      return tracer.startSpan(config, operation_name, start_time, span_context.value());
+    } else {
+      ENVOY_LOG(trace, "Unable to extract span context: ", span_context.status());
       return std::make_unique<Tracing::NullSpan>();
     }
   }

@@ -62,6 +62,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.tracers.opentelemetry"],
     deps = [
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

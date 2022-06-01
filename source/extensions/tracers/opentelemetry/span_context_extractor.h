@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/tracing/http_tracer.h"
+#include "source/common/common/statusor.h"
 
 #include "source/common/http/header_map_impl.h"
 
@@ -12,10 +13,6 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-struct ExtractorException : public EnvoyException {
-  ExtractorException(const std::string& what) : EnvoyException(what) {}
-};
-
 /**
  * This class is used to SpanContext extracted from the HTTP traceparent header
  * See https://www.w3.org/TR/trace-context/#traceparent-header.
@@ -24,7 +21,7 @@ class SpanContextExtractor {
 public:
   SpanContextExtractor(Tracing::TraceContext& trace_context);
   ~SpanContextExtractor();
-  SpanContext extractSpanContext();
+  absl::StatusOr<SpanContext> extractSpanContext();
   bool propagationHeaderPresent();
 
 private:

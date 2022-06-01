@@ -1,6 +1,7 @@
 #include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
 #include "test/test_common/utility.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -12,6 +13,9 @@ namespace OpenTelemetry {
 
 namespace {
 
+using StatusHelpers::HasStatusMessage;
+using StatusHelpers::IsOk;
+
 constexpr absl::string_view version = "00";
 constexpr absl::string_view trace_id = "00000000000000000000000000000001";
 constexpr absl::string_view parent_id = "0000000000000003";
@@ -21,12 +25,13 @@ TEST(SpanContextExtractorTest, ExtractSpanContext) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"traceparent", fmt::format("{}-{}-{}-{}", version, trace_id, parent_id, trace_flags)}};
   SpanContextExtractor span_context_extractor(request_headers);
-  SpanContext span_context = span_context_extractor.extractSpanContext();
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_EQ(span_context.traceId(), trace_id);
-  EXPECT_EQ(span_context.parentId(), parent_id);
-  EXPECT_EQ(span_context.version(), version);
-  EXPECT_TRUE(span_context.sampled());
+  EXPECT_OK(span_context);
+  EXPECT_EQ(span_context->traceId(), trace_id);
+  EXPECT_EQ(span_context->parentId(), parent_id);
+  EXPECT_EQ(span_context->version(), version);
+  EXPECT_TRUE(span_context->sampled());
 }
 
 TEST(SpanContextExtractorTest, ExtractSpanContextNotSampled) {
@@ -35,20 +40,23 @@ TEST(SpanContextExtractorTest, ExtractSpanContextNotSampled) {
       {"traceparent",
        fmt::format("{}-{}-{}-{}", version, trace_id, parent_id, trace_flags_unsampled)}};
   SpanContextExtractor span_context_extractor(request_headers);
-  SpanContext span_context = span_context_extractor.extractSpanContext();
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
-  EXPECT_EQ(span_context.traceId(), trace_id);
-  EXPECT_EQ(span_context.parentId(), parent_id);
-  EXPECT_EQ(span_context.version(), version);
-  EXPECT_FALSE(span_context.sampled());
+  EXPECT_OK(span_context);
+  EXPECT_EQ(span_context->traceId(), trace_id);
+  EXPECT_EQ(span_context->parentId(), parent_id);
+  EXPECT_EQ(span_context->version(), version);
+  EXPECT_FALSE(span_context->sampled());
 }
 
 TEST(SpanContextExtractorTest, ThrowsExceptionWithoutHeader) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   SpanContextExtractor span_context_extractor(request_headers);
 
-  EXPECT_THROW_WITH_MESSAGE(span_context_extractor.extractSpanContext(), ExtractorException,
-                            "No propagation header found");
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("No propagation header found"));
 }
 
 TEST(SpanContextExtractorTest, ThrowsExceptionWithTooLongHeader) {
@@ -56,8 +64,10 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithTooLongHeader) {
       {"traceparent", fmt::format("000{}-{}-{}-{}", version, trace_id, parent_id, trace_flags)}};
   SpanContextExtractor span_context_extractor(request_headers);
 
-  EXPECT_THROW_WITH_MESSAGE(span_context_extractor.extractSpanContext(), ExtractorException,
-                            "Invalid traceparent header length");
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent header length"));
 }
 
 TEST(SpanContextExtractorTest, ThrowsExceptionWithTooShortHeader) {
@@ -65,8 +75,10 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithTooShortHeader) {
       {"traceparent", fmt::format("{}-{}-{}", trace_id, parent_id, trace_flags)}};
   SpanContextExtractor span_context_extractor(request_headers);
 
-  EXPECT_THROW_WITH_MESSAGE(span_context_extractor.extractSpanContext(), ExtractorException,
-                            "Invalid traceparent header length");
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent header length"));
 }
 
 TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidHyphenation) {
@@ -74,8 +86,10 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidHyphenation) {
       {"traceparent", fmt::format("{}{}-{}-{}", version, trace_id, parent_id, trace_flags)}};
   SpanContextExtractor span_context_extractor(request_headers);
 
-  EXPECT_THROW_WITH_MESSAGE(span_context_extractor.extractSpanContext(), ExtractorException,
-                            "Invalid traceparent header length");
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent header length"));
 }
 
 TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidSizes) {
@@ -86,8 +100,10 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidSizes) {
        fmt::format("{}-{}-{}-{}", invalid_version, trace_id, parent_id, invalid_trace_flags)}};
   SpanContextExtractor span_context_extractor(request_headers);
 
-  EXPECT_THROW_WITH_MESSAGE(span_context_extractor.extractSpanContext(), ExtractorException,
-                            "Invalid traceparent field sizes");
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent field sizes"));
 }
 
 TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidHex) {
@@ -97,8 +113,10 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidHex) {
        fmt::format("{}-{}-{}-{}", invalid_version, trace_id, parent_id, trace_flags)}};
   SpanContextExtractor span_context_extractor(request_headers);
 
-  EXPECT_THROW_WITH_MESSAGE(span_context_extractor.extractSpanContext(), ExtractorException,
-                            "Invalid header hex");
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid header hex"));
 }
 
 TEST(SpanContextExtractorTest, ThrowsExceptionWithAllZeroTraceId) {
@@ -108,8 +126,10 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithAllZeroTraceId) {
        fmt::format("{}-{}-{}-{}", version, invalid_trace_id, parent_id, trace_flags)}};
   SpanContextExtractor span_context_extractor(request_headers);
 
-  EXPECT_THROW_WITH_MESSAGE(span_context_extractor.extractSpanContext(), ExtractorException,
-                            "Invalid trace id");
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid trace id"));
 }
 
 TEST(SpanContextExtractorTest, ThrowsExceptionWithAllZeroParentId) {
@@ -119,8 +139,10 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithAllZeroParentId) {
        fmt::format("{}-{}-{}-{}", version, trace_id, invalid_parent_id, trace_flags)}};
   SpanContextExtractor span_context_extractor(request_headers);
 
-  EXPECT_THROW_WITH_MESSAGE(span_context_extractor.extractSpanContext(), ExtractorException,
-                            "Invalid parent id");
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid parent id"));
 }
 
 } // namespace

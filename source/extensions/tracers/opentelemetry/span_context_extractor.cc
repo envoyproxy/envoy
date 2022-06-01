@@ -1,6 +1,5 @@
 #include "span_context_extractor.h"
 
-#include "envoy/common/exception.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "source/common/http/header_map_impl.h"
@@ -46,22 +45,22 @@ bool SpanContextExtractor::propagationHeaderPresent() {
   return propagation_header.has_value();
 }
 
-SpanContext SpanContextExtractor::extractSpanContext() {
+absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   auto propagation_header = trace_context_.getByKey(openTelemetryPropagationHeader());
   if (!propagation_header.has_value()) {
     // We should have already caught this, but just in case.
-    throw ExtractorException("No propagation header found");
+    return absl::InvalidArgumentError("No propagation header found");
   }
   auto header_value_string = propagation_header.value();
 
   if (header_value_string.size() != kTraceparentHeaderSize) {
-    throw ExtractorException("Invalid traceparent header length");
+    return absl::InvalidArgumentError("Invalid traceparent header length");
   }
   // Try to split it into its component parts:
   std::vector<absl::string_view> propagation_header_components =
       absl::StrSplit(header_value_string, '-', absl::SkipEmpty());
   if (propagation_header_components.size() != 4) {
-    throw ExtractorException("Invalid traceparent hyphenation");
+    return absl::InvalidArgumentError("Invalid traceparent hyphenation");
   }
   absl::string_view version = propagation_header_components[0];
   absl::string_view trace_id = propagation_header_components[1];
@@ -69,19 +68,19 @@ SpanContext SpanContextExtractor::extractSpanContext() {
   absl::string_view trace_flags = propagation_header_components[3];
   if (version.size() != kVersionHexSize || trace_id.size() != kTraceIdHexSize ||
       parent_id.size() != kParentIdHexSize || trace_flags.size() != kTraceFlagsHexSize) {
-    throw ExtractorException("Invalid traceparent field sizes");
+    return absl::InvalidArgumentError("Invalid traceparent field sizes");
   }
   if (!isValidHex(version) || !isValidHex(trace_id) || !isValidHex(parent_id) ||
       !isValidHex(trace_flags)) {
-    throw ExtractorException("Invalid header hex");
+    return absl::InvalidArgumentError("Invalid header hex");
   }
   // As per the traceparent header definition, if the trace-id or parent-id are all zeros, they are
   // invalid and must be ignored.
   if (isAllZeros(trace_id)) {
-    throw ExtractorException("Invalid trace id");
+    return absl::InvalidArgumentError("Invalid trace id");
   }
   if (isAllZeros(parent_id)) {
-    throw ExtractorException("Invalid parent id");
+    return absl::InvalidArgumentError("Invalid parent id");
   }
 
   // Set whether or not the span is sampled from the trace flags.
