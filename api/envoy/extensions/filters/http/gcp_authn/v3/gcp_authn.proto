@@ -28,6 +28,7 @@ message GcpAuthnFilterConfig {
   // This field is optional. If it is not configured, the filter will be fail-closed (i.e., reject the requests).
   config.core.v3.RetryPolicy retry_policy = 2;
 
+  // Token cache configuration. This field is optional.
   TokenCacheConfig cache_config = 3;
 }
 
