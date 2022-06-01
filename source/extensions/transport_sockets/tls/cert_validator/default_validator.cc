@@ -230,8 +230,8 @@ int DefaultCertValidator::doSynchronousVerifyCertChain(
   // `NotValidated` or `Validated`). If `trusted_ca` doesn't exist, we will need to make sure
   // other configurations are verified and the verification succeed.
   const bool success = verify_trusted_ca_
-                              ? validated != Envoy::Ssl::ClientValidationStatus::Failed
-                              : validated == Envoy::Ssl::ClientValidationStatus::Validated;
+                           ? validated != Envoy::Ssl::ClientValidationStatus::Failed
+                           : validated == Envoy::Ssl::ClientValidationStatus::Validated;
 
   return (allow_untrusted_certificate_ || success) ? 1 : 0;
 }

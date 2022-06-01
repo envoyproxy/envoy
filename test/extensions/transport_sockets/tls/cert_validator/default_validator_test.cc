@@ -178,9 +178,9 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
             Envoy::Ssl::ClientValidationStatus::NotValidated);
   bssl::UniquePtr<X509> cert(X509_new());
   EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/nullptr,
-                                                 /*ssl_extended_info=*/nullptr,
-                                                 /*leaf_cert=*/*cert,
-                                                 /*transport_socket_options=*/nullptr),
+                                                            /*ssl_extended_info=*/nullptr,
+                                                            /*leaf_cert=*/*cert,
+                                                            /*transport_socket_options=*/nullptr),
             0);
 }
 
