@@ -700,7 +700,11 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
 
 // Attempt to heuristically discover missing tag-extraction rules when new stats are added.
 // This is done by looking through the entire config for fields named `stat_prefix`, and then
-// validating that those values do not appear in the tag-extracted name of any stat.
+// validating that those values do not appear in the tag-extracted name of any stat. The alternate
+// approach of looking for the prefix in the extracted tags was more difficult because in the tests
+// some prefix values are reused (leading to false negatives) and some tests have base configuration
+// that sets a stat_prefix but don't produce any stats at all with that configuration (leading to
+// false positives).
 //
 // To add a rule, see `source/common/config/well_known_names.cc`.
 //
