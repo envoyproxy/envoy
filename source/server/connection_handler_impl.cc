@@ -202,7 +202,8 @@ ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag) {
   auto listener = findActiveListenerByTag(listener_tag);
   if (listener.has_value()) {
     // If the tag matches this must be a UDP listener.
-    // TODO(soulxu): find listener by address.
+    // TODO(soulxu): return first listener here, this will be changed
+    // when UdpWorkerRouter supports the multiple addresses.
     auto udp_listener = listener->get().per_address_details_[0]->udpListener();
     ASSERT(udp_listener.has_value());
     return udp_listener;
@@ -322,7 +323,8 @@ Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
   auto active_listener = findActiveListenerByTag(listener_tag);
   if (active_listener.has_value()) {
-    // TODO(soulxu): find by address.
+    // TODO(soulxu): return first listener here, this will be changed
+    // when ConnectionBalancer supports the multiple addresses.
     ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
                active_listener->get().per_address_details_[0]->typed_listener_) &&
            active_listener->get().per_address_details_[0]->listener_->listener() != nullptr);
