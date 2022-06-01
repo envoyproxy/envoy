@@ -11,8 +11,7 @@ This filter should be configured with the name *envoy.filters.http.gcp_authn*.
 
 The filter configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig>` has three fields:
 
-* Field *http_uri* specifies the HTTP URI for fetching the from GCE Metadata Server(https://cloud.google.com/compute/docs/metadata/overview). The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]".
-The *AUDIENCE* field is provied by configuration, please see more details below.
+* Field *http_uri* specifies the HTTP URI for fetching the from `GCE Metadata Server <https://cloud.google.com/compute/docs/metadata/overview>`_. The URL format is *http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]*. The *AUDIENCE* field is provied by configuration, please see more details below.
 
 * Field *retry_policy* specifies the retry policy if fetching tokens failed. This field is optional. If it is not configured, the filter will be fail-closed (i.e., reject the requests).
 
