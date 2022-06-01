@@ -46,7 +46,7 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
 
 void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded) {
   cert_validation_result_ =
-      succeeded ? Ssl::ValidateResult::Successful : Ssl::ValidateResult::Failed;
+      succeeded ? Ssl::ValidateStatus::Successful : Ssl::ValidateStatus::Failed;
   if (cert_validate_result_callback_.has_value()) {
     ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation"));
     // This is an async cert validation.
@@ -57,12 +57,12 @@ void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded)
 }
 
 Ssl::ValidateResultCallbackPtr
-SslExtendedSocketInfoImpl::createValidateResultCallback(uint8_t* current_tls_alert) {
+SslExtendedSocketInfoImpl::createValidateResultCallback(uint8_t current_tls_alert) {
   auto callback = std::make_unique<ValidateResultCallbackImpl>(
       ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
   cert_validate_result_callback_ = *callback;
-  tls_alert_ = *current_tls_alert;
-  cert_validation_result_ = Ssl::ValidateResult::Pending;
+  cert_validation_result_ = Ssl::ValidateStatus::Pending;
+  tls_alert_ = current_tls_alert;
   return callback;
 }
 

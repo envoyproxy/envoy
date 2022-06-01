@@ -44,12 +44,12 @@ public:
   int doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
                         X509& leaf_cert,
                         const Network::TransportSocketOptions* transport_socket_options) override;
-  Ssl::ValidateResult
+  ValidationResults
   doCustomVerifyCertChain(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
                           Ssl::SslExtendedSocketInfo* ssl_extended_info,
                           const Network::TransportSocketOptions* transport_socket_options,
-                          SSL_CTX* ssl_ctx, absl::string_view ech_name_override, bool is_server,
-                          std::string* error_details, uint8_t* out_alert) override;
+                          SSL_CTX& ssl_ctx, absl::string_view ech_name_override, bool is_server,
+                          uint8_t out_alert) override;
 
   int initializeSslContexts(std::vector<SSL_CTX*> contexts, bool provides_certificates) override;
 

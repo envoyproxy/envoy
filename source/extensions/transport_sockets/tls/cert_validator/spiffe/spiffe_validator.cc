@@ -221,31 +221,30 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
   return san_match;
 }
 
-Ssl::ValidateResult SPIFFEValidator::doCustomVerifyCertChain(
+ValidationResults SPIFFEValidator::doCustomVerifyCertChain(
     STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
-    const Network::TransportSocketOptions* /*transport_socket_options*/, SSL_CTX* ssl_ctx,
-    absl::string_view /*ech_name_override*/, bool /*is_server*/, std::string* error_details,
-    uint8_t* out_alert) {
-  if (out_alert != nullptr) {
-    *out_alert = SSL_AD_CERTIFICATE_UNKNOWN;
-  }
+    const Network::TransportSocketOptions* /*transport_socket_options*/, SSL_CTX& ssl_ctx,
+    absl::string_view /*ech_name_override*/, bool /*is_server*/, uint8_t current_tls_alert) {
   if (sk_X509_num(&cert_chain) == 0) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(
           Envoy::Ssl::ClientValidationStatus::NotValidated);
     }
     stats_.fail_verify_error_.inc();
-    if (error_details != nullptr) {
-      *error_details = "verify cert failed: empty cert chain";
-    }
-    return Ssl::ValidateResult::Failed;
+    ValidationResults result{ValidationResults::ValidationStatus::Failed, absl::nullopt,
+                             "verify cert failed: empty cert chain"};
+    return result;
   }
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
+  std::string error_details;
   return verifyCertChainUsingTrustBundleStore(ssl_extended_info, *leaf_cert, &cert_chain,
-                                              SSL_CTX_get0_param(ssl_ctx), error_details, out_alert)
-             ? Ssl::ValidateResult::Successful
-             : Ssl::ValidateResult::Failed;
+                                              SSL_CTX_get0_param(&ssl_ctx), &error_details,
+                                              &current_tls_alert)
+             ? ValidationResults{ValidationResults::ValidationStatus::Successful, absl::nullopt,
+                                 absl::nullopt}
+             : ValidationResults{ValidationResults::ValidationStatus::Failed, current_tls_alert,
+                                 error_details};
 }
 
 X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {

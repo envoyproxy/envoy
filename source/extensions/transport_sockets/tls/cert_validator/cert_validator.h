@@ -25,6 +25,21 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+struct ValidationResults {
+  enum class ValidationStatus {
+    Pending,
+    Successful,
+    Failed,
+  };
+  // If the value is Pending, the validation is asynchronous.
+  // If the value is Failed, refer to tls_alert and error_details for detailed error messages.
+  ValidationStatus status;
+  // The TLS alert used to interpret validation error if the validation failed.
+  absl::optional<uint8_t> tls_alert;
+  // The detailed error messages populated during validation.
+  absl::optional<std::string> error_details;
+};
+
 class CertValidator {
 public:
   virtual ~CertValidator() = default;
@@ -61,20 +76,20 @@ public:
    * ssl_extended_info will create one.
    * @param ssl_extended_info the info for creating async validation result callback if needed,
    * tracking the validation and storing the result.
-   * @param transport_socket_options config options to verify cert.
+   * @param transport_socket_options config options to validate cert, might short live the
+   * validation if it is asynchronous.
    * @param ssl_ctx the config context this validation should use.
    * @param ech_name_override the ECH name override if there is any, otherwise empty.
    * @param is_server whether the validation is on server side.
-   * @param error_details used to return back the verification error.
-   * @param out_alert used to return back the verification error to boring SSL.
-   * @return ValidateResult Pending if doing asynchronously, otherwise Successful or Failed.
+   * @param current_tls_alert the TLS alert from boring SSL stack.
+   * @return ValidationResult the validation status and error messages if there is any.
    */
-  virtual Ssl::ValidateResult
+  virtual ValidationResults
   doCustomVerifyCertChain(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
                           Ssl::SslExtendedSocketInfo* ssl_extended_info,
                           const Network::TransportSocketOptions* transport_socket_options,
-                          SSL_CTX* ssl_ctx, absl::string_view ech_name_override, bool is_server,
-                          std::string* error_details, uint8_t* out_alert) PURE;
+                          SSL_CTX& ssl_ctx, absl::string_view ech_name_override, bool is_server,
+                          uint8_t current_tls_alert) PURE;
 
   /**
    * Called to initialize all ssl contexts

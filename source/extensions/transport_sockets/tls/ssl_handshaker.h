@@ -58,9 +58,9 @@ public:
 
   void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override;
   Envoy::Ssl::ClientValidationStatus certificateValidationStatus() const override;
-  Ssl::ValidateResultCallbackPtr createValidateResultCallback(uint8_t* current_tls_alert) override;
+  Ssl::ValidateResultCallbackPtr createValidateResultCallback(uint8_t current_tls_alert) override;
   void onCertificateValidationCompleted(bool succeeded) override;
-  absl::optional<Ssl::ValidateResult> certificateValidationResult() const override {
+  Ssl::ValidateStatus certificateValidationResult() const override {
     return cert_validation_result_;
   }
   uint8_t tlsAlert() const override { return tls_alert_; }
@@ -78,7 +78,7 @@ private:
   uint8_t tls_alert_{SSL_AD_CERTIFICATE_UNKNOWN};
   // Stores the validation result if there is any.
   // nullopt if no validation has ever been kicked off.
-  absl::optional<Ssl::ValidateResult> cert_validation_result_;
+  Ssl::ValidateStatus cert_validation_result_{Ssl::ValidateStatus::NotStarted};
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,

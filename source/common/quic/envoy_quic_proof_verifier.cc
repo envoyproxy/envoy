@@ -15,6 +15,8 @@
 namespace Envoy {
 namespace Quic {
 
+using ValidationResults = Envoy::Extensions::TransportSockets::Tls::ValidationResults;
+
 namespace {
 
 // Returns true if hostname matches one of the Subject Alt Names in cert_view. Returns false and
@@ -118,24 +120,32 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   // We down cast rather than add verifyCertChain to Envoy::Ssl::Context because
   // verifyCertChain uses a bunch of SSL-specific structs which we want to keep
   // out of the interface definition.
-  Ssl::ValidateResult result =
+  ValidationResults result =
       static_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get())
           ->customVerifyCertChainForQuic(
               *cert_chain, std::unique_ptr<QuicValidateResultCallback>(envoy_callback),
               verify_context->isServer(), /*transport_socket_options=*/nullptr,
-              verify_context->getEchNameOverrride(), error_details, out_alert);
-  if (result == Ssl::ValidateResult::Pending) {
-    // Transfer the ownership of cert_view to callback while asynchronously verifying the cert
-    // chain.
+              verify_context->getEchNameOverrride());
+  if (result.status == ValidationResults::ValidationStatus::Pending) {
+    // Retain leaf cert while asynchronously verifying the cert chain.
     envoy_callback->storeLeafCert(certs[0]);
     return quic::QUIC_PENDING;
   }
-  if (result == Ssl::ValidateResult::Successful) {
+  if (result.status == ValidationResults::ValidationStatus::Successful) {
     if (verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
       *details = std::make_unique<CertVerifyResult>(true);
       return quic::QUIC_SUCCESS;
     }
+  } else {
+    ASSERT(result.status == ValidationResults::ValidationStatus::Failed);
+    if (result.error_details.has_value() && error_details) {
+      *error_details = std::move(result.error_details.value());
+    }
+    if (result.tls_alert.has_value() && out_alert) {
+      *out_alert = result.tls_alert.value();
+    }
   }
+
   *details = std::make_unique<CertVerifyResult>(false);
   return quic::QUIC_FAILURE;
 }

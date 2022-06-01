@@ -1,6 +1,7 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 
 #include <array>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <string>
@@ -303,32 +304,26 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
   return validated;
 }
 
-Ssl::ValidateResult DefaultCertValidator::doCustomVerifyCertChain(
+ValidationResults DefaultCertValidator::doCustomVerifyCertChain(
     STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
-    const Network::TransportSocketOptions* transport_socket_options, SSL_CTX* ssl_ctx,
-    absl::string_view ech_name_override, bool is_server, std::string* error_details,
-    uint8_t* out_alert) {
-  if (out_alert != nullptr) {
-    *out_alert = SSL_AD_CERTIFICATE_UNKNOWN;
-  }
+    const Network::TransportSocketOptions* transport_socket_options, SSL_CTX& ssl_ctx,
+    absl::string_view ech_name_override, bool is_server, uint8_t current_tls_alert) {
   if (sk_X509_num(&cert_chain) == 0) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(
           Envoy::Ssl::ClientValidationStatus::NotValidated);
     }
     stats_.fail_verify_error_.inc();
-    std::string error("verify cert failed: empty cert chain");
-    if (error_details != nullptr) {
-      *error_details = error;
-    }
-    ENVOY_LOG(debug, error);
-    return Ssl::ValidateResult::Failed;
+    ValidationResults result{ValidationResults::ValidationStatus::Failed, absl::nullopt,
+                             "verify cert failed: empty cert chain"};
+    ENVOY_LOG(debug, result.error_details.value());
+    return result;
   }
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
   ASSERT(leaf_cert);
   if (verify_trusted_ca_) {
-    X509_STORE* verify_store = SSL_CTX_get_cert_store(ssl_ctx);
+    X509_STORE* verify_store = SSL_CTX_get_cert_store(&ssl_ctx);
     ASSERT(verify_store);
     bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
     if (!ctx || !X509_STORE_CTX_init(ctx.get(), verify_store, leaf_cert, &cert_chain) ||
@@ -338,7 +333,7 @@ Ssl::ValidateResult DefaultCertValidator::doCustomVerifyCertChain(
         !X509_STORE_CTX_set_default(ctx.get(), is_server ? "ssl_client" : "ssl_server") ||
         // Anything non-default in "param" should overwrite anything in the ctx.
         !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(ctx.get()),
-                                SSL_CTX_get0_param(ssl_ctx)) ||
+                                SSL_CTX_get0_param(&ssl_ctx)) ||
         // ClientHelloOuter connections use a different name.
         (!ech_name_override.empty() &&
          !X509_VERIFY_PARAM_set1_host(X509_STORE_CTX_get0_param(ctx.get()),
@@ -349,12 +344,10 @@ Ssl::ValidateResult DefaultCertValidator::doCustomVerifyCertChain(
             Envoy::Ssl::ClientValidationStatus::Failed);
       }
       stats_.fail_verify_error_.inc();
-      std::string error("verify cert failed: init and setup X509_STORE_CTX");
-      if (error_details != nullptr) {
-        *error_details = error;
-      }
-      ENVOY_LOG(debug, error);
-      return Ssl::ValidateResult::Failed;
+      ValidationResults result{ValidationResults::ValidationStatus::Failed, absl::nullopt,
+                               "verify cert failed: init and setup X509_STORE_CTX"};
+      ENVOY_LOG(debug, result.error_details.value());
+      return result;
     }
     int ret = X509_verify_cert(ctx.get());
     if (ssl_extended_info) {
@@ -365,22 +358,24 @@ Ssl::ValidateResult DefaultCertValidator::doCustomVerifyCertChain(
 
     if (ret <= 0) {
       stats_.fail_verify_error_.inc();
-      std::string error =
-          absl::StrCat("verify cert failed: ", Utility::getX509VerificationErrorInfo(ctx.get()));
-      if (out_alert != nullptr) {
-        *out_alert = SSL_alert_from_verify_result(X509_STORE_CTX_get_error(ctx.get()));
-      }
-      if (error_details != nullptr) {
-        *error_details = error;
-      }
-      ENVOY_LOG(debug, error);
-      return allow_untrusted_certificate_ ? Ssl::ValidateResult::Successful
-                                          : Ssl::ValidateResult::Failed;
+      ValidationResults result{
+          ValidationResults::ValidationStatus::Failed,
+          SSL_alert_from_verify_result(X509_STORE_CTX_get_error(ctx.get())),
+          absl::StrCat("verify cert failed: ", Utility::getX509VerificationErrorInfo(ctx.get()))};
+      ENVOY_LOG(debug, result.error_details.value());
+      return allow_untrusted_certificate_
+                 ? ValidationResults{ValidationResults::ValidationStatus::Successful, absl::nullopt,
+                                     absl::nullopt}
+                 : result;
     }
   }
+  std::string error_details;
   bool succeeded = verifyCertAndUpdateStatus(ssl_extended_info, leaf_cert, transport_socket_options,
-                                             error_details, out_alert);
-  return succeeded ? Ssl::ValidateResult::Successful : Ssl::ValidateResult::Failed;
+                                             &error_details, &current_tls_alert);
+  return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
+                                       absl::nullopt, absl::nullopt}
+                   : ValidationResults{ValidationResults::ValidationStatus::Failed,
+                                       current_tls_alert, error_details};
 }
 
 bool DefaultCertValidator::verifySubjectAltName(X509* cert,

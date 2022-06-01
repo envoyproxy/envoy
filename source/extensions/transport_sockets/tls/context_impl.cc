@@ -67,17 +67,6 @@ void logSslErrorChain() {
   }
 }
 
-enum ssl_verify_result_t ValidationResultToSslVerifyResult(Ssl::ValidateResult result) {
-  switch (result) {
-  case Ssl::ValidateResult::Failed:
-    return ssl_verify_invalid;
-  case Ssl::ValidateResult::Successful:
-    return ssl_verify_ok;
-  case Ssl::ValidateResult::Pending:
-    return ssl_verify_retry;
-  }
-}
-
 } // namespace
 
 int ContextImpl::sslExtendedSocketInfoIndex() {
@@ -459,43 +448,51 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
 enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* out_alert) {
   auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
       SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
-  if (extended_socket_info->certificateValidationResult().has_value()) {
-    if (extended_socket_info->certificateValidationResult().value() ==
-        Ssl::ValidateResult::Pending) {
+  if (extended_socket_info->certificateValidationResult() != Ssl::ValidateStatus::NotStarted) {
+    if (extended_socket_info->certificateValidationResult() == Ssl::ValidateStatus::Pending) {
       return ssl_verify_retry;
     }
-    ENVOY_LOG(debug, "Already has a result: {}",
-              static_cast<int>(extended_socket_info->certificateValidationResult().value()));
+    ENVOY_LOG(trace, "Already has a result: {}",
+              static_cast<int>(extended_socket_info->certificateValidationStatus()));
     // Already has a binary result, return immediately.
     *out_alert = extended_socket_info->tlsAlert();
-    return ValidationResultToSslVerifyResult(
-        extended_socket_info->certificateValidationResult().value());
+    return extended_socket_info->certificateValidationResult() == Ssl::ValidateStatus::Successful
+               ? ssl_verify_ok
+               : ssl_verify_invalid;
   }
   // Hasn't kicked off any validation for this connection yet.
   SSL_CTX* ssl_ctx = SSL_get_SSL_CTX(ssl);
   ContextImpl* context_impl = static_cast<ContextImpl*>(SSL_CTX_get_app_data(ssl_ctx));
   auto* transport_socket_option =
       static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl));
-  Ssl::ValidateResult result =
-      context_impl->customVerifyCertChain(extended_socket_info, transport_socket_option, ssl,
-                                          /*error_details=*/nullptr, out_alert);
-  return ValidationResultToSslVerifyResult(result);
+  ValidationResults result = context_impl->customVerifyCertChain(
+      extended_socket_info, transport_socket_option, ssl, *out_alert);
+  switch (result.status) {
+  case ValidationResults::ValidationStatus::Successful:
+    return ssl_verify_ok;
+  case ValidationResults::ValidationStatus::Pending:
+    return ssl_verify_retry;
+  case ValidationResults::ValidationStatus::Failed: {
+    if (result.tls_alert.has_value() && out_alert) {
+      *out_alert = result.tls_alert.value();
+    }
+    return ssl_verify_invalid;
+  }
+  }
 }
 
-Ssl::ValidateResult
+ValidationResults
 ContextImpl::customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
                                    const Network::TransportSocketOptions* transport_socket_options,
-                                   SSL* ssl, std::string* error_details, uint8_t* out_alert) {
+                                   SSL* ssl, uint8_t current_tls_alert) {
   ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation"));
   ASSERT(extended_socket_info);
   STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
   if (cert_chain == nullptr) {
-    *out_alert = SSL_AD_INTERNAL_ERROR;
-    extended_socket_info->setCertificateValidationStatus(
-        Envoy::Ssl::ClientValidationStatus::NotValidated);
+    extended_socket_info->setCertificateValidationStatus(Ssl::ClientValidationStatus::NotValidated);
     stats_.fail_verify_error_.inc();
     ENVOY_LOG(debug, "verify cert failed: no cert chain");
-    return Ssl::ValidateResult::Failed;
+    return {ValidationResults::ValidationStatus::Failed, SSL_AD_INTERNAL_ERROR, absl::nullopt};
   }
   const char* name = nullptr;
   size_t name_len = 0;
@@ -504,12 +501,12 @@ ContextImpl::customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_s
   ASSERT(cert_validator_);
   // Do not provide async callback here, but defer its creation to extended_socket_info if the
   // validation is async.
-  Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
-      *cert_chain, nullptr, extended_socket_info, transport_socket_options, SSL_get_SSL_CTX(ssl),
-      ech_name_override, SSL_is_server(ssl), error_details, out_alert);
-  if (result != Ssl::ValidateResult::Pending) {
-    extended_socket_info->onCertificateValidationCompleted(result ==
-                                                           Ssl::ValidateResult::Successful);
+  ValidationResults result = cert_validator_->doCustomVerifyCertChain(
+      *cert_chain, nullptr, extended_socket_info, transport_socket_options, *SSL_get_SSL_CTX(ssl),
+      ech_name_override, SSL_is_server(ssl), current_tls_alert);
+  if (result.status != ValidationResults::ValidationStatus::Pending) {
+    extended_socket_info->onCertificateValidationCompleted(
+        result.status == ValidationResults::ValidationStatus::Successful);
   }
   return result;
 }
@@ -1252,10 +1249,10 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
   return true;
 }
 
-Ssl::ValidateResult ContextImpl::customVerifyCertChainForQuic(
+ValidationResults ContextImpl::customVerifyCertChainForQuic(
     STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
     const Network::TransportSocketOptions* transport_socket_options,
-    absl::string_view ech_name_override, std::string* error_details, uint8_t* out_alert) {
+    absl::string_view ech_name_override) {
   ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation"));
   ASSERT(!tls_contexts_.empty());
   // It doesn't matter which SSL context is used, because they share the same cert validation
@@ -1263,11 +1260,11 @@ Ssl::ValidateResult ContextImpl::customVerifyCertChainForQuic(
   SSL_CTX* ssl_ctx = tls_contexts_[0].ssl_ctx_.get();
   if (SSL_CTX_get_verify_mode(ssl_ctx) == SSL_VERIFY_NONE) {
     // Skip validation if the tls is configured SSL_VERIFY_NONE.
-    return Ssl::ValidateResult::Successful;
+    return {ValidationResults::ValidationStatus::Successful, absl::nullopt, absl::nullopt};
   }
-  Ssl::ValidateResult result = cert_validator_->doCustomVerifyCertChain(
+  ValidationResults result = cert_validator_->doCustomVerifyCertChain(
       cert_chain, std::move(callback), /*extended_socket_info=*/nullptr, transport_socket_options,
-      ssl_ctx, ech_name_override, is_server, error_details, out_alert);
+      *ssl_ctx, ech_name_override, is_server, SSL_AD_CERTIFICATE_UNKNOWN);
   return result;
 }
 

@@ -12,10 +12,12 @@ namespace Envoy {
 namespace Ssl {
 
 enum class ClientValidationStatus { NotValidated, NoClientCertificate, Validated, Failed };
-enum class ValidateResult {
+
+enum class ValidateStatus {
+  NotStarted,
+  Pending,
   Successful,
   Failed,
-  Pending,
 };
 
 class ValidateResultCallback {
@@ -52,10 +54,9 @@ public:
 
   /**
    * Only called when doing asynchronous cert validation.
-   * @param current_tls_alert the value to be latched for return after the async validation.
    * @return ValidateResultCallbackPtr a callback used to return the validation result.
    */
-  virtual ValidateResultCallbackPtr createValidateResultCallback(uint8_t* current_tls_alert) PURE;
+  virtual ValidateResultCallbackPtr createValidateResultCallback(uint8_t current_tls_alert) PURE;
 
   /**
    * Called after the cert validation completes either synchronously or asynchronously.
@@ -64,10 +65,9 @@ public:
   virtual void onCertificateValidationCompleted(bool succeeded) PURE;
 
   /**
-   * @return absl::optional<ValidateResult> returns nullopt if no validation has been done. Returns
-   * either Successful or Failed after the validation completed, and Pending during the validation.
+   * @return ValidateStatus the validation status.
    */
-  virtual absl::optional<ValidateResult> certificateValidationResult() const PURE;
+  virtual ValidateStatus certificateValidationResult() const PURE;
 
   /**
    * Called when doing asynchronous cert validation.
