@@ -49,7 +49,8 @@ void Span::finishSpan() {
   parent_tracer_.sendSpan(span_);
 }
 
-void Span::injectContext(Tracing::TraceContext& trace_context) {
+void Span::injectContext(Tracing::TraceContext& trace_context,
+                         const Upstream::HostDescriptionConstSharedPtr&) {
   std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
   std::string span_id_hex = absl::BytesToHexString(span_.span_id());
   std::vector<uint8_t> trace_flags_vec{sampled()};

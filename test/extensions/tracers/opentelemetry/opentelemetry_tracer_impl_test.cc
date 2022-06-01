@@ -115,7 +115,7 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
 
   // Remove headers, then inject context into header from the span.
   request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT);
-  span->injectContext(request_headers);
+  span->injectContext(request_headers, nullptr);
 
   auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT);
 
@@ -154,7 +154,7 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
 
   // Remove headers, then inject context into header from the span.
   request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT);
-  span->injectContext(request_headers);
+  span->injectContext(request_headers, nullptr);
 
   auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT);
 
