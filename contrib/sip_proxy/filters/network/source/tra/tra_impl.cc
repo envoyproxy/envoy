@@ -95,7 +95,7 @@ void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
   request.mutable_retrieve_request()->set_key(key);
 
   for (auto& item : context) {
-    (*request.mutable_update_request()->mutable_data())[item.first] = item.second;
+    (*request.mutable_retrieve_request()->mutable_context())[item.first] = item.second;
   }
 
   const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(

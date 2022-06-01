@@ -180,10 +180,9 @@ public:
 
   auto traContext() {
     auto context = absl::flat_hash_map<std::string, std::string>{};
-    auto fromHeader = listHeader(HeaderType::From);
-    std::string method = methodStr[methodType()];
-    context.emplace(std::make_pair("method_type", method));
-    context.emplace(std::make_pair("from_header", fromHeader.front().text()));
+    auto fromHeader = listHeader(HeaderType::From).front().text();
+    context.emplace(std::make_pair("method_type", methodStr[methodType()]));
+    context.emplace(std::make_pair("from_header", fromHeader));
     return context;
   }
 
