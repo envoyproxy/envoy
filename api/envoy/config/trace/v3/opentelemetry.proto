@@ -21,5 +21,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //  [#extension: envoy.tracers.opentelemetry]
 message OpenTelemetryConfig {
   // The upstream gRPC cluster that will receive OTLP traces.
+  // Note that the tracer drops traces if the server does not read data fast enough.
   core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
 }
