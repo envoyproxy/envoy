@@ -915,7 +915,6 @@ TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationSucceeds) {
       new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
-  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
