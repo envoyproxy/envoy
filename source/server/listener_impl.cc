@@ -863,8 +863,8 @@ ListenerImpl::~ListenerImpl() {
 Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 void ListenerImpl::setSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
-  ASSERT(!socket_factory_);
-  socket_factory_ = std::move(socket_factory);
+  ASSERT(socket_factories_.size() == 0);
+  socket_factories_.emplace_back(std::move(socket_factory));
 }
 
 bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,

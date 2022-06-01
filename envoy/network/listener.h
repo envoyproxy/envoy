@@ -151,6 +151,11 @@ public:
   virtual ListenSocketFactory& listenSocketFactory() PURE;
 
   /**
+   * @return std::vector<ListenSocketFactoryPtr>& the factories to create listen sockets.
+   */
+  virtual std::vector<ListenSocketFactoryPtr>& listenSocketFactories() PURE;
+
+  /**
    * @return bool specifies whether the listener should actually listen on the port.
    *         A listener that doesn't listen on a port can only receive connections
    *         redirected from other listeners.
