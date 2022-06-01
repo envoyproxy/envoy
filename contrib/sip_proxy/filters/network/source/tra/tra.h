@@ -55,6 +55,7 @@ public:
       const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
       Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
   virtual void retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                               const absl::flat_hash_map<std::string, std::string>& context,
                                                Tracing::Span& parent_span,
                                                const StreamInfo::StreamInfo& stream_info) PURE;
   virtual void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,

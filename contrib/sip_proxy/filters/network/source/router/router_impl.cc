@@ -157,10 +157,11 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
     }
   } else if (type == "text") {
     auto header_type = HeaderTypes::get().str2Header(header);
+  
     ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(
-        header, std::string(metadata->header(header_type).text()), *callbacks_, host);
+        header, std::string(metadata->header(header_type).text()), metadata->traContext(), *callbacks_, host);
   } else {
-    ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(type, key, *callbacks_, host);
+    ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(type, key, metadata->traContext(),  *callbacks_, host);
   }
 
   if (QueryStatus::Continue == ret) {

@@ -43,6 +43,7 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(const std::st
 
 QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
     const std::string& type, const std::string& key,
+    const absl::flat_hash_map<std::string, std::string>& context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
   if (cache_manager_.contains(type, key)) {
     host = cache_manager_[type][key];
@@ -52,7 +53,7 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
   if (activetrans.metadata()->affinityIteration()->query()) {
     parent_.pushIntoPendingList(type, key, activetrans, [&]() {
       if (traClient()) {
-        traClient()->retrieveTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
+        traClient()->retrieveTrafficRoutingAssistant(type, key, context, Tracing::NullSpan::instance(),
                                                      stream_info_);
       }
     });
@@ -97,11 +98,12 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
             envoy::extensions::filters::network::sip_proxy::tra::v3alpha::RetrieveResponse>(resp)
             .data();
     for (const auto& item : resp_data) {
-      ENVOY_LOG(trace, "TRA === RetrieveResp {} {}={}", message_type, item.first, item.second);
+      ENVOY_LOG(trace, "TRA === RetrieveResp {} {}={}, item.second.empty()={}, size={}, length={}", message_type, item.first, item.second, item.second.empty(), item.second.size(), item.second.length());
       if (!item.second.empty()) {
         parent_.onResponseHandleForPendingList(
             message_type, item.first,
             [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
+              ENVOY_LOG(trace, "JONAH - TRA Adding Item to Cache {} {}", item.first, item.second);
               cache_manager_[message_type].emplace(item.first, item.second);
               metadata->setDestination(item.second);
               return parent_.continueHandling(metadata, decoder_event_handler);
@@ -112,6 +114,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
       parent_.onResponseHandleForPendingList(
           message_type, item.first,
           [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
+            ENVOY_LOG(trace, "JONAH - TRA Trying next affinity", item.first, item.second);
             metadata->nextAffinityIteration();
             parent_.continueHandling(metadata, decoder_event_handler);
           });

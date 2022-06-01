@@ -86,12 +86,17 @@ void GrpcClientImpl::updateTrafficRoutingAssistant(
 
 void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
                                                      const std::string& key,
+                                                     const absl::flat_hash_map<std::string, std::string>& context,
                                                      Tracing::Span& parent_span,
                                                      const StreamInfo::StreamInfo& stream_info) {
 
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest request;
   request.set_type(type);
   request.mutable_retrieve_request()->set_key(key);
+
+  for (auto& item : context) {
+    (*request.mutable_update_request()->mutable_data())[item.first] = item.second;
+  }
 
   const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
       "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Retrieve");

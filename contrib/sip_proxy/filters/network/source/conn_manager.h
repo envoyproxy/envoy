@@ -69,6 +69,7 @@ public:
                                              const std::string& val);
   virtual QueryStatus
   retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                  const absl::flat_hash_map<std::string, std::string>& context,
                                   SipFilters::DecoderFilterCallbacks& activetrans,
                                   std::string& host);
   virtual void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key);
