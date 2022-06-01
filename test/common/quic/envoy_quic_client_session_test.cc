@@ -365,7 +365,6 @@ TEST_P(EnvoyQuicClientSessionTest, GetRttAndCwnd) {
 TEST_P(EnvoyQuicClientSessionTest, VerifyContext) {
   auto& verify_context = dynamic_cast<EnvoyQuicProofVerifyContextImpl&>(
       crypto_stream_factory_.lastVerifyContext().ref());
-  ASSERT(verify_context);
   EXPECT_FALSE(verify_context.isServer());
   EXPECT_EQ(transport_socket_options_.get(), verify_context.transportSocketOptions().get());
   EXPECT_EQ(dispatcher_.get(), &verify_context.dispatcher());
