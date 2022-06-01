@@ -4670,14 +4670,14 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
   // Extract listener_factory_context avoid accessing private member.
   ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
       .WillByDefault(
-          Invoke([&listener_factory_context](
+          Invoke([&listener_factory_context, this](
                      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                          filters,
                      Configuration::ListenerFactoryContext& context)
-                     -> std::vector<Network::ListenerFilterFactoryCb> {
+                     -> Filter::ListenerFilterFactoriesList {
             listener_factory_context = &context;
-            return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(filters,
-                                                                                     context);
+            return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+                filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
           }));
   server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
