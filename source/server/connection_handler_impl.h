@@ -90,12 +90,12 @@ private:
   };
 
   struct ActiveListenerDetails {
-    std::vector<std::shared_ptr<PerAddressActiveListenerDetails>> per_address_details_;
+    std::vector<std::shared_ptr<PerAddressActiveListenerDetails>> per_address_details_list_;
 
     using ListenerMethodFn = std::function<void(Network::ConnectionHandler::ActiveListener&)>;
 
     void invokeListenerMethod(ListenerMethodFn fn) {
-      std::for_each(per_address_details_.begin(), per_address_details_.end(),
+      std::for_each(per_address_details_list_.begin(), per_address_details_list_.end(),
                     [&fn](std::shared_ptr<PerAddressActiveListenerDetails>& details) {
                       fn(*details->listener_);
                     });
@@ -117,7 +117,7 @@ private:
         listener->setRejectFraction(listener_reject_fraction);
       }
       pre_address_details->listener_tag_ = config.listenerTag();
-      per_address_details_.emplace_back(pre_address_details);
+      per_address_details_list_.emplace_back(pre_address_details);
     }
   };
 

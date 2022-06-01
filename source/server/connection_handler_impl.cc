@@ -106,7 +106,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
 
   ASSERT(!listener_map_by_tag_.contains(config.listenerTag()));
 
-  for (auto& per_address_details : details->per_address_details_) {
+  for (auto& per_address_details : details->per_address_details_list_) {
     // This map only store the new listener.
     if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
             per_address_details->typed_listener_)) {
@@ -155,7 +155,7 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
       listener_iter != listener_map_by_tag_.end()) {
     // listener_map_by_address_ may already update to the new listener. Compare it with the one
     // which find from listener_map_by_tag_, only delete it when it is same listener.
-    for (auto& per_address_details : listener_iter->second->per_address_details_) {
+    for (auto& per_address_details : listener_iter->second->per_address_details_list_) {
       auto& address = per_address_details->address_;
       auto address_view = address->asStringView();
       if (tcp_listener_map_by_address_.contains(address_view) &&
@@ -204,7 +204,7 @@ ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag) {
     // If the tag matches this must be a UDP listener.
     // TODO(soulxu): return first listener here, this will be changed
     // when UdpWorkerRouter supports the multiple addresses.
-    auto udp_listener = listener->get().per_address_details_[0]->udpListener();
+    auto udp_listener = listener->get().per_address_details_list_[0]->udpListener();
     ASSERT(udp_listener.has_value());
     return udp_listener;
   }
@@ -326,9 +326,9 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
     // TODO(soulxu): return first listener here, this will be changed
     // when ConnectionBalancer supports the multiple addresses.
     ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-               active_listener->get().per_address_details_[0]->typed_listener_) &&
-           active_listener->get().per_address_details_[0]->listener_->listener() != nullptr);
-    return active_listener->get().per_address_details_[0]->tcpListener().value().get();
+               active_listener->get().per_address_details_list_[0]->typed_listener_) &&
+           active_listener->get().per_address_details_list_[0]->listener_->listener() != nullptr);
+    return active_listener->get().per_address_details_list_[0]->tcpListener().value().get();
   }
   return absl::nullopt;
 }
