@@ -1,7 +1,5 @@
 #pragma once
 
-#include <netinet/tcp.h>
-
 #include <memory>
 
 #include "source/common/quic/envoy_quic_proof_verifier_base.h"
