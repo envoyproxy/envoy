@@ -157,7 +157,9 @@ public:
     }
     Network::FilterChainFactory& filterChainFactory() override { return parent_.factory_; }
     Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
-    std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override { return socket_factories_; }
+    std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
+      return socket_factories_;
+    }
     bool bindToPort() override { return bind_to_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
