@@ -466,7 +466,7 @@ message ClusterSpecifierPlugin {
   bool is_optional = 2;
 }
 
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -542,6 +542,8 @@ message RouteMatch {
     //
     // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
     string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
+
+    string path_template_match = 15;
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
@@ -656,7 +658,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 41]
+// [#next-free-field: 42]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -1041,6 +1043,8 @@ message RouteAction {
   //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
   //   ``/aaa/yyy/bbb``.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
+
+  string pattern_rewrite = 41;
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with

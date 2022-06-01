@@ -99,6 +99,11 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
   }
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathPatternMatch: {
+    route = std::make_shared<PatternTemplateRouteEntryImpl>(
+        vhost, route_config, optional_http_filters, factory_context, validator);
+    break;
+  }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // throw the error below.
   }
@@ -1351,6 +1356,38 @@ void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
     cb(*cfg);
   }
 }
+
+// start new
+PatternTemplateRouteEntryImpl::PatternTemplateRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    const OptionalHttpFilters& optional_http_filters,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator)
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      pattern_(route.match().prefix()),
+      pattern_matcher_(Matchers::PathMatcher::createPrefix(pattern_, !case_sensitive_)) {}
+
+void PatternTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
+                                             bool insert_envoy_original_path) const {
+  finalizePathHeader(headers, pattern_, insert_envoy_original_path);
+}
+
+absl::optional<std::string>
+PatternTemplateRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, pattern_);
+}
+
+RouteConstSharedPtr PatternTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                  const StreamInfo::StreamInfo& stream_info,
+                                                  uint64_t random_value) const {
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
+      pattern_matcher_->match(headers.getPathValue())) {
+    return clusterEntry(headers, random_value);
+  }
+  return nullptr;
+}
+
+// end new
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,

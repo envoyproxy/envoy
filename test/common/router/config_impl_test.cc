@@ -5050,6 +5050,35 @@ virtual_hosts:
       "Cannot specify both prefix_rewrite and regex_rewrite");
 }
 
+TEST_F(RouteMatcherTest, TestPatternRewrites) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: pattern_rewrite
+  domains: ["*"]
+  routes:
+  - match:
+      path_template_match: "/bar/{country}/{lang}"
+    route:
+      pattern_rewrite: "/bar/{lang}/{country}"
+      cluster: www2
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers =
+        genHeaders("test.com", "/bar/usa/eng\"", "CONNECT");
+
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/bar/eng/usa", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/bar/eng/usa", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("test.com", headers.get_(Http::Headers::get().Host));
+
+
+}
+
 TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
   const std::string yaml = R"EOF(
 virtual_hosts:
