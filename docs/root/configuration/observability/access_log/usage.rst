@@ -759,6 +759,20 @@ The following command operators are supported:
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
+%UPSTREAM_FILTER_STATE(KEY:F):Z%
+  HTTP
+    :repo:`StreamInfo <envoy/stream_info/stream_info.h>` could contain filter state for upstream
+    components like cluster or transport socket extensions. This command operator extracts the
+    upstream filter state from StreamInfo. The semantics of `KEY`, `F` and `Z` are same as that of
+    :ref: `FILTER_STATE <config_access_log_format_filter_state>`.
+
+  TCP/UDP
+    Not implemented.
+
+  .. note::
+
+    This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`
+
 %REQUESTED_SERVER_NAME%
   HTTP/TCP/THRIFT
     String value set on ssl connection socket for Server Name Indication (SNI)
