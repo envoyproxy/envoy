@@ -497,7 +497,7 @@ TEST_F(QuicPlatformTest, QuicFlags) {
 
   // Verify that the saver reset all the flags to their previous values.
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
+  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
 }
 
