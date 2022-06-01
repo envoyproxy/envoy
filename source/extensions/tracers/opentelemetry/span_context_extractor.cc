@@ -25,12 +25,12 @@ constexpr int kTraceIdHexSize = 32;
 constexpr int kParentIdHexSize = 16;
 constexpr int kTraceFlagsHexSize = 2;
 
-bool isValidHex(const std::string& input) {
+bool isValidHex(const absl::string_view& input) {
   return std::all_of(input.begin(), input.end(),
                      [](const char& c) { return absl::ascii_isxdigit(c); });
 }
 
-bool isAllZeros(const std::string& input) {
+bool isAllZeros(const absl::string_view& input) {
   return std::all_of(input.begin(), input.end(), [](const char& c) { return c == '0'; });
 }
 
@@ -58,15 +58,15 @@ SpanContext SpanContextExtractor::extractSpanContext() {
     throw ExtractorException("Invalid traceparent header length");
   }
   // Try to split it into its component parts:
-  std::vector<std::string> propagation_header_components =
+  std::vector<absl::string_view> propagation_header_components =
       absl::StrSplit(header_value_string, '-', absl::SkipEmpty());
   if (propagation_header_components.size() != 4) {
     throw ExtractorException("Invalid traceparent hyphenation");
   }
-  std::string version = propagation_header_components[0];
-  std::string trace_id = propagation_header_components[1];
-  std::string parent_id = propagation_header_components[2];
-  std::string trace_flags = propagation_header_components[3];
+  absl::string_view version = propagation_header_components[0];
+  absl::string_view trace_id = propagation_header_components[1];
+  absl::string_view parent_id = propagation_header_components[2];
+  absl::string_view trace_flags = propagation_header_components[3];
   if (version.size() != kVersionHexSize || trace_id.size() != kTraceIdHexSize ||
       parent_id.size() != kParentIdHexSize || trace_flags.size() != kTraceFlagsHexSize) {
     throw ExtractorException("Invalid traceparent field sizes");
