@@ -114,6 +114,12 @@ public:
      * is not sent, and a subsequent call to nextChunk can be made later,
      * possibly after a post() or low-watermark callback on the http filter.
      *
+     * It is not necessary for the caller to drain the response after each call;
+     * it can leave the data in response if it's necessary to buffer the entire
+     * response prior to sending it to the network. It is preferable to stream
+     * the data out, draining the response buffer on each call, but not
+     * required.
+     *
      * @param response a buffer in which to write the chunk
      * @return whether or not any chunks follow this one.
      */

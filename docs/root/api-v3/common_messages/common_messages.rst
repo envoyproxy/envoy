@@ -23,6 +23,7 @@ Common messages
   ../config/common/key_value/v3/config.proto
   ../config/common/mutation_rules/v3/mutation_rules.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto
+  ../extensions/early_data/v3/default_early_data_policy.proto
   ../extensions/filters/common/fault/v3/fault.proto
   ../extensions/network/socket_interface/v3/default_socket_interface.proto
   ../extensions/common/matching/v3/extension_matcher.proto
@@ -34,8 +35,12 @@ Common messages
   ../extensions/matching/input_matchers/ip/v3/ip.proto
   ../extensions/matching/common_inputs/environment_variable/v3/input.proto
   ../extensions/matching/common_inputs/network/v3/network_inputs.proto
+  ../../xds/type/v3/cel.proto
   ../../xds/type/v3/range.proto
   ../../xds/type/v3/typed_struct.proto
+  ../../xds/type/matcher/v3/cel.proto
+  ../../xds/type/matcher/v3/domain.proto
+  ../../xds/type/matcher/v3/http_inputs.proto
   ../../xds/type/matcher/v3/ip.proto
   ../../xds/type/matcher/v3/matcher.proto
   ../../xds/type/matcher/v3/range.proto

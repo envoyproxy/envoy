@@ -205,6 +205,8 @@ else
   if [[ "$CI_TARGET" == "bazel.release" ]]; then
     # We test contrib on release only.
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
+  elif [[ "${CI_TARGET}" == "bazel.msan" ]]; then
+    COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
   fi
   TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
 fi
@@ -338,7 +340,7 @@ elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
   BAZEL_BUILD_OPTIONS=("--config=rbe-toolchain-msan" "${BAZEL_BUILD_OPTIONS[@]}" "-c" "dbg" "--build_tests_only")
   echo "bazel MSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -- "${TEST_TARGETS[@]}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   setup_clang_toolchain
@@ -505,7 +507,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
 
   echo "check dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check -- -v warn
 
   # Run pip requirements tests
   echo "check pip..."
@@ -515,14 +517,10 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 elif [[ "$CI_TARGET" == "tooling" ]]; then
   setup_clang_toolchain
 
-  # TODO(phlax): move this to a bazel rule
-
-  echo "Run pytest tooling tests..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
-
   echo "Run protoxform test"
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
 
+  # TODO(phlax): move this to a bazel rule
   echo "check_format_test..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
 

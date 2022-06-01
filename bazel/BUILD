@@ -16,6 +16,7 @@ exports_files([
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",
+    "exported_symbols.txt",
 ])
 
 genrule(
@@ -535,6 +536,13 @@ config_setting(
 config_setting(
     name = "manual_stamp",
     values = {"define": "manual_stamp=manual_stamp"},
+)
+
+config_setting(
+    name = "android",
+    constraint_values = [
+        "@platforms//os:android",
+    ],
 )
 
 config_setting(

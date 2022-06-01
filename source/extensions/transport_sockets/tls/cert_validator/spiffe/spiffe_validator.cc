@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
+#include <cstdint>
+
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
@@ -263,14 +265,16 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   return "";
 }
 
-size_t SPIFFEValidator::daysUntilFirstCertExpires() const {
+absl::optional<uint32_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
   if (ca_certs_.empty()) {
-    return 0;
+    return absl::make_optional(std::numeric_limits<uint32_t>::max());
   }
-  size_t ret = SIZE_MAX;
+  absl::optional<uint32_t> ret = absl::make_optional(std::numeric_limits<uint32_t>::max());
   for (auto& cert : ca_certs_) {
-    size_t tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
-    if (tmp < ret) {
+    const absl::optional<uint32_t> tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
+    if (!tmp.has_value()) {
+      return absl::nullopt;
+    } else if (tmp.value() < ret.value()) {
       ret = tmp;
     }
   }
