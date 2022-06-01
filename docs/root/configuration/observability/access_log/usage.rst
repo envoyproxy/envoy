@@ -761,10 +761,15 @@ The following command operators are supported:
 
 %UPSTREAM_FILTER_STATE(KEY:F):Z%
   HTTP
-    :repo:`StreamInfo <envoy/stream_info/stream_info.h>` could contain filter state for upstream
-    components like cluster or transport socket extensions. This command operator extracts the
-    upstream filter state from StreamInfo. The semantics of `KEY`, `F` and `Z` are same as that of
-    :ref: `FILTER_STATE <config_access_log_format_filter_state>`.
+    Extracts filter state from upstream components like cluster or transport socket extensions.
+
+    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
+    look up the filter state object. The serialized proto will be logged as JSON string if possible.
+    If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
+    Z is an optional parameter denoting string truncation up to Z characters long.
+    F is an optional parameter used to indicate which method FilterState uses for serialization.
+    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
+    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
 
   TCP/UDP
     Not implemented.
