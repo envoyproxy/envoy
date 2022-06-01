@@ -498,6 +498,33 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
 }
 
+TEST_F(QuicPlatformTest, UpdateReloadableFlags) {
+  auto& flag_registry = quiche::FlagRegistry::getInstance();
+  flag_registry.resetFlags();
+
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
+
+  // Flip both flags to a non-default value.
+  flag_registry.updateReloadableFlags(
+      {{"FLAGS_quic_reloadable_flag_quic_testonly_default_false", true},
+       {"FLAGS_quic_reloadable_flag_quic_testonly_default_true", false}});
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
+
+  // Flip one flag back to a default value.
+  flag_registry.updateReloadableFlags(
+      {{"FLAGS_quic_reloadable_flag_quic_testonly_default_false", false}});
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
+
+  // Flip the other back to a default value.
+  flag_registry.updateReloadableFlags(
+      {{"FLAGS_quic_reloadable_flag_quic_testonly_default_true", true}});
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
+}
+
 class FileUtilsTest : public testing::Test {
 public:
   FileUtilsTest() : dir_path_(Envoy::TestEnvironment::temporaryPath("quic_file_util_test")) {

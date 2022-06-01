@@ -554,22 +554,20 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
     envoy.reloadable_features.FLAGS_quic_reloadable_flag_spdy_testonly_default_false: false
   )EOF");
   SetQuicReloadableFlag(spdy_testonly_default_false, true);
-  EXPECT_EQ(true, GetQuicReloadableFlag(spdy_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(spdy_testonly_default_false));
   setup();
-  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_true));
-  EXPECT_EQ(false, GetQuicReloadableFlag(spdy_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
+  EXPECT_FALSE(GetQuicReloadableFlag(spdy_testonly_default_false));
 
-  // Test 2 behaviors:
-  // 1. Removing overwritten config will make the flag fallback to default value.
-  // 2. Quiche flags can be overwritten again.
+  // Test that Quiche flags can be overwritten again.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: true
   )EOF");
   setup();
-  EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_true));
-  EXPECT_EQ(true, GetQuicReloadableFlag(spdy_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
+  EXPECT_FALSE(GetQuicReloadableFlag(spdy_testonly_default_false));
 }
 #endif
 

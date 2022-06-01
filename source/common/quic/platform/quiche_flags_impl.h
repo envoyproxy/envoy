@@ -53,8 +53,6 @@ public:
   // Reset flag to default value.
   virtual void resetValue() = 0;
 
-  virtual void resetReloadedValue() = 0;
-
   // Return flag name.
   absl::string_view name() const { return name_; }
 
@@ -96,11 +94,6 @@ public:
     absl::MutexLock lock(&mutex_);
     has_reloaded_value_ = true;
     reloaded_value_ = value;
-  }
-
-  void resetReloadedValue() override {
-    absl::MutexLock lock(&mutex_);
-    has_reloaded_value_ = false;
   }
 
 private:

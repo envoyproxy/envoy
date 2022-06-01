@@ -1,6 +1,7 @@
 #include "test/integration/filters/test_listener_filter.h"
 
 #include "test/integration/filters/test_listener_filter.pb.h"
+#include "test/integration/filters/test_listener_filter.pb.validate.h"
 
 namespace Envoy {
 
@@ -31,6 +32,34 @@ absl::Mutex TestListenerFilter::alpn_lock_;
 std::string TestListenerFilter::alpn_;
 
 /**
+ * Config registration for the test TCP listener filter.
+ */
+class TestTcpInspectorConfigFactory
+    : public Server::Configuration::NamedListenerFilterConfigFactory {
+public:
+  // NamedListenerFilterConfigFactory
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message& proto_config,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      Server::Configuration::ListenerFactoryContext& context) override {
+    const auto& message = MessageUtil::downcastAndValidate<
+        const test::integration::filters::TestTcpListenerFilterConfig&>(
+        proto_config, context.messageValidationVisitor());
+    return [listener_filter_matcher,
+            message](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(
+          listener_filter_matcher, std::make_unique<TestTcpListenerFilter>(message.drain_bytes()));
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::integration::filters::TestTcpListenerFilterConfig>();
+  }
+
+  std::string name() const override { return "envoy.filters.tcp_listener.test"; }
+};
+
+/**
  * Config registration for the UDP test filter.
  */
 class TestUdpInspectorConfigFactory
@@ -54,8 +83,11 @@ public:
 };
 
 REGISTER_FACTORY(TestInspectorConfigFactory,
-                 Server::Configuration::NamedListenerFilterConfigFactory){"envoy.listener.test"};
+                 Server::Configuration::NamedListenerFilterConfigFactory);
+
+REGISTER_FACTORY(TestTcpInspectorConfigFactory,
+                 Server::Configuration::NamedListenerFilterConfigFactory);
 
 REGISTER_FACTORY(TestUdpInspectorConfigFactory,
-                 Server::Configuration::NamedUdpListenerFilterConfigFactory){"envoy.listener.test"};
+                 Server::Configuration::NamedUdpListenerFilterConfigFactory);
 } // namespace Envoy
