@@ -51,13 +51,19 @@ PGV annotations are not intended to be an exhaustive list of validation checks
 to be performed by the client; clients may reject a resource for reasons
 unrelated to the PGV annotations.
 
-In general, it is not recommended that control planes or xDS proxies directly
-do any validation using the PGV annotations. There may be some rare cases where
-a control plane knows a priori that all of its clients have been compiled with
-the same version of the xDS proto files and are therefore using the same PGV
-annotations, but in general it is not possible for a control plane to
-know that, so any validation that it performs may not wind up matching
-the validation that will actually be done by its clients.
+In general, the PGV annotations are not intended to be used by control
+planes or xDS proxies directly. There may be some cases where a control
+plane may wish to do validation using the PGV annotations as a means of
+catching problems earlier in the config pipeline (e.g., rejecting invalid
+input when the resource is added to the control plane, before it is ever
+sent to any client). However, the PGV annotations evolve over time as the
+xDS API evolves, and it is not considered a breaking change in the API
+to make a PGV annotation less strict. Therefore, in the general case,
+a control plane cannot assume that all of its clients were compiled
+with the same version of the xDS proto files as the control plane was,
+which means that it cannot know that the client will actually use the
+same validations that the server does. This can lead to problems where
+the server rejects a resource that the client would have accepted.
 
 
 Filesystem subscriptions
