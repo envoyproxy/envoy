@@ -863,7 +863,7 @@ ListenerImpl::~ListenerImpl() {
 Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 void ListenerImpl::setSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
-  ASSERT(socket_factories_.size() == 0);
+  ASSERT(socket_factories_.empty());
   socket_factories_.emplace_back(std::move(socket_factory));
 }
 
