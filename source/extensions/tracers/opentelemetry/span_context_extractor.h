@@ -2,8 +2,8 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/tracing/http_tracer.h"
-#include "source/common/common/statusor.h"
 
+#include "source/common/common/statusor.h"
 #include "source/common/http/header_map_impl.h"
 
 #include "span_context.h"

@@ -1,7 +1,7 @@
 #include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
-#include "test/test_common/utility.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
