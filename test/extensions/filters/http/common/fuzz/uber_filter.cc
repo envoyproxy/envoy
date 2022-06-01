@@ -100,6 +100,7 @@ void UberFilterFuzzer::reset() {
   encoder_filter_.reset();
 
   access_logger_.reset();
+  decoding_buffer_ = nullptr;
   HttpFilterFuzzer::reset();
 }
 
