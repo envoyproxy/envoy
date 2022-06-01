@@ -91,8 +91,8 @@ public:
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
   ActiveStreamFilterBase(FilterManager& parent, bool dual_filter,
-                         FilterMatchStateSharedPtr match_state)
-      : parent_(parent), iteration_state_(IterationState::Continue),
+                         StreamFilterBase* base_filter FilterMatchStateSharedPtr match_state)
+      : parent_(parent), iteration_state_(IterationState::Continue), base_filter_(base_filter),
         filter_match_state_(std::move(match_state)), iterate_from_current_filter_(false),
         headers_continued_(false), continued_1xx_headers_(false), end_stream_(false),
         dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false) {}
@@ -146,6 +146,9 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
+  Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override;
+  void traversePerFilterConfig(
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -193,6 +196,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   };
   FilterManager& parent_;
   IterationState iteration_state_;
+
+  StreamFilterBase* base_filter_{};
 
   FilterMatchStateSharedPtr filter_match_state_;
   // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter

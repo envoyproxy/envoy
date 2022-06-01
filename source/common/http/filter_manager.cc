@@ -278,6 +278,46 @@ void ActiveStreamFilterBase::resetIdleTimer() {
   parent_.filter_manager_callbacks_.resetIdleTimer();
 }
 
+Router::RouteSpecificFilterConfig* ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
+  ASSERT(base_filter_ != nullptr);
+  auto route = parent_.filter_manager_callbacks_.route(nullptr);
+  if (route == nullptr) {
+    return nullptr;
+  }
+
+  std::string custom_name(base_filter_->customName());
+  auto* result = route->mostSpecificPerFilterConfig(custom_name);
+
+  if (result == nullptr) {
+    std::string filter_name(base_filter_->filterName());
+    result = route->mostSpecificPerFilterConfig(filter_name);
+  }
+  return result;
+}
+
+void ActiveStreamFilterBase::traversePerFilterConfig(
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  ASSERT(base_filter_ != nullptr);
+  if (route == nullptr) {
+    return;
+  }
+
+  bool handled = false;
+  std::string custom_name(base_filter_->customName());
+  route->traversePerFilterConfig(custom_name,
+                                 [&handled, &cb](const Router::RouteSpecificFilterConfig& config) {
+                                   handled = true;
+                                   cb(config);
+                                 });
+
+  if (handled) {
+    return;
+  }
+
+  std::string filter_name(base_filter_->filterName());
+  route->traversePerFilterConfig(filter_name, cb);
+}
+
 void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {
   if (match_tree_evaluated_ || !matching_data_) {
     return;
