@@ -345,7 +345,7 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     return;
   }
 
@@ -379,7 +379,7 @@ typed_config:
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationAfterTearDown) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     return;
   }
 
@@ -425,7 +425,7 @@ typed_config:
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationAfterSslShutdown) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     return;
   }
 

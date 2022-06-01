@@ -20,6 +20,9 @@ enum class ValidateStatus {
   Failed,
 };
 
+/**
+ * Used to return the result from an asynchronous cert validation.
+ */
 class ValidateResultCallback {
 public:
   virtual ~ValidateResultCallback() = default;
@@ -30,10 +33,10 @@ public:
    * Called when the asynchronous cert validation completes.
    * @param succeeded true if the validation succeeds
    * @param error_details failure details, only used if the validation fails.
-   * @param out_alert the SSL error related to the failure, only used if the validation fails.
+   * @param tls_alert the TLS error related to the failure, only used if the validation fails.
    */
   virtual void onCertValidationResult(bool succeeded, const std::string& error_details,
-                                      uint8_t out_alert) PURE;
+                                      uint8_t tls_alert) PURE;
 };
 
 using ValidateResultCallbackPtr = std::unique_ptr<ValidateResultCallback>;
@@ -71,9 +74,10 @@ public:
 
   /**
    * Called when doing asynchronous cert validation.
-   * @return uint8_t represents the tls alert populated by cert validator.
+   * @return uint8_t represents the TLS alert populated by cert validator in
+   * case of failure.
    */
-  virtual uint8_t tlsAlert() const PURE;
+  virtual uint8_t certificateValidationAlert() const PURE;
 };
 
 } // namespace Ssl

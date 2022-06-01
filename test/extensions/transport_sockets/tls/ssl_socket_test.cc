@@ -6377,7 +6377,7 @@ TEST_P(SslSocketTest, Sni) {
 }
 
 TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     return;
   }
 
@@ -6420,7 +6420,7 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
 }
 
 TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     return;
   }
 

@@ -84,7 +84,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     std::unique_ptr<quic::ProofVerifierCallback> callback) {
   ASSERT(details != nullptr);
   ASSERT(!certs.empty());
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     if (doVerifyCertChain(hostname, port, certs, ocsp_response, cert_sct, context, error_details,
                           out_alert, std::move(callback))) {
       *details = std::make_unique<CertVerifyResult>(true);

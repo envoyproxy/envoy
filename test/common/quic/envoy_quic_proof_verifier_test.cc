@@ -124,7 +124,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainSuccess) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     return;
   }
   custom_validator_config_ = envoy::config::core::v3::TypedExtensionConfig();
@@ -235,7 +235,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainFailureInvalidHost) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     return;
   }
 

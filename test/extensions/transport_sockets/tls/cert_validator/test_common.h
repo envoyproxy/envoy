@@ -33,7 +33,7 @@ public:
     validate_result_ = succeeded ? Ssl::ValidateStatus::Successful : Ssl::ValidateStatus::Failed;
   }
   Ssl::ValidateStatus certificateValidationResult() const override { return validate_result_; }
-  uint8_t tlsAlert() const override { return SSL_AD_CERTIFICATE_UNKNOWN; }
+  uint8_t certificateValidationAlert() const override { return SSL_AD_CERTIFICATE_UNKNOWN; }
 
 private:
   Envoy::Ssl::ClientValidationStatus status_;

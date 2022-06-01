@@ -41,7 +41,7 @@ public:
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
   void onCertValidationResult(bool succeeded, const std::string& error_details,
-                              uint8_t out_alert) override;
+                              uint8_t tls_alert) override;
 
   void onSslHandshakeCancelled();
 
@@ -63,9 +63,9 @@ public:
   Ssl::ValidateStatus certificateValidationResult() const override {
     return cert_validation_result_;
   }
-  uint8_t tlsAlert() const override { return tls_alert_; }
+  uint8_t certificateValidationAlert() const override { return cert_validation_alert_; }
 
-  void setTlsAlert(uint8_t alert) { tls_alert_ = alert; }
+  void setCertificateValidationAlert(uint8_t alert) { cert_validation_alert_ = alert; }
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
@@ -75,7 +75,7 @@ private:
   // nullopt if there is none.
   OptRef<ValidateResultCallbackImpl> cert_validate_result_callback_;
   // Stores the TLS out_alert.
-  uint8_t tls_alert_{SSL_AD_CERTIFICATE_UNKNOWN};
+  uint8_t cert_validation_alert_{SSL_AD_CERTIFICATE_UNKNOWN};
   // Stores the validation result if there is any.
   // nullopt if no validation has ever been kicked off.
   Ssl::ValidateStatus cert_validation_result_{Ssl::ValidateStatus::NotStarted};

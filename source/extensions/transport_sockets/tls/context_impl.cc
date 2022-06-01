@@ -162,7 +162,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   if (!capabilities_.verifies_peer_certificates) {
     for (auto ctx : ssl_contexts) {
       if (verify_mode != SSL_VERIFY_NONE) {
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation")) {
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
           SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
           SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
         } else {
@@ -455,7 +455,7 @@ enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* ou
     ENVOY_LOG(trace, "Already has a result: {}",
               static_cast<int>(extended_socket_info->certificateValidationStatus()));
     // Already has a binary result, return immediately.
-    *out_alert = extended_socket_info->tlsAlert();
+    *out_alert = extended_socket_info->certificateValidationAlert();
     return extended_socket_info->certificateValidationResult() == Ssl::ValidateStatus::Successful
                ? ssl_verify_ok
                : ssl_verify_invalid;
@@ -485,7 +485,7 @@ ValidationResults
 ContextImpl::customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
                                    const Network::TransportSocketOptions* transport_socket_options,
                                    SSL* ssl, uint8_t current_tls_alert) {
-  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation"));
+  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
   ASSERT(extended_socket_info);
   STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
   if (cert_chain == nullptr) {
@@ -1253,7 +1253,7 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
     STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
     const Network::TransportSocketOptions* transport_socket_options,
     absl::string_view ech_name_override) {
-  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_aync_cert_validation"));
+  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
   ASSERT(!tls_contexts_.empty());
   // It doesn't matter which SSL context is used, because they share the same cert validation
   // config.
