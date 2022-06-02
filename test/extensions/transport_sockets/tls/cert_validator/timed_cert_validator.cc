@@ -9,7 +9,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-ValidationResults TimedCertValidator::doCustomVerifyCertChain(
+ValidationResults TimedCertValidator::doVerifyCertChain(
     STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptions* transport_socket_options, SSL_CTX& ssl_ctx,
@@ -39,7 +39,7 @@ ValidationResults TimedCertValidator::doCustomVerifyCertChain(
           ASSERT(cert);
           sk_X509_push(certs.get(), cert);
         }
-        ValidationResults result = DefaultCertValidator::doCustomVerifyCertChain(
+        ValidationResults result = DefaultCertValidator::doVerifyCertChain(
             *certs, nullptr, nullptr, transport_socket_options, ssl_ctx, ech_name_override_,
             is_server, SSL_AD_CERTIFICATE_UNKNOWN);
         callback_->onCertValidationResult(

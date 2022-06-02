@@ -180,11 +180,24 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
                                                  nullptr),
             Envoy::Ssl::ClientValidationStatus::NotValidated);
   bssl::UniquePtr<X509> cert(X509_new());
-  EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/nullptr,
-                                                            /*ssl_extended_info=*/nullptr,
-                                                            /*leaf_cert=*/*cert,
-                                                            /*transport_socket_options=*/nullptr),
-            0);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
+    SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+              default_validator
+                  ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr,
+                                      /*ssl_extended_info=*/nullptr,
+                                      /*transport_socket_options=*/nullptr, *ssl_ctx, "", false,
+                                      SSL_AD_INTERNAL_ERROR)
+                  .status);
+  } else {
+    EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/nullptr,
+                                                              /*ssl_extended_info=*/nullptr,
+                                                              /*leaf_cert=*/*cert,
+                                                              /*transport_socket_options=*/nullptr),
+              0);
+  }
 }
 
 TEST(DefaultCertValidatorTest, NoSanInCert) {

@@ -504,7 +504,7 @@ ContextImpl::customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_s
   ASSERT(cert_validator_);
   // Do not provide async callback here, but defer its creation to extended_socket_info if the
   // validation is async.
-  ValidationResults result = cert_validator_->doCustomVerifyCertChain(
+  ValidationResults result = cert_validator_->doVerifyCertChain(
       *cert_chain, nullptr, extended_socket_info, transport_socket_options, *SSL_get_SSL_CTX(ssl),
       ech_name_override, SSL_is_server(ssl), current_tls_alert);
   if (result.status != ValidationResults::ValidationStatus::Pending) {
@@ -1265,7 +1265,7 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
     // Skip validation if the tls is configured SSL_VERIFY_NONE.
     return {ValidationResults::ValidationStatus::Successful, absl::nullopt, absl::nullopt};
   }
-  ValidationResults result = cert_validator_->doCustomVerifyCertChain(
+  ValidationResults result = cert_validator_->doVerifyCertChain(
       cert_chain, std::move(callback), /*extended_socket_info=*/nullptr, transport_socket_options,
       *ssl_ctx, ech_name_override, is_server, SSL_AD_CERTIFICATE_UNKNOWN);
   return result;

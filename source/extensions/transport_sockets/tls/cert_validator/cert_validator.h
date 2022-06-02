@@ -84,11 +84,11 @@ public:
    * @return ValidationResult the validation status and error messages if there is any.
    */
   virtual ValidationResults
-  doCustomVerifyCertChain(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
-                          Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                          const Network::TransportSocketOptions* transport_socket_options,
-                          SSL_CTX& ssl_ctx, absl::string_view ech_name_override, bool is_server,
-                          uint8_t current_tls_alert) PURE;
+  doVerifyCertChain(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
+                    Ssl::SslExtendedSocketInfo* ssl_extended_info,
+                    const Network::TransportSocketOptions* transport_socket_options,
+                    SSL_CTX& ssl_ctx, absl::string_view ech_name_override, bool is_server,
+                    uint8_t current_tls_alert) PURE;
 
   /**
    * Called to initialize all ssl contexts

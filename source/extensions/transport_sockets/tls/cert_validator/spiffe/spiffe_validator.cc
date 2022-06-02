@@ -222,7 +222,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
   return san_match;
 }
 
-ValidationResults SPIFFEValidator::doCustomVerifyCertChain(
+ValidationResults SPIFFEValidator::doVerifyCertChain(
     STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptions* /*transport_socket_options*/, SSL_CTX& ssl_ctx,
