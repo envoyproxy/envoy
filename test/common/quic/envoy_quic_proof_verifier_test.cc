@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <memory>
 
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
@@ -383,6 +384,25 @@ ZCFbredVxDBZuoVsfrKPSQa407Jj1Q==
             "unsupported certificate "
             "purpose",
             error_details);
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
+  transport_socket_options_.reset(new Network::TransportSocketOptionsImpl("", {"non-example.com"}));
+  configCertVerificationDetails(true);
+  std::unique_ptr<quic::CertificateView> cert_view =
+      quic::CertificateView::ParseSingleCertificate(leaf_cert_);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_FAILURE,
+            verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
+                                       {leaf_cert_}, ocsp_response, cert_sct, &verify_context_,
+                                       &error_details, &verify_details, nullptr, nullptr))
+      << error_details;
+  EXPECT_EQ("verify cert failed: verify SAN list", error_details);
+  EXPECT_NE(verify_details, nullptr);
+  EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
 }
 
 } // namespace Quic
