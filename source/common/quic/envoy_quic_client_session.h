@@ -13,8 +13,6 @@
 namespace Envoy {
 namespace Quic {
 
-class EnvoyQuicClientSession;
-
 // Act as a Network::ClientConnection to ClientCodec.
 // TODO(danzh) This class doesn't need to inherit Network::FilterManager
 // interface but need all other Network::Connection implementation in
