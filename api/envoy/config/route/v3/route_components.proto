@@ -449,7 +449,8 @@ message WeightedCluster {
     // If header is not present or invalid, Envoy will fall back to use the internally generated random value.
     // This header is expected to be single-valued header as we only want to have one selected value throughout
     // the process for the consistency. And the value is a unsigned number between 0 and UINT64_MAX.
-    string header_name = 4;
+    string header_name = 4
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
   }
 }
 
