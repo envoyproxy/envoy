@@ -3,14 +3,12 @@
 # for the underlying protos mentioned in this file. See
 # https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
-import json
 import logging
 import functools
 import sys
 from collections import defaultdict
 from functools import cached_property
 
-from google.protobuf import json_format
 from bazel_tools.tools.python.runfiles import runfiles
 import yaml
 
@@ -29,9 +27,7 @@ from envoy.code.check.checker import BackticksCheck
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
-from tools.config_validation import validate_fragment
 
-from tools.protodoc import manifest_pb2
 from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
 from validate import validate_pb2
@@ -526,11 +522,10 @@ def format_security_options(security_option, field, type_context, edge_config):
     if security_option.configure_for_untrusted_upstream:
         sections.append(
             indent(4, 'This field should be configured in the presence of untrusted *upstreams*.'))
-    if edge_config.note:
-        sections.append(indent(4, edge_config.note))
+    if edge_config["note"]:
+        sections.append(indent(4, edge_config["note"]))
 
-    example_dict = json_format.MessageToDict(edge_config.example)
-    validate_fragment.validate_fragment(field.type_name[1:], example_dict)
+    example_dict = edge_config["example"]
     field_name = type_context.name.split('.')[-1]
     example = {field_name: example_dict}
     sections.append(
@@ -603,12 +598,12 @@ def format_field_as_definition_list_item(
 
     # If there is a udpa.annotations.security option, include it after the comment.
     if field.options.HasExtension(security_pb2.security):
-        manifest_description = protodoc_manifest.fields.get(type_context.name)
+        manifest_description = protodoc_manifest.get(type_context.name)
         if not manifest_description:
             raise ProtodocError('Missing protodoc manifest YAML for %s' % type_context.name)
         formatted_security_options = format_security_options(
             field.options.Extensions[security_pb2.security], field, type_context,
-            manifest_description.edge_config)
+            manifest_description)
     else:
         formatted_security_options = ''
     pretty_label_names = {
@@ -706,12 +701,7 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-        # Load as YAML, emit as JSON and then parse as proto to provide type
-        # checking.
-        protodoc_manifest_untyped = utils.from_yaml(
-            r.Rlocation('envoy/docs/protodoc_manifest.yaml'))
-        self.protodoc_manifest = manifest_pb2.Manifest()
-        json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
+        self.protodoc_manifest = utils.from_json(r.Rlocation("envoy/tools/protodoc/manifest.json"))
 
     @cached_property
     def backticks_check(self):
