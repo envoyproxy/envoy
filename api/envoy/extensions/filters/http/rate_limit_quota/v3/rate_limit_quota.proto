@@ -207,12 +207,8 @@ message RateLimitQuotaBucketSettings {
     //
     // When the field is not set, the ``ExpiredAssignmentBehavior`` time is **not limited**:
     // it's applied until the server returns a new assignment.
-    //
-    // .. attention::
-    //   Zero-second ``Duration`` expires **immediately**, while unset ``Duration``
-    //   **has no expiration date**.
     google.protobuf.Duration expired_assignment_behavior_timeout = 1
-        [(validate.rules).duration = {gte {}}];
+        [(validate.rules).duration = {gt {}}];
 
     oneof expired_assignment_behavior {
       option (validate.required) = true;
