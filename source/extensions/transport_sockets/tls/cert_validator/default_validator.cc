@@ -315,7 +315,7 @@ ValidationResults DefaultCertValidator::doCustomVerifyCertChain(
           Envoy::Ssl::ClientValidationStatus::NotValidated);
     }
     stats_.fail_verify_error_.inc();
-    std::string error{"verify cert failed: empty cert chain"};
+    std::string error = "verify cert failed: empty cert chain";
     ENVOY_LOG(debug, error);
     return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
   }
@@ -343,7 +343,7 @@ ValidationResults DefaultCertValidator::doCustomVerifyCertChain(
             Envoy::Ssl::ClientValidationStatus::Failed);
       }
       stats_.fail_verify_error_.inc();
-      std::string error{"verify cert failed: init and setup X509_STORE_CTX"};
+      std::string error = "verify cert failed: init and setup X509_STORE_CTX";
       ENVOY_LOG(debug, error);
       return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
     }

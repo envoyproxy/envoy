@@ -1682,7 +1682,10 @@ TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
   testUtilV2(
       test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
           .setExpectedClientCertUri("spiffe://lyft.com/test-team")
-          .setExpectedTransportFailureReasonContains("TLSV1_ALERT_BAD_CERTIFICATE_HASH_VALUE"));
+          .setExpectedTransportFailureReasonContains(
+              Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")
+                  ? "TLSV1_ALERT_BAD_CERTIFICATE_HASH_VALUE"
+                  : "SSLV3_ALERT_CERTIFICATE_EXPIRED"));
 }
 
 // Allow expired certificates, but use the wrong CA so it should fail still.
@@ -2236,7 +2239,10 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertific
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(
       test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-          .setExpectedTransportFailureReasonContains("TLSV1_ALERT_BAD_CERTIFICATE_HASH_VALUE"));
+          .setExpectedTransportFailureReasonContains(
+              Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")
+                  ? "TLSV1_ALERT_BAD_CERTIFICATE_HASH_VALUE"
+                  : "SSLV3_ALERT_CERTIFICATE_UNKNOWN"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -2271,7 +2277,10 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCert
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(
       test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-          .setExpectedTransportFailureReasonContains("TLSV1_ALERT_BAD_CERTIFICATE_HASH_VALUE"));
+          .setExpectedTransportFailureReasonContains(
+              Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")
+                  ? "TLSV1_ALERT_BAD_CERTIFICATE_HASH_VALUE"
+                  : "SSLV3_ALERT_CERTIFICATE_UNKNOWN"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -2478,7 +2487,10 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientC
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(
       test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-          .setExpectedTransportFailureReasonContains("TLSV1_ALERT_BAD_CERTIFICATE_HASH_VALUE"));
+          .setExpectedTransportFailureReasonContains(
+              Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")
+                  ? "TLSV1_ALERT_BAD_CERTIFICATE_HASH_VALUE"
+                  : "SSLV3_ALERT_CERTIFICATE_UNKNOWN"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -2514,7 +2526,10 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongCli
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(
       test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-          .setExpectedTransportFailureReasonContains("TLSV1_ALERT_BAD_CERTIFICATE_HASH_VALUE"));
+          .setExpectedTransportFailureReasonContains(
+              Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")
+                  ? "TLSV1_ALERT_BAD_CERTIFICATE_HASH_VALUE"
+                  : "SSLV3_ALERT_CERTIFICATE_UNKNOWN"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);

@@ -72,9 +72,7 @@ private:
 absl::string_view EnvoyQuicProofVerifyContextImpl::getEchNameOverrride() const {
   const char* name = nullptr;
   size_t name_len = 0;
-#ifndef BORINGSSL_FIPS
   SSL_get0_ech_name_override(ssl_info_.ssl(), &name, &name_len);
-#endif
   return {name, name_len};
 }
 
