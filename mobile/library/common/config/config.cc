@@ -447,6 +447,9 @@ stats_config:
             regex: '^dns.apple.*'
         - safe_regex:
             google_re2: {}
+            regex: '^http.client.*'
+        - safe_regex:
+            google_re2: {}
             regex: '^http.dispatcher.*'
         - safe_regex:
             google_re2: {}
@@ -454,6 +457,9 @@ stats_config:
         - safe_regex:
             google_re2: {}
             regex: '^http.hcm.downstream_rq_[\w]+'
+        - safe_regex:
+            google_re2: {}
+            regex: '^pbf_filter.*'
         - safe_regex:
             google_re2: {}
             regex: '^pulse.*'
