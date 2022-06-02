@@ -25,21 +25,30 @@ builtin:
 # labels intended to make clear the trust that operators may place in
 # extensions.
 security_postures:
-# This extension is hardened against untrusted downstream traffic. It
-# assumes that the upstream is trusted.
-- robust_to_untrusted_downstream
-# This extension is hardened against both untrusted downstream and upstream
-# traffic.
-- robust_to_untrusted_downstream_and_upstream
-# This extension is not hardened and should only be used in deployments
-# where both the downstream and upstream are trusted.
-- requires_trusted_downstream_and_upstream
-# This is functionally equivalent to
-# requires_trusted_downstream_and_upstream, but acts as a placeholder to
-# allow us to identify extensions that need classifying.
-- unknown
-# Not relevant to data plane threats, e.g. stats sinks.
-- data_plane_agnostic
+- name: robust_to_untrusted_downstream
+  description: |
+    This extension is intended to be robust against untrusted downstream traffic. It
+    assumes that the upstream is trusted.
+- name: robust_to_untrusted_downstream_and_upstream
+  description: |
+    This extension is intended to be robust against both untrusted downstream and
+    upstream traffic.
+- name: requires_trusted_downstream_and_upstream
+  description: |
+    This extension is not hardened and should only be used in deployments
+    where both the downstream and upstream are trusted.
+- name: unknown
+  # This is functionally equivalent to
+  # requires_trusted_downstream_and_upstream, but acts as a placeholder to
+  # allow us to identify extensions that need classifying.
+  description: |
+    This extension has an unknown security posture and should only be
+    used in deployments where both the downstream and upstream are
+    trusted.
+- name: data_plane_agnostic
+  # Not relevant to data plane threats, e.g. stats sinks.
+  description: |
+    This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
 
 # Extension categories as defined by factories
 categories:
@@ -94,11 +103,13 @@ categories:
 - envoy.matching.network.custom_matchers
 
 status_values:
-# This extension is stable and is expected to be production usable.
-- stable
-# This extension is functional but has not had substantial production burn
-# time, use only with this caveat.
-- alpha
-# This extension is work-in-progress. Functionality is incomplete and it is
-# not intended for production use.
-- wip
+- name: stable
+  # This extension is stable and is expected to be production usable.
+  description:
+- name: alpha
+  description: |
+    This extension is functional but has not had substantial production burn time,
+    use only with this caveat.
+- name: wip
+  description: |
+    This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.

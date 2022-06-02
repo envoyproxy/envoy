@@ -1131,6 +1131,7 @@ if __name__ == "__main__":
             "':(exclude)source/extensions/early_data/BUILD' "
             "':(exclude)source/extensions/filters/http/buffer/BUILD' "
             "':(exclude)source/extensions/filters/network/common/BUILD' "
+            "':(exclude)source/extensions/transport_sockets/common/BUILD' "
             "':(exclude)source/extensions/udp_packet_writer/default/BUILD' "
             "':(exclude)source/extensions/udp_packet_writer/gso/BUILD' ")
         command = (

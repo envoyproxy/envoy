@@ -416,7 +416,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 void UpstreamRequest::onPoolReady(
     std::unique_ptr<GenericUpstream>&& upstream, Upstream::HostDescriptionConstSharedPtr host,
     const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-    const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
@@ -442,16 +442,22 @@ void UpstreamRequest::onPoolReady(
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
-  if (info.upstreamInfo().has_value()) {
-    auto& upstream_timing = info.upstreamInfo().value().get().upstreamTiming();
+  if (info.upstreamInfo()) {
+    auto& upstream_timing = info.upstreamInfo()->upstreamTiming();
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
     upstreamTiming().upstream_connect_complete_ = upstream_timing.upstream_connect_complete_;
     upstreamTiming().upstream_handshake_complete_ = upstream_timing.upstream_handshake_complete_;
-    upstream_info.setUpstreamNumStreams(info.upstreamInfo().value().get().upstreamNumStreams());
+    upstream_info.setUpstreamNumStreams(info.upstreamInfo()->upstreamNumStreams());
   }
 
-  upstream_info.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
-      info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
+  // Upstream filters might have already created/set a filter state.
+  const StreamInfo::FilterStateSharedPtr& filter_state = info.filterState();
+  if (!filter_state) {
+    upstream_info.setUpstreamFilterState(
+        std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
+  } else {
+    upstream_info.setUpstreamFilterState(filter_state);
+  }
   upstream_info.setUpstreamLocalAddress(upstream_local_address);
   upstream_info.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
 
