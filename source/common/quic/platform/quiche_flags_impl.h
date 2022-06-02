@@ -17,29 +17,10 @@ const std::string EnvoyQuicheReloadableFlagPrefix =
     "envoy.reloadable_features.FLAGS_quic_reloadable_flag_";
 const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
 
-// Abstract class for QUICHE protocol and feature flags.
-class Flag {
-public:
-  // Construct Flag with the given name and help string.
-  Flag(const char* name, const char* help) : name_(name), help_(help) {}
-  virtual ~Flag() = default;
-
-  // Return flag name.
-  absl::string_view name() const { return name_; }
-
-  // Return flag help string.
-  absl::string_view help() const { return help_; }
-
-private:
-  std::string name_;
-  std::string help_;
-};
-
 // Concrete class for QUICHE protocol and feature flags, templated by flag type.
-template <typename T> class TypedFlag : public Flag {
+template <typename T> class TypedFlag {
 public:
-  TypedFlag(const char* name, T default_value, const char* help)
-      : Flag(name, help), value_(default_value), default_value_(default_value) {}
+  explicit TypedFlag(T value) : value_(value) {}
 
   // Set flag value.
   void setValue(T value) {
@@ -50,24 +31,12 @@ public:
   // Return flag value.
   T value() const {
     absl::MutexLock lock(&mutex_);
-    if (has_reloaded_value_) {
-      return reloaded_value_;
-    }
     return value_;
-  }
-
-  void setReloadedValue(T value) {
-    absl::MutexLock lock(&mutex_);
-    has_reloaded_value_ = true;
-    reloaded_value_ = value;
   }
 
 private:
   mutable absl::Mutex mutex_;
   T value_ ABSL_GUARDED_BY(mutex_);
-  const T default_value_;
-  bool has_reloaded_value_ ABSL_GUARDED_BY(mutex_) = false;
-  T reloaded_value_ ABSL_GUARDED_BY(mutex_);
 };
 
 using ReloadableFlag = TypedFlag<bool>;
