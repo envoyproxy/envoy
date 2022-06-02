@@ -81,7 +81,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
         # chromium-103.0.5060.24 (linux/beta)
-        version = "227ff6e6425283b83594a91a1aa81cc78f1a88df",
+        version = "62079f7cb4e9a2d5d8a68fe8a4a3f2375dd53585"
         sha256 = "9b0ec8c81cea758960d12f6d1eafa1a9deb5888a42efcd39390ce3334ea4ed3f",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
