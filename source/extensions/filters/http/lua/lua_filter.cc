@@ -16,7 +16,6 @@
 #include "source/common/http/message_impl.h"
 
 #include "absl/strings/escaping.h"
-#include "wrappers.h"
 
 namespace Envoy {
 namespace Extensions {
