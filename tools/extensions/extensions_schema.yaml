@@ -95,7 +95,6 @@ categories:
 - envoy.matching.http.input
 - envoy.matching.network.input
 - envoy.matching.network.custom_matchers
-- envoy.matching.ssl.input
 
 status_values:
 # This extension is stable and is expected to be production usable.
