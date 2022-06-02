@@ -6766,6 +6766,7 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  std::cout<<"after parsing"<<"\n";
 
   // Default allows safe requests using early data.
   Http::TestRequestHeaderMapImpl foo_request1 = genHeaders("www.lyft.com", "/foo", "GET");
