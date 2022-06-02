@@ -10,7 +10,6 @@
 #include <string>
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/synchronization/mutex.h"
 
 namespace quiche {
 
@@ -21,7 +20,7 @@ const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
 // Concrete class for QUICHE protocol and feature flags, templated by flag type.
 template <typename T> class TypedFlag {
 public:
-  explicit TypedFlag(T value) : value_(value) { ASSERT(value_.is_lock_free()); }
+  explicit TypedFlag(T value) : value_(value) {}
 
   // Set flag value.
   void setValue(T value) { value_.store(value, std::memory_order_relaxed); }
