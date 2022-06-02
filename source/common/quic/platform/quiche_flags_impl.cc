@@ -21,7 +21,7 @@ namespace {
 absl::flat_hash_map<absl::string_view, ReloadableFlag*> makeReloadableFlagMap() {
   absl::flat_hash_map<absl::string_view, ReloadableFlag*> flags;
 
-#define QUIC_FLAG(flag, ...) flags.emplace(flag->name(), flag);
+#define QUIC_FLAG(flag, ...) flags.emplace(#flag, flag);
 #include "quiche/quic/core/quic_flags_list.h"
   QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
   QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
@@ -71,13 +71,13 @@ void FlagRegistry::updateReloadableFlags(
   for (auto& [flag_name, flag] : reloadable_flags_) {
     const auto it = quiche_flags_override.find(flag_name);
     if (it != quiche_flags_override.end()) {
-      flag->setReloadedValue(it->second);
+      flag->setValue(it->second);
     }
   }
 }
 
 // Flag definitions
-#define QUIC_FLAG(flag, value) TypedFlag<bool>* flag = new ReloadableFlag(#flag, value, "");
+#define QUIC_FLAG(flag, value) TypedFlag<bool>* flag = new ReloadableFlag(value);
 #include "quiche/quic/core/quic_flags_list.h"
 QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
 QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
@@ -90,10 +90,8 @@ QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 
 #undef QUIC_FLAG
 
-#define STRINGIFY(X) #X
-
 #define DEFINE_QUIC_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                    \
-  TypedFlag<type>* FLAGS_##flag = new TypedFlag<type>(STRINGIFY(FLAGS_##flag), value, help);
+  TypedFlag<type>* FLAGS_##flag = new TypedFlag<type>(value);
 
 #define DEFINE_QUIC_PROTOCOL_FLAG_SINGLE_VALUE(type, flag, value, doc)                             \
   DEFINE_QUIC_PROTOCOL_FLAG_IMPL(type, flag, value, doc)
