@@ -149,6 +149,9 @@ new_features:
     added support for preserving header keys.
 - area: thrift
   change: |
+    added support onLocalReply to inform filters of local replies.
+- area: thrift
+  change: |
     introduced thrift configurable encoder and bidirectional filters, which allows peeking and modifying the thrift response message.
 - area: on_demand
   change: |
@@ -177,6 +180,9 @@ new_features:
 - area: http
   change: |
     added :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster_header>` in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to allow routing shadow request to the cluster specified in the request_header.
+- area: router
+  change:
+    added :ref:`keep_empty_value <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>` to allow keeping empty values in custom headers.
 - area: dubbo_proxy
   change: |
     added :ref:`metadata_match <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.metadata_match>` support to the dubbo proxy.

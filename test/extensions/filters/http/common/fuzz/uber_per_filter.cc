@@ -76,18 +76,28 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
 void cleanTapConfig(Protobuf::Message* message) {
   envoy::extensions::filters::http::tap::v3::Tap& config =
       dynamic_cast<envoy::extensions::filters::http::tap::v3::Tap&>(*message);
-  // TODO(samflattery): remove once StreamingGrpcSink is implemented
-  // a static config filter is required to have one sink, but since validation isn't performed on
-  // the filter until after this function runs, we have to manually check that there are sinks
-  // before checking that they are not StreamingGrpc
   if (config.common_config().config_type_case() ==
-          envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
-              kStaticConfig &&
-      !config.common_config().static_config().output_config().sinks().empty() &&
-      config.common_config().static_config().output_config().sinks(0).output_sink_type_case() ==
-          envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
-    // will be caught in UberFilterFuzzer::fuzz
-    throw EnvoyException("received input with not implemented output_sink_type StreamingGrpcSink");
+      envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kStaticConfig) {
+    auto const& output_config = config.common_config().static_config().output_config();
+    // TODO(samflattery): remove once StreamingGrpcSink is implemented
+    // a static config filter is required to have one sink, but since validation isn't performed on
+    // the filter until after this function runs, we have to manually check that there are sinks
+    // before checking that they are not StreamingGrpc
+    if (!output_config.sinks().empty() &&
+        output_config.sinks(0).output_sink_type_case() ==
+            envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
+      // will be caught in UberFilterFuzzer::fuzz
+      throw EnvoyException(
+          "received input with not implemented output_sink_type StreamingGrpcSink");
+    } else if (!output_config.sinks().empty() &&
+               (output_config.sinks(0).output_sink_type_case() ==
+                    envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kBufferedAdmin ||
+                output_config.sinks(0).output_sink_type_case() ==
+                    envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingAdmin)) {
+      // will be caught in UberFilterFuzzer::fuzz
+      throw EnvoyException("received input for which factory can not create for output_sink_type "
+                           "BufferAdmin or StreamingAdmin");
+    }
   }
 }
 

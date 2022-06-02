@@ -37,9 +37,9 @@ message CryptoMbPrivateKeyMethodConfig {
   // queue is not filled before the delay has expired, the requests
   // already in the queue are processed, even if the queue is not full.
   // In effect, this value controls the balance between latency and
-  // throughput. The duration needs to be set to a non-zero value.
+  // throughput. The duration needs to be set to a value greater than or equal to 1 millisecond.
   google.protobuf.Duration poll_delay = 2 [(validate.rules).duration = {
     required: true
-    gt {}
+    gte {nanos: 1000000}
   }];
 }
