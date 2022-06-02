@@ -143,6 +143,30 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
       KEEP_UNCHANGED;
 }
 
+Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config,
+    Server::Configuration::FactoryContext& context) {
+
+  Http::HeaderValidatorFactoryPtr header_validator_factory;
+  if (config.has_typed_header_validation_config()) {
+    auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(
+        config.typed_header_validation_config());
+    if (!factory) {
+      throw EnvoyException(fmt::format("Header validator extension not found: '{}'",
+                                       config.typed_header_validation_config().name()));
+    }
+
+    header_validator_factory =
+        factory->createFromProto(config.typed_header_validation_config().typed_config(), context);
+    if (!header_validator_factory) {
+      throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
+                                       config.typed_header_validation_config().name()));
+    }
+  }
+  return header_validator_factory;
+}
+
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
@@ -341,7 +365,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       proxy_status_config_(config.has_proxy_status_config()
                                ? std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>(
                                      config.proxy_status_config())
-                               : nullptr) {
+                               : nullptr),
+      header_validator_factory_(createHeaderValidatorFactory(config, context)) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -700,7 +725,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction());
+        headersWithUnderscoresAction(), header_validator_factory_.get());
   }
   case CodecType::HTTP2: {
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
@@ -723,7 +748,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
+        header_validator_factory_);
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

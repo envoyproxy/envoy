@@ -342,6 +342,7 @@ FakeHttpConnection::FakeHttpConnection(
         headers_with_underscores_action)
     : FakeConnectionBase(shared_connection, time_system), type_(type) {
   ASSERT(max_request_headers_count != 0);
+  // TODO(yanavlasov): fake upstreams use the default header validator
   if (type == Http::CodecType::HTTP1) {
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
@@ -349,7 +350,7 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
     codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, nullptr);
   } else if (type == Http::CodecType::HTTP2) {
     envoy::config::core::v3::Http2ProtocolOptions http2_options = fake_upstream.http2Options();
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();

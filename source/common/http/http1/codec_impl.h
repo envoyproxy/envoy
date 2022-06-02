@@ -10,6 +10,7 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/buffer/watermark_buffer.h"
@@ -253,7 +254,8 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
-                 MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count);
+                 MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 Http::HeaderValidatorFactory* header_validator_factory);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -273,6 +275,10 @@ protected:
    * @return A codecProtocolError status if headers exceed the size limit.
    */
   Status checkMaxHeadersSize();
+
+  virtual Status checkHeaderEntry(const HeaderString& key, const HeaderString& value) PURE;
+  Status checkHeaderEntryAndSendError(const HeaderString& key, const HeaderString& value,
+                                      absl::string_view error_details);
 
   Network::Connection& connection_;
   CodecStats& stats_;
@@ -294,6 +300,7 @@ protected:
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
   StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
+  Http::HeaderValidatorFactory* const header_validator_factory_{};
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -399,7 +406,9 @@ private:
   /**
    * Send a protocol error response to remote.
    */
-  virtual Status sendProtocolError(absl::string_view details) PURE;
+  virtual Status sendProtocolError(
+      absl::string_view details,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers = nullptr) PURE;
 
   /**
    * Called when output_buffer_ or the underlying connection go from below a low watermark to over
@@ -444,7 +453,8 @@ public:
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                           headers_with_underscores_action);
+                           headers_with_underscores_action,
+                       Http::HeaderValidatorFactory* header_validator_factory);
   bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
 
 protected:
@@ -462,12 +472,14 @@ protected:
     RequestDecoder* request_decoder_{};
     ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
+    Http::HeaderValidatorPtr header_validator_;
   };
   ActiveRequest* activeRequest() { return active_request_.get(); }
   // ConnectionImpl
   CallbackResult onMessageCompleteBase() override;
   // Add the size of the request_url to the reported header size when processing request headers.
   uint32_t getHeadersSize() override;
+  Status checkHeaderEntry(const HeaderString& key, const HeaderString& value) override;
 
 private:
   /**
@@ -502,7 +514,9 @@ private:
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
   void onResetStream(StreamResetReason reason) override;
-  Status sendProtocolError(absl::string_view details) override;
+  Status sendProtocolError(
+      absl::string_view details,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers = nullptr) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
   HeaderMap& headersOrTrailers() override {
@@ -535,6 +549,8 @@ private:
 
   Status doFloodProtectionChecks() const;
   Status checkHeaderNameForUnderscores() override;
+  Http::HeaderValidatorPtr makeHeaderValidator();
+  Status checkHeaderMapAndHandleError(RequestHeaderMap& header_map);
 
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
@@ -599,7 +615,9 @@ private:
   void onBody(Buffer::Instance& data) override;
   CallbackResult onMessageCompleteBase() override;
   void onResetStream(StreamResetReason reason) override;
-  Status sendProtocolError(absl::string_view details) override;
+  Status sendProtocolError(
+      absl::string_view details,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers = nullptr) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
   HeaderMap& headersOrTrailers() override {
@@ -626,6 +644,7 @@ private:
     }
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
+  Status checkHeaderEntry(const HeaderString& key, const HeaderString& value) override;
 
   // Buffer used to encode the HTTP message before moving it to the network connection's output
   // buffer. This buffer is always allocated, never nullptr.

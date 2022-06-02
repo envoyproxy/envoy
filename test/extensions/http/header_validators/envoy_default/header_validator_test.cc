@@ -49,7 +49,7 @@ protected:
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  ::Envoy::Http::HeaderValidatorFactorySharedPtr uhv_factory_;
+  ::Envoy::Http::HeaderValidatorFactoryPtr uhv_factory_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 

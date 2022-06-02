@@ -23,6 +23,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 

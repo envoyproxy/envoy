@@ -40,6 +40,7 @@ envoy_cc_library(
         "//envoy/common:scope_tracker_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",

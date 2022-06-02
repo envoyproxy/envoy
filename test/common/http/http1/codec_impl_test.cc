@@ -18,6 +18,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
@@ -83,7 +84,7 @@ public:
   void initialize() {
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, headers_with_underscores_action_);
+        max_request_headers_count_, headers_with_underscores_action_, uhv_factory_);
   }
 
   ~Http1ServerConnectionImplTest() override {
@@ -137,11 +138,37 @@ public:
     response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "200"}}, true);
   }
 
+  void runUhvTest(absl::string_view request, [[maybe_unused]] absl::string_view error_details,
+                  [[maybe_unused]] absl::string_view status_message,
+                  [[maybe_unused]] Code expected_status = Code::BadRequest) {
+    StreamInfo::MockStreamInfo stream_info;
+    MockRequestDecoder decoder;
+    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+#ifdef ENVOY_ENABLE_UHV
+    EXPECT_CALL(decoder, streamInfo()).WillOnce(ReturnRef(stream_info));
+    EXPECT_CALL(stream_info, setResponseCodeDetails("http1.response_code"));
+    EXPECT_CALL(decoder, sendLocalReply(expected_status, _, _, _, error_details));
+#else
+    EXPECT_CALL(decoder, decodeHeaders_(_, true));
+#endif
+
+    Buffer::OwnedImpl buffer(request);
+    auto status = codec_->dispatch(buffer);
+
+#ifdef ENVOY_ENABLE_UHV
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_EQ(status.message(), status_message);
+#else
+    EXPECT_TRUE(status.ok());
+#endif
+  }
+
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
+  Http::HeaderValidatorFactory* uhv_factory_ = nullptr;
 };
 
 void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
@@ -152,7 +179,7 @@ void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
   codec_settings_.allow_absolute_url_ = true;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW, nullptr);
 
   MockRequestDecoder decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
@@ -180,7 +207,7 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW, nullptr);
   }
 
   MockRequestDecoder decoder;
@@ -201,7 +228,7 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
     codec_settings_.enable_trailers_ = enable_trailers;
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW, nullptr);
   }
 
   InSequence sequence;
@@ -238,7 +265,7 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   codec_settings_.enable_trailers_ = enable_trailers;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW, nullptr);
   std::string exception_reason;
   NiceMock<MockRequestDecoder> decoder;
   EXPECT_CALL(callbacks_, newStream(_, _))
@@ -322,7 +349,7 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW, nullptr);
 
   MockRequestDecoder decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
@@ -707,7 +734,7 @@ TEST_F(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfTrue) {
   codec_settings_.stream_error_on_invalid_http_message_ = true;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW, nullptr);
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   NiceMock<MockRequestDecoder> decoder;
@@ -726,7 +753,7 @@ TEST_F(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfFalse) {
   codec_settings_.stream_error_on_invalid_http_message_ = false;
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW, nullptr);
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   NiceMock<MockRequestDecoder> decoder;
@@ -3476,6 +3503,207 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAlloc
 
   // Check contents for corresponding downstream request
   EXPECT_THAT(ostream.contents(), testing::HasSubstr("Dumping corresponding downstream request:"));
+}
+
+namespace {
+
+class CustomHeaderValidator : public Http::HeaderValidator {
+public:
+  CustomHeaderValidator(StreamInfo::StreamInfo& stream_info,
+                        HeaderEntryValidationResult request_header_entry_result,
+                        HeaderEntryValidationResult response_header_entry_result,
+                        RequestHeaderMapValidationResult request_headers_result,
+                        ResponseHeaderMapValidationResult response_headers_result,
+                        absl::string_view bad_key, absl::string_view reason)
+      : stream_info_(stream_info), request_header_entry_result_(request_header_entry_result),
+        response_header_entry_result_(response_header_entry_result),
+        request_headers_result_(request_headers_result),
+        response_headers_result_(response_headers_result), bad_key_(bad_key), reason_(reason) {}
+
+  HeaderEntryValidationResult
+  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                             const ::Envoy::Http::HeaderString&) override {
+    if (bad_key_.empty() || key == bad_key_) {
+      if (request_header_entry_result_ != HeaderEntryValidationResult::Accept) {
+        stream_info_.setResponseCodeDetails("http1.response_code");
+      }
+      return request_header_entry_result_;
+    }
+    return HeaderEntryValidationResult::Accept;
+  }
+
+  HeaderEntryValidationResult
+  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                              const ::Envoy::Http::HeaderString&) override {
+    if (bad_key_.empty() || key == bad_key_) {
+      if (response_header_entry_result_ != HeaderEntryValidationResult::Accept) {
+        stream_info_.setResponseCodeDetails("http1.response_code");
+      }
+      return response_header_entry_result_;
+    }
+    return HeaderEntryValidationResult::Accept;
+  }
+
+  RequestHeaderMapValidationResult
+  validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap&) override {
+    if (request_headers_result_ != RequestHeaderMapValidationResult::Accept) {
+      stream_info_.setResponseCodeDetails("http1.response_code");
+    }
+    return request_headers_result_;
+  }
+
+  ResponseHeaderMapValidationResult
+  validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap&) override {
+    if (response_headers_result_ != ResponseHeaderMapValidationResult::Accept) {
+      stream_info_.setResponseCodeDetails("http1.response_code");
+    }
+    return response_headers_result_;
+  }
+
+private:
+  StreamInfo::StreamInfo& stream_info_;
+  HeaderEntryValidationResult request_header_entry_result_ =
+      Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+  HeaderEntryValidationResult response_header_entry_result_ =
+      Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+  RequestHeaderMapValidationResult request_headers_result_ =
+      Http::HeaderValidator::RequestHeaderMapValidationResult::Accept;
+  ResponseHeaderMapValidationResult response_headers_result_ =
+      Http::HeaderValidator::ResponseHeaderMapValidationResult::Accept;
+  std::string bad_key_;
+  std::string reason_;
+};
+
+class CustomHeaderValidatorFactory : public Http::HeaderValidatorFactory {
+public:
+  CustomHeaderValidatorFactory() {}
+
+  ::Envoy::Http::HeaderValidatorPtr create(::Envoy::Http::HeaderValidatorFactory::Protocol,
+                                           StreamInfo::StreamInfo& stream_info) override {
+    return std::make_unique<CustomHeaderValidator>(
+        stream_info, request_header_entry_result_, response_header_entry_result_,
+        request_headers_result_, response_headers_result_, bad_key_, reason_);
+  }
+
+  Http::HeaderValidator::HeaderEntryValidationResult request_header_entry_result_ =
+      Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+  Http::HeaderValidator::HeaderEntryValidationResult response_header_entry_result_ =
+      Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+  Http::HeaderValidator::RequestHeaderMapValidationResult request_headers_result_ =
+      Http::HeaderValidator::RequestHeaderMapValidationResult::Accept;
+  Http::HeaderValidator::ResponseHeaderMapValidationResult response_headers_result_ =
+      Http::HeaderValidator::ResponseHeaderMapValidationResult::Accept;
+  std::string bad_key_;
+  std::string reason_;
+};
+
+} // namespace
+TEST_F(Http1ServerConnectionImplTest, HeaderValidatorBadHeader) {
+  CustomHeaderValidatorFactory factory;
+  factory.request_header_entry_result_ = Http::HeaderValidator::HeaderEntryValidationResult::Reject;
+  uhv_factory_ = &factory;
+  initialize();
+
+  runUhvTest("GET / HTTP/1.1\r\nHost: foo.com\r\n\r\n", "http1.invalid_header",
+             "http/1.1 protocol error: invalid header Host");
+}
+
+// Validate adding pseudo header :path from the H/1 request line
+TEST_F(Http1ServerConnectionImplTest, HeaderValidatorBadPath) {
+  CustomHeaderValidatorFactory factory;
+  factory.request_header_entry_result_ = Http::HeaderValidator::HeaderEntryValidationResult::Reject;
+  factory.bad_key_ = ":path";
+  uhv_factory_ = &factory;
+  initialize();
+
+  runUhvTest("GET / HTTP/1.1\r\nHost: foo.com\r\n\r\n", "http1.invalid_path",
+             "http/1.1 protocol error: invalid header :path");
+}
+
+// Validate adding pseudo header :path from the H/1 request line
+TEST_F(Http1ServerConnectionImplTest, HeaderValidatorBadBadPathInAbsoluteURLWhenNotAllowed) {
+  CustomHeaderValidatorFactory factory;
+  factory.request_header_entry_result_ = Http::HeaderValidator::HeaderEntryValidationResult::Reject;
+  factory.bad_key_ = ":path";
+  uhv_factory_ = &factory;
+  codec_settings_.allow_absolute_url_ = false;
+  initialize();
+
+  runUhvTest("GET https://foo.com/a/b HTTP/1.1\r\nHost: foo.com\r\n\r\n", "http1.invalid_path",
+             "http/1.1 protocol error: invalid header :path");
+}
+
+// Validate adding pseudo header :path from the H/1 request line
+TEST_F(Http1ServerConnectionImplTest, HeaderValidatorBadPathInAbsoluteURL) {
+  CustomHeaderValidatorFactory factory;
+  factory.request_header_entry_result_ = Http::HeaderValidator::HeaderEntryValidationResult::Reject;
+  factory.bad_key_ = ":path";
+  uhv_factory_ = &factory;
+  codec_settings_.allow_absolute_url_ = true;
+  initialize();
+
+  runUhvTest("GET https://foo.com/a/b?blah HTTP/1.1\r\nHost: foo.com\r\n\r\n", "http1.invalid_path",
+             "http/1.1 protocol error: invalid header :path");
+}
+
+// Validate modifying header :authority from the absolute URL in H/1 request line
+TEST_F(Http1ServerConnectionImplTest, HeaderValidatorBadHostInAbsoluteURL) {
+  CustomHeaderValidatorFactory factory;
+  factory.request_header_entry_result_ = Http::HeaderValidator::HeaderEntryValidationResult::Reject;
+  factory.bad_key_ = ":authority";
+  uhv_factory_ = &factory;
+  codec_settings_.allow_absolute_url_ = true;
+  initialize();
+
+  runUhvTest("GET https://foo.com/a/b?blah HTTP/1.1\r\nHost: foo.com\r\n\r\n", "http1.invalid_host",
+             "http/1.1 protocol error: invalid header :authority");
+}
+
+// Validate modifying header :scheme from the absolute URL in H/1 request line
+TEST_F(Http1ServerConnectionImplTest, HeaderValidatorBadSchemeInAbsoluteURL) {
+  CustomHeaderValidatorFactory factory;
+  factory.request_header_entry_result_ = Http::HeaderValidator::HeaderEntryValidationResult::Reject;
+  factory.bad_key_ = ":scheme";
+  uhv_factory_ = &factory;
+  codec_settings_.allow_absolute_url_ = true;
+  initialize();
+
+  runUhvTest("GET https://foo.com/a/b?blah HTTP/1.1\r\nHost: foo.com\r\n\r\n",
+             "http1.invalid_scheme", "http/1.1 protocol error: invalid header :scheme");
+}
+
+// Validate modifying header :scheme from the absolute URL in H/1 request line
+TEST_F(Http1ServerConnectionImplTest, HeaderValidatorBadMethodInAbsoluteURL) {
+  CustomHeaderValidatorFactory factory;
+  factory.request_header_entry_result_ = Http::HeaderValidator::HeaderEntryValidationResult::Reject;
+  factory.bad_key_ = ":method";
+  uhv_factory_ = &factory;
+  codec_settings_.allow_absolute_url_ = true;
+  initialize();
+
+  runUhvTest("GET https://foo.com/a/b?blah HTTP/1.1\r\nHost: foo.com\r\n\r\n",
+             "http1.invalid_method", "http/1.1 protocol error: invalid header :method");
+}
+
+TEST_F(Http1ServerConnectionImplTest, HeaderMapRejected) {
+  CustomHeaderValidatorFactory factory;
+  factory.request_headers_result_ = Http::HeaderValidator::RequestHeaderMapValidationResult::Reject;
+  uhv_factory_ = &factory;
+  initialize();
+
+  runUhvTest("GET /a/b?blah HTTP/1.1\r\nHost: foo.com\r\n\r\n", "http1.invalid_headers",
+             "http/1.1 protocol error: invalid header map");
+}
+
+TEST_F(Http1ServerConnectionImplTest, HeaderMapRedirected) {
+  CustomHeaderValidatorFactory factory;
+  factory.request_headers_result_ =
+      Http::HeaderValidator::RequestHeaderMapValidationResult::Redirect;
+  uhv_factory_ = &factory;
+  initialize();
+
+  runUhvTest("GET /a/b?blah HTTP/1.1\r\nHost: foo.com\r\n\r\n", "http1.invalid_headers",
+             "http/1.1 protocol error: invalid header map", Code::TemporaryRedirect);
 }
 
 } // namespace Http

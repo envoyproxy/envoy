@@ -601,6 +601,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         client_http1settings, max_response_headers_count);
   }
 
+  // TODO(yanavlasov): make fuzz tests codecs use the default header validator.
   if (http2) {
     const envoy::config::core::v3::Http2ProtocolOptions server_http2_options{
         fromHttp2Settings(input.h2_settings().server())};
@@ -613,7 +614,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     server = std::make_unique<Http1::ServerConnectionImpl>(
         server_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store), server_callbacks,
         server_http1settings, max_request_headers_kb, max_request_headers_count,
-        headers_with_underscores_action);
+        headers_with_underscores_action, nullptr);
   }
 
   // We track whether the connection should be closed for HTTP/1, since stream resets imply

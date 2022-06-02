@@ -49,6 +49,12 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view ChunkedContentLength = "http1.content_length_and_chunked_not_allowed";
   const absl::string_view HttpsInPlaintext = "http1.https_url_on_plaintext_connection";
   const absl::string_view InvalidScheme = "http1.invalid_scheme";
+  const absl::string_view InvalidHost = "http1.invalid_host";
+  const absl::string_view InvalidPath = "http1.invalid_path";
+  const absl::string_view InvalidMethod = "http1.invalid_method";
+  const absl::string_view InvalidStatus = "http1.invalid_status";
+  const absl::string_view InvalidHeader = "http1.invalid_header";
+  const absl::string_view InvalidHeaders = "http1.invalid_headers";
 };
 
 struct Http1HeaderTypesValues {
@@ -494,11 +500,13 @@ ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<CallbackResult>&& st
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                const Http1Settings& settings, MessageType type,
-                               uint32_t max_headers_kb, const uint32_t max_headers_count)
+                               uint32_t max_headers_kb, const uint32_t max_headers_count,
+                               Http::HeaderValidatorFactory* header_validator_factory)
     : connection_(connection), stats_(stats), codec_settings_(settings),
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
-      deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
+      deferred_end_stream_headers_(false), dispatching_(false),
+      header_validator_factory_(header_validator_factory), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count) {
   parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
 }
@@ -507,6 +515,9 @@ Status ConnectionImpl::completeLastHeader() {
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
+
+  RETURN_IF_ERROR(checkHeaderEntryAndSendError(current_header_field_, current_header_value_,
+                                               Http1ResponseCodeDetails::get().InvalidHeader));
   auto& headers_or_trailers = headersOrTrailers();
 
   // Account for ":" and "\r\n" bytes between the header key value pair.
@@ -923,6 +934,20 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
+Status
+ConnectionImpl::checkHeaderEntryAndSendError([[maybe_unused]] const HeaderString& key,
+                                             [[maybe_unused]] const HeaderString& value,
+                                             [[maybe_unused]] absl::string_view error_details) {
+  absl::Status status;
+#ifdef ENVOY_ENABLE_UHV
+  status = checkHeaderEntry(key, value);
+  if (!status.ok()) {
+    RETURN_IF_ERROR(sendProtocolError(error_details));
+  }
+#endif
+  return status;
+}
+
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
@@ -1001,9 +1026,10 @@ ServerConnectionImpl::ServerConnectionImpl(
     const Http1Settings& settings, uint32_t max_request_headers_kb,
     const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    Http::HeaderValidatorFactory* header_validator_factory)
     : ConnectionImpl(connection, stats, settings, MessageType::Request, max_request_headers_kb,
-                     max_request_headers_count),
+                     max_request_headers_count, header_validator_factory),
       callbacks_(callbacks),
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
@@ -1047,6 +1073,8 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
       (active_request_->request_url_.getStringView()[0] == '/' ||
        (method == header_values.MethodValues.Options &&
         active_request_->request_url_.getStringView()[0] == '*'))) {
+    RETURN_IF_ERROR(checkHeaderEntryAndSendError(path, active_request_->request_url_,
+                                                 Http1ResponseCodeDetails::get().InvalidPath));
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return okStatus();
   }
@@ -1056,6 +1084,8 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // CONNECT "urls" are actually host:port so look like absolute URLs to the above checks.
   // Absolute URLS in CONNECT requests will be rejected below by the URL class validation.
   if (!codec_settings_.allow_absolute_url_ && !is_connect) {
+    RETURN_IF_ERROR(checkHeaderEntryAndSendError(path, active_request_->request_url_,
+                                                 Http1ResponseCodeDetails::get().InvalidPath));
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return okStatus();
   }
@@ -1072,10 +1102,16 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // request-target. A proxy that forwards such a request MUST generate a
   // new Host field-value based on the received request-target rather than
   // forward the received Host field-value.
+  RETURN_IF_ERROR(checkHeaderEntryAndSendError(Http::HeaderString(header_values.Host),
+                                               Http::HeaderString(absolute_url.hostAndPort()),
+                                               Http1ResponseCodeDetails::get().InvalidHost));
   headers.setHost(absolute_url.hostAndPort());
   // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
   if (!is_connect) {
+    RETURN_IF_ERROR(checkHeaderEntryAndSendError(Http::HeaderString(header_values.Scheme),
+                                                 Http::HeaderString(absolute_url.scheme()),
+                                                 Http1ResponseCodeDetails::get().InvalidScheme));
     headers.setScheme(absolute_url.scheme());
     if (!HeaderUtility::schemeIsValid(absolute_url.scheme())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
@@ -1090,6 +1126,9 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   }
 
   if (!absolute_url.pathAndQueryParams().empty()) {
+    RETURN_IF_ERROR(
+        checkHeaderEntryAndSendError(path, Http::HeaderString(absolute_url.pathAndQueryParams()),
+                                     Http1ResponseCodeDetails::get().InvalidPath));
     headers.setPath(absolute_url.pathAndQueryParams());
   }
   active_request_->request_url_.clear();
@@ -1128,8 +1167,12 @@ Envoy::StatusOr<CallbackResult> ServerConnectionImpl::onHeadersCompleteBase() {
     RETURN_IF_ERROR(handlePath(*headers, parser_->methodName()));
     ASSERT(active_request_->request_url_.empty());
 
+    RETURN_IF_ERROR(checkHeaderEntryAndSendError(Http::HeaderString(header_values.Method),
+                                                 Http::HeaderString(parser_->methodName()),
+                                                 Http1ResponseCodeDetails::get().InvalidMethod));
     headers->setMethod(parser_->methodName());
 
+    RETURN_IF_ERROR(checkHeaderMapAndHandleError(*headers));
     // Make sure the host is valid.
     auto details = HeaderUtility::requestHeadersValid(*headers);
     if (details.has_value()) {
@@ -1170,6 +1213,7 @@ Status ServerConnectionImpl::onMessageBeginBase() {
       return codecClientError("cannot create new streams after calling reset");
     }
     active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
+    active_request_->header_validator_ = makeHeaderValidator();
 
     // Check for pipelined request flood as we prepare to accept a new request.
     // Parse errors that happen prior to onMessageBegin result in stream termination, it is not
@@ -1261,7 +1305,9 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   }
 }
 
-Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
+Status ServerConnectionImpl::sendProtocolError(
+    absl::string_view details,
+    const std::function<void(ResponseHeaderMap& headers)>& modify_headers) {
   // We do this here because we may get a protocol error before we have a logical stream.
   if (active_request_ == nullptr) {
     RETURN_IF_ERROR(onMessageBeginImpl());
@@ -1271,7 +1317,7 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
   active_request_->response_encoder_.setDetails(details);
   if (!active_request_->response_encoder_.startedResponse()) {
     active_request_->request_decoder_->sendLocalReply(
-        error_code_, CodeUtility::toString(error_code_), nullptr, absl::nullopt, details);
+        error_code_, CodeUtility::toString(error_code_), modify_headers, absl::nullopt, details);
   }
   return okStatus();
 }
@@ -1323,11 +1369,66 @@ void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent
   os << DUMP_MEMBER(response_encoder_.local_end_stream_);
 }
 
+Http::HeaderValidatorPtr ServerConnectionImpl::makeHeaderValidator() {
+  Http::HeaderValidatorPtr validator;
+#ifdef ENVOY_ENABLE_UHV
+  if (header_validator_factory_) {
+    validator = header_validator_factory_->create(Http::HeaderValidatorFactory::Protocol::HTTP1,
+                                                  active_request_->request_decoder_->streamInfo());
+  }
+#endif
+  return validator;
+}
+
+Http::Status ServerConnectionImpl::checkHeaderEntry([[maybe_unused]] const HeaderString& key,
+                                                    [[maybe_unused]] const HeaderString& value) {
+  Http::Status result;
+#ifdef ENVOY_ENABLE_UHV
+  if (active_request_->header_validator_) {
+    auto validation_result =
+        active_request_->header_validator_->validateRequestHeaderEntry(key, value);
+    if (validation_result == Http::HeaderValidator::HeaderEntryValidationResult::Reject) {
+      result = codecProtocolError(
+          absl::StrCat("http/1.1 protocol error: invalid header ", key.getStringView()));
+    }
+  }
+#endif
+  return result;
+}
+
+Http::Status
+ServerConnectionImpl::checkHeaderMapAndHandleError([[maybe_unused]] RequestHeaderMap& header_map) {
+  Http::Status result;
+#ifdef ENVOY_ENABLE_UHV
+  if (active_request_->header_validator_) {
+    auto validation_result =
+        active_request_->header_validator_->validateRequestHeaderMap(header_map);
+    if (validation_result == Http::HeaderValidator::RequestHeaderMapValidationResult::Reject ||
+        validation_result == Http::HeaderValidator::RequestHeaderMapValidationResult::Redirect) {
+      result = codecProtocolError("http/1.1 protocol error: invalid header map");
+      std::function<void(ResponseHeaderMap & headers)> modify_headers;
+      if (validation_result == Http::HeaderValidator::RequestHeaderMapValidationResult::Redirect &&
+          !Grpc::Common::hasGrpcContentType(header_map)) {
+        error_code_ = Code::TemporaryRedirect;
+        modify_headers = [new_path = header_map.Path()->value().getStringView()](
+                             Http::ResponseHeaderMap& response_headers) -> void {
+          response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
+        };
+      }
+      RETURN_IF_ERROR(
+          sendProtocolError(Http1ResponseCodeDetails::get().InvalidHeaders, modify_headers));
+    }
+  }
+#endif
+  return result;
+}
+
+// TODO(yanavlasov): plumbing of header validator into client codecs is in a follow up PR.
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, settings, MessageType::Response, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count),
+                     max_response_headers_count, nullptr),
       owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
@@ -1498,7 +1599,9 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   }
 }
 
-Status ClientConnectionImpl::sendProtocolError(absl::string_view details) {
+Status
+ClientConnectionImpl::sendProtocolError(absl::string_view details,
+                                        const std::function<void(ResponseHeaderMap& headers)>&) {
   if (pending_response_.has_value()) {
     ASSERT(!pending_response_done_);
     pending_response_.value().encoder_.setDetails(details);
@@ -1517,6 +1620,12 @@ void ClientConnectionImpl::onBelowLowWatermark() {
   if (pending_response_.has_value() && !pending_response_done_) {
     pending_response_.value().encoder_.runLowWatermarkCallbacks();
   }
+}
+
+Http::Status ClientConnectionImpl::checkHeaderEntry(const HeaderString&, const HeaderString&) {
+  Http::Status result;
+  // TODO(yanavlasov): to be implemented in a follow up PR
+  return result;
 }
 
 } // namespace Http1

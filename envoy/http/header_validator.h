@@ -72,14 +72,14 @@ public:
   virtual HeaderValidatorPtr create(Protocol protocol, StreamInfo::StreamInfo& stream_info) PURE;
 };
 
-using HeaderValidatorFactorySharedPtr = std::shared_ptr<HeaderValidatorFactory>;
+using HeaderValidatorFactoryPtr = std::unique_ptr<HeaderValidatorFactory>;
 
 /**
  * Extension configuration for header validators.
  */
 class HeaderValidatorFactoryConfig : public Config::TypedFactory {
 public:
-  virtual HeaderValidatorFactorySharedPtr
+  virtual HeaderValidatorFactoryPtr
   createFromProto(const Protobuf::Message& config,
                   Server::Configuration::FactoryContext& context) PURE;
 

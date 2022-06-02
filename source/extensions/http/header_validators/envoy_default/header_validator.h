@@ -33,6 +33,9 @@ public:
 
   ResponseHeaderMapValidationResult
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
+
+protected:
+  StreamInfo::StreamInfo& stream_info_;
 };
 
 class HeaderValidatorFactory : public ::Envoy::Http::HeaderValidatorFactory {

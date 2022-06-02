@@ -20,7 +20,8 @@ HeaderValidatorFactory::create(::Envoy::Http::HeaderValidatorFactory::Protocol p
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig&,
                                  ::Envoy::Http::HeaderValidatorFactory::Protocol,
-                                 StreamInfo::StreamInfo&) {}
+                                 StreamInfo::StreamInfo& stream_info)
+    : stream_info_(stream_info) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateRequestHeaderEntry(const HeaderString&, const HeaderString&) {
