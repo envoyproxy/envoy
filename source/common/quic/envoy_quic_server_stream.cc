@@ -70,6 +70,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   Buffer::RawSliceVector raw_slices = data.getRawSlices();
   absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
   quic_slices.reserve(raw_slices.size());
+  size_t payload_length = 0;
   for (auto& slice : raw_slices) {
     ASSERT(slice.len_ != 0);
     // Move each slice into a stand-alone buffer.
@@ -77,15 +78,17 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
     // If it turns out to be expensive, add a new function to free data in the middle in buffer
     // interface and re-design QuicheMemSliceImpl.
     quic_slices.emplace_back(quiche::QuicheMemSliceImpl(data, slice.len_));
+    payload_length += slice.len_;
   }
+  quic::QuicConsumedData result{0, false};
   absl::Span<quiche::QuicheMemSlice> span(quic_slices);
-  // QUIC stream must take all.
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
-    WriteBodySlices(span, end_stream);
+    result = WriteBodySlices(span, end_stream);
   }
-  if (data.length() > 0) {
-    // Send buffer didn't take all the data, threshold needs to be adjusted.
+  // QUIC stream must take all.
+  if (result.bytes_consumed != payload_length) {
+    ENVOY_STREAM_LOG(error, "Send buffer didn't take all the data. Stream is write {} with {} bytes in send buffer. The payload is {} bytes but only {} was consumed.", *this, write_side_closed() ? "closed" : "open", BufferedDataBytes(), payload_length, result.bytes_consumed);
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
