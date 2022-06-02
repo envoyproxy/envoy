@@ -373,9 +373,6 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
       return WasmResult::Ok;
     }
     return WasmResult::SerializationFailure;
-  case CelValue::Type::kNullType:
-    result->clear();
-    return WasmResult::Ok;
   case CelValue::Type::kMap: {
     const auto& map = *value.MapOrDie();
     const auto& keys = *map.ListKeys();
