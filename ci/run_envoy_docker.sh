@@ -54,6 +54,12 @@ fi
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR="${DEFAULT_ENVOY_DOCKER_BUILD_DIR}"
 # Replace backslash with forward slash for Windows style paths
 ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR//\\//}"
+# Check if ${ENVOY_DOCKER_BUILD_DIR} exists and own by current user
+OWNER_ENVOY_DOCKER_BUILD_DIR=$(stat -c "%U" ${ENVOY_DOCKER_BUILD_DIR})
+if [[ -d "${ENVOY_DOCKER_BUILD_DIR}" ]] && [[ $OWNER_ENVOY_DOCKER_BUILD_DIR != $USER ]]; then
+  echo "ERROR: ENVOY_DOCKER_BUILD_DIR:${ENVOY_DOCKER_BUILD_DIR} is required to own by current user."
+  exit 1
+fi
 mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 
 [[ -t 1 ]] && ENVOY_DOCKER_OPTIONS+=("-it")
