@@ -1563,13 +1563,15 @@ envoy_cc_fuzz_test(
     deps = [":h1_fuzz_lib"],
 )
 
-envoy_cc_fuzz_test(
-    name = "h1_capture_persistent_fuzz_test",
-    srcs = ["h1_capture_fuzz_test.cc"],
-    copts = ["-DPERSISTENT_FUZZER"],
-    corpus = "h1_corpus",
-    deps = [":h1_fuzz_persistent_lib"],
-)
+# TODO(#20382): Enable this test once the TSAN issues are sorted out.
+#
+# envoy_cc_fuzz_test(
+#    name = "h1_capture_persistent_fuzz_test",
+#    srcs = ["h1_capture_fuzz_test.cc"],
+#    copts = ["-DPERSISTENT_FUZZER"],
+#    corpus = "h1_corpus",
+#    deps = [":h1_fuzz_persistent_lib"],
+#)
 
 envoy_cc_fuzz_test(
     name = "h1_capture_direct_response_fuzz_test",
