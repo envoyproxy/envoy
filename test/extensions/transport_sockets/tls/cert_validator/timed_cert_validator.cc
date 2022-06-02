@@ -28,6 +28,7 @@ ValidationResults TimedCertValidator::doCustomVerifyCertChain(
     int len = i2d_X509(cert, &der);
     ASSERT(len > 0);
     cert_chain_in_str_.emplace_back(reinterpret_cast<char*>(der), len);
+    OPENSSL_free(der);
   }
   validation_timer_ =
       callback_->dispatcher().createTimer([&ssl_ctx, transport_socket_options, is_server, this]() {

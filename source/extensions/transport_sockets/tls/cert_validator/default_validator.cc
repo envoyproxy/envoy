@@ -315,10 +315,9 @@ ValidationResults DefaultCertValidator::doCustomVerifyCertChain(
           Envoy::Ssl::ClientValidationStatus::NotValidated);
     }
     stats_.fail_verify_error_.inc();
-    ValidationResults result{ValidationResults::ValidationStatus::Failed, absl::nullopt,
-                             "verify cert failed: empty cert chain"};
-    ENVOY_LOG(debug, result.error_details.value());
-    return result;
+    std::string error{"verify cert failed: empty cert chain"};
+    ENVOY_LOG(debug, error);
+    return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
   }
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
   ASSERT(leaf_cert);
@@ -344,10 +343,9 @@ ValidationResults DefaultCertValidator::doCustomVerifyCertChain(
             Envoy::Ssl::ClientValidationStatus::Failed);
       }
       stats_.fail_verify_error_.inc();
-      ValidationResults result{ValidationResults::ValidationStatus::Failed, absl::nullopt,
-                               "verify cert failed: init and setup X509_STORE_CTX"};
-      ENVOY_LOG(debug, result.error_details.value());
-      return result;
+      std::string error{"verify cert failed: init and setup X509_STORE_CTX"};
+      ENVOY_LOG(debug, error);
+      return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
     }
     int ret = X509_verify_cert(ctx.get());
     if (ssl_extended_info) {
@@ -358,15 +356,15 @@ ValidationResults DefaultCertValidator::doCustomVerifyCertChain(
 
     if (ret <= 0) {
       stats_.fail_verify_error_.inc();
-      ValidationResults result{
-          ValidationResults::ValidationStatus::Failed,
-          SSL_alert_from_verify_result(X509_STORE_CTX_get_error(ctx.get())),
-          absl::StrCat("verify cert failed: ", Utility::getX509VerificationErrorInfo(ctx.get()))};
-      ENVOY_LOG(debug, result.error_details.value());
-      return allow_untrusted_certificate_
-                 ? ValidationResults{ValidationResults::ValidationStatus::Successful, absl::nullopt,
-                                     absl::nullopt}
-                 : result;
+      const std::string error =
+          absl::StrCat("verify cert failed: ", Utility::getX509VerificationErrorInfo(ctx.get()));
+      ENVOY_LOG(debug, error);
+      if (allow_untrusted_certificate_) {
+        return ValidationResults{ValidationResults::ValidationStatus::Successful, absl::nullopt,
+                                 absl::nullopt};
+      }
+      return {ValidationResults::ValidationStatus::Failed,
+              SSL_alert_from_verify_result(X509_STORE_CTX_get_error(ctx.get())), error};
     }
   }
   std::string error_details;

@@ -232,9 +232,8 @@ ValidationResults SPIFFEValidator::doCustomVerifyCertChain(
           Envoy::Ssl::ClientValidationStatus::NotValidated);
     }
     stats_.fail_verify_error_.inc();
-    ValidationResults result{ValidationResults::ValidationStatus::Failed, absl::nullopt,
-                             "verify cert failed: empty cert chain"};
-    return result;
+    return {ValidationResults::ValidationStatus::Failed, absl::nullopt,
+            "verify cert failed: empty cert chain"};
   }
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
   std::string error_details;

@@ -479,6 +479,7 @@ enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* ou
     return ssl_verify_invalid;
   }
   }
+  PANIC("not reached");
 }
 
 ValidationResults
@@ -496,7 +497,9 @@ ContextImpl::customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_s
   }
   const char* name = nullptr;
   size_t name_len = 0;
+#ifndef BORINGSSL_FIPS
   SSL_get0_ech_name_override(ssl, &name, &name_len);
+#endif
   absl::string_view ech_name_override(name, name_len);
   ASSERT(cert_validator_);
   // Do not provide async callback here, but defer its creation to extended_socket_info if the

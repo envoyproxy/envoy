@@ -72,8 +72,10 @@ private:
 absl::string_view EnvoyQuicProofVerifyContextImpl::getEchNameOverrride() const {
   const char* name = nullptr;
   size_t name_len = 0;
+#ifndef BORINGSSL_FIPS
   SSL_get0_ech_name_override(ssl_info_.ssl(), &name, &name_len);
-  return absl::string_view(name, name_len);
+#endif
+  return {name, name_len};
 }
 
 quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
@@ -95,8 +97,8 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
 
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
-  for (size_t i = 0; i < certs.size(); i++) {
-    bssl::UniquePtr<X509> cert = parseDERCertificate(certs[i], error_details);
+  for (const auto& cert_str : certs) {
+    bssl::UniquePtr<X509> cert = parseDERCertificate(cert_str, error_details);
     if (!cert) {
       return quic::QUIC_FAILURE;
     }

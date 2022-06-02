@@ -347,10 +347,10 @@ void testUtil(const TestUtilOptions& options) {
   auto server_cfg =
       std::make_unique<ServerContextConfigImpl>(server_tls_context, server_factory_context);
   ContextManagerImpl manager(*time_system);
+  Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(options.version()));
   Network::MockTcpListenerCallbacks callbacks;
