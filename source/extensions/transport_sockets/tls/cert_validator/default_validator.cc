@@ -192,7 +192,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
   return verify_mode;
 }
 
-int DefaultCertValidator::doVerifyCertChain(
+int DefaultCertValidator::doSynchronousVerifyCertChain(
     X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
     const Network::TransportSocketOptions* transport_socket_options) {
   if (verify_trusted_ca_) {
@@ -239,11 +239,11 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
   // sure the verification for other validation context configurations doesn't fail (i.e. either
   // `NotValidated` or `Validated`). If `trusted_ca` doesn't exist, we will need to make sure
   // other configurations are verified and the verification succeed.
-  const bool validation_status = verify_trusted_ca_
-                                     ? validated != Envoy::Ssl::ClientValidationStatus::Failed
-                                     : validated == Envoy::Ssl::ClientValidationStatus::Validated;
+  const bool success = verify_trusted_ca_
+                           ? validated != Envoy::Ssl::ClientValidationStatus::Failed
+                           : validated == Envoy::Ssl::ClientValidationStatus::Validated;
 
-  return allow_untrusted_certificate_ || validation_status;
+  return (allow_untrusted_certificate_ || success) ? 1 : 0;
 }
 
 Envoy::Ssl::ClientValidationStatus

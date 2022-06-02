@@ -51,6 +51,8 @@ public:
     ON_CALL(client_context_config_, certificateValidationContext())
         .WillByDefault(Return(&cert_validation_ctx_config_));
     ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(verify_context_, transportSocketOptions())
+        .WillByDefault(ReturnRef(transport_socket_options_));
   }
 
   // Since this cert chain contains an expired cert, we can flip allow_expired_cert to test the code
@@ -101,6 +103,7 @@ protected:
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
   NiceMock<Ssl::MockContextManager> tls_context_manager_;
   Event::MockDispatcher dispatcher_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   NiceMock<MockProofVerifyContext> verify_context_;
 };
 

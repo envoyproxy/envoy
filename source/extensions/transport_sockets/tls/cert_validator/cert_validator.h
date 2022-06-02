@@ -60,10 +60,9 @@ public:
    * @param leaf_cert the peer certificate to verify
    * @return 1 to indicate verification success and 0 to indicate verification failure.
    */
-  virtual int
-  doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                    X509& leaf_cert,
-                    const Network::TransportSocketOptions* transport_socket_options) PURE;
+  virtual int doSynchronousVerifyCertChain(
+      X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
+      const Network::TransportSocketOptions* transport_socket_options) PURE;
 
   /**
    * Called by customVerifyCallback to do the actual cert chain verification which could be

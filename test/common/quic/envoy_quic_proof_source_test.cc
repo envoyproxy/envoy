@@ -71,6 +71,7 @@ public:
     ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
         store_, client_context_config_, time_system_);
+    ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
     ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   }

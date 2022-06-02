@@ -69,13 +69,6 @@ private:
 
 } // namespace
 
-absl::string_view EnvoyQuicProofVerifyContextImpl::getEchNameOverrride() const {
-  const char* name = nullptr;
-  size_t name_len = 0;
-  SSL_get0_ech_name_override(ssl_info_.ssl(), &name, &name_len);
-  return {name, name_len};
-}
-
 quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const std::string& hostname, const uint16_t port, const std::vector<std::string>& certs,
     const std::string& ocsp_response, const std::string& cert_sct,
@@ -84,6 +77,13 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     std::unique_ptr<quic::ProofVerifierCallback> callback) {
   ASSERT(details != nullptr);
   ASSERT(!certs.empty());
+  auto* verify_context = dynamic_cast<const EnvoyQuicProofVerifyContext*>(context);
+  if (verify_context == nullptr) {
+    IS_ENVOY_BUG("QUIC proof verify context was not setup correctly.");
+    return quic::QUIC_FAILURE;
+  }
+  ENVOY_BUG(!verify_context->isServer(), "Client certificates are not supported in QUIC yet.");
+
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     if (doVerifyCertChain(hostname, port, certs, ocsp_response, cert_sct, context, error_details,
                           out_alert, std::move(callback))) {
@@ -110,11 +110,6 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     return quic::QUIC_FAILURE;
   }
 
-  auto* verify_context = dynamic_cast<const EnvoyQuicProofVerifyContext*>(context);
-  if (verify_context == nullptr) {
-    ENVOY_BUG(false, "QUIC proof verify context was not setup correctly.");
-    return quic::QUIC_FAILURE;
-  }
   auto* envoy_callback =
       new QuicValidateResultCallback(verify_context->dispatcher(), std::move(callback), hostname);
   // We down cast rather than add verifyCertChain to Envoy::Ssl::Context because

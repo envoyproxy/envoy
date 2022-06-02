@@ -141,9 +141,10 @@ int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
   return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 }
 
-int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
-                                       Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                                       X509& leaf_cert, const Network::TransportSocketOptions*) {
+int SPIFFEValidator::doSynchronousVerifyCertChain(X509_STORE_CTX* store_ctx,
+                                                  Ssl::SslExtendedSocketInfo* ssl_extended_info,
+                                                  X509& leaf_cert,
+                                                  const Network::TransportSocketOptions*) {
   STACK_OF(X509)* cert_chain = X509_STORE_CTX_get0_untrusted(store_ctx);
   X509_VERIFY_PARAM* verify_param = X509_STORE_CTX_get0_param(store_ctx);
   return verifyCertChainUsingTrustBundleStore(ssl_extended_info, leaf_cert, cert_chain,
