@@ -24,5 +24,19 @@ public:
 
 using CompiledMatcherPtr = std::unique_ptr<const CompiledMatcher>;
 
+/**
+ * A regular expression engine which turns regular expressions into compiled matchers.
+ */
+class Engine {
+public:
+  virtual ~Engine() = default;
+
+  /**
+   * Create a @ref CompiledMatcher with the given regex expression.
+   * @param regex the regex expression match string
+   */
+  virtual CompiledMatcherPtr matcher(const std::string& regex) const PURE;
+};
+
 } // namespace Regex
 } // namespace Envoy

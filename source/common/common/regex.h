@@ -7,6 +7,7 @@
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/regex_engine.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/symbol_table.h"
 
@@ -19,6 +20,9 @@ namespace Regex {
 class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
   explicit CompiledGoogleReMatcher(const std::string& regex, bool do_program_size_check);
+
+  explicit CompiledGoogleReMatcher(const std::string& regex,
+                                   absl::optional<uint32_t> max_program_size);
 
   explicit CompiledGoogleReMatcher(const xds::type::matcher::v3::RegexMatcher& config)
       : CompiledGoogleReMatcher(config.regex(), false) {}
@@ -41,6 +45,25 @@ public:
 private:
   const re2::RE2 regex_;
 };
+
+class GoogleReEngine : public EngineBase {
+public:
+  CompiledMatcherPtr matcher(const std::string& regex) const override;
+
+  // Server::Configuration::BootstrapExtensionFactory
+  Server::BootstrapExtensionPtr
+  createBootstrapExtension(const Protobuf::Message& config,
+                           Server::Configuration::ServerFactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+  std::string name() const override { return "envoy.regex_engine.google_re2"; };
+
+private:
+  absl::optional<uint32_t> max_program_size_{};
+};
+
+DECLARE_FACTORY(GoogleReEngine);
+
 enum class Type { Re2, StdRegex };
 
 /**
@@ -63,9 +86,12 @@ public:
    */
   template <class RegexMatcherType>
   static CompiledMatcherPtr parseRegex(const RegexMatcherType& matcher) {
-    // Google Re is the only currently supported engine.
-    ASSERT(matcher.has_google_re2());
-    return std::make_unique<CompiledGoogleReMatcher>(matcher);
+    // Fallback deprecated engine type in regex matcher.
+    if (matcher.has_google_re2()) {
+      return std::make_unique<CompiledGoogleReMatcher>(matcher);
+    }
+
+    return EngineSingleton::get().matcher(matcher.regex());
   }
 };
 

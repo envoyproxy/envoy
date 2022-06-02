@@ -584,6 +584,15 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     }
   }
 
+  if (!bootstrap_.default_regex_engine().empty()) {
+    auto& engine_name = bootstrap_.default_regex_engine();
+    auto engine = const_cast<Regex::Engine*>(Regex::engine(engine_name));
+    if (engine != nullptr) {
+      Regex::EngineSingleton::clear();
+      Regex::EngineSingleton::initialize(engine);
+    }
+  }
+
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
       std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_,
