@@ -119,7 +119,9 @@ configuration enables rate limit quota filter with 3 buckets. Note that bucket I
                 string_value: "default-rate-limit-quota"
           reporting_interval: 60s
           deny_response_settings:
-            http_status_code: 429
+            deny_response_http:
+              http_status:
+                code: TooManyRequests
           no_assignment_behavior:
             blanket_rule: ALLOW_ALL
           expired_assignment_behavior:
@@ -146,7 +148,7 @@ Statistics
 
 The rate limit filter outputs statistics in the *cluster.<route target cluster>.rate_limit_quota.* namespace.
 429 responses or the configured
-:ref:`rate limited status <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings.http_status>`
+:ref:`rate limited status <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings.DenyResponseHttp.http_status>`
 are emitted to the normal cluster :ref:`dynamic HTTP statistics <config_cluster_manager_cluster_stats_dynamic_http>`.
 
 .. csv-table::
