@@ -31,24 +31,13 @@ public:
   // Return flag value.
   T value() const {
     absl::MutexLock lock(&mutex_);
-    if (has_reloaded_value_) {
-      return reloaded_value_;
-    }
     return value_;
-  }
-
-  void setReloadedValue(T value) {
-    absl::MutexLock lock(&mutex_);
-    has_reloaded_value_ = true;
-    reloaded_value_ = value;
   }
 
 private:
   mutable absl::Mutex mutex_;
   T value_ ABSL_GUARDED_BY(mutex_);
   const T default_value_;
-  bool has_reloaded_value_ ABSL_GUARDED_BY(mutex_) = false;
-  T reloaded_value_ ABSL_GUARDED_BY(mutex_);
 };
 
 using ReloadableFlag = TypedFlag<bool>;

@@ -71,7 +71,7 @@ void FlagRegistry::updateReloadableFlags(
   for (auto& [flag_name, flag] : reloadable_flags_) {
     const auto it = quiche_flags_override.find(flag_name);
     if (it != quiche_flags_override.end()) {
-      flag->setReloadedValue(it->second);
+      flag->setValue(it->second);
     }
   }
 }
