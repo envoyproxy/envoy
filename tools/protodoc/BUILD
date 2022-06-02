@@ -2,7 +2,7 @@ load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
-load("//tools/base:envoy_python.bzl", "envoy_jinja_env", "envoy_py_data")
+load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_jinja_env", "envoy_py_data")
 
 licenses(["notice"])  # Apache 2
 
@@ -18,16 +18,6 @@ py_binary(
 envoy_proto_library(
     name = "manifest_proto",
     srcs = ["manifest.proto"],
-)
-
-envoy_py_data(
-    name = "extensions_db",
-    src = "//source/extensions:extensions_metadata.yaml",
-)
-
-envoy_py_data(
-    name = "contrib_extensions_db",
-    src = "//contrib:extensions_metadata.yaml",
 )
 
 envoy_py_data(
@@ -57,9 +47,36 @@ genrule(
     tools = [":manifest_to_json"],
 )
 
+envoy_genjson(
+    name = "data_srcs",
+    srcs = [":manifest.json"],
+    filter = """
+    {manifest: .[0],
+     extensions: .[1],
+     contrib_extensions: .[2],
+     extension_categories: (
+         .[1] | reduce to_entries[] as $item ({};
+             .[$item.value.categories[]] += [$item.key])),
+     contrib_extension_categories: (
+         .[2] | reduce to_entries[] as $item ({};
+             .[$item.value.categories[]] += [$item.key])),
+     extension_status_values: (
+         reduce .[3].status_values[] as $value ({};
+             .[$value.name] = $value.description)),
+     extension_security_postures: (
+         reduce .[3].security_postures[] as $posture ({};
+             .[$posture.name] = $posture.description))}
+    """,
+    yaml_srcs = [
+        "//source/extensions:extensions_metadata.yaml",
+        "//contrib:extensions_metadata.yaml",
+        "//tools/extensions:extensions_schema.yaml",
+    ],
+)
+
 envoy_py_data(
-    name = "manifest_db",
-    src = ":manifest.json",
+    name = "data",
+    src = ":data_srcs",
 )
 
 py_binary(
@@ -67,17 +84,14 @@ py_binary(
     srcs = ["protodoc.py"],
     visibility = ["//visibility:public"],
     deps = [
-        ":contrib_extensions_db",
-        ":extensions_db",
+        ":data",
         ":jinja",
-        ":manifest_db",
         "//tools/api_proto_plugin",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
         requirement("envoy.code.check"),
-        requirement("Jinja2"),
     ],
 )
 

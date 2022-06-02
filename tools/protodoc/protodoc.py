@@ -16,10 +16,8 @@ from envoy.code.check.checker import BackticksCheck
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
-from tools.protodoc.extensions_db import data as EXTENSION_DB
-from tools.protodoc.contrib_extensions_db import data as CONTRIB_EXTENSION_DB
+from tools.protodoc.data import data
 from tools.protodoc.jinja import env as jinja_env
-from tools.protodoc.manifest_db import data as manifest_db
 
 from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
@@ -27,6 +25,14 @@ from validate import validate_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
 
 logger = logging.getLogger(__name__)
+
+manifest_db = data["manifest"]
+EXTENSION_DB = data["extensions"]
+CONTRIB_EXTENSION_DB = data["contrib_extensions"]
+EXTENSION_CATEGORIES = data["extension_categories"]
+CONTRIB_EXTENSION_CATEGORIES = data["contrib_extension_categories"]
+EXTENSION_SECURITY_POSTURES = data["extension_security_postures"]
+EXTENSION_STATUS_VALUES = data["extension_status_values"]
 
 # Namespace prefix for Envoy core APIs.
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
@@ -49,54 +55,12 @@ CNCF_PREFIX = '.xds.'
 # http://www.fileformat.info/info/unicode/char/2063/index.htm
 UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
 
-# A map from the extension security postures (as defined in the
-# envoy_cc_extension build macro) to human readable text for extension docs.
-EXTENSION_SECURITY_POSTURES = {
-    'robust_to_untrusted_downstream':
-        'This extension is intended to be robust against untrusted downstream traffic. It '
-        'assumes that the upstream is trusted.',
-    'robust_to_untrusted_downstream_and_upstream':
-        'This extension is intended to be robust against both untrusted downstream and '
-        'upstream traffic.',
-    'requires_trusted_downstream_and_upstream':
-        'This extension is not hardened and should only be used in deployments'
-        ' where both the downstream and upstream are trusted.',
-    'unknown':
-        'This extension has an unknown security posture and should only be '
-        'used in deployments where both the downstream and upstream are '
-        'trusted.',
-    'data_plane_agnostic':
-        'This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.',
-}
-
-# A map from the extension status value to a human readable text for extension
-# docs.
-EXTENSION_STATUS_VALUES = {
-    'alpha':
-        'This extension is functional but has not had substantial production burn time, use only with this caveat.',
-    'wip':
-        'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
-}
-
 WIP_WARNING = (
     '.. warning::\n   This API feature is currently work-in-progress. API features marked as '
     'work-in-progress are not considered stable, are not covered by the :ref:`threat model '
     '<arch_overview_threat_model>`, are not supported by the security team, and are subject to '
     'breaking changes. Do not use this feature without understanding each of the previous '
     'points.\n\n')
-
-
-# create an index of extension categories from extension db
-def build_categories(extensions_db):
-    ret = {}
-    for _k, _v in extensions_db.items():
-        for _cat in _v['categories']:
-            ret.setdefault(_cat, []).append(_k)
-    return ret
-
-
-EXTENSION_CATEGORIES = build_categories(EXTENSION_DB)
-CONTRIB_EXTENSION_CATEGORIES = build_categories(CONTRIB_EXTENSION_DB)
 
 
 class ProtodocError(Exception):
@@ -215,8 +179,9 @@ def format_extension(extension):
   This extension is only available in :ref:`contrib <install_contrib>` images.
 
 """
-        status = EXTENSION_STATUS_VALUES.get(extension_metadata.get('status'), '')
-        security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
+        status = (EXTENSION_STATUS_VALUES.get(extension_metadata.get('status')) or "").strip()
+        security_posture = EXTENSION_SECURITY_POSTURES[
+            extension_metadata['security_posture']].strip()
         categories = extension_metadata["categories"]
     except KeyError as e:
         sys.stderr.write(
@@ -468,7 +433,7 @@ def format_security_options(security_option, field, type_context, edge_config):
         sections.append(
             indent(4, 'This field should be configured in the presence of untrusted *upstreams*.'))
     if edge_config["note"]:
-        sections.append(indent(4, edge_config["note"]))
+        sections.append(indent(4, edge_config["note"].strip()))
 
     example_dict = edge_config["example"]
     field_name = type_context.name.split('.')[-1]
