@@ -20,7 +20,7 @@ const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
 // Concrete class for QUICHE protocol and feature flags, templated by flag type.
 template <typename T> class TypedFlag {
 public:
-  explicit TypedFlag(T default_value) : value_(default_value), default_value_(default_value) {}
+  explicit TypedFlag(T value) : value_(value) {}
 
   // Set flag value.
   void setValue(T value) {
@@ -37,7 +37,6 @@ public:
 private:
   mutable absl::Mutex mutex_;
   T value_ ABSL_GUARDED_BY(mutex_);
-  const T default_value_;
 };
 
 using ReloadableFlag = TypedFlag<bool>;
