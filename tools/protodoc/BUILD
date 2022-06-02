@@ -36,6 +36,30 @@ envoy_py_data(
 )
 
 py_binary(
+    name = "manifest_to_json",
+    srcs = ["manifest_to_json.py"],
+    deps = [
+        ":manifest_proto_py_proto",
+        "//tools/config_validation:validate_fragment",
+        "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
+        "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
+        "@com_google_protobuf//:protobuf_python",
+        requirement("envoy.base.utils"),
+    ],
+)
+
+genrule(
+    name = "manifest",
+    outs = ["manifest.json"],
+    cmd = """$(location :manifest_to_json) $(location //docs:protodoc_manifest.yaml) $@""",
+    tools = [
+        ":manifest_to_json",
+        "//docs:protodoc_manifest.yaml",
+    ],
+)
+
+py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
     visibility = ["//visibility:public"],
@@ -46,7 +70,8 @@ py_binary(
         ":manifest_proto_py_proto",
         ":protodoc_manifest_untyped",
         "//tools/api_proto_plugin",
-        "//tools/config_validation:validate_fragment",
+        # Added temporarily, as config_validation is no longer an immediate dep...
+        "@bazel_tools//tools/python/runfiles",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
