@@ -264,6 +264,22 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestParamUnescapePlus) {
       R"({"id":"20","theme":"Children"})");
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParams111) {
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf?shelf.search[field]=Google"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      "", {R"(shelf { search_field: "Google" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"},
+          {"content-type", "application/json"},
+      },
+      R"({"id":"20","theme":"Children"})");
+}
+
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParams) {
   HttpIntegrationTest::initialize();
   // 1. Binding theme='Children' in CreateShelfRequest

@@ -198,6 +198,8 @@ message Shelf {
   int64 id = 1;
   // A theme of the shelf (fiction, poetry, etc).
   string theme = 2;
+
+  string search_field = 3 [json_name = "search[field]"];
 }
 
 // A book resource.
