@@ -82,7 +82,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         #
         # chromium-103.0.5060.24 (linux/beta)
         version = "62079f7cb4e9a2d5d8a68fe8a4a3f2375dd53585",
-        sha256 = "9b0ec8c81cea758960d12f6d1eafa1a9deb5888a42efcd39390ce3334ea4ed3f",
+        sha256 = "770faf8dcea0c2872e0c8202fc0d71f5b623c71510d1fa580ab271d2de7e72a9",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
