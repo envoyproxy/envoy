@@ -150,7 +150,8 @@ TEST_P(WasmCommonTest, WasmFailState) {
       StreamInfo::FilterState::LifeSpan::FilterChain);
   auto wasm_state = std::make_unique<Filters::Common::Expr::CelState>(wasm_state_prototype);
   Protobuf::Arena arena;
-  EXPECT_EQ(wasm_state->exprValue(&arena, true).MessageOrDie(), nullptr);
+  EXPECT_EQ(wasm_state->exprValue(&arena, true).type(),
+            Filters::Common::Expr::CelValue::Type::kNullType);
   wasm_state->setValue("foo");
   auto any = wasm_state->serializeAsProto();
   EXPECT_TRUE(static_cast<ProtobufWkt::Any*>(any.get())->Is<ProtobufWkt::BytesValue>());
