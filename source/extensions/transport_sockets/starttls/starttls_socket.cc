@@ -8,7 +8,7 @@ namespace StartTls {
 // Switch clear-text to secure transport.
 bool StartTlsSocket::startSecureTransport() {
   if (!using_tls_) {
-    tls_socket_->setTransportSocketCallbacks(*callbacks_);
+    tls_socket_->setTransportSocketCallbacks(callbacks_);
     tls_socket_->onConnected();
     // TODO(cpakulski): deleting active_socket_ assumes
     // that active_socket_ does not contain any buffered data.
