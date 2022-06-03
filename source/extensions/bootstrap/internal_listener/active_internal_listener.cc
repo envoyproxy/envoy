@@ -1,20 +1,21 @@
-#include "source/server/active_internal_listener.h"
+#include "source/extensions/bootstrap/internal_listener/active_internal_listener.h"
 
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/network/address_impl.h"
 #include "source/common/stats/timespan_impl.h"
-
-#include "active_stream_listener_base.h"
+#include "source/server/active_stream_listener_base.h"
 
 namespace Envoy {
-namespace Server {
+namespace Extensions {
+namespace Bootstrap {
+namespace InternalListener {
 
 ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& conn_handler,
                                                Event::Dispatcher& dispatcher,
                                                Network::ListenerConfig& config)
-    : OwnedActiveStreamListenerBase(
+    : Server::OwnedActiveStreamListenerBase(
           conn_handler, dispatcher,
           std::make_unique<ActiveInternalListener::NetworkInternalListener>(), config) {}
 
@@ -22,7 +23,8 @@ ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& conn_
                                                Event::Dispatcher& dispatcher,
                                                Network::ListenerPtr listener,
                                                Network::ListenerConfig& config)
-    : OwnedActiveStreamListenerBase(conn_handler, dispatcher, std::move(listener), config) {}
+    : Server::OwnedActiveStreamListenerBase(conn_handler, dispatcher, std::move(listener), config) {
+}
 
 ActiveInternalListener::~ActiveInternalListener() {
   is_deleting_ = true;
@@ -53,7 +55,7 @@ void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   // connections.
   incNumConnections();
 
-  auto active_socket = std::make_unique<ActiveTcpSocket>(
+  auto active_socket = std::make_unique<Server::ActiveTcpSocket>(
       *this, std::move(socket), false /* do not hand off at internal listener */);
 
   onSocketAccepted(std::move(active_socket));
@@ -63,9 +65,9 @@ void ActiveInternalListener::newActiveConnection(
     const Network::FilterChain& filter_chain, Network::ServerConnectionPtr server_conn_ptr,
     std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   auto& active_connections = getOrCreateActiveConnections(filter_chain);
-  auto active_connection =
-      std::make_unique<ActiveTcpConnection>(active_connections, std::move(server_conn_ptr),
-                                            dispatcher().timeSource(), std::move(stream_info));
+  auto active_connection = std::make_unique<Server::ActiveTcpConnection>(
+      active_connections, std::move(server_conn_ptr), dispatcher().timeSource(),
+      std::move(stream_info));
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(
@@ -75,5 +77,7 @@ void ActiveInternalListener::newActiveConnection(
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }
 }
-} // namespace Server
+} // namespace InternalListener
+} // namespace Bootstrap
+} // namespace Extensions
 } // namespace Envoy
