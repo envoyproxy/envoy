@@ -23,7 +23,7 @@ public:
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
 
-#define QUIC_FLAG(flag, ...) saved_##flag##_ = GetQuicheFlagImpl(flag);
+#define QUIC_FLAG(flag, ...) saved_##flag##_ = GetQuicheFlagImpl(FLAGS_##flag);
 #include "quiche/quic/core/quic_flags_list.h"
 #undef QUIC_FLAG
   }
@@ -34,7 +34,7 @@ public:
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
 
-#define QUIC_FLAG(flag, ...) SetQuicheFlagImpl(flag, saved_##flag##_);
+#define QUIC_FLAG(flag, ...) SetQuicheFlagImpl(FLAGS_##flag, saved_##flag##_);
 #include "quiche/quic/core/quic_flags_list.h"
 #undef QUIC_FLAG
   }

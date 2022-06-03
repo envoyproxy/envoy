@@ -21,16 +21,16 @@ namespace {
 absl::flat_hash_map<absl::string_view, ReloadableFlag*> makeReloadableFlagMap() {
   absl::flat_hash_map<absl::string_view, ReloadableFlag*> flags;
 
-#define QUIC_FLAG(flag, ...) flags.emplace(#flag, flag);
+#define QUIC_FLAG(flag, ...) flags.emplace("FLAGS_" #flag, FLAGS_##flag);
 #include "quiche/quic/core/quic_flags_list.h"
-  QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
-  QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
-  QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_false, false)
-  QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_true, true)
-  QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_false, false)
-  QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_true, true)
-  QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
-  QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
+  QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_false, false)
+  QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true)
+  QUIC_FLAG(quic_restart_flag_spdy_testonly_default_false, false)
+  QUIC_FLAG(quic_restart_flag_spdy_testonly_default_true, true)
+  QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_false, false)
+  QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_true, true)
+  QUIC_FLAG(quic_restart_flag_http2_testonly_default_false, false)
+  QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)
 #undef QUIC_FLAG
   return flags;
 }
@@ -77,16 +77,16 @@ void FlagRegistry::updateReloadableFlags(
 }
 
 // Flag definitions
-#define QUIC_FLAG(flag, value) TypedFlag<bool>* flag = new ReloadableFlag(value);
+#define QUIC_FLAG(flag, value) TypedFlag<bool>* FLAGS_##flag = new ReloadableFlag(value);
 #include "quiche/quic/core/quic_flags_list.h"
-QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
+QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_false, false)
+QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true)
+QUIC_FLAG(quic_restart_flag_spdy_testonly_default_false, false)
+QUIC_FLAG(quic_restart_flag_spdy_testonly_default_true, true)
+QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_false, false)
+QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_true, true)
+QUIC_FLAG(quic_restart_flag_http2_testonly_default_false, false)
+QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)
 
 #undef QUIC_FLAG
 

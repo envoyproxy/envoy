@@ -58,16 +58,16 @@ private:
 };
 
 // Flag declarations
-#define QUIC_FLAG(flag, ...) extern ReloadableFlag* flag;
+#define QUIC_FLAG(flag, ...) extern ReloadableFlag* FLAGS_##flag;
 #include "quiche/quic/core/quic_flags_list.h"
-QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
+QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_false, false)
+QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true)
+QUIC_FLAG(quic_restart_flag_spdy_testonly_default_false, false)
+QUIC_FLAG(quic_restart_flag_spdy_testonly_default_true, true)
+QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_false, false)
+QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_true, true)
+QUIC_FLAG(quic_restart_flag_http2_testonly_default_false, false)
+QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)
 #undef QUIC_FLAG
 
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) extern TypedFlag<type>* FLAGS_##flag;
