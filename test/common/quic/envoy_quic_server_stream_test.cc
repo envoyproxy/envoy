@@ -219,7 +219,7 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
   quic_stream_->encodeTrailers(response_trailers_);
 }
 
-TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithClosedStream) {
+TEST_F(EnvoyQuicServerStreamTest, EncodeDataOnClosedStream) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   receiveRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
@@ -228,8 +228,6 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithClosedStream) {
   // rest should be buffered.
   std::string response(18 * 1024, 'a');
   Buffer::OwnedImpl buffer(response);
-  // The high watermark is 16KB, so this call should make the send buffer reach its high watermark.
-  EXPECT_CALL(stream_callbacks_, onAboveWriteBufferHighWatermark());
   quic_stream_->encodeData(buffer, false);
 
   // Reset stream should clear the connection level bufferred bytes accounting.
@@ -241,9 +239,10 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithClosedStream) {
 
   // Try to send more data on the closed stream. And the watermark shouldn't be
   // messed up.
-   std::string response2(1024, 'a');
+  std::string response2(1024, 'a');
   Buffer::OwnedImpl buffer2(response2);
-  quic_stream_->encodeData(buffer2, true);
+  EXPECT_ENVOY_BUG(quic_stream_->encodeData(buffer2, true),
+                   "encodeData is called on write-closed stream");
 }
 
 TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
