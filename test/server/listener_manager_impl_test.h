@@ -87,14 +87,16 @@ protected:
               return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
                   filters, filter_chain_factory_context);
             }));
+    ON_CALL(listener_factory_, getTcpListenerConfigProviderManager())
+        .WillByDefault(Return(&tcp_listener_config_provider_manager_));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
-                          filters,
-                      Configuration::ListenerFactoryContext& context)
-                       -> std::vector<Network::ListenerFilterFactoryCb> {
-              return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(filters,
-                                                                                       context);
+        .WillByDefault(Invoke(
+            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                       filters,
+                   Configuration::ListenerFactoryContext& context)
+                -> Filter::ListenerFilterFactoriesList {
+              return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+                  filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
             }));
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(
@@ -364,6 +366,7 @@ protected:
   NiceMock<testing::MockFunction<void()>> callback_;
   // Test parameter indicating whether the unified filter chain matcher is enabled.
   bool use_matcher_;
+  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 } // namespace Server
 } // namespace Envoy
