@@ -1,0 +1,50 @@
+#pragma once
+
+#include "test/integration/integration.h"
+
+#include "library/common/http/client.h"
+#include "library/common/types/c_types.h"
+
+namespace Envoy {
+
+// Maintains statistics and status data obtained from the Http::Client callbacks.
+typedef struct {
+  uint32_t on_headers_calls;
+  uint32_t on_data_calls;
+  uint32_t on_complete_calls;
+  uint32_t on_error_calls;
+  uint32_t on_cancel_calls;
+  uint64_t on_header_consumed_bytes_from_response;
+  uint64_t on_complete_received_byte_count;
+  std::string status;
+  ConditionalInitializer* terminal_callback;
+  envoy_final_stream_intel final_intel;
+} callbacks_called;
+
+// Based on Http::Utility::toRequestHeaders() but only used for these tests.
+Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers);
+
+// A base class for Envoy Mobile client integration tests which interact with Envoy through the
+// Http::Client class.
+//
+// TODO(junr03): move this to derive from the ApiListenerIntegrationTest after moving that class
+// into a test lib.
+class BaseClientIntegrationTest : public BaseIntegrationTest {
+public:
+  BaseClientIntegrationTest(Network::Address::IpVersion ip_version);
+  virtual ~BaseClientIntegrationTest() = default;
+
+protected:
+  virtual void initialize() override;
+  virtual void cleanup();
+
+  Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
+  Http::ClientPtr http_client_{};
+  envoy_http_callbacks bridge_callbacks_;
+  ConditionalInitializer terminal_callback_;
+  callbacks_called cc_{0, 0, 0, 0, 0, 0, 0, "", &terminal_callback_, {}};
+  Http::TestRequestHeaderMapImpl default_request_headers_;
+  envoy_stream_t stream_{1};
+};
+
+} // namespace Envoy
