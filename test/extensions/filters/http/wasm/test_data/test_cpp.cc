@@ -65,7 +65,8 @@ bool TestRootContext::onConfigure(size_t size) {
       const std::vector<std::string> properties = {
           "string_state",     "metadata",   "request",        "response",    "connection",
           "connection_id",    "upstream",   "source",         "destination", "cluster_name",
-          "cluster_metadata", "route_name", "route_metadata",
+          "cluster_metadata", "route_name", "route_metadata", "upstream_host_metadata",
+          "filter_state",
       };
       for (const auto& property : properties) {
         if (getProperty({property}).has_value()) {
@@ -298,10 +299,6 @@ FilterHeadersStatus TestContext::onResponseHeaders(uint32_t, bool) {
   auto test = root()->test_;
   if (test == "headers") {
     CHECK_RESULT(addResponseHeader("test-status", "OK"));
-  }
-  std::string upstream_host_metadata;
-  if (getValue({"upstream_host_metadata", "filter_metadata", "namespace", "key"}, &upstream_host_metadata)) {
-    logWarn("upstream host metadata: " + upstream_host_metadata);
   }
   return FilterHeadersStatus::Continue;
 }
