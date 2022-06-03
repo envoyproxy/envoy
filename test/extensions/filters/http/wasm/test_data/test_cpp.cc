@@ -299,6 +299,10 @@ FilterHeadersStatus TestContext::onResponseHeaders(uint32_t, bool) {
   if (test == "headers") {
     CHECK_RESULT(addResponseHeader("test-status", "OK"));
   }
+  std::string upstream_host_metadata;
+  if (getValue({"upstream_host_metadata", "filter_metadata", "namespace", "key"}, &upstream_host_metadata)) {
+    logWarn("upstream host metadata: " + upstream_host_metadata);
+  }
   return FilterHeadersStatus::Continue;
 }
 
@@ -367,6 +371,10 @@ void TestContext::onLog() {
     auto response_trailer = getResponseTrailer("bogus-trailer");
     if (response_trailer && response_trailer->view() != "") {
       logWarn("response bogus-trailer found");
+    }
+    auto request_trailer = getRequestTrailer("error-details");
+    if (request_trailer && request_trailer->view() != "") {
+      logWarn("request bogus-trailer found");
     }
   } else if (test == "cluster_metadata") {
     std::string cluster_metadata;
