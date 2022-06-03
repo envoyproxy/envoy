@@ -29,11 +29,12 @@ public:
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    Stats::StatName request_vhost_name = Stats::StatName(),
                    Stats::StatName request_vcluster_name = Stats::StatName(),
+                   Stats::StatName request_route_name = Stats::StatName(),
                    Stats::StatName from_az = Stats::StatName(),
                    Stats::StatName to_az = Stats::StatName()) {
     Http::CodeStats::ResponseStatInfo info{
         global_store_,      cluster_scope_,        prefix_, code,  internal_request,
-        request_vhost_name, request_vcluster_name, from_az, to_az, canary};
+        request_vhost_name, request_route_name, request_vcluster_name, from_az, to_az, canary};
 
     code_stats_.chargeResponseStat(info, false);
   }
