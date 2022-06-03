@@ -87,7 +87,6 @@ namespace quiche {
 
 namespace {
 
-
 absl::flat_hash_map<absl::string_view, ReloadableFlag*> makeReloadableFlagMap() {
   absl::flat_hash_map<absl::string_view, ReloadableFlag*> flags;
 
