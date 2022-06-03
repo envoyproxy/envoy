@@ -1,4 +1,9 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_library", "envoy_package")
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+    "envoy_cc_test_library",
+    "envoy_package",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -13,9 +18,39 @@ envoy_cc_test(
     },
     repository = "@envoy",
     deps = [
+        ":base_client_integration_test_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "rtds_integration_test",
+    srcs = ["rtds_integration_test.cc"],
+    exec_properties = {
+        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
+        "sandboxNetwork": "standard",
+    },
+    repository = "@envoy",
+    deps = [
+        ":base_client_integration_test_lib",
+        "@envoy//test/common/grpc:grpc_client_integration_lib",
+        "@envoy//test/server:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "base_client_integration_test_lib",
+    srcs = [
+        "base_client_integration_test.cc",
+    ],
+    hdrs = [
+        "base_client_integration_test.h",
+    ],
+    repository = "@envoy",
+    deps = [
         "//library/cc:engine_builder_lib",
-        "//library/common/extensions/filters/http/local_error:config",
-        "//library/common/extensions/filters/http/local_error:filter_cc_proto",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
@@ -23,8 +58,6 @@ envoy_cc_test(
         "@envoy//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "@envoy//test/common/http:common_lib",
         "@envoy//test/integration:http_integration_lib",
-        "@envoy//test/server:utility_lib",
-        "@envoy//test/test_common:environment_lib",
     ],
 )
 

@@ -1,55 +1,21 @@
 #include "source/extensions/http/header_formatters/preserve_case/config.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
-#include "test/common/http/common.h"
+#include "test/common/integration/base_client_integration_test.h"
 #include "test/integration/autonomous_upstream.h"
-#include "test/integration/integration.h"
-#include "test/server/utility.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "library/cc/engine_builder.h"
-#include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
-#include "library/common/http/client.h"
 #include "library/common/http/header_utility.h"
-#include "library/common/types/c_types.h"
-
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace {
 
-// Based on Http::Utility::toRequestHeaders() but only used for these tests.
-Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
-  std::unique_ptr<Http::ResponseHeaderMapImpl> transformed_headers =
-      Http::ResponseHeaderMapImpl::create();
-  transformed_headers->setFormatter(
-      std::make_unique<
-          Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>(
-          false, envoy::extensions::http::header_formatters::preserve_case::v3::
-                     PreserveCaseFormatterConfig::DEFAULT));
-  Http::Utility::toEnvoyHeaders(*transformed_headers, headers);
-  return transformed_headers;
-}
-
-typedef struct {
-  uint32_t on_headers_calls;
-  uint32_t on_data_calls;
-  uint32_t on_complete_calls;
-  uint32_t on_error_calls;
-  uint32_t on_cancel_calls;
-  uint64_t on_header_consumed_bytes_from_response;
-  uint64_t on_complete_received_byte_count;
-  std::string status;
-  ConditionalInitializer* terminal_callback;
-} callbacks_called;
-
 void validateStreamIntel(const envoy_final_stream_intel& final_intel) {
   EXPECT_NE(-1, final_intel.dns_start_ms);
   EXPECT_NE(-1, final_intel.dns_end_ms);
+
   // This test doesn't do TLS.
   EXPECT_EQ(-1, final_intel.ssl_start_ms);
   EXPECT_EQ(-1, final_intel.ssl_end_ms);
@@ -69,112 +35,21 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel) {
   ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
 }
 
-// TODO(junr03): move this to derive from the ApiListenerIntegrationTest after moving that class
-// into a test lib.
-class ClientIntegrationTest : public BaseIntegrationTest,
+class ClientIntegrationTest : public BaseClientIntegrationTest,
                               public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  ClientIntegrationTest() : BaseIntegrationTest(GetParam(), defaultConfig()) {
-    use_lds_ = false;
-    autonomous_upstream_ = true;
-    defer_listener_finalization_ = true;
-    HttpTestUtility::addDefaultHeaders(default_request_headers_);
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // The default stats config has overenthusiastic filters.
-      bootstrap.clear_stats_config();
-    });
-  }
-
-  void initialize() override {
-    BaseIntegrationTest::initialize();
-    ConditionalInitializer server_started;
-    test_server_->server().dispatcher().post([this, &server_started]() -> void {
-      http_client_ = std::make_unique<Http::Client>(
-          test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
-          test_server_->statStore(), test_server_->server().api().randomGenerator());
-      dispatcher_->drain(test_server_->server().dispatcher());
-      server_started.setReady();
-    });
-    server_started.waitReady();
-    default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
-  }
+  ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/GetParam()) {}
 
   void SetUp() override {
-    bridge_callbacks_.context = &cc_;
-    bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, envoy_stream_intel intel,
-                                      void* context) -> void* {
-      Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
-      callbacks_called* cc_ = static_cast<callbacks_called*>(context);
-      cc_->on_headers_calls++;
-      cc_->status = response_headers->Status()->value().getStringView();
-      cc_->on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
-      return nullptr;
-    };
-    bridge_callbacks_.on_data = [](envoy_data c_data, bool, envoy_stream_intel,
-                                   void* context) -> void* {
-      callbacks_called* cc_ = static_cast<callbacks_called*>(context);
-      cc_->on_data_calls++;
-      release_envoy_data(c_data);
-      return nullptr;
-    };
-    bridge_callbacks_.on_complete = [](envoy_stream_intel, envoy_final_stream_intel final_intel,
-                                       void* context) -> void* {
-      validateStreamIntel(final_intel);
-      callbacks_called* cc_ = static_cast<callbacks_called*>(context);
-      cc_->on_complete_received_byte_count = final_intel.received_byte_count;
-      cc_->on_complete_calls++;
-      cc_->terminal_callback->setReady();
-      return nullptr;
-    };
-    bridge_callbacks_.on_error = [](envoy_error error, envoy_stream_intel, envoy_final_stream_intel,
-                                    void* context) -> void* {
-      release_envoy_error(error);
-      callbacks_called* cc_ = static_cast<callbacks_called*>(context);
-      cc_->on_error_calls++;
-      cc_->terminal_callback->setReady();
-      return nullptr;
-    };
-    bridge_callbacks_.on_cancel = [](envoy_stream_intel, envoy_final_stream_intel final_intel,
-                                     void* context) -> void* {
-      EXPECT_NE(-1, final_intel.stream_start_ms);
-      callbacks_called* cc_ = static_cast<callbacks_called*>(context);
-      cc_->on_cancel_calls++;
-      cc_->terminal_callback->setReady();
-      return nullptr;
-    };
+    setUpstreamCount(config_helper_.bootstrap().static_resources().clusters_size());
+    // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
+    setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
   void TearDown() override {
-    // Right now each test does one request - if this changes, make the 1
-    // configurable.
     ASSERT_EQ(cc_.on_complete_calls + cc_.on_cancel_calls + cc_.on_error_calls, 1);
-    test_server_.reset();
-    fake_upstreams_.clear();
+    cleanup();
   }
-
-  static std::string bootstrap_config() {
-    // At least one empty filter chain needs to be specified.
-    return ConfigHelper::baseConfig() + R"EOF(
-    filter_chains:
-      filters:
-    )EOF";
-  }
-
-  // Use the Envoy mobile default config as much as possible in this test.
-  // There are some config modifiers below which do result in deltas.
-  static std::string defaultConfig() {
-    Platform::EngineBuilder builder;
-    std::string config_str = absl::StrCat(config_header, builder.generateConfigStr());
-    return config_str;
-  }
-
-  Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
-  Http::ClientPtr http_client_{};
-  envoy_http_callbacks bridge_callbacks_;
-  ConditionalInitializer terminal_callback_;
-  callbacks_called cc_ = {0, 0, 0, 0, 0, 0, 0, "", &terminal_callback_};
-  Http::TestRequestHeaderMapImpl default_request_headers_;
-  envoy_stream_t stream_ = 1;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
@@ -221,6 +96,7 @@ TEST_P(ClientIntegrationTest, Basic) {
   });
   terminal_callback_.waitReady();
 
+  validateStreamIntel(cc_.final_intel);
   ASSERT_EQ(cc_.on_headers_calls, 1);
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_data_calls, 2);
@@ -250,6 +126,7 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
   });
   terminal_callback_.waitReady();
 
+  validateStreamIntel(cc_.final_intel);
   ASSERT_EQ(cc_.on_error_calls, 0);
   ASSERT_EQ(cc_.status, "503");
   ASSERT_EQ(cc_.on_headers_calls, 1);
@@ -315,6 +192,7 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
   ASSERT_TRUE(upstream_connection->write(response));
   // For this test only, the terminal callback is called when headers arrive.
   terminal_callback_.waitReady();
+
   ASSERT_EQ(cc_.on_headers_calls, 1);
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_data_calls, 0);
@@ -323,6 +201,7 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
   // Now cancel, and make sure the cancel is received.
   dispatcher_->post([&]() -> void { http_client_->cancelStream(stream_); });
   terminal_callback_.waitReady();
+
   ASSERT_EQ(cc_.on_headers_calls, 1);
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_data_calls, 0);
@@ -366,6 +245,7 @@ TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
   ASSERT_TRUE(upstream_connection->write(response));
   // For this test only, the terminal callback is called when headers arrive.
   terminal_callback_.waitReady();
+
   ASSERT_EQ(cc_.on_headers_calls, 1);
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_data_calls, 0);
@@ -375,6 +255,7 @@ TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
   // and make sure the cancel is received.
   dispatcher_->post([&]() -> void { http_client_->cancelStream(stream_); });
   terminal_callback_.waitReady();
+
   ASSERT_EQ(cc_.on_headers_calls, 1);
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_data_calls, 0);
@@ -449,6 +330,7 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
 
   terminal_callback_.waitReady();
 
+  validateStreamIntel(cc_.final_intel);
   ASSERT_EQ(cc_.on_headers_calls, 1);
   ASSERT_EQ(cc_.status, "200");
   ASSERT_EQ(cc_.on_data_calls, 0);
