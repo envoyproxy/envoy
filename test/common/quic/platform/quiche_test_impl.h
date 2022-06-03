@@ -18,6 +18,7 @@
 class QuicheFlagSaverImpl {
 public:
   QuicheFlagSaverImpl() {
+    //quiche::FlagRegistry::getInstance();
     // Save the current value of each flag.
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) saved_##flag##_ = GetQuicheFlagImpl(FLAGS_##flag);
 #include "quiche/quic/core/quic_protocol_flags_list.h"

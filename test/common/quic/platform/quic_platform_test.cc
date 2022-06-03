@@ -16,10 +16,8 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/printf.h"
@@ -462,6 +460,7 @@ TEST_F(QuicPlatformTest, MonotonicityWithRealEpollClock) {
 }
 
 TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
+  quiche::FlagRegistry::getInstance();
   epoll_server::test::FakeSimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
@@ -475,9 +474,11 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 }
 
 TEST_F(QuicPlatformTest, QuicFlags) {
-  quiche::FlagRegistry::getInstance();
+  // Test that the flags which envoy explicitly overrides have the right value.
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_disable_version_draft_29));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr));
-
+  EXPECT_FALSE(GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
+  EXPECT_EQ(512 * 1024 * 1024, GetQuicFlag(FLAGS_quic_buffered_data_threshold));
   {
     quiche::test::QuicheFlagSaver saver;
     EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
