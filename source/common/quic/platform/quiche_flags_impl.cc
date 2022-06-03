@@ -29,16 +29,16 @@ constexpr T maybeOverride(absl::string_view /*name*/, T val) {
 
 template <>
 constexpr bool maybeOverride<bool>(absl::string_view name, bool val) {
-  if (name.compare("quic_reloadable_flag_quic_disable_version_draft_29") == 0) {
+  if (name == "quic_reloadable_flag_quic_disable_version_draft_29") {
     // Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by
     // default.
     return true;
   }
-  if (name.compare("quic_reloadable_flag_quic_default_to_bbr") == 0) {
+  if (name == "quic_reloadable_flag_quic_default_to_bbr") {
     // This flag enables BBR, otherwise QUIC will use Cubic which is less performant.
     return true;
   }
-  if (name.compare("quic_header_size_limit_includes_overhead") == 0) {
+  if (name == "quic_header_size_limit_includes_overhead") {
     // Do not include 32-byte per-entry overhead while counting header size.
     return false;
   }
@@ -48,7 +48,7 @@ constexpr bool maybeOverride<bool>(absl::string_view name, bool val) {
 
 template <>
 constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int32_t val) {
-  if (name.compare("quic_buffered_data_threshold") == 0) {
+  if (name == "quic_buffered_data_threshold") {
     // Set send buffer twice of max flow control window to ensure that stream send
     // buffer always takes all the data.
     // The max amount of data buffered is the per-stream high watermark + the max
