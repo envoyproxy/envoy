@@ -61,10 +61,11 @@ public:
   }
 
   void responseTiming() {
+    Stats::StatName empty_stat_name;
     Http::CodeStats::ResponseTimingInfo info{
-        global_store_, cluster_scope_, prefix_,     std::chrono::milliseconds(5),
-        true,          true,           vhost_name_, req_vcluster_name_,
-        from_az_,      to_az_};
+        global_store_, cluster_scope_, prefix_,         std::chrono::milliseconds(5), true,
+        true,          vhost_name_,    empty_stat_name, req_vcluster_name_,           from_az_,
+        to_az_};
     code_stats_.chargeResponseTiming(info);
   }
 
