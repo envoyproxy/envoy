@@ -12,6 +12,7 @@
 *.pyc
 *.tulsiconf-user
 *.xcodeproj
+Envoy.doccarchive/
 clang.bazelrc
 user.bazelrc
 tags

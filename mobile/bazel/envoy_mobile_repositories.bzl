@@ -78,12 +78,12 @@ def swift_repos():
         url = "https://github.com/bazelbuild/rules_apple/archive/29f5b63d702f1d071f95343be29d4c23045e0e84.tar.gz",
     )
 
-    # TODO(jpsim): Update to the next release which includes https://github.com/bazelbuild/rules_swift/pull/818
+    # https://github.com/bazelbuild/rules_swift/pull/838
     http_archive(
         name = "build_bazel_rules_swift",
-        sha256 = "b5966b422113866398035cd970feffb4ab6c081fa1c96c02d942b17e5b8429c4",
-        strip_prefix = "rules_swift-8d4b096b90e47095755e47c27e749ae9b9f83e81",
-        url = "https://github.com/bazelbuild/rules_swift/archive/8d4b096b90e47095755e47c27e749ae9b9f83e81.tar.gz",
+        sha256 = "a3fac55d12f33a2d030b816e189eaa84218fd0fc501fc93ded0b1dcba01e47fb",
+        strip_prefix = "rules_swift-3bc7bc164020a842ae08e0cf071ed35f0939dd39",
+        url = "https://github.com/bazelbuild/rules_swift/archive/3bc7bc164020a842ae08e0cf071ed35f0939dd39.tar.gz",
     )
 
     http_archive(

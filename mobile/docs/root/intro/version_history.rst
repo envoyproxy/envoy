@@ -30,6 +30,7 @@ Features:
 - android: enable the filtering of unroutable families by default. (:issues: `#2267 <2267>`)
 - instrumentation: add timers and warnings to platform-provided callbacks (:issue: `#2300 <2300>`)
 - iOS: add support for integrating Envoy Mobile via the Swift Package Manager
+- iOS: A documentation archive is now included in the GitHub release artifact (:issue: `#2335 <2335>`)
 
 0.4.6 (April 26, 2022)
 ========================
