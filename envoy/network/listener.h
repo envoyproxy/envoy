@@ -459,64 +459,6 @@ public:
 using UdpListenerPtr = std::unique_ptr<UdpListener>;
 
 /**
- * Internal listener callbacks.
- */
-class InternalListener {
-public:
-  virtual ~InternalListener() = default;
-
-  /**
-   * Called when a new connection is accepted.
-   * @param socket supplies the socket that is moved into the callee.
-   */
-  virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
-};
-using InternalListenerOptRef = OptRef<InternalListener>;
-
-/**
- * The query interface of the registered internal listener callbacks.
- */
-class InternalListenerManager {
-public:
-  virtual ~InternalListenerManager() = default;
-
-  /**
-   * Return the internal listener binding the listener address.
-   *
-   * @param listen_address the internal address of the expected internal listener.
-   */
-  virtual InternalListenerOptRef
-  findByAddress(const Address::InstanceConstSharedPtr& listen_address) PURE;
-};
-
-using InternalListenerManagerOptRef =
-    absl::optional<std::reference_wrapper<InternalListenerManager>>;
-
-// The thread local registry.
-class LocalInternalListenerRegistry {
-public:
-  virtual ~LocalInternalListenerRegistry() = default;
-
-  // Set the internal listener manager which maintains life of internal listeners. Called by
-  // connection handler.
-  virtual void setInternalListenerManager(InternalListenerManager& internal_listener_manager) PURE;
-
-  // Get the internal listener manager to obtain a listener. Called by client connection factory.
-  virtual Network::InternalListenerManagerOptRef getInternalListenerManager() PURE;
-};
-
-// The central internal listener registry interface providing the thread local accessor.
-class InternalListenerRegistry {
-public:
-  virtual ~InternalListenerRegistry() = default;
-
-  /**
-   * @return The thread local registry.
-   */
-  virtual LocalInternalListenerRegistry* getLocalRegistry() PURE;
-};
-
-/**
  * Handles delivering datagrams to the correct worker.
  */
 class UdpListenerWorkerRouter {

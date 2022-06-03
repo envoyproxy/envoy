@@ -12,7 +12,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-#include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
@@ -24,10 +23,12 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-namespace Server {
+namespace Extensions {
+namespace Bootstrap {
+namespace InternalListener {
 
-class ActiveInternalListener : public OwnedActiveStreamListenerBase,
-                               public Network::InternalListener {
+class ActiveInternalListener : public Network::InternalListener,
+                               public Server::OwnedActiveStreamListenerBase {
 public:
   ActiveInternalListener(Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
                          Network::ListenerConfig& config);
@@ -52,9 +53,6 @@ public:
     void setRejectFraction(UnitFloat) override {}
   };
 
-  // ActiveListenerImplBase
-  Network::Listener* listener() override { return listener_.get(); }
-
   // Network::TcpConnectionHandler
   Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance&) override {
@@ -63,6 +61,9 @@ public:
     PANIC("not implemented");
   }
 
+  // Network::InternalListener
+  uint64_t listenerTag() override { return OwnedActiveStreamListenerBase::listenerTag(); }
+  Network::Listener* listener() override { return listener_.get(); }
   void pauseListening() override {
     if (listener_ != nullptr) {
       listener_->disable();
@@ -74,8 +75,11 @@ public:
     }
   }
   void shutdownListener() override { listener_.reset(); }
-
-  // Network::InternalListener
+  void updateListenerConfig(Network::ListenerConfig& config) override;
+  void onFilterChainDraining(
+      const std::list<const Network::FilterChain*>& draining_filter_chains) override {
+    OwnedActiveStreamListenerBase::onFilterChainDraining(draining_filter_chains);
+  }
   void onAccept(Network::ConnectionSocketPtr&& socket) override;
 
   // Network::BalancedConnectionHandler
@@ -85,12 +89,9 @@ public:
   void newActiveConnection(const Network::FilterChain& filter_chain,
                            Network::ServerConnectionPtr server_conn_ptr,
                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) override;
-  /**
-   * Update the listener config. The follow up connections will see the new config. The existing
-   * connections are not impacted.
-   */
-  void updateListenerConfig(Network::ListenerConfig& config) override;
 };
 
-} // namespace Server
+} // namespace InternalListener
+} // namespace Bootstrap
+} // namespace Extensions
 } // namespace Envoy
