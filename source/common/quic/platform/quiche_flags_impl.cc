@@ -34,7 +34,6 @@ constexpr bool maybeOverride<bool>(absl::string_view name, bool val) {
     // default.
     return true;
   }
-
   if (name.compare("quic_reloadable_flag_quic_default_to_bbr") == 0) {
     // This flag enables BBR, otherwise QUIC will use Cubic which is less performant.
     return true;
