@@ -14,6 +14,21 @@ using SpdLoggerSharedPtr = std::shared_ptr<spdlog::logger>;
 using FancyMap = absl::flat_hash_map<std::string, SpdLoggerSharedPtr>;
 using FancyMapPtr = std::shared_ptr<FancyMap>;
 using FancyLogLevelMap = absl::flat_hash_map<std::string, spdlog::level::level_enum>;
+using spdlog::level::level_enum;
+
+/**
+ * Data struct that stores the necessary verbosity log update info
+ */
+struct VerbosityLogUpdateInfo final {
+  std::string update_pattern;
+  bool update_is_path; // i.e. it contains a path separator.
+  level_enum log_level;
+
+  VerbosityLogUpdateInfo(absl::string_view update_pattern, bool update_is_path,
+                         level_enum log_level)
+      : update_pattern(std::string(update_pattern)), update_is_path(update_is_path),
+        log_level(log_level) {}
+};
 
 /**
  * Stores the lock and functions used by Fancy Logger's macro so that we don't need to declare
@@ -27,7 +42,8 @@ public:
   SpdLoggerSharedPtr getFancyLogEntry(std::string key) ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
-   * Initializes Fancy Logger and register it in global map if not done.
+   * Initializes Fancy Logger, gets log level from setting vector, and registers it in global
+   * map if not done.
    */
   void initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger)
       ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
@@ -62,6 +78,29 @@ public:
    */
   FancyLogLevelMap getAllFancyLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
+  /**
+   * Updates the all the loggers based on the verbosity updates <(file, level) ...>.
+   * It supports file basename and glob "*" and "?" pattern, eg. ("foo", 2), ("foo/b*", 3)
+   * Patterns including a slash character are matched against full pathnames, while those
+   * without are matched against basenames (by removing one suffix) only.
+   *
+   * It will store the current verbosity updates and clear all previous modifications for
+   * future check when initializing a new logger.
+   *
+   * Files are matched against globs in updates in order, and the first match determines
+   * the verbosity level.
+   *
+   * Files which do not match any pattern use the value of default log level form Context.
+   */
+  void updateVerbositySetting(std::vector<std::pair<absl::string_view, int>> updates)
+      ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+
+  /**
+   * Check if a string matches a glob patter. It only supports "*" and "?" wildcards,
+   * and wildcards will match /. No support for bracket expressions [...].
+   */
+  static bool safeFileNameMatch(absl::string_view pattern, absl::string_view str);
+
 private:
   /**
    * Initializes sink for the initialization of loggers, needed only in benchmark test.
@@ -69,14 +108,25 @@ private:
   void initSink();
 
   /**
-   * Creates a logger given key and log level, and add it to map.
+   * Creates a logger given key, and add it to map. Logger level is got from getLogLevel.
    * Key is the log component name, e.g. file name now.
    */
-  spdlog::logger* createLogger(std::string key, int level = -1)
+  spdlog::logger* createLogger(std::string key) ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
+
+  /**
+   * Append verborsity level updates to the VerbosityLogUpdateInfo vector.
+   */
+  void appendVerbosityLogUpdate(absl::string_view update_pattern, level_enum log_level)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
+  /**
+   * Returns the current log level of `file`. default log level is used if there is no
+   * match in log_update_info_.
+   */
+  level_enum getLogLevel(absl::string_view file) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
 
   /**
-   * Lock for the following map (not for the corresponding loggers).
+   * Lock for the following global map and update vector (not for the corresponding loggers).
    */
   absl::Mutex fancy_log_lock_;
 
@@ -84,6 +134,11 @@ private:
    * Map that stores <key, logger> pairs, key can be the file name.
    */
   FancyMapPtr fancy_log_map_ ABSL_GUARDED_BY(fancy_log_lock_) = std::make_shared<FancyMap>();
+
+  /**
+   * Vector that stores <update, level> pairs, key can be the file basename or glob expressions.
+   */
+  std::vector<VerbosityLogUpdateInfo> log_update_info_ ABSL_GUARDED_BY(fancy_log_lock_);
 };
 
 FancyContext& getFancyContext();
