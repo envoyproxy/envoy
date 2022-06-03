@@ -228,48 +228,27 @@ message RateLimitQuotaBucketSettings {
 
   // Customize the deny response to the requests over the rate limit.
   message DenyResponseSettings {
-    // Configure the deny response for HTTP requests (gRPC excluded) over the rate limit.
-    message DenyResponseHttp {
-      // HTTP response code.
-      // Defaults to 429 (:ref:`StatusCode.TooManyRequests<envoy_v3_api_enum_value_type.v3.StatusCode.TooManyRequests>`).
-      type.v3.HttpStatus http_status = 1;
+    // HTTP response code for denying non-gRPC HTTP requests.
+    // Defaults to 429 (:ref:`StatusCode.TooManyRequests<envoy_v3_api_enum_value_type.v3.StatusCode.TooManyRequests>`).
+    type.v3.HttpStatus http_status = 1;
 
-      // HTTP response body.
-      // If not set, an empty body is returned.
-      google.protobuf.BytesValue http_body = 2;
+    // HTTP response body used for denying non-gRPC HTTP requests.
+    // If not set, an empty body is returned.
+    google.protobuf.BytesValue http_body = 2;
 
-      // Specifies a list of HTTP headers that should be added to each response for requests that
-      // have been rate limited.
-      repeated config.core.v3.HeaderValueOption http_headers_to_add = 3
-          [(validate.rules).repeated = {max_items: 10}];
-    }
+    // Specifies the `RPC code
+    // <https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#google.rpc.Code>`_
+    // and the message used when denying over-the-limit gRPC requests.
+    // Defaults to the Status with the RPC Code ``UNAVAILABLE`` and empty message.
+    //
+    // .. note::
+    //   The HTTP code for a gRPC response is always 200.
+    google.rpc.Status grpc_status = 3;
 
-    // Configure the deny response for gRPC requests over the rate limit.
-    message DenyResponseGrpc {
-      // Specifies the `RPC code
-      // <https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#google.rpc.Code>`_
-      // and the message used when denying over-the-limit gRPC requests.
-      // Defaults to the Status with the RPC Code ``UNAVAILABLE`` and empty message.
-      //
-      // .. note::
-      //   The HTTP code for a gRPC response is always 200.
-      google.rpc.Status grpc_status = 1;
-
-      // Specifies a list of HTTP headers that should be added to each response for requests that
-      // have been rate limited.
-      repeated config.core.v3.HeaderValueOption http_headers_to_add = 3
-          [(validate.rules).repeated = {max_items: 10}];
-    }
-
-    oneof deny_settings {
-      option (validate.required) = true;
-
-      // Configure the deny response for HTTP requests (gRPC excluded) over the rate limit.
-      DenyResponseHttp deny_response_http = 1;
-
-      // Configure the deny response for gRPC requests over the rate limit.
-      DenyResponseGrpc deny_response_grpc = 2;
-    }
+    // Specifies a list of HTTP headers that should be added to each response for requests that
+    // have been rate limited. Applies both to plain HTTP, and gRPC requests.
+    repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
+        [(validate.rules).repeated = {max_items: 10}];
   }
 
   // ``BucketIdBuilder`` makes it possible to build :ref:`BucketId
@@ -411,16 +390,9 @@ message RateLimitQuotaBucketSettings {
   }];
 
   // Customize the deny response to the requests over the rate limit.
-  //
-  // If not set, the filter will behave according to the defaults specified in
-  // :ref:`DenyResponseSettings <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings>`,
-  // corresponding to the type of the request being processed (gRPC or plain HTTP).
-  // The type is determined using the standard check based on value of the ``Content-Type`` header:
-  //
-  // * :ref:`DenyResponseGrpc <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings.DenyResponseGrpc>`
-  //   is selected for ``application/grpc``, including various ``application/grpc+`` values.
-  // * :ref:`DenyResponseHttp <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings.DenyResponseHttp>`
-  //   is selected otherwise.
+  // If not set, the filter will be configured as if an empty message is set,
+  // and will behave according to the defaults specified in :ref:`DenyResponseSettings
+  // <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings>`.
   DenyResponseSettings deny_response_settings = 3;
 
   // Configures the behavior in the "no assignment" state: after the first request has been
