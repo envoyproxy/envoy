@@ -71,7 +71,12 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
 void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeData (end_stream={}) of {} bytes.", *this, end_stream,
                    data.length());
-  if (data.length() == 0 && !end_stream) {
+  const bool has_data = data.length() > 0;
+  if (!has_data && !end_stream) {
+    return;
+  }
+  if (write_side_closed()) {
+    IS_ENVOY_BUG("encodeData is called on write-closed stream.");
     return;
   }
   ASSERT(!local_end_stream_);
@@ -88,14 +93,17 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
     // interface and re-design QuicheMemSliceImpl.
     quic_slices.emplace_back(quiche::QuicheMemSliceImpl(data, slice.len_));
   }
+  quic::QuicConsumedData result{0, false};
   absl::Span<quiche::QuicheMemSlice> span(quic_slices);
-  // QUIC stream must take all.
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
-    WriteBodySlices(span, end_stream);
+    result = WriteBodySlices(span, end_stream);
   }
-  if (data.length() > 0) {
-    // Send buffer didn't take all the data, threshold needs to be adjusted.
+  // QUIC stream must take all.
+  if (result.bytes_consumed == 0 && has_data) {
+    IS_ENVOY_BUG(fmt::format("Send buffer didn't take all the data. Stream is write {} with {} "
+                             "bytes in send buffer. Current write was rejected.",
+                             write_side_closed() ? "closed" : "open", BufferedDataBytes()));
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
