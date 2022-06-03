@@ -1,3 +1,4 @@
+#include "envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.pb.h"
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
@@ -15,6 +16,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace {
+
+// Limit the number of threads for the FileSystemBufferFilterConfig.manager_config.thread_count to
+// 8 to ensure test stays responsive.
+static const uint32_t kMaxAsyncFileManagerThreadCount = 8;
 
 void addFileDescriptorsRecursively(const Protobuf::FileDescriptor& descriptor,
                                    Protobuf::FileDescriptorSet& set,
@@ -101,6 +106,19 @@ void cleanTapConfig(Protobuf::Message* message) {
   }
 }
 
+void cleanFileSystemBufferConfig(Protobuf::Message* message) {
+  envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig& config =
+      dynamic_cast<
+          envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig&>(
+          *message);
+  if (config.manager_config().thread_pool().thread_count() > kMaxAsyncFileManagerThreadCount) {
+    throw EnvoyException(fmt::format(
+        "received input exceeding the allowed number of threads ({} > {}) for "
+        "FileSystemBufferFilter.AsyncFileManager",
+        config.manager_config().thread_pool().thread_count(), kMaxAsyncFileManagerThreadCount));
+  }
+}
+
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
                                          Protobuf::Message* message) {
   // Map filter name to clean-up function.
@@ -110,6 +128,9 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   } else if (filter_name == "envoy.filters.http.tap") {
     // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);
+  } else if (filter_name == "envoy.filters.http.file_system_buffer") {
+    // Limit the number of threads to create to kMaxAsyncFileManagerThreadCount
+    cleanFileSystemBufferConfig(message);
   }
 }
 
