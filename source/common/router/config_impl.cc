@@ -657,8 +657,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
   if (!route.stat_prefix().empty()) {
     route_stats_scope_ = Stats::Utility::scopeFromStatNames(
-        *factory_context.scope().scopeFromStatName(factory_context.routerContext().routeStatNames().vhost_),
-        {vhost.statName(), factory_context.routerContext().routeStatNames().route_, route_stat_name_storage_.statName()});
+        *factory_context.scope().scopeFromStatName(
+            factory_context.routerContext().routeStatNames().vhost_),
+        {vhost.statName(), factory_context.routerContext().routeStatNames().route_,
+         route_stat_name_storage_.statName()});
     route_stats_config_.emplace(RouteStatsConfig{
         route_stat_name_storage_.statName(),
         generateRouteStats(*route_stats_scope_, factory_context.routerContext().routeStatNames())});
@@ -673,7 +675,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   } else {
     early_data_policy_ = std::make_unique<DefaultEarlyDataPolicy>(/*allow_safe_request*/ true);
   }
-      }
+}
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
   return !runtime_ ? true

@@ -533,10 +533,10 @@ using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
 /**
  * All route level stats. @see stats_macro.h
  */
-#define ALL_ROUTE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                          \
+#define ALL_ROUTE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                         \
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
-  COUNTER(upstream_rq_retry_overflow)                                                               \
+  COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \

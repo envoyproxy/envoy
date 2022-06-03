@@ -28,9 +28,9 @@ public:
   static std::unique_ptr<RetryStateImpl>
   create(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
          const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-         const RouteStatsConfig* route_stats_config,
-         Runtime::Loader& runtime, Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-         TimeSource& time_source, Upstream::ResourcePriority priority);
+         const RouteStatsConfig* route_stats_config, Runtime::Loader& runtime,
+         Random::RandomGenerator& random, Event::Dispatcher& dispatcher, TimeSource& time_source,
+         Upstream::ResourcePriority priority);
   ~RetryStateImpl() override;
 
   /**
@@ -99,10 +99,10 @@ public:
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                 const RouteStatsConfig* route_stats_config,
-                 Runtime::Loader& runtime, Random::RandomGenerator& random,
-                 Event::Dispatcher& dispatcher, TimeSource& time_source,
-                 Upstream::ResourcePriority priority, bool auto_configured_for_http3,
+                 const RouteStatsConfig* route_stats_config, Runtime::Loader& runtime,
+                 Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                 TimeSource& time_source, Upstream::ResourcePriority priority,
+                 bool auto_configured_for_http3,
                  bool conn_pool_new_stream_with_early_data_and_http3);
 
   void enableBackoffTimer();

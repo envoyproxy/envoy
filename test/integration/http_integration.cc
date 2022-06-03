@@ -755,9 +755,8 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
 // Make sure route level stats are generated correctly.
 void HttpIntegrationTest::testRouteStats() {
   config_helper_.addConfigModifier(
-      [](
-          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) {
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
         auto* route_config = hcm.mutable_route_config();
         ASSERT_EQ(1, route_config->virtual_hosts_size());
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
@@ -775,7 +774,7 @@ void HttpIntegrationTest::testRouteStats() {
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   checkSimpleRequestSuccess(0, 0, response.get());
 
-test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_total", 1);
+  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_total", 1);
   test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_completed", 1);
 }
 

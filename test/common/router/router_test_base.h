@@ -30,9 +30,9 @@ public:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
                                  const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 const RouteStatsConfig*,
-                                 Runtime::Loader&, Random::RandomGenerator&, Event::Dispatcher&,
-                                 TimeSource&, Upstream::ResourcePriority) override {
+                                 const RouteStatsConfig*, Runtime::Loader&,
+                                 Random::RandomGenerator&, Event::Dispatcher&, TimeSource&,
+                                 Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<MockRetryState>();
     if (reject_all_hosts_) {
