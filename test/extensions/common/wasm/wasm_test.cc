@@ -63,7 +63,7 @@ std::string sha256(absl::string_view data) {
   rc = EVP_DigestFinal(ctx, digest.data(), nullptr);
   RELEASE_ASSERT(rc == 1, "Failed to finalize digest");
   EVP_MD_CTX_free(ctx);
-  return std::string(reinterpret_cast<const char*>(&digest[0]), digest.size());
+  return {reinterpret_cast<const char*>(&digest[0]), digest.size()};
 }
 
 class TestContext : public ::Envoy::Extensions::Common::Wasm::Context {
