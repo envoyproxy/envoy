@@ -660,7 +660,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   ASSERT(headers.Scheme());
 
   retry_state_ = createRetryState(
-      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, config_.runtime_,
+      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_config_,config_.runtime_,
       config_.random_, callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
@@ -944,6 +944,9 @@ void Filter::onResponseTimeout() {
       cluster_->stats().upstream_rq_timeout_.inc();
       if (request_vcluster_) {
         request_vcluster_->stats().upstream_rq_timeout_.inc();
+      }
+      if (route_stats_config_) {
+        route_stats_config_->route_stats_.upstream_rq_timeout_.inc();
       }
 
       if (upstream_request->upstreamHost()) {
@@ -1848,12 +1851,14 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
                                            Http::RequestHeaderMap& request_headers,
                                            const Upstream::ClusterInfo& cluster,
-                                           const VirtualCluster* vcluster, Runtime::Loader& runtime,
+                                           const VirtualCluster* vcluster, 
+                                           const RouteStatsConfig* route_stats_config,
+                                           Runtime::Loader& runtime,
                                            Random::RandomGenerator& random,
                                            Event::Dispatcher& dispatcher, TimeSource& time_source,
                                            Upstream::ResourcePriority priority) {
   std::unique_ptr<RetryStateImpl> retry_state =
-      RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
+      RetryStateImpl::create(policy, request_headers, cluster, vcluster,route_stats_config,runtime, random,
                              dispatcher, time_source, priority);
   if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the

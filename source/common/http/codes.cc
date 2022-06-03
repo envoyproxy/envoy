@@ -108,7 +108,7 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info,
                {vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_, rq_code});
   }
 
-  // Handle path level stats.
+  // Handle route level stats.
   if (!info.request_route_name_.empty()) {
     incCounter(info.global_scope_, {vhost_, info.request_vhost_name_, route_,
                                     info.request_route_name_, upstream_rq_completed_});

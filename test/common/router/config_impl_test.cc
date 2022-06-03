@@ -6766,7 +6766,6 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-  std::cout<<"after parsing"<<"\n";
 
   // Default allows safe requests using early data.
   Http::TestRequestHeaderMapImpl foo_request1 = genHeaders("www.lyft.com", "/foo", "GET");
@@ -6791,6 +6790,45 @@ virtual_hosts:
                    ->routeEntry()
                    ->earlyDataPolicy()
                    .allowsEarlyDataForRequest(bar_request2));
+}
+
+TEST_F(RouteMatcherTest, ConfigRouteStats) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+    stat_prefix: "foo_prefix"
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+      early_data_policy:
+        name: envoy.route.early_data_policy.default
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.early_data.v3.DefaultEarlyDataPolicy
+ )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // Validate that route has stats config if stat_prefix is configured.
+  Http::TestRequestHeaderMapImpl foo_request1 = genHeaders("www.lyft.com", "/foo", "GET");
+  EXPECT_TRUE(config.route(foo_request1, 0)
+                  ->routeEntry()
+                  ->routeStatsConfig().has_value());
+  
+
+  // Validate that route does not have stats config if stat_prefix is configured.
+   Http::TestRequestHeaderMapImpl bar_request1 = genHeaders("www.lyft.com", "/bar", "GET");
+   EXPECT_FALSE(config.route(bar_request1, 0)
+                  ->routeEntry()
+                  ->routeStatsConfig().has_value());
 }
 
 class CustomRequestHeadersTest : public testing::Test, public ConfigImplTestBase {};

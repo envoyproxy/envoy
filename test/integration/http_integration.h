@@ -231,6 +231,7 @@ protected:
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
   void testRouterVirtualClusters();
+  void testRouteStats();
   void testRouterUpstreamProtocolError(const std::string&, const std::string&);
 
   void testRouterRequestAndResponseWithBody(

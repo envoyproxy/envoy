@@ -45,6 +45,7 @@ public:
   MOCK_METHOD(bool, downstreamEndStream, (), (const));
   MOCK_METHOD(uint32_t, attemptCount, (), (const));
   MOCK_METHOD(const VirtualCluster*, requestVcluster, (), (const));
+  MOCK_METHOD(const RouteStatsConfig*, routeStatsConfig, (), (const));
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(const std::list<UpstreamRequestPtr>&, upstreamRequests, (), (const));
   MOCK_METHOD(const UpstreamRequest*, finalUpstreamRequest, (), (const));

@@ -421,6 +421,7 @@ public:
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   UpgradeMap upgrade_map_;
   absl::optional<ConnectConfig> connect_config_;
+  absl::optional<RouteStatsConfig> route_stats_config_;
   testing::NiceMock<MockEarlyDataPolicy> early_data_policy_;
 };
 
