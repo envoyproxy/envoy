@@ -19,14 +19,12 @@ The filter configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.fil
 
 The audience configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience>` is the URL of the destionation service, which is the receving service that calling service is invoking. This information is provided through cluster metadata :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`
 
-The token cache configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Token>`. This is used to avoid the redundant queries to authentication server (GCE metadata server in the context of this filter) for duplicated tokens.
-
-
 Coniguration example
 --------------------
 Static and dynamic resouce configuration example:
 
 .. code-block:: yaml
+
   static_resources:
   clusters:
     // cluster for fake destination service which has typed metadata that contains 
@@ -108,60 +106,39 @@ Filter chain configuration example:
 
 .. code-block:: yaml
 
-  filter_chains {
-      filters {
+  filter_chains:
+      filters:
         name: "http"
-        typed_config { [type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager] {
+        typed_config: [type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager]:
             codec_type: HTTP2
             stat_prefix: "config_test"
-            route_config {
+            route_config:
               name: "route_config_0"
-              virtual_hosts {
+              virtual_hosts:
                 name: "integration"
                 domains: "*"
-                routes {
-                  match {
+                routes:
+                  match:
                     prefix: "/"
-                  }
-                  route {
+                  route:
                     cluster: "cluster_0"
-                  }
-                }
-              }
-            }
-            http_filters {
+            http_filters:
               name: "envoy.filters.http.gcp_authn"
-              typed_config {            [type.googleapis.com/net.envoy.source.extensions.filters.http.metadata.GcpAuthnFilterConfig] {
-                  http_uri {
+              typed_config: [type.googleapis.com/net.envoy.source.extensions.filters.http.metadata.GcpAuthnFilterConfig]:
+                  http_uri:
                     uri: "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
                     cluster: "gcp_authn"
-                    timeout {
+                    timeout:
                       seconds: 10
-                    }
-                  }
-                }
-              }
-            }
-            http_filters {
+            http_filters:
               name: "envoy.filters.http.router"
-            }
-            access_log {
+            access_log:
               name: "accesslog"
-              filter {
-                not_health_check_filter {
-                }
-              }
-              typed_config {
-                [type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {
+              filter:
+                not_health_check_filter:
+              typed_config:
+                [type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog]:
                   path: "/dev/null"
-                }
-              }
-            }
-            delayed_close_timeout {
+            delayed_close_timeout:
               nanos: 100
-            }
-          }
-        }
-      }
-    }
-    
+
