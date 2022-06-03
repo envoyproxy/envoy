@@ -411,7 +411,17 @@ message RateLimitQuotaBucketSettings {
   }];
 
   // Customize the deny response to the requests over the rate limit.
-  DenyResponseSettings deny_response_settings = 3 [(validate.rules).message = {required: true}];
+  //
+  // If not set, the filter will behave according to the defaults specified in
+  // :ref:`DenyResponseSettings <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings>`,
+  // corresponding to the type of the request being processed (gRPC or plain HTTP).
+  // The type is determined using the standard check based on value of the ``Content-Type`` header:
+  //
+  // * :ref:`DenyResponseGrpc <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings.DenyResponseGrpc>`
+  //   is selected for ``application/grpc``, including various ``application/grpc+`` values.
+  // * :ref:`DenyResponseHttp <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings.DenyResponseHttp>`
+  //   is selected otherwise.
+  DenyResponseSettings deny_response_settings = 3;
 
   // Configures the behavior in the "no assignment" state: after the first request has been
   // matched to the bucket, and before the the RLQS server returns the first quota assignment.
