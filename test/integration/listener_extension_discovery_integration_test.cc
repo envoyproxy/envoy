@@ -15,6 +15,9 @@ namespace {
 
 enum class ListenerMatcherType { NULLMATCHER, ANYMATCHER, NOTANYMATCHER };
 
+constexpr absl::string_view EcdsClusterName = "ecds_cluster";
+constexpr absl::string_view Ecds2ClusterName = "ecds2_cluster";
+
 class ListenerExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                                   public BaseIntegrationTest {
 public:
@@ -25,10 +28,9 @@ public:
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
                         bool set_default_config = true, bool rate_limit = false,
                         ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER,
-                        const std::string& cluster_name = "ecds_cluster",
                         bool second_stream = false) {
     config_helper_.addConfigModifier([name, apply_without_warming, set_default_config, rate_limit,
-                                      matcher, cluster_name, second_stream,
+                                      matcher, second_stream,
                                       this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       listener->set_stat_prefix("listener_stat");
@@ -57,9 +59,11 @@ public:
       addListenerFilterMatcher(listener_filter, matcher);
       auto* grpc_service = api_config_source->add_grpc_services();
       if (!second_stream) {
-        setGrpcService(*grpc_service, cluster_name, getEcdsFakeUpstream().localAddress());
+        setGrpcService(*grpc_service, std::string(EcdsClusterName),
+                       getEcdsFakeUpstream().localAddress());
       } else {
-        setGrpcService(*grpc_service, cluster_name, getEcds2FakeUpstream().localAddress());
+        setGrpcService(*grpc_service, std::string(Ecds2ClusterName),
+                       getEcds2FakeUpstream().localAddress());
       }
     });
   }
@@ -115,10 +119,10 @@ public:
       filter->mutable_typed_config()->PackFrom(config);
     });
 
-    addEcdsCluster("ecds_cluster");
+    addEcdsCluster(std::string(EcdsClusterName));
     // Add 2nd cluster in case of two streams.
     if (two_stream_) {
-      addEcdsCluster("ecds2_cluster");
+      addEcdsCluster(std::string(Ecds2ClusterName));
     }
     BaseIntegrationTest::initialize();
     registerTestServerPorts({port_name_});
@@ -417,8 +421,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentName)
   two_stream_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("foo", true);
-  addDynamicFilter("bar", false, true, false, ListenerMatcherType::NULLMATCHER, "ecds2_cluster",
-                   true);
+  addDynamicFilter("bar", false, true, false, ListenerMatcherType::NULLMATCHER, true);
   initialize();
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
