@@ -751,7 +751,9 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, stream_info);
+  auto empty_req_map = Http::RequestHeaderMapImpl::create();
+  auto empty_response_map = Http::ResponseHeaderMapImpl::create();
+    header_parser->evaluateHeaders(headers, *empty_req_map, *empty_response_map, stream_info);
   }
 
   // Restore the port if this was a CONNECT request.
@@ -793,12 +795,12 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 }
 
-void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+void RouteEntryImplBase::finalizeResponseHeaders(const Http::RequestHeaderMap& request_headers, Http::ResponseHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, stream_info);
+    header_parser->evaluateHeaders(headers, request_headers, headers, stream_info);
   }
 }
 

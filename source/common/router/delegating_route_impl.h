@@ -62,7 +62,9 @@ public:
   }
 
   // Router::ResponseEntry
-  void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+  void finalizeResponseHeaders(
+                               const Http::RequestHeaderMap& request_headers,
+Http::ResponseHeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;

@@ -105,7 +105,7 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 class SslRedirector : public DirectResponseEntry {
 public:
   // Router::DirectResponseEntry
-  void finalizeResponseHeaders(Http::ResponseHeaderMap&,
+  void finalizeResponseHeaders(const Http::RequestHeaderMap&, Http::ResponseHeaderMap&,
                                const StreamInfo::StreamInfo&) const override {}
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
                                                   bool) const override {
@@ -538,7 +538,7 @@ public:
                               bool insert_envoy_original_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
-  void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+  void finalizeResponseHeaders(const Http::RequestHeaderMap& request_headers, Http::ResponseHeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;
@@ -649,9 +649,9 @@ public:
                                                    bool do_formatting = true) const override {
       return parent_->requestHeaderTransforms(stream_info, do_formatting);
     }
-    void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+    void finalizeResponseHeaders(const Http::RequestHeaderMap& request_headers, Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
-      return parent_->finalizeResponseHeaders(headers, stream_info);
+      return parent_->finalizeResponseHeaders(request_headers, headers, stream_info);
     }
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                     bool do_formatting = true) const override {
@@ -782,7 +782,9 @@ public:
     void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
-      request_headers_parser_->evaluateHeaders(headers, stream_info);
+  //auto empty_req_map = Http::RequestHeaderMapImpl::create();
+  auto empty_response_map = Http::ResponseHeaderMapImpl::create();
+      request_headers_parser_->evaluateHeaders(headers, headers, *empty_response_map, stream_info);
       if (!host_rewrite_.empty()) {
         headers.setHost(host_rewrite_);
       }
@@ -790,10 +792,10 @@ public:
     }
     Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                    bool do_formatting = true) const override;
-    void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+    void finalizeResponseHeaders(const Http::RequestHeaderMap& request_headers, Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
-      response_headers_parser_->evaluateHeaders(headers, stream_info);
-      DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
+      response_headers_parser_->evaluateHeaders(headers, request_headers, headers, stream_info);
+      DynamicRouteEntry::finalizeResponseHeaders(request_headers, headers, stream_info);
     }
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                     bool do_formatting = true) const override;

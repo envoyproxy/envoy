@@ -82,7 +82,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
   cluster_ = decoder_callbacks_->clusterInfo();
   initiating_call_ = true;
   client_->check(*this, check_request_, decoder_callbacks_->activeSpan(),
-                 decoder_callbacks_->streamInfo());
+                 headers, decoder_callbacks_->streamInfo());
   initiating_call_ = false;
 }
 

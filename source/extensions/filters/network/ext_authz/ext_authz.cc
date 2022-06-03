@@ -33,6 +33,7 @@ void Filter::callCheck() {
 
   calling_check_ = true;
   client_->check(*this, check_request_, Tracing::NullSpan::instance(),
+                 *Http::StaticEmptyHeaders::get().request_headers,
                  filter_callbacks_->connection().streamInfo());
   calling_check_ = false;
 }

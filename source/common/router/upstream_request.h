@@ -37,7 +37,7 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public GenericConnectionPoolCallbacks,
                         public Event::DeferredDeletable {
 public:
-  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
+  UpstreamRequest(RouterFilterInterface& parent, const Http::RequestHeaderMap& request_headers, std::unique_ptr<GenericConnPool>&& conn_pool,
                   bool can_send_early_data, bool can_use_http3);
   ~UpstreamRequest() override;
 
@@ -131,6 +131,8 @@ public:
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
   bool hadUpstream() const { return had_upstream_; }
 
+  const Http::RequestHeaderMap& getRequestHeaders() const {return request_headers_;}
+
 private:
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return stream_info_.upstreamInfo()->upstreamTiming();
@@ -149,6 +151,7 @@ private:
   void onPerTryIdleTimeout();
 
   RouterFilterInterface& parent_;
+  const Http::RequestHeaderMap& request_headers_;
   std::unique_ptr<GenericConnPool> conn_pool_;
   bool grpc_rq_success_deferred_;
   Event::TimerPtr per_try_timeout_;

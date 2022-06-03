@@ -509,6 +509,12 @@ public:
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
 };
 
+class UpstreamHostMetadataFormatter : public MetadataFormatter {
+public:
+  UpstreamHostMetadataFormatter(const std::string& filter_namespace,
+                           const std::vector<std::string>& path, absl::optional<size_t> max_length);
+};
+
 /**
  * FormatterProvider for FilterState from StreamInfo.
  */

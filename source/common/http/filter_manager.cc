@@ -961,7 +961,9 @@ void FilterManager::sendLocalReplyViaFilterChain(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
             if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
+  auto empty_req_map = Http::RequestHeaderMapImpl::create();
+  //auto empty_response_map = Http::ResponseHeaderMapImpl::create();
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(*empty_req_map, headers, streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);
@@ -1000,7 +1002,9 @@ void FilterManager::sendDirectLocalReply(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
             if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
+  auto empty_req_map = Http::RequestHeaderMapImpl::create();
+  //auto empty_response_map = Http::ResponseHeaderMapImpl::create();
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(*empty_req_map, headers, streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);

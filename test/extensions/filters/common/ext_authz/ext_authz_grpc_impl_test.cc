@@ -90,7 +90,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -117,7 +117,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(),*Http::StaticEmptyHeaders::get().request_headers,  stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -140,7 +140,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(),*Http::StaticEmptyHeaders::get().request_headers, stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -164,7 +164,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(),*Http::StaticEmptyHeaders::get().request_headers, stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -193,7 +193,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(),*Http::StaticEmptyHeaders::get().request_headers, stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -226,7 +226,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithEmptyDeniedResponseStatus)
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(),*Http::StaticEmptyHeaders::get().request_headers, stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -244,7 +244,7 @@ TEST_F(ExtAuthzGrpcClientTest, UnknownError) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(),*Http::StaticEmptyHeaders::get().request_headers, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
@@ -257,7 +257,7 @@ TEST_F(ExtAuthzGrpcClientTest, CancelledAuthorizationRequest) {
 
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(),*Http::StaticEmptyHeaders::get().request_headers, stream_info_);
 
   EXPECT_CALL(async_request_, cancel());
   client_->cancel();
@@ -269,7 +269,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(),*Http::StaticEmptyHeaders::get().request_headers, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
@@ -304,7 +304,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(),*Http::StaticEmptyHeaders::get().request_headers, stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -344,7 +344,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(),*Http::StaticEmptyHeaders::get().request_headers, stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);

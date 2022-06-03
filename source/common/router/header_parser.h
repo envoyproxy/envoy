@@ -49,9 +49,10 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add,
       const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
-  void evaluateHeaders(Http::HeaderMap& headers,
+  void evaluateHeaders( Http::HeaderMap& headers,const Http::RequestHeaderMap& request_headers,
+                       const Http::ResponseHeaderMap& response_headers,
                        const StreamInfo::StreamInfo& stream_info) const override;
-  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const;
+  void evaluateHeaders( Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers, const StreamInfo::StreamInfo* stream_info) const;
 
   /*
    * Same as evaluateHeaders, but returns the modifications that would have been made rather than
@@ -68,7 +69,7 @@ protected:
 
 private:
   struct HeadersToAddEntry {
-    HeaderFormatterPtr formatter_;
+    HeaderFormatterNewPtr formatter_;
     const std::string original_value_;
     const bool add_if_empty_ = false;
   };

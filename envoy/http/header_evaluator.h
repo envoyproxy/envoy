@@ -19,6 +19,8 @@ public:
    * @param stream_info the source of values that can be used in the evaluation.
    */
   virtual void evaluateHeaders(Http::HeaderMap& headers,
+                               const Http::RequestHeaderMap&,
+                               const Http::ResponseHeaderMap&,
                                const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 } // namespace Http
