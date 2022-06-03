@@ -16,6 +16,8 @@
 #include "quiche_platform_impl/quiche_flags_impl.h"
 
 namespace {
+// Implementation of strcmp which is constexpr so it can be used in the
+// initialization of value values.
 constexpr bool compare(const char* a, const char* b) {
   while (true) {
     if (*a != *b) {
@@ -29,6 +31,12 @@ constexpr bool compare(const char* a, const char* b) {
   }
   return true;
 }
+
+// Envoy uses different default values for some QUICHE flags. The following methods
+// ensure that the absl::Flag objects are created with the correct values for
+// these flags. This ensures that the absl::FlagSaver finds the correct values
+// and avoid a race condition between the dynamic initialization of these flags
+// and the FlagSaver in tests.
 
 constexpr bool maybeOverride_bool(const char* name, bool val) {
   if (compare(name, "quic_reloadable_flag_quic_disable_version_draft_29")) {
@@ -122,35 +130,7 @@ absl::flat_hash_map<absl::string_view, ReloadableFlag*> makeReloadableFlagMap() 
 
 } // namespace
 
-bool initialize() {
-  // Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by
-  // default.
-  absl::SetFlag(&FLAGS_quic_reloadable_flag_quic_disable_version_draft_29, true);
-  // This flag enables BBR, otherwise QUIC will use Cubic which is less performant.
-  absl::SetFlag(&FLAGS_quic_reloadable_flag_quic_default_to_bbr, true);
-
-  // Do not include 32-byte per-entry overhead while counting header size.
-  absl::SetFlag(&FLAGS_quic_header_size_limit_includes_overhead, false);
-
-  // Set send buffer twice of max flow control window to ensure that stream send
-  // buffer always takes all the data.
-  // The max amount of data buffered is the per-stream high watermark + the max
-  // flow control window of upstream. The per-stream high watermark should be
-  // smaller than max flow control window to make sure upper stream can be flow
-  // control blocked early enough not to send more than the threshold allows.
-  // TODO(#8826) Ideally we should use the negotiated value from upstream which is not accessible
-  // for now. 512MB is way to large, but the actual bytes buffered should be bound by the negotiated
-  // upstream flow control window.
-  absl::SetFlag(&FLAGS_quic_buffered_data_threshold,
-      2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE); // 512MB
-  return true;
-}
-
-//static const bool kInitialized = initialize();
-
-FlagRegistry::FlagRegistry() : reloadable_flags_(makeReloadableFlagMap()) {
-  initialize();
-}
+FlagRegistry::FlagRegistry() : reloadable_flags_(makeReloadableFlagMap()) {}
 
 // static
 FlagRegistry& FlagRegistry::getInstance() {
