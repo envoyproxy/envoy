@@ -208,7 +208,7 @@ level_enum FancyContext::getLogLevel(absl::string_view file) const {
   }
   for (const auto& info : log_update_info_) {
     if (info.update_is_path) {
-      // If there are any slashes in the pattern, try to match the full pathname.
+      // If there are any slashes in the pattern, try to match the full path name.
       if (safeFileNameMatch(info.update_pattern, stem)) {
         return info.log_level;
       }

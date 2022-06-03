@@ -81,8 +81,8 @@ public:
   /**
    * Updates the all the loggers based on the verbosity updates <(file, level) ...>.
    * It supports file basename and glob "*" and "?" pattern, eg. ("foo", 2), ("foo/b*", 3)
-   * Patterns including a slash character are matched against full pathnames, while those
-   * without are matched against basenames (by removing one suffix) only.
+   * Patterns including a slash character are matched against full path names, while those
+   * without are matched against base names (by removing one suffix) only.
    *
    * It will store the current verbosity updates and clear all previous modifications for
    * future check when initializing a new logger.
@@ -97,7 +97,7 @@ public:
 
   /**
    * Check if a string matches a glob patter. It only supports "*" and "?" wildcards,
-   * and wildcards will match /. No support for bracket expressions [...].
+   * and wildcards may match /. No support for bracket expressions [...].
    */
   static bool safeFileNameMatch(absl::string_view pattern, absl::string_view str);
 
@@ -114,10 +114,11 @@ private:
   spdlog::logger* createLogger(std::string key) ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
 
   /**
-   * Append verborsity level updates to the VerbosityLogUpdateInfo vector.
+   * Append verbosity level updates to the VerbosityLogUpdateInfo vector.
    */
   void appendVerbosityLogUpdate(absl::string_view update_pattern, level_enum log_level)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
+  
   /**
    * Returns the current log level of `file`. default log level is used if there is no
    * match in log_update_info_.
