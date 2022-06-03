@@ -12,7 +12,6 @@
 
 #include "absl/flags/reflection.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_flags.h"

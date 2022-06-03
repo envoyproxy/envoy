@@ -22,13 +22,9 @@ namespace {
 // these flags. This ensures that the absl::FlagSaver finds the correct values
 // and avoid a race condition between the dynamic initialization of these flags
 // and the FlagSaver in tests.
-template <typename T>
-constexpr T maybeOverride(absl::string_view /*name*/, T val) {
-  return val;
-}
+template <typename T> constexpr T maybeOverride(absl::string_view /*name*/, T val) { return val; }
 
-template <>
-constexpr bool maybeOverride<bool>(absl::string_view name, bool val) {
+template <> constexpr bool maybeOverride<bool>(absl::string_view name, bool val) {
   if (name == "quic_reloadable_flag_quic_disable_version_draft_29") {
     // Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by
     // default.
@@ -46,8 +42,7 @@ constexpr bool maybeOverride<bool>(absl::string_view name, bool val) {
   return val;
 }
 
-template <>
-constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int32_t val) {
+template <> constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int32_t val) {
   if (name == "quic_buffered_data_threshold") {
     // Set send buffer twice of max flow control window to ensure that stream send
     // buffer always takes all the data.
@@ -56,10 +51,9 @@ constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int32_t val) {
     // smaller than max flow control window to make sure upper stream can be flow
     // control blocked early enough not to send more than the threshold allows.
     // TODO(#8826) Ideally we should use the negotiated value from upstream which is not accessible
-    // for now. 512MB is way to large, but the actual bytes buffered should be bound by the negotiated
-    // upstream flow control window.
-    return
-      2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE; // 512MB
+    // for now. 512MB is way to large, but the actual bytes buffered should be bound by the
+    // negotiated upstream flow control window.
+    return 2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE; // 512MB
   }
   return val;
 }
@@ -79,7 +73,8 @@ QUIC_FLAG(quic_restart_flag_http2_testonly_default_false, false)
 QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)
 #undef QUIC_FLAG
 
-#define QUIC_PROTOCOL_FLAG(type, flag, value, help) ABSL_FLAG(type, flag, maybeOverride(#flag, value), help);
+#define QUIC_PROTOCOL_FLAG(type, flag, value, help)                                                \
+  ABSL_FLAG(type, flag, maybeOverride(#flag, value), help);
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
 
@@ -91,7 +86,7 @@ absl::flat_hash_map<absl::string_view, ReloadableFlag*> makeReloadableFlagMap() 
   absl::flat_hash_map<absl::string_view, ReloadableFlag*> flags;
 
   ASSERT(absl::GetFlag(FLAGS_quic_restart_flag_quic_testonly_default_true) == true);
-#define QUIC_FLAG(flag, ...) flags.emplace("FLAGS_"#flag, &FLAGS_##flag);
+#define QUIC_FLAG(flag, ...) flags.emplace("FLAGS_" #flag, &FLAGS_##flag);
 #include "quiche/quic/core/quic_flags_list.h"
   QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_false, false)
   QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true)

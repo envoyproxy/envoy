@@ -38,7 +38,7 @@ private:
   const absl::flat_hash_map<absl::string_view, ReloadableFlag*> reloadable_flags_;
 };
 
-}  // namespace quiche
+} // namespace quiche
 
 // Flag declarations
 #define QUIC_FLAG(flag, ...) ABSL_DECLARE_FLAG(bool, flag);
