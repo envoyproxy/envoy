@@ -45,12 +45,17 @@ void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& head
 
 void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
+  if (write_side_closed()) {
+    IS_ENVOY_BUG("encodeHeaders is called on write-closed stream.");
+    return;
+  }
   // This is counting not serialized bytes in the send buffer.
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
-    WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+    size_t bytes_sent = WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+    ENVOY_BUG(bytes_sent != 0, "Failed to encode headers.");
   }
 
   if (local_end_stream_) {
@@ -103,14 +108,20 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
+  ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
+  if (write_side_closed()) {
+    IS_ENVOY_BUG("encodeTrailers is called on write-closed stream.");
+    return;
+  }
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
-  ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
+
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
 
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
-    WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+    size_t bytes_sent = WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+    ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers.");
   }
   onLocalEndStream();
 }
