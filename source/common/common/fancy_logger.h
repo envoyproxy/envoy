@@ -118,7 +118,7 @@ private:
    */
   void appendVerbosityLogUpdate(absl::string_view update_pattern, level_enum log_level)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
-  
+
   /**
    * Returns the current log level of `file`. default log level is used if there is no
    * match in log_update_info_.

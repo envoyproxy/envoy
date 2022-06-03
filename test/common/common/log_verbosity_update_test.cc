@@ -145,7 +145,7 @@ TEST(Fancy, globStarUpdate) {
   EXPECT_EQ(p->level(), spdlog::level::err);
   p = getFancyContext().getFancyLogEntry(file_3);
   EXPECT_EQ(p->level(), Logger::Context::getFancyDefaultLevel());
-  
+
   std::pair<absl::string_view, int> update_4 = std::make_pair("*", 2);
   getFancyContext().updateVerbositySetting({update_4});
 
