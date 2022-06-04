@@ -6,10 +6,10 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include <atomic>
 #include <string>
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/synchronization/mutex.h"
 
 namespace quiche {
 
@@ -23,20 +23,13 @@ public:
   explicit TypedFlag(T value) : value_(value) {}
 
   // Set flag value.
-  void setValue(T value) {
-    absl::MutexLock lock(&mutex_);
-    value_ = value;
-  }
+  void setValue(T value) { value_.store(value, std::memory_order_relaxed); }
 
   // Return flag value.
-  T value() const {
-    absl::MutexLock lock(&mutex_);
-    return value_;
-  }
+  T value() const { return value_; }
 
 private:
-  mutable absl::Mutex mutex_;
-  T value_ ABSL_GUARDED_BY(mutex_);
+  std::atomic<T> value_; // Current value of the flag.
 };
 
 using ReloadableFlag = TypedFlag<bool>;
@@ -58,16 +51,16 @@ private:
 };
 
 // Flag declarations
-#define QUIC_FLAG(flag, ...) extern ReloadableFlag* flag;
+#define QUIC_FLAG(flag, ...) extern ReloadableFlag* FLAGS_##flag;
 #include "quiche/quic/core/quic_flags_list.h"
-QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_true, true)
-QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
-QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
+QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_false, false)
+QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true)
+QUIC_FLAG(quic_restart_flag_spdy_testonly_default_false, false)
+QUIC_FLAG(quic_restart_flag_spdy_testonly_default_true, true)
+QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_false, false)
+QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_true, true)
+QUIC_FLAG(quic_restart_flag_http2_testonly_default_false, false)
+QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)
 #undef QUIC_FLAG
 
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) extern TypedFlag<type>* FLAGS_##flag;
