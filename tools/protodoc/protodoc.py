@@ -26,6 +26,7 @@ from tools.api_proto_plugin import visitor
 from tools.protodoc.extensions_db import data as EXTENSION_DB
 from tools.protodoc.contrib_extensions_db import data as CONTRIB_EXTENSION_DB
 from tools.protodoc.jinja import env as jinja_env
+from tools.protodoc.manifest_db import data as manifest_db
 
 from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
@@ -652,14 +653,7 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-<<<<<<< HEAD
-        # Load as YAML, emit as JSON and then parse as proto to provide type
-        # checking.
-        self.protodoc_manifest = manifest_pb2.Manifest()
-        json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
-=======
-        self.protodoc_manifest = utils.from_json(r.Rlocation("envoy/tools/protodoc/manifest.json"))
->>>>>>> 3b91640ae8 (protodoc: Pre-validate the protodoc manifest)
+        self.protodoc_manifest = manifest_db
 
     @cached_property
     def backticks_check(self):
