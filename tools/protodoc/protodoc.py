@@ -11,7 +11,6 @@ from collections import defaultdict
 from functools import cached_property
 
 from google.protobuf import json_format
-from bazel_tools.tools.python.runfiles import runfiles
 import yaml
 
 from jinja2 import Template
@@ -23,13 +22,15 @@ from jinja2 import Template
 # just remove it from the sys.path.
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
-from envoy.base import utils
 from envoy.code.check.checker import BackticksCheck
 
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
 from tools.config_validation import validate_fragment
+from tools.protodoc.protodoc_manifest_untyped import data as protodoc_manifest_untyped
+from tools.protodoc.extensions_db import data as EXTENSION_DB
+from tools.protodoc.contrib_extensions_db import data as CONTRIB_EXTENSION_DB
 
 from tools.protodoc import manifest_pb2
 from udpa.annotations import security_pb2
@@ -140,11 +141,6 @@ WIP_WARNING = (
     '<arch_overview_threat_model>`, are not supported by the security team, and are subject to '
     'breaking changes. Do not use this feature without understanding each of the previous '
     'points.\n\n')
-
-r = runfiles.Create()
-
-EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml"))
-CONTRIB_EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/contrib/extensions_metadata.yaml"))
 
 
 # create an index of extension categories from extension db
@@ -708,8 +704,6 @@ class RstFormatVisitor(visitor.Visitor):
     def __init__(self):
         # Load as YAML, emit as JSON and then parse as proto to provide type
         # checking.
-        protodoc_manifest_untyped = utils.from_yaml(
-            r.Rlocation('envoy/docs/protodoc_manifest.yaml'))
         self.protodoc_manifest = manifest_pb2.Manifest()
         json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
 

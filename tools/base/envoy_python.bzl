@@ -1,5 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("@base_pip3//:requirements.bzl", base_entry_point = "entry_point")
+load("@base_pip3//:requirements.bzl", "requirement", base_entry_point = "entry_point")
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 
@@ -243,4 +243,91 @@ def envoy_genjson(name, srcs = [], yaml_srcs = [], filter = None, args = None):
         out = "%s.json" % name,
         args = args,
         filter = filter,
+    )
+
+def envoy_py_data(name, src, format = None, entry_point = base_entry_point):
+    """Preload JSON/YAML data as a python lib.
+
+    Data is loaded to python and then dumped to a pickle file.
+
+    A python lib is provided which exposes the pickled data.
+
+    Example:
+
+    ```starlark
+
+    envoy_py_data(
+        name = "mydata",
+        src = ":somedata.json",
+    )
+
+    envoy_py_data(
+        name = "otherdata",
+        src = ":somedata.yaml",
+    )
+
+    py_binary(
+        name = "use_data",
+        srcs = ["use_data.py"],
+        deps = [":mydata", ":otherdata"],
+    )
+
+    ```
+
+    With the above rules, and assuming the rule is `//path/to:use_data`, `use_data.py`
+    can import `mydata` and `otherdata:
+
+    ```python
+
+    from path.to.mydata import data
+    from path.to.otherdata import data
+
+    ```
+
+    """
+    default_format = "yaml" if src.endswith(".yaml") else "json"
+    format = format if format else default_format
+
+    name_entry_point = "%s_data_env" % name
+    name_pickle = "%s_pickle" % name
+    name_pickle_p = "%s_pickle.P" % name
+    name_env = "%s_env" % name
+    name_env_py = "%s.py" % name
+    pickle_arg = "$(location %s)" % name_pickle
+
+    envoy_entry_point(
+        name = name_entry_point,
+        entry_point = entry_point,
+        pkg = "envoy.base.utils",
+        script = "envoy.data_env",
+    )
+
+    native.genrule(
+        name = name_pickle,
+        cmd = """
+        $(location %s) $(location %s) -f %s $@
+        """ % (name_entry_point, src, format),
+        outs = [name_pickle_p],
+        tools = [name_entry_point],
+        srcs = [src],
+    )
+
+    native.genrule(
+        name = name_env,
+        cmd = """
+        PICKLE_PATH=$$(realpath %s) \
+        && echo -n "\
+               \nfrom envoy.base.utils.data_env import DataEnvironment \
+               \ndata = DataEnvironment.load(\\"$$PICKLE_PATH\\")" \
+               > $@
+        """ % pickle_arg,
+        outs = [name_env_py],
+        tools = [name_pickle],
+    )
+
+    py_library(
+        name = name,
+        srcs = [name_env_py],
+        data = [name_pickle],
+        deps = [name_entry_point, requirement("envoy.base.utils")],
     )
