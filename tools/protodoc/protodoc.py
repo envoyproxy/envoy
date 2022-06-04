@@ -27,7 +27,7 @@ from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
 from tools.protodoc.extensions_db import data as EXTENSION_DB
 from tools.protodoc.contrib_extensions_db import data as CONTRIB_EXTENSION_DB
-from tools.protodoc.manifest_Db import data as manifest_db
+from tools.protodoc.manifest_db import data as manifest_db
 
 from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
@@ -697,7 +697,7 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-        return manifest_db
+        self.protodoc_manifest = manifest_db
 
     @cached_property
     def backticks_check(self):
