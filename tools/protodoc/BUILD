@@ -39,8 +39,8 @@ py_binary(
     name = "manifest_to_json",
     srcs = ["manifest_to_json.py"],
     deps = [
-        ":protodoc_manifest_untyped",
         ":manifest_proto_py_proto",
+        ":protodoc_manifest_untyped",
         "//tools/config_validation:validate_fragment",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
