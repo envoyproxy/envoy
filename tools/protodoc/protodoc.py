@@ -11,13 +11,6 @@ from functools import cached_property
 
 import yaml
 
-# We have to do some evil things to sys.path due to the way that Python module
-# resolution works; we have both tools/ trees in bazel_tools and envoy. By
-# default, Bazel leaves us with a sys.path in which the @bazel_tools repository
-# takes precedence. Now that we're done with importing runfiles above, we can
-# just remove it from the sys.path.
-sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
-
 from envoy.code.check.checker import BackticksCheck
 
 from tools.api_proto_plugin import annotations
