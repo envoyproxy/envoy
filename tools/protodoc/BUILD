@@ -39,6 +39,7 @@ py_binary(
     name = "manifest_to_json",
     srcs = ["manifest_to_json.py"],
     deps = [
+        ":protodoc_manifest_untyped",
         ":manifest_proto_py_proto",
         "//tools/config_validation:validate_fragment",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
@@ -52,11 +53,8 @@ py_binary(
 genrule(
     name = "manifest",
     outs = ["manifest.json"],
-    cmd = """$(location :manifest_to_json) $(location //docs:protodoc_manifest.yaml) $@""",
-    tools = [
-        ":manifest_to_json",
-        "//docs:protodoc_manifest.yaml",
-    ],
+    cmd = """$(location :manifest_to_json) $@""",
+    tools = [":manifest_to_json"],
 )
 
 envoy_py_data(

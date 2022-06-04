@@ -4,21 +4,17 @@ import sys
 
 from google.protobuf import json_format
 
-from envoy.base import utils
-
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
 from tools.config_validation import validate_fragment
 from tools.protodoc import manifest_pb2
+from tools.protodoc.protodoc_manifest_untyped import data as protodoc_manifest_untyped
 
 
-def main(manifest, output):
+def main(output):
     # Load as YAML, emit as JSON and then parse as proto to provide type
     # checking.
-    protodoc_manifest_untyped = utils.from_yaml(manifest)
-    protodoc_manifest = manifest_pb2.Manifest()
-    manifest = json_format.Parse(json.dumps(protodoc_manifest_untyped), protodoc_manifest)
-
+    manifest = json_format.Parse(json.dumps(protodoc_manifest_untyped), manifest_pb2.Manifest())
     result = {}
     for field_name in manifest.fields:
         field = manifest.fields[field_name]
