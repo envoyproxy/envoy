@@ -54,7 +54,15 @@ public:
   }
 
   void setup(Http::RequestHeaderMap& request_headers) {
-    state_ = RetryStateImpl::create(policy_, request_headers, cluster_, &virtual_cluster_, runtime_,
+      const absl::optional<std::string> route_name = "fake_route";
+  Stats::TestUtil::TestSymbolTable symbol_table;
+  Stats::StatNameManagedStorage stat_name{"fake_route", *symbol_table_};
+  Stats::IsolatedStoreImpl stats_store;
+  RouteStatNames stat_names{stats_store_.symbolTable()};
+  mutable RouteStats stats{generateStats(stats_store, stat_names)};
+  route_stats_config_.route_stat_name_ = stat_name;
+  route_stats_config_.route_stats_ = stats;
+    state_ = RetryStateImpl::create(policy_, request_headers, cluster_, &route_stats_config_, &virtual_cluster_, runtime_,
                                     random_, dispatcher_, test_time_.timeSystem(),
                                     Upstream::ResourcePriority::Default);
   }
@@ -167,6 +175,7 @@ public:
   NiceMock<TestRetryPolicy> policy_;
   NiceMock<Upstream::MockClusterInfo> cluster_;
   TestVirtualCluster virtual_cluster_;
+  RouteStatsConfig route_stats_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   Event::MockDispatcher dispatcher_;
