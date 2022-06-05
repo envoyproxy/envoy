@@ -4,6 +4,7 @@ load(
 )
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("//tools/base:envoy_python.bzl", "envoy_genparallel", "envoy_pkg_filter")
 
 licenses(["notice"])  # Apache 2
 
@@ -41,6 +42,33 @@ filegroup(
 filegroup(
     name = "proto_examples",
     srcs = glob(["root/**/*.pb"]),
+)
+
+envoy_genparallel(
+    name = "protos_rst",
+    srcs = [":proto_names"],
+    outs = ["protos_rst.tar"],
+    args = [
+        "$(location @com_google_protobuf//:protoc)",
+        "--descriptor_set_in=$$(realpath $(location @envoy_api//:v3_proto_set))",
+        "--plugin=protoc-gen-api_proto_plugin=$(location //tools/protodoc)",
+        "--api_proto_plugin_out=$$OUTDIR",
+    ],
+    tools = [
+        "//tools/protodoc",
+        "@com_google_protobuf//:protoc",
+        "@envoy_api//:v3_proto_set",
+    ],
+    verbosity = "warn",
+)
+
+envoy_pkg_filter(
+    name = "api_rst",
+    srcs = [":protos_rst"],
+    matching = "*.rst",
+    merge_paths = {"contrib/envoy/extensions": "api-v3"},
+    remap_paths = {"envoy": "api-v3"},
+    strip_empty = True,
 )
 
 genrule(
@@ -85,6 +113,18 @@ genquery(
 )
 
 genrule(
+    name = "proto_names",
+    srcs = [
+        ":v3_proto_srcs",
+        ":xds_proto_srcs",
+    ],
+    outs = ["proto_names.txt"],
+    cmd = """
+    cat $(SRCS) | cut -d/ -f3- | tr ':' '/' > $@
+    """,
+)
+
+genrule(
     name = "empty_protos_rst",
     srcs = [":empty_extensions.json"],
     outs = ["empty_protos_rst.tar"],
@@ -93,34 +133,6 @@ genrule(
         $(location empty_extensions.json) $@
     """,
     tools = ["//tools/protodoc:generate_empty"],
-)
-
-genrule(
-    name = "api_rst",
-    srcs = [
-        "//tools/protodoc:api_v3_protodoc",
-        ":v3_proto_srcs",
-    ],
-    outs = ["api_rst.tar"],
-    cmd = """
-    $(location //tools/docs:generate_api_rst) \\
-        $(location v3_proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
-    """,
-    tools = ["//tools/docs:generate_api_rst"],
-)
-
-genrule(
-    name = "xds_rst",
-    srcs = [
-        "//tools/protodoc:xds_protodoc",
-        ":xds_proto_srcs",
-    ],
-    outs = ["xds_rst.tar"],
-    cmd = """
-    $(location //tools/docs:generate_api_rst) \\
-        $(location xds_proto_srcs) $(locations //tools/protodoc:xds_protodoc) $@
-    """,
-    tools = ["//tools/docs:generate_api_rst"],
 )
 
 pkg_files(
@@ -206,7 +218,6 @@ pkg_tar(
         ":extensions_security_rst",
         ":external_deps_rst",
         ":version_history_rst",
-        ":xds_rst",
     ],
 )
 

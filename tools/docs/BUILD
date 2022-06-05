@@ -24,13 +24,6 @@ py_binary(
     data = ["//bazel:all_repository_locations"],
 )
 
-py_binary(
-    name = "generate_api_rst",
-    srcs = [
-        "generate_api_rst.py",
-    ],
-)
-
 # The upstream lib is maintained here:
 #
 #    https://github.com/envoyproxy/pytooling/tree/main/envoy.docs.sphinx_runner

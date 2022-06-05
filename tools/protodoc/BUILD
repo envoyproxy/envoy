@@ -1,7 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
-load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 load("//tools/base:envoy_python.bzl", "envoy_jinja_env", "envoy_py_data")
 
 licenses(["notice"])  # Apache 2
@@ -57,6 +56,11 @@ genrule(
     tools = [":manifest_to_json"],
 )
 
+envoy_py_data(
+    name = "manifest_db",
+    src = ":manifest.json",
+)
+
 py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
@@ -65,11 +69,8 @@ py_binary(
         ":contrib_extensions_db",
         ":extensions_db",
         ":jinja",
-        ":manifest_proto_py_proto",
-        ":protodoc_manifest_untyped",
+        ":manifest_db",
         "//tools/api_proto_plugin",
-        # Added temporarily, as config_validation is no longer an immediate dep...
-        "@bazel_tools//tools/python/runfiles",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
@@ -77,16 +78,6 @@ py_binary(
         requirement("envoy.code.check"),
         requirement("Jinja2"),
     ],
-)
-
-protodoc_rule(
-    name = "api_v3_protodoc",
-    deps = ["@envoy_api//:v3_protos"],
-)
-
-protodoc_rule(
-    name = "xds_protodoc",
-    deps = ["@envoy_api//:xds_protos"],
 )
 
 py_library(

@@ -298,7 +298,7 @@ def envoy_genparallel(name, args, srcs, outs, verbosity = "info", tools = [], pa
             $$PARALLEL_TARGETS \
         && tar cf $@ -C $$OUTDIR . \
         && rm -rf $$OUTDIR
-        """ % (parralel, verbosity, " ".join(args)),
+        """ % (parallel, verbosity, " ".join(args)),
         tools = [parallel] + tools,
     )
 
@@ -347,7 +347,7 @@ def envoy_pkg_filter(
     commands = []
     deletable = []
     if matching:
-        deletable.append('! -name "%s"' % matching)
+        deletable.append('-type f ! -name "%s"' % matching)
     if prune:
         deletable.append('-name "%s"' % prune)
     if strip_dirs:
@@ -355,7 +355,7 @@ def envoy_pkg_filter(
     if strip_files:
         deletable.append("-type f -empty")
     if deletable:
-        commands.append("find $$OUTDIR %s" % (" -o ".join("%s -delete" for d in deletable)))
+        commands.append("find $$OUTDIR %s" % (" -o ".join(["%s -delete" % d for d in deletable])))
     for src, target in remap_paths.items():
         commands.append("mv $$OUTDIR/%s $$OUTDIR/%s" % (src, target))
     for src, target in merge_paths.items():
