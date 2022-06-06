@@ -27,6 +27,8 @@
 
 #include "gmock/gmock.h"
 
+#include "quiche/common/platform/api/quiche_logging.h"
+
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -389,6 +391,7 @@ public:
       ENVOY_LOG_MISC(debug, "Request stream action on {} in state {} {}", stream_index_,
                      static_cast<int>(request_.stream_state_),
                      static_cast<int>(response_.stream_state_));
+      stream_action_active_ = true;
       if (stream_action.has_dispatching_action()) {
         // Simulate some response action while dispatching request headers, data, or trailers. This
         // may happen as a result of a filter sending a direct response.
@@ -403,8 +406,18 @@ public:
         } else if (request_action == test::common::http::DirectionalAction::kData) {
           EXPECT_CALL(request_.request_decoder_, decodeData(_, _))
               .Times(testing::AtLeast(1))
-              .WillRepeatedly(InvokeWithoutArgs(
-                  [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+              .WillRepeatedly(InvokeWithoutArgs([&] {
+                // Only simulate response action if the stream action is active
+                // otherwise the expectation could trigger in other moments
+                // causing the fuzzer to OOM.
+                // TODO(kbaichoo): In the future if the fuzzer invokes
+                // decodeData from deferred processing callbacks as part of
+                // a request data step, we should allow response data
+                // generation.
+                if (stream_action_active_) {
+                  directionalAction(response_, stream_action.dispatching_action());
+                }
+              }));
         } else if (request_action == test::common::http::DirectionalAction::kTrailers) {
           EXPECT_CALL(request_.request_decoder_, decodeTrailers_(_))
               .WillOnce(InvokeWithoutArgs(
@@ -419,6 +432,7 @@ public:
       if (response_.stream_state_ != HttpStream::StreamState::Closed) {
         directionalAction(request_, stream_action.request());
       }
+      stream_action_active_ = false;
       break;
     }
     case test::common::http::StreamAction::kResponse: {
@@ -442,6 +456,8 @@ public:
 
   Protocol http_protocol_;
   int32_t stream_index_{-1};
+  // Whether we're currently dispatching a stream action.
+  bool stream_action_active_{false};
   StreamResetCallbackFn stream_reset_callback_;
   ConnectionContext context_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -773,6 +789,12 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     codecFuzz(input, HttpVersion::Http1);
     codecFuzz(input, HttpVersion::Http2Nghttp2);
     codecFuzz(input, HttpVersion::Http2WrappedNghttp2);
+    // Prevent oghttp2 from aborting the program.
+    // If when disabling the FATAL log abort the fuzzer will create a test that reaches an
+    // inconsistent state (and crashes/accesses inconsistent memory), then it will be a bug we'll
+    // need to further evaluate. However, in fuzzing we allow oghttp2 reaching FATAL states that may
+    // happen in production environments.
+    quiche::setDFatalExitDisabled(true);
     codecFuzz(input, HttpVersion::Http2Oghttp2);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());

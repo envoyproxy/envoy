@@ -6,9 +6,9 @@
 # enough to consume all memory constrained by cgroup in large host.
 # Limiting JVM heapsize here to let it do GC more when approaching the limit to
 # leave room for compiler/linker.
-# The number 2G is chosen heuristically to both support large VM and small VM with RBE.
+# The number 3G is chosen heuristically to both support large VM and small VM with RBE.
 # Startup options cannot be selected via config.
-startup --host_jvm_args=-Xmx2g
+startup --host_jvm_args=-Xmx3g
 
 run --color=yes
 
@@ -29,6 +29,7 @@ build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
 build --action_env=PATH --host_action_env=PATH
 
 build --enable_platform_specific_config
+build --test_summary=terse
 
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation

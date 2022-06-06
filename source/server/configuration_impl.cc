@@ -38,11 +38,60 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
   return filter_manager.initializeReadFilters();
 }
 
-bool FilterChainUtility::buildFilterChain(
-    Network::ListenerFilterManager& filter_manager,
-    const std::vector<Network::ListenerFilterFactoryCb>& factories) {
-  for (const Network::ListenerFilterFactoryCb& factory : factories) {
-    factory(filter_manager);
+/**
+ * All missing listener config stats. @see stats_macros.h
+ */
+#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(extension_config_missing)
+/**
+ * Struct definition for all missing listener config stats. @see stats_macros.h
+ */
+struct MissingListenerConfigStats {
+  ALL_MISSING_LISTENER_CONFIG_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+class MissingConfigTcpListenerFilter : public Network::ListenerFilter,
+                                       public Logger::Loggable<Logger::Id::filter> {
+public:
+  MissingConfigTcpListenerFilter(Stats::Scope& stats_scope)
+      : scope_(stats_scope), stats_({ALL_MISSING_LISTENER_CONFIG_STATS(POOL_COUNTER(scope_))}) {}
+
+  // Network::ListenerFilter
+  Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
+    ENVOY_LOG(debug, "Listener filter: new connection accepted while missing configuration. "
+                     "Close socket and stop the iteration onAccept.");
+    cb.socket().ioHandle().close();
+    stats_.extension_config_missing_.inc();
+    return Network::FilterStatus::StopIteration;
+  }
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
+    // The socket is already closed onAccept. Just return StopIteration here.
+    return Network::FilterStatus::StopIteration;
+  }
+  size_t maxReadBytes() const override { return 0; }
+
+private:
+  Stats::Scope& scope_;
+  MissingListenerConfigStats stats_;
+};
+
+bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter_manager,
+                                          const Filter::ListenerFilterFactoriesList& factories,
+                                          Stats::Scope& stats_scope) {
+  bool added_missing_config_filter = false;
+  for (const auto& filter_config_provider : factories) {
+    auto config = filter_config_provider->config();
+    if (config.has_value()) {
+      auto config_value = config.value();
+      config_value(filter_manager);
+      continue;
+    }
+
+    // If a filter config is missing after warming, stop iteration.
+    if (!added_missing_config_filter) {
+      filter_manager.addAcceptFilter(nullptr,
+                                     std::make_unique<MissingConfigTcpListenerFilter>(stats_scope));
+      added_missing_config_filter = true;
+    }
   }
 
   return true;
