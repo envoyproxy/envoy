@@ -721,17 +721,14 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   }
 
   EXPECT_EQ("200", response->headers().getStatusValue());
-  Json::ObjectSharedPtr json;
-  try {
-    json = Json::Factory::loadFromString(response->body());
-  } catch (const std::exception&) {
-    // There are a few integration tests that result in the output being an error message instead of
-    // valid JSON. Skip this test for those cases.
-    return;
-  }
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+
   std::vector<std::string> stat_prefixes;
   Json::ObjectCallback find_stat_prefix = [&](const std::string& name,
                                               const Json::Object& root) -> bool {
+    // Looking for `stat_prefix` is based on precedent for how this is usually named in the config.
+    // If there are other names used for a similar purpose, this check could be expanded to add them
+    // also.
     if (name == "stat_prefix") {
       auto prefix = root.asString();
       if (!prefix.empty()) {
