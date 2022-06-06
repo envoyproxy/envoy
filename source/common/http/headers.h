@@ -60,6 +60,7 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString AccessControlPrviateNetworkAccess{"access-control-private-network-access"};
   const LowerCaseString Age{"age"};
   const LowerCaseString AltSvc{"alt-svc"};
   const LowerCaseString Authentication{"authentication"};

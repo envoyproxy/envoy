@@ -82,6 +82,11 @@ public:
         .WillByDefault(Return(enabled));
   }
 
+  void setAllowdPrivateNetworkAccess(bool enabled) {
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(filter_name_))
+        .WillByDefault(Return(enabled));
+  }
+
   const std::string filter_name_ = "envoy.filters.http.csrf";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   Buffer::OwnedImpl data_;
@@ -442,6 +447,56 @@ TEST_F(CsrfFilterTest, RequestFromInvalidAdditionalRegexOrigin) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(1U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
+}
+
+TEST_F(CsrfFilterTest, RequestWithPNAEnabled) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {"origin", "http://cross-origin"},
+                                                 {"host", "localhost"},
+                                                 {":scheme", "http"},
+                                                 {"access-control-allow-private-network", "true"}};
+
+  setAllowdPrivateNetworkAccess(true);
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "403"},
+      {"content-length", "14"},
+      {"content-type", "text/plain"},
+      {"access-control-allow-private-network", "true"},
+  };
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(1U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
+}
+
+TEST_F(CsrfFilterTest, RequestWithPNAWithoutEnabled) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {"origin", "http://cross-origin"},
+                                                 {"host", "localhost"},
+                                                 {":scheme", "http"},
+                                                 {"access-control-allow-private-network", "true"}};
+
+  setAllowdPrivateNetworkAccess(false);
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "403"},
+      {"content-length", "14"},
+      {"content-type", "text/plain"},
+  };
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 

@@ -38,6 +38,9 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Respons
     access_control_max_age_handle(Http::CustomHeaders::get().AccessControlMaxAge);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     access_control_expose_headers_handle(Http::CustomHeaders::get().AccessControlExposeHeaders);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    access_control_private_network_handle(
+        Http::CustomHeaders::get().AccessControlPrviateNetworkAccess);
 
 CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(generateStats(stats_prefix + "cors.", scope)) {}
@@ -123,6 +126,11 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
 
   if (!maxAge().empty()) {
     response_headers->setInline(access_control_max_age_handle.handle(), maxAge());
+  }
+
+  if (allowPrivateNetworkAccess() &&
+      headers.getInlineValue(access_control_private_network_handle.handle()) == "true") {
+    response_headers->setInline(access_control_private_network_handle.handle(), true);
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true,
@@ -217,6 +225,15 @@ bool CorsFilter::allowCredentials() {
   for (const auto policy : policies_) {
     if (policy && policy->allowCredentials()) {
       return policy->allowCredentials().value();
+    }
+  }
+  return false;
+}
+
+bool CorsFilter::allowPrivateNetworkAccess() {
+  for (const auto policy : policies_) {
+    if (policy && policy->allowPrivateNetworkAccess()) {
+      return policy->allowPrivateNetworkAccess().value();
     }
   }
   return false;

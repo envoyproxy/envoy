@@ -555,6 +555,11 @@ message CorsPolicy {
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.RuntimeFractionalPercent shadow_enabled = 10;
+
+  // If enable it, Envoy will respond requests with the header ``Access-Control-Allow-Private-Network: true``
+  // when the header ``Access-Control-Request-Private-Network: true`` is present on OPTIONS preflight requests.
+  // More details refer to `Private Network Access Preflight <https://developer.chrome.com/blog/private-network-access-preflight>`_
+  bool allow_private_network_access = 11;
 }
 
 // [#next-free-field: 34]
