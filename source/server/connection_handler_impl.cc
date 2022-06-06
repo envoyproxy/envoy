@@ -10,7 +10,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/server/active_internal_listener.h"
 #include "source/server/active_tcp_listener.h"
 
 namespace Envoy {
@@ -65,7 +64,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       }
       IS_ENVOY_BUG("unexpected");
     }
-    auto internal_listener = std::make_unique<ActiveInternalListener>(*this, dispatcher(), config);
+    auto internal_listener = local_registry->createActiveInternalListener(*this, config, dispatcher());
     // TODO(soulxu): support multiple internal addresses in listener in the future.
     ASSERT(config.listenSocketFactories().size() == 1);
     details->addActiveListener(config, config.listenSocketFactories()[0], listener_reject_fraction_,
@@ -141,7 +140,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           }
         }
       }
-    } else if (absl::holds_alternative<std::reference_wrapper<ActiveInternalListener>>(
+    } else if (absl::holds_alternative<std::reference_wrapper<Network::InternalListener>>(
                    per_address_details->typed_listener_)) {
       internal_listener_map_by_address_.insert_or_assign(
           per_address_details->address_->asStringView(), per_address_details);
@@ -305,10 +304,9 @@ ConnectionHandlerImpl::PerAddressActiveListenerDetails::udpListener() {
   return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
 }
 
-ConnectionHandlerImpl::ActiveInternalListenerOptRef
-ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
-  auto* val = absl::get_if<std::reference_wrapper<ActiveInternalListener>>(&typed_listener_);
-  return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
+Network::InternalListenerOptRef ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
+  auto* val = absl::get_if<std::reference_wrapper<Network::InternalListener>>(&typed_listener_);
+  return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
 }
 
 ConnectionHandlerImpl::ActiveListenerDetailsOptRef

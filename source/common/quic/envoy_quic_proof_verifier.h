@@ -18,6 +18,14 @@ private:
   bool is_valid_{false};
 };
 
+// An interface for the Envoy specific QUIC verify context.
+class EnvoyQuicProofVerifyContext : public quic::ProofVerifyContext {
+public:
+  virtual Event::Dispatcher& dispatcher() const PURE;
+  virtual bool isServer() const PURE;
+  virtual const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() const PURE;
+};
+
 // A quic::ProofVerifier implementation which verifies cert chain using SSL
 // client context config.
 class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {

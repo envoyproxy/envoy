@@ -6,6 +6,7 @@
 #include "envoy/network/post_io_action.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/options.h"
+#include "envoy/singleton/manager.h"
 
 #include "openssl/ssl.h"
 
@@ -63,6 +64,11 @@ using SslCtxCb = std::function<void(SSL_CTX*)>;
 class HandshakerFactoryContext {
 public:
   virtual ~HandshakerFactoryContext() = default;
+
+  /**
+   * Returns the singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
 
   /**
    * @return reference to the server options
