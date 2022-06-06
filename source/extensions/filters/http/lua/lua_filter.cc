@@ -3,7 +3,6 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
-#include <string>
 
 #include "envoy/http/codes.h"
 

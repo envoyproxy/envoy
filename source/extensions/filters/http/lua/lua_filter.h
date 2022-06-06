@@ -10,8 +10,6 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/lua/wrappers.h"
 
-#include "wrappers.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
