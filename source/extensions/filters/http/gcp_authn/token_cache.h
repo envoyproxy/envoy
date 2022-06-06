@@ -24,7 +24,7 @@ template <typename TokenType> class TokenCacheImpl : public Logger::Loggable<Log
 public:
   TokenCacheImpl(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& config,
                  TimeSource& time_source)
-      : lru_cache_(config.cache_size()), time_source_(time_source) {}
+      : lru_cache_(PROTOBUF_GET_WRAPPED_REQUIRED(config, cache_size)), time_source_(time_source) {}
 
   TokenCacheImpl() = delete;
   TokenType* lookUp(const std::string& key);
@@ -54,11 +54,11 @@ private:
 };
 
 struct TokenCache {
-  TokenCache(const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
+  TokenCache(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& cache_config,
              Envoy::Server::Configuration::FactoryContext& context)
       : tls(context.threadLocal()) {
-    tls.set([config](Envoy::Event::Dispatcher& dispatcher) {
-      return std::make_shared<ThreadLocalCache>(config.cache_config(), dispatcher.timeSource());
+    tls.set([cache_config](Envoy::Event::Dispatcher& dispatcher) {
+      return std::make_shared<ThreadLocalCache>(cache_config, dispatcher.timeSource());
     });
   }
   Envoy::ThreadLocal::TypedSlot<ThreadLocalCache> tls;

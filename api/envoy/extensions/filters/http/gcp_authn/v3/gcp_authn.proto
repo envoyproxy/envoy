@@ -5,6 +5,8 @@ package envoy.extensions.filters.http.gcp_authn.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -40,6 +42,7 @@ message Audience {
 
 // Token Cache configuration.
 message TokenCacheConfig {
-  // Cache size. Default value is 0, which means the cache is disabled by default.
-  uint32 cache_size = 1;
+  // The number of token entries in the cache.
+  // Default value 0 ( i.e., proto3 defaults) disable the cache by default. Other default values will enable the cache.
+  google.protobuf.Int64Value cache_size = 1;
 }
