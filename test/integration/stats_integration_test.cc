@@ -48,6 +48,7 @@ TEST_P(StatsIntegrationTest, WithDefaultConfig) {
 }
 
 TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
+  skip_tag_extraction_rule_check_ = true;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
   });

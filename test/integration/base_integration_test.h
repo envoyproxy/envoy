@@ -404,6 +404,8 @@ protected:
     upstream_config_.quic_options_.MergeFrom(options);
   }
 
+  void checkForMissingTagExtractionRules();
+
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.
@@ -484,6 +486,9 @@ protected:
   // By default the test server will use custom stats to notify on increment.
   // This override exists for tests measuring stats memory.
   bool use_real_stats_{};
+
+  // If true, skip checking stats for missing tag-extraction rules.
+  bool skip_tag_extraction_rule_check_{};
 
 private:
   // Configuration for the fake upstream.

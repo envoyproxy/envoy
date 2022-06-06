@@ -51,7 +51,9 @@ class PostgresBaseIntegrationTest : public testing::TestWithParam<Network::Addre
 public:
   PostgresBaseIntegrationTest(bool terminate_ssl, bool add_starttls_transport_socket)
       : BaseIntegrationTest(GetParam(),
-                            postgresConfig(terminate_ssl, add_starttls_transport_socket)){};
+                            postgresConfig(terminate_ssl, add_starttls_transport_socket)) {
+    skip_tag_extraction_rule_check_ = true;
+  };
 
   void SetUp() override { BaseIntegrationTest::initialize(); }
 };
