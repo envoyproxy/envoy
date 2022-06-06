@@ -21,7 +21,7 @@
 #include "source/extensions/filters/network/thrift_proxy/stats.h"
 #include "source/extensions/filters/network/thrift_proxy/transport.h"
 
-#include "absl/types/any.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,6 +43,7 @@ public:
   virtual bool payloadPassthrough() const PURE;
   virtual uint64_t maxRequestsPerConnection() const PURE;
   virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
+  virtual bool headerKeysPreserveCase() const PURE;
 };
 
 /**
@@ -70,6 +71,14 @@ public:
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override;
   bool passthroughEnabled() const override;
+  bool isRequest() const override { return true; }
+  bool headerKeysPreserveCase() const override;
+
+  using FilterContext =
+      absl::variant<absl::monostate, MessageMetadataSharedPtr, Buffer::Instance*,
+                    std::tuple<std::string, FieldType, int16_t>, bool, uint8_t, int16_t, int32_t,
+                    int64_t, double, std::string, std::tuple<FieldType, FieldType, uint32_t>,
+                    std::tuple<FieldType, uint32_t>>;
 
 private:
   struct ActiveRpc;
@@ -114,6 +123,8 @@ private:
     // DecoderCallbacks
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
     bool passthroughEnabled() const override;
+    bool isRequest() const override { return false; }
+    bool headerKeysPreserveCase() const override;
 
     void finalizeResponse();
 
@@ -205,7 +216,8 @@ private:
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
                        parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
-          local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false} {
+          local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false},
+          under_on_local_reply_{false} {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() override {
@@ -213,7 +225,11 @@ private:
       stream_info_.onRequestComplete();
       parent_.stats_.request_active_.dec();
 
-      parent_.emitLogEntry(stream_info_);
+      parent_.emitLogEntry(metadata_ ? &metadata_->requestHeaders() : nullptr,
+                           response_decoder_ && response_decoder_->metadata_
+                               ? &response_decoder_->metadata_->responseHeaders()
+                               : nullptr,
+                           stream_info_);
 
       for (auto& filter : base_filters_) {
         filter->onDestroy();
@@ -260,6 +276,7 @@ private:
     ProtocolType downstreamProtocolType() const override {
       return parent_.decoder_->protocolType();
     }
+    void onLocalReply(const MessageMetadata& metadata, bool end_stream);
     void sendLocalReply(const DirectResponse& response, bool end_stream) override;
     void startUpstreamResponse(Transport& transport, Protocol& protocol) override;
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
@@ -307,9 +324,9 @@ private:
     // @param filter    the last filter which is already applied to the decoder_event.
     //                  nullptr indicates none is applied and the decoder_event is applied from the
     //                  first filter.
-    FilterStatus applyDecoderFilters(DecoderEvent state, absl::any data,
+    FilterStatus applyDecoderFilters(DecoderEvent state, FilterContext&& data,
                                      ActiveRpcDecoderFilter* filter = nullptr);
-    FilterStatus applyEncoderFilters(DecoderEvent state, absl::any data,
+    FilterStatus applyEncoderFilters(DecoderEvent state, FilterContext&& data,
                                      ProtocolConverterSharedPtr protocol_converter,
                                      ActiveRpcEncoderFilter* filter = nullptr);
     template <typename FilterType>
@@ -317,8 +334,8 @@ private:
                               std::list<std::unique_ptr<FilterType>>& filter_list,
                               ProtocolConverterSharedPtr protocol_converter = nullptr);
 
-    // Helper to setup filter_action_ and filter_context_
-    void prepareFilterAction(DecoderEvent event, absl::any data);
+    // Helper to setup filter_action_
+    void prepareFilterAction(DecoderEvent event, FilterContext&& data);
 
     void finalizeRequest();
 
@@ -340,10 +357,10 @@ private:
     int32_t original_sequence_id_{0};
     MessageType original_msg_type_{MessageType::Call};
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
-    absl::any filter_context_;
     bool local_response_sent_ : 1;
     bool pending_transport_end_ : 1;
     bool passthrough_ : 1;
+    bool under_on_local_reply_ : 1;
   };
 
   using ActiveRpcPtr = std::unique_ptr<ActiveRpc>;
@@ -353,7 +370,9 @@ private:
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs(bool local_reset);
-  void emitLogEntry(const StreamInfo::StreamInfo& stream_info);
+  void emitLogEntry(const Http::RequestHeaderMap* request_headers,
+                    const Http::ResponseHeaderMap* response_headers,
+                    const StreamInfo::StreamInfo& stream_info);
 
   Config& config_;
   ThriftFilterStats& stats_;

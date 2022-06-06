@@ -1888,8 +1888,10 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
+    // TODO(alyssar) remove the origin check #21345
     if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+            "envoy.reloadable_features.allow_concurrency_for_alpn_pool") &&
+        origin.has_value()) {
       ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
       envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
       default_options.set_name(host->cluster().name());

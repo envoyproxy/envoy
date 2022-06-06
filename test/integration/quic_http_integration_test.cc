@@ -150,12 +150,12 @@ public:
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
     // Setting socket options is not supported.
-    ASSERT(!options);
-    return makeClientConnectionWithHost(port, "");
+    return makeClientConnectionWithHost(port, "", options);
   }
 
-  Network::ClientConnectionPtr makeClientConnectionWithHost(uint32_t port,
-                                                            const std::string& host) {
+  Network::ClientConnectionPtr makeClientConnectionWithHost(
+      uint32_t port, const std::string& host,
+      const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr) {
     // Setting socket options is not supported.
     server_addr_ = Network::Utility::resolveUrl(
         fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -167,7 +167,7 @@ public:
     // different version set on server side to test that.
     auto connection = std::make_unique<TestEnvoyQuicClientConnection>(
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
-        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr,
+        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, options,
         validation_failure_on_path_response_);
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
@@ -183,7 +183,7 @@ public:
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
-        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_);
+        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_, nullptr);
     return session;
   }
 

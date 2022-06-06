@@ -108,6 +108,7 @@ private:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
+  bool connection_established_{};
 };
 
 } // namespace ListenerFilters

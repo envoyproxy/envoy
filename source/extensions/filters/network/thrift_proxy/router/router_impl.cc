@@ -99,7 +99,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value,
 
   const auto& cluster_header = clusterHeader();
   if (!cluster_header.get().empty()) {
-    const auto& headers = metadata.headers();
+    const auto& headers = metadata.requestHeaders();
     const auto entry = headers.get(cluster_header);
     if (!entry.empty()) {
       // This is an implicitly untrusted header, so per the API documentation only the first
@@ -149,7 +149,7 @@ MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
 
 RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                       uint64_t random_value) const {
-  if (RouteEntryImplBase::headersMatch(metadata.headers())) {
+  if (RouteEntryImplBase::headersMatch(metadata.requestHeaders())) {
     bool matches =
         method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
@@ -178,7 +178,7 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
 
 RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                        uint64_t random_value) const {
-  if (RouteEntryImplBase::headersMatch(metadata.headers())) {
+  if (RouteEntryImplBase::headersMatch(metadata.requestHeaders())) {
     bool matches =
         service_name_.empty() ||
         (metadata.hasMethodName() && absl::StartsWith(metadata.methodName(), service_name_));

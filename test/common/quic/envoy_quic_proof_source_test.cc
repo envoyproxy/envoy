@@ -7,6 +7,7 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
+#include "test/common/quic/test_utils.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 
@@ -70,6 +71,7 @@ public:
     ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
         store_, client_context_config_, time_system_);
+    ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
@@ -90,7 +92,7 @@ public:
     EXPECT_EQ(quic::QUIC_SUCCESS,
               verifier_->VerifyCertChain("www.example.org", 54321, chain->certs,
                                          /*ocsp_response=*/"", /*cert_sct=*/"Fake SCT",
-                                         /*context=*/nullptr, &error, &verify_details,
+                                         &verify_context_, &error, &verify_details,
                                          /*out_alert=*/nullptr,
                                          /*callback=*/nullptr))
         << error;
@@ -103,6 +105,8 @@ private:
   NiceMock<Ssl::MockCertificateValidationContextConfig> cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
   NiceMock<Ssl::MockContextManager> tls_context_manager_;
+  Event::MockDispatcher dispatcher_;
+  NiceMock<MockProofVerifyContext> verify_context_;
 };
 
 class TestSignatureCallback : public quic::ProofSource::SignatureCallback {
