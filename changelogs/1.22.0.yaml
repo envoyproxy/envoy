@@ -383,6 +383,9 @@ new_features:
 - area: udp_proxy
   change: |
     added support for :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log>`.
+- area: matching
+  change : |
+    added support for matching authenticated inputs in network and HTTP matching data.
 
 deprecated:
 - area: config
