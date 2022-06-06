@@ -3,6 +3,7 @@
 #include <limits>
 
 #include "envoy/common/exception.h"
+#include "envoy/http/header_formatter.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
@@ -132,6 +133,8 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
   }
 
   const bool is_request = metadata.isRequest();
+  auto formatter =
+      is_request ? metadata.requestHeaders().formatter() : metadata.responseHeaders().formatter();
 
   while (header_size > 0) {
     // Attempt to read info blocks
@@ -150,9 +153,13 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
 
     while (num_headers-- > 0) {
       std::string key_string = drainVarString(buffer, header_size, "header key");
+      if (formatter) {
+        formatter->processKey(key_string);
+      }
       // LowerCaseString doesn't allow '\0', '\n', and '\r'.
       key_string =
           absl::StrReplaceAll(key_string, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
+
       const Http::LowerCaseString key = Http::LowerCaseString(key_string);
       const std::string value = drainVarString(buffer, header_size, "header value");
 
@@ -221,20 +228,22 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
     // Num headers
     BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers_size));
 
+    auto formatter = metadata.isRequest() ? metadata.requestHeaders().formatter()
+                                          : metadata.responseHeaders().formatter();
+
+    auto header_writer = [&header_buffer,
+                          formatter](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      const auto header_key = header.key().getStringView();
+
+      writeVarString(header_buffer, formatter ? formatter->format(header_key) : header_key);
+      writeVarString(header_buffer, header.value().getStringView());
+      return Http::HeaderMap::Iterate::Continue;
+    };
+
     if (metadata.isRequest()) {
-      metadata.requestHeaders().iterate(
-          [&header_buffer](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-            writeVarString(header_buffer, header.key().getStringView());
-            writeVarString(header_buffer, header.value().getStringView());
-            return Http::HeaderMap::Iterate::Continue;
-          });
+      metadata.requestHeaders().iterate(header_writer);
     } else {
-      metadata.responseHeaders().iterate(
-          [&header_buffer](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-            writeVarString(header_buffer, header.key().getStringView());
-            writeVarString(header_buffer, header.value().getStringView());
-            return Http::HeaderMap::Iterate::Continue;
-          });
+      metadata.responseHeaders().iterate(header_writer);
     }
   }
 

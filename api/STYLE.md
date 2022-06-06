@@ -115,10 +115,7 @@ Extensions must currently be added as v3 APIs following the [package
 organization](#package-organization) above.
 To add an extension config to the API, the steps below should be followed:
 
-1. If this is still WiP and subject to breaking changes, please tag it
-   `option (xds.annotations.v3.file_status).work_in_progress = true;` and
-   optionally hide it from the docs (`[#not-implemented-hide:]`).
-1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
+1. Place the v3 extension configuration `.proto` in `api/envoy/extensions` or `api/contrib/envoy/extensions`, e.g.
    `api/envoy/extensions/filters/http/foobar/v3/foobar.proto` together with an initial BUILD file:
    ```bazel
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
@@ -129,7 +126,15 @@ To add an extension config to the API, the steps below should be followed:
        deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
    )
    ```
-1. Update [source/extensions/extensions_metadata.yaml](../source/extensions/extensions_metadata.yaml)
+1. If this is still WiP and subject to breaking changes, please tag it
+   `option (xds.annotations.v3.file_status).work_in_progress = true;` and
+   optionally hide it from the docs (`[#not-implemented-hide:]`).
+1. Make sure your proto imports the v3 extension config proto (`import "udpa/annotations/status.proto";`)
+1. Make sure your proto is tracked as ready to be used
+   (`option (udpa.annotations.file_status).package_version_status = ACTIVE;`).
+   This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
+1. Add a reference to the v3 extension config in [api/BUILD](BUILD) under `v3_protos`.
+1. Update [source/extensions/extensions_metadata.yaml](../source/extensions/extensions_metadata.yaml) or [contrib/extensions_metadata.yaml](../contrib/extensions_metadata.yaml)
    with the category, [security posture, and status](../EXTENSION_POLICY.md#extension-stability-and-security-posture).
    * Any extension category added to `extensions_metadata.yaml` should be annotated in precisely one proto file, associated with a field of a proto message. e.g.
      ```proto
@@ -148,22 +153,16 @@ To add an extension config to the API, the steps below should be followed:
      message YourFilterConfig {
      }
      ```
+1. If you introduce a new extension category, you'll also need to add its name
+   under `categories` in: [tools/extensions/extensions_schema.yaml](../tools/extensions/extensions_schema.yaml).
 1. Update
-   [source/extensions/extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl)
+   [source/extensions/extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl) or [contrib/contrib_build_config.bzl](../contrib/contrib_build_config.bzl)
    to include the new extension.
 1. If the extension is not hidden, find or create a docs file with a toctree
    and to reference your proto to make sure users can navigate to it from the API docs
-   (and to not break the docs build).
-   See the [key-value-store PR](https://github.com/envoyproxy/envoy/pull/17745/files) for an example of adding a new extension point to common.
-1. Make sure your proto imports the v3 extension config proto (`import "udpa/annotations/status.proto";`)
-1. Make sure your proto is tracked as ready to be used
-   (`option (udpa.annotations.file_status).package_version_status = ACTIVE;`).
-   This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD) under `active_protos`. Without it `proto_format.sh` will delete the proto file.
-1. Add a reference to the v3 extension config in (2) in [api/BUILD](BUILD) under `v3_protos`. Without this, `proto_format.sh` will erase any imports of your proto file from other proto files.
-1. If you introduce a new extension category, you'll also need to add its name
-   under `categories` in: [tools/extensions/extensions_schema.yaml](../tools/extensions/extensions_schema.yaml).
-1. Run `./tools/proto_format/proto_format.sh fix`. Before running the script, you will need to commit your local changes to make them effective,
-   otherwise it will skip proto_format.sh due to no API change detected. This should regenerate the `BUILD` file and reformat `foobar.proto` as needed.
+   (and to not break the docs build), like [docs/root/api-v3/admin/admin.rst](../docs/root/api-v3/admin/admin.rst).
+1. Run `./tools/proto_format/proto_format.sh fix`. **Before running the script**, you will need to **commit your local changes**. By adding the commit, the tool will recognize the change, and will regenerate the `BUILD` file and reformat `foobar.proto` as needed. If you have not followed any of the above steps correctly `proto_format.sh` may remove some of the files that you added. If that is the case you can revert to the committed state, and try again once any issues are resolved.
+1. See the [key-value-store PR](https://github.com/envoyproxy/envoy/pull/17745/files) for an example of adding a new extension point to common.
 
 ## API annotations
 
