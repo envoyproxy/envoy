@@ -562,7 +562,7 @@ TEST_F(EnvoyQuicClientStreamTest, MaxIncomingHeadersCount) {
 }
 
 TEST_F(EnvoyQuicClientStreamTest, EncodeHeadersOnClosedStream) {
-  // Reset stream should clear the connection level bufferred bytes accounting.
+  // Reset stream should clear the connection level buffered bytes accounting.
   EXPECT_CALL(stream_callbacks_,
               onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
@@ -583,7 +583,7 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeDataOnClosedStream) {
   quic_stream_->encodeData(buffer, false);
   EXPECT_LT(0u, quic_session_.bytesToSend());
 
-  // Reset stream should clear the connection level bufferred bytes accounting.
+  // Reset stream should clear the connection level buffered bytes accounting.
   EXPECT_CALL(stream_callbacks_,
               onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
@@ -608,7 +608,7 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeTrailersOnClosedStream) {
   quic_stream_->encodeData(buffer, false);
   EXPECT_LT(0u, quic_session_.bytesToSend());
 
-  // Reset stream should clear the connection level bufferred bytes accounting.
+  // Reset stream should clear the connection level buffered bytes accounting.
   EXPECT_CALL(stream_callbacks_,
               onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);

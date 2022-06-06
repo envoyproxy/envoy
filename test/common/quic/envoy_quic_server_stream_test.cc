@@ -222,7 +222,7 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
 TEST_F(EnvoyQuicServerStreamTest, EncodeHeaderOnClosedStream) {
   receiveRequest(request_body_, true, request_body_.size() * 2);
 
-  // Reset stream should clear the connection level bufferred bytes accounting.
+  // Reset stream should clear the connection level buffered bytes accounting.
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_,
@@ -244,7 +244,7 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeDataOnClosedStream) {
   quic_stream_->encodeData(buffer, false);
   EXPECT_LT(0u, quic_session_.bytesToSend());
 
-  // Reset stream should clear the connection level bufferred bytes accounting.
+  // Reset stream should clear the connection level buffered bytes accounting.
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_,
@@ -271,7 +271,7 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeTrailersOnClosedStream) {
   quic_stream_->encodeData(buffer, false);
   EXPECT_LT(0u, quic_session_.bytesToSend());
 
-  // Reset stream should clear the connection level bufferred bytes accounting.
+  // Reset stream should clear the connection level buffered bytes accounting.
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_,
