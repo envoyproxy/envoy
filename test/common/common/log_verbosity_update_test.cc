@@ -70,7 +70,7 @@ TEST(Fancy, updateBasename) {
 TEST(Fancy, multipleUpdatesBasename) {
   const char* file_1 = "envoy/src/foo.cc";
   const char* file_2 = "envoy/src/bar.cc";
-  std::atomic<spdlog::logger*> flogger{0};
+  std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
   getFancyContext().initFancyLogger(file_2, flogger);
 
@@ -89,7 +89,7 @@ TEST(Fancy, multipleUpdatesBasename) {
 TEST(Fancy, multipleMatchesBasename) {
   const char* file_1 = "envoy/src/a.cc";
   const char* file_2 = "envoy/a.cc";
-  std::atomic<spdlog::logger*> flogger{0};
+  std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
   getFancyContext().initFancyLogger(file_2, flogger);
 
@@ -108,7 +108,7 @@ TEST(Fancy, globStarUpdate) {
   const char* file_1 = "envoy/src/foo.cc";
   const char* file_2 = "envoy/src/bar.cc";
   const char* file_3 = "envoy/baz.cc";
-  std::atomic<spdlog::logger*> flogger{0};
+  std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
   getFancyContext().initFancyLogger(file_2, flogger);
   getFancyContext().initFancyLogger(file_3, flogger);
@@ -171,7 +171,7 @@ TEST(Fancy, globQuestionUpdate) {
   const char* file_1 = "envoy/src/foo.cc";
   const char* file_2 = "envoy/f__.cc";
   const char* file_3 = "/bar.cc";
-  std::atomic<spdlog::logger*> flogger{0};
+  std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
   getFancyContext().initFancyLogger(file_2, flogger);
   getFancyContext().initFancyLogger(file_3, flogger);
@@ -201,7 +201,7 @@ TEST(Fancy, globQuestionUpdate) {
 
 TEST(Fancy, inOrderUpdate) {
   const char* file_1 = "envoy/src/foo.cc";
-  std::atomic<spdlog::logger*> flogger{0};
+  std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
 
   std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 3);
@@ -215,7 +215,7 @@ TEST(Fancy, inOrderUpdate) {
 
 TEST(Fancy, invalidLevelUpdate) {
   const char* file_1 = "envoy/src/foo.cc";
-  std::atomic<spdlog::logger*> flogger{0};
+  std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
 
   std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 9);

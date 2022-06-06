@@ -111,11 +111,13 @@ bool FancyContext::safeFileNameMatch(absl::string_view pattern, absl::string_vie
     }
     if (pattern.front() == '*') {
       pattern.remove_prefix(1);
-      if (pattern.empty())
+      if (pattern.empty()) {
         return true;
+      }
       do {
-        if (safeFileNameMatch(pattern, str))
+        if (safeFileNameMatch(pattern, str)) {
           return true;
+        }
         str.remove_prefix(1);
       } while (!str.empty());
       return false;
