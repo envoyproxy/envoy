@@ -485,7 +485,7 @@ message RouteMatch {
   TlsContextMatchOptions tls_context = 11;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message CorsPolicy {
   // Specifies the origins that will be allowed to do CORS requests.
   //
@@ -559,7 +559,7 @@ message CorsPolicy {
   // If enable it, Envoy will respond requests with the header ``Access-Control-Allow-Private-Network: true``
   // when the header ``Access-Control-Request-Private-Network: true`` is present on OPTIONS preflight requests.
   // More details refer to `Private Network Access Preflight <https://developer.chrome.com/blog/private-network-access-preflight>`_
-  bool allow_private_network_access = 11;
+  bool allow_private_network_access = 12;
 }
 
 // [#next-free-field: 34]
