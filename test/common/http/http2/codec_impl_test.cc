@@ -3640,7 +3640,6 @@ TEST_P(Http2CodecImplTest, ConnectTestOld) {
   driveToCompletion();
 }
 
-// CONNECT without upgrade type gets tagged with "bytestream"
 TEST_P(Http2CodecImplTest, ConnectTest) {
   client_http2_options_.set_allow_connect(true);
   server_http2_options_.set_allow_connect(true);
