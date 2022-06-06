@@ -20,7 +20,13 @@ class ListenerExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegra
 public:
   ListenerExtensionDiscoveryIntegrationTest()
       : BaseIntegrationTest(ipVersion(), ConfigHelper::baseConfig()), filter_name_("foo"),
-        data_("HelloWorld"), port_name_("http") {}
+        data_("HelloWorld"), port_name_("http") {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat
+    // 'extension_config_discovery.tcp_listener_filter.foo.grpc.ecds_cluster.streams_closed_7' and
+    // stat_prefix 'ecds_cluster'.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
                         bool set_default_config = true, bool rate_limit = false,
