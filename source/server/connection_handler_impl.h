@@ -36,8 +36,6 @@ public:
   using UdpListenerCallbacksOptRef =
       absl::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
-  using ActiveInternalListenerOptRef =
-      absl::optional<std::reference_wrapper<ActiveInternalListener>>;
 
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
 
@@ -80,13 +78,13 @@ private:
 
     absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
                   std::reference_wrapper<Network::UdpListenerCallbacks>,
-                  std::reference_wrapper<ActiveInternalListener>>
+                  std::reference_wrapper<Network::InternalListener>>
         typed_listener_;
 
     // Helpers for accessing the data in the variant for cleaner code.
     ActiveTcpListenerOptRef tcpListener();
     UdpListenerCallbacksOptRef udpListener();
-    ActiveInternalListenerOptRef internalListener();
+    Network::InternalListenerOptRef internalListener();
   };
   using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
