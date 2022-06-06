@@ -21,7 +21,6 @@ virtual_hosts:
     - name: :path
       string_match:
         safe_regex:
-          google_re2: {}
           regex: ^/users/\d+$
     - name: :method
       string_match:

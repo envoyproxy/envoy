@@ -420,5 +420,6 @@ envoy_cc_library(
     hdrs = ["delegating_route_impl.h"],
     deps = [
         "//envoy/router:router_interface",
+        "//source/common/config:metadata_lib",
     ],
 )
