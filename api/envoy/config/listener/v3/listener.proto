@@ -110,7 +110,7 @@ message Listener {
   core.v3.Address address = 2;
 
   // The additional addresses the listener should listen on. The addresses must be unique across all
-  // listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in single listener,
+  // listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in a single listener,
   // all addresses use the same protocol, and multiple internal addresses are not supported.
   // [#not-implemented-hide:]
   repeated core.v3.Address additional_addresses = 33;
