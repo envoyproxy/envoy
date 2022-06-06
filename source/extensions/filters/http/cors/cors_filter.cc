@@ -40,10 +40,10 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Respons
     access_control_expose_headers_handle(Http::CustomHeaders::get().AccessControlExposeHeaders);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     access_control_request_private_network_handle(
-        Http::CustomHeaders::get().AccessControlPrviateNetworkAccess);
+        Http::CustomHeaders::get().AccessControlRequestPrviateNetwork);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     access_control_response_private_network_handle(
-        Http::CustomHeaders::get().AccessControlPrviateNetworkAccess);
+        Http::CustomHeaders::get().AccessControlAllowPrviateNetwork);
 
 CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(generateStats(stats_prefix + "cors.", scope)) {}
@@ -131,12 +131,12 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
     response_headers->setInline(access_control_max_age_handle.handle(), maxAge());
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cors_allow_private_network_access")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cors_private_network_access")) {
     if (headers.getInlineValue(access_control_request_private_network_handle.handle()) == "true") {
-      response_headers->setInline(access_control_response_private_network_handle.handle(), true);
+      response_headers->setInline(access_control_response_private_network_handle.handle(), "true");
     }
   }
-  
+
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true,
                                     HttpResponseCodeDetails::get().CorsResponse);
 
