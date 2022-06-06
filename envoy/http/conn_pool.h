@@ -43,7 +43,7 @@ public:
    * @param protocol supplies the protocol associated with the stream, or absl::nullopt for raw TCP.
    */
   virtual void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                           const StreamInfo::StreamInfo& info,
+                           StreamInfo::StreamInfo& info,
                            absl::optional<Http::Protocol> protocol) PURE;
 };
 

@@ -32,6 +32,7 @@ envoy_cc_library(
     hdrs = ["configuration_impl.h"],
     deps = [
         "//envoy/config:typed_config_interface",
+        "//envoy/filter:config_provider_manager_interface",
         "//envoy/http:filter_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
@@ -64,7 +65,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "connection_handler_lib",
     deps = [
-        ":active_internal_listener",
         ":active_tcp_listener",
         ":active_udp_listener",
         ":connection_handler_impl",
@@ -80,7 +80,6 @@ envoy_cc_library(
         "connection_handler_impl.h",
     ],
     deps = [
-        ":active_internal_listener",
         ":active_tcp_listener",
         "//envoy/common:time_interface",
         "//envoy/event:deferred_deletable",
@@ -180,37 +179,6 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
         "//source/common/stats:timespan_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "active_internal_listener",
-    srcs = ["active_internal_listener.cc"],
-    hdrs = [
-        "active_internal_listener.h",
-    ],
-    deps = [
-        ":active_listener_base",
-        ":active_tcp_listener_headers",
-        "//envoy/common:time_interface",
-        "//envoy/event:deferred_deletable",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/event:timer_interface",
-        "//envoy/network:connection_handler_interface",
-        "//envoy/network:connection_interface",
-        "//envoy/network:exception_interface",
-        "//envoy/network:filter_interface",
-        "//envoy/network:listen_socket_interface",
-        "//envoy/network:listener_interface",
-        "//envoy/server:listener_manager_interface",
-        "//envoy/stats:timespan_interface",
-        "//source/common/common:linked_object",
-        "//source/common/common:non_copyable",
-        "//source/common/event:deferred_task",
-        "//source/common/network:connection_lib",
-        "//source/common/network:listener_filter_buffer_lib",
-        "//source/common/stats:timespan_lib",
-        "//source/common/stream_info:stream_info_lib",
     ],
 )
 

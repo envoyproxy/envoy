@@ -241,7 +241,6 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   }
 #ifdef ENVOY_ENABLE_QUIC
   // Setting socket options is not supported for HTTP3.
-  ASSERT(!options);
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
       fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Address::InstanceConstSharedPtr local_addr =
@@ -253,7 +252,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
       quic::QuicServerId(
           quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
           static_cast<uint16_t>(port)),
-      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_);
+      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_, options, nullptr);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;

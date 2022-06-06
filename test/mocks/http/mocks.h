@@ -503,17 +503,8 @@ public:
   ~MockFilterChainFactoryCallbacks() override;
 
   MOCK_METHOD(void, addStreamDecoderFilter, (Http::StreamDecoderFilterSharedPtr filter));
-  MOCK_METHOD(void, addStreamDecoderFilter,
-              (Http::StreamDecoderFilterSharedPtr filter,
-               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree));
   MOCK_METHOD(void, addStreamEncoderFilter, (Http::StreamEncoderFilterSharedPtr filter));
-  MOCK_METHOD(void, addStreamEncoderFilter,
-              (Http::StreamEncoderFilterSharedPtr filter,
-               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree));
   MOCK_METHOD(void, addStreamFilter, (Http::StreamFilterSharedPtr filter));
-  MOCK_METHOD(void, addStreamFilter,
-              (Http::StreamFilterSharedPtr filter,
-               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree));
   MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 };

@@ -10,11 +10,6 @@ if [[ ! $(command -v bazel) ]]; then
     echo 'ERROR: bazel must be installed and available in "$PATH" to build docs' >&2
     exit 1
 fi
-if [[ ! $(command -v jq) ]]; then
-    # shellcheck disable=SC2016
-    echo 'ERROR: jq must be installed and available in "$PATH" to build docs' >&2
-    exit 1
-fi
 
 MAIN_BRANCH="refs/heads/main"
 RELEASE_TAG_REGEX="^refs/tags/v.*"
