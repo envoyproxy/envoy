@@ -893,7 +893,8 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
     return makeSslClientConnection({});
   };
 
-  // Disable for this test because it messes up the connection IDs.
+  // Disable for this test because it uses connection IDs, which disrupts the accounting below
+  // leading to the wrong path for the `pb_text` being used.
   skip_tag_extraction_rule_check_ = true;
 
   const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
@@ -923,7 +924,8 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsStringUpstreamTap) {
     return makeSslClientConnection({});
   };
 
-  // Disable for this test because it messes up the connection IDs.
+  // Disable for this test because it uses connection IDs, which disrupts the accounting below
+  // leading to the wrong path for the `pb_text` being used.
   skip_tag_extraction_rule_check_ = true;
 
   const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 2;
@@ -958,7 +960,8 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
     return makeSslClientConnection({});
   };
 
-  // Disable for this test because it messes up the connection IDs.
+  // Disable for this test because it uses connection IDs, which disrupts the accounting below
+  // leading to the wrong path for the `pb_text` being used.
   skip_tag_extraction_rule_check_ = true;
 
   const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 2;
