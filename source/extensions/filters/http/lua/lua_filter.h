@@ -166,7 +166,8 @@ public:
             {"importPublicKey", static_luaImportPublicKey},
             {"verifySignature", static_luaVerifySignature},
             {"base64Escape", static_luaBase64Escape},
-            {"timestamp", static_luaTimestamp}};
+            {"timestamp", static_luaTimestamp},
+            {"timestampString", static_luaTimestampString}};
   }
 
 private:
@@ -284,10 +285,18 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestamp);
 
+  /**
+   * TimestampString.
+   * @param1 (string) optional format (e.g. milliseconds_from_epoch, microseconds_from_epoch).
+   * Defaults to milliseconds_from_epoch.
+   * @return (string) timestamp.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestampString);
+
+  enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
+
   int doSynchronousHttpCall(lua_State* state, Tracing::Span& span);
   int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span);
-
-  int timestamp(int timestamp, absl::uint128 resolution);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
