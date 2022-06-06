@@ -133,7 +133,7 @@ To add an extension config to the API, the steps below should be followed:
 1. Make sure your proto is tracked as ready to be used
    (`option (udpa.annotations.file_status).package_version_status = ACTIVE;`).
    This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
-1. Add a reference to the v3 extension config in (2) in [api/BUILD](BUILD) under `v3_protos`.
+1. Add a reference to the v3 extension config in [api/BUILD](BUILD) under `v3_protos`.
 1. Update [source/extensions/extensions_metadata.yaml](../source/extensions/extensions_metadata.yaml) or [contrib/extensions_metadata.yaml](../contrib/extensions_metadata.yaml)
    with the category, [security posture, and status](../EXTENSION_POLICY.md#extension-stability-and-security-posture).
    * Any extension category added to `extensions_metadata.yaml` should be annotated in precisely one proto file, associated with a field of a proto message. e.g.
