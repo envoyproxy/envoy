@@ -64,7 +64,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       }
       IS_ENVOY_BUG("unexpected");
     }
-    auto internal_listener = local_registry->createActiveInternalListener(*this, config, dispatcher());
+    auto internal_listener =
+        local_registry->createActiveInternalListener(*this, config, dispatcher());
     // TODO(soulxu): support multiple internal addresses in listener in the future.
     ASSERT(config.listenSocketFactories().size() == 1);
     details->addActiveListener(config, config.listenSocketFactories()[0], listener_reject_fraction_,
@@ -304,7 +305,8 @@ ConnectionHandlerImpl::PerAddressActiveListenerDetails::udpListener() {
   return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
 }
 
-Network::InternalListenerOptRef ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
+Network::InternalListenerOptRef
+ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
   auto* val = absl::get_if<std::reference_wrapper<Network::InternalListener>>(&typed_listener_);
   return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
 }
