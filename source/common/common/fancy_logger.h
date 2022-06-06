@@ -14,18 +14,17 @@ using SpdLoggerSharedPtr = std::shared_ptr<spdlog::logger>;
 using FancyMap = absl::flat_hash_map<std::string, SpdLoggerSharedPtr>;
 using FancyMapPtr = std::shared_ptr<FancyMap>;
 using FancyLogLevelMap = absl::flat_hash_map<std::string, spdlog::level::level_enum>;
-using spdlog::level::level_enum;
 
 /**
  * Data struct that stores the necessary verbosity log update info
  */
 struct VerbosityLogUpdateInfo final {
-  std::string update_pattern;
-  bool update_is_path; // i.e. it contains a path separator.
-  level_enum log_level;
+  const std::string update_pattern;
+  const bool update_is_path; // i.e. it contains a path separator.
+  const spdlog::level::level_enum log_level;
 
   VerbosityLogUpdateInfo(absl::string_view update_pattern, bool update_is_path,
-                         level_enum log_level)
+                         spdlog::level::level_enum log_level)
       : update_pattern(std::string(update_pattern)), update_is_path(update_is_path),
         log_level(log_level) {}
 };
@@ -92,7 +91,7 @@ public:
    *
    * Files which do not match any pattern use the value of default log level from Context.
    */
-  void updateVerbositySetting(std::vector<std::pair<absl::string_view, int>> updates)
+  void updateVerbositySetting(const std::vector<std::pair<absl::string_view, int>> updates)
       ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
@@ -116,14 +115,14 @@ private:
   /**
    * Append verbosity level updates to the VerbosityLogUpdateInfo vector.
    */
-  void appendVerbosityLogUpdate(absl::string_view update_pattern, level_enum log_level)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
+  void appendVerbosityLogUpdate(absl::string_view update_pattern, 
+      spdlog::level::level_enum log_level) ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
 
   /**
    * Returns the current log level of `file`. Default log level is used if there is no
    * match in log_update_info_.
    */
-  level_enum getLogLevel(absl::string_view file) const
+  spdlog::level::level_enum getLogLevel(absl::string_view file) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
 
   /**

@@ -160,16 +160,15 @@ void FancyContext::updateVerbositySetting(std::vector<std::pair<absl::string_vie
   absl::WriterMutexLock ul(&fancy_log_lock_);
   log_update_info_.clear();
   for (const auto& [glob, level] : updates) {
-    if (level < 0 || level > 6) {
+    if (level < 0 || level >= static_cast<int>(ARRAY_SIZE(spdlog::level::level_string_views))) {
+      printf("This log level: %d is out of scope, and it should be in [0, 6]. Skipping.", level);
       continue;
     }
     appendVerbosityLogUpdate(glob, static_cast<level_enum>(level));
   }
 
   for (auto& [key, logger] : *fancy_log_map_) {
-    level_enum level = getLogLevel(key);
-    printf("vupdate all key %s, level %d\n", key.c_str(), level);
-    logger->set_level(level);
+    logger->set_level(getLogLevel(key));
   }
 }
 
