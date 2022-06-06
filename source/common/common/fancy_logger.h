@@ -90,13 +90,13 @@ public:
    * Files are matched against globs in updates in order, and the first match determines
    * the verbosity level.
    *
-   * Files which do not match any pattern use the value of default log level form Context.
+   * Files which do not match any pattern use the value of default log level from Context.
    */
   void updateVerbositySetting(std::vector<std::pair<absl::string_view, int>> updates)
       ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
-   * Check if a string matches a glob patter. It only supports "*" and "?" wildcards,
+   * Check if a string matches a glob pattern. It only supports "*" and "?" wildcards,
    * and wildcards may match /. No support for bracket expressions [...].
    */
   static bool safeFileNameMatch(absl::string_view pattern, absl::string_view str);
@@ -108,7 +108,7 @@ private:
   void initSink();
 
   /**
-   * Creates a logger given key, and add it to map. Logger level is got from getLogLevel.
+   * Creates a logger given key, and add it to map. Logger level is from getLogLevel.
    * Key is the log component name, e.g. file name now.
    */
   spdlog::logger* createLogger(std::string key) ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
@@ -120,7 +120,7 @@ private:
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
 
   /**
-   * Returns the current log level of `file`. default log level is used if there is no
+   * Returns the current log level of `file`. Default log level is used if there is no
    * match in log_update_info_.
    */
   level_enum getLogLevel(absl::string_view file) const
