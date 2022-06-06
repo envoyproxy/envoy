@@ -607,6 +607,8 @@ LookupStatus CacheFilter::lookupStatus() const {
         return LookupStatus::StaleHitWithSuccessfulValidation;
       case FilterState::NotServingFromCache:
         return LookupStatus::StaleHitWithFailedValidation;
+      // Ignore the following lines. This code should not be executed.
+      // GCOV_EXCL_START
       case FilterState::Initial:
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::DecodeServingFromCache:
@@ -617,6 +619,7 @@ LookupStatus CacheFilter::lookupStatus() const {
                                   filter_state_));
       }
       return LookupStatus::Unknown;
+      // GCOV_EXCL_STOP
     }
     case CacheEntryStatus::FoundNotModified:
       // TODO(capoferro): Report this as a FoundNotModified when we handle
@@ -625,10 +628,13 @@ LookupStatus CacheFilter::lookupStatus() const {
     case CacheEntryStatus::LookupError:
       return LookupStatus::LookupError;
     }
+    // Ignore the following lines. This code should not be executed.
+    // GCOV_EXCL_START
     IS_ENVOY_BUG(absl::StrCat(
         "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
         std::to_string(static_cast<int>(filter_state_))));
     return LookupStatus::Unknown;
+    // GCOV_EXCL_STOP
   }
 
   // Either decodeHeaders decided not to do a cache lookup (because the
@@ -638,6 +644,8 @@ LookupStatus CacheFilter::lookupStatus() const {
     return LookupStatus::RequestIncomplete;
   case FilterState::NotServingFromCache:
     return LookupStatus::RequestNotCacheable;
+  // Ignore the following lines. This code should not be executed.
+  // GCOV_EXCL_START
   case FilterState::ValidatingCachedResponse:
     ABSL_FALLTHROUGH_INTENDED;
   case FilterState::DecodeServingFromCache:
@@ -652,6 +660,7 @@ LookupStatus CacheFilter::lookupStatus() const {
                               filter_state_));
   }
   return LookupStatus::Unknown;
+  // GCOV_EXCL_STOP
 }
 
 InsertStatus CacheFilter::insertStatus() const {
