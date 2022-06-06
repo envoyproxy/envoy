@@ -199,3 +199,25 @@ cc_library(
         "//library/common/jni/import:jni_import_lib",
     ],
 )
+
+cc_library(
+    name = "android_jni_utility_lib",
+    srcs = [
+        "android_jni_utility.cc",
+    ],
+    hdrs = [
+        "android_jni_utility.h",
+    ],
+    deps = [
+        "@envoy//source/common/common:assert_lib",
+        "//library/common/types:c_types_lib",
+    ] + select({
+        "@envoy//bazel:android": [
+            ":ndk_jni_support",
+            ":jni_utility_lib",
+            "//library/common/data:utility_lib",
+            "//library/common/jni/import:jni_import_lib",
+        ],
+        "//conditions:default": [],
+    }),
+)
