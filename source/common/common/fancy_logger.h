@@ -115,8 +115,9 @@ private:
   /**
    * Append verbosity level updates to the VerbosityLogUpdateInfo vector.
    */
-  void appendVerbosityLogUpdate(absl::string_view update_pattern, 
-      spdlog::level::level_enum log_level) ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
+  void appendVerbosityLogUpdate(absl::string_view update_pattern,
+                                spdlog::level::level_enum log_level)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
 
   /**
    * Returns the current log level of `file`. Default log level is used if there is no
