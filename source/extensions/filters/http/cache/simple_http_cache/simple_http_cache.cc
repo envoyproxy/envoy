@@ -20,10 +20,10 @@ public:
     SimpleHttpCache::Entry entry = cache_.lookup(*request_);
     body_ = std::move(entry.body_);
     trailers_ = std::move(entry.trailers_);
-    cb(entry.response_headers_ ? request_->makeLookupResult(std::move(entry.response_headers_),
-                                                           *entry.metadata_, body_.size(),
-                                                           trailers_ != nullptr)
-                               : LookupResult{});
+    cb(entry.response_headers_
+           ? request_->makeLookupResult(std::move(entry.response_headers_), *entry.metadata_,
+                                        body_.size(), trailers_ != nullptr)
+           : LookupResult{});
   }
 
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
@@ -184,7 +184,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
         }
         return Http::HeaderMap::Iterate::Continue;
       });
-  entry.metadata_ = absl::make_unique<ResponseMetadata>(metadata);
+  entry.metadata_ = std::make_unique<ResponseMetadata>(metadata);
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
@@ -204,7 +204,8 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
     }
     return SimpleHttpCache::Entry{
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
-        std::make_unique<ResponseMetadata>(*iter->second.metadata_), iter->second.body_, std::move(trailers_map)};
+        std::make_unique<ResponseMetadata>(*iter->second.metadata_), iter->second.body_,
+        std::move(trailers_map)};
   }
 }
 
@@ -249,7 +250,8 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
 
   return SimpleHttpCache::Entry{
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
-      std::make_unique<ResponseMetadata>(*iter->second.metadata_), iter->second.body_, std::move(trailers_map)};
+      std::make_unique<ResponseMetadata>(*iter->second.metadata_), iter->second.body_,
+      std::move(trailers_map)};
 }
 
 void SimpleHttpCache::varyInsert(const Key& request_key,
@@ -324,13 +326,13 @@ public:
         envoy::extensions::cache::simple_http_cache::v3::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
-  HttpCacheSharedPtr getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&, Server::Configuration::FactoryContext& context) override {
+  HttpCacheSharedPtr getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
+                              Server::Configuration::FactoryContext& context) override {
     return context.singletonManager().getTyped<SimpleHttpCache>(
         SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_singleton), &createCache);
   }
 
 private:
-
   static std::shared_ptr<Singleton::Instance> createCache() {
     return std::make_shared<SimpleHttpCache>();
   }

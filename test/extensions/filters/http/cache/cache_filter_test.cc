@@ -27,13 +27,15 @@ using ::Envoy::StatusHelpers::IsOkAndHolds;
 constexpr Seconds kArbitraryAge(10);
 
 class CacheFilterTest : public ::testing::Test {
- public:
+public:
   CacheFilterTest() : simple_cache_(std::make_shared<SimpleHttpCache>()) {}
 
- protected:
+protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
-  CacheFilterSharedPtr makeFilter(HttpCacheSharedPtr cache, CachePolicyPtr cache_policy = std::make_unique<NiceMock<MockCachePolicy>>()) {
+  CacheFilterSharedPtr
+  makeFilter(HttpCacheSharedPtr cache,
+             CachePolicyPtr cache_policy = std::make_unique<NiceMock<MockCachePolicy>>()) {
     auto filter =
         std::make_shared<CacheFilter>(config_, /*stats_prefix=*/"", context_.scope(),
                                       context_.timeSource(), cache, std::move(cache_policy));

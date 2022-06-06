@@ -136,6 +136,7 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/cache/simple_http_cache/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/cache/cache_policy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
 

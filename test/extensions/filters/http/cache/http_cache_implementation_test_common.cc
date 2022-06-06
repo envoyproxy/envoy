@@ -41,7 +41,8 @@ MATCHER(IsOk, "") { return arg.ok(); }
 } // namespace
 
 HttpCacheImplementationTest::HttpCacheImplementationTest()
-    : delegate_(GetParam()()), vary_allow_list_(getConfig().allowed_vary_headers()), cache_policy_(std::make_unique<CachePolicyImpl>()) {
+    : delegate_(GetParam()()), vary_allow_list_(getConfig().allowed_vary_headers()),
+      cache_policy_(std::make_unique<CachePolicyImpl>()) {
   request_headers_.setMethod("GET");
   request_headers_.setHost("example.com");
   request_headers_.setForwardedProto("https");
@@ -90,7 +91,7 @@ absl::Status HttpCacheImplementationTest::insert(
     const absl::string_view body, const absl::optional<Http::TestResponseTrailerMapImpl> trailers,
     std::chrono::milliseconds timeout) {
   InsertContextPtr inserter = cache()->makeInsertContext(std::move(lookup));
-  auto metadata = absl::make_unique<ResponseMetadata>(time_source_.systemTime());
+  auto metadata = std::make_unique<ResponseMetadata>(time_source_.systemTime());
   bool headers_end_stream = body.empty() && !trailers.has_value();
   inserter->insertHeaders(headers, std::move(metadata), headers_end_stream);
 
@@ -181,14 +182,13 @@ Http::TestResponseTrailerMapImpl HttpCacheImplementationTest::getTrailers(Lookup
   return trailers;
 }
 
-LookupRequestPtr HttpCacheImplementationTest::makeLookupRequest(
-    absl::string_view request_path) {
+LookupRequestPtr HttpCacheImplementationTest::makeLookupRequest(absl::string_view request_path) {
   request_headers_.setPath(request_path);
   RequestCacheControl request_cache_control(request_headers_);
 
-  return std::make_unique<LookupRequest>(
-      request_headers_, std::move(request_cache_control), *cache_policy_,
-      time_source_.systemTime(), vary_allow_list_);
+  return std::make_unique<LookupRequest>(request_headers_, std::move(request_cache_control),
+                                         *cache_policy_, time_source_.systemTime(),
+                                         vary_allow_list_);
 }
 
 testing::AssertionResult HttpCacheImplementationTest::expectLookupSuccessWithHeaders(
@@ -391,7 +391,7 @@ TEST_P(HttpCacheImplementationTest, StreamingPut) {
                                                    {"cache-control", "public, max-age=3600"}};
   const std::string request_path("/path");
   InsertContextPtr inserter = cache()->makeInsertContext(lookup(request_path));
-  auto metadata = absl::make_unique<ResponseMetadata>(time_source_.systemTime());
+  auto metadata = std::make_unique<ResponseMetadata>(time_source_.systemTime());
   inserter->insertHeaders(response_headers, std::move(metadata), false);
   inserter->insertBody(
       Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);

@@ -36,8 +36,7 @@ Key CachePolicyImpl::createCacheKey(const Http::RequestHeaderMap& request_header
   size_t query_offset = path_and_query.find('?');
   key.set_path(std::string(path_and_query.substr(0, query_offset)));
   key.set_query(std::string(path_and_query.substr(query_offset + 1, -1)));
-  const Envoy::Http::HeaderString& forwarded_proto =
-      request_headers.ForwardedProto()->value();
+  const Envoy::Http::HeaderString& forwarded_proto = request_headers.ForwardedProto()->value();
   const auto& scheme_values = Envoy::Http::Headers::get().SchemeValues;
   if (forwarded_proto == scheme_values.Http) {
     key.set_scheme(Key::HTTP);
