@@ -35,8 +35,9 @@ public:
       return;
     }
 
-    EXPECT_CALL(io_handle_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                             Event::FileReadyType::Read))
+    EXPECT_CALL(io_handle_,
+                createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                 Event::FileReadyType::Read | Event::FileReadyType::Closed))
         .WillOnce(SaveArg<1>(&file_event_callback_));
 
     // Use the on_data callback to verify the data.

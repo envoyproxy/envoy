@@ -18,7 +18,7 @@ ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle,
 
   io_handle_.initializeFileEvent(
       dispatcher_, [this](uint32_t events) { onFileEvent(events); },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Closed);
 }
 
 const Buffer::ConstRawSlice ListenerFilterBufferImpl::rawSlice() const {

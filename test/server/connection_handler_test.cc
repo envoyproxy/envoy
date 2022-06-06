@@ -1693,8 +1693,9 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
   EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
   EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
-  EXPECT_CALL(io_handle, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                          Event::FileReadyType::Read));
+  EXPECT_CALL(io_handle,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed));
   EXPECT_CALL(io_handle, activateFileEvents(Event::FileReadyType::Read));
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
@@ -1862,8 +1863,9 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
   EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
   EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
-  EXPECT_CALL(io_handle, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                          Event::FileReadyType::Read));
+  EXPECT_CALL(io_handle,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed));
   EXPECT_CALL(io_handle, activateFileEvents(Event::FileReadyType::Read));
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
   EXPECT_CALL(*test_filter, destroy_());
