@@ -13,40 +13,13 @@ namespace Http1 {
 namespace {
 
 ParserStatus intToStatus(int rc) {
-  // See
-  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
   switch (rc) {
-  case -1:
-    return ParserStatus::Error;
   case 0:
-    return ParserStatus::Success;
-  case 1:
-    return ParserStatus::NoBody;
-  case 2:
-    return ParserStatus::NoBodyData;
+    return ParserStatus::Ok;
   case 31:
     return ParserStatus::Paused;
   default:
-    return ParserStatus::Unknown;
-  }
-}
-
-int statusToInt(const ParserStatus status) {
-  // See
-  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
-  switch (status) {
-  case ParserStatus::Error:
-    return -1;
-  case ParserStatus::Success:
-    return 0;
-  case ParserStatus::NoBody:
-    return 1;
-  case ParserStatus::NoBodyData:
-    return 2;
-  case ParserStatus::Paused:
-    return 31;
-  default:
-    PANIC("not implemented");
+    return ParserStatus::Error;
   }
 }
 
@@ -64,27 +37,27 @@ public:
     settings_ = {
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onMessageBegin());
+          return static_cast<int>(conn_impl->onMessageBegin());
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onUrl(at, length));
+          return static_cast<int>(conn_impl->onUrl(at, length));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onStatus(at, length));
+          return static_cast<int>(conn_impl->onStatus(at, length));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onHeaderField(at, length));
+          return static_cast<int>(conn_impl->onHeaderField(at, length));
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onHeaderValue(at, length));
+          return static_cast<int>(conn_impl->onHeaderValue(at, length));
         },
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onHeadersComplete());
+          return static_cast<int>(conn_impl->onHeadersComplete());
         },
         [](http_parser* parser, const char* at, size_t length) -> int {
           static_cast<ParserCallbacks*>(parser->data)->bufferBody(at, length);
@@ -92,7 +65,7 @@ public:
         },
         [](http_parser* parser) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return statusToInt(conn_impl->onMessageComplete());
+          return static_cast<int>(conn_impl->onMessageComplete());
         },
         [](http_parser* parser) -> int {
           // A 0-byte chunk header is used to signal the end of the chunked body.
@@ -113,19 +86,16 @@ public:
 
   void resume() { http_parser_pause(&parser_, 0); }
 
-  ParserStatus pause() {
+  CallbackResult pause() {
     http_parser_pause(&parser_, 1);
-    // http_parser pauses through http_parser_pause above.
-    return ParserStatus::Success;
+    return CallbackResult::Success;
   }
 
   int getErrno() { return HTTP_PARSER_ERRNO(&parser_); }
 
   uint16_t statusCode() const { return parser_.status_code; }
 
-  int httpMajor() const { return parser_.http_major; }
-
-  int httpMinor() const { return parser_.http_minor; }
+  bool isHttp11() const { return parser_.http_major == 1 && parser_.http_minor == 1; }
 
   absl::optional<uint64_t> contentLength() const {
     // An unset content length will be have all bits set.
@@ -174,15 +144,13 @@ size_t LegacyHttpParserImpl::execute(const char* slice, int len) {
 
 void LegacyHttpParserImpl::resume() { impl_->resume(); }
 
-ParserStatus LegacyHttpParserImpl::pause() { return impl_->pause(); }
+CallbackResult LegacyHttpParserImpl::pause() { return impl_->pause(); }
 
 ParserStatus LegacyHttpParserImpl::getStatus() { return intToStatus(impl_->getErrno()); }
 
 uint16_t LegacyHttpParserImpl::statusCode() const { return impl_->statusCode(); }
 
-int LegacyHttpParserImpl::httpMajor() const { return impl_->httpMajor(); }
-
-int LegacyHttpParserImpl::httpMinor() const { return impl_->httpMinor(); }
+bool LegacyHttpParserImpl::isHttp11() const { return impl_->isHttp11(); }
 
 absl::optional<uint64_t> LegacyHttpParserImpl::contentLength() const {
   return impl_->contentLength();
