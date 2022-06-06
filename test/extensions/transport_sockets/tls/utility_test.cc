@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -122,17 +123,13 @@ TEST(UtilityTest, TestDaysUntilExpiration) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  // Get expiration time from the certificate info.
-  const absl::Time expiration =
-      TestUtility::parseTime(TEST_SAN_DNS_CERT_NOT_AFTER, "%b %e %H:%M:%S %Y GMT");
-
-  int days = std::difftime(absl::ToTimeT(expiration), known_date_time) / (60 * 60 * 24);
-  EXPECT_EQ(days, Utility::getDaysUntilExpiration(cert.get(), time_source));
+  EXPECT_EQ(absl::nullopt, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
   Event::SimulatedTimeSystem time_source;
-  EXPECT_EQ(std::numeric_limits<int>::max(), Utility::getDaysUntilExpiration(nullptr, time_source));
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
+            Utility::getDaysUntilExpiration(nullptr, time_source).value());
 }
 
 TEST(UtilityTest, TestValidFrom) {

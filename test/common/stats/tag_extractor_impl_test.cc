@@ -202,6 +202,20 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("listener.127.0.0.1_0.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
                          {listener_address, cipher_name});
 
+  // Stat prefix listener
+  listener_address.value_ = "my_prefix";
+  regex_tester.testRegex("listener.my_prefix.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
+                         {listener_address, cipher_name});
+
+  // Stat prefix with invalid period.
+  listener_address.value_ = "prefix";
+  regex_tester.testRegex("listener.prefix.notmatching.ssl.cipher.AES256-SHA",
+                         "listener.notmatching.ssl.cipher", {listener_address, cipher_name});
+
+  // Stat prefix with negative match for `admin`.
+  regex_tester.testRegex("listener.admin.ssl.cipher.AES256-SHA", "listener.admin.ssl.cipher",
+                         {cipher_name});
+
   // Mongo
   Tag mongo_prefix;
   mongo_prefix.name_ = tag_names.MONGO_PREFIX;

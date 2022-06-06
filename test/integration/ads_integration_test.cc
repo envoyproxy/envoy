@@ -1988,7 +1988,7 @@ TEST_P(XdsTpAdsIntegrationTest, LedsTimeout) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
   test_server_->waitForCounterEq(
-      "cluster.xdstp_//test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+      "cluster.xdstp_test/envoy.config.cluster.v3.Cluster/foo-cluster/"
       "baz?xds.node.cluster=cluster_name&xds.node.id=node_name.leds.init_fetch_timeout",
       1);
 

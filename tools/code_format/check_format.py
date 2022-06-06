@@ -146,7 +146,7 @@ BUILD_URLS_ALLOWLIST = (
     "./api/bazel/envoy_http_archive.bzl",
 )
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-12")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-14")
 BUILDIFIER_PATH = paths.get_buildifier()
 BUILDOZER_PATH = paths.get_buildozer()
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -308,9 +308,9 @@ class FormatChecker:
                 "installed, but the binary name is different or it's not available in "
                 "PATH, please use CLANG_FORMAT environment variable to specify the path. "
                 "Examples:\n"
-                "    export CLANG_FORMAT=clang-format-12.0.1\n"
-                "    export CLANG_FORMAT=/opt/bin/clang-format-12\n"
-                "    export CLANG_FORMAT=/usr/local/opt/llvm@12/bin/clang-format".format(
+                "    export CLANG_FORMAT=clang-format-14.0.0\n"
+                "    export CLANG_FORMAT=/opt/bin/clang-format-14\n"
+                "    export CLANG_FORMAT=/usr/local/opt/llvm@14/bin/clang-format".format(
                     CLANG_FORMAT_PATH))
 
         def check_bazel_tool(name, path, var):
@@ -1128,8 +1128,12 @@ if __name__ == "__main__":
         # https://github.com/envoyproxy/envoy/issues/9953
         # PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
         exclude_list = (
+            "':(exclude)source/extensions/early_data/BUILD' "
             "':(exclude)source/extensions/filters/http/buffer/BUILD' "
-            "':(exclude)source/extensions/filters/network/common/BUILD' ")
+            "':(exclude)source/extensions/filters/network/common/BUILD' "
+            "':(exclude)source/extensions/transport_sockets/common/BUILD' "
+            "':(exclude)source/extensions/udp_packet_writer/default/BUILD' "
+            "':(exclude)source/extensions/udp_packet_writer/gso/BUILD' ")
         command = (
             "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
             % exclude_list)

@@ -2,6 +2,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -20,7 +21,8 @@ public:
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          ConfigHelper::setConnectConfig(hcm, true, allow_post_,
+          hcm.mutable_delayed_close_timeout()->set_seconds(delay_close_seconds_);
+          ConfigHelper::setConnectConfig(hcm, !terminate_via_cluster_config_, allow_post_,
                                          downstream_protocol_ == Http::CodecType::HTTP3);
 
           if (enable_timeout_) {
@@ -92,6 +94,8 @@ public:
 
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
+  uint32_t delay_close_seconds_ = 200;
+  bool terminate_via_cluster_config_{};
   bool enable_timeout_{};
   bool exact_match_{};
   bool allow_post_{};
@@ -112,7 +116,25 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
   sendBidirectionalDataAndCleanShutdown();
 }
 
+TEST_P(ConnectTerminationIntegrationTest, BasicWithClusterconfig) {
+  terminate_via_cluster_config_ = true;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* upgrade =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_upstream_config();
+    envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
+    upgrade->set_name("envoy.filters.connection_pools.http.tcp");
+    upgrade->mutable_typed_config()->PackFrom(tcp_config);
+  });
+
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalDataAndCleanShutdown();
+}
+
 TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
+  // This case does not handle delay close well.
+  delay_close_seconds_ = 1;
   allow_post_ = true;
   initialize();
 
@@ -173,8 +195,10 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
     // In HTTP/3 end stream will be sent when the upstream connection is closed, and
     // STOP_SENDING frame sent instead of reset.
     ASSERT_TRUE(response_->waitForEndStream());
-  } else {
+  } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
     ASSERT_TRUE(response_->waitForReset());
+  } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
 }
 

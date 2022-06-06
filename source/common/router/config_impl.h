@@ -372,12 +372,14 @@ public:
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
+  const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
   bool traceSampled() const override { return trace_sampled_; }
 
 private:
-  std::string cluster_;
+  const std::string cluster_;
+  const Http::LowerCaseString cluster_header_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
   bool trace_sampled_;
@@ -597,6 +599,7 @@ public:
   }
   const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
+  const EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
@@ -729,6 +732,7 @@ public:
       return parent_->connectConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
+    const EarlyDataPolicy& earlyDataPolicy() const override { return parent_->earlyDataPolicy(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -979,6 +983,7 @@ private:
   const std::string route_name_;
   TimeSource& time_source_;
   const std::string random_value_header_name_;
+  EarlyDataPolicyPtr early_data_policy_;
 };
 
 /**
@@ -1193,6 +1198,7 @@ private:
   const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
+  bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
   Stats::ScopeSharedPtr vhost_scope_;
   absl::node_hash_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
@@ -1209,6 +1215,7 @@ private:
   WildcardVirtualHosts wildcard_virtual_host_prefixes_;
 
   VirtualHostSharedPtr default_virtual_host_;
+  const bool ignore_port_in_host_matching_{false};
 };
 
 /**

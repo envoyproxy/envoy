@@ -44,32 +44,6 @@ filegroup(
 )
 
 genrule(
-    name = "v2_redirects",
-    outs = ["v2_redirects.txt"],
-    cmd = """
-    jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/"))
-          | with_entries(.value |= sub("^envoy/";"api-v2/"))
-          | to_entries[]
-          | "\\(.value)\t\t\\(.key)"' \\
-        $(location :v2_mapping.json) > $@
-    """,
-    tools = [":v2_mapping.json"],
-)
-
-genrule(
-    name = "redirects",
-    outs = ["envoy-redirects.txt"],
-    cmd = """
-    cat $(location :redirects.txt) > $@ \\
-    && cat $(location :v2_redirects) >> $@
-    """,
-    tools = [
-        ":redirects.txt",
-        ":v2_redirects",
-    ],
-)
-
-genrule(
     name = "extensions_security_rst",
     srcs = [
         "//source/extensions:extensions_metadata.yaml",
@@ -153,10 +127,13 @@ pkg_files(
     name = "sphinx_base",
     srcs = glob(
         [
-            "conf.py",
             "_ext/*",
         ],
-    ) + [":redirects"],
+    ) + [
+        ":conf.py",
+        ":redirects.txt",
+        ":versions.yaml",
+    ],
     strip_prefix = "/docs",
 )
 
@@ -168,21 +145,21 @@ pkg_files(
 
 pkg_files(
     name = "sphinx_inventories",
-    srcs = ["inventories"],
+    srcs = glob(["inventories/**/*"]),
+    strip_prefix = "",
 )
 
 genrule(
     name = "version_histories",
     outs = ["version_histories.tar"],
     cmd = """
-    $(location //tools/docs:generate_version_histories) \
-        $(location //:VERSION.txt) \
-        $@ \
-        $(locations //changelogs)
+    $(location //tools/docs:generate_version_histories) $@
     """,
     tools = [
+        ":versions.yaml",
         "//:VERSION.txt",
         "//changelogs",
+        "//changelogs:sections.yaml",
         "//tools/docs:generate_version_histories",
     ],
 )

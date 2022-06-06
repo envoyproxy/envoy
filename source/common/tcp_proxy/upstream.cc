@@ -173,10 +173,11 @@ void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   }
 }
 
-void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                absl::string_view failure_reason,
                                 Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  callbacks_->onGenericPoolFailure(reason, host);
+  callbacks_->onGenericPoolFailure(reason, failure_reason, host);
 }
 
 void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
@@ -233,15 +234,16 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   }
 }
 
-void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                 absl::string_view failure_reason,
                                  Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  callbacks_->onGenericPoolFailure(reason, host);
+  callbacks_->onGenericPoolFailure(reason, failure_reason, host);
 }
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
-                               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
+                               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());

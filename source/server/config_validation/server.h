@@ -145,18 +145,19 @@ public:
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
-    return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+    return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
         filters, filter_chain_factory_context);
   }
-  std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+  Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
+    return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+        filters, context, tcp_listener_config_provider_manager_);
   }
   std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
+    return ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(filters, context);
   }
   Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
@@ -172,6 +173,10 @@ public:
     return nullptr;
   }
   uint64_t nextListenerTag() override { return 0; }
+  Filter::TcpListenerFilterConfigProviderManagerImpl*
+  getTcpListenerConfigProviderManager() override {
+    return &tcp_listener_config_provider_manager_;
+  }
 
   // Server::WorkerFactory
   WorkerPtr createWorker(uint32_t, OverloadManager&, const std::string&) override {
@@ -230,6 +235,7 @@ private:
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
   Quic::QuicStatNames quic_stat_names_;
+  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 
 } // namespace Server

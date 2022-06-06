@@ -110,21 +110,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "active_internal_listener_test",
-    srcs = ["active_internal_listener_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//source/common/network:address_lib",
-        "//source/common/network:listen_socket_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
-        "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/server:connection_handler_lib",
-        "//test/mocks/network:network_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "active_udp_listener_test",
     srcs = ["active_udp_listener_test.cc"],
     deps = [
@@ -213,7 +198,6 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

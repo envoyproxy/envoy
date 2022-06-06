@@ -69,6 +69,38 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   checkSimpleRequestSuccess(0U, 0U, response.get());
 }
 
+TEST_P(ProtocolIntegrationTest, LogicalDns) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster.set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
+    cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(ProtocolIntegrationTest, StrictDns) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster.set_type(envoy::config::cluster::v3::Cluster::STRICT_DNS);
+    cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Change the default route to be restrictive, and send a request to an alternate route.
 TEST_P(DownstreamProtocolIntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
@@ -220,6 +252,10 @@ TEST_P(DownstreamProtocolIntegrationTest, AddInvalidEncodedData) {
 
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
+  // Make sure one end to end test verifies the old path with runtime singleton,
+  // to check for regressions.
+  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "false");
+
   config_helper_.prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
   )EOF");

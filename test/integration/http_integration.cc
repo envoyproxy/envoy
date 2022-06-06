@@ -86,9 +86,11 @@ IntegrationCodecClient::IntegrationCodecClient(
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
     Http::CodecType type, bool wait_till_connected)
     : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
-      dispatcher_(dispatcher), callbacks_(*this, wait_till_connected), codec_callbacks_(*this) {
+      dispatcher_(dispatcher), callbacks_(*this, wait_till_connected), codec_callbacks_(*this),
+      codec_client_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
+  setCodecClientCallbacks(codec_client_callbacks_);
   if (wait_till_connected) {
     dispatcher.run(Event::Dispatcher::RunType::Block);
   }
@@ -239,7 +241,6 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   }
 #ifdef ENVOY_ENABLE_QUIC
   // Setting socket options is not supported for HTTP3.
-  ASSERT(!options);
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
       fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Address::InstanceConstSharedPtr local_addr =
@@ -251,7 +252,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
       quic::QuicServerId(
           quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
           static_cast<uint16_t>(port)),
-      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_);
+      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_, options, nullptr);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
