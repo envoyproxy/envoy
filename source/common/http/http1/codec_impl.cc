@@ -294,9 +294,12 @@ void StreamEncoderImpl::endEncode() {
 
   flushOutput(true);
   connection_.onEncodeComplete();
-  // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream.
-  if (connect_request_ || is_tcp_tunneling_) {
-    connection_.connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+  // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream so
+  // don't delay that signal.
+  if (connect_request_ || is_tcp_tunneling_ ||
+      (is_response_to_connect_request_ &&
+       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades"))) {
+    connection_.connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
 

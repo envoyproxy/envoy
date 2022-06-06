@@ -303,7 +303,8 @@ private:
     struct State {
       State()
           : codec_saw_local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false), is_internally_created_(false), decorated_propagate_(true) {}
+            successful_upgrade_(false), is_internally_created_(false), is_tunneling_(false),
+            decorated_propagate_(true) {}
 
       bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
                                           // the way through to the codec.
@@ -313,6 +314,10 @@ private:
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
+
+      // True if the response headers indicate a successful upgrade or connect
+      // response.
+      bool is_tunneling_ : 1;
 
       bool decorated_propagate_ : 1;
     };
