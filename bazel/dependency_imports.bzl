@@ -6,12 +6,12 @@ load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
-load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies")
 load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
+load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 
 # go version for rules_go
 GO_VERSION = "1.17.5"
@@ -45,7 +45,6 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     )
     shellcheck_dependencies()
     upb_deps()
-    antlr_dependencies(472)
     proxy_wasm_rust_sdk_dependencies()
     rules_fuzzing_dependencies(
         oss_fuzz = True,
@@ -54,6 +53,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     emscripten_deps()
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
+    parser_deps()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
     go_repository(
