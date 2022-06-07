@@ -81,11 +81,39 @@ bug_fixes:
     Fixed HTTP/2 CONNECT to be RFC compliant, rather than following the abandoned extended connect draft.
     This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.use_rfc_connect`` to false.
 
+- area: decompression
+  change: |
+    Fixed CVE-2022-29225: Decompressors can be zip bombed. Previously decompressors were
+    susceptible to memory inflation in takes in which specially crafted payloads could cause a
+    large amount of memory usage by Envoy. The max inflation payload size is now limited.
+    This change can be reverted via the ``envoy.reloadable_features.enable_compression_bomb_protection``
+    runtime flag.
+- area: router
+  change: |
+    Fixed CVE-2022-29227: Internal redirect crash for requests with body/trailers. Envoy would
+    previously crash in some cases when processing internal redirects for requests with bodies or
+    trailers if the redirect prompts an Envoy-generated local reply.
+- area: oauth
+  change: |
+    Fixed CVE-2022-29226: oauth filter allows trivial bypass. The OAuth filter implementation does
+    not include a mechanism for validating access tokens, so by design when the HMAC signed cookie
+    is missing a full authentication flow should be triggered. However, the current implementation
+    assumes that access tokens are always validated thus allowing access in the presence of any
+    access token attached to the request.
+- area: oauth
+  change: |
+    Fixed CVE-2022-29228: oauth filter calls continueDecoding() from within decodeHeaders(). The
+    OAuth filter would try to invoke the remaining filters in the chain after emitting a local
+    response, which triggers an ASSERT() in newer versions and corrupts memory on earlier versions.
+- area: health_check
+  change: |
+    Fixed CVE-2022-29224: Segfault in GrpcHealthCheckerImpl. An attacker-controlled upstream server
+    that is health checked using gRPC health checking can crash Envoy via a null pointer dereference
+    in certain circumstances.
 - area: runtime
   change: |
     Fixed a bug where was ``envoy.restart_features.no_runtime_singleton`` was inverted.
     Runtime singleton status is now guarded by non-inverted ``envoy.restart_features.remove_runtime_singleton``.
-
 - area: tcp_proxy
   change: |
     Fixed an issue using the cluster wide CONNECT termination so it will successfully proxy payloads.
@@ -93,7 +121,6 @@ bug_fixes:
   change: |
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`
     is properly extracted.
-
 - area: upstream
   change: |
     Fixed the LOGICAL_DNS and STRICT_DNS clusters to work for IPv6.
