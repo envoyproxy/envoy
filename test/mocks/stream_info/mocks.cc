@@ -18,11 +18,10 @@ namespace Envoy {
 namespace StreamInfo {
 
 MockUpstreamInfo::MockUpstreamInfo()
-    : ssl_connection_info_(std::make_shared<testing::NiceMock<Ssl::MockConnectionInfo>>()),
-      upstream_local_address_(new Network::Address::Ipv4Instance("127.1.2.3", 58443)),
+    : upstream_local_address_(new Network::Address::Ipv4Instance("127.1.2.3", 58443)),
       upstream_host_(new testing::NiceMock<Upstream::MockHostDescription>()) {
   ON_CALL(*this, dumpState(_, _)).WillByDefault(Invoke([](std::ostream& os, int indent_level) {
-    os << "MockUpstreamInfo test dumpStatei with indent: " << indent_level << std::endl;
+    os << "MockUpstreamInfo test dumpState with indent: " << indent_level << std::endl;
   }));
   ON_CALL(*this, setUpstreamConnectionId(_)).WillByDefault(Invoke([this](uint64_t id) {
     upstream_connection_id_ = id;
@@ -71,6 +70,8 @@ MockUpstreamInfo::MockUpstreamInfo()
 
 MockStreamInfo::MockStreamInfo()
     : start_time_(ts_.systemTime()),
+      // upstream
+      upstream_info_(std::make_shared<testing::NiceMock<MockUpstreamInfo>>()),
       filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
       downstream_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2"),
@@ -80,8 +81,6 @@ MockStreamInfo::MockStreamInfo()
       new Network::Address::Ipv4Instance("127.0.0.3", 63443)};
   downstream_connection_info_provider_->setDirectRemoteAddressForTest(
       downstream_direct_remote_address);
-  // upstream
-  upstream_info_ = std::make_shared<testing::NiceMock<MockUpstreamInfo>>();
 
   ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {
     response_flags_ |= response_flag;
@@ -112,13 +111,7 @@ MockStreamInfo::MockStreamInfo()
           Invoke([this]() -> OptRef<const DownstreamTiming> { return downstream_timing_; }));
   ON_CALL(*this, upstreamInfo()).WillByDefault(Invoke([this]() { return upstream_info_; }));
   ON_CALL(testing::Const(*this), upstreamInfo())
-      .WillByDefault(Invoke([this]() -> OptRef<const UpstreamInfo> {
-        std::shared_ptr<UpstreamInfo> upstream_info = upstreamInfo();
-        if (!upstream_info) {
-          return {};
-        }
-        return *upstream_info;
-      }));
+      .WillByDefault(Invoke([this]() -> OptRef<const UpstreamInfo> { return *upstream_info_; }));
   ON_CALL(*this, downstreamAddressProvider())
       .WillByDefault(ReturnPointee(downstream_connection_info_provider_));
   ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
