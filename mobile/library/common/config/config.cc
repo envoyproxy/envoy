@@ -4,7 +4,7 @@
 
 const int custom_cluster_indent = 2;
 const int custom_listener_indent = 2;
-const int custom_filter_indent = 10;
+const int custom_filter_indent = 2;
 const int custom_route_indent = 16;
 
 const int fake_remote_response_indent = 14;
@@ -13,29 +13,48 @@ const char* fake_remote_listener_insert = "  - *fake_remote_listener\n";
 const char* fake_remote_route_insert = "              - *fake_remote_route\n";
 
 const char* platform_filter_template = R"(
-          - name: envoy.filters.http.platform_bridge
-            typed_config:
-              "@type": type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge
-              platform_filter_name: {{ platform_filter_name }}
+  - name: envoy.filters.http.platform_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge
+      platform_filter_name: {{ platform_filter_name }}
 )";
 
 const char* native_filter_template = R"(
-          - name: {{ native_filter_name }}
-            typed_config: {{ native_filter_typed_config }}
+  - name: {{ native_filter_name }}
+    typed_config: {{ native_filter_typed_config }}
 )";
 
 const char* route_cache_reset_filter_insert = R"(
-          - name: envoy.filters.http.route_cache_reset
-            typed_config:
-              "@type": type.googleapis.com/envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset
+  - name: envoy.filters.http.route_cache_reset
+    typed_config:
+      "@type": type.googleapis.com/envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset
 )";
 
 const char* alternate_protocols_cache_filter_insert = R"(
-          - name: alternate_protocols_cache
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig
-              alternate_protocols_cache_options:
-                name: default_alternate_protocols_cache
+  - name: alternate_protocols_cache
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig
+      alternate_protocols_cache_options:
+        name: default_alternate_protocols_cache
+)";
+
+const char* gzip_config_insert = R"(
+  - name: envoy.filters.http.decompressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
+      decompressor_library:
+        name: gzip
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip
+          window_bits: 15
+      request_direction_config:
+        common_config:
+          enabled:
+            default_value: false
+            runtime_key: request_decompressor_enabled
+      response_direction_config:
+        common_config:
+          ignore_no_transform_header: true
 )";
 
 // clang-format off
@@ -124,6 +143,45 @@ R"(
 )";
 
 const char* config_template = R"(
+!ignore local_error_defs: &local_error_config
+  "@type": type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError
+
+!ignore network_defs: &network_configuration_config
+  "@type": type.googleapis.com/envoymobile.extensions.filters.http.network_configuration.NetworkConfiguration
+  enable_drain_post_dns_refresh: *enable_drain_post_dns_refresh
+  enable_interface_binding: *enable_interface_binding
+
+!ignore dfp_defs: &dfp_config
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+  dns_cache_config: &dns_cache_config
+    name: base_dns_cache
+    preresolve_hostnames: *dns_preresolve_hostnames
+    dns_lookup_family: *dns_lookup_family
+    host_ttl: 86400s
+    dns_min_refresh_rate: *dns_min_refresh_rate
+    dns_refresh_rate: *dns_refresh_rate
+    dns_failure_refresh_rate:
+      base_interval: *dns_fail_base_interval
+      max_interval: *dns_fail_max_interval
+    dns_query_timeout: *dns_query_timeout
+    typed_dns_resolver_config:
+      name: *dns_resolver_name
+      typed_config: *dns_resolver_config
+
+!ignore router_defs: &router_config
+  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+!ignore http_filter_defs: &http_filters
+#{custom_filters}
+  - name: envoy.filters.http.network_configuration
+    typed_config: *network_configuration_config
+  - name: envoy.filters.http.local_error
+    typed_config: *local_error_config
+  - name: envoy.filters.http.dynamic_forward_proxy
+    typed_config: *dfp_config
+  - name: envoy.router
+    typed_config: *router_config
+
 !ignore protocol_options_defs:
 - &h1_protocol_options
   envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
@@ -290,67 +348,7 @@ static_resources:
                     retry_back_off:
                       base_interval: 0.25s
                       max_interval: 60s
-          http_filters:
-#{custom_filters}
-          - name: envoy.filters.http.network_configuration
-            typed_config:
-              "@type": type.googleapis.com/envoymobile.extensions.filters.http.network_configuration.NetworkConfiguration
-              enable_drain_post_dns_refresh: *enable_drain_post_dns_refresh
-              enable_interface_binding: *enable_interface_binding
-          - name: envoy.filters.http.local_error
-            typed_config:
-              "@type": type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError
-          - name: envoy.filters.http.dynamic_forward_proxy
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
-              dns_cache_config: &dns_cache_config
-                name: base_dns_cache
-)"              // TODO: Support API for overriding prefetch_hostnames:
-                // https://github.com/envoyproxy/envoy-mobile/issues/1534
-R"(
-                preresolve_hostnames: *dns_preresolve_hostnames
-                dns_lookup_family: *dns_lookup_family
-)"              // On mobile, backgrounding might cause the host to be past its TTL without good
-                // reason. Given the host would be deleted, and new streams for a given domain
-                // would have to wait for resolution, it is better to not delete existing hosts;
-                // especially since deletion only happens when re-resolving is already in progress.
-                // There is no way to disable so the value below is equivalent to 24 hours.
-R"(
-                host_ttl: 86400s
-                dns_min_refresh_rate: *dns_min_refresh_rate
-                dns_refresh_rate: *dns_refresh_rate
-                dns_failure_refresh_rate:
-                  base_interval: *dns_fail_base_interval
-                  max_interval: *dns_fail_max_interval
-                dns_query_timeout: *dns_query_timeout
-                typed_dns_resolver_config:
-                  name: *dns_resolver_name
-                  typed_config: *dns_resolver_config
-          # TODO: make this configurable for users.
-          - name: envoy.filters.http.decompressor
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
-              decompressor_library:
-                name: gzip
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip
-)"                // Maximum window bits to allow for any stream to be decompressed. Optimally this
-                  // would be set to 0. According to the zlib manual this would allow the decompressor
-                  // to use the window bits in the zlib header to perform the decompression.
-                  // Unfortunately, the proto field constraint makes this impossible currently.
-R"(
-                  window_bits: 15
-              request_direction_config:
-                common_config:
-                  enabled:
-                    default_value: false
-                    runtime_key: request_decompressor_enabled
-              response_direction_config:
-                common_config:
-                  ignore_no_transform_header: true
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          http_filters: *http_filters
   clusters:
 #{custom_clusters}
   - *stats_cluster
