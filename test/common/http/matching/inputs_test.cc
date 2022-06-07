@@ -71,7 +71,6 @@ TEST(HttpRequestCookiesDataInput, Idempotence) {
   data.onRequestHeaders(request_headers);
 
   EXPECT_EQ(input.get(data).data_, "foo,bar");
-  EXPECT_EQ(input.get(data).data_, "foo,bar");
 }
 
 TEST(MatchingData, HttpResponseHeadersDataInput) {

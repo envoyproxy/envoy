@@ -88,7 +88,7 @@ public:
                                     const HashPolicy::AddCookieCallback add_cookie,
                                     const StreamInfo::FilterStateSharedPtr) const override {
     absl::optional<uint64_t> hash;
-    absl::string_view value = Utility::parseCookieValue(headers, key_);
+    std::string value = Utility::parseCookieValue(headers, key_);
     if (value.empty() && ttl_.has_value()) {
       value = add_cookie(key_, path_, ttl_.value());
       hash = HashUtil::xxHash64(value);

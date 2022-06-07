@@ -278,7 +278,7 @@ std::string replaceQueryString(const HeaderString& path, const QueryParams& para
  * @return absl::string_view the parsed cookie value, or a default constructed absl::string_view if
  *         it doesn't exist.
  **/
-absl::string_view parseCookieValue(const HeaderMap& headers, const absl::string_view key);
+std::string parseCookieValue(const HeaderMap& headers, const absl::string_view key);
 
 /**
  * Parse cookies from header into a map.
@@ -301,9 +301,9 @@ absl::flat_hash_map<std::string, std::string> parseCookies(const RequestHeaderMa
  * Parse a particular value out of a set-cookie
  * @param headers supplies the headers to get the set-cookie from.
  * @param key the key for the particular set-cookie value to return
- * @return absl::string_view the parsed set-cookie value, or "" if none exists
+ * @return std::string the parsed set-cookie value, or "" if none exists
  **/
-absl::string_view parseSetCookieValue(const HeaderMap& headers, const absl::string_view key);
+std::string parseSetCookieValue(const HeaderMap& headers, const absl::string_view key);
 
 /**
  * Parse particular value(s) out of a cookie. The difference with
@@ -314,12 +314,13 @@ absl::string_view parseSetCookieValue(const HeaderMap& headers, const absl::stri
  *
  * @param headers supplies the headers to get the cookie from.
  * @param key the key for the particular cookie value to return.
- * @param max_vals the maximum number of values to return. 0 means all of them.
- * @return absl::InlinedVector<absl::string_view, 2> a vector of
- *         absl::string_view objects containing the extracted values.
+ * @param max_vals the maximum number of values to return.
+ * @return absl::InlinedVector<std::string, 2> a vector of
+ *         std::string objects containing the extracted values.
  **/
-absl::InlinedVector<absl::string_view, 2>
-parseCookieValues(const HeaderMap& headers, const absl::string_view key, const size_t max_vals = 0);
+absl::InlinedVector<std::string, 2>
+parseCookieValues(const HeaderMap& headers, const absl::string_view key,
+                  const size_t max_vals = std::numeric_limits<size_t>::max());
 
 /**
  * Produce the value for a Set-Cookie header with the given parameters.

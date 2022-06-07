@@ -33,9 +33,9 @@ absl::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) c
 
 // Extract the value of the key from the cookie header.
 absl::optional<std::string> CookieValueSelector::extract(Http::HeaderMap& map) const {
-  std::string value(Envoy::Http::Utility::parseCookieValue(map, cookie_));
+  std::string value = Envoy::Http::Utility::parseCookieValue(map, cookie_);
   if (!value.empty()) {
-    return absl::optional<std::string>(value);
+    return absl::optional<std::string>(std::move(value));
   }
   return absl::nullopt;
 }

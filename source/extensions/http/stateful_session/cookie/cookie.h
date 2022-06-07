@@ -53,7 +53,7 @@ public:
 
 private:
   absl::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
-    const absl::string_view cookie_value = Envoy::Http::Utility::parseCookieValue(headers, name_);
+    const std::string cookie_value = Envoy::Http::Utility::parseCookieValue(headers, name_);
     std::string address = Envoy::Base64::decode(cookie_value);
 
     return !address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt;
