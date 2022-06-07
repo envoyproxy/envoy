@@ -14,8 +14,8 @@ diff --git a/libdlb/Makefile b/libdlb/Makefile
         @$(CC) $^ -shared $(LDFLAGS) -o $@ -Wl,--version-script=version.map
 
 +$(LIB2): $(OBJS)
-+  @echo Linking $@
-+  @$(AR) rcs $@ $^
++       @echo Linking $@
++       @$(AR) rcs $@ $^
 +
  examples cli: $(LIB)
         @$(MAKE) -C $@/

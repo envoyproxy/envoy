@@ -1143,6 +1143,7 @@ filegroup(
     visibility = ["@envoy//contrib/dlb/source:__pkg__"],
 )
 """,
+        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
     )
 
 def _rules_fuzzing():
