@@ -51,7 +51,7 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   const Network::Connection& connection) {
-  if (Http::Utility::getScheme(downstream_headers) == Http::Headers::get().SchemeValues.Http) {
+  if (downstream_headers.getSchemeValue() == Http::Headers::get().SchemeValues.Http) {
     return true;
   }
   if (!connection.ssl()) {
@@ -99,9 +99,6 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
 
 bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& runtime,
                                  uint64_t stable_random) {
-  if (policy.cluster().empty()) {
-    return false;
-  }
 
   // The policy's default value is set correctly regardless of whether there is a runtime key
   // or not, thus this call is sufficient for all cases (100% if no runtime set, otherwise
@@ -677,9 +674,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   conn_pool_new_stream_with_early_data_and_http3_ =
       Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3);
-  const bool can_send_early_data = conn_pool_new_stream_with_early_data_and_http3_ &&
-                                   Http::Utility::isSafeRequest(*downstream_headers_);
-
+  const bool can_send_early_data =
+      conn_pool_new_stream_with_early_data_and_http3_ &&
+      route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
                                         /*can_use_http3=*/true);
@@ -844,11 +841,34 @@ void Filter::cleanup() {
   }
 }
 
+absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& policy,
+                                                           const Http::HeaderMap& headers) const {
+  if (!policy.cluster().empty()) {
+    return policy.cluster();
+  } else {
+    ASSERT(!policy.clusterHeader().get().empty());
+    const auto entry = headers.get(policy.clusterHeader());
+    if (!entry.empty() && !entry[0]->value().empty()) {
+      return entry[0]->value().getStringView();
+    }
+    ENVOY_STREAM_LOG(debug, "There is no cluster name in header: {}", *callbacks_,
+                     policy.clusterHeader());
+    return absl::nullopt;
+  }
+}
+
 void Filter::maybeDoShadowing() {
   for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
     const auto& shadow_policy = shadow_policy_wrapper.get();
 
-    ASSERT(!shadow_policy.cluster().empty());
+    const absl::optional<absl::string_view> cluster_name =
+        getShadowCluster(shadow_policy, *downstream_headers_);
+
+    // The cluster name got from headers is empty.
+    if (!cluster_name.has_value()) {
+      continue;
+    }
+
     Http::RequestMessagePtr request(new Http::RequestMessageImpl(
         Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_)));
     if (callbacks_->decodingBuffer()) {
@@ -863,7 +883,7 @@ void Filter::maybeDoShadowing() {
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
                        .setSampled(shadow_policy.traceSampled());
-    config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request), options);
+    config_.shadowWriter().shadow(std::string(cluster_name.value()), std::move(request), options);
   }
 }
 

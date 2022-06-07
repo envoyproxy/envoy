@@ -525,6 +525,8 @@ private:
   std::unique_ptr<GenericConnPool>
   createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster);
   UpstreamRequestPtr createUpstreamRequest();
+  absl::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
+                                                     const Http::HeaderMap& headers) const;
 
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);

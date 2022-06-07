@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
@@ -87,6 +88,10 @@ public:
   Router::Config& routerConfig() override { return *this; }
   bool payloadPassthrough() const override { return payload_passthrough_; }
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return access_logs_;
+  }
+  bool headerKeysPreserveCase() const override { return header_keys_preserve_case_; }
 
 private:
   void processFilter(
@@ -103,6 +108,8 @@ private:
   const bool payload_passthrough_;
 
   const uint64_t max_requests_per_connection_{};
+  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+  const bool header_keys_preserve_case_;
 };
 
 } // namespace ThriftProxy

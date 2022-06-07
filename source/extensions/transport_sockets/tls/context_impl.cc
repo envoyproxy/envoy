@@ -1,6 +1,7 @@
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -429,7 +430,7 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
   auto cert = bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl));
-  return impl->cert_validator_->doVerifyCertChain(
+  return impl->cert_validator_->doSynchronousVerifyCertChain(
       store_ctx,
       reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
           SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex())),
@@ -484,14 +485,18 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
   return providers;
 }
 
-size_t ContextImpl::daysUntilFirstCertExpires() const {
-  int daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
-  for (auto& ctx : tls_contexts_) {
-    daysUntilExpiration = std::min<int>(
-        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_), daysUntilExpiration);
+absl::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
+  absl::optional<uint32_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
+  if (!daysUntilExpiration.has_value()) {
+    return absl::nullopt;
   }
-  if (daysUntilExpiration < 0) { // Ensure that the return value is unsigned
-    return 0;
+  for (auto& ctx : tls_contexts_) {
+    const absl::optional<uint32_t> tmp =
+        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_);
+    if (!tmp.has_value()) {
+      return absl::nullopt;
+    }
+    daysUntilExpiration = std::min<uint32_t>(tmp.value(), daysUntilExpiration.value());
   }
   return daysUntilExpiration;
 }
@@ -1161,7 +1166,7 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
     return false;
   }
 
-  int res = cert_validator_->doVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
+  int res = cert_validator_->doSynchronousVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
   // If |SSL_VERIFY_NONE|, the error is non-fatal, but we keep the error details.
   if (res <= 0 && SSL_CTX_get_verify_mode(ssl_ctx) != SSL_VERIFY_NONE) {
     error_details = Utility::getX509VerificationErrorInfo(ctx.get());

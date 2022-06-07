@@ -429,25 +429,12 @@ SubstitutionFormatParser::getKnownFormatters() {
        {"FILTER_STATE",
         {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](const std::string& format, const absl::optional<size_t>& max_length) {
-           std::string key, serialize_type;
-           static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
-           static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
-
-           SubstitutionFormatParser::parseSubcommand(format, ':', key, serialize_type);
-           if (key.empty()) {
-             throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
-           }
-
-           if (serialize_type.empty()) {
-             serialize_type = std::string(TYPED_SERIALIZATION);
-           }
-           if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
-             throw EnvoyException("Invalid filter state serialize type, only "
-                                  "support PLAIN/TYPED.");
-           }
-           const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
-
-           return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string);
+           return FilterStateFormatter::create(format, max_length, false);
+         }}},
+       {"UPSTREAM_FILTER_STATE",
+        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](const std::string& format, const absl::optional<size_t>& max_length) {
+           return FilterStateFormatter::create(format, max_length, true);
          }}},
        {"DOWNSTREAM_PEER_CERT_V_START",
         {CommandSyntaxChecker::PARAMS_OPTIONAL,
@@ -458,6 +445,16 @@ SubstitutionFormatParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_OPTIONAL,
          [](const std::string& format, const absl::optional<size_t>&) {
            return std::make_unique<DownstreamPeerCertVEndFormatter>(format);
+         }}},
+       {"UPSTREAM_PEER_CERT_V_START",
+        {CommandSyntaxChecker::PARAMS_OPTIONAL,
+         [](const std::string& format, const absl::optional<size_t>&) {
+           return std::make_unique<UpstreamPeerCertVStartFormatter>(format);
+         }}},
+       {"UPSTREAM_PEER_CERT_V_END",
+        {CommandSyntaxChecker::PARAMS_OPTIONAL,
+         [](const std::string& format, const absl::optional<size_t>&) {
+           return std::make_unique<UpstreamPeerCertVEndFormatter>(format);
          }}},
        {"ENVIRONMENT",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
@@ -794,6 +791,46 @@ private:
   FieldExtractor field_extractor_;
 };
 
+class StreamInfoUpstreamSslConnectionInfoFieldExtractor
+    : public StreamInfoFormatter::FieldExtractor {
+public:
+  using FieldExtractor =
+      std::function<absl::optional<std::string>(const Ssl::ConnectionInfo& connection_info)>;
+
+  StreamInfoUpstreamSslConnectionInfoFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
+
+  absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
+    if (!stream_info.upstreamInfo() ||
+        stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
+      return absl::nullopt;
+    }
+
+    const auto value = field_extractor_(*(stream_info.upstreamInfo()->upstreamSslConnection()));
+    if (value && value->empty()) {
+      return absl::nullopt;
+    }
+
+    return value;
+  }
+
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
+    if (!stream_info.upstreamInfo() ||
+        stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
+      return unspecifiedValue();
+    }
+
+    const auto value = field_extractor_(*(stream_info.upstreamInfo()->upstreamSslConnection()));
+    if (value && value->empty()) {
+      return unspecifiedValue();
+    }
+
+    return ValueUtil::optionalStringValue(value);
+  }
+
+private:
+  FieldExtractor field_extractor_;
+};
+
 const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnownFieldExtractors() {
   CONSTRUCT_ON_FIRST_USE(FieldExtractorLookupTbl,
                          {{"REQUEST_DURATION",
@@ -890,6 +927,17 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                   [](const StreamInfo::StreamInfo& stream_info) {
                                     return SubstitutionFormatUtils::protocolToString(
                                         stream_info.protocol());
+                                  });
+                            }}},
+                          {"UPSTREAM_PROTOCOL",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return stream_info.upstreamInfo()
+                                               ? SubstitutionFormatUtils::protocolToString(
+                                                     stream_info.upstreamInfo()->upstreamProtocol())
+                                               : absl::nullopt;
                                   });
                             }}},
                           {"RESPONSE_CODE",
@@ -1095,6 +1143,60 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                               return std::make_unique<StreamInfoUInt64FieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
                                     return stream_info.attemptCount().value_or(0);
+                                  });
+                            }}},
+                          {"UPSTREAM_TLS_CIPHER",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.ciphersuiteString();
+                                  });
+                            }}},
+                          {"UPSTREAM_TLS_VERSION",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.tlsVersion();
+                                  });
+                            }}},
+                          {"UPSTREAM_TLS_SESSION_ID",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.sessionId();
+                                  });
+                            }}},
+                          {"UPSTREAM_PEER_ISSUER",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.issuerPeerCertificate();
+                                  });
+                            }}},
+                          {"UPSTREAM_PEER_CERT",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.urlEncodedPemEncodedPeerCertificate();
+                                  });
+                            }}},
+                          {"UPSTREAM_PEER_SUBJECT",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<
+                                  StreamInfoUpstreamSslConnectionInfoFieldExtractor>(
+                                  [](const Ssl::ConnectionInfo& connection_info) {
+                                    return connection_info.subjectPeerCertificate();
                                   });
                             }}},
                           {"DOWNSTREAM_LOCAL_ADDRESS",
@@ -1324,6 +1426,9 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                                    .value()
                                                    .get()
                                                    .upstreamTransportFailureReason();
+                                    }
+                                    if (result) {
+                                      std::replace(result->begin(), result->end(), ' ', '_');
                                     }
                                     return result;
                                   });
@@ -1700,15 +1805,55 @@ ClusterMetadataFormatter::ClusterMetadataFormatter(const std::string& filter_nam
                           }
                           return &cluster_info.value()->metadata();
                         }) {}
+
+std::unique_ptr<FilterStateFormatter>
+FilterStateFormatter::create(const std::string& format, const absl::optional<size_t>& max_length,
+                             bool is_upstream) {
+  std::string key, serialize_type;
+  static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
+  static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
+
+  SubstitutionFormatParser::parseSubcommand(format, ':', key, serialize_type);
+  if (key.empty()) {
+    throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
+  }
+
+  if (serialize_type.empty()) {
+    serialize_type = std::string(TYPED_SERIALIZATION);
+  }
+  if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
+    throw EnvoyException("Invalid filter state serialize type, only "
+                         "support PLAIN/TYPED.");
+  }
+
+  const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
+
+  return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string, is_upstream);
+}
+
 FilterStateFormatter::FilterStateFormatter(const std::string& key,
                                            absl::optional<size_t> max_length,
-                                           bool serialize_as_string)
-    : key_(key), max_length_(max_length), serialize_as_string_(serialize_as_string) {}
+                                           bool serialize_as_string, bool is_upstream)
+    : key_(key), max_length_(max_length), serialize_as_string_(serialize_as_string),
+      is_upstream_(is_upstream) {}
 
 const Envoy::StreamInfo::FilterState::Object*
 FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) const {
-  const StreamInfo::FilterState& filter_state = stream_info.filterState();
-  return filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
+  const StreamInfo::FilterState* filter_state = nullptr;
+  if (is_upstream_) {
+    const OptRef<const StreamInfo::UpstreamInfo> upstream_info = stream_info.upstreamInfo();
+    if (upstream_info) {
+      filter_state = upstream_info->upstreamFilterState().get();
+    }
+  } else {
+    filter_state = &stream_info.filterState();
+  }
+
+  if (filter_state) {
+    return filter_state->getDataReadOnly<StreamInfo::FilterState::Object>(key_);
+  }
+
+  return nullptr;
 }
 
 absl::optional<std::string> FilterStateFormatter::format(const Http::RequestHeaderMap&,
@@ -1805,6 +1950,30 @@ DownstreamPeerCertVEndFormatter::DownstreamPeerCertVEndFormatter(const std::stri
                             stream_info.downstreamAddressProvider().sslConnection();
                         return connection_info != nullptr
                                    ? connection_info->expirationPeerCertificate()
+                                   : absl::optional<SystemTime>();
+                      })) {}
+UpstreamPeerCertVStartFormatter::UpstreamPeerCertVStartFormatter(const std::string& format)
+    : SystemTimeFormatter(
+          format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        return stream_info.upstreamInfo() &&
+                                       stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                           nullptr
+                                   ? stream_info.upstreamInfo()
+                                         ->upstreamSslConnection()
+                                         ->validFromPeerCertificate()
+                                   : absl::optional<SystemTime>();
+                      })) {}
+UpstreamPeerCertVEndFormatter::UpstreamPeerCertVEndFormatter(const std::string& format)
+    : SystemTimeFormatter(
+          format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        return stream_info.upstreamInfo() &&
+                                       stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                           nullptr
+                                   ? stream_info.upstreamInfo()
+                                         ->upstreamSslConnection()
+                                         ->expirationPeerCertificate()
                                    : absl::optional<SystemTime>();
                       })) {}
 

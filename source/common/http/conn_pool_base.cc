@@ -73,7 +73,9 @@ HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& con
                                        bool can_send_early_data) {
   Http::ResponseDecoder& decoder = *typedContext<HttpAttachContext>(context).decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *typedContext<HttpAttachContext>(context).callbacks_;
-  ENVOY_LOG(debug, "queueing stream due to no available connections");
+  ENVOY_LOG(debug,
+            "queueing stream due to no available connections (ready={} busy={} connecting={})",
+            ready_clients_.size(), busy_clients_.size(), connecting_clients_.size());
   Envoy::ConnectionPool::PendingStreamPtr pending_stream(
       new HttpPendingStream(*this, decoder, callbacks, can_send_early_data));
   return addPendingStream(std::move(pending_stream));
@@ -120,9 +122,11 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
     if (settings.maxConcurrentStreams().has_value()) {
       int64_t old_unused_capacity = currentUnusedCapacity();
       // Given config limits old_unused_capacity should never exceed int32_t.
-      // TODO(alyssawilk) move remaining_streams_, concurrent_stream_limit_ and
-      // currentUnusedCapacity() to be explicit int32_t
       ASSERT(std::numeric_limits<int32_t>::max() >= old_unused_capacity);
+      if (parent().cache() && parent().origin().has_value()) {
+        parent().cache()->setConcurrentStreams(*parent().origin(),
+                                               settings.maxConcurrentStreams().value());
+      }
       concurrent_stream_limit_ =
           std::min(settings.maxConcurrentStreams().value(), configured_stream_limit_);
 
@@ -203,36 +207,13 @@ uint64_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint64_t max_strea
   return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
 }
 
-MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& parent,
-                                                         uint32_t max_concurrent_streams,
-                                                         Stats::Counter& cx_total)
+MultiplexedActiveClientBase::MultiplexedActiveClientBase(
+    HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
+    uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
+    OptRef<Upstream::Host::CreateConnectionData> data)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          max_concurrent_streams) {
-  codec_client_->setCodecClientCallbacks(*this);
-  codec_client_->setCodecConnectionCallbacks(*this);
-  cx_total.inc();
-}
-
-MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& parent,
-                                                         uint32_t max_concurrent_streams,
-                                                         Stats::Counter& cx_total,
-                                                         Upstream::Host::CreateConnectionData& data)
-    : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          max_concurrent_streams, data) {
-  codec_client_->setCodecClientCallbacks(*this);
-  codec_client_->setCodecConnectionCallbacks(*this);
-  cx_total.inc();
-}
-
-MultiplexedActiveClientBase::MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
-                                                         Upstream::Host::CreateConnectionData& data,
-                                                         uint32_t max_concurrent_streams,
-                                                         Stats::Counter& cx_total)
-    : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          max_concurrent_streams, data) {
+          effective_concurrent_streams, max_configured_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
   cx_total.inc();

@@ -117,12 +117,70 @@ enum class MessageType {
 };
 
 /**
+ * Names of available message types.
+ */
+class MessageTypeNameValues {
+public:
+  // Call (regular request that awaits for a response)
+  const std::string CALL = "call";
+
+  // Reply (or response)
+  const std::string REPLY = "reply";
+
+  // Exception (generated instead of reply)
+  const std::string EXCEPTION = "exception";
+
+  // Oneway (no reply expected)
+  const std::string ONEWAY = "oneway";
+
+  const std::string& fromType(MessageType type) const {
+    switch (type) {
+    case MessageType::Call:
+      return CALL;
+    case MessageType::Reply:
+      return REPLY;
+    case MessageType::Exception:
+      return EXCEPTION;
+    case MessageType::Oneway:
+      return ONEWAY;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+};
+
+using MessageTypeNames = ConstSingleton<MessageTypeNameValues>;
+
+/**
  * A Reply message is either a success or an error (IDL exception)
  */
 enum class ReplyType {
   Success,
   Error,
 };
+
+/**
+ * Names of available reply types.
+ */
+class ReplyTypeNameValues {
+public:
+  // Success
+  const std::string SUCCESS = "success";
+
+  // Error
+  const std::string ERROR = "error";
+
+  const std::string& fromType(ReplyType type) const {
+    switch (type) {
+    case ReplyType::Success:
+      return SUCCESS;
+    case ReplyType::Error:
+      return ERROR;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+};
+
+using ReplyTypeNames = ConstSingleton<ReplyTypeNameValues>;
 
 /**
  * Thrift protocol struct field types.

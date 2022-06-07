@@ -31,7 +31,7 @@
 
 namespace Envoy {
 
-std::string ConfigHelper::baseConfig() {
+std::string ConfigHelper::baseConfigNoListeners() {
   return fmt::format(R"EOF(
 admin:
   access_log:
@@ -69,14 +69,19 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
+)EOF",
+                     Platform::null_device_path, Platform::null_device_path);
+}
+
+std::string ConfigHelper::baseConfig() {
+  return absl::StrCat(baseConfigNoListeners(), R"EOF(
   listeners:
   - name: listener_0
     address:
       socket_address:
         address: 127.0.0.1
         port_value: 0
-)EOF",
-                     Platform::null_device_path, Platform::null_device_path);
+)EOF");
 }
 
 std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address) {
@@ -121,7 +126,7 @@ std::string ConfigHelper::tcpProxyConfig() {
         name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-          stat_prefix: tcp_stats
+          stat_prefix: tcpproxy_stats
           cluster: cluster_0
 )EOF");
 }
@@ -876,6 +881,7 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    ASSERT(!old_options.has_auto_config());
     old_options.MergeFrom(protocol_options);
     protocol_options.CopyFrom(old_options);
   }

@@ -195,7 +195,7 @@ public:
 
     // Hold a Scope for the lifetime of the configuration because connections in
     // the UpstreamDrainManager can live longer than the listener.
-    const Stats::ScopePtr stats_scope_;
+    const Stats::ScopeSharedPtr stats_scope_;
 
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
@@ -343,6 +343,7 @@ public:
                           const Network::Address::InstanceConstSharedPtr& local_address,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info) override;
   void onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
+                            absl::string_view failure_reason,
                             Upstream::HostDescriptionConstSharedPtr host) override;
 
   // Upstream::LoadBalancerContext

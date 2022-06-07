@@ -54,21 +54,22 @@ protected:
   Stats::ThreadLocalStoreImpl store_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Buffer::OwnedImpl response_;
+  StatsParams params_;
 };
 
 TEST_F(StatsRenderTest, TextInt) {
-  StatsTextRender renderer(Utility::HistogramBucketsMode::NoBuckets);
+  StatsTextRender renderer(params_);
   EXPECT_EQ("name: 42\n", render<uint64_t>(renderer, "name", 42));
 }
 
 TEST_F(StatsRenderTest, TextString) {
-  StatsTextRender renderer(Utility::HistogramBucketsMode::NoBuckets);
+  StatsTextRender renderer(params_);
   EXPECT_EQ("name: \"abc 123 ~!@#$%^&amp;*()-_=+;:&#39;&quot;,&lt;.&gt;/?\"\n",
             render<std::string>(renderer, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"));
 }
 
 TEST_F(StatsRenderTest, TextHistogramNoBuckets) {
-  StatsTextRender renderer(Utility::HistogramBucketsMode::NoBuckets);
+  StatsTextRender renderer(params_);
   constexpr absl::string_view expected =
       "h1: P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) "
       "P90(308.5,308.5) P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) "
@@ -77,7 +78,8 @@ TEST_F(StatsRenderTest, TextHistogramNoBuckets) {
 }
 
 TEST_F(StatsRenderTest, TextHistogramCumulative) {
-  StatsTextRender renderer(Utility::HistogramBucketsMode::Cumulative);
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Cumulative;
+  StatsTextRender renderer(params_);
   constexpr absl::string_view expected =
       "h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(1,1) "
       "B500(3,3) B1000(3,3) B2500(3,3) B5000(3,3) B10000(3,3) B30000(3,3) B60000(3,3) "
@@ -86,7 +88,8 @@ TEST_F(StatsRenderTest, TextHistogramCumulative) {
 }
 
 TEST_F(StatsRenderTest, TextHistogramDisjoint) {
-  StatsTextRender renderer(Utility::HistogramBucketsMode::Disjoint);
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Disjoint;
+  StatsTextRender renderer(params_);
   constexpr absl::string_view expected =
       "h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(1,1) B500(2,2) "
       "B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) B300000(0,0) "
@@ -95,13 +98,13 @@ TEST_F(StatsRenderTest, TextHistogramDisjoint) {
 }
 
 TEST_F(StatsRenderTest, JsonInt) {
-  StatsJsonRender renderer(response_headers_, response_, Utility::HistogramBucketsMode::NoBuckets);
+  StatsJsonRender renderer(response_headers_, response_, params_);
   const std::string expected = R"EOF({"stats":[ {"value":42, "name":"name"}]})EOF";
   EXPECT_THAT(render<uint64_t>(renderer, "name", 42), JsonStringEq(expected));
 }
 
 TEST_F(StatsRenderTest, JsonString) {
-  StatsJsonRender renderer(response_headers_, response_, Utility::HistogramBucketsMode::NoBuckets);
+  StatsJsonRender renderer(response_headers_, response_, params_);
   const std::string expected = R"EOF({
     "stats": [{"value": "abc 123 ~!@#$%^&*()-_=+;:'\",\u003c.\u003e/?",
                "name": "name"}]})EOF";
@@ -110,7 +113,7 @@ TEST_F(StatsRenderTest, JsonString) {
 }
 
 TEST_F(StatsRenderTest, JsonHistogramNoBuckets) {
-  StatsJsonRender renderer(response_headers_, response_, Utility::HistogramBucketsMode::NoBuckets);
+  StatsJsonRender renderer(response_headers_, response_, params_);
   const std::string expected = R"EOF(
 {
     "stats": [{
@@ -159,7 +162,8 @@ TEST_F(StatsRenderTest, JsonHistogramNoBuckets) {
 }
 
 TEST_F(StatsRenderTest, JsonHistogramCumulative) {
-  StatsJsonRender renderer(response_headers_, response_, Utility::HistogramBucketsMode::Cumulative);
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Cumulative;
+  StatsJsonRender renderer(response_headers_, response_, params_);
   const std::string expected = R"EOF(
 {
     "stats": [{
@@ -251,7 +255,8 @@ TEST_F(StatsRenderTest, JsonHistogramCumulative) {
 }
 
 TEST_F(StatsRenderTest, JsonHistogramDisjoint) {
-  StatsJsonRender renderer(response_headers_, response_, Utility::HistogramBucketsMode::Disjoint);
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Disjoint;
+  StatsJsonRender renderer(response_headers_, response_, params_);
   const std::string expected = R"EOF(
 {
     "stats": [{
