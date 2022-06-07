@@ -200,7 +200,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreationCustomTag) {
   const auto kv_yaml = R"EOF(
 values:
 - key: host_name
-  value: 
+  value:
     string_value: test_host_name
   )EOF";
   TestUtility::loadFromYaml(kv_yaml, keyValueList);
