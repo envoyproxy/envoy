@@ -26,6 +26,8 @@ BBR
 BIDIRECTIONAL
 BSON
 BPF
+Bdecoded
+Bencoded
 Repick
 TRA
 btree
@@ -1131,8 +1133,6 @@ schedulable
 schemas
 scopekey
 sd
-search%5Bdecoded%5D
-search%5Bencoded%5D
 secp
 sendmsg
 sendmmsg
