@@ -1,7 +1,5 @@
 #include "contrib/hyperscan/matching/input_matchers/source/matcher.h"
 
-#include <numeric>
-
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
@@ -15,48 +13,16 @@ ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database) {
   }
 }
 
-Matcher::Matcher(
-    const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan& config,
-    ThreadLocal::SlotAllocator& tls)
+Matcher::Matcher(const std::vector<const char*>& expressions,
+                 const std::vector<unsigned int>& flags, const std::vector<unsigned int>& ids,
+                 ThreadLocal::SlotAllocator& tls)
     : tls_(ThreadLocal::TypedSlot<ScratchThreadLocal>::makeUnique(tls)) {
-  std::vector<const char*> expressions;
-  expressions.reserve(config.regexes_size());
-  flags_.reserve(config.regexes_size());
-  ids_.reserve(config.regexes_size());
-  for (const auto& regex : config.regexes()) {
-    expressions.push_back(regex.regex().c_str());
-    unsigned int flag = 0;
-    if (regex.caseless()) {
-      flag |= HS_FLAG_CASELESS;
-    }
-    if (regex.dot_all()) {
-      flag |= HS_FLAG_DOTALL;
-    }
-    if (regex.multiline()) {
-      flag |= HS_FLAG_MULTILINE;
-    }
-    if (regex.allow_empty()) {
-      flag |= HS_FLAG_ALLOWEMPTY;
-    }
-    if (regex.utf8()) {
-      flag |= HS_FLAG_UTF8;
-      if (regex.ucp()) {
-        flag |= HS_FLAG_UCP;
-      }
-    }
-    if (regex.combination()) {
-      flag |= HS_FLAG_COMBINATION;
-    }
-    if (regex.quiet()) {
-      flag |= HS_FLAG_QUIET;
-    }
-    flags_.push_back(flag);
-    ids_.push_back(regex.id());
-  }
+  ASSERT(expressions.size() == flags.size());
+  ASSERT(expressions.size() == ids.size());
 
   hs_compile_error_t* compile_err;
   hs_error_t err =
-      hs_compile_multi(expressions.data(), flags_.data(), ids_.data(), expressions.size(),
+      hs_compile_multi(expressions.data(), flags.data(), ids.data(), expressions.size(),
                        HS_MODE_BLOCK, nullptr, &database_, &compile_err);
   if (err != HS_SUCCESS) {
     std::string compile_err_message(compile_err->message);
@@ -76,16 +42,11 @@ Matcher::Matcher(
       [this](Event::Dispatcher&) { return std::make_shared<ScratchThreadLocal>(this->database_); });
 }
 
-bool Matcher::match(absl::optional<absl::string_view> input) {
-  if (!input) {
-    return false;
-  }
-
+bool Matcher::match(absl::string_view value) const {
   bool matched = false;
-  const absl::string_view input_str = *input;
   hs_scratch_t* scratch = tls_->get()->scratch_;
   hs_error_t err = hs_scan(
-      database_, input_str.data(), input_str.size(), 0, scratch,
+      database_, value.data(), value.size(), 0, scratch,
       [](unsigned int, unsigned long long, unsigned long long, unsigned int, void* context) -> int {
         bool* matched = static_cast<bool*>(context);
         *matched = true;
@@ -99,6 +60,20 @@ bool Matcher::match(absl::optional<absl::string_view> input) {
   }
 
   return matched;
+}
+
+std::string Matcher::replaceAll(absl::string_view value, absl::string_view substitution) const {
+  // TODO:
+  ASSERT(value == substitution);
+  return "";
+}
+
+bool Matcher::match(absl::optional<absl::string_view> input) {
+  if (!input) {
+    return false;
+  }
+
+  return static_cast<Envoy::Regex::CompiledMatcher*>(this)->match(*input);
 }
 
 } // namespace Hyperscan

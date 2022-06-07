@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package envoy.extensions.bootstrap.hyperscan.v3alpha;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.bootstrap.hyperscan.v3alpha";
+option java_outer_classname = "HyperscanProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/hyperscan/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Hyperscan]
+// [#extension: envoy.bootstrap.hyperscan]
+
+// `Hyperscan <https://github.com/intel/hyperscan>`_ regex engine. The engine uses hybrid automata
+// techniques to allow simultaneous matching of large numbers of regular expressions across streams
+// of data.
+//
+// The engine follows PCRE pattern syntax, and the regex string must adhere to the documented
+// `pattern support <https://intel.github.io/hyperscan/dev-reference/compilation.html#pattern-support>`_.
+// The syntax is not compatible with the default RE2 regex engine. Depending on configured
+// expressions, swapping regex engine may cause match rules to no longer be valid.
+// [#next-free-field: 7]
+message Hyperscan {
+  // Matching will be performed case-insensitively.
+  //
+  // The expression may still use PCRE tokens (notably `(?i)` and `(?-i)`) to switch
+  // case-insensitive matching on and off.
+  bool caseless = 1;
+
+  // Matching a `.` will not exclude newlines.
+  bool dot_all = 2;
+
+  // `^` and `$` anchors match any newlines in data.
+  bool multiline = 3;
+
+  // Allow expressions which can match against an empty string.
+  //
+  // This option instructs the compiler to allow expressions that can match against empty buffers,
+  // such as `.?`, `.*`, `(a|)`. Since Hyperscan can return every possible match for an expression,
+  // such expressions generally execute very slowly.
+  bool allow_empty = 4;
+
+  // Treat the pattern as a sequence of UTF-8 characters.
+  bool utf8 = 5;
+
+  // Use Unicode properties for character classes.
+  //
+  // This option instructs Hyperscan to use Unicode properties, rather than the default ASCII
+  // interpretations, for character mnemonics like `\w` and `\s` as well as the POSIX character
+  // classes. It is only meaningful in conjunction with `utf8`.
+  bool ucp = 6;
+}

@@ -43,11 +43,9 @@ BENCHMARK(BM_CompiledGoogleReMatcher);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_HyperscanMatcher(benchmark::State& state) {
-  envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan config;
-  auto regex = config.add_regexes();
-  regex->set_regex(std::string(cluster_re_pattern));
   auto instance = ThreadLocal::InstanceImpl();
-  auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(config, instance);
+  auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(
+      {cluster_re_pattern.data()}, {0}, {0}, instance);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : clusterInputs()) {

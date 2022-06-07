@@ -1,10 +1,9 @@
 #pragma once
 
+#include "envoy/common/regex.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "absl/synchronization/mutex.h"
-#include "contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.pb.h"
 #include "hs/hs.h"
 
 namespace Envoy {
@@ -19,19 +18,20 @@ struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
   hs_scratch_t* scratch_{};
 };
 
-class Matcher : public Envoy::Matcher::InputMatcher {
+class Matcher : public Envoy::Regex::CompiledMatcher, public Envoy::Matcher::InputMatcher {
 public:
-  explicit Matcher(
-      const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan& config,
-      ThreadLocal::SlotAllocator& tls);
+  Matcher(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
+          const std::vector<unsigned int>& ids, ThreadLocal::SlotAllocator& tls);
   ~Matcher() override { hs_free_database(database_); }
+
+  // Envoy::Regex::CompiledMatcher
+  bool match(absl::string_view value) const override;
+  std::string replaceAll(absl::string_view value, absl::string_view substitution) const override;
 
   // Envoy::Matcher::InputMatcher
   bool match(absl::optional<absl::string_view> input) override;
 
 private:
-  std::vector<unsigned int> flags_{};
-  std::vector<unsigned int> ids_{};
   hs_database_t* database_{};
   ThreadLocal::TypedSlotPtr<ScratchThreadLocal> tls_;
 };
