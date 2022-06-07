@@ -22,6 +22,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/common/matching/url_template_matching.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
@@ -473,6 +474,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        ProtobufMessage::ValidationVisitor& validator)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
       prefix_rewrite_(route.route().prefix_rewrite()),
+      pattern_rewrite_(route.route().pattern_rewrite()),
       host_rewrite_(route.route().host_rewrite_literal()), vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
       auto_host_rewrite_header_(!route.route().host_rewrite_header().empty()
@@ -638,12 +640,24 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (route.route().has_regex_rewrite()) {
-    if (!prefix_rewrite_.empty()) {
-      throw EnvoyException("Cannot specify both prefix_rewrite and regex_rewrite");
+    if (!prefix_rewrite_.empty() || !pattern_rewrite_.empty()) {
+      throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or pattern_rewrite");
     }
     auto rewrite_spec = route.route().regex_rewrite();
     regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
     regex_rewrite_substitution_ = rewrite_spec.substitution();
+  }
+
+  if (!pattern_rewrite_.empty()) {
+    if (!prefix_rewrite_.empty() || route.route().has_regex_rewrite()) {
+      throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or pattern_rewrite");
+    }
+  }
+
+  if (!prefix_rewrite_.empty()) {
+    if (route.route().has_regex_rewrite() || !pattern_rewrite_.empty()) {
+      throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or pattern_rewrite");
+    }
   }
 
   if (route.redirect().has_regex_rewrite()) {
@@ -793,7 +807,8 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 
   // Handle path rewrite
   absl::optional<std::string> container;
-  if (!getPathRewrite(headers, container).empty() || regex_rewrite_ != nullptr) {
+  if (!getPathRewrite(headers, container).empty() || regex_rewrite_ != nullptr ||
+      !pattern_rewrite_.empty()) {
     rewritePathHeader(headers, insert_envoy_original_path);
   }
 }
@@ -927,6 +942,32 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
       return path.replace(0, just_path.size(),
                           regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_));
     }
+  }
+
+  // complete pattern rewrite
+  if (!pattern_rewrite_.empty()) {
+    auto just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
+
+    absl::StatusOr<std::string> regex_pattern =
+        matching::ConvertURLPatternSyntaxToRegex(pattern_rewrite_);
+    if (!regex_pattern.ok()) {
+      throw EnvoyException("Unable to parse url pattern regex");
+    }
+    std::string regex_pattern_str = *std::move(regex_pattern);
+
+    absl::StatusOr<envoy::config::route::v3::RouteUrlRewritePattern> rewrite_pattern =
+        matching::ParseRewritePattern(just_path, regex_pattern_str);
+
+    if (!rewrite_pattern.ok()) {
+      throw EnvoyException("Unable to parse url rewrite pattern");
+    }
+    envoy::config::route::v3::RouteUrlRewritePattern rewrite_pattern_str =
+        *std::move(rewrite_pattern);
+
+    absl::StatusOr<std::string> new_path =
+        matching::RewriteURLTemplatePattern(just_path, regex_pattern_str, rewrite_pattern_str);
+
+    return *std::move(new_path);
   }
 
   // There are no rewrites configured.

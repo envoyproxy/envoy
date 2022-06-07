@@ -828,6 +828,7 @@ public:
 protected:
   const bool case_sensitive_;
   const std::string prefix_rewrite_;
+  const std::string pattern_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
   std::string regex_rewrite_substitution_;

@@ -68,7 +68,7 @@ message StringMatcher {
     // Examples:
     //
     // * */bar/{foo}/{goo}* matches the value */bar/var1/var2*
-    string pattern = 8;
+    string pattern = 8 [(validate.rules).string = {min_len: 1}];
   }
 
   // If true, indicates the exact/prefix/suffix/contains matching should be case insensitive. This
