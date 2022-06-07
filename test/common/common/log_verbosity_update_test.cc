@@ -11,23 +11,28 @@
 namespace Envoy {
 
 TEST(Fancy, safeFileNameMatch) {
+  // Exact file name or path match
   EXPECT_TRUE(FancyContext::safeFileNameMatch("foo", "foo"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("foo", "bar"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("foo", "fo"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("foo", "foo1"));
+  EXPECT_FALSE(FancyContext::safeFileNameMatch("bar/baz.cc", "bar/foo.cc"));
 
-  EXPECT_TRUE(FancyContext::safeFileNameMatch("bar/foo.cc", "bar/foo.cc"));
+  // Star wildcard match
   EXPECT_TRUE(FancyContext::safeFileNameMatch("*ba*r/f*oo.c*c", "bar/foo.cc"));
-
-  EXPECT_TRUE(FancyContext::safeFileNameMatch("?a?/*.cc", "bar/foo.cc"));
-  EXPECT_FALSE(FancyContext::safeFileNameMatch("bar/*.cc", "barbaz/foo.cc"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("*/*.cc", "barbaz/foo.cc2"));
-  EXPECT_TRUE(FancyContext::safeFileNameMatch("b?r/*", "bar/foo.cc2"));
-  EXPECT_TRUE(FancyContext::safeFileNameMatch("b?r/*", "bar/"));
-  EXPECT_FALSE(FancyContext::safeFileNameMatch("?a?/?", "bar/"));
-  EXPECT_TRUE(FancyContext::safeFileNameMatch("??r/?", "bar/a"));
+  EXPECT_FALSE(FancyContext::safeFileNameMatch("bar/*.cc", "barbaz/foo.cc"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("/*", "foo/bar.h"));
   EXPECT_TRUE(FancyContext::safeFileNameMatch("/*", "/bar.h"));
+
+  // Question wildcard match
+  EXPECT_FALSE(FancyContext::safeFileNameMatch("?a?/?", "bar/"));
+  EXPECT_TRUE(FancyContext::safeFileNameMatch("??r/?", "bar/a"));
+
+  // Question and star wildcards match
+  EXPECT_TRUE(FancyContext::safeFileNameMatch("b?r/*", "bar/foo.cc2"));
+  EXPECT_TRUE(FancyContext::safeFileNameMatch("b?r/*", "bar/"));
+  EXPECT_TRUE(FancyContext::safeFileNameMatch("?a?/*.cc", "bar/foo.cc"));
 }
 
 TEST(Fancy, updateCurrentFilePath) {
@@ -38,7 +43,7 @@ TEST(Fancy, updateCurrentFilePath) {
 
   absl::string_view file_path = __FILE__;
   file_path.remove_suffix(3);
-  std::pair<absl::string_view, int> update = std::make_pair(file_path, 1);
+  const std::pair<absl::string_view, int> update = std::make_pair(file_path, 1);
   getFancyContext().updateVerbositySetting({update});
 
   FANCY_LOG(debug, "Debug: now level is debug");
@@ -58,7 +63,7 @@ TEST(Fancy, updateBasename) {
   const size_t position = file_path.rfind('/');
   file_path.remove_prefix(position + 1);
 
-  std::pair<absl::string_view, int> update = std::make_pair(file_path, 1);
+  const std::pair<absl::string_view, int> update = std::make_pair(file_path, 1);
   getFancyContext().updateVerbositySetting({update});
 
   FANCY_LOG(debug, "Debug: now level is debug");
@@ -68,14 +73,14 @@ TEST(Fancy, updateBasename) {
 }
 
 TEST(Fancy, multipleUpdatesBasename) {
-  const char* file_1 = "envoy/src/foo.cc";
-  const char* file_2 = "envoy/src/bar.cc";
-  std::atomic<spdlog::logger*> flogger{nullptr};
+  const std::string file_1 = "envoy/src/foo.cc";
+  const std::string file_2 = "envoy/src/bar.cc";
+  static std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
   getFancyContext().initFancyLogger(file_2, flogger);
 
-  std::pair<absl::string_view, int> update_1 = std::make_pair("foo", 1);
-  std::pair<absl::string_view, int> update_2 = std::make_pair("bar", 3);
+  const std::pair<absl::string_view, int> update_1 = std::make_pair("foo", 1);
+  const std::pair<absl::string_view, int> update_2 = std::make_pair("bar", 3);
   getFancyContext().updateVerbositySetting({update_1, update_2});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);
@@ -87,13 +92,13 @@ TEST(Fancy, multipleUpdatesBasename) {
 }
 
 TEST(Fancy, multipleMatchesBasename) {
-  const char* file_1 = "envoy/src/a.cc";
-  const char* file_2 = "envoy/a.cc";
+  const std::string file_1 = "envoy/src/a.cc";
+  const std::string file_2 = "envoy/a.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
   getFancyContext().initFancyLogger(file_2, flogger);
 
-  std::pair<absl::string_view, int> update_1 = std::make_pair("a", 3);
+  const std::pair<absl::string_view, int> update_1 = std::make_pair("a", 3);
   getFancyContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);
@@ -105,15 +110,15 @@ TEST(Fancy, multipleMatchesBasename) {
 }
 
 TEST(Fancy, globStarUpdate) {
-  const char* file_1 = "envoy/src/foo.cc";
-  const char* file_2 = "envoy/src/bar.cc";
-  const char* file_3 = "envoy/baz.cc";
+  const std::string file_1 = "envoy/src/foo.cc";
+  const std::string file_2 = "envoy/src/bar.cc";
+  const std::string file_3 = "envoy/baz.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
   getFancyContext().initFancyLogger(file_2, flogger);
   getFancyContext().initFancyLogger(file_3, flogger);
 
-  std::pair<absl::string_view, int> update_1 = std::make_pair("envoy/*", 3);
+  const std::pair<absl::string_view, int> update_1 = std::make_pair("envoy/*", 3);
   getFancyContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);
@@ -126,7 +131,7 @@ TEST(Fancy, globStarUpdate) {
   EXPECT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
 
-  std::pair<absl::string_view, int> update_2 = std::make_pair("envoy/src/*", 2);
+  const std::pair<absl::string_view, int> update_2 = std::make_pair("envoy/src/*", 2);
   getFancyContext().updateVerbositySetting({update_2});
 
   p = getFancyContext().getFancyLogEntry(file_1);
@@ -136,7 +141,7 @@ TEST(Fancy, globStarUpdate) {
   p = getFancyContext().getFancyLogEntry(file_3);
   EXPECT_EQ(p->level(), Logger::Context::getFancyDefaultLevel());
 
-  std::pair<absl::string_view, int> update_3 = std::make_pair("*/src/*", 4);
+  const std::pair<absl::string_view, int> update_3 = std::make_pair("*/src/*", 4);
   getFancyContext().updateVerbositySetting({update_3});
 
   p = getFancyContext().getFancyLogEntry(file_1);
@@ -146,7 +151,7 @@ TEST(Fancy, globStarUpdate) {
   p = getFancyContext().getFancyLogEntry(file_3);
   EXPECT_EQ(p->level(), Logger::Context::getFancyDefaultLevel());
 
-  std::pair<absl::string_view, int> update_4 = std::make_pair("*", 2);
+  const std::pair<absl::string_view, int> update_4 = std::make_pair("*", 2);
   getFancyContext().updateVerbositySetting({update_4});
 
   p = getFancyContext().getFancyLogEntry(file_1);
@@ -156,7 +161,7 @@ TEST(Fancy, globStarUpdate) {
   p = getFancyContext().getFancyLogEntry(file_3);
   EXPECT_EQ(p->level(), spdlog::level::info);
 
-  std::pair<absl::string_view, int> update_5 = std::make_pair("/*", 1);
+  const std::pair<absl::string_view, int> update_5 = std::make_pair("/*", 1);
   getFancyContext().updateVerbositySetting({update_5});
 
   p = getFancyContext().getFancyLogEntry(file_1);
@@ -168,15 +173,15 @@ TEST(Fancy, globStarUpdate) {
 }
 
 TEST(Fancy, globQuestionUpdate) {
-  const char* file_1 = "envoy/src/foo.cc";
-  const char* file_2 = "envoy/f__.cc";
-  const char* file_3 = "/bar.cc";
+  const std::string file_1 = "envoy/src/foo.cc";
+  const std::string file_2 = "envoy/f__.cc";
+  const std::string file_3 = "/bar.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
   getFancyContext().initFancyLogger(file_2, flogger);
   getFancyContext().initFancyLogger(file_3, flogger);
 
-  std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 3);
+  const std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 3);
   getFancyContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);
@@ -189,7 +194,7 @@ TEST(Fancy, globQuestionUpdate) {
   EXPECT_NE(p, nullptr);
   EXPECT_EQ(p->level(), Logger::Context::getFancyDefaultLevel());
 
-  std::pair<absl::string_view, int> update_2 = std::make_pair("????y/*", 2);
+  const std::pair<absl::string_view, int> update_2 = std::make_pair("????y/*", 2);
   getFancyContext().updateVerbositySetting({update_2});
   p = getFancyContext().getFancyLogEntry(file_1);
   EXPECT_EQ(p->level(), spdlog::level::info);
@@ -200,12 +205,12 @@ TEST(Fancy, globQuestionUpdate) {
 }
 
 TEST(Fancy, inOrderUpdate) {
-  const char* file_1 = "envoy/src/foo.cc";
+  const std::string file_1 = "envoy/src/foo.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
 
-  std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 3);
-  std::pair<absl::string_view, int> update_2 = std::make_pair("envoy/*/f??", 2);
+  const std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 3);
+  const std::pair<absl::string_view, int> update_2 = std::make_pair("envoy/*/f??", 2);
   getFancyContext().updateVerbositySetting({update_1, update_2});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);
@@ -214,11 +219,11 @@ TEST(Fancy, inOrderUpdate) {
 }
 
 TEST(Fancy, invalidLevelUpdate) {
-  const char* file_1 = "envoy/src/foo.cc";
+  const std::string file_1 = "envoy/src/foo.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
 
-  std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 9);
+  const std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 9);
   getFancyContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);

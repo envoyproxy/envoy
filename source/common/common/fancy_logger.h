@@ -15,6 +15,9 @@ using FancyMap = absl::flat_hash_map<std::string, SpdLoggerSharedPtr>;
 using FancyMapPtr = std::shared_ptr<FancyMap>;
 using FancyLogLevelMap = absl::flat_hash_map<std::string, spdlog::level::level_enum>;
 
+constexpr static int LOGLEVEL_MAX = 6; // spdlog level is in [0, 6]
+constexpr static int LOGLEVEL_MIN = 0;
+
 /**
  * Data struct that stores the necessary verbosity log update info
  */
@@ -91,7 +94,7 @@ public:
    *
    * Files which do not match any pattern use the value of default log level from Context.
    */
-  void updateVerbositySetting(const std::vector<std::pair<absl::string_view, int>> updates)
+  void updateVerbositySetting(const std::vector<std::pair<absl::string_view, int>>& updates)
       ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
@@ -110,7 +113,8 @@ private:
    * Creates a logger given key, and add it to map. Log level is from getLogLevel.
    * Key is the log component name, e.g. file name now.
    */
-  spdlog::logger* createLogger(std::string key) ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
+  spdlog::logger* createLogger(const std::string key)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
 
   /**
    * Append verbosity level updates to the VerbosityLogUpdateInfo vector.

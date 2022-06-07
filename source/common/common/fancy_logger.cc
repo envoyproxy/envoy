@@ -156,12 +156,15 @@ spdlog::logger* FancyContext::createLogger(std::string key)
   return new_logger.get();
 }
 
-void FancyContext::updateVerbositySetting(std::vector<std::pair<absl::string_view, int>> updates) {
+void FancyContext::updateVerbositySetting(
+    const std::vector<std::pair<absl::string_view, int>>& updates) {
   absl::WriterMutexLock ul(&fancy_log_lock_);
   log_update_info_.clear();
   for (const auto& [glob, level] : updates) {
-    if (level < 0 || level >= static_cast<int>(ARRAY_SIZE(spdlog::level::level_string_views))) {
-      printf("This log level: %d is out of scope, and it should be in [0, 6]. Skipping.", level);
+    if (level < LOGLEVEL_MIN || level > LOGLEVEL_MAX) {
+      printf(
+          "The log level: %d for glob: %s is out of scope, and it should be in [0, 6]. Skipping.",
+          level, std::string(glob).c_str());
       continue;
     }
     appendVerbosityLogUpdate(glob, static_cast<level_enum>(level));
