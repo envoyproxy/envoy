@@ -245,6 +245,135 @@ def envoy_genjson(name, srcs = [], yaml_srcs = [], filter = None, args = None):
         filter = filter,
     )
 
+def envoy_genparallel(name, args, srcs, outs, verbosity = "info", tools = [], parallel = "//tools/base:parallel"):
+    """Run batched tasks in parallel.
+
+    This is not dissimilar to how aspects work, except that the jobs are not batched one process
+    per task, and are instead batched according to the number of available cpus.
+
+    This is useful for tasks that have a high startup overhead which makes them unsuitable
+    for running in an aspect (for example `protoc`).
+
+    `args` are the command and any cli args for the command that should be run on every batch
+
+    `srcs` are labels pointing to text files containing a list of targets
+
+    `tools` are passed to the `genrule`. You can refer to these eg with `$(location x)` in `args`.
+
+    `verbosity` should be one of `info`, `warn`, `error`
+
+    `$$OUTDIR` is available when constructing args to pass your tool for output generation.
+
+    Example:
+
+    ```starlark
+
+    envoy_genparallel(
+        name = "protos_rst",
+        outs = ["protos_rst.tar"],
+        args = [
+            "$(location @com_google_protobuf//:protoc)",
+            "--descriptor_set_in=$$(realpath $(location @envoy_api//:v3_proto_set))",
+            "--plugin=protoc-gen-api_proto_plugin=$(location //tools/protodoc)",
+            "--api_proto_plugin_out=$$OUTDIR",
+        ],
+        srcs = [":proto_names"],
+        tools = [
+            "//tools/protodoc",
+            "@com_google_protobuf//:protoc",
+            "@envoy_api//:v3_proto_set",
+        ],
+        verbosity = "warn",
+    )
+    ```
+    """
+    native.genrule(
+        name = name,
+        srcs = srcs,
+        outs = outs,
+        cmd = """
+        OUTDIR=$$(mktemp -d) \
+        && PARALLEL_TARGETS=$$(cat $(SRCS)) \
+        && $(location %s) -v %s "%s" \
+            $$PARALLEL_TARGETS \
+        && tar cf $@ -C $$OUTDIR . \
+        && rm -rf $$OUTDIR
+        """ % (parralel, verbosity, " ".join(args)),
+        tools = [parallel] + tools,
+    )
+
+def envoy_pkg_filter(
+        name,
+        srcs,
+        matching = "",
+        prune = "",
+        remap_paths = {},
+        merge_paths = {},
+        strip_files = False,
+        strip_dirs = False,
+        strip_empty = False):
+    """Generate a tarball from other tarballs mangling the resulting files and directories.
+
+    `srcs` should be labels pointing to tarball files.
+
+    `matching` is a match string that is passed to `find -name "$match"`. Only matching files
+        are included in the output tarball.
+
+    `prune` is the reverse of `matching`
+
+    `remap_paths` is a mapping of `src` to `target` files or directories to `mv`.
+
+    `merge_paths` instead copies and then deletes the `src`
+
+    `strip*` removes empty `files`, `dirs` or both if `strip_empty` is set.
+
+    Example:
+
+    ```starlark
+
+    envoy_pkg_filter(
+       name = "mypkg",
+       srcs = [":some_source.tar",],
+       matching = "*.proto",
+       remap_paths = {"path1": "path3"},
+       merge_paths = {"path2/sub/dir": "path3"},
+    )
+
+    ```
+
+    """
+    strip_files = strip_empty if strip_empty else strip_files
+    strip_dirs = strip_empty if strip_empty else strip_dirs
+    commands = []
+    deletable = []
+    if matching:
+        deletable.append('! -name "%s"' % matching)
+    if prune:
+        deletable.append('-name "%s"' % prune)
+    if strip_dirs:
+        deletable.append("-type d -empty")
+    if strip_files:
+        deletable.append("-type f -empty")
+    if deletable:
+        commands.append("find $$OUTDIR %s" % (" -o ".join("%s -delete" for d in deletable)))
+    for src, target in remap_paths.items():
+        commands.append("mv $$OUTDIR/%s $$OUTDIR/%s" % (src, target))
+    for src, target in merge_paths.items():
+        commands.append("cp -a $$OUTDIR/%s $$OUTDIR/%s && rm -rf $$OUTDIR/%s" % (src, target, src))
+    commands = "&& ".join(commands)
+    native.genrule(
+        name = name,
+        srcs = srcs,
+        outs = ["%s.tar" % name],
+        cmd = """
+        OUTDIR=$$(mktemp -d) \
+        && tar xf $(SRCS) -C $$OUTDIR \
+        && %s \
+        && tar cf $@ -C $$OUTDIR . \
+        && rm -rf $$OUTDIR
+        """ % commands,
+    )
+
 def envoy_py_data(name, src, format = None, entry_point = base_entry_point):
     """Preload JSON/YAML data as a python lib.
 
