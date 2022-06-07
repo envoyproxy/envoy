@@ -251,7 +251,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   bool connection_close = stream.state_.saw_connection_close_;
   bool request_complete = stream.filter_manager_.remoteDecodeComplete();
 
-  checkForDeferredClose(connection_close && (request_complete || http_10_sans_cl));
+  // Don't do delay close for responses which are framed by connection close:
+  // HTTP/1.0 and below, upgrades, and CONNECT responses.
+  checkForDeferredClose(
+      (connection_close && (request_complete || http_10_sans_cl)) ||
+      (stream.state_.is_tunneling_ &&
+       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades")));
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
@@ -1473,13 +1478,17 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     connection_manager_.stats_.named_.downstream_rq_response_before_rq_complete_.inc();
   }
 
+  if (Utility::isUpgrade(headers) ||
+      HeaderUtility::isConnectResponse(request_headers_.get(), *responseHeaders())) {
+    state_.is_tunneling_ = true;
+  }
+
   if (connection_manager_.drain_state_ != DrainState::NotDraining &&
       connection_manager_.codec_->protocol() < Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
     // payload is no longer HTTP/1.1)
-    if (!Utility::isUpgrade(headers) &&
-        !HeaderUtility::isConnectResponse(request_headers_.get(), *responseHeaders())) {
+    if (!state_.is_tunneling_) {
       headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
     }
   }

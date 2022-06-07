@@ -80,13 +80,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-100.0.4896.30 (linux/beta)
-        version = "cacb5526268191ab52e3a8b2d71f686115776646",
-        sha256 = "fd72798ee22beb9f052d792d6c701d3ea94183c2e5b94e737866a53152b46f41",
+        # chromium-103.0.5060.24 (linux/beta)
+        version = "62079f7cb4e9a2d5d8a68fe8a4a3f2375dd53585",
+        sha256 = "770faf8dcea0c2872e0c8202fc0d71f5b623c71510d1fa580ab271d2de7e72a9",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-02-08",
+        release_date = "2022-05-10",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -944,8 +944,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Common Expression Language (CEL) C++ library",
         project_desc = "Common Expression Language (CEL) C++ library",
         project_url = "https://opensource.google/projects/cel",
-        version = "60c7aeabb4e6fa633b49c14d6c6fc8f0516761b9",
-        sha256 = "7cb1e8ce293182e1d28321d4d6baecdacbc263cffcd9da1f7ffd25312611a329",
+        version = "1adb61321cf1975bee8e1df3300984166f45cb1d",
+        sha256 = "32b57e5c8b6ad95e58cf2fc7d2ac8a79f106ddb88285d06974ef62b1474594b7",
         strip_prefix = "cel-cpp-{version}",
         urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -961,7 +961,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.stat_sinks.wasm",
             "envoy.rbac.matchers.upstream_ip_port",
         ],
-        release_date = "2021-11-08",
+        release_date = "2022-06-02",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
@@ -1158,28 +1158,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
         release_date = "2022-04-26",
-        cpe = "N/A",
-    ),
-    rules_antlr = dict(
-        project_name = "ANTLR Rules for Bazel",
-        project_desc = "Bazel rules for ANTLR",
-        project_url = "https://github.com/marcohu/rules_antlr",
-        version = "3cc2f9502a54ceb7b79b37383316b23c4da66f9a",
-        sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
-        strip_prefix = "rules_antlr-{version}",
-        urls = ["https://github.com/marcohu/rules_antlr/archive/{version}.tar.gz"],
-        # ANTLR has a runtime component, so is not purely build.
-        use_category = ["dataplane_ext"],
-        extensions = [
-            "envoy.access_loggers.extension_filters.cel",
-            "envoy.access_loggers.wasm",
-            "envoy.bootstrap.wasm",
-            "envoy.rate_limit_descriptors.expr",
-            "envoy.filters.http.wasm",
-            "envoy.filters.network.wasm",
-            "envoy.stat_sinks.wasm",
-        ],
-        release_date = "2019-06-21",
         cpe = "N/A",
     ),
     antlr4_runtimes = dict(
