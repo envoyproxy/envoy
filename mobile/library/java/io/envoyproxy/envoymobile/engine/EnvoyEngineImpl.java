@@ -97,7 +97,8 @@ public class EnvoyEngineImpl implements EnvoyEngine {
     return runWithResolvedYAML(
         envoyConfiguration.resolveTemplate(configurationYAML, JniLibrary.platformFilterTemplate(),
                                            JniLibrary.nativeFilterTemplate(),
-                                           JniLibrary.altProtocolCacheFilterInsert()),
+                                           JniLibrary.altProtocolCacheFilterInsert(),
+                                           JniLibrary.gzipConfigInsert()),
         logLevel);
   }
 
