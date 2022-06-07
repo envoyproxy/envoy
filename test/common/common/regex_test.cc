@@ -69,6 +69,14 @@ TEST(Utility, ParseRegex) {
     EXPECT_NO_THROW(Utility::parseRegex(matcher));
   }
 
+  // Positive case to ensure matcher can be created by config without google_re2 field.
+  {
+    TestScopedRuntime scoped_runtime;
+    envoy::type::matcher::v3::RegexMatcher matcher;
+    matcher.set_regex("/asdf/.*");
+    EXPECT_NO_THROW(Utility::parseRegex(matcher));
+  }
+
   // Verify max program size with the deprecated field codepath plus runtime.
   // The deprecated field codepath precedes any runtime settings.
   {
