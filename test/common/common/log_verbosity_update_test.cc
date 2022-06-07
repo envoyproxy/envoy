@@ -11,25 +11,25 @@
 namespace Envoy {
 
 TEST(Fancy, safeFileNameMatch) {
-  // Exact file name or path match
+  // Exact file name or path match.
   EXPECT_TRUE(FancyContext::safeFileNameMatch("foo", "foo"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("foo", "bar"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("foo", "fo"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("foo", "foo1"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("bar/baz.cc", "bar/foo.cc"));
 
-  // Star wildcard match
+  // Star wildcard match.
   EXPECT_TRUE(FancyContext::safeFileNameMatch("*ba*r/f*oo.c*c", "bar/foo.cc"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("*/*.cc", "barbaz/foo.cc2"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("bar/*.cc", "barbaz/foo.cc"));
   EXPECT_FALSE(FancyContext::safeFileNameMatch("/*", "foo/bar.h"));
   EXPECT_TRUE(FancyContext::safeFileNameMatch("/*", "/bar.h"));
 
-  // Question wildcard match
+  // Question wildcard match.
   EXPECT_FALSE(FancyContext::safeFileNameMatch("?a?/?", "bar/"));
   EXPECT_TRUE(FancyContext::safeFileNameMatch("??r/?", "bar/a"));
 
-  // Question and star wildcards match
+  // Question and star wildcards match.
   EXPECT_TRUE(FancyContext::safeFileNameMatch("b?r/*", "bar/foo.cc2"));
   EXPECT_TRUE(FancyContext::safeFileNameMatch("b?r/*", "bar/"));
   EXPECT_TRUE(FancyContext::safeFileNameMatch("?a?/*.cc", "bar/foo.cc"));
