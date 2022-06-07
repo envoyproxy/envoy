@@ -274,6 +274,30 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
   EXPECT_FALSE(transcoder);
 }
 
+TEST_F(GrpcJsonTranscoderConfigTest, DecodedQueryParameterWithEncodedJsonName) {
+  JsonTranscoderConfig config(
+      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                     "bookstore.Bookstore"),
+      *api_);
+
+  // When "json_name" is percent encoded, but the field name in query parameter
+  // is percent decoded, it will not match, transcoding fails.
+  // * json_name = "search%5Bencoded%5D", defined in "test/proto/bookstore.proto".
+  // " the query parameter is "search[encode]".
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/shelf?shelf.search[encode]=Google"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  TranscoderPtr transcoder;
+  MethodInfoSharedPtr method_info;
+  const auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+
+  EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
+  EXPECT_EQ("Could not find field \"search[encode]\" in the type \"bookstore.Shelf\".",
+            status.message());
+  EXPECT_FALSE(transcoder);
+}
+
 TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
   auto proto_config = getProtoConfig(
       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore");
