@@ -22,8 +22,6 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "io_handle_lib",
     hdrs = ["io_handle.h"],
-    # Used by internal upstream transport socket extension and core server internal listener.
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
