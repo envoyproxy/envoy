@@ -727,7 +727,6 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
   ON_CALL(Const(*mock_upstream_info.get()), upstreamFilterState())
       .WillByDefault(ReturnRef(upstream_filter_state));
   EXPECT_CALL(Const(*mock_upstream_info.get()), upstreamFilterState()).Times(2);
-  ;
 
   OpenTelemetryFormatMap expected = {{"test_key", "\"test_value\""},
                                      {"test_obj", "{\"inner_key\":\"inner_value\"}"}};
