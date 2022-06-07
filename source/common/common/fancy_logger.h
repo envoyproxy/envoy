@@ -113,7 +113,7 @@ private:
    * Creates a logger given key, and add it to map. Log level is from getLogLevel.
    * Key is the log component name, e.g. file name now.
    */
-  spdlog::logger* createLogger(const std::string key)
+  spdlog::logger* createLogger(const std::string& key)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
 
   /**

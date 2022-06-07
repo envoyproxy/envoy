@@ -141,7 +141,7 @@ void FancyContext::initSink() {
   }
 }
 
-spdlog::logger* FancyContext::createLogger(const std::string key)
+spdlog::logger* FancyContext::createLogger(const std::string& key)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_) {
   SpdLoggerSharedPtr new_logger =
       std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
