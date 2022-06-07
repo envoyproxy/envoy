@@ -36,9 +36,12 @@ using X509StoreContextPtr = CSmartPtr<X509_STORE_CTX, X509_STORE_CTX_free>;
 using X509Ptr = CSmartPtr<X509, X509_free>;
 using SSLContextPtr = CSmartPtr<SSL_CTX, SSL_CTX_free>;
 
-class TestSPIFFEValidator : public testing::Test {
+class TestSPIFFEValidator : public ::testing::Test, public testing::WithParamInterface<bool> {
 public:
-  TestSPIFFEValidator() : stats_(generateSslStats(store_)) {}
+  TestSPIFFEValidator() : stats_(generateSslStats(store_)) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_async_cert_validation",
+                                  GetParam());
+  }
   void initialize(std::string yaml, TimeSource& time_source) {
     envoy::config::core::v3::TypedExtensionConfig typed_conf;
     TestUtility::loadFromYaml(yaml, typed_conf);
@@ -99,7 +102,9 @@ private:
   SPIFFEValidatorPtr validator_;
 };
 
-TEST_F(TestSPIFFEValidator, InvalidCA) {
+INSTANTIATE_TEST_SUITE_P(TestSPIFFEValidators, TestSPIFFEValidator, testing::Bool());
+
+TEST_P(TestSPIFFEValidator, InvalidCA) {
   // Invalid trust bundle.
   EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -114,7 +119,7 @@ typed_config:
 }
 
 // Multiple trust bundles are given for the same trust domain.
-TEST_F(TestSPIFFEValidator, Constructor) {
+TEST_P(TestSPIFFEValidator, Constructor) {
   EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -199,13 +204,13 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
   EXPECT_TRUE(SPIFFEValidator::certificatePrecheck(cert.get()));
 }
 
-TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
+TEST_P(TestSPIFFEValidator, TestInitializeSslContexts) {
   initialize();
   EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
             validator().initializeSslContexts({}, false));
 }
 
-TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
+TEST_P(TestSPIFFEValidator, TestGetTrustBundleStore) {
   initialize();
 
   // No SAN
@@ -231,7 +236,7 @@ TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
   EXPECT_TRUE(validator().getTrustBundleStore(cert.get()));
 }
 
-TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
+TEST_P(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
   initialize();
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints: CA:True
@@ -255,7 +260,7 @@ TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
   EXPECT_EQ(info.certificateValidationStatus(), Envoy::Ssl::ClientValidationStatus::Failed);
 }
 
-TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainSingleTrustDomain) {
+TEST_P(TestSPIFFEValidator, TestDoVerifyCertChainSingleTrustDomain) {
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -328,7 +333,7 @@ typed_config:
   EXPECT_EQ(2, stats().fail_verify_error_.value());
 }
 
-TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomain) {
+TEST_P(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomain) {
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -423,7 +428,7 @@ typed_config:
   EXPECT_EQ(2, stats().fail_verify_error_.value());
 }
 
-TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomainAllowExpired) {
+TEST_P(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomainAllowExpired) {
   setAllowExpiredCertificate(true);
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -461,7 +466,7 @@ typed_config:
   EXPECT_EQ(0, stats().fail_verify_error_.value());
 }
 
-TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainSANMatching) {
+TEST_P(TestSPIFFEValidator, TestDoVerifyCertChainSANMatching) {
   const auto config = TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -480,7 +485,9 @@ typed_config:
   X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), store.get(), cert.get(), nullptr));
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
-  sk_X509_push(cert_chain.get(), cert.release());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
+    sk_X509_push(cert_chain.get(), cert.release());
+  }
   TestSslExtendedSocketInfo info;
   info.setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::NotValidated);
   {
@@ -512,18 +519,17 @@ typed_config:
                                        /*transport_socket_options=*/nullptr, *ssl_ctx, "", false,
                                        SSL_AD_INTERNAL_ERROR)
                     .status);
-      EXPECT_EQ(1, stats().fail_verify_san_.value());
     } else {
       EXPECT_FALSE(
           validator().doSynchronousVerifyCertChain(store_ctx.get(), &info, *cert, nullptr));
-      EXPECT_EQ(1, stats().fail_verify_error_.value());
     }
     EXPECT_EQ(info.certificateValidationStatus(), Envoy::Ssl::ClientValidationStatus::Failed);
+    EXPECT_EQ(1, stats().fail_verify_san_.value());
     stats().fail_verify_san_.reset();
   }
 }
 
-TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainIntermediateCerts) {
+TEST_P(TestSPIFFEValidator, TestDoVerifyCertChainIntermediateCerts) {
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -575,7 +581,7 @@ void addIA5StringGenNameExt(X509* cert, int type, const std::string name) {
   EXPECT_TRUE(X509_add1_ext_i2d(cert, NID_subject_alt_name, gens.get(), 0, X509V3_ADD_DEFAULT));
 }
 
-TEST_F(TestSPIFFEValidator, TestMatchSubjectAltNameWithURISan) {
+TEST_P(TestSPIFFEValidator, TestMatchSubjectAltNameWithURISan) {
   envoy::type::matcher::v3::StringMatcher exact_matcher, prefix_matcher, regex_matcher;
   exact_matcher.set_exact("spiffe://example.com/workload");
   prefix_matcher.set_prefix("spiffe://envoy.com");
@@ -620,7 +626,7 @@ typed_config:
 }
 
 // SPIFFE validator ignores any SANs other than URI.
-TEST_F(TestSPIFFEValidator, TestMatchSubjectAltNameWithoutURISan) {
+TEST_P(TestSPIFFEValidator, TestMatchSubjectAltNameWithoutURISan) {
   envoy::type::matcher::v3::StringMatcher exact_matcher, prefix_matcher;
   exact_matcher.set_exact("spiffe://example.com/workload");
   prefix_matcher.set_prefix("envoy");
@@ -652,7 +658,7 @@ typed_config:
   }
 }
 
-TEST_F(TestSPIFFEValidator, TestGetCaCertInformation) {
+TEST_P(TestSPIFFEValidator, TestGetCaCertInformation) {
   initialize();
 
   // No cert is set so this should be nullptr.
@@ -675,7 +681,7 @@ typed_config:
   EXPECT_TRUE(actual);
 }
 
-TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpires) {
+TEST_P(TestSPIFFEValidator, TestDaysUntilFirstCertExpires) {
   initialize();
   EXPECT_EQ(std::numeric_limits<uint32_t>::max(), validator().daysUntilFirstCertExpires().value());
 
@@ -700,7 +706,7 @@ typed_config:
   EXPECT_EQ(19221, validator().daysUntilFirstCertExpires().value());
 }
 
-TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpiresExpired) {
+TEST_P(TestSPIFFEValidator, TestDaysUntilFirstCertExpiresExpired) {
   Event::SimulatedTimeSystem time_system;
   // 2033-05-18 03:33:20 UTC
   const time_t known_date_time = 2000000000;
@@ -720,7 +726,7 @@ typed_config:
   EXPECT_EQ(absl::nullopt, validator().daysUntilFirstCertExpires());
 }
 
-TEST_F(TestSPIFFEValidator, TestAddClientValidationContext) {
+TEST_P(TestSPIFFEValidator, TestAddClientValidationContext) {
   Event::TestRealTimeSystem time_system;
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -763,7 +769,7 @@ typed_config:
   EXPECT_TRUE(foundTestCA);
 }
 
-TEST_F(TestSPIFFEValidator, TestUpdateDigestForSessionId) {
+TEST_P(TestSPIFFEValidator, TestUpdateDigestForSessionId) {
   Event::TestRealTimeSystem time_system;
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
