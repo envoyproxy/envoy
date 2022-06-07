@@ -43,6 +43,6 @@ message Audience {
 // Token Cache configuration.
 message TokenCacheConfig {
   // The number of cache entries.
-  // Default value 0 (i.e., proto3 defaults) disable the cache by default. Other default values will enable the cache.
+  // Default value 0 (i.e., proto3 defaults) disables the cache by default. Other default values will enable the cache.
   google.protobuf.Int64Value cache_size = 1;
 }

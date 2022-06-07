@@ -17,7 +17,7 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
     const GcpAuthnFilterConfig& config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<TokenCache> token_cache;
-  if (PROTOBUF_GET_WRAPPED_REQUIRED(config.cache_config(), cache_size) > 0) {
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.cache_config(), cache_size, 0) > 0) {
     token_cache = std::make_shared<TokenCache>(config.cache_config(), context);
   }
   return [config, stats_prefix, &context, token_cache = std::move(token_cache)](
