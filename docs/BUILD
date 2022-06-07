@@ -214,16 +214,14 @@ genrule(
          --build_sha="$${BUILD_SHA:-}" \
          --docs_tag="$${DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
-         --validator_path=$(location //tools/config_validation:validate_fragment) \
-         --descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text) \
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \\
          $(location rst) \
          $@
     """,
     exec_tools = [
         "//tools/docs:sphinx_runner",
         ":rst",
-        "//tools/config_validation:validate_fragment",
-        "//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text",
         "//:VERSION.txt",
+        "@envoy_api//:v3_proto_set",
     ],
 )
