@@ -17,13 +17,15 @@ std::vector<std::string>
 CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                              const std::string& system_version_info) {
-  Config::ScopedResume maybe_resume_eds_leds;
+  Config::ScopedResume maybe_resume_eds_leds_sds;
   if (cm_.adsMux()) {
     // A cluster update pauses sending EDS and LEDS requests.
     const auto eds_type_url =
         Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
     const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-    maybe_resume_eds_leds = cm_.adsMux()->pause({eds_type_url, leds_type_url});
+    const auto sds_type_url =
+        Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>();
+    maybe_resume_eds_leds_sds = cm_.adsMux()->pause({eds_type_url, leds_type_url, sds_type_url});
   }
 
   ENVOY_LOG(info, "{}: add {} cluster(s), remove {} cluster(s)", name_, added_resources.size(),

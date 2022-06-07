@@ -42,10 +42,12 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
 void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                                 const std::string& system_version_info) {
-  Config::ScopedResume maybe_resume_rds;
+  Config::ScopedResume maybe_resume_rds_sds;
   if (cm_.adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
-    maybe_resume_rds = cm_.adsMux()->pause(type_url);
+    const auto sds_type_url =
+        Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>();
+    maybe_resume_rds_sds = cm_.adsMux()->pause({type_url, sds_type_url});
   }
 
   bool any_applied = false;
