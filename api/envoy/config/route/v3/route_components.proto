@@ -324,7 +324,7 @@ message Route {
   // endpoints that one wishes to get “perfect” statistics on.
   // If not set, endpoint statistics are not generated.
   //
-  // The emitted statistics are the same as those documented for:ref:`virtual clusters <config_http_filters_router_vcluster_stats>`.
+  // The emitted statistics are the same as those documented for :ref:`virtual clusters <config_http_filters_router_vcluster_stats>`.
   //
   // .. warning::
   //
