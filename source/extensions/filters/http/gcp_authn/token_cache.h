@@ -24,7 +24,8 @@ template <typename TokenType> class TokenCacheImpl : public Logger::Loggable<Log
 public:
   TokenCacheImpl(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& config,
                  TimeSource& time_source)
-      : lru_cache_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_size, 0)), time_source_(time_source) {}
+      : lru_cache_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_size, 0)),
+        time_source_(time_source) {}
 
   TokenCacheImpl() = delete;
   TokenType* lookUp(const std::string& key);
