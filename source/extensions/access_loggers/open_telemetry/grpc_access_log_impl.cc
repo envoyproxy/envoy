@@ -86,9 +86,11 @@ GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
   // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
   // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in
   // the main thread if necessary.
-  auto client = async_client_manager_.factoryForGrpcService(config.common_config().grpc_service(), scope_, true)
+  auto client = async_client_manager_
+                    .factoryForGrpcService(config.common_config().grpc_service(), scope_, true)
                     ->createUncachedRawAsyncClient();
-  return std::make_shared<GrpcAccessLoggerImpl>(std::move(client), config, dispatcher, local_info_, scope_);
+  return std::make_shared<GrpcAccessLoggerImpl>(std::move(client), config, dispatcher, local_info_,
+                                                scope_);
 }
 
 } // namespace OpenTelemetry

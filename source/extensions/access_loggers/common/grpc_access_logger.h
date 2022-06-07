@@ -285,7 +285,7 @@ public:
     if (it != cache.access_loggers_.end()) {
       return it->second;
     }
-     
+
     const auto logger = createLogger(config, cache.dispatcher_);
     cache.access_loggers_.emplace(cache_key, logger);
     return logger;
@@ -310,8 +310,8 @@ private:
   };
 
   // Create the specific logger type for this cache.
-  virtual typename GrpcAccessLogger::SharedPtr
-  createLogger(const ConfigProto& config, Event::Dispatcher& dispatcher) PURE;
+  virtual typename GrpcAccessLogger::SharedPtr createLogger(const ConfigProto& config,
+                                                            Event::Dispatcher& dispatcher) PURE;
 
   ThreadLocal::SlotPtr tls_slot_;
 };

@@ -156,7 +156,8 @@ public:
 TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
   config.mutable_common_config()->set_log_name("test-log");
-  config.mutable_common_config()->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  config.mutable_common_config()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
   // Force a flush for every log entry.
   config.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
@@ -191,7 +192,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreationCustomTag) {
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
   config.mutable_common_config()->set_log_name("test_log");
   config.mutable_common_config()->set_transport_api_version(
-        envoy::config::core::v3::ApiVersion::V3);
+      envoy::config::core::v3::ApiVersion::V3);
   // Force a flush for every log entry.
   config.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
