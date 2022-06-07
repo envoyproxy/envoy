@@ -65,7 +65,7 @@ AccessLog::AccessLog(
   Envoy::Config::Utility::checkTransportVersion(config.common_config());
   tls_slot_->set([this, config](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config.common_config(), Common::GrpcAccessLoggerType::HTTP));
+        config, Common::GrpcAccessLoggerType::HTTP));
   });
 
   // Packing the body "AnyValue" to a "KeyValueList" only if it's not empty, otherwise the

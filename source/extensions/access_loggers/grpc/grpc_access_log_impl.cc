@@ -49,9 +49,15 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
     : GrpcAccessLoggerCache(async_client_manager, scope, tls), local_info_(local_info) {}
 
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
-    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    const Grpc::RawAsyncClientSharedPtr& client, Event::Dispatcher& dispatcher) {
-  return std::make_shared<GrpcAccessLoggerImpl>(client, config, dispatcher, local_info_, scope_);
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config, 
+    Event::Dispatcher& dispatcher) {
+  // We pass skip_cluster_check=true to factoryForGrpcService in order to avoid throwing
+  // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
+  // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in
+  // the main thread if necessary.
+  auto client = async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
+                    ->createUncachedRawAsyncClient();
+  return std::make_shared<GrpcAccessLoggerImpl>(std::move(client), config, dispatcher, local_info_, scope_);
 }
 
 } // namespace GrpcCommon
