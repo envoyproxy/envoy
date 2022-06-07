@@ -2112,7 +2112,6 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
   EXPECT_EQ(1U, store_.counter("test.downstream_response_drain_close").value());
-  EXPECT_EQ(1U, store_.counter("test.downstream_response_drain_close_local_reply").value());
 
   // Upstream connection is closed by remote. Hence we expect the downstream connection to be
   // closed after the response is sent. Drain header is set to hint downstream not to use the

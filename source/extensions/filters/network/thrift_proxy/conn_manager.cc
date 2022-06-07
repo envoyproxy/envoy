@@ -987,7 +987,6 @@ void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response
     localReplyMetadata_->responseHeaders().addReferenceKey(Headers::get().Drain, "true");
     ConnectionManager& cm = parent_;
     cm.stats_.downstream_response_drain_close_.inc();
-    cm.stats_.downstream_response_drain_close_local_reply_.inc();
   }
 
   parent_.sendLocalReply(*localReplyMetadata_, response, end_stream);
