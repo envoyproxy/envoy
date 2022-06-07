@@ -18,7 +18,8 @@ public:
                         Network::TransportSocketFactoryPtr&& inner_factory);
 
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr host) const override;
 
 private:
 #if defined(__linux__)

@@ -270,10 +270,10 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 
   // Create TLS transport socket and install it in fake_upstream.
-  Network::TransportSocketPtr ts =
-      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(),
-          std::vector<std::string>{"envoyalpn"}));
+  Network::TransportSocketPtr ts = tls_context_->createTransportSocket(
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"envoyalpn"}),
+      nullptr);
 
   // Synchronization object used to suspend execution
   // until dispatcher completes transport socket conversion.

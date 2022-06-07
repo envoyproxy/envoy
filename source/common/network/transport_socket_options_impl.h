@@ -4,10 +4,39 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "source/common/singleton/const_singleton.h"
-
 namespace Envoy {
 namespace Network {
+
+// A wrapper around another TransportSocketOptions that overrides the ALPN fallback.
+class AlpnDecoratingTransportSocketOptions : public TransportSocketOptions {
+public:
+  AlpnDecoratingTransportSocketOptions(std::vector<std::string>&& alpn,
+                                       TransportSocketOptionsConstSharedPtr inner_options)
+      : alpn_fallback_(std::move(alpn)), inner_options_(std::move(inner_options)) {}
+  // Network::TransportSocketOptions
+  const absl::optional<std::string>& serverNameOverride() const override {
+    return inner_options_->serverNameOverride();
+  }
+  const std::vector<std::string>& verifySubjectAltNameListOverride() const override {
+    return inner_options_->verifySubjectAltNameListOverride();
+  }
+  const std::vector<std::string>& applicationProtocolListOverride() const override {
+    return inner_options_->applicationProtocolListOverride();
+  }
+  const std::vector<std::string>& applicationProtocolFallback() const override {
+    return alpn_fallback_;
+  }
+  absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
+    return inner_options_->proxyProtocolOptions();
+  }
+  const StreamInfo::FilterStateSharedPtr& filterState() const override {
+    return inner_options_->filterState();
+  }
+
+private:
+  const std::vector<std::string> alpn_fallback_;
+  const TransportSocketOptionsConstSharedPtr inner_options_;
+};
 
 class TransportSocketOptionsImpl : public TransportSocketOptions {
 public:
@@ -42,8 +71,6 @@ public:
   }
   const StreamInfo::FilterStateSharedPtr& filterState() const override { return filter_state_; }
 
-  const std::shared_ptr<const Upstream::HostDescription>& host() const override { return host_; }
-
 private:
   const absl::optional<std::string> override_server_name_;
   const std::vector<std::string> override_verify_san_list_;
@@ -51,7 +78,6 @@ private:
   const std::vector<std::string> alpn_fallback_;
   const absl::optional<Network::ProxyProtocolData> proxy_protocol_options_;
   const StreamInfo::FilterStateSharedPtr filter_state_;
-  const std::shared_ptr<const Upstream::HostDescription> host_;
 };
 
 class TransportSocketOptionsUtility {
@@ -73,74 +99,6 @@ public:
    */
   void hashKey(std::vector<uint8_t>& key,
                TransportSocketOptionsConstSharedPtr options) const override;
-};
-
-using EmptyTransportSocketOptions = ConstSingleton<TransportSocketOptionsImpl>;
-
-// Base wrapper for transport socket options.
-class BaseWrapperTransportSocketOptions : public TransportSocketOptions {
-public:
-  BaseWrapperTransportSocketOptions(TransportSocketOptionsConstSharedPtr inner_options)
-      : inner_options_(std::move(inner_options)) {}
-  // Network::TransportSocketOptions
-  const absl::optional<std::string>& serverNameOverride() const override {
-    return inner_options_ ? inner_options_->serverNameOverride()
-                          : EmptyTransportSocketOptions::get().serverNameOverride();
-  }
-  const std::vector<std::string>& verifySubjectAltNameListOverride() const override {
-    return inner_options_ ? inner_options_->verifySubjectAltNameListOverride()
-                          : EmptyTransportSocketOptions::get().verifySubjectAltNameListOverride();
-  }
-  const std::vector<std::string>& applicationProtocolListOverride() const override {
-    return inner_options_ ? inner_options_->applicationProtocolListOverride()
-                          : EmptyTransportSocketOptions::get().applicationProtocolListOverride();
-  }
-  const std::vector<std::string>& applicationProtocolFallback() const override {
-    return inner_options_ ? inner_options_->applicationProtocolFallback()
-                          : EmptyTransportSocketOptions::get().applicationProtocolFallback();
-  }
-  absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
-    return inner_options_ ? inner_options_->proxyProtocolOptions() : absl::nullopt;
-  }
-  const StreamInfo::FilterStateSharedPtr& filterState() const override {
-    return inner_options_ ? inner_options_->filterState()
-                          : EmptyTransportSocketOptions::get().filterState();
-  }
-  const std::shared_ptr<const Upstream::HostDescription>& host() const override {
-    return inner_options_ ? inner_options_->host() : EmptyTransportSocketOptions::get().host();
-  }
-
-private:
-  const TransportSocketOptionsConstSharedPtr inner_options_;
-};
-
-// A wrapper around another TransportSocketOptions that overrides the ALPN fallback.
-class AlpnDecoratingTransportSocketOptions : public BaseWrapperTransportSocketOptions {
-public:
-  AlpnDecoratingTransportSocketOptions(std::vector<std::string>&& alpn,
-                                       TransportSocketOptionsConstSharedPtr inner_options)
-      : BaseWrapperTransportSocketOptions(std::move(inner_options)),
-        alpn_fallback_(std::move(alpn)) {}
-  // Network::TransportSocketOptions
-  const std::vector<std::string>& applicationProtocolFallback() const override {
-    return alpn_fallback_;
-  }
-
-private:
-  const std::vector<std::string> alpn_fallback_;
-};
-
-// A wrapper around another TransportSocketOptions that overrides the upstream host.
-class HostDecoratingTransportSocketOptions : public BaseWrapperTransportSocketOptions {
-public:
-  HostDecoratingTransportSocketOptions(std::shared_ptr<const Upstream::HostDescription>& host,
-                                       TransportSocketOptionsConstSharedPtr inner_options)
-      : BaseWrapperTransportSocketOptions(std::move(inner_options)), host_(host) {}
-  // Network::TransportSocketOptions
-  const std::shared_ptr<const Upstream::HostDescription>& host() const override { return host_; }
-
-private:
-  const std::shared_ptr<const Upstream::HostDescription> host_;
 };
 
 } // namespace Network

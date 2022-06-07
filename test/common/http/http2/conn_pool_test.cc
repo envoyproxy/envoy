@@ -354,14 +354,13 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   // happens before all the connection set up but after the test client is created (due to some)
   // of the mocks that are constructed as part of the test client.
   createTestClients(1);
-  EXPECT_CALL(*factory_ptr, createTransportSocket(_))
-      .WillOnce(Invoke(
-          [](Network::TransportSocketOptionsConstSharedPtr options) -> Network::TransportSocketPtr {
-            EXPECT_TRUE(options != nullptr);
-            EXPECT_EQ(options->applicationProtocolFallback()[0],
-                      Http::Utility::AlpnNames::get().Http2);
-            return std::make_unique<Network::RawBufferSocket>();
-          }));
+  EXPECT_CALL(*factory_ptr, createTransportSocket(_, _))
+      .WillOnce(Invoke([](Network::TransportSocketOptionsConstSharedPtr options,
+                          Upstream::HostDescriptionConstSharedPtr) -> Network::TransportSocketPtr {
+        EXPECT_TRUE(options != nullptr);
+        EXPECT_EQ(options->applicationProtocolFallback()[0], Http::Utility::AlpnNames::get().Http2);
+        return std::make_unique<Network::RawBufferSocket>();
+      }));
   expectConnectionSetupForClient(1);
   ActiveTestRequest r(*this, 0, false);
   expectClientConnect(0, r);

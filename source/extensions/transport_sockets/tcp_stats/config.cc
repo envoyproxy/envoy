@@ -26,16 +26,18 @@ TcpStatsSocketFactory::TcpStatsSocketFactory(
 #endif
 }
 
-Network::TransportSocketPtr TcpStatsSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr options) const {
+Network::TransportSocketPtr
+TcpStatsSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                                             Upstream::HostDescriptionConstSharedPtr host) const {
 #if defined(__linux__)
-  auto inner_socket = transport_socket_factory_->createTransportSocket(options);
+  auto inner_socket = transport_socket_factory_->createTransportSocket(options, host);
   if (inner_socket == nullptr) {
     return nullptr;
   }
   return std::make_unique<TcpStatsSocket>(config_, std::move(inner_socket));
 #else
   UNREFERENCED_PARAMETER(options);
+  UNREFERENCED_PARAMETER(host);
   return nullptr;
 #endif
 }

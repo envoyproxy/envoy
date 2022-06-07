@@ -142,15 +142,16 @@ InternalSocketFactory::InternalSocketFactory(
     Network::TransportSocketFactoryPtr&& inner_factory)
     : PassthroughFactory(std::move(inner_factory)), config_(config_proto, context.scope()) {}
 
-Network::TransportSocketPtr InternalSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr options) const {
-  auto inner_socket = transport_socket_factory_->createTransportSocket(options);
+Network::TransportSocketPtr
+InternalSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                                             Upstream::HostDescriptionConstSharedPtr host) const {
+  auto inner_socket = transport_socket_factory_->createTransportSocket(options, host);
   if (inner_socket == nullptr) {
     return nullptr;
   }
   std::unique_ptr<envoy::config::core::v3::Metadata> extracted_metadata;
-  if (options && options->host()) {
-    extracted_metadata = config_.extractMetadata(options->host());
+  if (host) {
+    extracted_metadata = config_.extractMetadata(host);
   }
   std::unique_ptr<IoSocket::UserSpace::FilterStateObjects> extracted_filter_state;
   if (options && options->filterState()) {

@@ -34,7 +34,9 @@ public:
   MOCK_METHOD(bool, supportsAlpn, (), (const));
   MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
-              (Network::TransportSocketOptionsConstSharedPtr), (const));
+              (Network::TransportSocketOptionsConstSharedPtr,
+               Upstream::HostDescriptionConstSharedPtr),
+              (const));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&, Network::TransportSocketOptionsConstSharedPtr),
               (const));
   FakeTransportSocketFactory(std::string id, bool alpn) : supports_alpn_(alpn), id_(std::move(id)) {
@@ -55,7 +57,9 @@ class FooTransportSocketFactory
 public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
-              (Network::TransportSocketOptionsConstSharedPtr), (const));
+              (Network::TransportSocketOptionsConstSharedPtr,
+               Upstream::HostDescriptionConstSharedPtr),
+              (const));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&, Network::TransportSocketOptionsConstSharedPtr),
               (const));
   MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));

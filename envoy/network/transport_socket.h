@@ -239,11 +239,6 @@ public:
    * @return filter state from the downstream request or connection.
    */
   virtual const StreamInfo::FilterStateSharedPtr& filterState() const PURE;
-
-  /**
-   * @return optional upstream host description.
-   */
-  virtual const std::shared_ptr<const Upstream::HostDescription>& host() const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;
@@ -262,10 +257,12 @@ public:
 
   /**
    * @param options for creating the transport socket
+   * @param host description for the destination upstream host
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.
    */
   virtual TransportSocketPtr
-  createTransportSocket(TransportSocketOptionsConstSharedPtr options) const PURE;
+  createTransportSocket(TransportSocketOptionsConstSharedPtr options,
+                        std::shared_ptr<const Upstream::HostDescription> host) const PURE;
 
   /**
    * Returns true if the transport socket created by this factory supports some form of ALPN

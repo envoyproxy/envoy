@@ -220,7 +220,8 @@ void StartTlsIntegrationTest::initialize() {
       *dispatcher_, address, Network::Address::InstanceConstSharedPtr(),
       cleartext_context_->createTransportSocket(
           std::make_shared<Network::TransportSocketOptionsImpl>(
-              absl::string_view(""), std::vector<std::string>(), std::vector<std::string>())),
+              absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()),
+          nullptr),
       nullptr);
 
   conn_->enableHalfClose(true);
@@ -280,10 +281,10 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Without closing the connection, switch to tls.
-  conn_->setTransportSocket(
-      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(),
-          std::vector<std::string>{"envoyalpn"})));
+  conn_->setTransportSocket(tls_context_->createTransportSocket(
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"envoyalpn"}),
+      nullptr));
   connect_callbacks_.reset();
   while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -347,10 +348,10 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromUpstream) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Without closing the connection, switch to tls.
-  conn_->setTransportSocket(
-      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(),
-          std::vector<std::string>{"envoyalpn"})));
+  conn_->setTransportSocket(tls_context_->createTransportSocket(
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"envoyalpn"}),
+      nullptr));
   connect_callbacks_.reset();
   while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

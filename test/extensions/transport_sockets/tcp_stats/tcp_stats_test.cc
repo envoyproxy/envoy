@@ -272,8 +272,8 @@ public:
 // Test createTransportSocket returns nullptr if inner call returns nullptr
 TEST_F(TcpStatsSocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
   initialize();
-  EXPECT_CALL(*inner_factory_, createTransportSocket(_)).WillOnce(ReturnNull());
-  EXPECT_EQ(nullptr, factory_->createTransportSocket(nullptr));
+  EXPECT_CALL(*inner_factory_, createTransportSocket(_, _)).WillOnce(ReturnNull());
+  EXPECT_EQ(nullptr, factory_->createTransportSocket(nullptr, nullptr));
 }
 
 // Test implementsSecureTransport calls inner factory

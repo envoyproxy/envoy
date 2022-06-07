@@ -81,7 +81,7 @@ SslIntegrationTestBase::makeSslClientConnection(const ClientSslTransportOptions&
       createClientSslTransportSocketFactory(options, *context_manager_, *api_);
   return dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
-      client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
+      client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr);
 }
 
 void SslIntegrationTestBase::checkStats() {
@@ -360,7 +360,7 @@ protected:
         [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
           response.append(data.toString());
         },
-        client_transport_socket_factory_ptr->createTransportSocket({}));
+        client_transport_socket_factory_ptr->createTransportSocket({}, nullptr));
 
     // Drive the connection until we get a response.
     while (response.empty()) {

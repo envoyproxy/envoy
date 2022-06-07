@@ -457,8 +457,8 @@ public:
 // Test createTransportSocket returns nullptr if inner call returns nullptr
 TEST_F(ProxyProtocolSocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
   initialize();
-  EXPECT_CALL(*inner_factory_, createTransportSocket(_)).WillOnce(ReturnNull());
-  ASSERT_EQ(nullptr, factory_->createTransportSocket(nullptr));
+  EXPECT_CALL(*inner_factory_, createTransportSocket(_, _)).WillOnce(ReturnNull());
+  ASSERT_EQ(nullptr, factory_->createTransportSocket(nullptr, nullptr));
 }
 
 // Test implementsSecureTransport calls inner factory

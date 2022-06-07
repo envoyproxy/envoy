@@ -301,14 +301,14 @@ TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
 TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
   // Override the TransportSocketFactory with a mock version we can add expectations to.
   auto factory = std::make_unique<Network::MockTransportSocketFactory>();
-  EXPECT_CALL(*factory, createTransportSocket(_))
-      .WillOnce(Invoke(
-          [](Network::TransportSocketOptionsConstSharedPtr options) -> Network::TransportSocketPtr {
-            EXPECT_TRUE(options != nullptr);
-            EXPECT_EQ(options->applicationProtocolFallback()[0],
-                      Http::Utility::AlpnNames::get().Http11);
-            return std::make_unique<Network::RawBufferSocket>();
-          }));
+  EXPECT_CALL(*factory, createTransportSocket(_, _))
+      .WillOnce(Invoke([](Network::TransportSocketOptionsConstSharedPtr options,
+                          Upstream::HostDescriptionConstSharedPtr) -> Network::TransportSocketPtr {
+        EXPECT_TRUE(options != nullptr);
+        EXPECT_EQ(options->applicationProtocolFallback()[0],
+                  Http::Utility::AlpnNames::get().Http11);
+        return std::make_unique<Network::RawBufferSocket>();
+      }));
   cluster_->transport_socket_matcher_ =
       std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(factory));
 

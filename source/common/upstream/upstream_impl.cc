@@ -338,18 +338,14 @@ Host::CreateConnectionData HostImpl::createConnection(
   ASSERT(!address->envoyInternalAddress() ||
          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
 
-  auto host_transport_socket_options =
-      std::make_shared<Network::HostDecoratingTransportSocketOptions>(host,
-                                                                      transport_socket_options);
-
   Network::ClientConnectionPtr connection =
       address_list.size() > 1
           ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
                 dispatcher, address_list, cluster.sourceAddress(), socket_factory,
-                std::move(host_transport_socket_options), connection_options)
+                transport_socket_options, host, connection_options)
           : dispatcher.createClientConnection(
                 address, cluster.sourceAddress(),
-                socket_factory.createTransportSocket(std::move(host_transport_socket_options)),
+                socket_factory.createTransportSocket(transport_socket_options, host),
                 connection_options);
 
   connection->connectionInfoSetter().enableSettingInterfaceName(

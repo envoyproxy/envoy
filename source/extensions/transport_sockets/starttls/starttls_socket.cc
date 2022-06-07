@@ -23,10 +23,11 @@ bool StartTlsSocket::startSecureTransport() {
 }
 
 Network::TransportSocketPtr StartTlsSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    Upstream::HostDescriptionConstSharedPtr host) const {
   return std::make_unique<StartTlsSocket>(
-      raw_socket_factory_->createTransportSocket(transport_socket_options),
-      tls_socket_factory_->createTransportSocket(transport_socket_options),
+      raw_socket_factory_->createTransportSocket(transport_socket_options, host),
+      tls_socket_factory_->createTransportSocket(transport_socket_options, host),
       transport_socket_options);
 }
 

@@ -116,7 +116,8 @@ public:
         tls_socket_factory_(std::move(tls_socket_factory)) {}
 
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr host) const override;
   bool implementsSecureTransport() const override { return false; }
   absl::string_view defaultServerNameIndication() const override { return ""; }
 

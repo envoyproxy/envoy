@@ -112,8 +112,9 @@ UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
     : PassthroughFactory(std::move(transport_socket_factory)), config_(config) {}
 
 Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr options) const {
-  auto inner_socket = transport_socket_factory_->createTransportSocket(options);
+    Network::TransportSocketOptionsConstSharedPtr options,
+    Upstream::HostDescriptionConstSharedPtr host) const {
+  auto inner_socket = transport_socket_factory_->createTransportSocket(options, host);
   if (inner_socket == nullptr) {
     return nullptr;
   }

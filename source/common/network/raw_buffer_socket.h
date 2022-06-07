@@ -36,8 +36,8 @@ private:
 class RawBufferSocketFactory : public CommonTransportSocketFactory {
 public:
   // Network::TransportSocketFactory
-  TransportSocketPtr
-  createTransportSocket(TransportSocketOptionsConstSharedPtr options) const override;
+  TransportSocketPtr createTransportSocket(TransportSocketOptionsConstSharedPtr,
+                                           Upstream::HostDescriptionConstSharedPtr) const override;
   bool implementsSecureTransport() const override;
   absl::string_view defaultServerNameIndication() const override { return ""; }
 };

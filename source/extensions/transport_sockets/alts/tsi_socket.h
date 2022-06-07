@@ -138,7 +138,8 @@ public:
   absl::string_view defaultServerNameIndication() const override { return ""; }
 
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr) const override;
 
 private:
   HandshakerFactory handshaker_factory_;

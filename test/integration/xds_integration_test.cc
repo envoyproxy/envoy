@@ -202,8 +202,10 @@ public:
           response.append(data.toString());
         },
         version_, *dispatcher_,
-        context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-            absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})));
+        context_->createTransportSocket(
+            std::make_shared<Network::TransportSocketOptionsImpl>(
+                absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn}),
+            nullptr));
   }
 
   std::unique_ptr<Ssl::ContextManager> context_manager_;
@@ -466,8 +468,10 @@ public:
     TestListenerFilter::setAlpn(alpn);
     auto ssl_conn = dispatcher_->createClientConnection(
         address_, Network::Address::InstanceConstSharedPtr(),
-        context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-            absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})),
+        context_->createTransportSocket(
+            std::make_shared<Network::TransportSocketOptionsImpl>(
+                absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn}),
+            nullptr),
         nullptr);
     return makeHttpConnection(std::move(ssl_conn));
   }
