@@ -1140,9 +1140,10 @@ filegroup(
     srcs = glob([
         "dlb/libdlb/**",
     ]),
-    visibility = ["@envoy//contrib/dlb/source:__pkg__"],
+    visibility = ["//visibility:public"],
 )
 """,
+        patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
     )
 
