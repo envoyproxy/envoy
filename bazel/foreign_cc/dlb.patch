@@ -1,0 +1,21 @@
+diff --git a/libdlb/Makefile b/libdlb/Makefile
+--- a/libdlb/Makefile
++++ b/libdlb/Makefile
+@@ -34,6 +34,7 @@ SRCS :=         \
+ OBJS := $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.o))
+ DEPS := $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.d))
+ LIB  := libdlb.so
++LIB2  := libdlb.a
+
+ default: $(LIB) examples cli doc
+
+@@ -55,6 +56,10 @@ $(LIB): $(OBJS)
+        @echo Linking $@
+        @$(CC) $^ -shared $(LDFLAGS) -o $@ -Wl,--version-script=version.map
+
++$(LIB2): $(OBJS)
++  @echo Linking $@
++  @$(AR) rcs $@ $^
++
+ examples cli: $(LIB)
+        @$(MAKE) -C $@/
