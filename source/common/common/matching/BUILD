@@ -16,6 +16,10 @@ envoy_cc_library(
     name = "url_template_matching",
     srcs = ["url_template_matching.cc"],
     hdrs = ["url_template_matching.h"],
+    visibility = [
+        "//source/common/common:__subpackages__",
+        "//test/common/common:__subpackages__",
+    ],
     deps = [
         ":url_template_matching_internal_cc",
         "@com_google_absl//absl/status",

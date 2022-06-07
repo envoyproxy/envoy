@@ -4,6 +4,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/matchers.h"
+#include "source/common/common/matching/url_template_matching.h"
 #include "envoy/common/regex.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
@@ -99,6 +100,13 @@ public:
         // Cache the lowercase conversion of the Contains matcher for future use
         lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
       }
+    } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kPattern) {
+      absl::StatusOr<std::string> status =
+          matching::ConvertURLPatternSyntaxToRegex(matcher_.pattern());
+      if (!status.ok()) {
+        ExceptionUtil::throwEnvoyException("unable to parse pattern url to regex");
+      }
+      path_template_match_regex_ = *std::move(status);
     }
   }
 
@@ -118,17 +126,16 @@ public:
       return matcher_.ignore_case()
                  ? absl::StrContains(absl::AsciiStrToLower(value), lowercase_contains_match_)
                  : absl::StrContains(value, matcher_.contains());
-    case StringMatcherType::MatchPatternCase::kPathTemplateMatch:
-      return matcher_.ignore_case()
-                 ? absl::StrContains(absl::AsciiStrToLower(value), lowercase_contains_match_)
-                 : absl::StrContains(value, matcher_.contains());
     case StringMatcherType::MatchPatternCase::kSafeRegex:
       return regex_->match(value);
+    case StringMatcherType::MatchPatternCase::kPattern:
+      return matching::IsPatternMatch(value, path_template_match_regex_);
     case StringMatcherType::MatchPatternCase::MATCH_PATTERN_NOT_SET:
       break;
     }
     PANIC("unexpected");
   }
+
   bool match(const ProtobufWkt::Value& value) const override {
 
     if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
@@ -161,6 +168,7 @@ private:
   const StringMatcherType matcher_;
   Regex::CompiledMatcherPtr regex_;
   std::string lowercase_contains_match_;
+  std::string path_template_match_regex_;
 };
 
 class ListMatcher : public ValueMatcher {

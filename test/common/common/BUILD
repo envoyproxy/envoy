@@ -218,6 +218,7 @@ envoy_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
     deps = [
+        "//source/common/common/matching:url_template_matching",
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",

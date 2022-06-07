@@ -23,6 +23,11 @@ using ::matching::url_template_matching_internal::ParsedUrlPattern;
 
 inline re2::StringPiece ToStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
 
+bool IsPatternMatch(absl::string_view pattern, absl::string_view capture_regex) {
+  RE2 regex = RE2(ToStringPiece(capture_regex));
+  return RE2::FullMatch(ToStringPiece(pattern), regex);
+}
+
 absl::StatusOr<std::string> ConvertURLPatternSyntaxToRegex(absl::string_view url_pattern) {
 
   absl::StatusOr<ParsedUrlPattern> status =

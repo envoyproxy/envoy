@@ -475,6 +475,30 @@ TEST(PathMatcher, MatchRegexPath) {
   EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/regez#regex"));
 }
 
+TEST(StringMatcher, PatternMatch) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_pattern("/foo/{lang}/{country}");
+
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/foo/english/us"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/foo/spanish/spain"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/foo/french/france"));
+
+  // with params
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/foo/english/us#fragment"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/foo/spanish/spain#fragment?param=val"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/foo/french/france?param=regex"));
+
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/foo/english/us/goat"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/foo/goat"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/foo"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match(""));
+
+  // with params
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/foo/english/us/goat#fragment?param=val"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/foo/goat?param=regex"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/foo?param=regex"));
+}
+
 } // namespace
 } // namespace Matcher
 } // namespace Envoy

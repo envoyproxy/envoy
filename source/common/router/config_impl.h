@@ -22,6 +22,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/matchers.h"
+#include "source/common/common/matching/url_template_matching.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/header_utility.h"
@@ -991,15 +992,16 @@ private:
  * Route entry implementation for pattern path match routing.
  */
 class PathTemplateRouteEntryImpl : public RouteEntryImplBase {
- public:
-  PathTemplateRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
-                       const OptionalHttpFilters& optional_http_filters,
-                       Server::Configuration::ServerFactoryContext& factory_context,
-                       ProtobufMessage::ValidationVisitor& validator);
+public:
+  PathTemplateRouteEntryImpl(const VirtualHostImpl& vhost,
+                             const envoy::config::route::v3::Route& route,
+                             const OptionalHttpFilters& optional_http_filters,
+                             Server::Configuration::ServerFactoryContext& factory_context,
+                             ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override { return pattern_; }
-  PathMatchType matchType() const override { return PathMatchType::Template; }
+  const std::string& matcher() const override { return template_; }
+  PathMatchType matchType() const override { return PathMatchType::Pattern; }
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
@@ -1015,8 +1017,9 @@ class PathTemplateRouteEntryImpl : public RouteEntryImplBase {
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
-  const std::string pattern_;
-  const Matchers::PathMatcherConstSharedPtr pattern_matcher_;
+  const std::string template_;
+  // todo
+  const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
 /**

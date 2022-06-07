@@ -7,6 +7,7 @@ import "envoy/type/matcher/v3/regex.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
+import "google/api/annotations.proto";
 
 option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "StringProto";
@@ -17,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: String matcher]
 
 // Specifies the way to match a string.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message StringMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.StringMatcher";
 
@@ -61,6 +62,13 @@ message StringMatcher {
     //
     // * *abc* matches the value *xyz.abc.def*
     string contains = 7 [(validate.rules).string = {min_len: 1}];
+
+    // The input string must have match the path pattern specified
+    //
+    // Examples:
+    //
+    // * */bar/{foo}/{goo}* matches the value */bar/var1/var2*
+    string pattern = 8;
   }
 
   // If true, indicates the exact/prefix/suffix/contains matching should be case insensitive. This

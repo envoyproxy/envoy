@@ -18,6 +18,9 @@ struct RewritePatternSegment {
   RewriteStringKind kind;
 };
 
+// Returns if the regex pattern matches the given url_pattern.
+bool IsPatternMatch(absl::string_view pattern, absl::string_view capture_regex);
+
 // Returns the regex pattern that is equivalent to the given url_pattern.
 // Used in the config pipeline to translate user given url pattern to
 // the safe regex Envoy can understand. Strips away any variable captures.

@@ -543,7 +543,7 @@ message RouteMatch {
     // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
     string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
 
-    string path_template_match = 15;
+    string path_template_match = 15 [(validate.rules).string = {min_len: 1}];
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
@@ -1044,7 +1044,7 @@ message RouteAction {
   //   ``/aaa/yyy/bbb``.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
 
-  string pattern_rewrite = 41;
+  RouteUrlRewritePattern pattern_rewrite = 41;
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
@@ -1275,6 +1275,22 @@ message RouteAction {
 
   // Specifies the maximum stream duration for this route.
   MaxStreamDuration max_stream_duration = 36;
+}
+
+// Holds the segments for rewrite
+message RouteUrlRewritePattern {
+  message RewriteSegment {
+    oneof segment_type {
+      // Represents a segment of the rewritten URL, including any path segments,
+      // slash and prefix.
+      string literal = 1;
+      // Represents an index into the RE2 capture which value should be used
+      // to construct the rewritten URL. Note that the index should be greater
+      // than 0 as 0 index into the whole match RE2 pattern.
+      int32 var_index = 2;
+    }
+  }
+  repeated RewriteSegment segments = 3;
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.

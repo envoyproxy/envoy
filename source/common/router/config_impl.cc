@@ -99,9 +99,9 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
   }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathPatternMatch: {
-    route = std::make_shared<PatternTemplateRouteEntryImpl>(
-        vhost, route_config, optional_http_filters, factory_context, validator);
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathTemplateMatch: {
+    route = std::make_shared<PathTemplateRouteEntryImpl>(vhost, route_config, optional_http_filters,
+                                                         factory_context, validator);
     break;
   }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
@@ -1358,35 +1358,37 @@ void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
 }
 
 // start new
-PatternTemplateRouteEntryImpl::PatternTemplateRouteEntryImpl(
+PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      pattern_(route.match().prefix()),
-      pattern_matcher_(Matchers::PathMatcher::createPrefix(pattern_, !case_sensitive_)) {}
+      template_(route.match().path_template_match()),
+      // done setting up path matchers for template pattern
+      path_matcher_(Matchers::PathMatcher::createPattern(template_, !case_sensitive_)) {}
 
-void PatternTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
-                                             bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, pattern_, insert_envoy_original_path);
+void PathTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
+                                                   bool insert_envoy_original_path) const {
+  finalizePathHeader(headers, template_, insert_envoy_original_path);
 }
 
-absl::optional<std::string>
-PatternTemplateRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, pattern_);
+absl::optional<std::string> PathTemplateRouteEntryImpl::currentUrlPathAfterRewrite(
+    const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, template_);
 }
 
-RouteConstSharedPtr PatternTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
-                                                  const StreamInfo::StreamInfo& stream_info,
-                                                  uint64_t random_value) const {
+// done setting up pattern match
+RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                        const StreamInfo::StreamInfo& stream_info,
+                                                        uint64_t random_value) const {
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      pattern_matcher_->match(headers.getPathValue())) {
+      path_matcher_->match(path)) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
 }
-
 // end new
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(

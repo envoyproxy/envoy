@@ -112,7 +112,7 @@ PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, b
 
 PathMatcherConstSharedPtr PathMatcher::createPattern(const std::string& pattern, bool ignore_case) {
   envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_path_template_match(pattern);
+  matcher.set_pattern(pattern);
   matcher.set_ignore_case(ignore_case);
   return std::make_shared<const PathMatcher>(matcher);
 }
