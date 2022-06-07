@@ -335,8 +335,8 @@ message Http1ProtocolOptions {
   // Allows sending fully qualified URLs when proxying the first line of the
   // response. By default, Envoy will only send the path components in the first line.
   // If this is true, Envoy will create a fully qualified URI composing scheme
-  // (infered if not present), host (from the host/:authority header) and path
-  // (from firstline or :path header).
+  // (inferred if not present), host (from the host/:authority header) and path
+  // (from first line or :path header).
   bool send_fully_qualified_url = 8;
 }
 
