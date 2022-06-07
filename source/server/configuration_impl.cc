@@ -41,7 +41,10 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
 /**
  * All missing listener config stats. @see stats_macros.h
  */
-#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(extension_config_missing)
+#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER)         \
+  COUNTER(extension_listener_config_missing)               \
+  COUNTER(extension_udp_listener_config_missing)
+
 /**
  * Struct definition for all missing listener config stats. @see stats_macros.h
  */
@@ -60,7 +63,7 @@ public:
     ENVOY_LOG(debug, "Listener filter: new connection accepted while missing configuration. "
                      "Close socket and stop the iteration onAccept.");
     cb.socket().ioHandle().close();
-    stats_.extension_config_missing_.inc();
+    stats_.extension_listener_config_missing_.inc();
     return Network::FilterStatus::StopIteration;
   }
   Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
@@ -97,11 +100,48 @@ bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter
   return true;
 }
 
+
+class MissingConfigUdpListenerFilter : public Network::UdpListenerReadFilter,
+                                       public Logger::Loggable<Logger::Id::filter> {
+public:
+  MissingConfigUdpListenerFilter(Network::UdpReadFilterCallbacks& callbacks, Stats::Scope& stats_scope)
+      : UdpListenerReadFilter(callbacks), scope_(stats_scope),
+        stats_({ALL_MISSING_LISTENER_CONFIG_STATS(POOL_COUNTER(scope_))})  {}
+
+  // Network::UdpListenerReadFilter callbacks
+  Network::FilterStatus onData(Network::UdpRecvData&) override {
+    ENVOY_LOG(debug, "UDP Listener filter: Receiving data while missing configuration. "
+                     "Stop the iteration onData.");
+    stats_.extension_udp_listener_config_missing_.inc();
+    return Network::FilterStatus::StopIteration;
+  }
+  Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
+    return Network::FilterStatus::StopIteration;
+  }
+
+private:
+  Stats::Scope& scope_;
+  MissingListenerConfigStats stats_;
+};
+
 void FilterChainUtility::buildUdpFilterChain(
     Network::UdpListenerFilterManager& filter_manager, Network::UdpReadFilterCallbacks& callbacks,
-    const std::vector<Network::UdpListenerFilterFactoryCb>& factories) {
-  for (const Network::UdpListenerFilterFactoryCb& factory : factories) {
-    factory(filter_manager, callbacks);
+    const Filter::UdpListenerFilterFactoriesList& factories,
+    Stats::Scope& stats_scope) {
+  bool added_missing_config_filter = false;
+  std::cout << "\n Yanjun here 10 buildUdpFilterChain \n" << std::endl;
+  for (const auto& filter_config_provider : factories) {
+    auto config = filter_config_provider->config();
+    if (config.has_value()) {
+      auto config_value = config.value();
+      config_value(filter_manager, callbacks);
+      continue;
+    }
+    // If a UDP filter config is missing after warming, stop iteration.
+    if (!added_missing_config_filter) {
+      filter_manager.addReadFilter(std::make_unique<MissingConfigUdpListenerFilter>(callbacks, stats_scope));
+      added_missing_config_filter = true;
+    }
   }
 }
 

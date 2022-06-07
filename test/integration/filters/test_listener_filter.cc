@@ -67,11 +67,18 @@ class TestUdpInspectorConfigFactory
 public:
   // NamedUdpListenerFilterConfigFactory
   Network::UdpListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::ListenerFactoryContext&) override {
-    return [](Network::UdpListenerFilterManager& filter_manager,
-              Network::UdpReadFilterCallbacks& callbacks) -> void {
-      filter_manager.addReadFilter(std::make_unique<TestUdpListenerFilter>(callbacks));
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::ListenerFactoryContext& context) override {
+
+    const auto& message = MessageUtil::downcastAndValidate<
+        const test::integration::filters::TestUdpListenerFilterConfig&>(
+        proto_config, context.messageValidationVisitor());
+    std::cout << "\n Yanjun Udp Listener factory from proto  here 2 drain_bytes " << message.drain_bytes() << std::endl;
+    return [message](Network::UdpListenerFilterManager& filter_manager,
+                     Network::UdpReadFilterCallbacks& callbacks) -> void {
+
+      std::cout << "\n Yanjun Udp Listener  proto  here 3 callback  drain_bytes " << message.drain_bytes() << std::endl;
+      filter_manager.addReadFilter(std::make_unique<TestUdpListenerFilter>(callbacks, message.drain_bytes()));
     };
   }
 

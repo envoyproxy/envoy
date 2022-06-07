@@ -1,4 +1,5 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
@@ -35,12 +36,23 @@ public:
       listener_filter->set_name(name);
 
       auto* discovery = listener_filter->mutable_config_discovery();
-      discovery->add_type_urls(
-          "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig");
-      if (set_default_config) {
-        auto default_configuration = test::integration::filters::TestTcpListenerFilterConfig();
-        default_configuration.set_drain_bytes(default_drain_bytes_);
-        discovery->mutable_default_config()->PackFrom(default_configuration);
+      if (!is_udp_) {
+        addListenerFilterMatcher(listener_filter, matcher);
+        discovery->add_type_urls(
+            "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig");
+        if (set_default_config) {
+          auto default_configuration = test::integration::filters::TestTcpListenerFilterConfig();
+          default_configuration.set_drain_bytes(default_drain_bytes_);
+          discovery->mutable_default_config()->PackFrom(default_configuration);
+        }
+      } else {
+        discovery->add_type_urls(
+            "type.googleapis.com/test.integration.filters.TestUdpListenerFilterConfig");
+        if (set_default_config) {
+          auto default_configuration = test::integration::filters::TestUdpListenerFilterConfig();
+          default_configuration.set_drain_bytes(default_drain_bytes_);
+          discovery->mutable_default_config()->PackFrom(default_configuration);
+        }
       }
 
       discovery->set_apply_default_config_without_warming(apply_without_warming);
@@ -52,7 +64,7 @@ public:
       if (rate_limit) {
         api_config_source->mutable_rate_limit_settings()->mutable_max_tokens()->set_value(10);
       }
-      addListenerFilterMatcher(listener_filter, matcher);
+
       auto* grpc_service = api_config_source->add_grpc_services();
       setGrpcService(*grpc_service, "ecds_cluster", getEcdsFakeUpstream().localAddress());
     });
@@ -86,16 +98,43 @@ public:
     defer_listener_finalization_ = true;
     setUpstreamCount(1);
 
+
+    if (is_udp_) {
+      FakeUpstreamConfig::UdpConfig config;
+      config.max_rx_datagram_size_ = absl::nullopt;
+      setUdpFakeUpstream(config);
+    }
+
     // Add a tcp_proxy network filter.
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* filter_chain = listener->add_filter_chains();
-      auto* filter = filter_chain->add_filters();
-      filter->set_name("envoy.filters.network.tcp_proxy");
-      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
-      config.set_stat_prefix("tcp_stats");
-      config.set_cluster("cluster_0");
-      filter->mutable_typed_config()->PackFrom(config);
+      if (is_udp_) {
+        listener->mutable_address()->mutable_socket_address()->set_protocol(
+            envoy::config::core::v3::SocketAddress::UDP);
+          config_helper_.addListenerFilter(R"EOF(
+name: udp_proxy
+typed_config:
+  '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+  stat_prefix: foo
+  matcher:
+    on_no_match:
+      action:
+        name: route
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+          cluster: cluster_0
+)EOF");
+
+          listener->mutable_listener_filters()->SwapElements(1, 0);
+      } else {
+        auto* filter_chain = listener->add_filter_chains();
+        auto* filter = filter_chain->add_filters();
+        filter->set_name("envoy.filters.network.tcp_proxy");
+        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
+        config.set_stat_prefix("tcp_stats");
+        config.set_cluster("cluster_0");
+        filter->mutable_typed_config()->PackFrom(config);
+      }
     });
 
     // Add an xDS cluster for extension config discovery.
@@ -148,9 +187,15 @@ public:
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);
 
-    auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
-    configuration.set_drain_bytes(drain_bytes);
-    typed_config.mutable_typed_config()->PackFrom(configuration);
+    if (!is_udp_) {
+      auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
+      configuration.set_drain_bytes(drain_bytes);
+      typed_config.mutable_typed_config()->PackFrom(configuration);
+    } else {
+      auto configuration = test::integration::filters::TestUdpListenerFilterConfig();
+      configuration.set_drain_bytes(drain_bytes);
+      typed_config.mutable_typed_config()->PackFrom(configuration);
+    }
     resource.mutable_resource()->PackFrom(typed_config);
     if (ttl) {
       resource.mutable_ttl()->set_seconds(1);
@@ -177,10 +222,28 @@ public:
     tcp_client->close();
   }
 
+  void sendUdpDataVerifyResults(uint32_t drain_bytes) {
+    test_server_->waitUntilListenersReady();
+    EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+    const uint32_t port = lookupPort(port_name_);
+    const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+    Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
+    std::string request = data_;
+    client.write(request, *listener_address);
+
+    Network::UdpRecvData request_datagram;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+    const std::string expected_data = data_.substr(drain_bytes, std::string::npos);
+    EXPECT_EQ(expected_data, request_datagram.buffer_->toString());
+  }
+
   const uint32_t default_drain_bytes_{2};
   const std::string filter_name_;
   const std::string data_;
   const std::string port_name_;
+  bool is_udp_{false};
 
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
 
@@ -191,6 +254,59 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ListenerExtensionDiscoveryIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessUdp) {
+  is_udp_ = true;
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter(filter_name_, false);
+  initialize();
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  // Send 1st config update to have listener filter drain 5 bytes of data.
+  sendXdsResponse(filter_name_, "1", 5);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.udp_listener_filter." + filter_name_ + ".config_reload", 1);
+
+  sendUdpDataVerifyResults(2);
+   // Send 2nd config update to have listener filter drain 7 bytes of data.
+  sendXdsResponse(filter_name_, "1", 7);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.udp_listener_filter." + filter_name_ + ".config_reload", 2);
+
+  sendUdpDataVerifyResults(2);
+}
+
+
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessUdpNoDefault) {
+  is_udp_ = true;
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter(filter_name_, false, false);
+  initialize();
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  // Send 1st config update to have listener filter drain 5 bytes of data.
+  sendXdsResponse(filter_name_, "1", 5);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.udp_listener_filter." + filter_name_ + ".config_reload", 1);
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  const uint32_t port = lookupPort(port_name_);
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
+  std::string request = data_;
+  client.write(request, *listener_address);
+
+   // The extension_listener_config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.extension_udp_listener_config_missing", 1);
+
+}
+
+
+
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
@@ -264,16 +380,16 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   if (result) {
     tcp_client->waitForDisconnect();
   }
-  // The extension_config_missing stats counter increases by 1.
-  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 1);
+  // The extension_listener_config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.extension_listener_config_missing", 1);
 
-  // Send the data again. The extension_config_missing stats counter increases to 2.
+  // Send the data again. The extension_listener_config_missing stats counter increases to 2.
   tcp_client = makeTcpConnection(lookupPort(port_name_));
   result = tcp_client->write(data_);
   if (result) {
     tcp_client->waitForDisconnect();
   }
-  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 2);
+  test_server_->waitForCounterGe("listener.listener_stat.extension_listener_config_missing", 2);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
@@ -329,8 +445,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   if (result) {
     tcp_client->waitForDisconnect();
   }
-  // The extension_config_missing stats counter increases by 1.
-  test_server_->waitForCounterGe("listener.listener_stat.extension_config_missing", 1);
+  // The extension_listener_config_missing stats counter increases by 1.
+  test_server_->waitForCounterGe("listener.listener_stat.extension_listener_config_missing", 1);
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {

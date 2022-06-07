@@ -1245,10 +1245,12 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/filters/udp/udp_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration/filters:test_listener_filter_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
     ],

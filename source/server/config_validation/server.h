@@ -154,10 +154,11 @@ public:
     return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         filters, context, tcp_listener_config_provider_manager_);
   }
-  std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+  Filter::UdpListenerFilterFactoriesList createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(filters, context);
+    return ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
+        filters, context, udp_listener_config_provider_manager_);
   }
   Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
@@ -236,6 +237,7 @@ private:
   ServerFactoryContextImpl server_contexts_;
   Quic::QuicStatNames quic_stat_names_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  Filter::UdpListenerFilterConfigProviderManagerImpl udp_listener_config_provider_manager_;
 };
 
 } // namespace Server

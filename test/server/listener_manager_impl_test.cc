@@ -4677,7 +4677,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
                      -> Filter::ListenerFilterFactoriesList {
             listener_factory_context = &context;
             return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
-                filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
+                filters, context, tcp_listener_config_provider_manager_);
           }));
   server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));

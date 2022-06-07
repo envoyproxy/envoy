@@ -839,7 +839,8 @@ bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& man
 void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManager& manager,
                                                 Network::UdpReadFilterCallbacks& callbacks) {
   Configuration::FilterChainUtility::buildUdpFilterChain(manager, callbacks,
-                                                         udp_listener_filter_factories_);
+                                                         udp_listener_filter_factories_,
+                                                         listenerScope());
 }
 
 void ListenerImpl::debugLog(const std::string& message) {

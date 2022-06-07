@@ -14,4 +14,5 @@ message TestTcpListenerFilterConfig {
 }
 // Configuration for UDP listener filter test
 message TestUdpListenerFilterConfig {
+ uint32 drain_bytes = 1 [(validate.rules).uint32 = {gte: 2}];
 }

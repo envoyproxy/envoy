@@ -22,6 +22,8 @@ using DynamicFilterConfigProviderPtr = std::unique_ptr<DynamicFilterConfigProvid
 // Listener filter config provider aliases
 using ListenerFilterFactoriesList =
     std::vector<FilterConfigProviderPtr<Network::ListenerFilterFactoryCb>>;
+using UdpListenerFilterFactoriesList =
+    std::vector<FilterConfigProviderPtr<Network::UdpListenerFilterFactoryCb>>;
 
 /**
  * The FilterConfigProviderManager exposes the ability to get an FilterConfigProvider

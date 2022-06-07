@@ -166,11 +166,13 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
   return ret;
 }
 
-std::vector<Network::UdpListenerFilterFactoryCb>
+Filter::UdpListenerFilterFactoriesList
 ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
-    Configuration::ListenerFactoryContext& context) {
-  std::vector<Network::UdpListenerFilterFactoryCb> ret;
+    Configuration::ListenerFactoryContext& context,
+    Filter::UdpListenerFilterConfigProviderManagerImpl& config_provider_manager) {
+  Filter::UdpListenerFilterFactoriesList ret;
+  ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
@@ -179,14 +181,42 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
-    // Now see if there is a factory that will accept the config.
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
-            proto_config);
-
-    auto message = Config::Utility::translateToFactoryConfig(
-        proto_config, context.messageValidationVisitor(), factory);
-    ret.push_back(factory.createFilterFactoryFromProto(*message, context));
+    // dynamic UDP listener filter configuration
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      const auto& config_discovery = proto_config.config_discovery();
+      const auto& name = proto_config.name();
+      if (config_discovery.apply_default_config_without_warming() &&
+          !config_discovery.has_default_config()) {
+        throw EnvoyException(fmt::format(
+            "Error: listener filter config {} applied without warming but has no default config.",
+            name));
+      }
+      for (const auto& type_url : config_discovery.type_urls()) {
+        const auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+        const auto* factory =
+            Registry::FactoryRegistry<Server::Configuration::NamedUdpListenerFilterConfigFactory>::
+                getFactoryByType(factory_type_url);
+        if (factory == nullptr) {
+          throw EnvoyException(fmt::format(
+              "Error: no UDP listener factory found for a required type URL {}.", factory_type_url));
+        }
+      }
+      auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
+          config_discovery, name, context, "udp_listener.", false, "listener", nullptr);
+      ret.push_back(std::move(filter_config_provider));
+    } else {
+      // For static configuration, now see if there is a factory that will accept the config.
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
+              proto_config);
+      const auto message = Config::Utility::translateToFactoryConfig(
+          proto_config, context.messageValidationVisitor(), factory);
+      const auto callback = factory.createFilterFactoryFromProto(*message, context);
+      auto filter_config_provider =
+          config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name());
+      ret.push_back(std::move(filter_config_provider));
+    }
   }
   return ret;
 }
