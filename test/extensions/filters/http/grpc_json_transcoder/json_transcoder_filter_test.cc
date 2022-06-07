@@ -284,7 +284,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, DecodedQueryParameterWithEncodedJsonName) {
   // is percent decoded, it will not match, transcoding fails.
   // * json_name = "search%5Bencoded%5D", defined in "test/proto/bookstore.proto".
   // " the query parameter is "search[encode]".
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/shelf?shelf.search[encode]=Google"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/shelf?shelf.search[encode]=Google"}};
 
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
