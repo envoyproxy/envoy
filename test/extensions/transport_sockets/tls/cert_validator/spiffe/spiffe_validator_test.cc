@@ -236,6 +236,21 @@ TEST_P(TestSPIFFEValidator, TestGetTrustBundleStore) {
   EXPECT_TRUE(validator().getTrustBundleStore(cert.get()));
 }
 
+TEST_P(TestSPIFFEValidator, TestDoVerifyCertChainWithEmptyChain) {
+  initialize();
+  TestSslExtendedSocketInfo info;
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+  EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+            validator()
+                .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
+                                   /*transport_socket_options=*/nullptr, *ssl_ctx, "", false,
+                                   SSL_AD_INTERNAL_ERROR)
+                .status);
+  EXPECT_EQ(1, stats().fail_verify_error_.value());
+  EXPECT_EQ(info.certificateValidationStatus(), Envoy::Ssl::ClientValidationStatus::NotValidated);
+}
+
 TEST_P(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
   initialize();
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
