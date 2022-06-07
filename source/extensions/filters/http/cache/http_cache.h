@@ -256,7 +256,7 @@ public:
 
   virtual ~HttpCache() = default;
 };
-using HttpCachePtr = std::shared_ptr<HttpCache>;
+using HttpCacheSharedPtr = std::shared_ptr<HttpCache>;
 
 // Factory interface for cache implementations to implement and register.
 class HttpCacheFactory : public Config::TypedFactory {
@@ -271,7 +271,7 @@ public:
   // etc.
 
   // Get cache for global config
-  virtual HttpCachePtr
+  virtual HttpCacheSharedPtr
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
            Server::Configuration::CommonFactoryContext& context) PURE;
 

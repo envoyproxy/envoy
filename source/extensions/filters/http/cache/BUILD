@@ -16,7 +16,6 @@ envoy_cc_library(
     name = "cache_filter_lib",
     srcs = [
         "cache_filter.cc",
-        "cache_filter_config.cc",
     ],
     hdrs = [
         "cache_filter.h",

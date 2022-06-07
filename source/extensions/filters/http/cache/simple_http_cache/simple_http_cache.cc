@@ -320,8 +320,8 @@ public:
   // From HttpCacheFactory
 
   // Get cache for global config
-  HttpCachePtr getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
-                        Server::Configuration::CommonFactoryContext& context) override {
+  HttpCacheSharedPtr getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
+                              Server::Configuration::CommonFactoryContext& context) override {
     return context.singletonManager().getTyped<SimpleHttpCache>(
         SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_singleton), &createCache);
   }

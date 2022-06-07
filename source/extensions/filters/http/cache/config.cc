@@ -11,8 +11,8 @@ namespace Cache {
 
 namespace {
 template <typename FactoryCtx>
-HttpCachePtr getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-                      FactoryCtx& ctx) {
+HttpCacheSharedPtr getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
+                            FactoryCtx& ctx) {
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   auto* http_cache_factory = Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(type);
   if (Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(type) == nullptr) {

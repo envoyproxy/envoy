@@ -1,15 +1,9 @@
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
+#include "envoy/router/router.h"
 
-#include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
-#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,18 +13,19 @@ namespace Cache {
 using CacheFilterConfigPb = envoy::extensions::filters::http::cache::v3::CacheConfig;
 using CacheFilterConfigPbRef = std::reference_wrapper<const CacheFilterConfigPb>;
 
-// Config contains raw proto config and cache reference which is used in current filter.
-// Initially 'CacheRouteFilterConfig' is created from global config and can be
-// overriden with route config (see config.cc)
+/**
+ * Route configuration for the HTTP cache filter.
+ */
 class CacheRouteFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
-  explicit CacheRouteFilterConfig(HttpCachePtr cache, const CacheFilterConfigPb& config);
+  explicit CacheRouteFilterConfig(HttpCacheSharedPtr cache, const CacheFilterConfigPb& config)
+      : cache_(cache), pb_config_(config) {}
 
   const CacheFilterConfigPb& proto() const { return pb_config_; }
-  HttpCachePtr getCache() const;
+  HttpCacheSharedPtr getCache() const { return cache_; }
 
 private:
-  HttpCachePtr cache_;
+  HttpCacheSharedPtr cache_;
   CacheFilterConfigPbRef pb_config_;
 };
 

@@ -34,9 +34,9 @@ using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 bool is_route_config_init_ = false;
 
 CacheFilter::CacheFilter(const std::string&, Stats::Scope&, TimeSource& time_source,
-                         const CacheFilterConfigPb& pb_config, HttpCachePtr cache)
-    : pb_config_(pb_config), cache_(cache), time_source_(time_source),
-      vary_allow_list_(pb_config.allowed_vary_headers()) {}
+                         const CacheFilterConfigPb& pb_config, HttpCacheSharedPtr cache)
+    : cache_(cache), time_source_(time_source), vary_allow_list_(pb_config.allowed_vary_headers()) {
+}
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;
@@ -60,7 +60,6 @@ void CacheFilter::initRouteConfig() {
     return;
   }
 
-  pb_config_ = cfg->proto();
   cache_ = cfg->getCache();
   vary_allow_list_ = cfg->proto().allowed_vary_headers();
   ASSERT(cache_);

@@ -21,17 +21,14 @@ namespace Cache {
 
 class CacheFilterTest : public ::testing::Test {
 protected:
-  const CacheFilterConfigPb& getFilterCfg(CacheFilterSharedPtr filter) {
-    return filter->pb_config_;
-  }
-  const HttpCachePtr& getFilterCache(CacheFilterSharedPtr filter) { return filter->cache_; }
+  const HttpCacheSharedPtr& getFilterCache(CacheFilterSharedPtr filter) { return filter->cache_; }
   const VaryAllowList& getVaryAllowList(CacheFilterSharedPtr filter) {
     return filter->vary_allow_list_;
   }
 
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
-  CacheFilterSharedPtr makeFilter(HttpCachePtr cache) {
+  CacheFilterSharedPtr makeFilter(HttpCacheSharedPtr cache) {
     auto filter = std::make_shared<CacheFilter>(/*stats_prefix=*/"", context_.scope(),
                                                 context_.timeSource(), config_, simple_cache_);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -129,7 +126,7 @@ protected:
 
   void waitBeforeSecondRequest() { time_source_.advanceTimeWait(delay_); }
 
-  HttpCachePtr simple_cache_;
+  HttpCacheSharedPtr simple_cache_;
   envoy::extensions::filters::http::cache::v3::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;
@@ -588,7 +585,7 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
 }
 
 // Check that per route config is used in filter (in case if it is defined)
-TEST_F(CacheFilterTest, PerFilterConfigOverride) {
+TEST_F(CacheFilterTest, PerRouteConfigOverride) {
   // Define per route config
   const auto yaml_config = R"EOF(
 allowed_vary_headers:
@@ -613,11 +610,9 @@ typed_config:
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter->decodeHeaders(request_headers_, true));
 
-  // During header decoding filter should reinit config using per route config.
-  // It means that cache should be initialized with 'simple_cache_' and allowed_vary_headers should
-  // be taken from per route config as well
+  // During header decoding filter should override global config with route config.
+  // In this test filter should use allowed_vary_headers = [bar]
   EXPECT_EQ(getFilterCache(filter), simple_cache_);
-  EXPECT_EQ(getFilterCfg(filter).DebugString(), cache_per_route.DebugString());
   EXPECT_TRUE(getVaryAllowList(filter).allowsValue("bar"));
 }
 

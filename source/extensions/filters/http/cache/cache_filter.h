@@ -26,7 +26,7 @@ class CacheFilter : public Http::PassThroughFilter,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
   CacheFilter(const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
-              const CacheFilterConfigPb& pb_config, HttpCachePtr cache);
+              const CacheFilterConfigPb& pb_config, HttpCacheSharedPtr cache);
   // Http::StreamFilterBase
   void onDestroy() override;
   // Http::StreamDecoderFilter
@@ -91,8 +91,7 @@ private:
   void finalizeEncodingCachedResponse();
 
   bool is_route_config_init_ = false;
-  CacheFilterConfigPbRef pb_config_;
-  HttpCachePtr cache_;
+  HttpCacheSharedPtr cache_;
   TimeSource& time_source_;
   LookupContextPtr lookup_;
   InsertContextPtr insert_;
