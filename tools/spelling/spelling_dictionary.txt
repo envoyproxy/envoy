@@ -1131,6 +1131,8 @@ schedulable
 schemas
 scopekey
 sd
+search%5Bdecoded%5D
+search%5Bencoded%5D
 secp
 sendmsg
 sendmmsg
