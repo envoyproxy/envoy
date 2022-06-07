@@ -1,6 +1,5 @@
 #include "source/extensions/filters/http/cache/cache_filter.h"
 
-#include "cache_filter_config.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -13,6 +12,7 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "cache_filter_config.h"
 
 namespace Envoy {
 namespace Extensions {

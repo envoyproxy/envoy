@@ -8,9 +8,9 @@
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/http/cache/cache_filter_config.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
-#include "source/extensions/filters/http/cache/cache_filter_config.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {

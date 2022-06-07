@@ -1,7 +1,8 @@
 #include "source/extensions/filters/http/cache/config.h"
 
-#include "http_cache.h"
 #include "source/extensions/filters/http/cache/cache_filter.h"
+
+#include "http_cache.h"
 
 namespace Envoy {
 namespace Extensions {

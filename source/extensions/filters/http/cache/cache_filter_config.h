@@ -1,9 +1,9 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
-#include <functional>
 
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 

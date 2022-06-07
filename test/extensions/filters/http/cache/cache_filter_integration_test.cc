@@ -1,8 +1,8 @@
 #include <initializer_list>
 #include <optional>
 
-#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "envoy/common/optref.h"
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/simulated_time_system.h"

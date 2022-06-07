@@ -1,6 +1,8 @@
-#include "envoy/event/dispatcher.h"
+#include <memory>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
+
 #include "source/common/http/headers.h"
 #include "source/extensions/filters/http/cache/cache_filter.h"
 #include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
@@ -11,7 +13,6 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {
