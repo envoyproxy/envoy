@@ -9,6 +9,7 @@ def envoy_contrib_linux_x86_64_constraints():
 
 ARM64_SKIP_CONTRIB_TARGETS = ["envoy.tls.key_providers.cryptomb", "envoy.matching.input_matchers.hyperscan", "envoy.network.connection_balance"]
 PPC_SKIP_CONTRIB_TARGETS = ["envoy.tls.key_providers.cryptomb", "envoy.matching.input_matchers.hyperscan", "envoy.network.connection_balance"]
+
 # TODO(@daixiang0) add clang support for dlb
 GCC_SKIP_CONTRIB_TARGETS = ["envoy.network.connection_balance.dlb"]
 
