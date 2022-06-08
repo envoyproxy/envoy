@@ -418,6 +418,42 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+  func testAddingKeyValueStoreToConfigurationWhenRunningEnvoy() {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual("bar", config.keyValueStores["name"]?.readValue(forKey: "foo"))
+      expectation.fulfill()
+    }
+
+    let testStore: KeyValueStore = {
+      class TestStore: KeyValueStore {
+        private var dict: [String: String] = [:]
+
+        func readValue(forKey key: String) -> String? {
+          return dict[key]
+        }
+
+        func saveValue(_ value: String, toKey key: String) {
+          dict[key] = value
+        }
+
+        func removeKey(_ key: String) {
+          dict[key] = nil
+        }
+      }
+
+      return TestStore()
+    }()
+
+    testStore.saveValue("bar", toKey: "foo")
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addKeyValueStore(name: "name", keyValueStore: testStore)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
   func testResolvesYAMLWithIndividuallySetValues() throws {
     let config = EnvoyConfiguration(
       adminInterfaceEnabled: false,
@@ -452,7 +488,8 @@ final class EngineBuilderTests: XCTestCase {
       platformFilterChain: [
         EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init),
       ],
-      stringAccessors: [:]
+      stringAccessors: [:],
+      keyValueStores: [:]
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&connect_timeout 200s"))
@@ -532,7 +569,8 @@ final class EngineBuilderTests: XCTestCase {
       platformFilterChain: [
         EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init),
       ],
-      stringAccessors: [:]
+      stringAccessors: [:],
+      keyValueStores: [:]
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family V4_PREFERRED"))
@@ -573,7 +611,8 @@ final class EngineBuilderTests: XCTestCase {
       directResponses: "",
       nativeFilterChain: [],
       platformFilterChain: [],
-      stringAccessors: [:]
+      stringAccessors: [:],
+      keyValueStores: [:]
     )
     XCTAssertNil(config.resolveTemplate("{{ missing }}"))
   }

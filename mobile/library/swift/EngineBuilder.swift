@@ -44,6 +44,7 @@ open class EngineBuilder: NSObject {
   private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
+  private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
   private var directResponses: [DirectResponse] = []
 
   // MARK: - Public
@@ -348,10 +349,22 @@ open class EngineBuilder: NSObject {
   /// - parameter name: the name of the accessor.
   /// - parameter accessor: lambda to access a string from the platform layer.
   ///
-  /// - returns this builder.
+  /// - returns: This builder.
   @discardableResult
   public func addStringAccessor(name: String, accessor: @escaping () -> String) -> Self {
     self.stringAccessors[name] = EnvoyStringAccessor(block: accessor)
+    return self
+  }
+
+  /// Register a key-value store implementation for internal use.
+  ///
+  /// - parameter name: the name of the KV store.
+  /// - parameter keyValueStore: the KV store implementation.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addKeyValueStore(name: String, keyValueStore: KeyValueStore) -> Self {
+    self.keyValueStores[name] = KeyValueStoreImpl(implementation: keyValueStore)
     return self
   }
 
@@ -482,7 +495,8 @@ open class EngineBuilder: NSObject {
         .joined(separator: "\n"),
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
-      stringAccessors: self.stringAccessors
+      stringAccessors: self.stringAccessors,
+      keyValueStores: self.keyValueStores
     )
 
     switch self.base {
