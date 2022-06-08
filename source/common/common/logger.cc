@@ -5,7 +5,6 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <algorithm>
 
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/lock_guard.h"
@@ -126,7 +125,8 @@ std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
   }
 
   // Log line ends with newline. Escape everything except the EOL to preserve line format.
-  absl::string_view msg_leading = absl::string_view(msg_view.data(), msg_view.size() - eol.length());
+  absl::string_view msg_leading =
+      absl::string_view(msg_view.data(), msg_view.size() - eol.length());
   return absl::StrCat(absl::CEscape(msg_leading), eol);
 }
 

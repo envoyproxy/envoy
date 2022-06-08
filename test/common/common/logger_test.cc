@@ -22,27 +22,27 @@ TEST(LoggerTest, StackingStderrSinkDelegate) {
 }
 
 TEST(LoggerEscapeTest, LinuxEOL) {
-  #ifdef _WIN32
-    EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"), "line 1 \\n line 2\\n");
-  #else
-    EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"), "line 1 \\n line 2\n");
-  #endif
+#ifdef _WIN32
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"), "line 1 \\n line 2\\n");
+#else
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"), "line 1 \\n line 2\n");
+#endif
 }
 
 TEST(LoggerEscapeTest, MultipleTrailingLinxEOL) {
-  #ifdef _WIN32
-    EXPECT_EQ(DelegatingLogSink::escapeLogLine("line1\n\n"), "line1\\n\\n");
-  #else
-    EXPECT_EQ(DelegatingLogSink::escapeLogLine("line1\n\n"), "line1\\n\n");
-  #endif
+#ifdef _WIN32
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line1\n\n"), "line1\\n\\n");
+#else
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line1\n\n"), "line1\\n\n");
+#endif
 }
 
 TEST(LoggerEscapeTest, WindowEOL) {
-  #ifdef _WIN32
-    EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"), "line 1 \\n line 2\r\n");
-  #else
-    EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"), "line 1 \\n line 2\\r\n");
-  #endif
+#ifdef _WIN32
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"), "line 1 \\n line 2\r\n");
+#else
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"), "line 1 \\n line 2\\r\n");
+#endif
 }
 
 TEST(LoggerEscapeTest, NoTrailingWhitespace) {
@@ -54,7 +54,8 @@ TEST(LoggerEscapeTest, NoWhitespace) {
 }
 
 TEST(LoggerEscapeTest, AnyTrailingWhitespace) {
-  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \t tab 1 \n line 2\t\t"), "line 1 \\t tab 1 \\n line 2\\t\\t");
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \t tab 1 \n line 2\t\t"),
+            "line 1 \\t tab 1 \\n line 2\\t\\t");
 }
 
 TEST(LoggerEscapeTest, WhitespaceOnly) {
