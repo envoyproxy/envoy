@@ -206,7 +206,7 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_colm_open_source_ragel()
     _net_zlib()
-    _dlb()
+    _intel_dlb()
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
     _org_brotli()
@@ -1112,9 +1112,9 @@ def _com_github_wasm_c_api():
         actual = "@com_github_wasm_c_api//:wasmtime_lib",
     )
 
-def _dlb():
+def _intel_dlb():
     external_http_archive(
-        name = "dlb",
+        name = "intel_dlb",
         build_file_content = """
 filegroup(
     name = "libdlb",

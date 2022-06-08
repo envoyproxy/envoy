@@ -1194,9 +1194,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-03-02",
         cpe = "N/A",
     ),
-    dlb = dict(
-        project_name = "dlb",
-        project_desc = "dlb",
+    intel_dlb = dict(
+        project_name = "Intel Dlb",
+        project_desc = "Dlb",
         project_url = "https://networkbuilders.intel.com/solutionslibrary/queue-management-and-load-balancing-on-intel-architecture",
         version = "7.6.0",
         sha256 = "b74c1bb2863fb6374bf80b9268b5978ab7b9d4eabb2d47ea427a5460aa3ae5fe",
