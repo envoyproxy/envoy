@@ -29,11 +29,17 @@ else
     fi
 fi
 
+if [[ -n "${AZP_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
+    export SPHINX_RUNNER_ARGS="-v warn"
+fi
+
+
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
 IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 BAZEL_BUILD_OPTIONS+=(
     "--action_env=DOCS_TAG"
     "--action_env=BUILD_SHA"
+    "--action_env=SPHINX_RUNNER_ARGS"
     "--action_env=SPHINX_SKIP_CONFIG_VALIDATION")
 
 # Building html/rst is determined by then needs of CI but can be overridden in dev.
