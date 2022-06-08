@@ -95,7 +95,7 @@ public:
   }
 
   // Set up proto fields with standard config.
-  FilterConfigSharedPtr getConfig() {
+  FilterConfigSharedPtr getConfig(bool forward_bearer_token = true) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -105,7 +105,7 @@ public:
     p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
     p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
-    p.set_forward_bearer_token(true);
+    p.set_forward_bearer_token(forward_bearer_token);
     p.add_auth_scopes("user");
     p.add_auth_scopes("openid");
     p.add_auth_scopes("email");
@@ -359,6 +359,50 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
+  };
+
+  // cookie-validation mocking
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  // Sanitized return reference mocking
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(mock_request_headers, false));
+
+  // Ensure that existing OAuth forwarded headers got sanitized.
+  EXPECT_EQ(mock_request_headers, expected_headers);
+
+  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+}
+
+/**
+ * Scenario: The OAuth filter receives a request to an arbitrary path with valid OAuth cookies
+ * (cookie values and validation are mocked out), but with an invalid token in the Authorization
+ * header and forwarding bearer token is disabled.
+ *
+ * Expected behavior: the filter should sanitize the Authorization header and let the request
+ * proceed.
+ */
+TEST_F(OAuth2Test, OAuthOkPassButInvalidToken) {
+  init(getConfig(false /* forward_bearer_token */));
+
+  Http::TestRequestHeaderMapImpl mock_request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer injected_malice!"},
+  };
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
 
   // cookie-validation mocking
@@ -771,21 +815,12 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
 
   EXPECT_CALL(decoder_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
   filter_->finishFlow();
 }
 
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
-  Http::TestRequestHeaderMapImpl request_headers_before{
-      {Http::Headers::get().Path.get(), "/test?role=bearer"},
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "https"},
-      {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-header-token"},
-  };
-  // Expected decoded headers after the callback & validation of the bearer token is complete.
-  Http::TestRequestHeaderMapImpl request_headers_after{
+  Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/test?role=bearer"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -793,41 +828,28 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
       {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-header-token"},
   };
 
-  // Fail the validation to trigger the OAuth flow.
+  // Fail the validation.
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->decodeHeaders(request_headers_before, false));
-
-  // Finally, expect that the header map had OAuth information appended to it.
-  EXPECT_EQ(request_headers_before, request_headers_after);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 }
 
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
-  Http::TestRequestHeaderMapImpl request_headers_before{
+  Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/test?role=bearer&token=xyz-queryparam-token"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
-  };
-  Http::TestRequestHeaderMapImpl request_headers_after{
-      {Http::Headers::get().Path.get(), "/test?role=bearer&token=xyz-queryparam-token"},
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "https"},
-      {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-queryparam-token"},
   };
 
-  // Fail the validation to trigger the OAuth flow.
+  // Fail the validation.
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->decodeHeaders(request_headers_before, false));
-
-  // Expected decoded headers after the callback & validation of the bearer token is complete.
-  EXPECT_EQ(request_headers_before, request_headers_after);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 }
 
 } // namespace Oauth2
