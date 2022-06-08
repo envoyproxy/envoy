@@ -44,14 +44,17 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   auto spdy_headers = envoyHeadersToSpdyHeaderBlock(headers);
   if (headers.Method()) {
     if (headers.Method()->value() == "CONNECT") {
-      // It is a bytestream connect and should have :path and :protocol set accordingly
-      // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
-      // if shifting codecs. For now, default to "/" - this can be made
-      // configurable if necessary.
-      // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
-      spdy_headers[":protocol"] = Http::Headers::get().ProtocolValues.Bytestream;
-      if (!headers.Path()) {
-        spdy_headers[":path"] = "/";
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
+        spdy_headers.erase(":scheme");
+        spdy_headers.erase(":path");
+        spdy_headers.erase(":protocol");
+      } else {
+        // Legacy support for abandoned
+        // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
+        spdy_headers[":protocol"] = Http::Headers::get().ProtocolValues.Bytestream;
+        if (!headers.Path()) {
+          spdy_headers[":path"] = "/";
+        }
       }
     } else if (headers.Method()->value() == "HEAD") {
       sent_head_request_ = true;
