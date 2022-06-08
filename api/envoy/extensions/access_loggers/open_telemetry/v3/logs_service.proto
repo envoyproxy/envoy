@@ -28,7 +28,7 @@ message OpenTelemetryAccessLogConfig {
   // [#comment:TODO(itamarkam): add 'filter_state_objects_to_log' to logs.]
   grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
 
-  // OpenTelemetry `resource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto>`_
+  // OpenTelemetry `ResourceInfo <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto#L51>`_
   // fields.
   // Example: ``resources { values { key: "region" value { string_value: "cn-north-7" } } }``.
   opentelemetry.proto.common.v1.KeyValueList resources = 4;
