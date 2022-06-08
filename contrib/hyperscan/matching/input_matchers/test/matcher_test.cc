@@ -33,7 +33,7 @@ TEST(ThreadLocalTest, RaceScratchCreation) {
       // Block each thread on waking up a common condition variable,
       // so we make it likely to race on creation.
       creation.wait();
-      ScratchThreadLocal tls(database);
+      ScratchThreadLocal tls(database, nullptr);
       creates.DecrementCount();
 
       wait.wait();

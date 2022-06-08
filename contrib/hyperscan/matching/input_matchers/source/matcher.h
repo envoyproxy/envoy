@@ -13,7 +13,7 @@ namespace InputMatchers {
 namespace Hyperscan {
 
 struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
-  explicit ScratchThreadLocal(const hs_database_t* database);
+  ScratchThreadLocal(const hs_database_t* database, const hs_database_t* som_database);
   ~ScratchThreadLocal() override { hs_free_scratch(scratch_); }
 
   hs_scratch_t* scratch_{};
@@ -37,7 +37,10 @@ class Matcher : public Envoy::Regex::CompiledMatcher, public Envoy::Matcher::Inp
 public:
   Matcher(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
           const std::vector<unsigned int>& ids, ThreadLocal::SlotAllocator& tls);
-  ~Matcher() override { hs_free_database(database_); }
+  ~Matcher() override {
+    hs_free_database(database_);
+    hs_free_database(som_database_);
+  }
 
   // Envoy::Regex::CompiledMatcher
   bool match(absl::string_view value) const override;
@@ -48,6 +51,7 @@ public:
 
 private:
   hs_database_t* database_{};
+  hs_database_t* som_database_{};
   ThreadLocal::TypedSlotPtr<ScratchThreadLocal> tls_;
 };
 

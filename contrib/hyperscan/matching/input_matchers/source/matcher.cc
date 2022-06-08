@@ -6,10 +6,18 @@ namespace Matching {
 namespace InputMatchers {
 namespace Hyperscan {
 
-ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database) {
+ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database,
+                                       const hs_database_t* som_database) {
   hs_error_t err = hs_alloc_scratch(database, &scratch_);
   if (err != HS_SUCCESS) {
     throw EnvoyException(fmt::format("unable to allocate scratch space, error code {}.", err));
+  }
+  if (som_database) {
+    err = hs_alloc_scratch(som_database, &scratch_);
+    if (err != HS_SUCCESS) {
+      throw EnvoyException(
+          fmt::format("unable to allocate start of match scratch space, error code {}.", err));
+    }
   }
 }
 
@@ -20,6 +28,7 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
   ASSERT(expressions.size() == flags.size());
   ASSERT(expressions.size() == ids.size());
 
+  // Compile database.
   hs_compile_error_t* compile_err;
   hs_error_t err =
       hs_compile_multi(expressions.data(), flags.data(), ids.data(), expressions.size(),
@@ -38,8 +47,29 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
     }
   }
 
-  tls_->set(
-      [this](Event::Dispatcher&) { return std::make_shared<ScratchThreadLocal>(this->database_); });
+  // Compile SOM database. The SOM database will report start of matching, works for replaceAll.
+  std::vector<unsigned int> som_flags = flags;
+  for (unsigned int& som_flag : som_flags) {
+    som_flag = som_flag | HS_FLAG_SOM_LEFTMOST;
+  }
+  err = hs_compile_multi(expressions.data(), som_flags.data(), ids.data(), expressions.size(),
+                         HS_MODE_BLOCK, nullptr, &som_database_, &compile_err);
+  if (err != HS_SUCCESS) {
+    std::string compile_err_message(compile_err->message);
+    int compile_err_expression = compile_err->expression;
+
+    if (compile_err_expression < 0) {
+      ENVOY_LOG_MISC(warn, "unable to compile SOM database: {}.", compile_err_message);
+    } else {
+      ENVOY_LOG_MISC(warn, "unable to compile pattern '{}': {}.",
+                     expressions.at(compile_err_expression), compile_err_message);
+    }
+  }
+
+  hs_free_compile_error(compile_err);
+  tls_->set([this](Event::Dispatcher&) {
+    return std::make_shared<ScratchThreadLocal>(this->database_, this->som_database_);
+  });
 }
 
 bool Matcher::match(absl::string_view value) const {
@@ -65,9 +95,9 @@ bool Matcher::match(absl::string_view value) const {
 std::string Matcher::replaceAll(absl::string_view value, absl::string_view substitution) const {
   // Find matched pair.
   std::vector<Matched> founds;
-  hs_scratch_t* scratch = tls_->get()->scratch_;
+  hs_scratch_t* scratch_ = tls_->get()->scratch_;
   hs_error_t err = hs_scan(
-      database_, value.data(), value.size(), 0, scratch,
+      som_database_, value.data(), value.size(), 0, scratch_,
       [](unsigned int, unsigned long long from, unsigned long long to, unsigned int,
          void* context) -> int {
         std::vector<std::pair<unsigned long long, unsigned long long>>* founds =
@@ -80,6 +110,7 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
       &founds);
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
     ENVOY_LOG_MISC(error, "unable to scan, error code {}.", err);
+    return std::string(value);
   }
 
   // Sort founds.
