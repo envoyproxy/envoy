@@ -1121,7 +1121,7 @@ filegroup(
     srcs = glob([
         "dlb/libdlb/**",
     ]),
-    visibility = ["//visibility:public"],
+    visibility = ["@envoy//contrib/dlb/source:__pkg__"],
 )
 """,
         patch_args = ["-p1"],
