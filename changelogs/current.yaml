@@ -76,6 +76,11 @@ minor_behavior_changes:
     ``envoy.reloadable_features.lua_respond_with_send_local_reply`` to false.
 
 bug_fixes:
+- area: http
+  change: |
+    Fixed HTTP/2 CONNECT to be RFC compliant, rather than following the abandoned extended connect draft.
+    This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.use_rfc_connect`` to false.
+
 - area: runtime
   change: |
     Fixed a bug where was ``envoy.restart_features.no_runtime_singleton`` was inverted.
