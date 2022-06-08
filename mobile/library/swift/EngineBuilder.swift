@@ -40,7 +40,7 @@ open class EngineBuilder: NSObject {
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
-  private(set) var enableNetworkPathMonitor = true
+  private(set) var monitoringMode: NetworkMonitoringMode = .pathMonitor
   private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
@@ -401,13 +401,13 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Configure the engine to use `NWPathMonitor` to observe network reachability.
-  /// Defaults to `true`. Set to `false` to use `SCNetworkReachability`.
+  /// Configure how the engine observes network reachability state changes.
+  /// Defaults to `.pathMonitor`.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableNetworkPathMonitor(_ enableNetworkPathMonitor: Bool) -> Self {
-    self.enableNetworkPathMonitor = enableNetworkPathMonitor
+  public func setNetworkMonitoringMode(_ mode: NetworkMonitoringMode) -> Self {
+    self.monitoringMode = mode
     return self
   }
 
@@ -460,7 +460,7 @@ open class EngineBuilder: NSObject {
   public func build() -> Engine {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
                                       eventTracker: self.eventTracker,
-                                      enableNetworkPathMonitor: self.enableNetworkPathMonitor)
+                                      networkMonitoringMode: Int32(self.monitoringMode.rawValue))
     let config = EnvoyConfiguration(
       adminInterfaceEnabled: self.adminInterfaceEnabled,
       grpcStatsDomain: self.grpcStatsDomain,
