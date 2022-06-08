@@ -4528,6 +4528,70 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
   expectHostHealthy(true);
 }
 
+// Verify functionality when a host is removed inline with a failure via RPC that was proceeded
+// by a GOAWAY.
+TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFailViaRpcRemoveHostInCallback) {
+  setupHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  health_checker_->start();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed))
+      .WillOnce(Invoke([&](HostSharedPtr host, HealthTransition) {
+        cluster_->prioritySet().getMockHostSet(0)->hosts_ = {};
+        cluster_->prioritySet().runUpdateCallbacks(0, {}, {host});
+      }));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+}
+
+// Verify functionality when a host is removed inline with a failure via an error GOAWAY.
+TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFailViaGoawayRemoveHostInCallback) {
+  setupHCWithUnhealthyThreshold(/*threshold=*/1);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  health_checker_->start();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed))
+      .WillOnce(Invoke([&](HostSharedPtr host, HealthTransition) {
+        cluster_->prioritySet().getMockHostSet(0)->hosts_ = {};
+        cluster_->prioritySet().runUpdateCallbacks(0, {}, {host});
+      }));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
+}
+
+// Verify functionality when a host is removed inline with by a bad RPC response.
+TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFailViaBadResponseRemoveHostInCallback) {
+  setupHCWithUnhealthyThreshold(/*threshold=*/1);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  health_checker_->start();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed))
+      .WillOnce(Invoke([&](HostSharedPtr host, HealthTransition) {
+        cluster_->prioritySet().getMockHostSet(0)->hosts_ = {};
+        cluster_->prioritySet().runUpdateCallbacks(0, {}, {host});
+      }));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "500"}});
+  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), false);
+}
+
 // Test host recovery after explicit check failure requires several successful checks.
 TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFail) {
   setupHC();
