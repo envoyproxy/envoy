@@ -23,7 +23,7 @@ make(
     includes = [],
     lib_source = "@intel_dlb//:libdlb",
     out_static_libs = ["libdlb.a"],
-    postfix_script = "mv libdlb.a $INSTALLDIR/lib; cp -L *.h $INSTALLDIR/include",
+    postfix_script = "mv libdlb.a $INSTALLDIR/lib && rm -rf $INSTALLDIR/include && mkdir -p $INSTALLDIR/include && cp -L *.h $INSTALLDIR/include",
     tags = ["skip_on_windows"],
     targets = ["libdlb.a"],
 )
