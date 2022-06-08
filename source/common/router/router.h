@@ -304,7 +304,7 @@ public:
   virtual bool downstreamEndStream() const PURE;
   virtual uint32_t attemptCount() const PURE;
   virtual const VirtualCluster* requestVcluster() const PURE;
-  virtual const RouteStatsConfig* routeStatsConfig() const PURE;
+  virtual const RouteStatsConfigSharedPtr routeStatsConfig() const PURE;
   virtual const RouteEntry* routeEntry() const PURE;
   virtual const std::list<UpstreamRequestPtr>& upstreamRequests() const PURE;
   virtual const UpstreamRequest* finalUpstreamRequest() const PURE;
@@ -489,7 +489,7 @@ public:
   bool downstreamEndStream() const override { return downstream_end_stream_; }
   uint32_t attemptCount() const override { return attempt_count_; }
   const VirtualCluster* requestVcluster() const override { return request_vcluster_; }
-  const RouteStatsConfig* routeStatsConfig() const override { return route_stats_config_; }
+  const RouteStatsConfigSharedPtr routeStatsConfig() const override { return route_stats_config_; }
   const RouteEntry* routeEntry() const override { return route_entry_; }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const override {
     return upstream_requests_;
@@ -575,7 +575,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
-  const RouteStatsConfig* route_stats_config_{};
+  RouteStatsConfigSharedPtr route_stats_config_{};
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
   FilterUtility::HedgingParams hedging_params_;

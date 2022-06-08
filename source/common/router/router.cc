@@ -465,8 +465,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
-  if (route_entry_->routeStatsConfig().has_value()) {
-    route_stats_config_ = &route_entry_->routeStatsConfig().value();
+  if (route_entry_->routeStatsConfig()) {
+    route_stats_config_ = route_entry_->routeStatsConfig();
   }
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.getPathValue());
@@ -661,7 +661,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_,
-                       route_stats_config_, config_.runtime_, config_.random_,
+                       route_stats_config_.get(), config_.runtime_, config_.random_,
                        callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to

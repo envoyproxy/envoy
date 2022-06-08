@@ -528,8 +528,11 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const absl::optional<RouteStatsConfig>& routeStatsConfig() const override {
-    return route_stats_config_;
+  const RouteStatsConfigSharedPtr routeStatsConfig() const override {
+    if (route_stats_context_) {
+      return route_stats_context_->route_stats_config_;
+    }
+    return nullptr;
   }
   static RouteStats generateRouteStats(Stats::Scope& scope, const RouteStatNames& stat_names) {
     return RouteStats{stat_names, scope};
@@ -737,7 +740,7 @@ public:
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return parent_->connectConfig();
     }
-    const absl::optional<RouteStatsConfig>& routeStatsConfig() const override {
+    const RouteStatsConfigSharedPtr routeStatsConfig() const override {
       return parent_->routeStatsConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
@@ -869,6 +872,21 @@ private:
     envoy::type::v3::FractionalPercent fractional_runtime_default_{};
   };
 
+  struct RouteStatsContext {
+    RouteStatsConfigSharedPtr route_stats_config_;
+    Stats::ScopeSharedPtr route_stats_scope_;
+    const Stats::StatNameManagedStorage& route_stat_name_storage_;
+
+  public:
+    RouteStatsContext(RouteStatsConfigSharedPtr route_stats_config,
+                      Stats::ScopeSharedPtr route_stats_scope,
+                      Stats::StatNameManagedStorage& route_stat_name_storage)
+        : route_stats_config_(route_stats_config), route_stats_scope_(route_stats_scope),
+          route_stat_name_storage_(route_stat_name_storage) {}
+  };
+
+  using RouteStatsContextPtr = std::unique_ptr<RouteStatsContext>;
+
   /**
    * Returns a vector of request header parsers which applied or will apply header transformations
    * to the request in this route.
@@ -937,9 +955,8 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const bool append_xfh_;
   const std::string cluster_name_;
-  absl::optional<RouteStatsConfig> route_stats_config_;
-  Stats::ScopeSharedPtr route_stats_scope_;
-  Stats::StatNameManagedStorage route_stat_name_storage_;
+  RouteStatsContextPtr route_stats_context_{};
+  const Stats::StatNameManagedStorage route_stat_name_storage_;
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;

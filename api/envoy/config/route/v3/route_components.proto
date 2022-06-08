@@ -321,7 +321,7 @@ message Route {
   // The human readable prefix to use when emitting statistics for this endpoint.
   // The statistics are rooted at vhost.<virtual host name>.route.<stat_prefix>.
   // This should be set for highly critical
-  // endpoints that one wishes to get “perfect” statistics on.
+  // endpoints that one wishes to get “per-route” statistics on.
   // If not set, endpoint statistics are not generated.
   //
   // The emitted statistics are the same as those documented for :ref:`virtual clusters <config_http_filters_router_vcluster_stats>`.
@@ -330,7 +330,7 @@ message Route {
   //
   //    We do not recommend setting up a stat prefix for
   //    every application endpoint. This is both not easily maintainable and
-  //    statistics use a non-trivial amount of memory.
+  //    statistics use a non-trivial amount of memory(approximately 1k per route).
   string stat_prefix = 19;
 }
 

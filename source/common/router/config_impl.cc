@@ -656,14 +656,19 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               path_redirect_);
   }
   if (!route.stat_prefix().empty()) {
-    route_stats_scope_ = Stats::Utility::scopeFromStatNames(
+    Stats::StatNameManagedStorage route_stat_name_storage =
+        Stats::StatNameManagedStorage(route.stat_prefix(), factory_context.scope().symbolTable());
+    Stats::ScopeSharedPtr route_stats_scope = Stats::Utility::scopeFromStatNames(
         *factory_context.scope().scopeFromStatName(
             factory_context.routerContext().routeStatNames().vhost_),
         {vhost.statName(), factory_context.routerContext().routeStatNames().route_,
          route_stat_name_storage_.statName()});
-    route_stats_config_.emplace(RouteStatsConfig{
-        route_stat_name_storage_.statName(),
-        generateRouteStats(*route_stats_scope_, factory_context.routerContext().routeStatNames())});
+    route_stats_context_ = std::make_unique<RouteStatsContext>(
+        std::make_shared<RouteStatsConfig>(
+            route_stat_name_storage_.statName(),
+            generateRouteStats(*route_stats_scope,
+                               factory_context.routerContext().routeStatNames())),
+        route_stats_scope, route_stat_name_storage);
   }
 
   if (route.route().has_early_data_policy()) {

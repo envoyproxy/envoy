@@ -567,6 +567,8 @@ public:
       : route_stat_name_(stat_name), route_stats_(route_stats) {}
 };
 
+using RouteStatsConfigSharedPtr = std::shared_ptr<RouteStatsConfig>;
+
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
  * routes for stat tracking and priority purposes).
@@ -1061,9 +1063,9 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return RouteStatsConfig the config needed to generate route level stats.
+   * @return RouteStatsConfigSharedPtr the config needed to generate route level stats.
    */
-  virtual const absl::optional<RouteStatsConfig>& routeStatsConfig() const PURE;
+  virtual const RouteStatsConfigSharedPtr routeStatsConfig() const PURE;
 
   /**
    * @return EarlyDataPolicy& the configured early data option.

@@ -6819,11 +6819,11 @@ virtual_hosts:
 
   // Validate that route has stats config if stat_prefix is configured.
   Http::TestRequestHeaderMapImpl foo_request1 = genHeaders("www.lyft.com", "/foo", "GET");
-  EXPECT_TRUE(config.route(foo_request1, 0)->routeEntry()->routeStatsConfig().has_value());
+  EXPECT_NE(nullptr, config.route(foo_request1, 0)->routeEntry()->routeStatsConfig());
 
   // Validate that route does not have stats config if stat_prefix is configured.
   Http::TestRequestHeaderMapImpl bar_request1 = genHeaders("www.lyft.com", "/bar", "GET");
-  EXPECT_FALSE(config.route(bar_request1, 0)->routeEntry()->routeStatsConfig().has_value());
+  EXPECT_EQ(nullptr, config.route(bar_request1, 0)->routeEntry()->routeStatsConfig());
 }
 
 class CustomRequestHeadersTest : public testing::Test, public ConfigImplTestBase {};

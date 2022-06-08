@@ -13,13 +13,10 @@ public:
       : DelegatingRouteEntry(std::move(base_route)), custom_cluster_name_(cluster_name_override) {}
 
   const std::string& clusterName() const override { return custom_cluster_name_; }
-  const absl::optional<Router::RouteStatsConfig>& routeStatsConfig() const override {
-    return route_stats_config_;
-  }
+  const route_stats_config_ routeStatsConfig() const override { return nullptr; }
 
 private:
   const std::string custom_cluster_name_;
-  const absl::optional<RouteStatsConfig> route_stats_config_;
 };
 
 // Example derived class of DelegatingRoute. Leverages ExampleDerivedDelegatingRouteEntry to create

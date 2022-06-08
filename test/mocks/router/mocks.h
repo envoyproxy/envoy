@@ -399,10 +399,11 @@ public:
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
-  MOCK_METHOD(const absl::optional<RouteStatsConfig>&, routeStatsConfig, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
+
+  const RouteStatsConfigSharedPtr routeStatsConfig() const override { return nullptr; }
 
   std::string cluster_name_{"fake_cluster"};
   std::string route_name_{"fake_route_name"};
@@ -421,7 +422,6 @@ public:
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   UpgradeMap upgrade_map_;
   absl::optional<ConnectConfig> connect_config_;
-  absl::optional<RouteStatsConfig> route_stats_config_;
   testing::NiceMock<MockEarlyDataPolicy> early_data_policy_;
 };
 

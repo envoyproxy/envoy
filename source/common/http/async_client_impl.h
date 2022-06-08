@@ -197,9 +197,7 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
-    const absl::optional<Router::RouteStatsConfig>& routeStatsConfig() const override {
-      return route_stats_config_nullopt_;
-    }
+    const Router::RouteStatsConfigSharedPtr routeStatsConfig() const override { return nullptr; }
     Http::Code clusterNotFoundResponseCode() const override {
       return Http::Code::InternalServerError;
     }
@@ -303,7 +301,6 @@ private:
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
     static const absl::optional<ConnectConfig> connect_config_nullopt_;
-    static const absl::optional<Router::RouteStatsConfig> route_stats_config_nullopt_;
     const std::string route_name_;
     // Pass early data option config through StreamOptions.
     std::unique_ptr<Router::EarlyDataPolicy> early_data_policy_{
