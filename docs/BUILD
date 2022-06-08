@@ -125,11 +125,7 @@ genrule(
 
 pkg_files(
     name = "sphinx_base",
-    srcs = glob(
-        [
-            "_ext/*",
-        ],
-    ) + [
+    srcs = [
         ":conf.py",
         ":redirects.txt",
         ":versions.yaml",
