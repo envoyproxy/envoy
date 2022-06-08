@@ -158,6 +158,12 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_gzipConfigInsert(JNIEnv* env, j
   return result;
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliConfigInsert(JNIEnv* env, jclass) {
+  jstring result = env->NewStringUTF(brotli_config_insert);
+  return result;
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
     JNIEnv* env,
     jclass, // class

@@ -78,6 +78,21 @@ TEST(TestConfig, SetGzip) {
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.filters.http.decompressor"));
 }
 
+TEST(TestConfig, SetBrotli) {
+  auto engine_builder = EngineBuilder();
+
+  engine_builder.enableBrotli(false);
+  auto config_str = engine_builder.generateConfigStr();
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("brotli.decompressor.v3.Brotli")));
+
+  engine_builder.enableBrotli(true);
+  config_str = engine_builder.generateConfigStr();
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("brotli.decompressor.v3.Brotli"));
+}
+
 TEST(TestConfig, SetAltSvcCache) {
   auto engine_builder = EngineBuilder();
 

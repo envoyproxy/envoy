@@ -59,7 +59,7 @@ public class BrotliTest {
     TestUrlRequestCallback callback = startAndWaitForComplete(url);
     assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
     // TODO(carloseltuerto): also support "deflate" decompressor - Cronet does.
-    assertTrue(callback.mResponseAsString.contains("accept-encoding: br,gzip"));
+    assertTrue(callback.mResponseAsString.contains("accept-encoding: gzip,br"));
   }
 
   @Test

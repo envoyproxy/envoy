@@ -306,9 +306,14 @@ public class JniLibrary {
   public static native String altProtocolCacheFilterInsert();
 
   /**
-   * Provides a configuration insert that may be used to enable decompression.
+   * Provides a configuration insert that may be used to enable gzip decompression.
    */
   public static native String gzipConfigInsert();
+
+  /**
+   * Provides a configuration insert that may be used to enable brotli decompression.
+   */
+  public static native String brotliConfigInsert();
 
   /**
    * Register a platform-provided key-value store implementation.

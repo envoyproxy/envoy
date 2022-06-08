@@ -94,12 +94,12 @@ public class EnvoyEngineImpl implements EnvoyEngine {
                                        new JvmKeyValueStoreContext(entry.getValue()));
     }
 
-    return runWithResolvedYAML(
-        envoyConfiguration.resolveTemplate(configurationYAML, JniLibrary.platformFilterTemplate(),
-                                           JniLibrary.nativeFilterTemplate(),
-                                           JniLibrary.altProtocolCacheFilterInsert(),
-                                           JniLibrary.gzipConfigInsert()),
-        logLevel);
+    return runWithResolvedYAML(envoyConfiguration.resolveTemplate(
+                                   configurationYAML, JniLibrary.platformFilterTemplate(),
+                                   JniLibrary.nativeFilterTemplate(),
+                                   JniLibrary.altProtocolCacheFilterInsert(),
+                                   JniLibrary.gzipConfigInsert(), JniLibrary.brotliConfigInsert()),
+                               logLevel);
   }
 
   /**
