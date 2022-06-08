@@ -22,6 +22,7 @@ kt_android_library(
     name = "envoy_lib",
     srcs = [
         "AndroidEngineBuilder.kt",
+        "android/SharedPreferencesStore.kt",
     ],
     custom_package = "io.envoyproxy.envoymobile",
     manifest = "EnvoyManifest.xml",

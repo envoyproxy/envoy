@@ -469,7 +469,7 @@ open class EngineBuilder(
    * @return this builder.
    */
   fun addKeyValueStore(name: String, keyValueStore: KeyValueStore): EngineBuilder {
-    this.keyValueStores.put(name, EnvoyKeyValueStoreAdapter(keyValueStore))
+    this.keyValueStores.put(name, keyValueStore)
     return this
   }
 

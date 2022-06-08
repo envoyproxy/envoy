@@ -68,11 +68,11 @@ class KeyValueStoreTest {
 
     val readExpectation = CountDownLatch(3)
     val saveExpectation = CountDownLatch(1)
-    val testKeyValueStore = KeyValueStore(
-      read = { _ -> readExpectation.countDown(); null },
-      remove = { _ -> {}},
-      save = { _, _ -> saveExpectation.countDown() }
-    )
+    val testKeyValueStore = object : KeyValueStore {
+      override fun read(key: String): String? { readExpectation.countDown(); return null }
+      override fun remove(key: String) {}
+      override fun save(key: String, value: String) { saveExpectation.countDown() }
+    }
 
     val engine = EngineBuilder(Custom(config))
         .addKeyValueStore("envoy.key_value.platform_test", testKeyValueStore)

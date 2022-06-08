@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile.helloenvoykotlin
 
 import android.app.Activity
+import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
@@ -8,6 +9,7 @@ import android.util.Log
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import io.envoyproxy.envoymobile.android.SharedPreferencesStore
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.Element
 import io.envoyproxy.envoymobile.Engine
@@ -26,6 +28,7 @@ private const val REQUEST_HANDLER_THREAD_NAME = "hello_envoy_kt"
 private const val REQUEST_AUTHORITY = "api.lyft.com"
 private const val REQUEST_PATH = "/ping"
 private const val REQUEST_SCHEME = "https"
+private const val PERSISTENCE_KEY = "EnvoyMobilePersistenceKey"
 private val FILTERED_HEADERS = setOf(
   "server",
   "filter-demo",
@@ -45,6 +48,8 @@ class MainActivity : Activity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
 
+    val preferences = getSharedPreferences(PERSISTENCE_KEY, Context.MODE_PRIVATE)
+
     engine = AndroidEngineBuilder(application)
       .addLogLevel(LogLevel.DEBUG)
       .addPlatformFilter(::DemoFilter)
@@ -54,6 +59,7 @@ class MainActivity : Activity() {
       .enableInterfaceBinding(true)
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
       .addStringAccessor("demo-accessor", { "PlatformString" })
+      .addKeyValueStore("demo-kv-store", SharedPreferencesStore(preferences))
       .setOnEngineRunning { Log.d("MainActivity", "Envoy async internal setup completed") }
       .setEventTracker({
         for (entry in it.entries) {
