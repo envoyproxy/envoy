@@ -11,8 +11,6 @@ from functools import cached_property
 
 import yaml
 
-from jinja2 import Template
-
 from envoy.code.check.checker import BackticksCheck
 
 from tools.api_proto_plugin import annotations
@@ -20,6 +18,7 @@ from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
 from tools.protodoc.extensions_db import data as EXTENSION_DB
 from tools.protodoc.contrib_extensions_db import data as CONTRIB_EXTENSION_DB
+from tools.protodoc.jinja import env as jinja_env
 from tools.protodoc.manifest_db import data as manifest_db
 
 from udpa.annotations import security_pb2
@@ -49,51 +48,6 @@ CNCF_PREFIX = '.xds.'
 
 # http://www.fileformat.info/info/unicode/char/2063/index.htm
 UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
-
-# Template for formating extension descriptions.
-EXTENSION_TEMPLATE = Template(
-    """
-.. _extension_{{extension}}:
-
-This extension may be referenced by the qualified name ``{{extension}}``
-{{contrib}}
-.. note::
-  {{status}}
-
-  {{security_posture}}
-
-.. tip::
-  This extension extends and can be used with the following extension {% if categories|length > 1 %}categories{% else %}category{% endif %}:
-
-{% for cat in categories %}
-  - :ref:`{{cat}} <extension_category_{{cat}}>`
-{% endfor %}
-
-""")
-
-# Template for formating an extension category.
-EXTENSION_CATEGORY_TEMPLATE = Template(
-    """
-.. _extension_category_{{category}}:
-
-.. tip::
-{% if extensions %}
-  This extension category has the following known extensions:
-
-{% for ext in extensions %}
-  - :ref:`{{ext}} <extension_{{ext}}>`
-{% endfor %}
-
-{% endif %}
-{% if contrib_extensions %}
-  The following extensions are available in :ref:`contrib <install_contrib>` images only:
-
-{% for ext in contrib_extensions %}
-  - :ref:`{{ext}} <extension_{{ext}}>`
-{% endfor %}
-{% endif %}
-
-""")
 
 # A map from the extension security postures (as defined in the
 # envoy_cc_extension build macro) to human readable text for extension docs.
@@ -271,12 +225,13 @@ def format_extension(extension):
             "or contrib/extensions_metadata.yaml?\n\n")
         exit(1)  # Raising the error buries the above message in tracebacks.
 
-    return EXTENSION_TEMPLATE.render(
+    extension = jinja_env.get_template("extension.rst.tpl").render(
         extension=extension,
         contrib=contrib,
         status=status,
         security_posture=security_posture,
         categories=categories)
+    return f"\n{extension}\n"
 
 
 def format_extension_category(extension_category):
@@ -292,10 +247,11 @@ def format_extension_category(extension_category):
     contrib_extensions = CONTRIB_EXTENSION_CATEGORIES.get(extension_category, [])
     if not extensions and not contrib_extensions:
         raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
-    return EXTENSION_CATEGORY_TEMPLATE.render(
+    extension_category = jinja_env.get_template("extension_category.rst.tpl").render(
         category=extension_category,
         extensions=sorted(extensions),
         contrib_extensions=sorted(contrib_extensions))
+    return f"\n{extension_category}\n"
 
 
 def format_header_from_file(style, source_code_info, proto_name):
