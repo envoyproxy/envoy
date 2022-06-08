@@ -36,7 +36,8 @@ DecompressorFilterConfig::DecompressorFilterConfig(
       request_direction_config_(proto_config.request_direction_config(), stats_prefix_, scope,
                                 runtime),
       response_direction_config_(proto_config.response_direction_config(), stats_prefix_, scope,
-                                 runtime) {}
+                                 runtime),
+      max_decompress_bytes_(proto_config.max_decompress_bytes()) {}
 
 DecompressorFilterConfig::DirectionConfig::DirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::CommonDirectionConfig&
@@ -105,9 +106,14 @@ Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bo
     if (end_stream) {
       trailers = HeaderMapOptRef(std::ref(decoder_callbacks_->addDecodedTrailers()));
     }
-    decompress(config_->requestDirectionConfig(), request_decompressor_, *decoder_callbacks_, data,
-               request_byte_tracker_, trailers);
+    if(!decompress(config_->requestDirectionConfig(), request_decompressor_, *decoder_callbacks_, data,
+               request_byte_tracker_, trailers)){
+      decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, Http::CodeUtility::toString(Http::Code::PayloadTooLarge), nullptr,
+                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
   }
+  
   return Http::FilterDataStatus::Continue;
 }
 
@@ -137,8 +143,13 @@ Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bo
     if (end_stream) {
       trailers = HeaderMapOptRef(std::ref(encoder_callbacks_->addEncodedTrailers()));
     }
-    decompress(config_->responseDirectionConfig(), response_decompressor_, *encoder_callbacks_,
-               data, response_byte_tracker_, trailers);
+    if(!decompress(config_->requestDirectionConfig(), request_decompressor_, *decoder_callbacks_, data,
+               request_byte_tracker_, trailers)){
+      decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, Http::CodeUtility::toString(Http::Code::PayloadTooLarge), nullptr,
+                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+               
   }
   return Http::FilterDataStatus::Continue;
 }
@@ -151,15 +162,16 @@ Http::FilterTrailersStatus DecompressorFilter::encodeTrailers(Http::ResponseTrai
   return Http::FilterTrailersStatus::Continue;
 }
 
-void DecompressorFilter::decompress(
+bool DecompressorFilter::decompress(
     const DecompressorFilterConfig::DirectionConfig& direction_config,
     const Compression::Decompressor::DecompressorPtr& decompressor,
     Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer,
     ByteTracker& byte_tracker, HeaderMapOptRef trailers) const {
   ASSERT(decompressor);
   Buffer::OwnedImpl output_buffer;
-  decompressor->decompress(input_buffer, output_buffer);
-
+  if(decompressor->decompress(input_buffer, output_buffer)){
+    return false;
+  }
   // Report decompression via stats and logging before modifying the input buffer.
   byte_tracker.chargeBytes(input_buffer.length(), output_buffer.length());
   direction_config.stats().total_compressed_bytes_.add(input_buffer.length());
@@ -173,6 +185,7 @@ void DecompressorFilter::decompress(
   if (trailers.has_value()) {
     byte_tracker.reportTotalBytes(trailers.value().get());
   }
+  return true;
 }
 
 template <>

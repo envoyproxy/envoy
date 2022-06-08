@@ -29,7 +29,7 @@ public:
 
   // Envoy::Compression::Decompressor::DecompressorFactory
   Envoy::Compression::Decompressor::DecompressorPtr
-  createDecompressor(const std::string& stats_prefix) override;
+  createDecompressor(const std::string& stats_prefix,const uint64_t max_decompress_bytes) override;
   const std::string& statsPrefix() const override { return gzipStatsPrefix(); }
   const std::string& contentEncoding() const override {
     return Http::CustomHeaders::get().ContentEncodingValues.Gzip;

@@ -40,7 +40,7 @@ class ZlibDecompressorImpl : public Zlib::Base,
                              public Envoy::Compression::Decompressor::Decompressor,
                              public Logger::Loggable<Logger::Id::decompression> {
 public:
-  ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix);
+  ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,const uint64_t max_decompress_bytes);
 
   /**
    * Constructor that allows setting the size of decompressor's output buffer. It
@@ -50,7 +50,7 @@ public:
    * 256K bytes. @see http://zlib.net/zlib_how.html
    * @param chunk_size amount of memory reserved for the decompressor output.
    */
-  ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix, uint64_t chunk_size);
+  ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,const uint64_t max_decompress_bytes, uint64_t chunk_size);
 
   /**
    * Init must be called in order to initialize the decompressor. Once decompressor is initialized,
@@ -61,7 +61,7 @@ public:
   void init(int64_t window_bits);
 
   // Compression::Decompressor::Decompressor
-  void decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
+  bool decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
   // Flag to track whether error occurred during decompression.
   // When an error occurs, the error code (a negative int) will be stored in this variable.
@@ -81,6 +81,7 @@ private:
   void chargeErrorStats(const int result);
 
   const ZlibDecompressorStats stats_;
+  uint64_t max_decompress_bytes_{0};
 };
 
 } // namespace Decompressor

@@ -16,17 +16,17 @@ namespace Compression {
 namespace Gzip {
 namespace Decompressor {
 
-ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix)
-    : ZlibDecompressorImpl(scope, stats_prefix, 4096) {}
+ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix, const uint64_t max_decompress_bytes)
+    : ZlibDecompressorImpl(scope, stats_prefix, max_decompress_bytes,4096) {}
 
-ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
+ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix, const uint64_t max_decompress_bytes,
                                            uint64_t chunk_size)
     : Zlib::Base(chunk_size,
                  [](z_stream* z) {
                    inflateEnd(z);
                    delete z;
                  }),
-      stats_(generateStats(stats_prefix, scope)) {
+      stats_(generateStats(stats_prefix, scope)), max_decompress_bytes_(max_decompress_bytes) {
   zstream_ptr_->zalloc = Z_NULL;
   zstream_ptr_->zfree = Z_NULL;
   zstream_ptr_->opaque = Z_NULL;
@@ -41,7 +41,7 @@ void ZlibDecompressorImpl::init(int64_t window_bits) {
   initialized_ = true;
 }
 
-void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
+bool ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     zstream_ptr_->avail_in = input_slice.len_;
@@ -49,6 +49,9 @@ void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
     while (inflateNext()) {
       if (zstream_ptr_->avail_out == 0) {
         updateOutput(output_buffer);
+        if(max_decompress_bytes_ > 0 && output_buffer.length() > max_decompress_bytes_){
+          return false;
+        }
       }
     }
   }
@@ -56,6 +59,10 @@ void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
   // Flush z_stream and reset its buffer. Otherwise the stale content of the buffer
   // will pollute output upon the next call to decompress().
   updateOutput(output_buffer);
+  if(max_decompress_bytes_ > 0 && output_buffer.length() > max_decompress_bytes_){
+    return false;
+  }
+  return true;
 }
 
 bool ZlibDecompressorImpl::inflateNext() {

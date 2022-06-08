@@ -22,8 +22,8 @@ GzipDecompressorFactory::GzipDecompressorFactory(
       chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, chunk_size, DefaultChunkSize)) {}
 
 Envoy::Compression::Decompressor::DecompressorPtr
-GzipDecompressorFactory::createDecompressor(const std::string& stats_prefix) {
-  auto decompressor = std::make_unique<ZlibDecompressorImpl>(scope_, stats_prefix, chunk_size_);
+GzipDecompressorFactory::createDecompressor(const std::string& stats_prefix, const uint64_t max_decompress_bytes) {
+  auto decompressor = std::make_unique<ZlibDecompressorImpl>(scope_, stats_prefix, max_decompress_bytes, chunk_size_);
   decompressor->init(window_bits_);
   return decompressor;
 }

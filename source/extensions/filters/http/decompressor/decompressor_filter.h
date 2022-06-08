@@ -9,7 +9,9 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/common/http/codes.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -97,7 +99,7 @@ public:
       Compression::Decompressor::DecompressorFactoryPtr decompressor_factory);
 
   Compression::Decompressor::DecompressorPtr makeDecompressor() {
-    return decompressor_factory_->createDecompressor(decompressor_stats_prefix_);
+    return decompressor_factory_->createDecompressor(decompressor_stats_prefix_, max_decompress_bytes_);
   }
   const std::string& contentEncoding() { return decompressor_factory_->contentEncoding(); }
   const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
@@ -118,6 +120,7 @@ private:
   const Compression::Decompressor::DecompressorFactoryPtr decompressor_factory_;
   const RequestDirectionConfig request_direction_config_;
   const ResponseDirectionConfig response_direction_config_;
+  const uint64_t max_decompress_bytes_;
 };
 
 using DecompressorFilterConfigSharedPtr = std::shared_ptr<DecompressorFilterConfig>;
@@ -192,7 +195,7 @@ private:
   }
 
   using HeaderMapOptRef = absl::optional<std::reference_wrapper<Http::HeaderMap>>;
-  void decompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
+  bool decompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                   const Compression::Decompressor::DecompressorPtr& decompressor,
                   Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer,
                   ByteTracker& byte_tracker, HeaderMapOptRef trailers) const;

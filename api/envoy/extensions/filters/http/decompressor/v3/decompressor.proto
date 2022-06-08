@@ -56,4 +56,7 @@ message Decompressor {
 
   // Configuration for response decompression. Decompression is enabled by default if left empty.
   ResponseDirectionConfig response_direction_config = 3;
+
+  // The maximum bytes of decompressed data
+  uint64 max_decompress_bytes = 4;
 }
