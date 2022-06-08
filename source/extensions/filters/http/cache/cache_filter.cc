@@ -180,6 +180,83 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
   return Http::FilterTrailersStatus::Continue;
 }
 
+/*static*/ LookupStatus CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status, FilterState filter_state) {
+  if (cache_entry_status.has_value()) {
+    switch (cache_entry_status.value()) {
+    case CacheEntryStatus::Ok:
+      return LookupStatus::CacheHit;
+    case CacheEntryStatus::Unusable:
+      return LookupStatus::CacheMiss;
+    case CacheEntryStatus::RequiresValidation: {
+      // The CacheFilter sent the response upstream for validation; check the
+      // filter state to see whether and how the upstream responded. The
+      // filter currently won't send the stale entry if it can't reach the
+      // upstream or if the upstream responds with a 5xx, so don't include
+      // special handling for those cases.
+      std::cout << "JKJK RequiresValidation\n";
+      switch (filter_state) {
+      case FilterState::ValidatingCachedResponse:
+        return LookupStatus::RequestIncomplete;
+      case FilterState::EncodeServingFromCache:
+        ABSL_FALLTHROUGH_INTENDED;
+      case FilterState::ResponseServedFromCache:
+        // Functionally a cache hit, this is differentiated for metrics reporting.
+        return LookupStatus::StaleHitWithSuccessfulValidation;
+      case FilterState::NotServingFromCache:
+        return LookupStatus::StaleHitWithFailedValidation;
+      case FilterState::Initial:
+      std::cout << "JKJK Initial\n";
+        ABSL_FALLTHROUGH_INTENDED;
+      case FilterState::DecodeServingFromCache:
+              std::cout << "JKJK DecodeServingFromCache\n";
+        ABSL_FALLTHROUGH_INTENDED;
+      case FilterState::Destroyed:
+        std::cout << "JKJK Destroyed\n";
+        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
+                                  "response required validation, but filter state is ",
+                                  filter_state));
+      }
+      return LookupStatus::Unknown;
+    }
+    case CacheEntryStatus::FoundNotModified:
+      // TODO(capoferro): Report this as a FoundNotModified when we handle
+      // those.
+      return LookupStatus::CacheHit;
+    case CacheEntryStatus::LookupError:
+      return LookupStatus::LookupError;
+    }
+    IS_ENVOY_BUG(absl::StrCat(
+        "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
+        std::to_string(static_cast<int>(filter_state))));
+    return LookupStatus::Unknown;
+  }
+
+  // Either decodeHeaders decided not to do a cache lookup (because the
+  // request isn't cacheable), or decodeHeaders hasn't been called yet.
+  switch (filter_state) {
+  case FilterState::Initial:
+    return LookupStatus::RequestIncomplete;
+  case FilterState::NotServingFromCache:
+    return LookupStatus::RequestNotCacheable;
+  // Ignore the following lines. This code should not be executed.
+  // GCOV_EXCL_START
+  case FilterState::ValidatingCachedResponse:
+    ABSL_FALLTHROUGH_INTENDED;
+  case FilterState::DecodeServingFromCache:
+    ABSL_FALLTHROUGH_INTENDED;
+  case FilterState::EncodeServingFromCache:
+    ABSL_FALLTHROUGH_INTENDED;
+  case FilterState::ResponseServedFromCache:
+    ABSL_FALLTHROUGH_INTENDED;
+  case FilterState::Destroyed:
+    IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: "
+                              "lookup_result_ is empty but filter state is ",
+                              filter_state));
+  }
+  return LookupStatus::Unknown;
+
+}
+
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
 
@@ -586,81 +663,10 @@ LookupStatus CacheFilter::lookupStatus() const {
   }
 
   if (lookup_result_ != nullptr) {
-    switch (lookup_result_->cache_entry_status_) {
-    case CacheEntryStatus::Ok:
-      return LookupStatus::CacheHit;
-    case CacheEntryStatus::Unusable:
-      return LookupStatus::CacheMiss;
-    case CacheEntryStatus::RequiresValidation: {
-      // The CacheFilter sent the response upstream for validation; check the
-      // filter state to see whether and how the upstream responded. The
-      // filter currently won't send the stale entry if it can't reach the
-      // upstream or if the upstream responds with a 5xx, so don't include
-      // special handling for those cases.
-      switch (filter_state_) {
-      case FilterState::ValidatingCachedResponse:
-        return LookupStatus::RequestIncomplete;
-      case FilterState::EncodeServingFromCache:
-        ABSL_FALLTHROUGH_INTENDED;
-      case FilterState::ResponseServedFromCache:
-        // Functionally a cache hit, this is differentiated for metrics reporting.
-        return LookupStatus::StaleHitWithSuccessfulValidation;
-      case FilterState::NotServingFromCache:
-        return LookupStatus::StaleHitWithFailedValidation;
-      // Ignore the following lines. This code should not be executed.
-      // GCOV_EXCL_START
-      case FilterState::Initial:
-        ABSL_FALLTHROUGH_INTENDED;
-      case FilterState::DecodeServingFromCache:
-        ABSL_FALLTHROUGH_INTENDED;
-      case FilterState::Destroyed:
-        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
-                                  "response required validation, but filter state is ",
-                                  filter_state_));
-      }
-      return LookupStatus::Unknown;
-      // GCOV_EXCL_STOP
-    }
-    case CacheEntryStatus::FoundNotModified:
-      // TODO(capoferro): Report this as a FoundNotModified when we handle
-      // those.
-      return LookupStatus::CacheHit;
-    case CacheEntryStatus::LookupError:
-      return LookupStatus::LookupError;
-    }
-    // Ignore the following lines. This code should not be executed.
-    // GCOV_EXCL_START
-    IS_ENVOY_BUG(absl::StrCat(
-        "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
-        std::to_string(static_cast<int>(filter_state_))));
-    return LookupStatus::Unknown;
-    // GCOV_EXCL_STOP
+    return resolveLookupStatus(lookup_result_->cache_entry_status_, filter_state_);
+  } else {
+    return resolveLookupStatus(absl::nullopt, filter_state_);
   }
-
-  // Either decodeHeaders decided not to do a cache lookup (because the
-  // request isn't cacheable), or decodeHeaders hasn't been called yet.
-  switch (filter_state_) {
-  case FilterState::Initial:
-    return LookupStatus::RequestIncomplete;
-  case FilterState::NotServingFromCache:
-    return LookupStatus::RequestNotCacheable;
-  // Ignore the following lines. This code should not be executed.
-  // GCOV_EXCL_START
-  case FilterState::ValidatingCachedResponse:
-    ABSL_FALLTHROUGH_INTENDED;
-  case FilterState::DecodeServingFromCache:
-    ABSL_FALLTHROUGH_INTENDED;
-  case FilterState::EncodeServingFromCache:
-    ABSL_FALLTHROUGH_INTENDED;
-  case FilterState::ResponseServedFromCache:
-    ABSL_FALLTHROUGH_INTENDED;
-  case FilterState::Destroyed:
-    IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: "
-                              "lookup_result_ is empty but filter state is ",
-                              filter_state_));
-  }
-  return LookupStatus::Unknown;
-  // GCOV_EXCL_STOP
 }
 
 InsertStatus CacheFilter::insertStatus() const {
