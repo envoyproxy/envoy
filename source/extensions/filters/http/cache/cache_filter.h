@@ -19,30 +19,30 @@ namespace HttpFilters {
 namespace Cache {
 
 enum class FilterState {
-    Initial,
+  Initial,
 
-    // Cache lookup found a cached response that requires validation.
-    ValidatingCachedResponse,
+  // Cache lookup found a cached response that requires validation.
+  ValidatingCachedResponse,
 
-    // Cache lookup found a fresh cached response and it is being added to the encoding stream.
-    DecodeServingFromCache,
+  // Cache lookup found a fresh cached response and it is being added to the encoding stream.
+  DecodeServingFromCache,
 
-    // A cached response was successfully validated and it is being added to the encoding stream
-    EncodeServingFromCache,
+  // A cached response was successfully validated and it is being added to the encoding stream
+  EncodeServingFromCache,
 
-    // The cached response was successfully added to the encoding stream (either during decoding or
-    // encoding).
-    ResponseServedFromCache,
+  // The cached response was successfully added to the encoding stream (either during decoding or
+  // encoding).
+  ResponseServedFromCache,
 
-    // The filter won't serve a response from the cache, whether because the
-    // request wasn't cacheable, there was no response in cache, or the response
-    // in cache couldn't be served. This may be set during decoding or encoding.
-    NotServingFromCache,
+  // The filter won't serve a response from the cache, whether because the
+  // request wasn't cacheable, there was no response in cache, or the response
+  // in cache couldn't be served. This may be set during decoding or encoding.
+  NotServingFromCache,
 
-    // CacheFilter::onDestroy has been called, the filter will be destroyed soon. Any triggered
-    // callbacks should be ignored.
-    Destroyed
-  };
+  // CacheFilter::onDestroy has been called, the filter will be destroyed soon. Any triggered
+  // callbacks should be ignored.
+  Destroyed
+};
 
 /**
  * A filter that caches responses and attempts to satisfy requests from cache.
@@ -50,7 +50,7 @@ enum class FilterState {
 class CacheFilter : public Http::PassThroughFilter,
                     public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
- public:
+public:
   CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
               HttpCache& http_cache);
@@ -66,7 +66,8 @@ class CacheFilter : public Http::PassThroughFilter,
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
-  static LookupStatus resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status, FilterState filter_state);
+  static LookupStatus resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status,
+                                          FilterState filter_state);
 
 private:
   // Utility functions; make any necessary checks and call the corresponding lookup_ functions

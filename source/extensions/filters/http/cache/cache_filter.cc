@@ -180,7 +180,9 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
   return Http::FilterTrailersStatus::Continue;
 }
 
-/*static*/ LookupStatus CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status, FilterState filter_state) {
+/*static*/ LookupStatus
+CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status,
+                                 FilterState filter_state) {
   if (cache_entry_status.has_value()) {
     switch (cache_entry_status.value()) {
     case CacheEntryStatus::Ok:
@@ -205,10 +207,10 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
       case FilterState::NotServingFromCache:
         return LookupStatus::StaleHitWithFailedValidation;
       case FilterState::Initial:
-      std::cout << "JKJK Initial\n";
+        std::cout << "JKJK Initial\n";
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::DecodeServingFromCache:
-              std::cout << "JKJK DecodeServingFromCache\n";
+        std::cout << "JKJK DecodeServingFromCache\n";
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::Destroyed:
         std::cout << "JKJK Destroyed\n";
@@ -254,7 +256,6 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
                               filter_state));
   }
   return LookupStatus::Unknown;
-
 }
 
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {

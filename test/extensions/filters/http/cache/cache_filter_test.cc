@@ -763,30 +763,45 @@ TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
 }
 
 TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterState1) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation, FilterState::Initial), "Unexpected filter state");
+  EXPECT_ENVOY_BUG(
+      CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation, FilterState::Initial),
+      "Unexpected filter state");
 }
 TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterState2) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation, FilterState::DecodeServingFromCache), "Unexpected filter state");
+  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
+                                                    FilterState::DecodeServingFromCache),
+                   "Unexpected filter state");
 }
 TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterState3) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation, FilterState::Destroyed), "Unexpected filter state");
+  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
+                                                    FilterState::Destroyed),
+                   "Unexpected filter state");
 }
 
 TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterStateNullopt1) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse), "Unexpected filter state");
+  EXPECT_ENVOY_BUG(
+      CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse),
+      "Unexpected filter state");
 }
 TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterStateNullopt2) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::DecodeServingFromCache), "Unexpected filter state");
+  EXPECT_ENVOY_BUG(
+      CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::DecodeServingFromCache),
+      "Unexpected filter state");
 }
 TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterStateNullopt3) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::EncodeServingFromCache), "Unexpected filter state");
+  EXPECT_ENVOY_BUG(
+      CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::EncodeServingFromCache),
+      "Unexpected filter state");
 }
 TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterStateNullopt4) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::Destroyed), "Unexpected filter state");
+  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::Destroyed),
+                   "Unexpected filter state");
 }
 
 TEST_F(CacheFilterTest, ResolveLookupStatusUnhandledCacheEntryStatus) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(static_cast<CacheEntryStatus>(99), FilterState::Initial), "Unhandled CacheEntryStatus");
+  EXPECT_ENVOY_BUG(
+      CacheFilter::resolveLookupStatus(static_cast<CacheEntryStatus>(99), FilterState::Initial),
+      "Unhandled CacheEntryStatus");
 }
 
 // A new type alias for a different type of tests that use the exact same class
