@@ -285,7 +285,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, DecodedQueryParameterWithEncodedJsonName) {
   // * json_name = "search%5Bencoded%5D", defined in "test/proto/bookstore.proto".
   // " the query parameter is "search[encode]".
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {":path", "/shelf?shelf.search[encode]=Google"}};
+                                         {":path", "/shelf?shelf.search[encoded]=Google"}};
 
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
