@@ -2,7 +2,7 @@ load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
-load("//tools/base:envoy_python.bzl", "envoy_py_data")
+load("//tools/base:envoy_python.bzl", "envoy_jinja_env", "envoy_py_data")
 
 licenses(["notice"])  # Apache 2
 
@@ -42,6 +42,7 @@ py_binary(
     deps = [
         ":contrib_extensions_db",
         ":extensions_db",
+        ":jinja",
         ":manifest_proto_py_proto",
         ":protodoc_manifest_untyped",
         "//tools/api_proto_plugin",
@@ -63,4 +64,25 @@ protodoc_rule(
 protodoc_rule(
     name = "xds_protodoc",
     deps = ["@envoy_api//:xds_protos"],
+)
+
+py_library(
+    name = "rst_filters",
+    srcs = ["rst_filters.py"],
+)
+
+envoy_jinja_env(
+    name = "jinja",
+    filters = {
+        "rst_anchor": "tools.protodoc.rst_filters.rst_anchor",
+        "rst_header": "tools.protodoc.rst_filters.rst_header",
+    },
+    templates = [
+        "templates/empty.rst.tpl",
+        "templates/extension.rst.tpl",
+        "templates/extension_category.rst.tpl",
+    ],
+    deps = [
+        ":rst_filters",
+    ],
 )
