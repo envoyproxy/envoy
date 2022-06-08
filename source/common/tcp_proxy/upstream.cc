@@ -280,16 +280,14 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
       {Http::Headers::get().Host, config_.hostname()},
   });
 
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
+  if (config_.usePost()) {
     headers->addReference(Http::Headers::get().Path, "/");
     headers->addReference(Http::Headers::get().Scheme, scheme);
-    if (!config_.usePost()) {
-      headers->addReference(Http::Headers::get().Protocol,
-                            Http::Headers::get().ProtocolValues.Bytestream);
-    }
-  } else if (config_.usePost()) {
+  } else if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
     headers->addReference(Http::Headers::get().Path, "/");
     headers->addReference(Http::Headers::get().Scheme, scheme);
+    headers->addReference(Http::Headers::get().Protocol,
+                          Http::Headers::get().ProtocolValues.Bytestream);
   }
 
   config_.headerEvaluator().evaluateHeaders(*headers, downstream_info_);
