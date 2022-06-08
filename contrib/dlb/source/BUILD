@@ -10,8 +10,19 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
+selects.config_setting_group(
+    name = "linux_x86_64_gcc_build",
+    match_all = [
+        "//bazel:linux_x86_64",
+        "//bazel:gcc_build",
+    ],
+)
+
 make(
     name = "dlb",
+    defines = select({
+        ":linux_x86_64_gcc_build": [],
+    }),
     includes = [],
     lib_source = "@dlb//:libdlb",
     out_static_libs = ["libdlb.a"],
@@ -19,14 +30,6 @@ make(
     tags = ["skip_on_windows"],
     targets = ["libdlb.a"],
     visibility = ["//visibility:public"],
-)
-
-selects.config_setting_group(
-    name = "linux_x86_64_gcc_build",
-    match_all = [
-        "//bazel:linux_x86_64",
-        "//bazel:gcc_build",
-    ],
 )
 
 envoy_cc_contrib_extension(
