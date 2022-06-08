@@ -22,9 +22,12 @@ make(
     name = "dlb",
     defines = select({
         ":linux_x86_64_gcc_build": [],
+         "//conditions:default": [
+            "DLB_DISABLED=0",
+        ],
     }),
     includes = [],
-    lib_source = "@dlb//:libdlb",
+    lib_source = "@intel_dlb//:libdlb",
     out_static_libs = ["libdlb.a"],
     postfix_script = "mv libdlb.a $INSTALLDIR/lib; cp -L *.h $INSTALLDIR/include",
     tags = ["skip_on_windows"],
