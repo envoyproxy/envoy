@@ -120,7 +120,7 @@ public:
     });
 
     addEcdsCluster(std::string(EcdsClusterName));
-    // Add 2nd cluster in case of two streams.
+    // Add 2nd cluster in case of two connections.
     if (two_connections_) {
       addEcdsCluster(std::string(Ecds2ClusterName));
     }
@@ -170,7 +170,8 @@ public:
   }
 
   void sendXdsResponse(const std::string& name, const std::string& version,
-                       const uint32_t drain_bytes, bool ttl = false, bool second_connection = false) {
+                       const uint32_t drain_bytes, bool ttl = false,
+                       bool second_connection = false) {
     // The to-be-drained bytes has to be smaller than data size.
     ASSERT(drain_bytes <= data_.size());
 
