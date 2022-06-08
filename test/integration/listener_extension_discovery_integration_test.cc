@@ -28,9 +28,9 @@ public:
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
                         bool set_default_config = true, bool rate_limit = false,
                         ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER,
-                        bool second_stream = false) {
+                        bool second_connection = false) {
     config_helper_.addConfigModifier([name, apply_without_warming, set_default_config, rate_limit,
-                                      matcher, second_stream,
+                                      matcher, second_connection,
                                       this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       listener->set_stat_prefix("listener_stat");
@@ -58,7 +58,7 @@ public:
       }
       addListenerFilterMatcher(listener_filter, matcher);
       auto* grpc_service = api_config_source->add_grpc_services();
-      if (!second_stream) {
+      if (!second_connection) {
         setGrpcService(*grpc_service, std::string(EcdsClusterName),
                        getEcdsFakeUpstream().localAddress());
       } else {
@@ -121,7 +121,7 @@ public:
 
     addEcdsCluster(std::string(EcdsClusterName));
     // Add 2nd cluster in case of two streams.
-    if (two_stream_) {
+    if (two_connections_) {
       addEcdsCluster(std::string(Ecds2ClusterName));
     }
     BaseIntegrationTest::initialize();
@@ -147,7 +147,7 @@ public:
     BaseIntegrationTest::createUpstreams();
     // Create two extension config discovery upstreams (fake_upstreams_[1] and fake_upstreams_[2]).
     addFakeUpstream(Http::CodecType::HTTP2);
-    if (two_stream_) {
+    if (two_connections_) {
       addFakeUpstream(Http::CodecType::HTTP2);
     }
   }
@@ -163,14 +163,14 @@ public:
 
   void waitXdsStream() {
     waitForEcdsStream(getEcdsFakeUpstream(), ecds_connection_, ecds_stream_);
-    if (two_stream_) {
+    if (two_connections_) {
       // Wait for 2nd ECDS stream.
       waitForEcdsStream(getEcds2FakeUpstream(), ecds2_connection_, ecds2_stream_);
     }
   }
 
   void sendXdsResponse(const std::string& name, const std::string& version,
-                       const uint32_t drain_bytes, bool ttl = false, bool second_stream = false) {
+                       const uint32_t drain_bytes, bool ttl = false, bool second_connection = false) {
     // The to-be-drained bytes has to be smaller than data size.
     ASSERT(drain_bytes <= data_.size());
 
@@ -190,7 +190,7 @@ public:
       resource.mutable_ttl()->set_seconds(1);
     }
     response.add_resources()->PackFrom(resource);
-    if (!second_stream) {
+    if (!second_connection) {
       ecds_stream_->sendGrpcMessage(response);
     } else {
       ecds2_stream_->sendGrpcMessage(response);
@@ -219,7 +219,7 @@ public:
   const std::string filter_name_;
   const std::string data_;
   const std::string port_name_;
-  bool two_stream_{false};
+  bool two_connections_{false};
 
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
   FakeUpstream& getEcds2FakeUpstream() const { return *fake_upstreams_[2]; }
@@ -418,7 +418,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) {
 }
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentName) {
-  two_stream_ = true;
+  two_connections_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("foo", true);
   addDynamicFilter("bar", false, true, false, ListenerMatcherType::NULLMATCHER, true);
