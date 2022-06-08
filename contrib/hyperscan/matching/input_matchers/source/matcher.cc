@@ -63,9 +63,42 @@ bool Matcher::match(absl::string_view value) const {
 }
 
 std::string Matcher::replaceAll(absl::string_view value, absl::string_view substitution) const {
-  // TODO:
-  ASSERT(value == substitution);
-  return "";
+  // Find matched pair.
+  std::vector<Matched> founds;
+  hs_scratch_t* scratch = tls_->get()->scratch_;
+  hs_error_t err = hs_scan(
+      database_, value.data(), value.size(), 0, scratch,
+      [](unsigned int, unsigned long long from, unsigned long long to, unsigned int,
+         void* context) -> int {
+        std::vector<std::pair<unsigned long long, unsigned long long>>* founds =
+            static_cast<std::vector<std::pair<unsigned long long, unsigned long long>>*>(context);
+        founds->push_back({from, to});
+
+        // Continue searching.
+        return 0;
+      },
+      &founds);
+  if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
+    ENVOY_LOG_MISC(error, "unable to scan, error code {}.", err);
+  }
+
+  // Sort founds.
+  std::sort(founds.begin(), founds.end());
+
+  // Replace matched pair with substitution.
+  std::string result;
+  unsigned long long pos = 0;
+  for (auto& found : founds) {
+    if (found.begin_ < pos) {
+      continue;
+    }
+
+    result += std::string(value.substr(pos, found.begin_ - pos));
+    result += std::string(substitution);
+    pos = found.end_;
+  }
+  result += std::string(value.substr(pos));
+  return result;
 }
 
 bool Matcher::match(absl::optional<absl::string_view> input) {

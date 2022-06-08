@@ -70,6 +70,22 @@ TEST_P(HyperscanIntegrationTest, HyperscanWithParam) {
   EXPECT_TRUE(regex_matcher->match("/ASDF/1"));
 };
 
+// Verify that matching will be performed successfully.
+TEST_P(HyperscanIntegrationTest, ReplaceAll) {
+  initializeConfig("");
+  initialize();
+
+  auto* engine = Envoy::Regex::engine("envoy.bootstrap.hyperscan");
+  ASSERT_EQ(Envoy::Regex::EngineSingleton::getExisting(), engine);
+
+  envoy::type::matcher::v3::RegexMatcher matcher;
+  *matcher.mutable_regex() = "b+";
+
+  Envoy::Regex::CompiledMatcherPtr regex_matcher = Envoy::Regex::Utility::parseRegex(matcher);
+
+  EXPECT_EQ(regex_matcher->replaceAll("yabba dabba doo", "d"), "yada dada doo");
+};
+
 } // namespace Hyperscan
 } // namespace InputMatchers
 } // namespace Matching

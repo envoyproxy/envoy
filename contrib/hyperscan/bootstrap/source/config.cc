@@ -14,7 +14,8 @@ namespace Hyperscan {
 
 Envoy::Regex::CompiledMatcherPtr HyperscanEngine::matcher(const std::string& regex) const {
   std::vector<const char*> expressions{regex.c_str()};
-  std::vector<unsigned int> flags{flag_};
+  // Enable leftmost start of match reporting for replaceAll interface.
+  std::vector<unsigned int> flags{flag_ | HS_FLAG_SOM_LEFTMOST};
   std::vector<unsigned int> ids{0};
 
   return std::make_unique<Matching::InputMatchers::Hyperscan::Matcher>(expressions, flags, ids,

@@ -15,7 +15,22 @@ namespace Hyperscan {
 struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
   explicit ScratchThreadLocal(const hs_database_t* database);
   ~ScratchThreadLocal() override { hs_free_scratch(scratch_); }
+
   hs_scratch_t* scratch_{};
+};
+
+struct Matched {
+  Matched(unsigned long long begin, unsigned long long end) : begin_(begin), end_(end) {}
+
+  bool operator<(const Matched& other) const {
+    if (begin_ == other.begin_) {
+      return end_ > other.end_;
+    }
+    return begin_ < other.begin_;
+  }
+
+  unsigned long long begin_;
+  unsigned long long end_;
 };
 
 class Matcher : public Envoy::Regex::CompiledMatcher, public Envoy::Matcher::InputMatcher {

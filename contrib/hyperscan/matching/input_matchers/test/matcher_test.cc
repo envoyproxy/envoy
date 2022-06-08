@@ -63,7 +63,7 @@ protected:
   }
 
   ThreadLocal::InstanceImpl instance_;
-  Envoy::Matcher::InputMatcherPtr matcher_;
+  std::shared_ptr<Matcher> matcher_;
 };
 
 // Verify that matching will be performed successfully.
@@ -150,6 +150,13 @@ TEST_F(MatcherTest, InvalidRegex) {
   EXPECT_THROW_WITH_MESSAGE(
       setup("(", 0), EnvoyException,
       "unable to compile pattern '(': Missing close parenthesis for group started at index 0.");
+}
+
+// Verify that replace all works correctly.
+TEST_F(MatcherTest, ReplaceAll) {
+  setup("b+", HS_FLAG_SOM_LEFTMOST);
+
+  EXPECT_EQ(matcher_->replaceAll("yabba dabba doo", "d"), "yada dada doo");
 }
 
 } // namespace Hyperscan
