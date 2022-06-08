@@ -98,6 +98,11 @@ EngineBuilder& EngineBuilder::enableGzip(bool gzip_on) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enableBrotli(bool brotli_on) {
+  this->brotli_filter_ = brotli_on;
+  return *this;
+}
+
 std::string EngineBuilder::generateConfigStr() {
   std::vector<std::pair<std::string, std::string>> replacements{
       {"connect_timeout", fmt::format("{}s", this->connect_timeout_seconds_)},
@@ -136,6 +141,11 @@ std::string EngineBuilder::generateConfigStr() {
   if (this->gzip_filter_) {
     absl::StrReplaceAll(
         {{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", gzip_config_insert)}},
+        &config_template_);
+  }
+  if (this->brotli_filter_) {
+    absl::StrReplaceAll(
+        {{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", brotli_config_insert)}},
         &config_template_);
   }
 

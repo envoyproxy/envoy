@@ -57,6 +57,24 @@ const char* gzip_config_insert = R"(
           ignore_no_transform_header: true
 )";
 
+const char* brotli_config_insert = R"(
+  - name: envoy.filters.http.decompressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
+      decompressor_library:
+        name: text_optimized
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli
+      request_direction_config:
+        common_config:
+          enabled:
+            default_value: false
+            runtime_key: request_decompressor_enabled
+      response_direction_config:
+        common_config:
+          ignore_no_transform_header: true
+)";
+
 // clang-format off
 const std::string config_header = R"(
 !ignore default_defs:
