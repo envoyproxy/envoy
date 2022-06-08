@@ -293,9 +293,9 @@ docutils==0.16 \
     #   sphinx
     #   sphinx-rtd-theme
     #   sphinx-tabs
-envoy-base-utils==0.3.4 \
-    --hash=sha256:1df33b65fb01a35afdae0a507d5d1c769e034419a4f8ca4079a12e09ff05a508 \
-    --hash=sha256:e10c96f48275e0552af4aa42cc1d7f02ed266318fa45f3b5be03ddbcc08e1b65
+envoy-base-utils==0.3.5 \
+    --hash=sha256:3901ff3e849242b0d3405183937413383f5ffe658f72b72cb3e065bc661cf1d4 \
+    --hash=sha256:d06b056f7ba1d6ff99d11f18754f7a71d5ecc6a9f10fbe2f12ef2dca9366e758
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -339,9 +339,9 @@ envoy-distribution-verify==0.0.8 \
 envoy-docker-utils==0.0.2 \
     --hash=sha256:a12cb57f0b6e204d646cbf94f927b3a8f5a27ed15f60d0576176584ec16a4b76
     # via envoy-distribution-distrotest
-envoy-docs-sphinx-runner==0.1.2 \
-    --hash=sha256:01981f28dbebf64d446e9e65ff93b1b7c41aec545122bfc468c07e70b88f920d \
-    --hash=sha256:0aa3db6fae0fe160ea40c0cacb1ebc299a594f5ee58a05ffd474e15c911ff96b
+envoy-docs-sphinx-runner==0.1.5 \
+    --hash=sha256:20bb0b2b26de86ea8478b1e9c89cad4ec6ba7e43263979a1672cc421e660a10d \
+    --hash=sha256:d94ca8df1046dd465f2c0a981c8354e74d6cda57ea95483200812cb88560492b
     # via -r requirements.in
 envoy-github-abstract==0.0.21 \
     --hash=sha256:243dae9457243fb42e4643b1f45006c3b0d3151c808884217447d29a081b26a1 \
