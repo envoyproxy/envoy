@@ -1,5 +1,6 @@
+# to skip clang build
 diff --git a/dlb/libdlb/Makefile b/dlb/libdlb/Makefile
-index e7fa1fa..bd051e6 100644
+index e7fa1fa..0d5b821 100644
 --- a/dlb/libdlb/Makefile
 +++ b/dlb/libdlb/Makefile
 @@ -34,6 +34,7 @@ SRCS :=         \
@@ -10,13 +11,19 @@ index e7fa1fa..bd051e6 100644
  
  default: $(LIB) examples cli doc
  
-@@ -55,6 +56,10 @@ $(LIB): $(OBJS)
+@@ -55,6 +56,16 @@ $(LIB): $(OBJS)
  	@echo Linking $@
  	@$(CC) $^ -shared $(LDFLAGS) -o $@ -Wl,--version-script=version.map
  
++$(LIB2):
++ifeq '' '$(findstring clang,$(CC))'
 +$(LIB2): $(OBJS)
 +	@echo Linking $@
 +	@$(AR) rcs $@ $^
++else
++$(LIB2):
++	@touch libdlb.a
++endif
 +
  examples cli: $(LIB)
  	@$(MAKE) -C $@/

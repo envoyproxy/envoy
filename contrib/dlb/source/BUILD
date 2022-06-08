@@ -20,19 +20,12 @@ selects.config_setting_group(
 
 make(
     name = "dlb",
-    defines = select({
-        ":linux_x86_64_gcc_build": [],
-        "//conditions:default": [
-            "DLB_DISABLED=0",
-        ],
-    }),
     includes = [],
     lib_source = "@intel_dlb//:libdlb",
     out_static_libs = ["libdlb.a"],
     postfix_script = "mv libdlb.a $INSTALLDIR/lib; cp -L *.h $INSTALLDIR/include",
     tags = ["skip_on_windows"],
     targets = ["libdlb.a"],
-    visibility = ["//visibility:public"],
 )
 
 envoy_cc_contrib_extension(
@@ -44,10 +37,9 @@ envoy_cc_contrib_extension(
     defines = select({
         ":linux_x86_64_gcc_build": [],
         "//conditions:default": [
-            "DLB_DISABLED=0",
+            "DLB_DISABLED=1",
         ],
     }),
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
