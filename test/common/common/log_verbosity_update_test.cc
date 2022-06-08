@@ -43,7 +43,8 @@ TEST(Fancy, updateCurrentFilePath) {
 
   absl::string_view file_path = __FILE__;
   file_path.remove_suffix(3);
-  const std::pair<absl::string_view, int> update = std::make_pair(file_path, 1);
+  const std::pair<absl::string_view, int> update =
+      std::make_pair(file_path, static_cast<int>(spdlog::level::debug));
   getFancyContext().updateVerbositySetting({update});
 
   FANCY_LOG(debug, "Debug: now level is debug");
@@ -63,7 +64,8 @@ TEST(Fancy, updateBasename) {
   const size_t position = file_path.rfind('/');
   file_path.remove_prefix(position + 1);
 
-  const std::pair<absl::string_view, int> update = std::make_pair(file_path, 1);
+  const std::pair<absl::string_view, int> update =
+      std::make_pair(file_path, static_cast<int>(spdlog::level::debug));
   getFancyContext().updateVerbositySetting({update});
 
   FANCY_LOG(debug, "Debug: now level is debug");
@@ -79,8 +81,10 @@ TEST(Fancy, multipleUpdatesBasename) {
   getFancyContext().initFancyLogger(file_1, flogger);
   getFancyContext().initFancyLogger(file_2, flogger);
 
-  const std::pair<absl::string_view, int> update_1 = std::make_pair("foo", 1);
-  const std::pair<absl::string_view, int> update_2 = std::make_pair("bar", 3);
+  const std::pair<absl::string_view, int> update_1 =
+      std::make_pair("foo", static_cast<int>(spdlog::level::debug));
+  const std::pair<absl::string_view, int> update_2 =
+      std::make_pair("bar", static_cast<int>(spdlog::level::warn));
   getFancyContext().updateVerbositySetting({update_1, update_2});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);
@@ -98,7 +102,8 @@ TEST(Fancy, multipleMatchesBasename) {
   getFancyContext().initFancyLogger(file_1, flogger);
   getFancyContext().initFancyLogger(file_2, flogger);
 
-  const std::pair<absl::string_view, int> update_1 = std::make_pair("a", 3);
+  const std::pair<absl::string_view, int> update_1 =
+      std::make_pair("a", static_cast<int>(spdlog::level::warn));
   getFancyContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);
@@ -118,7 +123,8 @@ TEST(Fancy, globStarUpdate) {
   getFancyContext().initFancyLogger(file_2, flogger);
   getFancyContext().initFancyLogger(file_3, flogger);
 
-  const std::pair<absl::string_view, int> update_1 = std::make_pair("envoy/*", 3);
+  const std::pair<absl::string_view, int> update_1 =
+      std::make_pair("envoy/*", static_cast<int>(spdlog::level::warn));
   getFancyContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);
@@ -131,7 +137,8 @@ TEST(Fancy, globStarUpdate) {
   EXPECT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
 
-  const std::pair<absl::string_view, int> update_2 = std::make_pair("envoy/src/*", 2);
+  const std::pair<absl::string_view, int> update_2 =
+      std::make_pair("envoy/src/*", static_cast<int>(spdlog::level::info));
   getFancyContext().updateVerbositySetting({update_2});
 
   p = getFancyContext().getFancyLogEntry(file_1);
@@ -141,7 +148,8 @@ TEST(Fancy, globStarUpdate) {
   p = getFancyContext().getFancyLogEntry(file_3);
   EXPECT_EQ(p->level(), Logger::Context::getFancyDefaultLevel());
 
-  const std::pair<absl::string_view, int> update_3 = std::make_pair("*/src/*", 4);
+  const std::pair<absl::string_view, int> update_3 =
+      std::make_pair("*/src/*", static_cast<int>(spdlog::level::err));
   getFancyContext().updateVerbositySetting({update_3});
 
   p = getFancyContext().getFancyLogEntry(file_1);
@@ -151,7 +159,8 @@ TEST(Fancy, globStarUpdate) {
   p = getFancyContext().getFancyLogEntry(file_3);
   EXPECT_EQ(p->level(), Logger::Context::getFancyDefaultLevel());
 
-  const std::pair<absl::string_view, int> update_4 = std::make_pair("*", 2);
+  const std::pair<absl::string_view, int> update_4 =
+      std::make_pair("*", static_cast<int>(spdlog::level::info));
   getFancyContext().updateVerbositySetting({update_4});
 
   p = getFancyContext().getFancyLogEntry(file_1);
@@ -161,7 +170,8 @@ TEST(Fancy, globStarUpdate) {
   p = getFancyContext().getFancyLogEntry(file_3);
   EXPECT_EQ(p->level(), spdlog::level::info);
 
-  const std::pair<absl::string_view, int> update_5 = std::make_pair("/*", 1);
+  const std::pair<absl::string_view, int> update_5 =
+      std::make_pair("/*", static_cast<int>(spdlog::level::debug));
   getFancyContext().updateVerbositySetting({update_5});
 
   p = getFancyContext().getFancyLogEntry(file_1);
@@ -181,7 +191,8 @@ TEST(Fancy, globQuestionUpdate) {
   getFancyContext().initFancyLogger(file_2, flogger);
   getFancyContext().initFancyLogger(file_3, flogger);
 
-  const std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 3);
+  const std::pair<absl::string_view, int> update_1 =
+      std::make_pair("f??", static_cast<int>(spdlog::level::warn));
   getFancyContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);
@@ -194,7 +205,8 @@ TEST(Fancy, globQuestionUpdate) {
   EXPECT_NE(p, nullptr);
   EXPECT_EQ(p->level(), Logger::Context::getFancyDefaultLevel());
 
-  const std::pair<absl::string_view, int> update_2 = std::make_pair("????y/*", 2);
+  const std::pair<absl::string_view, int> update_2 =
+      std::make_pair("????y/*", static_cast<int>(spdlog::level::info));
   getFancyContext().updateVerbositySetting({update_2});
   p = getFancyContext().getFancyLogEntry(file_1);
   EXPECT_EQ(p->level(), spdlog::level::info);
@@ -209,8 +221,10 @@ TEST(Fancy, inOrderUpdate) {
   std::atomic<spdlog::logger*> flogger{nullptr};
   getFancyContext().initFancyLogger(file_1, flogger);
 
-  const std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 3);
-  const std::pair<absl::string_view, int> update_2 = std::make_pair("envoy/*/f??", 2);
+  const std::pair<absl::string_view, int> update_1 =
+      std::make_pair("f??", static_cast<int>(spdlog::level::warn));
+  const std::pair<absl::string_view, int> update_2 =
+      std::make_pair("envoy/*/f??", static_cast<int>(spdlog::level::info));
   getFancyContext().updateVerbositySetting({update_1, update_2});
 
   SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file_1);

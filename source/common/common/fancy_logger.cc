@@ -161,7 +161,7 @@ void FancyContext::updateVerbositySetting(
   absl::WriterMutexLock ul(&fancy_log_lock_);
   log_update_info_.clear();
   for (const auto& [glob, level] : updates) {
-    if (level < LOGLEVEL_MIN || level > LOGLEVEL_MAX) {
+    if (level < kLogLevelMin || level > kLogLevelMax) {
       printf(
           "The log level: %d for glob: %s is out of scope, and it should be in [0, 6]. Skipping.",
           level, std::string(glob).c_str());
