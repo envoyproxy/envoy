@@ -191,31 +191,6 @@ const std::string& OAuth2Filter::bearerPrefix() const {
   CONSTRUCT_ON_FIRST_USE(std::string, "bearer ");
 }
 
-std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& headers) const {
-  ASSERT(headers.Path() != nullptr);
-
-  // Start by looking for a bearer token in the Authorization header.
-  const Http::HeaderEntry* authorization = headers.getInline(authorization_handle.handle());
-  if (authorization != nullptr) {
-    const auto value = StringUtil::trim(authorization->value().getStringView());
-    const auto& bearer_prefix = bearerPrefix();
-    if (absl::StartsWithIgnoreCase(value, bearer_prefix)) {
-      const size_t start = bearer_prefix.length();
-      return std::string(StringUtil::ltrim(value.substr(start)));
-    }
-  }
-
-  // Check for the named query string parameter.
-  const auto path = headers.Path()->value().getStringView();
-  const auto params = Http::Utility::parseQueryString(path);
-  const auto param = params.find("token");
-  if (param != params.end()) {
-    return param->second;
-  }
-
-  return EMPTY_STRING;
-}
-
 /**
  * primary cases:
  * 1) user is signing out
@@ -224,6 +199,10 @@ std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& heade
  * 4) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Sanitize the Authorization header, since we have no way to validate its content. Also,
+  // if token forwarding is enabled, this header will be set based on what is on the HMAC cookie
+  // before forwarding the request upstream.
+  headers.removeInline(authorization_handle.handle());
 
   // The following 2 headers are guaranteed for regular requests. The asserts are helpful when
   // writing test code to not forget these important variables in mock requests
@@ -278,17 +257,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     request_headers_ = &headers;
   }
 
-  // If a bearer token is supplied as a header or param, we ingest it here and kick off the
-  // user resolution immediately. Note this comes after HMAC validation, so technically this
-  // header is sanitized in a way, as the validation check forces the correct Bearer Cookie value.
-  access_token_ = extractAccessToken(headers);
-  if (!access_token_.empty()) {
-    found_bearer_token_ = true;
-    finishFlow();
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  // If no access token and this isn't the callback URI, redirect to acquire credentials.
+  // If this isn't the callback URI, redirect to acquire credentials.
   //
   // The following conditional could be replaced with a regex pattern-match,
   // if we're concerned about strict matching against the callback path.
@@ -417,18 +386,6 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
 }
 
 void OAuth2Filter::finishFlow() {
-
-  // We have fully completed the entire OAuth flow, whether through Authorization header or from
-  // user redirection to the auth server.
-  if (found_bearer_token_) {
-    if (config_->forwardBearerToken()) {
-      setBearerToken(*request_headers_, access_token_);
-    }
-    config_->stats().oauth_success_.inc();
-    decoder_callbacks_->continueDecoding();
-    return;
-  }
-
   std::string token_payload;
   if (config_->forwardBearerToken()) {
     token_payload = absl::StrCat(host_, new_expires_, access_token_);
@@ -450,8 +407,8 @@ void OAuth2Filter::finishFlow() {
   const std::string cookie_tail_http_only =
       fmt::format(CookieTailHttpOnlyFormatString, new_expires_);
 
-  // At this point we have all of the pieces needed to authorize a user that did not originally
-  // have a bearer access token. Now, we construct a redirect request to return the user to their
+  // At this point we have all of the pieces needed to authorize a user.
+  // Now, we construct a redirect request to return the user to their
   // previous state and additionally set the OAuth cookies in browser.
   // The redirection should result in successfully passing this filter.
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
@@ -475,7 +432,6 @@ void OAuth2Filter::finishFlow() {
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
   config_->stats().oauth_success_.inc();
-  decoder_callbacks_->continueDecoding();
 }
 
 void OAuth2Filter::sendUnauthorizedResponse() {

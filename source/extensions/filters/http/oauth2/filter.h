@@ -214,7 +214,6 @@ private:
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;
-  bool found_bearer_token_{false};
   Http::RequestHeaderMap* request_headers_{nullptr};
 
   std::unique_ptr<OAuth2Client> oauth_client_;
@@ -228,7 +227,6 @@ private:
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
   const std::string& bearerPrefix() const;
-  std::string extractAccessToken(const Http::RequestHeaderMap& headers) const;
 };
 
 } // namespace Oauth2

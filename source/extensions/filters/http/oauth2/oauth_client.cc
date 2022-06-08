@@ -20,9 +20,6 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 namespace {
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    authorization_handle(Http::CustomHeaders::get().Authorization);
-
 constexpr const char* GetAccessTokenBodyFormatString =
     "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}";
 
