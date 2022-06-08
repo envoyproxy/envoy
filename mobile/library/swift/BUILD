@@ -17,6 +17,7 @@ swift_library(
         "FinalStreamIntel.swift",
         "Headers.swift",
         "HeadersBuilder.swift",
+        "KeyValueStore.swift",
         "LogLevel.swift",
         "PulseClient.swift",
         "PulseClientImpl.swift",

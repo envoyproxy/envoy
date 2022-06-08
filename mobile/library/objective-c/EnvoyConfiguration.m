@@ -37,7 +37,10 @@
                                   (NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
                                   stringAccessors:
                                       (NSDictionary<NSString *, EnvoyStringAccessor *> *)
-                                          stringAccessors {
+                                          stringAccessors
+                                   keyValueStores:
+                                       (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
+                                           keyValueStores {
   self = [super init];
   if (!self) {
     return nil;
@@ -73,6 +76,7 @@
   self.nativeFilterChain = nativeFilterChain;
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
+  self.keyValueStores = keyValueStores;
   return self;
 }
 

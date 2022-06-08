@@ -315,6 +315,21 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 
 @end
 
+#pragma mark - EnvoyKeyValueStore
+
+@protocol EnvoyKeyValueStore
+
+/// Read a value from the key value store implementation.
+- (NSString *_Nullable)readValueForKey:(NSString *)key;
+
+/// Save a value to the key value store implementation.
+- (void)saveValue:(NSString *)value toKey:(NSString *)key;
+
+/// Remove a value from the key value store implementation.
+- (void)removeKey:(NSString *)key;
+
+@end
+
 #pragma mark - EnvoyNativeFilterConfig
 
 @interface EnvoyNativeFilterConfig : NSObject
@@ -360,6 +375,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
+@property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 
 /**
  Create a new instance of the configuration.
@@ -397,7 +413,10 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
                                   (NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
                                   stringAccessors:
                                       (NSDictionary<NSString *, EnvoyStringAccessor *> *)
-                                          stringAccessors;
+                                          stringAccessors
+                                   keyValueStores:
+                                       (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
+                                           keyValueStores;
 
 /**
  Resolves the provided configuration template using properties on this configuration.

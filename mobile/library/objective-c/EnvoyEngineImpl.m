@@ -6,6 +6,7 @@
 
 #import "library/common/main_interface.h"
 #import "library/common/types/c_types.h"
+#import "library/common/extensions/key_value/platform/c_types.h"
 
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
@@ -394,6 +395,46 @@ static envoy_data ios_get_string(const void *context) {
   return toManagedNativeString(accessor.getEnvoyString());
 }
 
+static envoy_data ios_kv_store_read(envoy_data native_key, const void *context) {
+  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+  // is necessary to act as a breaker for any Objective-C allocation that happens.
+  @autoreleasepool {
+    id<EnvoyKeyValueStore> keyValueStore = (__bridge id<EnvoyKeyValueStore>)context;
+    NSString *key = [[NSString alloc] initWithBytes:native_key.bytes
+                                             length:native_key.length
+                                           encoding:NSUTF8StringEncoding];
+    NSString *value = [keyValueStore readValueForKey:key];
+    return value != nil ? toManagedNativeString(value) : envoy_nodata;
+  }
+}
+
+static void ios_kv_store_save(envoy_data native_key, envoy_data native_value, const void *context) {
+  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+  // is necessary to act as a breaker for any Objective-C allocation that happens.
+  @autoreleasepool {
+    id<EnvoyKeyValueStore> keyValueStore = (__bridge id<EnvoyKeyValueStore>)context;
+    NSString *key = [[NSString alloc] initWithBytes:native_key.bytes
+                                             length:native_key.length
+                                           encoding:NSUTF8StringEncoding];
+    NSString *value = [[NSString alloc] initWithBytes:native_key.bytes
+                                               length:native_key.length
+                                             encoding:NSUTF8StringEncoding];
+    [keyValueStore saveValue:value toKey:key];
+  }
+}
+
+static void ios_kv_store_remove(envoy_data native_key, const void *context) {
+  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+  // is necessary to act as a breaker for any Objective-C allocation that happens.
+  @autoreleasepool {
+    id<EnvoyKeyValueStore> keyValueStore = (__bridge id<EnvoyKeyValueStore>)context;
+    NSString *key = [[NSString alloc] initWithBytes:native_key.bytes
+                                             length:native_key.length
+                                           encoding:NSUTF8StringEncoding];
+    [keyValueStore removeKey:key];
+  }
+}
+
 static void ios_track_event(envoy_map map, const void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
   // is necessary to act as a breaker for any Objective-C allocation that happens.
@@ -490,6 +531,16 @@ static void ios_track_event(envoy_map map, const void *context) {
   accessorStruct->context = CFBridgingRetain(accessor);
 
   return register_platform_api(name.UTF8String, accessorStruct);
+}
+
+- (int)registerKeyValueStore:(NSString *)name keyValueStore:(id<EnvoyKeyValueStore>)keyValueStore {
+  envoy_kv_store *api = safe_malloc(sizeof(envoy_kv_store));
+  api->save = ios_kv_store_save;
+  api->read = ios_kv_store_read;
+  api->remove = ios_kv_store_remove;
+  api->context = CFBridgingRetain(keyValueStore);
+
+  return register_platform_api(name.UTF8String, api);
 }
 
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
