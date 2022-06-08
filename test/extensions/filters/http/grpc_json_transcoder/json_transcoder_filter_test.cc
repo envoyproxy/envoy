@@ -294,7 +294,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, DecodedQueryParameterWithEncodedJsonName) {
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
   EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
-  EXPECT_EQ("Could not find field \"search[encode]\" in the type \"bookstore.Shelf\".",
+  EXPECT_EQ("Could not find field \"search[encoded]\" in the type \"bookstore.Shelf\".",
             status.message());
   EXPECT_FALSE(transcoder);
 }
