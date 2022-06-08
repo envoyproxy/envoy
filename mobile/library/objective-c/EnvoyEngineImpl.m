@@ -452,7 +452,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
-               enableNetworkPathMonitor:(BOOL)enableNetworkPathMonitor {
+                  networkMonitoringMode:(int)networkMonitoringMode {
   self = [super init];
   if (!self) {
     return nil;
@@ -483,10 +483,10 @@ static void ios_track_event(envoy_map map, const void *context) {
   _engineHandle = init_engine(native_callbacks, native_logger, native_event_tracker);
   _networkMonitor = [[EnvoyNetworkMonitor alloc] initWithEngine:_engineHandle];
 
-  if (enableNetworkPathMonitor) {
-    [_networkMonitor startPathMonitor];
-  } else {
+  if (networkMonitoringMode == 1) {
     [_networkMonitor startReachability];
+  } else if (networkMonitoringMode == 2) {
+    [_networkMonitor startPathMonitor];
   }
 
   return self;

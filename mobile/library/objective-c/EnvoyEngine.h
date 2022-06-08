@@ -456,13 +456,12 @@ extern const int kEnvoyFailure;
  running.
  @param logger Logging interface.
  @param eventTracker Event tracking interface.
- @param enableNetworkPathMonitor Configure the engine to use `NWPathMonitor` to observe network
- reachability.
+ @param networkMonitoringMode Configure how the engines observe network reachability.
  */
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
-               enableNetworkPathMonitor:(BOOL)enableNetworkPathMonitor;
+                  networkMonitoringMode:(int)networkMonitoringMode;
 /**
  Run the Envoy engine with the provided configuration and log level.
 

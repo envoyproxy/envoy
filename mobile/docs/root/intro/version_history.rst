@@ -12,6 +12,7 @@ Breaking changes:
 - net: enable happy eyeballs by default (:issue:`#2272 <2272>`)
 - iOS: remove support for installing via CocoaPods, which had not worked since 2020 (:issue:`#2215 <2215>`)
 - iOS: enable usage of ``NWPathMonitor`` by default (:issue:`#2329 <2329>`)
+- iOS: replace ``enableNetworkPathMonitor`` with a new ``setNetworkMonitoringMode`` API to allow disabling monitoring (:issue:`#2345 <2345>`)
 
 Bugfixes:
 
