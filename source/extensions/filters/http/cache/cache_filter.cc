@@ -180,9 +180,7 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
   return Http::FilterTrailersStatus::Continue;
 }
 
-/*static*/ LookupStatus
-CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status,
-                                 FilterState filter_state) {
+/*static*/ LookupStatus CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status, FilterState filter_state) {
   if (cache_entry_status.has_value()) {
     switch (cache_entry_status.value()) {
     case CacheEntryStatus::Ok:
@@ -195,7 +193,6 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
       // filter currently won't send the stale entry if it can't reach the
       // upstream or if the upstream responds with a 5xx, so don't include
       // special handling for those cases.
-      std::cout << "JKJK RequiresValidation\n";
       switch (filter_state) {
       case FilterState::ValidatingCachedResponse:
         return LookupStatus::RequestIncomplete;
@@ -207,13 +204,10 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
       case FilterState::NotServingFromCache:
         return LookupStatus::StaleHitWithFailedValidation;
       case FilterState::Initial:
-        std::cout << "JKJK Initial\n";
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::DecodeServingFromCache:
-        std::cout << "JKJK DecodeServingFromCache\n";
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::Destroyed:
-        std::cout << "JKJK Destroyed\n";
         IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
                                   "response required validation, but filter state is ",
                                   filter_state));
@@ -232,7 +226,6 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
         std::to_string(static_cast<int>(filter_state))));
     return LookupStatus::Unknown;
   }
-
   // Either decodeHeaders decided not to do a cache lookup (because the
   // request isn't cacheable), or decodeHeaders hasn't been called yet.
   switch (filter_state) {
@@ -256,6 +249,7 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
                               filter_state));
   }
   return LookupStatus::Unknown;
+
 }
 
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
