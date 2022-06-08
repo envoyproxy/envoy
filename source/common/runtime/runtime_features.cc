@@ -61,6 +61,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.correctly_validate_alpn",
     "envoy.reloadable_features.disable_tls_inspector_injection",
+    "envoy.reloadable_features.enable_compression_bomb_protection",
     "envoy.reloadable_features.fix_added_trailers",
     "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.handle_stream_reset_during_hcm_encoding",
