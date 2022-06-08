@@ -1,3 +1,4 @@
+#include "envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.pb.h"
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
@@ -15,6 +16,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace {
+
+// Limit the number of threads for the FileSystemBufferFilterConfig.manager_config.thread_count to
+// 8 to ensure test stays responsive.
+static const uint32_t kMaxAsyncFileManagerThreadCount = 8;
 
 void addFileDescriptorsRecursively(const Protobuf::FileDescriptor& descriptor,
                                    Protobuf::FileDescriptorSet& set,
@@ -76,18 +81,41 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
 void cleanTapConfig(Protobuf::Message* message) {
   envoy::extensions::filters::http::tap::v3::Tap& config =
       dynamic_cast<envoy::extensions::filters::http::tap::v3::Tap&>(*message);
-  // TODO(samflattery): remove once StreamingGrpcSink is implemented
-  // a static config filter is required to have one sink, but since validation isn't performed on
-  // the filter until after this function runs, we have to manually check that there are sinks
-  // before checking that they are not StreamingGrpc
   if (config.common_config().config_type_case() ==
-          envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
-              kStaticConfig &&
-      !config.common_config().static_config().output_config().sinks().empty() &&
-      config.common_config().static_config().output_config().sinks(0).output_sink_type_case() ==
-          envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
-    // will be caught in UberFilterFuzzer::fuzz
-    throw EnvoyException("received input with not implemented output_sink_type StreamingGrpcSink");
+      envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kStaticConfig) {
+    auto const& output_config = config.common_config().static_config().output_config();
+    // TODO(samflattery): remove once StreamingGrpcSink is implemented
+    // a static config filter is required to have one sink, but since validation isn't performed on
+    // the filter until after this function runs, we have to manually check that there are sinks
+    // before checking that they are not StreamingGrpc
+    if (!output_config.sinks().empty() &&
+        output_config.sinks(0).output_sink_type_case() ==
+            envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
+      // will be caught in UberFilterFuzzer::fuzz
+      throw EnvoyException(
+          "received input with not implemented output_sink_type StreamingGrpcSink");
+    } else if (!output_config.sinks().empty() &&
+               (output_config.sinks(0).output_sink_type_case() ==
+                    envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kBufferedAdmin ||
+                output_config.sinks(0).output_sink_type_case() ==
+                    envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingAdmin)) {
+      // will be caught in UberFilterFuzzer::fuzz
+      throw EnvoyException("received input for which factory can not create for output_sink_type "
+                           "BufferAdmin or StreamingAdmin");
+    }
+  }
+}
+
+void cleanFileSystemBufferConfig(Protobuf::Message* message) {
+  envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig& config =
+      dynamic_cast<
+          envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig&>(
+          *message);
+  if (config.manager_config().thread_pool().thread_count() > kMaxAsyncFileManagerThreadCount) {
+    throw EnvoyException(fmt::format(
+        "received input exceeding the allowed number of threads ({} > {}) for "
+        "FileSystemBufferFilter.AsyncFileManager",
+        config.manager_config().thread_pool().thread_count(), kMaxAsyncFileManagerThreadCount));
   }
 }
 
@@ -100,6 +128,9 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   } else if (filter_name == "envoy.filters.http.tap") {
     // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);
+  } else if (filter_name == "envoy.filters.http.file_system_buffer") {
+    // Limit the number of threads to create to kMaxAsyncFileManagerThreadCount
+    cleanFileSystemBufferConfig(message);
   }
 }
 

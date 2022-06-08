@@ -29,6 +29,7 @@ build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
 build --action_env=PATH --host_action_env=PATH
 
 build --enable_platform_specific_config
+build --test_summary=terse
 
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation

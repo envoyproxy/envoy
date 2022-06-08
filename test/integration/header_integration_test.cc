@@ -13,6 +13,7 @@
 
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
@@ -1323,5 +1324,56 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
           {":status", "200"},
           {"connection", "close"},
       });
+}
+
+using EmptyHeaderIntegrationTest = HttpProtocolIntegrationTest;
+using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
+
+INSTANTIATE_TEST_SUITE_P(Protocols, EmptyHeaderIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(EmptyHeaderIntegrationTest, AllProtocolsPassEmptyHeaders) {
+  auto vhost = config_helper_.createVirtualHost("empty-headers.com");
+  *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
+    header:
+      key: "x-ds-add-empty"
+      value: "%PER_REQUEST_STATE(does.not.exist)%"
+    keep_empty_value: true
+  )EOF");
+  *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
+    header:
+      key: "x-ds-no-add-empty"
+      value: "%PER_REQUEST_STATE(does.not.exist)%"
+  )EOF");
+  *vhost.add_response_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
+    header:
+      key: "x-us-add-empty"
+      value: "%PER_REQUEST_STATE(does.not.exist)%"
+    keep_empty_value: true
+  )EOF");
+  *vhost.add_response_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
+    header:
+      key: "x-us-no-add-empty"
+      value: "%PER_REQUEST_STATE(does.not.exist)%"
+  )EOF");
+
+  config_helper_.addVirtualHost(vhost);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "empty-headers.com"}},
+      0,
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"}, {"content-length", "0"}, {":status", "200"}},
+      0);
+  EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString("x-ds-add-empty")).size(), 1);
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-ds-no-add-empty")).empty());
+  EXPECT_EQ(response->headers().get(Http::LowerCaseString("x-us-add-empty")).size(), 1);
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-us-no-add-empty")).empty());
 }
 } // namespace Envoy
