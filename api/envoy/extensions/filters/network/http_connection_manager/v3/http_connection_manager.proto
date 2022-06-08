@@ -792,7 +792,7 @@ message HttpConnectionManager {
   // #. Syntax of HTTP/1 request target URI and response status
   // #. HTTP/2 header map validity according to `RFC 7540 section 8.1.2<https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2`_
   // #. Syntax of HTTP/2 pseudo headers
-  // #. HTTP/3 header map validity according to `draft standard <https://datatracker.ietf.org/doc/html/draft-ietf-quic-http-34>`_
+  // #. HTTP/3 header map validity according to `RFC 9114 section 4.3 <https://www.rfc-editor.org/rfc/rfc9114.html>`_
   // #. Syntax of HTTP/3 pseudo headers
   // #. Syntax of ``Content-Length`` and ``Transfer-Encoding``
   // #. Validation of HTTP/1 requests with both ``Content-Length`` and ``Transfer-Encoding`` headers

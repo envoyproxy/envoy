@@ -268,12 +268,7 @@ TEST_P(CompressorProxyingConnectIntegrationTest, ProxyConnect) {
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
-  } else {
-    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
-              "bytestream");
-  }
+  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
 
   // Send response headers
   upstream_request_->encodeHeaders(default_response_headers_, false);
