@@ -69,8 +69,8 @@ py_binary(
     deps = [
         ":contrib_extensions_db",
         ":extensions_db",
-        ":manifest_db",
         ":jinja",
+        ":manifest_db",
         "//tools/api_proto_plugin",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
