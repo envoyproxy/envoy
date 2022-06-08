@@ -219,7 +219,7 @@ TEST_P(AdsIntegrationTest, ClusterSharingSecretWarming) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
-// Make sure two two clusters with different secrets send only a single SDS request.
+// Make sure two clusters with different secrets send only a single SDS request.
 // This is a regression test of #21518.
 TEST_P(AdsIntegrationTest, SecretsPausedDuringCDS) {
   initialize();
@@ -253,10 +253,18 @@ TEST_P(AdsIntegrationTest, SecretsPausedDuringCDS) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, clusters, clusters, {},
                                                              "1");
 
-  // Expect a single request containing the 2 SDS resources.
-  EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "",
-                                      {"validation_context_0", "validation_context_1"},
-                                      {"validation_context_0", "validation_context_1"}, {}));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.combine_sds_requests")) {
+    // Expect a single request containing the 2 SDS resources.
+    EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "",
+                                        {"validation_context_0", "validation_context_1"},
+                                        {"validation_context_0", "validation_context_1"}, {}));
+  } else {
+    // Expect two different SDS requests.
+    EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "", {"validation_context_0"},
+                                        {"validation_context_0"}, {}));
+    EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "", {"validation_context_1"},
+                                        {"validation_context_1"}, {}));
+  }
   test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 2);
 
   std::vector<envoy::extensions::transport_sockets::tls::v3::Secret> validation_contexts;

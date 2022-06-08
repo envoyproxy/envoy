@@ -198,13 +198,15 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // avoid double pause ClusterLoadAssignment.
       Config::ScopedResume maybe_resume_eds_leds_sds;
       if (cm_.adsMux()) {
-        const auto eds_type_url =
-            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-        const auto sds_type_url =
-            Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>();
-        maybe_resume_eds_leds_sds =
-            cm_.adsMux()->pause({eds_type_url, leds_type_url, sds_type_url});
+
+        std::vector<std::string> paused_xds_types{
+            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>()};
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.combine_sds_requests")) {
+          paused_xds_types.push_back(
+              Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
+        }
+        maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
       }
       initializeSecondaryClusters();
     }

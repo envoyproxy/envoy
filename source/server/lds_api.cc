@@ -44,10 +44,13 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
                                 const std::string& system_version_info) {
   Config::ScopedResume maybe_resume_rds_sds;
   if (cm_.adsMux()) {
-    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
-    const auto sds_type_url =
-        Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>();
-    maybe_resume_rds_sds = cm_.adsMux()->pause({type_url, sds_type_url});
+    std::vector<std::string> paused_xds_types{
+        Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>()};
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.combine_sds_requests")) {
+      paused_xds_types.push_back(
+          Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
+    }
+    maybe_resume_rds_sds = cm_.adsMux()->pause(paused_xds_types);
   }
 
   bool any_applied = false;
