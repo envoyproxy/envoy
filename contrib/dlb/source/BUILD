@@ -22,7 +22,7 @@ make(
     name = "dlb",
     defines = select({
         ":linux_x86_64_gcc_build": [],
-         "//conditions:default": [
+        "//conditions:default": [
             "DLB_DISABLED=0",
         ],
     }),
