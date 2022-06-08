@@ -68,6 +68,8 @@ MockUpstreamInfo::MockUpstreamInfo()
   ON_CALL(*this, upstreamProtocol()).WillByDefault(ReturnPointee(&upstream_protocol_));
 }
 
+MockUpstreamInfo::~MockUpstreamInfo() = default;
+
 MockStreamInfo::MockStreamInfo()
     : start_time_(ts_.systemTime()),
       // upstream
@@ -111,7 +113,12 @@ MockStreamInfo::MockStreamInfo()
           Invoke([this]() -> OptRef<const DownstreamTiming> { return downstream_timing_; }));
   ON_CALL(*this, upstreamInfo()).WillByDefault(Invoke([this]() { return upstream_info_; }));
   ON_CALL(testing::Const(*this), upstreamInfo())
-      .WillByDefault(Invoke([this]() -> OptRef<const UpstreamInfo> { return *upstream_info_; }));
+      .WillByDefault(Invoke([this]() -> OptRef<const UpstreamInfo> {
+        if (!upstream_info_) {
+          return {};
+        }
+        return *upstream_info_;
+      }));
   ON_CALL(*this, downstreamAddressProvider())
       .WillByDefault(ReturnPointee(downstream_connection_info_provider_));
   ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));

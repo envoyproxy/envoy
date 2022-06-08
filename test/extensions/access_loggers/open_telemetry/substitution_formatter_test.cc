@@ -711,7 +711,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
   StreamInfo::MockStreamInfo stream_info;
   std::string body;
 
-  auto upstream_filter_state =
+  const StreamInfo::FilterStateSharedPtr upstream_filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
   upstream_filter_state->setData("test_key",
                                  std::make_unique<Router::StringAccessorImpl>("test_value"),
@@ -724,9 +724,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
   std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
       std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(stream_info.upstreamInfo());
   EXPECT_CALL(Const(stream_info), upstreamInfo()).Times(testing::AtLeast(1));
-  ON_CALL(Const(*mock_upstream_info.get()), upstreamFilterState())
-      .WillByDefault(ReturnRef(upstream_filter_state));
-  EXPECT_CALL(Const(*mock_upstream_info.get()), upstreamFilterState()).Times(2);
+  EXPECT_CALL(Const(*mock_upstream_info), upstreamFilterState())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(upstream_filter_state));
 
   OpenTelemetryFormatMap expected = {{"test_key", "\"test_value\""},
                                      {"test_obj", "{\"inner_key\":\"inner_value\"}"}};

@@ -19,7 +19,7 @@ namespace StreamInfo {
 class MockUpstreamInfo : public UpstreamInfo {
 public:
   MockUpstreamInfo();
-  ~MockUpstreamInfo() override{};
+  ~MockUpstreamInfo() override;
 
   MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
   MOCK_METHOD(void, setUpstreamConnectionId, (uint64_t id));
