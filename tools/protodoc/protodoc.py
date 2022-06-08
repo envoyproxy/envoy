@@ -11,10 +11,7 @@ from collections import defaultdict
 from functools import cached_property
 
 from google.protobuf import json_format
-from bazel_tools.tools.python.runfiles import runfiles
 import yaml
-
-from jinja2 import Template
 
 # We have to do some evil things to sys.path due to the way that Python module
 # resolution works; we have both tools/ trees in bazel_tools and envoy. By
@@ -23,13 +20,16 @@ from jinja2 import Template
 # just remove it from the sys.path.
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
-from envoy.base import utils
 from envoy.code.check.checker import BackticksCheck
 
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
 from tools.config_validation import validate_fragment
+from tools.protodoc.protodoc_manifest_untyped import data as protodoc_manifest_untyped
+from tools.protodoc.extensions_db import data as EXTENSION_DB
+from tools.protodoc.contrib_extensions_db import data as CONTRIB_EXTENSION_DB
+from tools.protodoc.jinja import env as jinja_env
 
 from tools.protodoc import manifest_pb2
 from udpa.annotations import security_pb2
@@ -59,51 +59,6 @@ CNCF_PREFIX = '.xds.'
 
 # http://www.fileformat.info/info/unicode/char/2063/index.htm
 UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
-
-# Template for formating extension descriptions.
-EXTENSION_TEMPLATE = Template(
-    """
-.. _extension_{{extension}}:
-
-This extension may be referenced by the qualified name ``{{extension}}``
-{{contrib}}
-.. note::
-  {{status}}
-
-  {{security_posture}}
-
-.. tip::
-  This extension extends and can be used with the following extension {% if categories|length > 1 %}categories{% else %}category{% endif %}:
-
-{% for cat in categories %}
-  - :ref:`{{cat}} <extension_category_{{cat}}>`
-{% endfor %}
-
-""")
-
-# Template for formating an extension category.
-EXTENSION_CATEGORY_TEMPLATE = Template(
-    """
-.. _extension_category_{{category}}:
-
-.. tip::
-{% if extensions %}
-  This extension category has the following known extensions:
-
-{% for ext in extensions %}
-  - :ref:`{{ext}} <extension_{{ext}}>`
-{% endfor %}
-
-{% endif %}
-{% if contrib_extensions %}
-  The following extensions are available in :ref:`contrib <install_contrib>` images only:
-
-{% for ext in contrib_extensions %}
-  - :ref:`{{ext}} <extension_{{ext}}>`
-{% endfor %}
-{% endif %}
-
-""")
 
 # A map from the extension security postures (as defined in the
 # envoy_cc_extension build macro) to human readable text for extension docs.
@@ -140,11 +95,6 @@ WIP_WARNING = (
     '<arch_overview_threat_model>`, are not supported by the security team, and are subject to '
     'breaking changes. Do not use this feature without understanding each of the previous '
     'points.\n\n')
-
-r = runfiles.Create()
-
-EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml"))
-CONTRIB_EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/contrib/extensions_metadata.yaml"))
 
 
 # create an index of extension categories from extension db
@@ -286,12 +236,13 @@ def format_extension(extension):
             "or contrib/extensions_metadata.yaml?\n\n")
         exit(1)  # Raising the error buries the above message in tracebacks.
 
-    return EXTENSION_TEMPLATE.render(
+    extension = jinja_env.get_template("extension.rst.tpl").render(
         extension=extension,
         contrib=contrib,
         status=status,
         security_posture=security_posture,
         categories=categories)
+    return f"\n{extension}\n"
 
 
 def format_extension_category(extension_category):
@@ -307,10 +258,11 @@ def format_extension_category(extension_category):
     contrib_extensions = CONTRIB_EXTENSION_CATEGORIES.get(extension_category, [])
     if not extensions and not contrib_extensions:
         raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
-    return EXTENSION_CATEGORY_TEMPLATE.render(
+    extension_category = jinja_env.get_template("extension_category.rst.tpl").render(
         category=extension_category,
         extensions=sorted(extensions),
         contrib_extensions=sorted(contrib_extensions))
+    return f"\n{extension_category}\n"
 
 
 def format_header_from_file(style, source_code_info, proto_name):
@@ -708,8 +660,6 @@ class RstFormatVisitor(visitor.Visitor):
     def __init__(self):
         # Load as YAML, emit as JSON and then parse as proto to provide type
         # checking.
-        protodoc_manifest_untyped = utils.from_yaml(
-            r.Rlocation('envoy/docs/protodoc_manifest.yaml'))
         self.protodoc_manifest = manifest_pb2.Manifest()
         json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
 

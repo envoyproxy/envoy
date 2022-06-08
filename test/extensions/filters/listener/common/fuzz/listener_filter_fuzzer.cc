@@ -56,16 +56,21 @@ void ListenerFilterWithDataFuzzer::connect(Network::ListenerFilterPtr filter) {
   conn_->connect();
 
   EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        connection_established_ = true;
+        dispatcher_->exit();
+      }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 void ListenerFilterWithDataFuzzer::disconnect() {
-  EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  if (connection_established_) {
+    EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
-  conn_->close(Network::ConnectionCloseType::NoFlush);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+    conn_->close(Network::ConnectionCloseType::NoFlush);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void ListenerFilterWithDataFuzzer::fuzz(

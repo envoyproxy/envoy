@@ -91,7 +91,7 @@ def _config(key):
 sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
-    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig',
+    'envoy.docs.sphinx_runner.ext.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig',
     'sphinx.ext.intersphinx', 'sphinx_tabs.tabs', 'sphinx_copybutton', 'validating_code_block',
     'sphinxext.rediraffe', 'powershell_lexer'
 ]

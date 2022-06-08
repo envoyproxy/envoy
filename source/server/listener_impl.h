@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
@@ -438,7 +439,7 @@ private:
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   std::unique_ptr<Init::Manager> dynamic_init_manager_;
 
-  std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
+  Filter::ListenerFilterFactoriesList listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const envoy::config::listener::v3::Listener config_;
