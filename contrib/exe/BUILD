@@ -7,6 +7,7 @@ load(
 load(
     "//contrib:all_contrib_extensions.bzl",
     "ARM64_SKIP_CONTRIB_TARGETS",
+    "GCC_SKIP_CONTRIB_TARGETS",
     "PPC_SKIP_CONTRIB_TARGETS",
     "envoy_all_contrib_extensions",
 )
