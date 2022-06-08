@@ -22,12 +22,12 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "quiche/quic/core/quic_dispatcher.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::Invoke;
 using testing::Return;

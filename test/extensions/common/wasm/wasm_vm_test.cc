@@ -6,10 +6,10 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "include/proxy-wasm/bytecode_util.h"
 #include "include/proxy-wasm/null_vm_plugin.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using proxy_wasm::Cloneable;    // NOLINT
 using proxy_wasm::WasmCallVoid; // NOLINT

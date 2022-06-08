@@ -11,8 +11,8 @@
 #include "source/common/protobuf/utility.h"
 
 #ifndef IPP_CRYPTO_DISABLED
-#include "contrib/cryptomb/private_key_providers/source/ipp_crypto_impl.h"
 #include "contrib/cryptomb/private_key_providers/source/cryptomb_private_key_provider.h"
+#include "contrib/cryptomb/private_key_providers/source/ipp_crypto_impl.h"
 #endif
 
 #include "contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha/cryptomb.pb.h"

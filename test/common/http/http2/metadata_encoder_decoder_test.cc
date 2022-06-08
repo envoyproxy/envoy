@@ -8,10 +8,10 @@
 
 #include "test/test_common/logging.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "http2_frame.h"
 #include "nghttp2/nghttp2.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 // A global variable in nghttp2 to disable preface and initial settings for tests.
 // TODO(soya3129): Remove after issue https://github.com/nghttp2/nghttp2/issues/1246 is fixed.

@@ -9,10 +9,10 @@
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
 #include "quiche/quic/test_tools/test_certificates.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::Return;

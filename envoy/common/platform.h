@@ -16,9 +16,9 @@
 #include <winsock2.h>
 
 // These must follow afterwards
+#include <mstcpip.h>
 #include <mswsock.h>
 #include <ws2tcpip.h>
-#include <mstcpip.h>
 
 // This is introduced in Windows SDK 10.0.17063.0 which is required
 // to build Envoy on Windows (we will reevaluate whether earlier builds

@@ -13,9 +13,9 @@
 #include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
-#include "gtest/gtest.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

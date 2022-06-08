@@ -4,8 +4,8 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
 #include "xds_test_utility.h"
+#include "gtest/gtest.h"
 
 using ::testing::Pair;
 

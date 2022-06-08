@@ -8,10 +8,10 @@
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "opencensus/trace/sampler.h"
 #include "opencensus/trace/trace_config.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

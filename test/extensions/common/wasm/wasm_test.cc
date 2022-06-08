@@ -15,12 +15,12 @@
 #include "test/test_common/wasm_base.h"
 
 #include "absl/types/optional.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
 #include "zlib.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using Envoy::Server::ServerLifecycleNotifier;
 using StageCallbackWithCompletion =

@@ -7,9 +7,9 @@
 #include "test/mocks/tcp/mocks.h"
 
 #include "cluster_priority_set.h"
+#include "load_balancer.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "load_balancer.h"
 
 using ::testing::NiceMock;
 

@@ -17,12 +17,12 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;

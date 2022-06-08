@@ -4,8 +4,8 @@
 #include "envoy/server/options.h"
 
 #include "absl/strings/string_view.h"
-#include "gmock/gmock.h"
 #include "spdlog/spdlog.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Server {

@@ -3,8 +3,8 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
 #include "hessian2/object.hpp"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

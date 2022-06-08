@@ -5,9 +5,9 @@
 #include "envoy/stats/scope.h"
 
 #ifndef WIN32
+#include "contrib/kafka/filters/network/source/mesh/filter.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
-#include "contrib/kafka/filters/network/source/mesh/filter.h"
 #else
 #include "envoy/common/exception.h"
 #endif

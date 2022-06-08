@@ -914,8 +914,8 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenFailsAgain) {
 } // namespace Http
 } // namespace Envoy
 
-#include "test/mocks/server/transport_socket_factory_context.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 namespace Envoy {
 namespace Http {
 namespace {

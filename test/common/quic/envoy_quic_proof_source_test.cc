@@ -10,10 +10,10 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
 #include "quiche/quic/test_tools/test_certificates.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::Invoke;
 using testing::Return;

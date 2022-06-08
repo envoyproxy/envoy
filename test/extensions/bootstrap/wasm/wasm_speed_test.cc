@@ -15,9 +15,9 @@
 
 #include "absl/types/optional.h"
 #include "benchmark/benchmark.h"
+#include "tools/cpp/runfiles/runfiles.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "tools/cpp/runfiles/runfiles.h"
 
 using bazel::tools::cpp::runfiles::Runfiles;
 

@@ -12,9 +12,9 @@
 
 #include "contrib/cryptomb/private_key_providers/source/cryptomb_private_key_provider.h"
 #include "fake_factory.h"
-#include "gtest/gtest.h"
 #include "openssl/evp.h"
 #include "openssl/rsa.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

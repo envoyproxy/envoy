@@ -14,8 +14,6 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "opencensus/trace/exporter/span_data.h"
 #include "opencensus/trace/exporter/span_exporter.h"
 #include "opencensus/trace/propagation/b3.h"
@@ -24,6 +22,8 @@
 #include "opencensus/trace/propagation/trace_context.h"
 #include "opencensus/trace/span.h"
 #include "opencensus/trace/span_id.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 

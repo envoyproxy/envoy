@@ -2,8 +2,8 @@
 
 #include "envoy/server/lifecycle_notifier.h"
 
-#include "gmock/gmock.h"
 #include "spdlog/spdlog.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Server {

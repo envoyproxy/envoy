@@ -2,9 +2,9 @@
 
 #include "envoy/server/configuration.h"
 
-#include "gmock/gmock.h"
 #include "instance.h"
 #include "tracer_factory.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Server {

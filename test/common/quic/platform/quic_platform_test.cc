@@ -23,8 +23,6 @@
 #include "test/test_common/utility.h"
 
 #include "fmt/printf.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_mem_slice.h"
 #include "quiche/common/platform/api/quiche_stream_buffer_allocator.h"
 #include "quiche/common/platform/api/quiche_system_event_loop.h"
@@ -45,6 +43,8 @@
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche_platform_impl/quiche_flags_impl.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 // Basic tests to validate functioning of the QUICHE quic platform
 // implementation. For platform APIs in which the implementation is a simple

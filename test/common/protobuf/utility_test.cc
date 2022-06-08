@@ -39,10 +39,10 @@
 #include "test/test_common/utility.h"
 
 #include "absl/container/node_hash_set.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using namespace std::chrono_literals;
 

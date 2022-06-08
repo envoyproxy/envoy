@@ -9,11 +9,11 @@
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/mocks/network/connection.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/ssl.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

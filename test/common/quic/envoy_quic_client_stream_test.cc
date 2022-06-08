@@ -10,9 +10,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "quiche/quic/core/crypto/null_encrypter.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "quiche/quic/core/crypto/null_encrypter.h"
 
 namespace Envoy {
 namespace Quic {

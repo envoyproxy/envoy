@@ -14,9 +14,9 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/utility.h"
 
+#include "opentelemetry/proto/common/v1/common.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "opentelemetry/proto/common/v1/common.pb.h"
 
 using ::opentelemetry::proto::common::v1::KeyValueList;
 using OpenTelemetryFormatMap = std::list<std::pair<std::string, std::string>>;

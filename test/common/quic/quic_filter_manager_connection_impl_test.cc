@@ -3,10 +3,10 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "quiche/quic/core/quic_connection.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Quic {

@@ -17,10 +17,10 @@
 #include "test/mocks/http/mocks.h"
 
 #include "fake_upstream.h"
-#include "gtest/gtest.h"
 #include "http_integration.h"
 #include "integration_stream_decoder.h"
 #include "socket_interface_swap.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {

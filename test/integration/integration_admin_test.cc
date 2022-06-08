@@ -19,8 +19,8 @@
 #include "test/integration/utility.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
 using testing::Eq;
 using testing::HasSubstr;

@@ -16,9 +16,9 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "spdlog/spdlog.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "spdlog/spdlog.h"
 
 using testing::NiceMock;
 

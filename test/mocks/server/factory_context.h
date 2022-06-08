@@ -7,11 +7,11 @@
 
 #include "admin.h"
 #include "drain_manager.h"
-#include "gmock/gmock.h"
 #include "instance.h"
 #include "overload_manager.h"
 #include "server_lifecycle_notifier.h"
 #include "transport_socket_factory_context.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Server {

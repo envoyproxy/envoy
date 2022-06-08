@@ -30,8 +30,8 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
 #include "openssl/x509v3.h"
+#include "gtest/gtest.h"
 
 using Envoy::Protobuf::util::MessageDifferencer;
 using testing::EndsWith;

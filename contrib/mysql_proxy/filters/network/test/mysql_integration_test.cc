@@ -9,9 +9,9 @@
 #include "contrib/mysql_proxy/filters/network/source/mysql_codec_clogin_resp.h"
 #include "contrib/mysql_proxy/filters/network/source/mysql_codec_greeting.h"
 #include "contrib/mysql_proxy/filters/network/source/mysql_codec_switch_resp.h"
+#include "mysql_test_utils.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "mysql_test_utils.h"
 
 namespace Envoy {
 namespace Extensions {

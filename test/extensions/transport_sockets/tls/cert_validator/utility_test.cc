@@ -1,9 +1,9 @@
 #include "source/common/common/c_smart_ptr.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/utility.h"
 
-#include "gtest/gtest.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

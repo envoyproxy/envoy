@@ -3,9 +3,9 @@
 
 #include "test/mocks/network/io_handle.h"
 
+#include "openssl/ssl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "openssl/ssl.h"
 
 using testing::_;
 using testing::NiceMock;

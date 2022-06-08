@@ -16,8 +16,8 @@
 #include "source/common/network/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/codec_impl.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
+#include "source/common/quic/codec_impl.h"
 #endif
 
 #include "source/server/connection_handler_impl.h"

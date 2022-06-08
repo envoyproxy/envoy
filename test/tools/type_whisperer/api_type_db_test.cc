@@ -1,5 +1,5 @@
-#include "gtest/gtest.h"
 #include "tools/type_whisperer/api_type_db.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Tools {

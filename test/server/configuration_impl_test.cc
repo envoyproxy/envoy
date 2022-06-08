@@ -24,9 +24,9 @@
 #include "test/test_common/utility.h"
 
 #include "fmt/printf.h"
+#include "xds/type/v3/typed_struct.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "xds/type/v3/typed_struct.pb.h"
 
 using testing::NiceMock;
 using testing::Return;

@@ -1,5 +1,5 @@
-#include "source/common/common/assert.h"
 #include "source/common/common/thread_impl.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/str_cat.h"
 

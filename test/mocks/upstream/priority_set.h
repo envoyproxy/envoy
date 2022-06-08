@@ -3,9 +3,9 @@
 #include "envoy/common/callback.h"
 #include "envoy/upstream/upstream.h"
 
+#include "host_set.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "host_set.h"
 
 namespace Envoy {
 namespace Upstream {

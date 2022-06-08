@@ -36,8 +36,8 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
-#include "gtest/gtest.h"
 #include "openssl/crypto.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Assign;

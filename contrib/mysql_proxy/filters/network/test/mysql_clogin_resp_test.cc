@@ -2,8 +2,8 @@
 
 #include "contrib/mysql_proxy/filters/network/source/mysql_codec.h"
 #include "contrib/mysql_proxy/filters/network/source/mysql_codec_clogin_resp.h"
-#include "gtest/gtest.h"
 #include "mysql_test_utils.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

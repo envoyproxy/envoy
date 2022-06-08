@@ -15,11 +15,11 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/ssl.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

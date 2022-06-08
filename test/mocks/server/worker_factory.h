@@ -2,8 +2,8 @@
 
 #include "envoy/server/worker.h"
 
-#include "gmock/gmock.h"
 #include "worker.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Server {

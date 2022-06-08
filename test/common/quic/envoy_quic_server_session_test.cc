@@ -24,8 +24,6 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/core/quic_utils.h"
@@ -34,6 +32,8 @@
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;

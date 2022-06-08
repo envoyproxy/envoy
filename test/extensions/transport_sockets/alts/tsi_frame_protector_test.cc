@@ -1,9 +1,9 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/transport_sockets/alts/tsi_frame_protector.h"
 
+#include "src/core/tsi/fake_transport_security.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "src/core/tsi/fake_transport_security.h"
 
 namespace Envoy {
 namespace Extensions {

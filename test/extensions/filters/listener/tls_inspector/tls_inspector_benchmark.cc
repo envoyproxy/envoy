@@ -14,8 +14,8 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "benchmark/benchmark.h"
-#include "gtest/gtest.h"
 #include "openssl/ssl.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "cluster.h"
+#include "priority_set.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "priority_set.h"
 
 namespace Envoy {
 namespace Upstream {

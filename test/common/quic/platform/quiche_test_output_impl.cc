@@ -11,9 +11,9 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "fmt/printf.h"
-#include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_logging.h"
 #include "quiche_platform_impl/quiche_test_output_impl.h"
+#include "gtest/gtest.h"
 
 namespace quiche {
 namespace {

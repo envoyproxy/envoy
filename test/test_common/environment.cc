@@ -30,8 +30,8 @@
 #include "absl/debugging/symbolize.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "gtest/gtest.h"
 
 using bazel::tools::cpp::runfiles::Runfiles;
 using Envoy::Filesystem::Directory;

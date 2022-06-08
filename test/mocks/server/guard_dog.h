@@ -2,8 +2,8 @@
 
 #include "envoy/server/guarddog.h"
 
-#include "gmock/gmock.h"
 #include "watch_dog.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Server {

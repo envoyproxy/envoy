@@ -1,7 +1,7 @@
 #pragma once
 
-#include "gmock/gmock.h"
 #include "librdkafka/rdkafkacpp.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Extensions {

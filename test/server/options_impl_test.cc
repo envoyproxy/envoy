@@ -18,8 +18,8 @@
 #include "source/server/options_impl.h"
 
 #if defined(__linux__)
-#include <sched.h>
 #include "source/server/options_impl_platform_linux.h"
+#include <sched.h>
 #endif
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
@@ -28,9 +28,9 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "spdlog/spdlog.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace {

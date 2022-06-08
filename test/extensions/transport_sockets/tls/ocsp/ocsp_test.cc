@@ -8,9 +8,9 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "openssl/x509v3.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Extensions {

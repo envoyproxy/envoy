@@ -5,9 +5,9 @@
 #include "contrib/mysql_proxy/filters/network/source/mysql_codec.h"
 #include "contrib/mysql_proxy/filters/network/source/mysql_filter.h"
 #include "contrib/mysql_proxy/filters/network/source/mysql_utils.h"
+#include "mysql_test_utils.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "mysql_test_utils.h"
 
 using testing::NiceMock;
 
