@@ -76,11 +76,9 @@ non-VPN connections are eventually replaced by new connections which, when
 created, utilize any active VPN.
 
 Interestingly, since Envoy Mobile typically utilizes 3 clusters (``base``,
-``base_wlan``, and ``base_wwan``, depending on preferred network), it's
+``base_h2``, and ``stats``), it's
 possible that all clusters have not established connections when the VPN
-becomes enabled. If this is the case and the user switches between WiFi and
-cellular at the same time the VPN becomes enabled, this could prompt a faster
-connection to Envoy Mobile by initializing a new cluster and its connections.
+becomes enabled.
 
 In the experiments we ran, it was merely a matter of a second or two before
 all new requests typically went through the VPN once enabled.
