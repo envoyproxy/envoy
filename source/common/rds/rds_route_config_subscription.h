@@ -43,13 +43,14 @@ struct RdsStats {
 class RdsRouteConfigSubscription : Envoy::Config::SubscriptionCallbacks,
                                    protected Logger::Loggable<Logger::Id::rds> {
 public:
-  RdsRouteConfigSubscription(
-      RouteConfigUpdatePtr&& config_update,
-      std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>&& resource_decoder,
-      const envoy::config::core::v3::ConfigSource& config_source,
-      const std::string& route_config_name, const uint64_t manager_identifier,
-      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-      const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager);
+  RdsRouteConfigSubscription(RouteConfigUpdatePtr&& config_update,
+                             Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
+                             const envoy::config::core::v3::ConfigSource& config_source,
+                             const std::string& route_config_name,
+                             const uint64_t manager_identifier,
+                             Server::Configuration::ServerFactoryContext& factory_context,
+                             const std::string& stat_prefix, const std::string& rds_type,
+                             RouteConfigProviderManager& route_config_provider_manager);
 
   ~RdsRouteConfigSubscription() override;
 
@@ -99,7 +100,7 @@ protected:
   const uint64_t manager_identifier_;
   absl::optional<RouteConfigProvider*> route_config_provider_opt_;
   RouteConfigUpdatePtr config_update_info_;
-  std::unique_ptr<Envoy::Config::OpaqueResourceDecoder> resource_decoder_;
+  Envoy::Config::OpaqueResourceDecoderSharedPtr resource_decoder_;
 };
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;

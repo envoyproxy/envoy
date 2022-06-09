@@ -26,7 +26,10 @@ namespace {
 
 class SotwSubscriptionStateTest : public testing::Test {
 protected:
-  SotwSubscriptionStateTest() : resource_decoder_("cluster_name") {
+  SotwSubscriptionStateTest()
+      : resource_decoder_(
+            std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+                envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")) {
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
     state_ = std::make_unique<XdsMux::SotwSubscriptionState>(
         Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(), callbacks_,
@@ -104,8 +107,7 @@ protected:
   }
 
   NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_;
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* ttl_timer_;
   // We start out interested in three resources: name1, name2, and name3.
