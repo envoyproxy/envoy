@@ -54,9 +54,11 @@ public:
 class MockGrpcAccessLoggerCache : public GrpcAccessLoggerCache {
 public:
   // GrpcAccessLoggerCache
-  MOCK_METHOD(GrpcAccessLoggerSharedPtr, getOrCreateLogger,
-              (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type));
+  MOCK_METHOD(
+      GrpcAccessLoggerSharedPtr, getOrCreateLogger,
+      (const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+           config,
+       Common::GrpcAccessLoggerType logger_type));
 };
 
 class AccessLogTest : public testing::Test {
@@ -69,14 +71,13 @@ public:
     config_.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
     EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
-        .WillOnce(
-            [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
-                       config,
-                   Common::GrpcAccessLoggerType logger_type) {
-              EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
-              EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
-              return logger_;
-            });
+        .WillOnce([this](const envoy::extensions::access_loggers::open_telemetry::v3::
+                             OpenTelemetryAccessLogConfig& config,
+                         Common::GrpcAccessLoggerType logger_type) {
+          EXPECT_EQ(config.DebugString(), config_.DebugString());
+          EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
+          return logger_;
+        });
     return std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_);
   }
 

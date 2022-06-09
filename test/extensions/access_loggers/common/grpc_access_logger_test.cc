@@ -346,8 +346,9 @@ private:
   // Common::GrpcAccessLoggerCache
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               const Grpc::RawAsyncClientSharedPtr& client,
                Event::Dispatcher& dispatcher) override {
+    auto client = async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
+                      ->createUncachedRawAsyncClient();
     return std::make_shared<MockGrpcAccessLoggerImpl>(std::move(client), config, dispatcher, scope_,
                                                       "mock_access_log_prefix.",
                                                       mockMethodDescriptor());
