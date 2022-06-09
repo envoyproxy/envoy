@@ -35,7 +35,7 @@ def direct_output_descriptor(output_suffix, visitor, want_params=False):
 
 
 # TODO(phlax): make this into a class
-def plugin(output_descriptors, traverser=None):
+def plugin(output_descriptors, traverser=None, incoming=None):
     """Protoc plugin entry point.
 
     This defines protoc plugin and manages the stdin -> stdout flow. An
@@ -51,8 +51,11 @@ def plugin(output_descriptors, traverser=None):
 
     traverser = traverser or traverse.traverse_file
 
-    request = plugin_pb2.CodeGeneratorRequest()
-    request.ParseFromString(sys.stdin.buffer.read())
+    if incoming is None:
+        request = plugin_pb2.CodeGeneratorRequest()
+        request.ParseFromString(sys.stdin.buffer.read())
+    else:
+        request = incoming
     response = plugin_pb2.CodeGeneratorResponse()
     cprofile_enabled = os.getenv('CPROFILE_ENABLED')
 
@@ -90,4 +93,6 @@ def plugin(output_descriptors, traverser=None):
         descriptor_file = response.file.add()
         descriptor_file.name = file_proto.name + ".descriptor.proto"
         descriptor_file.content = str(file_proto)
+    if incoming is not None:
+        return response
     sys.stdout.buffer.write(response.SerializeToString())
