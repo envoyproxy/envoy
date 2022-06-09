@@ -59,8 +59,8 @@ public:
   std::string name() const override { return "envoy.extensions.regex_engine.google_re2"; };
 
 private:
-  uint32_t max_program_size_{};
-  uint32_t warn_program_size_{};
+  uint32_t max_program_size_{100};
+  uint32_t warn_program_size_{UINT32_MAX};
 };
 
 DECLARE_FACTORY(GoogleReEngine);
