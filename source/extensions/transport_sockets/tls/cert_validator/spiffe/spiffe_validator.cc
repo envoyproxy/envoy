@@ -298,7 +298,7 @@ public:
     return std::make_unique<SPIFFEValidator>(config, stats, time_source);
   }
 
-  absl::string_view name() override { return "envoy.tls.cert_validator.spiffe"; }
+  std::string name() const override { return "envoy.tls.cert_validator.spiffe"; }
 };
 
 REGISTER_FACTORY(SPIFFEValidatorFactory, CertValidatorFactory);

@@ -502,6 +502,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   }
 
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    auto registered_types = ext.second->registeredTypes();
     for (const auto& name : ext.second->allRegisteredNames()) {
       auto* extension = bootstrap_.mutable_node()->add_extensions();
       extension->set_name(std::string(name));
@@ -511,6 +512,13 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
         *extension->mutable_version() = version.value();
       }
       extension->set_disabled(ext.second->isFactoryDisabled(name));
+      auto it = registered_types.find(name);
+      if (it != registered_types.end()) {
+        std::sort(it->second.begin(), it->second.end());
+        for (const auto& type_url : it->second) {
+          extension->add_type_urls(type_url);
+        }
+      }
     }
   }
 
