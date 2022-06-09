@@ -111,9 +111,6 @@ public:
   MethodType methodType() { return method_type_; }
   void setMethodType(MethodType data) { method_type_ = data; }
 
-  MethodType respMethodType() { return resp_method_type_; }
-  void setRespMethodType(MethodType data) { resp_method_type_ = data; }
-
   absl::optional<absl::string_view> ep() { return ep_; }
   void setEP(absl::string_view data) { ep_ = data; }
 
@@ -181,7 +178,6 @@ public:
 private:
   MsgType msg_type_;
   MethodType method_type_;
-  MethodType resp_method_type_;
   std::vector<std::vector<SipHeader>> headers_{HeaderType::HeaderMaxNum};
 
   std::vector<Operation> operation_list_;
