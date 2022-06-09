@@ -484,7 +484,7 @@ public:
     return std::make_unique<DefaultCertValidator>(config, stats, time_source);
   }
 
-  absl::string_view name() override { return "envoy.tls.cert_validator.default"; }
+  std::string name() const override { return "envoy.tls.cert_validator.default"; }
 };
 
 REGISTER_FACTORY(DefaultCertValidatorFactory, CertValidatorFactory);
