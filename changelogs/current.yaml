@@ -23,12 +23,20 @@ minor_behavior_changes:
     any frame is received the assumption is that the connection is working. This behavior change
     can be reverted by setting the ``envoy.reloadable_features.http2_delay_keepalive_timeout`` runtime
     flag to false.
+- area: http
+  change: |
+    changing the behavior for CONNECT and upgrade requests over HTTP/1.1 to not delay close. This behavioral change
+    can be reverted by setting ``envoy.reloadable_features.no_delay_close_for_upgrades`` to false.
 - area: http-cache
   change: |
     http cache filter ``getCache`` interface changed from returning a reference to
     returning a shared_ptr - any third-party implementations of this interface will need to be
     updated accordingly. See changes to ``simple_http_cache.cc`` and ``simple_http_cache.h`` in
     `PR21114 <https://github.com/envoyproxy/envoy/pull/21114>`_ for example.
+- area: lua
+  change: |
+    new function ``timestampString`` returning the time since epoch as a string. Supported
+    resolutions are millisecond and microsecond.
 - area: lua
   change: |
     export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
@@ -68,6 +76,11 @@ minor_behavior_changes:
     ``envoy.reloadable_features.lua_respond_with_send_local_reply`` to false.
 
 bug_fixes:
+- area: http
+  change: |
+    Fixed HTTP/2 CONNECT to be RFC compliant, rather than following the abandoned extended connect draft.
+    This behavioral change can be reverted by setting runtime guard ``envoy.reloadable_features.use_rfc_connect`` to false.
+
 - area: runtime
   change: |
     Fixed a bug where was ``envoy.restart_features.no_runtime_singleton`` was inverted.

@@ -93,9 +93,9 @@ public:
 
   ::testing::AssertionResult assertOnDemandCounters(uint64_t success, uint64_t missing,
                                                     uint64_t timeout) {
-    auto success_counter = test_server_->counter("tcp.tcp_stats.on_demand_cluster_success");
-    auto missing_counter = test_server_->counter("tcp.tcp_stats.on_demand_cluster_missing");
-    auto timeout_counter = test_server_->counter("tcp.tcp_stats.on_demand_cluster_timeout");
+    auto success_counter = test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_success");
+    auto missing_counter = test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_missing");
+    auto timeout_counter = test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_timeout");
     if (success_counter && success_counter->value() == success && missing_counter &&
         missing_counter->value() == missing && timeout_counter &&
         timeout_counter->value() == timeout) {
@@ -139,7 +139,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, SingleTcpClient) {
   result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
   RELEASE_ASSERT(result, result.message());
   odcds_stream_->startGrpcStream();
-  test_server_->waitForCounterEq("tcp.tcp_stats.on_demand_cluster_attempt", 1);
+  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 1);
   // Verify the on-demand CDS request and respond with the prepared `new_cluster`.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_));
@@ -191,7 +191,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, RepeatedRequest) {
       Config::TypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
 
-  test_server_->waitForCounterEq("tcp.tcp_stats.on_demand_cluster_attempt",
+  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt",
                                  expected_upstream_connections);
 
   // This upstream is listening on the endpoint of `new_cluster`.
@@ -218,12 +218,13 @@ TEST_P(TcpProxyOdcdsIntegrationTest, RepeatedRequest) {
     tcp_client->close();
   }
 
-  auto success_value = test_server_->counter("tcp.tcp_stats.on_demand_cluster_success")->value();
+  auto success_value =
+      test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_success")->value();
   // The cluster look up occurs at least once and at most `expected_upstream_connections` times.
   EXPECT_GE(expected_upstream_connections, success_value);
   EXPECT_LE(1, success_value);
-  EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_missing")->value());
-  EXPECT_EQ(0, test_server_->counter("tcp.tcp_stats.on_demand_cluster_timeout")->value());
+  EXPECT_EQ(0, test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_missing")->value());
+  EXPECT_EQ(0, test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_timeout")->value());
 }
 
 TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownConnectionOnTimeout) {
@@ -243,7 +244,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownConnectionOnTimeout) {
   // Verify the on-demand CDS request and respond without providing the cluster.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_));
-  EXPECT_EQ(1, test_server_->counter("tcp.tcp_stats.on_demand_cluster_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_attempt")->value());
 
   tcp_client->waitForHalfClose();
   tcp_client->close();
@@ -270,7 +271,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownConnectionOnClusterMissing) {
       Config::TypeUrl::get().Cluster, {}, {"new_cluster"}, "1", odcds_stream_);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}, odcds_stream_));
 
-  EXPECT_EQ(1, test_server_->counter("tcp.tcp_stats.on_demand_cluster_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_attempt")->value());
 
   tcp_client->waitForHalfClose();
   tcp_client->close();
@@ -295,11 +296,11 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownAllConnectionsOnClusterLookupTimeou
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_));
 
-  EXPECT_EQ(1, test_server_->counter("tcp.tcp_stats.on_demand_cluster_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_attempt")->value());
 
   // TODO: assert there is no more on-demand cds request since the first cluster is in flight.
   IntegrationTcpClientPtr tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
-  test_server_->waitForCounterEq("tcp.tcp_stats.on_demand_cluster_attempt", 2);
+  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt", 2);
 
   tcp_client_1->waitForHalfClose();
   tcp_client_2->waitForHalfClose();
@@ -325,7 +326,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownTcpClientBeforeOdcdsResponse) {
   // Verify the on-demand CDS request and stall the response before tcp client close.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_));
-  EXPECT_EQ(1, test_server_->counter("tcp.tcp_stats.on_demand_cluster_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_attempt")->value());
   // Client disconnect when the tcp proxy is waiting for the on demand response.
   tcp_client->close();
   assertOnDemandCounters(0, 0, 0);

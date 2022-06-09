@@ -125,11 +125,7 @@ genrule(
 
 pkg_files(
     name = "sphinx_base",
-    srcs = glob(
-        [
-            "_ext/*",
-        ],
-    ) + [
+    srcs = [
         ":conf.py",
         ":redirects.txt",
         ":versions.yaml",
@@ -214,13 +210,14 @@ genrule(
     name = "html",
     outs = ["html.tar"],
     cmd = """
-    $(location //tools/docs:sphinx_runner) \\
-         --build_sha="$${BUILD_SHA:-}" \\
-         --docs_tag="$${DOCS_TAG:-}" \\
-         --version_file=$(location //:VERSION.txt) \\
-         --validator_path=$(location //tools/config_validation:validate_fragment) \\
-         --descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text) \\
-         $(location rst) \\
+    $(location //tools/docs:sphinx_runner) \
+         $${SPHINX_RUNNER_ARGS:-} \
+         --build_sha="$${BUILD_SHA:-}" \
+         --docs_tag="$${DOCS_TAG:-}" \
+         --version_file=$(location //:VERSION.txt) \
+         --validator_path=$(location //tools/config_validation:validate_fragment) \
+         --descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text) \
+         $(location rst) \
          $@
     """,
     exec_tools = [
