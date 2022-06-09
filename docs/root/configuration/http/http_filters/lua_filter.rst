@@ -519,6 +519,18 @@ High resolution timestamp function. *format* is an optional enum parameter to in
 *EnvoyTimestampResolution.MILLISECOND* is supported
 The function returns timestamp in milliseconds since epoch by default if format is not set.
 
+timestampString()
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  timestamp = handle:timestampString(resolution)
+
+Timestamp function. Timestamp is returned as a string. It represents the integer value of the selected resolution
+since epoch. *resolution* is an optional enum parameter to indicate the resolution of the timestamp.
+Supported resolutions are *EnvoyTimestampResolution.MILLISECOND* and *EnvoyTimestampResolution.MICROSECOND*.
+Default resolution is millisecond if *resolution* is not set.
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API

@@ -191,6 +191,31 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "upstream_socket_proto",
+    srcs = [":upstream_socket.proto"],
+    deps = [
+        "@envoy_api//envoy/config/core/v3:pkg",
+    ],
+)
+
+envoy_cc_test(
+    name = "upstream_filter_state_integration_test",
+    srcs = [
+        "upstream_filter_state_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        ":upstream_socket_proto_cc_proto",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/transport_sockets/common:passthrough_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "cluster_filter_integration_test",
     srcs = ["cluster_filter_integration_test.cc"],
@@ -1383,7 +1408,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 3,
+    shard_count = 7,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",

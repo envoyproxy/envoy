@@ -114,6 +114,8 @@ std::string print(CelValue value) {
     return absl::FormatDuration(value.DurationOrDie());
   case CelValue::Type::kTimestamp:
     return absl::FormatTime(value.TimestampOrDie(), absl::UTCTimeZone());
+  case CelValue::Type::kNullType:
+    return "NULL";
   default:
     return absl::StrCat(CelValue::TypeName(value.type()), " value");
   }
