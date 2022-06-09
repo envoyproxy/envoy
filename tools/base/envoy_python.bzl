@@ -3,6 +3,8 @@ load("@base_pip3//:requirements.bzl", "requirement", base_entry_point = "entry_p
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 
+load("@dev_pip3//:requirements.bzl", dev_entry_point = "entry_point", dev_requirement = "requirement")
+
 def envoy_entry_point(
         name,
         pkg,
@@ -329,5 +331,5 @@ def envoy_py_data(name, src, format = None, entry_point = base_entry_point):
         name = name,
         srcs = [name_env_py],
         data = [name_pickle],
-        deps = [name_entry_point, requirement("envoy.base.utils")],
+        deps = [name_entry_point, dev_requirement("envoy.base.utils")],
     )
