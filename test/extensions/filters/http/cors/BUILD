@@ -22,7 +22,6 @@ envoy_extension_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )

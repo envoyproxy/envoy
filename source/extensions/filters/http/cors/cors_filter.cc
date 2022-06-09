@@ -131,10 +131,10 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
     response_headers->setInline(access_control_max_age_handle.handle(), maxAge());
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cors_private_network_access")) {
-    if (headers.getInlineValue(access_control_request_private_network_handle.handle()) == "true") {
-      response_headers->setInline(access_control_response_private_network_handle.handle(), "true");
-    }
+  // More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
+  if (allowPrivateNetworkAccess() &&
+      headers.getInlineValue(access_control_request_private_network_handle.handle()) == "true") {
+    response_headers->setInline(access_control_response_private_network_handle.handle(), "true");
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true,
@@ -229,6 +229,15 @@ bool CorsFilter::allowCredentials() {
   for (const auto policy : policies_) {
     if (policy && policy->allowCredentials()) {
       return policy->allowCredentials().value();
+    }
+  }
+  return false;
+}
+
+bool CorsFilter::allowPrivateNetworkAccess() {
+  for (const auto policy : policies_) {
+    if (policy && policy->allowPrivateNetworkAccess()) {
+      return policy->allowPrivateNetworkAccess().value();
     }
   }
   return false;

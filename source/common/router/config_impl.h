@@ -160,6 +160,9 @@ public:
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
+  const absl::optional<bool>& allowPrivateNetworkAccess() const override {
+    return allow_private_network_access_;
+  };
   bool enabled() const override {
     if (config_.has_filter_enabled()) {
       const auto& filter_enabled = config_.filter_enabled();
@@ -186,6 +189,7 @@ private:
   const std::string expose_headers_;
   const std::string max_age_;
   absl::optional<bool> allow_credentials_{};
+  absl::optional<bool> allow_private_network_access_{};
 };
 
 class ConfigImpl;

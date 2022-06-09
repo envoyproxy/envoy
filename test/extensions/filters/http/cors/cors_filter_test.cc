@@ -8,7 +8,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -50,6 +49,7 @@ public:
     cors_policy_->allow_headers_ = "content-type";
     cors_policy_->expose_headers_ = "content-type";
     cors_policy_->allow_credentials_ = false;
+    cors_policy_->allow_private_network_access_ = true;
     cors_policy_->max_age_ = "0";
 
     ON_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy())
@@ -806,8 +806,7 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcardWithPNAWithRuntimeG
       {"access-control-max-age", "0"},
   };
 
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.cors_private_network_access", "false"}});
+  cors_policy_->allow_private_network_access_ = false;
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
