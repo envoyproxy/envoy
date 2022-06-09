@@ -331,10 +331,9 @@ void Router::UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason re
       reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
     if (reason == ConnectionPool::PoolFailureReason::Timeout) {
       host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
-    } else
-      (reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
-        host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
-      }
+    } else {
+      host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
+    }
     parent_.callbacks_->continueDecoding();
   }
 }
