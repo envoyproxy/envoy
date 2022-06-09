@@ -25,7 +25,7 @@ JNIEnv* get_env() {
   jint result = static_jvm->GetEnv(reinterpret_cast<void**>(&local_env), JNI_VERSION);
   if (result == JNI_EDETACHED) {
     // Note: the only thread that should need to be attached is Envoy's engine std::thread.
-    JavaVMAttachArgs args = {JNI_VERSION, "EnvoyMain", NULL};
+    JavaVMAttachArgs args = {JNI_VERSION, "EnvoyMain", nullptr};
     result = attach_jvm(static_jvm, &local_env, &args);
   }
   RELEASE_ASSERT(result == JNI_OK, "Unable to get a JVM env for the current thread");
@@ -196,7 +196,7 @@ envoy_data* buffer_to_native_data_ptr(JNIEnv* env, jobject j_data) {
   // acquire a new strong reference before attempting to interact with an object held by
   // a WeakGlobalRef. See:
   // https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/functions.html#weak
-  if (j_data == NULL) {
+  if (j_data == nullptr) {
     return nullptr;
   }
 
@@ -215,7 +215,7 @@ envoy_headers* to_native_headers_ptr(JNIEnv* env, jobjectArray headers) {
   // acquire a new strong reference before attempting to interact with an object held by
   // a WeakGlobalRef. See:
   // https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/functions.html#weak
-  if (headers == NULL) {
+  if (headers == nullptr) {
     return nullptr;
   }
 
@@ -231,7 +231,7 @@ envoy_map to_native_map(JNIEnv* env, jobjectArray entries) {
   // Therefore, the length of the native header array is n envoy_data or n/2 envoy_map_entry.
   envoy_map_size_t length = env->GetArrayLength(entries);
   if (length == 0) {
-    return {0, NULL};
+    return {0, nullptr};
   }
 
   envoy_map_entry* entry_array =
