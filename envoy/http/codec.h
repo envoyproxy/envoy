@@ -453,6 +453,9 @@ struct Http1Settings {
   // True if this is an edge Envoy (using downstream address, no trusted hops)
   // and https:// URLs should be rejected over unencrypted connections.
   bool validate_scheme_{false};
+
+  // If true, Envoy will send a fully qualified URL in the firstline of the request.
+  bool send_fully_qualified_url_{false};
 };
 
 /**

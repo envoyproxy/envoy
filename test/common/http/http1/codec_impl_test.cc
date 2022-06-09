@@ -2211,6 +2211,44 @@ TEST_F(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasing) {
   EXPECT_EQ("GET / HTTP/1.1\r\nMy-Custom-Header: hey\r\n\r\n", output);
 }
 
+TEST_F(Http1ClientConnectionImplTest, FullyQualifiedGet) {
+  codec_settings_.send_fully_qualified_url_ = true;
+  initialize();
+
+  MockResponseDecoder response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "https"}, {":authority", "foo.com"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+  EXPECT_EQ("GET https://foo.com/ HTTP/1.1\r\nhost: foo.com\r\n\r\n", output);
+}
+
+TEST_F(Http1ClientConnectionImplTest, FullyQualifiedGetMissingScheme) {
+  codec_settings_.send_fully_qualified_url_ = true;
+  initialize();
+
+  MockResponseDecoder response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "foo.com"}};
+  EXPECT_FALSE(request_encoder.encodeHeaders(headers, true).ok());
+}
+
+TEST_F(Http1ClientConnectionImplTest, FullyQualifiedGetMissingHost) {
+  codec_settings_.send_fully_qualified_url_ = true;
+  initialize();
+
+  MockResponseDecoder response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":scheme", "https"}};
+  EXPECT_FALSE(request_encoder.encodeHeaders(headers, true).ok());
+}
+
 TEST_F(Http1ClientConnectionImplTest, HostHeaderTranslate) {
   initialize();
 
