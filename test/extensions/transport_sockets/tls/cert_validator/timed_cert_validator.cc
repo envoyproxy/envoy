@@ -37,7 +37,9 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
           const uint8_t* inp = reinterpret_cast<uint8_t*>(cert_str.data());
           X509* cert = d2i_X509(nullptr, &inp, cert_str.size());
           ASSERT(cert);
-          sk_X509_push(certs.get(), cert);
+          if (!bssl::PushToStack(certs.get(), bssl::UniquePtr<X509>(cert))) {
+            PANIC("boring SSL object allocation failed.");
+          }
         }
         ValidationResults result = DefaultCertValidator::doVerifyCertChain(
             *certs, nullptr, nullptr, transport_socket_options, ssl_ctx, ech_name_override_,

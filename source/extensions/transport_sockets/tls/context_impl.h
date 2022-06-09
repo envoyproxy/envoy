@@ -130,7 +130,7 @@ protected:
   ValidationResults
   customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
                         const Network::TransportSocketOptions* transport_socket_options, SSL* ssl,
-                        uint8_t out_alert);
+                        uint8_t current_tls_alert);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we

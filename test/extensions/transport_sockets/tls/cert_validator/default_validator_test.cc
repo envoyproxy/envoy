@@ -187,7 +187,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
             0);
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
-  sk_X509_push(cert_chain.get(), cert.release());
+  ASSERT_TRUE(bssl::PushToStack(cert_chain.get(), std::move(cert)));
   EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
             default_validator
                 ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr,

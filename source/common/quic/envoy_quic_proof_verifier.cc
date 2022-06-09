@@ -1,6 +1,5 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 
-#include <openssl/safestack.h>
 #include <openssl/ssl.h>
 
 #include <cstdint>
@@ -42,7 +41,7 @@ public:
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
   void onCertValidationResult(bool succeeded, const std::string& error_details,
-                              uint8_t /*out_alert*/) override {
+                              uint8_t /*tls_alert*/) override {
     if (!succeeded) {
       std::unique_ptr<quic::ProofVerifyDetails> details = std::make_unique<CertVerifyResult>(false);
       quic_callback_->Run(succeeded, error_details, &details);
@@ -97,10 +96,9 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
   for (const auto& cert_str : certs) {
     bssl::UniquePtr<X509> cert = parseDERCertificate(cert_str, error_details);
-    if (!cert) {
+    if (!cert || !bssl::PushToStack(cert_chain.get(), std::move(cert))) {
       return quic::QUIC_FAILURE;
     }
-    sk_X509_push(cert_chain.get(), cert.release());
   }
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(certs[0]);

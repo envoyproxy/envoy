@@ -74,7 +74,7 @@ private:
   // Latch the in-flight async cert validation callback.
   // nullopt if there is none.
   OptRef<ValidateResultCallbackImpl> cert_validate_result_callback_;
-  // Stores the TLS out_alert.
+  // Stores the TLS alert.
   uint8_t cert_validation_alert_{SSL_AD_CERTIFICATE_UNKNOWN};
   // Stores the validation result if there is any.
   // nullopt if no validation has ever been kicked off.

@@ -49,7 +49,7 @@ public:
                     Ssl::SslExtendedSocketInfo* ssl_extended_info,
                     const Network::TransportSocketOptions* transport_socket_options,
                     SSL_CTX& ssl_ctx, absl::string_view ech_name_override, bool is_server,
-                    uint8_t out_alert) override;
+                    uint8_t current_tls_alert) override;
 
   int initializeSslContexts(std::vector<SSL_CTX*> contexts, bool provides_certificates) override;
 
