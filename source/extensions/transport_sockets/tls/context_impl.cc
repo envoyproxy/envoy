@@ -1221,7 +1221,7 @@ bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
   return false;
 }
 
-bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates,
+bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509)& intermediates,
                                   std::string& error_details) {
   bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
 
@@ -1253,7 +1253,7 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
 }
 
 ValidationResults ContextImpl::customVerifyCertChainForQuic(
-    STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
+    STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
     const Network::TransportSocketOptions* transport_socket_options,
     absl::string_view ech_name_override) {
   ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));

@@ -45,7 +45,7 @@ public:
       X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
       const Network::TransportSocketOptions* transport_socket_options) override;
   ValidationResults
-  doVerifyCertChain(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
+  doVerifyCertChain(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
                     Ssl::SslExtendedSocketInfo* ssl_extended_info,
                     const Network::TransportSocketOptions* transport_socket_options,
                     SSL_CTX& ssl_ctx, absl::string_view ech_name_override, bool is_server,
@@ -72,7 +72,7 @@ public:
 
 private:
   bool verifyCertChainUsingTrustBundleStore(Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                                            X509& leaf_cert, STACK_OF(X509) * cert_chain,
+                                            X509& leaf_cert, STACK_OF(X509)* cert_chain,
                                             X509_VERIFY_PARAM* verify_param,
                                             std::string* error_details, uint8_t* out_alert);
 

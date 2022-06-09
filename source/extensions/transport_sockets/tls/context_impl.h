@@ -91,11 +91,11 @@ public:
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
   // TODO(danzh) remove when deprecate envoy.reloadable_features.tls_async_cert_validation
-  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
+  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509)& intermediates, std::string& error_details);
 
   // Validate cert asynchronously for a QUIC connection.
   ValidationResults
-  customVerifyCertChainForQuic(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
+  customVerifyCertChainForQuic(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
                                bool is_server,
                                const Network::TransportSocketOptions* transport_socket_options,
                                absl::string_view ech_name_override);

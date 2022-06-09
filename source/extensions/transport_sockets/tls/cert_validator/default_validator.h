@@ -47,7 +47,7 @@ public:
       const Network::TransportSocketOptions* transport_socket_options) override;
 
   ValidationResults
-  doVerifyCertChain(STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
+  doVerifyCertChain(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
                     Ssl::SslExtendedSocketInfo* ssl_extended_info,
                     const Network::TransportSocketOptions* transport_socket_options, SSL_CTX& ssl,
                     absl::string_view ech_name_override, bool is_server,

@@ -154,7 +154,7 @@ int SPIFFEValidator::doSynchronousVerifyCertChain(X509_STORE_CTX* store_ctx,
 }
 
 bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
-    Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert, STACK_OF(X509) * cert_chain,
+    Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert, STACK_OF(X509)* cert_chain,
     X509_VERIFY_PARAM* verify_param, std::string* error_details, uint8_t* /*out_alert*/) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
     if (ssl_extended_info) {
@@ -223,7 +223,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
 }
 
 ValidationResults SPIFFEValidator::doVerifyCertChain(
-    STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
+    STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptions* /*transport_socket_options*/, SSL_CTX& ssl_ctx,
     absl::string_view /*ech_name_override*/, bool /*is_server*/, uint8_t current_tls_alert) {
