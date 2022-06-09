@@ -113,7 +113,6 @@ envoy_cc_library(
     hdrs = ["retry.h"],
     deps = [
         "//envoy/config:typed_config_interface",
-        "//envoy/singleton:manager_interface",
         "//envoy/upstream:types_interface",
         "//envoy/upstream:upstream_interface",
     ],

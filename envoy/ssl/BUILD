@@ -89,5 +89,6 @@ envoy_cc_library(
         "//envoy/network:post_io_action_interface",
         "//envoy/protobuf:message_validator_interface",
         "//envoy/server:options_interface",
+        "//envoy/singleton:manager_interface",
     ],
 )
