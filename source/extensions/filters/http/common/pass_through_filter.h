@@ -8,9 +8,6 @@ namespace Http {
 // A decoder filter which passes all data through with Continue status.
 class PassThroughDecoderFilter : public virtual StreamDecoderFilter {
 public:
-  // Http::StreamFilterBase
-  void onDestroy() override {}
-
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     return Http::FilterHeadersStatus::Continue;
@@ -32,9 +29,6 @@ protected:
 // An encoder filter which passes all data through with Continue status.
 class PassThroughEncoderFilter : public virtual StreamEncoderFilter {
 public:
-  // Http::StreamFilterBase
-  void onDestroy() override {}
-
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;

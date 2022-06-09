@@ -700,7 +700,7 @@ public:
    * onDestroy() invoked. Filters that cross-register as access log handlers receive log() before
    * onDestroy().
    */
-  virtual void onDestroy() PURE;
+  virtual void onDestroy() {}
 
   /**
    * Called when a match result occurs that isn't handled by the filter manager.
