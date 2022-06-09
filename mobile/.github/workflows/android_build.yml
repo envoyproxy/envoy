@@ -78,7 +78,7 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: ./ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
@@ -144,7 +144,7 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: ./ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
