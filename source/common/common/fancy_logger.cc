@@ -99,6 +99,38 @@ FancyLogLevelMap FancyContext::getAllFancyLogLevelsForTest() ABSL_LOCKS_EXCLUDED
   return log_levels;
 }
 
+bool FancyContext::safeFileNameMatch(absl::string_view pattern, absl::string_view str) {
+  while (true) {
+    if (pattern.empty()) {
+      // `pattern` is exhausted; succeed if all of `str` was consumed matching it.
+      return str.empty();
+    }
+    if (str.empty()) {
+      // `str` is exhausted; succeed if `pattern` is empty or all '*'s.
+      return pattern.find_first_not_of('*') == pattern.npos;
+    }
+    if (pattern.front() == '*') {
+      pattern.remove_prefix(1);
+      if (pattern.empty()) {
+        return true;
+      }
+      do {
+        if (safeFileNameMatch(pattern, str)) {
+          return true;
+        }
+        str.remove_prefix(1);
+      } while (!str.empty());
+      return false;
+    }
+    if (pattern.front() == '?' || pattern.front() == str.front()) {
+      pattern.remove_prefix(1);
+      str.remove_prefix(1);
+      continue;
+    }
+    return false;
+  }
+}
+
 void FancyContext::initSink() {
   spdlog::sink_ptr sink = Logger::Registry::getSink();
   Logger::DelegatingLogSinkSharedPtr sp = std::static_pointer_cast<Logger::DelegatingLogSink>(sink);
@@ -109,22 +141,87 @@ void FancyContext::initSink() {
   }
 }
 
-spdlog::logger* FancyContext::createLogger(std::string key, int level)
+spdlog::logger* FancyContext::createLogger(const std::string& key)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_) {
   SpdLoggerSharedPtr new_logger =
       std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
   if (!Logger::Registry::getSink()->hasLock()) { // occurs in benchmark test
     initSink();
   }
-  level_enum lv = Logger::Context::getFancyDefaultLevel();
-  if (level > -1) {
-    lv = static_cast<level_enum>(level);
-  }
-  new_logger->set_level(lv);
+
+  new_logger->set_level(getLogLevel(key));
   new_logger->set_pattern(Logger::Context::getFancyLogFormat());
   new_logger->flush_on(level_enum::critical);
   fancy_log_map_->insert(std::make_pair(key, new_logger));
   return new_logger.get();
+}
+
+void FancyContext::updateVerbositySetting(
+    const std::vector<std::pair<absl::string_view, int>>& updates) {
+  absl::WriterMutexLock ul(&fancy_log_lock_);
+  log_update_info_.clear();
+  for (const auto& [glob, level] : updates) {
+    if (level < kLogLevelMin || level > kLogLevelMax) {
+      printf(
+          "The log level: %d for glob: %s is out of scope, and it should be in [0, 6]. Skipping.",
+          level, std::string(glob).c_str());
+      continue;
+    }
+    appendVerbosityLogUpdate(glob, static_cast<level_enum>(level));
+  }
+
+  for (auto& [key, logger] : *fancy_log_map_) {
+    logger->set_level(getLogLevel(key));
+  }
+}
+
+void FancyContext::appendVerbosityLogUpdate(absl::string_view update_pattern,
+                                            level_enum log_level) {
+  for (const auto& info : log_update_info_) {
+    if (safeFileNameMatch(info.update_pattern, update_pattern)) {
+      // This is a memory optimization to avoid storing patterns that will never
+      // match due to exit early semantics.
+      return;
+    }
+  }
+  bool update_is_path = update_pattern.find('/') != update_pattern.npos;
+  log_update_info_.emplace_back(std::string(update_pattern), update_is_path, log_level);
+}
+
+level_enum FancyContext::getLogLevel(absl::string_view file) const {
+  if (log_update_info_.empty()) {
+    return Logger::Context::getFancyDefaultLevel();
+  }
+
+  // Get basename for file.
+  absl::string_view basename = file;
+  {
+    const size_t sep = basename.rfind('/');
+    if (sep != basename.npos) {
+      basename.remove_prefix(sep + 1);
+    }
+  }
+
+  absl::string_view stem = file, stem_basename = basename;
+  {
+    const size_t sep = stem_basename.find('.');
+    if (sep != stem_basename.npos) {
+      stem.remove_suffix(stem_basename.size() - sep);
+      stem_basename.remove_suffix(stem_basename.size() - sep);
+    }
+  }
+  for (const auto& info : log_update_info_) {
+    if (info.update_is_path) {
+      // If there are any slashes in the pattern, try to match the full path name.
+      if (safeFileNameMatch(info.update_pattern, stem)) {
+        return info.log_level;
+      }
+    } else if (safeFileNameMatch(info.update_pattern, stem_basename)) {
+      return info.log_level;
+    }
+  }
+
+  return Logger::Context::getFancyDefaultLevel();
 }
 
 FancyContext& getFancyContext() { MUTABLE_CONSTRUCT_ON_FIRST_USE(FancyContext); }

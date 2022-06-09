@@ -173,6 +173,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "log_verbosity_update_test",
+    srcs = ["log_verbosity_update_test.cc"],
+    args = ["--enable-fine-grain-logging"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "fancy_log_macros_test",
     srcs = ["log_macros_test.cc"],
     args = ["--enable-fine-grain-logging"],
