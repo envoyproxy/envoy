@@ -2,7 +2,7 @@ load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_proto//proto:defs.bzl", "ProtoInfo")
 
 # Borrowed from https://github.com/grpc/grpc-java/blob/v1.24.1/java_grpc_library.bzl#L61
-def _path_ignoring_repository(f):
+def path_ignoring_repository(f):
     # Bazel creates a _virtual_imports directory in case the .proto source files
     # need to be accessed at a path that's different from their source path:
     # https://github.com/bazelbuild/bazel/blob/0.27.1/src/main/java/com/google/devtools/build/lib/rules/proto/ProtoCommon.java#L289
@@ -42,13 +42,13 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     # extractions. See https://github.com/bazelbuild/bazel/issues/3971.
     import_paths = []
     for f in target[ProtoInfo].transitive_sources.to_list():
-        import_paths.append("{}={}".format(_path_ignoring_repository(f), f.path))
+        import_paths.append("{}={}".format(path_ignoring_repository(f), f.path))
 
     # The outputs live in the ctx.label's package root. We add some additional
     # path information to match with protoc's notion of path relative locations.
     outputs = []
     for output_suffix in output_suffixes:
-        outputs += [ctx.actions.declare_file(ctx.label.name + "/" + _path_ignoring_repository(f) +
+        outputs += [ctx.actions.declare_file(ctx.label.name + "/" + path_ignoring_repository(f) +
                                              output_suffix) for f in proto_sources]
 
     # Create the protoc command-line args.
