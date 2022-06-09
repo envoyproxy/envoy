@@ -164,9 +164,12 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 };
 
+// Pair of canonical filter name and HTTP stream filter factory callback.
+using NamedHttpFilterFactoryCb = std::pair<std::string, Http::FilterFactoryCb>;
+
 // Implementation of a HTTP dynamic filter config provider.
 class HttpDynamicFilterConfigProviderImpl
-    : public DynamicFilterConfigProviderImpl<Http::FilterFactoryCb> {
+    : public DynamicFilterConfigProviderImpl<NamedHttpFilterFactoryCb> {
 public:
   HttpDynamicFilterConfigProviderImpl(
       FilterConfigSubscriptionSharedPtr& subscription,
@@ -190,10 +193,12 @@ public:
   }
 
 private:
-  Http::FilterFactoryCb instantiateFilterFactory(const Protobuf::Message& message) const override {
+  NamedHttpFilterFactoryCb
+  instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
         getFactoryByType(message.GetTypeName());
-    return factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_);
+    return {factory->name(),
+            factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_)};
   }
 
   Server::Configuration::FactoryContext& factory_context_;
@@ -495,7 +500,7 @@ private:
 // HTTP filter
 class HttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::NamedHttpFilterConfigFactory, Http::FilterFactoryCb,
+          Server::Configuration::NamedHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
           Server::Configuration::FactoryContext, HttpDynamicFilterConfigProviderImpl> {
 public:
   absl::string_view statPrefix() const override { return "http_filter."; }

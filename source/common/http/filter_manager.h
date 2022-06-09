@@ -166,7 +166,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
                             bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+      : ActiveStreamFilterBase(parent, dual_filter, filter.get()), handle_(filter) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override;
@@ -261,7 +261,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                    LinkedObject<ActiveStreamEncoderFilter> {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
                             bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+      : ActiveStreamFilterBase(parent, dual_filter, filter.get()), handle_(filter) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override;

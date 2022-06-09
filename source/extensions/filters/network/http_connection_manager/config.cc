@@ -20,7 +20,6 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/default_server_string.h"
@@ -138,6 +137,46 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
   return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       KEEP_UNCHANGED;
 }
+
+class FilterChainFactoryCallbacksNameHelper : public Http::FilterChainFactoryCallbacks {
+public:
+  FilterChainFactoryCallbacksNameHelper(absl::string_view custom_name,
+                                        absl::string_view filter_name,
+                                        Http::FilterChainFactoryCallbacks& callback)
+      : custom_name_(custom_name), filter_name_(filter_name), callback_(callback) {}
+
+  void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
+    filter->setCustomName(custom_name_);
+    filter->setFilterName(filter_name_);
+
+    callback_.addStreamDecoderFilter(std::move(filter));
+  }
+
+  void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
+    filter->setCustomName(custom_name_);
+    filter->setFilterName(filter_name_);
+
+    callback_.addStreamEncoderFilter(std::move(filter));
+  }
+
+  void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
+    filter->setCustomName(custom_name_);
+    filter->setFilterName(filter_name_);
+
+    callback_.addStreamFilter(std::move(filter));
+  }
+
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
+    callback_.addAccessLogHandler(std::move(handler));
+  }
+
+  Event::Dispatcher& dispatcher() override { callback_.dispatcher(); }
+
+  absl::string_view custom_name_;
+  absl::string_view filter_name_;
+
+  Http::FilterChainFactoryCallbacks& callback_;
+};
 
 } // namespace
 
@@ -653,7 +692,8 @@ void HttpConnectionManagerConfig::processFilter(
   Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
-      callback, proto_config.name());
+      std::pair<std::string, Http::FilterFactoryCb>{factory->name(), callback},
+      proto_config.name());
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessageOrError(
@@ -730,7 +770,13 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
   for (const auto& filter_config_provider : filter_factories) {
     auto config = filter_config_provider->config();
     if (config.has_value()) {
-      config.value()(callbacks);
+      Filter::NamedHttpFilterFactoryCb& factory_cb = config.value().get();
+
+      // Set custom name and filter name by the helper to avoid to set the names by every filter
+      // itself.
+      FilterChainFactoryCallbacksNameHelper callbacks_with_name_helper(
+          filter_config_provider->name(), factory_cb.first, callbacks);
+      factory_cb.second(callbacks_with_name_helper);
       continue;
     }
 

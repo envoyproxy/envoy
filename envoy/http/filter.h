@@ -319,8 +319,6 @@ public:
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
 };
 
-};
-
 /**
  * RouteConfigUpdatedCallback is used to notify an OnDemandRouteUpdate filter about completion of a
  * RouteConfig update. The filter (and the associated ActiveStream) where the original on-demand
@@ -644,6 +642,32 @@ public:
 };
 
 /**
+ * Hepler used to set and get stream filter names.
+ */
+class StreamFilterNameHepler {
+public:
+  /**
+   * Get custom filter name of current filter instance. This name typically should be the
+   * name of HttpFilter proto configuration.
+   */
+  absl::string_view customName() const { return custom_name_; }
+  /**
+   * Get filter name of current filter instance.
+   */
+  absl::string_view filterName() const { return filter_name_; }
+
+  void setCustomName(absl::string_view view) { custom_name_ = std::string(view); }
+  void setFilterName(absl::string_view view) { filter_name_ = std::string(view); }
+
+protected:
+  // TODO(wbpcode): typically, the custom name and filter name have longer lifetime than the
+  // stream filter instances. We can simply keep string view here to avoid unnecessary copy
+  // and memory allocation. Currently, new strings are still always created for safety.
+  std::string custom_name_;
+  std::string filter_name_;
+};
+
+/**
  * Common base class for both decoder and encoder filters. Functions here are related to the
  * lifecycle of a filter. Currently the life cycle is as follows:
  * - All filters receive onStreamComplete()
@@ -656,7 +680,7 @@ public:
  * - onDestroy is used to cleanup all pending filter resources like pending http requests and
  * timers.
  */
-class StreamFilterBase {
+class StreamFilterBase : public StreamFilterNameHepler {
 public:
   virtual ~StreamFilterBase() = default;
 
@@ -713,23 +737,12 @@ public:
   virtual LocalErrorStatus onLocalReply(const LocalReplyData&) {
     return LocalErrorStatus::Continue;
   }
-
-  /**
-   * Get custom filter name of current filter instance. This name typically should be the
-   * name of HttpFilter proto configuration.
-   */
-  virtual absl::string_view customName() const { return {}; }
-
-  /**
-   * Get filter name of current filter instance.
-   */
-  virtual absl::string_view filterName() const { return {}; }
 };
 
 /**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter : public StreamFilterBase {
+class StreamDecoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -945,7 +958,7 @@ public:
 /**
  * Stream encoder filter interface.
  */
-class StreamEncoderFilter : public StreamFilterBase {
+class StreamEncoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with supported 1xx headers.

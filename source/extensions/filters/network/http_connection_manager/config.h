@@ -19,6 +19,7 @@
 #include "envoy/tracing/http_tracer_manager.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/date_provider_impl.h"
@@ -41,7 +42,7 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 
 using FilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Http::FilterFactoryCb,
+    Filter::FilterConfigProviderManager<Filer::NamedHttpFilterFactoryCb,
                                         Server::Configuration::FactoryContext>;
 
 /**
@@ -133,7 +134,8 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  using FilterFactoriesList = std::list<Filter::FilterConfigProviderPtr<Http::FilterFactoryCb>>;
+  using FilterFactoriesList =
+      std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
