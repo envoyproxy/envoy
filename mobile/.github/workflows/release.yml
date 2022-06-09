@@ -126,13 +126,6 @@ jobs:
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //:ios_xcframework
-      # Recompress as bazel's zip leads to bad CRC values
-      # See https://github.com/bazelbuild/rules_apple/issues/1489
-      - name: 'Recompress Envoy.xcframework.zip'
-        run: |
-          unzip bazel-bin/library/swift/Envoy.xcframework.zip || true
-          zip -r Envoy.xcframework.zip Envoy.xcframework
-          rm -rf Envoy.xcframework
       - uses: actions/upload-artifact@v2
         with:
           name: ios_framework
