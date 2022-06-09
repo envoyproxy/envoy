@@ -21,8 +21,8 @@ class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
   explicit CompiledGoogleReMatcher(const std::string& regex, bool do_program_size_check);
 
-  explicit CompiledGoogleReMatcher(const std::string& regex,
-                                   absl::optional<uint32_t> max_program_size);
+  explicit CompiledGoogleReMatcher(const std::string& regex, uint32_t max_program_size,
+                                   uint32_t warn_program_size);
 
   explicit CompiledGoogleReMatcher(const xds::type::matcher::v3::RegexMatcher& config)
       : CompiledGoogleReMatcher(config.regex(), false) {}
@@ -56,10 +56,11 @@ public:
                            Server::Configuration::ServerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override { return "envoy.regex_engine.google_re2"; };
+  std::string name() const override { return "envoy.extensions.regex_engine.google_re2"; };
 
 private:
-  absl::optional<uint32_t> max_program_size_{};
+  uint32_t max_program_size_{};
+  uint32_t warn_program_size_{};
 };
 
 DECLARE_FACTORY(GoogleReEngine);

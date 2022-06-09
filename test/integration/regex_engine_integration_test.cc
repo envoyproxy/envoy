@@ -17,9 +17,9 @@ public:
 
   void initializeConfig(const std::string& param) {
     config_helper_.addBootstrapExtension(fmt::format(R"EOF(
-name: envoy.regex_engine.google_re2
+name: envoy.extensions.regex_engine.google_re2
 typed_config:
-  '@type': type.googleapis.com/envoy.type.matcher.v3.RegexMatcher.GoogleRE2
+  '@type': type.googleapis.com/envoy.extensions.regex_engine.v3.GoogleRE2
   {}
     )EOF",
                                                      param));
@@ -27,7 +27,7 @@ typed_config:
 
   static std::string config() {
     return absl::StrCat(ConfigHelper::baseConfigNoListeners(), R"EOF(
-default_regex_engine: envoy.regex_engine.google_re2
+default_regex_engine: envoy.extensions.regex_engine.google_re2
     )EOF");
   }
 };
@@ -40,7 +40,7 @@ TEST_P(RegexEngineIntegrationTest, GoogleRE2) {
   initializeConfig("");
   initialize();
 
-  auto* engine = Regex::engine("envoy.regex_engine.google_re2");
+  auto* engine = Regex::engine("envoy.extensions.regex_engine.google_re2");
   ASSERT_EQ(Regex::EngineSingleton::getExisting(), engine);
 
   envoy::type::matcher::v3::RegexMatcher matcher;
@@ -49,17 +49,30 @@ TEST_P(RegexEngineIntegrationTest, GoogleRE2) {
   EXPECT_NO_THROW(Regex::Utility::parseRegex(matcher));
 };
 
-TEST_P(RegexEngineIntegrationTest, GoogleRE2WithParam) {
+TEST_P(RegexEngineIntegrationTest, GoogleRE2WithMaxProgramSize) {
   initializeConfig("max_program_size: 1");
   initialize();
 
-  auto* engine = Regex::engine("envoy.regex_engine.google_re2");
+  auto* engine = Regex::engine("envoy.extensions.regex_engine.google_re2");
   ASSERT_EQ(Regex::EngineSingleton::getExisting(), engine);
 
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_regex() = ".*";
 
   EXPECT_THROW_WITH_REGEX(Regex::Utility::parseRegex(matcher), EnvoyException, "max program size");
+}
+
+TEST_P(RegexEngineIntegrationTest, GoogleRE2WithWarnProgramSize) {
+  initializeConfig("warn_program_size: 1");
+  initialize();
+
+  auto* engine = Regex::engine("envoy.extensions.regex_engine.google_re2");
+  ASSERT_EQ(Regex::EngineSingleton::getExisting(), engine);
+
+  envoy::type::matcher::v3::RegexMatcher matcher;
+  *matcher.mutable_regex() = ".*";
+
+  EXPECT_LOG_CONTAINS("warning", "warn program size", Regex::Utility::parseRegex(matcher));
 }
 
 } // namespace
