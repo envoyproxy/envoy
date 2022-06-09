@@ -23,6 +23,8 @@ open class EngineBuilder: NSObject {
   private var dnsPreresolveHostnames: String = "[]"
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableHappyEyeballs: Bool = true
+  private var enableGzip: Bool = true
+  private var enableBrotli: Bool = false
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enableDrainPostDnsRefresh: Bool = false
@@ -164,6 +166,28 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enableHappyEyeballs(_ enableHappyEyeballs: Bool) -> Self {
     self.enableHappyEyeballs = enableHappyEyeballs
+    return self
+  }
+
+  /// Specify whether to do gzip response decompression or not.  Defaults to true.
+  ///
+  /// - parameter enableGzip: whether or not to gunzip responses.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableGzip(_ enableGzip: Bool) -> Self {
+    self.enableGzip = enableGzip
+    return self
+  }
+
+  /// Specify whether to do brotli response decompression or not.  Defaults to false.
+  ///
+  /// - parameter enableBrotli: whether or not to brotli decompress responses.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableBrotli(_ enableBrotli: Bool) -> Self {
+    self.enableBrotli = enableBrotli
     return self
   }
 
@@ -472,6 +496,8 @@ open class EngineBuilder: NSObject {
       dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
       enableHappyEyeballs: self.enableHappyEyeballs,
+      enableGzip: self.enableGzip,
+      enableBrotli: self.enableBrotli,
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,

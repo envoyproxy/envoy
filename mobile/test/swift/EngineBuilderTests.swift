@@ -466,6 +466,8 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableHappyEyeballs: true,
+      enableGzip: true,
+      enableBrotli: false,
       enableInterfaceBinding: true,
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: false,
@@ -518,6 +520,10 @@ final class EngineBuilderTests: XCTestCase {
 
     XCTAssertFalse(resolvedYAML.contains("admin: *admin_interface"))
 
+    // Decompression
+    XCTAssertTrue(resolvedYAML.contains("decompressor.v3.Gzip"))
+    XCTAssertFalse(resolvedYAML.contains("decompressor.v3.Brotli"))
+
     // Metadata
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
     XCTAssertTrue(resolvedYAML.contains("app_version: v1.2.3"))
@@ -547,6 +553,8 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableHappyEyeballs: false,
+      enableGzip: false,
+      enableBrotli: true,
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: true,
       enforceTrustChainVerification: true,
@@ -579,6 +587,10 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
     XCTAssertTrue(resolvedYAML.contains("&h2_delay_keepalive_timeout false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_drain_post_dns_refresh true"))
+
+    // Decompression
+    XCTAssertFalse(resolvedYAML.contains("decompressor.v3.Gzip"))
+    XCTAssertTrue(resolvedYAML.contains("decompressor.v3.Brotli"))
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
@@ -593,6 +605,8 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableHappyEyeballs: false,
+      enableGzip: false,
+      enableBrotli: false,
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: true,
