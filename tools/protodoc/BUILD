@@ -1,8 +1,11 @@
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@base_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
-load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_jinja_env", "envoy_py_data")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_genjson", "envoy_jinja_env", "envoy_py_data")
+
+load("@dev_pip3//:requirements.bzl", dev_entry_point = "entry_point", dev_requirement = "requirement")
+
 
 licenses(["notice"])  # Apache 2
 
@@ -31,7 +34,7 @@ py_binary(
     args = ["$(location @envoy_api//:v3_proto_set)"],
     data = ["@envoy_api//:v3_proto_set"],
     deps = [
-        requirement("envoy.base.utils"),
+        dev_requirement("envoy.base.utils"),
         ":manifest_proto_py_proto",
         ":protodoc_manifest_untyped",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
@@ -140,5 +143,16 @@ envoy_jinja_env(
     ],
     deps = [
         ":rst_filters",
+    ],
+)
+
+envoy_entry_point(
+    name = "worker",
+    entry_point = dev_entry_point,
+    pkg = "aio.api.bazel",
+    script = "aio.bazel.worker",
+    deps = [
+        "//tools/protodoc",
+        dev_requirement("envoy.base.utils"),
     ],
 )

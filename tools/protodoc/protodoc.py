@@ -3,9 +3,9 @@
 # for the underlying protos mentioned in this file. See
 # https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
-import logging
 import functools
 import sys
+import warnings
 from collections import defaultdict
 from functools import cached_property
 
@@ -14,8 +14,8 @@ import yaml
 from envoy.code.check.checker import BackticksCheck
 
 from tools.api_proto_plugin import annotations
-from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
+from tools.api_proto_plugin import plugin
 from tools.protodoc.data import data
 from tools.protodoc.jinja import env as jinja_env
 
@@ -23,8 +23,6 @@ from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
 from validate import validate_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
-
-logger = logging.getLogger(__name__)
 
 manifest_db = data["manifest"]
 EXTENSION_DB = data["extensions"]
@@ -653,7 +651,7 @@ class RstFormatVisitor(visitor.Visitor):
                 self.protodoc_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
         error = self.backticks_check(message)
         if error:
-            logger.warning(f"Bad RST ({msg_proto.name}): {error}")
+            warnings.warn(f"Bad RST ({msg_proto.name}): {error}", SyntaxWarning)
         return message
 
     def visit_file(self, file_proto, type_context, services, msgs, enums):
@@ -699,8 +697,9 @@ class RstFormatVisitor(visitor.Visitor):
         return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 
 
-def main():
-    plugin.plugin([plugin.direct_output_descriptor('.rst', RstFormatVisitor)])
+def main(request=None):
+    return plugin.plugin([plugin.direct_output_descriptor('.rst', RstFormatVisitor)],
+                         incoming=request)
 
 
 if __name__ == '__main__':

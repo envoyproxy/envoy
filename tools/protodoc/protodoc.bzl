@@ -1,7 +1,7 @@
-load("//tools/api_proto_plugin:plugin.bzl", "api_proto_plugin_aspect", "api_proto_plugin_impl")
+load("//tools/api_proto_plugin:worker_plugin.bzl", "api_proto_worker_plugin_aspect", "api_proto_worker_plugin_impl")
 
 def _protodoc_impl(target, ctx):
-    return api_proto_plugin_impl(target, ctx, "rst", "protodoc", [".rst"])
+    return api_proto_worker_plugin_impl(target, ctx, "rst", "Protodoc", [".rst"])
 
 # Bazel aspect (https://docs.bazel.build/versions/master/starlark/aspects.html)
 # that can be invoked from the CLI to produce docs via //tools/protodoc for
@@ -12,7 +12,10 @@ def _protodoc_impl(target, ctx):
 #
 # The aspect builds the transitive docs, so any .proto in the dependency graph
 # get docs created.
-protodoc_aspect = api_proto_plugin_aspect("//tools/protodoc", _protodoc_impl)
+protodoc_aspect = api_proto_worker_plugin_aspect(
+    "//tools/protodoc",
+    _protodoc_impl,
+    "@envoy//tools/protodoc:worker")
 
 def _protodoc_rule_impl(ctx):
     deps = []
