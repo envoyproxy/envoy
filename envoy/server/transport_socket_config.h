@@ -156,7 +156,7 @@ public:
    * @throw EnvoyException if the implementation is unable to produce a factory with the provided
    *        parameters.
    */
-  virtual Network::TransportSocketFactoryPtr
+  virtual Network::DownstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;

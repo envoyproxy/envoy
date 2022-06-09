@@ -50,7 +50,8 @@ Network::TransportSocketFactoryPtr UpstreamTapSocketConfigFactory::createTranspo
       context.mainThreadDispatcher(), std::move(inner_transport_factory));
 }
 
-Network::TransportSocketFactoryPtr DownstreamTapSocketConfigFactory::createTransportSocketFactory(
+Network::DownstreamTransportSocketFactoryPtr
+DownstreamTapSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
   const auto& outer_config =
@@ -63,7 +64,7 @@ Network::TransportSocketFactoryPtr DownstreamTapSocketConfigFactory::createTrans
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
       *inner_factory_config, context, server_names);
-  return std::make_unique<TapSocketFactory>(
+  return std::make_unique<DownstreamTapSocketFactory>(
       outer_config,
       std::make_unique<SocketTapConfigFactoryImpl>(context.mainThreadDispatcher().timeSource()),
       context.admin(), context.singletonManager(), context.threadLocal(),

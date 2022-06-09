@@ -239,23 +239,16 @@ public:
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;
 
 /**
- * A factory for creating transport socket. It will be associated to filter chains and clusters.
- */
-class TransportSocketFactory {
+ * A factory for creating transport sockets.
+ **/
+class TransportSocketFactoryBase {
 public:
-  virtual ~TransportSocketFactory() = default;
+  virtual ~TransportSocketFactoryBase() = default;
 
   /**
    * @return bool whether the transport socket implements secure transport.
    */
   virtual bool implementsSecureTransport() const PURE;
-
-  /**
-   * @param options for creating the transport socket
-   * @return Network::TransportSocketPtr a transport socket to be passed to connection.
-   */
-  virtual TransportSocketPtr
-  createTransportSocket(TransportSocketOptionsConstSharedPtr options) const PURE;
 
   /**
    * Returns true if the transport socket created by this factory supports some form of ALPN
@@ -269,6 +262,21 @@ public:
    * not client-side TLS sockets.
    */
   virtual absl::string_view defaultServerNameIndication() const PURE;
+};
+
+/**
+ * A factory for creating upstream transport sockets. It will be associated to clusters.
+ */
+class TransportSocketFactory : public virtual TransportSocketFactoryBase {
+public:
+  ~TransportSocketFactory() override = default;
+
+  /**
+   * @param options for creating the transport socket
+   * @return Network::TransportSocketPtr a transport socket to be passed to client connection.
+   */
+  virtual TransportSocketPtr
+  createTransportSocket(TransportSocketOptionsConstSharedPtr options) const PURE;
 
   /**
    * @param key supplies a vector of bytes to which the option should append hash key data that will
@@ -280,7 +288,21 @@ public:
                        TransportSocketOptionsConstSharedPtr options) const PURE;
 };
 
+/**
+ * A factory for creating downstream transport sockets. It will be associated to listeners.
+ */
+class DownstreamTransportSocketFactory : public virtual TransportSocketFactoryBase {
+public:
+  ~DownstreamTransportSocketFactory() override = default;
+
+  /**
+   * @return Network::TransportSocketPtr a transport socket to be passed to server connection.
+   */
+  virtual TransportSocketPtr createDownstreamTransportSocket() const PURE;
+};
+
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;
+using DownstreamTransportSocketFactoryPtr = std::unique_ptr<DownstreamTransportSocketFactory>;
 
 } // namespace Network
 } // namespace Envoy

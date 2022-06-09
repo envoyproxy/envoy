@@ -41,6 +41,20 @@ public:
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
 };
 
+class DownstreamTapSocketFactory : public Common::Tap::ExtensionConfigBase,
+                                   public DownstreamPassthroughFactory {
+public:
+  DownstreamTapSocketFactory(
+      const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
+      Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+      Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+      Event::Dispatcher& main_thread_dispatcher,
+      Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory);
+
+  // Network::TransportSocketFactory
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override;
+};
+
 } // namespace Tap
 } // namespace TransportSockets
 } // namespace Extensions

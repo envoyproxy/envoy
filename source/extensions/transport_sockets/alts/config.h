@@ -28,7 +28,7 @@ class DownstreamAltsTransportSocketConfigFactory
     : public AltsTransportSocketConfigFactory,
       public Server::Configuration::DownstreamTransportSocketConfigFactory {
 public:
-  Network::TransportSocketFactoryPtr
+  Network::DownstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message&,
                                Server::Configuration::TransportSocketFactoryContext&,
                                const std::vector<std::string>&) override;

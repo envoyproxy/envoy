@@ -125,6 +125,25 @@ private:
   Network::TransportSocketFactoryPtr tls_socket_factory_;
 };
 
+class StartTlsDownstreamSocketFactory : public Network::DownstreamTransportSocketFactory,
+                                        Logger::Loggable<Logger::Id::config> {
+public:
+  ~StartTlsDownstreamSocketFactory() override = default;
+
+  StartTlsDownstreamSocketFactory(Network::DownstreamTransportSocketFactoryPtr raw_socket_factory,
+                                  Network::DownstreamTransportSocketFactoryPtr tls_socket_factory)
+      : raw_socket_factory_(std::move(raw_socket_factory)),
+        tls_socket_factory_(std::move(tls_socket_factory)) {}
+
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override;
+  bool implementsSecureTransport() const override { return false; }
+  absl::string_view defaultServerNameIndication() const override { return ""; }
+
+private:
+  Network::DownstreamTransportSocketFactoryPtr raw_socket_factory_;
+  Network::DownstreamTransportSocketFactoryPtr tls_socket_factory_;
+};
+
 } // namespace StartTls
 } // namespace TransportSockets
 } // namespace Extensions

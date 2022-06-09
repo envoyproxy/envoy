@@ -130,7 +130,8 @@ private:
 /**
  * An implementation of Network::TransportSocketFactory for TsiSocket
  */
-class TsiSocketFactory : public Network::CommonTransportSocketFactory {
+class TsiSocketFactory : public Network::DownstreamTransportSocketFactory,
+                         public Network::CommonTransportSocketFactory {
 public:
   TsiSocketFactory(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
 
@@ -139,6 +140,8 @@ public:
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override;
 
 private:
   HandshakerFactory handshaker_factory_;

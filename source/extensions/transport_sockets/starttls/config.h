@@ -36,7 +36,7 @@ class DownstreamStartTlsSocketFactory
           Server::Configuration::DownstreamTransportSocketConfigFactory,
           envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig> {
 public:
-  Network::TransportSocketFactoryPtr
+  Network::DownstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) override;

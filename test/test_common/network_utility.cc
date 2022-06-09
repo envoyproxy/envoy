@@ -188,13 +188,17 @@ TransportSocketFactoryPtr createRawBufferSocketFactory() {
   return std::make_unique<RawBufferSocketFactory>();
 }
 
+DownstreamTransportSocketFactoryPtr createRawBufferDownstreamSocketFactory() {
+  return std::make_unique<RawBufferSocketFactory>();
+}
+
 const Network::FilterChainSharedPtr
-createEmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory) {
+createEmptyFilterChain(DownstreamTransportSocketFactoryPtr&& transport_socket_factory) {
   return std::make_shared<Network::Test::EmptyFilterChain>(std::move(transport_socket_factory));
 }
 
 const Network::FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets() {
-  return createEmptyFilterChain(createRawBufferSocketFactory());
+  return createEmptyFilterChain(createRawBufferDownstreamSocketFactory());
 }
 
 namespace {

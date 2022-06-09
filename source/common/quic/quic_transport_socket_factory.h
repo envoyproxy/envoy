@@ -61,12 +61,18 @@ protected:
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
 // differentiate server and client side context config.
-class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
+class QuicServerTransportSocketFactory : public Network::DownstreamTransportSocketFactory,
+                                         public QuicTransportSocketFactoryBase {
 public:
   QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
                                    Ssl::ServerContextConfigPtr config)
       : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)),
         enable_early_data_(enable_early_data) {}
+
+  // Network::DownstreamTransportSocketFactory
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override {
+    PANIC("not implemented");
+  }
 
   void initialize() override {
     config_->setSecretUpdateCallback([this]() {
@@ -157,7 +163,7 @@ class QuicServerTransportSocketConfigFactory
       public Server::Configuration::DownstreamTransportSocketConfigFactory {
 public:
   // Server::Configuration::DownstreamTransportSocketConfigFactory
-  Network::TransportSocketFactoryPtr
+  Network::DownstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) override;
