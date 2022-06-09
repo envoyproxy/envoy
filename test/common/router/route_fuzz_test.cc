@@ -18,6 +18,19 @@ namespace {
 // Limit the size of the input.
 static const size_t MaxInputSize = 64 * 1024;
 
+bool isUnsupportedRouteConfig(const envoy::config::route::v3::Route& route,
+                              bool extended_check = false) {
+  if (route.has_filter_action() || route.has_non_forwarding_action()) {
+    return true;
+  }
+  if (extended_check && route.has_route() &&
+      !(route.route().has_cluster_specifier_plugin() || route.route().has_cluster() ||
+        route.route().has_cluster_header() || route.route().has_weighted_clusters())) {
+    return true;
+  }
+  return false;
+}
+
 // Remove regex matching route configs.
 envoy::config::route::v3::RouteConfiguration
 cleanRouteConfig(envoy::config::route::v3::RouteConfiguration route_config) {
@@ -27,8 +40,7 @@ cleanRouteConfig(envoy::config::route::v3::RouteConfiguration route_config) {
                 [](envoy::config::route::v3::VirtualHost& virtual_host) {
                   auto routes = virtual_host.mutable_routes();
                   for (int i = 0; i < routes->size();) {
-                    if (routes->Get(i).has_filter_action() ||
-                        routes->Get(i).has_non_forwarding_action()) {
+                    if (isUnsupportedRouteConfig(routes->Get(i))) {
                       routes->erase(routes->begin() + i);
                     } else {
                       ++i;
@@ -60,13 +72,7 @@ bool validateConfig(const test::common::router::RouteTestCase& input) {
                             on_no_match_route_action_config);
       ENVOY_LOG_MISC(trace, "typed_config of virtual_host.matcher.on_no_match.action is: {}",
                      on_no_match_route_action_config.DebugString());
-      if (on_no_match_route_action_config.has_filter_action() ||
-          on_no_match_route_action_config.has_non_forwarding_action() ||
-          (on_no_match_route_action_config.has_route() &&
-           !(on_no_match_route_action_config.route().has_cluster_specifier_plugin() ||
-             on_no_match_route_action_config.route().has_cluster() ||
-             on_no_match_route_action_config.route().has_cluster_header() ||
-             on_no_match_route_action_config.route().has_weighted_clusters()))) {
+      if (isUnsupportedRouteConfig(on_no_match_route_action_config, true)) {
         ENVOY_LOG_MISC(debug, "matcher.on_no_match.action not sufficient for processing");
         return false;
       }
