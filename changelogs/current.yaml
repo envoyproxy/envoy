@@ -172,6 +172,8 @@ new_features:
 - area: http
   change: |
     added new :ref:`file_system_buffer <config_http_filters_file_system_buffer>` http filter.
+  change: |
+    added a :ref:`configuration option <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.send_fully_qualified_url>` to send absolute URLs for HTTP/1.1.
 - area: http
   change: |
     preserve case header formatter support innner formatter on Envoy headers in :ref:`formatter_type_on_envoy_headers <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.formatter_type_on_envoy_headers>`.
