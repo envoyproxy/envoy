@@ -398,6 +398,34 @@ Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. 
   // Swift
   builder.enableHappyEyeballs(true)
 
+~~~~~~~~~~~~~~~~~~~~~~~
+``enableGzip``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable transparent response Gzip decompression. Defaults to true.
+
+**Example**::
+
+  // Kotlin
+  builder.enableGzip(false)
+
+  // Swift
+  builder.enableGzip(false)
+
+~~~~~~~~~~~~~~~~~~~~~~~
+``enableBrotli``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable transparent response Brotli decompression. Defaults to false.
+
+**Example**::
+
+  // Kotlin
+  builder.enableBrotli(true)
+
+  // Swift
+  builder.enableBrotli(true)
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableInterfaceBinding``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

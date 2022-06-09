@@ -14,6 +14,8 @@
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
+                                       enableGzip:(BOOL)enableGzip
+                                     enableBrotli:(BOOL)enableBrotli
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
@@ -56,6 +58,8 @@
   self.dnsMinRefreshSeconds = dnsMinRefreshSeconds;
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableHappyEyeballs = enableHappyEyeballs;
+  self.enableGzip = enableGzip;
+  self.enableBrotli = enableBrotli;
   self.enableInterfaceBinding = enableInterfaceBinding;
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
@@ -102,6 +106,16 @@
             stringByReplacingOccurrencesOfString:@"{{ native_filter_typed_config }}"
                                       withString:nativeFilterConfig.typedConfig];
     [customFilters appendString:filterConfig];
+  }
+
+  if (self.enableGzip) {
+    NSString *gzipFilterInsert = [[NSString alloc] initWithUTF8String:gzip_config_insert];
+    [customFilters appendString:gzipFilterInsert];
+  }
+
+  if (self.enableBrotli) {
+    NSString *brotliFilterInsert = [[NSString alloc] initWithUTF8String:brotli_config_insert];
+    [customFilters appendString:brotliFilterInsert];
   }
 
   BOOL hasDirectResponses = self.directResponses.length > 0;
