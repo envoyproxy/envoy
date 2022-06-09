@@ -31,7 +31,8 @@ public:
   MOCK_METHOD(void, Run, (bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>*));
 };
 
-class EnvoyQuicProofVerifierTest : public testing::Test {
+class EnvoyQuicProofVerifierTest : public ::testing::Test,
+                                   public testing::WithParamInterface<bool> {
 public:
   EnvoyQuicProofVerifierTest()
       : root_ca_cert_(cert_chain_.substr(cert_chain_.rfind("-----BEGIN CERTIFICATE-----"))),
@@ -40,6 +41,8 @@ public:
           std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
           return chain[0];
         }()) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_async_cert_validation",
+                                  GetParam());
     ON_CALL(client_context_config_, cipherSuites)
         .WillByDefault(ReturnRef(
             Extensions::TransportSockets::Tls::ClientContextConfigImpl::DEFAULT_CIPHER_SUITES));
@@ -108,7 +111,9 @@ protected:
   NiceMock<MockProofVerifyContext> verify_context_;
 };
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicProofVerifierTests, EnvoyQuicProofVerifierTest, testing::Bool());
+
+TEST_P(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
   configCertVerificationDetails(true);
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(leaf_cert_);
@@ -127,7 +132,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
   EXPECT_TRUE(cloned->isValid());
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainSuccess) {
+TEST_P(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainSuccess) {
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     return;
   }
@@ -166,7 +171,7 @@ typed_config:
   verify_timer->invokeCallback();
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureFromSsl) {
+TEST_P(EnvoyQuicProofVerifierTest, VerifyCertChainFailureFromSsl) {
   configCertVerificationDetails(false);
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(leaf_cert_);
@@ -179,20 +184,26 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureFromSsl) {
                                        {leaf_cert_}, ocsp_response, cert_sct, &verify_context_,
                                        &error_details, &verify_details, nullptr, nullptr))
       << error_details;
-  EXPECT_EQ("verify cert failed: X509_verify_cert: certificate verification error at depth 1: "
-            "certificate has expired",
-            error_details);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
+    EXPECT_EQ("verify cert failed: X509_verify_cert: certificate verification error at depth 1: "
+              "certificate has expired",
+              error_details);
+  } else {
+    EXPECT_EQ("X509_verify_cert: certificate verification error at depth 1: "
+              "certificate has expired",
+              error_details);
+  }
   EXPECT_NE(verify_details, nullptr);
   EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidCA) {
+TEST_P(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidCA) {
   root_ca_cert_ = "invalid root CA";
   EXPECT_THROW_WITH_REGEX(configCertVerificationDetails(true), EnvoyException,
                           "Failed to load trusted CA certificates from");
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
+TEST_P(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
   configCertVerificationDetails(true);
   const std::string ocsp_response;
   const std::string cert_sct;
@@ -206,7 +217,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
   EXPECT_EQ("d2i_X509: fail to parse DER", error_details);
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureLeafCertWithGarbage) {
+TEST_P(EnvoyQuicProofVerifierTest, VerifyCertChainFailureLeafCertWithGarbage) {
   configCertVerificationDetails(true);
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(leaf_cert_);
@@ -224,7 +235,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureLeafCertWithGarbage) {
   EXPECT_EQ("There is trailing garbage in DER.", error_details);
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
+TEST_P(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
   configCertVerificationDetails(true);
   const std::string ocsp_response;
   const std::string cert_sct;
@@ -238,7 +249,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
   EXPECT_EQ("Leaf certificate doesn't match hostname: unknown.org", error_details);
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainFailureInvalidHost) {
+TEST_P(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainFailureInvalidHost) {
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
     return;
   }
@@ -277,7 +288,7 @@ typed_config:
   verify_timer->invokeCallback();
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureUnsupportedECKey) {
+TEST_P(EnvoyQuicProofVerifierTest, VerifyCertChainFailureUnsupportedECKey) {
   configCertVerificationDetails(true);
   const std::string ocsp_response;
   const std::string cert_sct;
@@ -312,7 +323,7 @@ VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
   EXPECT_EQ("Invalid leaf cert, only P-256 ECDSA certificates are supported", error_details);
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureNonServerAuthEKU) {
+TEST_P(EnvoyQuicProofVerifierTest, VerifyCertChainFailureNonServerAuthEKU) {
   // Override the CA cert with cert copied from test/config/integration/certs/cacert.pem.
   root_ca_cert_ = R"(-----BEGIN CERTIFICATE-----
 MIID3TCCAsWgAwIBAgIUdCu/mLip3X/We37vh3BA9u/nxakwDQYJKoZIhvcNAQEL
@@ -380,13 +391,24 @@ ZCFbredVxDBZuoVsfrKPSQa407Jj1Q==
             verifier_->VerifyCertChain("lyft.com", 54321, chain, ocsp_response, cert_sct,
                                        &verify_context_, &error_details, &verify_details, nullptr,
                                        nullptr));
-  EXPECT_EQ("verify cert failed: X509_verify_cert: certificate verification error at depth 0: "
-            "unsupported certificate "
-            "purpose",
-            error_details);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
+    EXPECT_EQ("verify cert failed: X509_verify_cert: certificate verification error at depth 0: "
+              "unsupported certificate "
+              "purpose",
+              error_details);
+  } else {
+    EXPECT_EQ("X509_verify_cert: certificate verification error at depth 0: "
+              "unsupported certificate "
+              "purpose",
+              error_details);
+  }
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
+TEST_P(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
+    return;
+  }
+
   transport_socket_options_.reset(new Network::TransportSocketOptionsImpl("", {"non-example.com"}));
   configCertVerificationDetails(true);
   std::unique_ptr<quic::CertificateView> cert_view =
