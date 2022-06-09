@@ -1,7 +1,5 @@
 #include "source/common/common/regex.h"
 
-#include <bits/stdint-uintn.h>
-
 #include "envoy/common/exception.h"
 #include "envoy/extensions/regex_engine/v3/google_re2.pb.h"
 #include "envoy/extensions/regex_engine/v3/google_re2.pb.validate.h"
