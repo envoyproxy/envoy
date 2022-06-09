@@ -441,15 +441,34 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     upgrade_request_ = true;
   }
 
-  absl::string_view host_or_path_view;
-  if (is_connect) {
-    host_or_path_view = host->value().getStringView();
-  } else {
-    host_or_path_view = path->value().getStringView();
-  }
+  if (connection_.sendFullyQualifiedUrl() && !is_connect) {
+    const HeaderEntry* scheme = headers.Scheme();
+    if (!scheme) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Scheme.get()));
+    }
+    if (!host) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
+    }
+    ASSERT(path);
+    ASSERT(host);
 
-  connection_.buffer().addFragments(
-      {method->value().getStringView(), SPACE, host_or_path_view, REQUEST_POSTFIX});
+    std::string url = absl::StrCat(scheme->value().getStringView(), "://",
+                                   host->value().getStringView(), path->value().getStringView());
+    connection_.buffer().addFragments(
+        {method->value().getStringView(), SPACE, url, REQUEST_POSTFIX});
+  } else {
+    absl::string_view host_or_path_view;
+    if (is_connect) {
+      host_or_path_view = host->value().getStringView();
+    } else {
+      host_or_path_view = path->value().getStringView();
+    }
+
+    connection_.buffer().addFragments(
+        {method->value().getStringView(), SPACE, host_or_path_view, REQUEST_POSTFIX});
+  }
 
   encodeHeadersBase(headers, absl::nullopt, end_stream,
                     HeaderUtility::requestShouldHaveNoBody(headers));
