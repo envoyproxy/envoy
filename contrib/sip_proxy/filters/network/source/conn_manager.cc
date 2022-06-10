@@ -214,11 +214,17 @@ void ConnectionManager::continueHandling(MessageMetadataSharedPtr metadata,
   } catch (const AppException& ex) {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
     sendLocalReply(*(decoder_->metadata()), ex, false);
+
+    std::string&& k = std::string(decoder_->metadata()->transactionId().value());
+    if (transactions_.find(k) != transactions_.end()) {
+      transactions_[k]->setLocalResponseSent(true);
+    }
+
+    decoder_->complete();
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
 
-    // Transport/protocol mismatch (including errors in automatic detection). Just hang up
-    // since we don't know how to encode a response.
+    // Still unaware how to handle this, just close the connection
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -239,8 +245,7 @@ void ConnectionManager::dispatch() {
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
 
-    // Transport/protocol mismatch (including errors in automatic detection). Just hang up
-    // since we don't know how to encode a response.
+    // Still unaware how to handle this, just close the connection
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -467,18 +472,7 @@ FilterStatus ConnectionManager::ActiveTrans::messageBegin(MessageMetadataSharedP
   filter_context_ = metadata;
   filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
     MessageMetadataSharedPtr metadata = absl::any_cast<MessageMetadataSharedPtr>(filter_context_);
-    FilterStatus ret = FilterStatus::StopIteration;
-    try {
-      ret = filter->messageBegin(metadata);
-    } catch (AppException& ex) {
-      ENVOY_LOG(debug, "sip application exception: {}", ex.what());
-      sendLocalReply(ex, false);
-    } catch (EnvoyException& ex) {
-      ENVOY_CONN_LOG(error, "sip response error: {}", parent_.read_callbacks_->connection(),
-                     ex.what());
-      onError(ex.what());
-    }
-    return ret;
+    return filter->messageBegin(metadata);
   };
 
   return applyDecoderFilters(nullptr);
