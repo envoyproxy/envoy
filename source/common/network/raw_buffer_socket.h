@@ -34,9 +34,9 @@ private:
 };
 
 class RawBufferSocketFactory : public DownstreamTransportSocketFactory,
-                               public CommonTransportSocketFactory {
+                               public CommonUpstreamTransportSocketFactory {
 public:
-  // Network::TransportSocketFactory
+  // Network::UpstreamTransportSocketFactory
   TransportSocketPtr
   createTransportSocket(TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;

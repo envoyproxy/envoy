@@ -98,7 +98,7 @@ TEST_F(PassthroughTest, ConfigureInitialCongestionWindowDefersToInnerSocket) {
 TEST(PassthroughFactoryTest, TestDelegation) {
   auto inner_factory_ptr = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
   Network::MockTransportSocketFactory* inner_factory = inner_factory_ptr.get();
-  Network::TransportSocketFactoryPtr factory{std::move(inner_factory_ptr)};
+  Network::UpstreamTransportSocketFactoryPtr factory{std::move(inner_factory_ptr)};
 
   {
     EXPECT_CALL(*inner_factory, implementsSecureTransport());

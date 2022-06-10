@@ -16,7 +16,6 @@
 namespace Envoy {
 namespace Network {
 
-class TransportSocketFactory;
 class Connection;
 enum class ConnectionEvent;
 
@@ -267,9 +266,9 @@ public:
 /**
  * A factory for creating upstream transport sockets. It will be associated to clusters.
  */
-class TransportSocketFactory : public virtual TransportSocketFactoryBase {
+class UpstreamTransportSocketFactory : public virtual TransportSocketFactoryBase {
 public:
-  ~TransportSocketFactory() override = default;
+  ~UpstreamTransportSocketFactory() override = default;
 
   /**
    * @param options for creating the transport socket
@@ -301,7 +300,7 @@ public:
   virtual TransportSocketPtr createDownstreamTransportSocket() const PURE;
 };
 
-using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;
+using UpstreamTransportSocketFactoryPtr = std::unique_ptr<UpstreamTransportSocketFactory>;
 using DownstreamTransportSocketFactoryPtr = std::unique_ptr<DownstreamTransportSocketFactory>;
 
 } // namespace Network

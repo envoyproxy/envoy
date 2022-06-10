@@ -148,11 +148,11 @@ ProtobufTypes::MessagePtr AltsTransportSocketConfigFactory::createEmptyConfigPro
   return std::make_unique<envoy::extensions::transport_sockets::alts::v3::Alts>();
 }
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 UpstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& factory_ctxt) {
-  return createTransportSocketFactoryHelper<Network::TransportSocketFactoryPtr>(
+  return createTransportSocketFactoryHelper<Network::UpstreamTransportSocketFactoryPtr>(
       message, /* is_upstream */ true, factory_ctxt);
 }
 

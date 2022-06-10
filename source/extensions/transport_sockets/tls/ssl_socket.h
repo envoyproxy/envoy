@@ -98,7 +98,7 @@ private:
   SslHandshakerImplSharedPtr info_;
 };
 
-class ClientSslSocketFactory : public Network::CommonTransportSocketFactory,
+class ClientSslSocketFactory : public Network::CommonUpstreamTransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:

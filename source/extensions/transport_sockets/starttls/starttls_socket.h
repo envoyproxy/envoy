@@ -105,13 +105,13 @@ private:
   bool using_tls_{false};
 };
 
-class StartTlsSocketFactory : public Network::CommonTransportSocketFactory,
+class StartTlsSocketFactory : public Network::CommonUpstreamTransportSocketFactory,
                               Logger::Loggable<Logger::Id::config> {
 public:
   ~StartTlsSocketFactory() override = default;
 
-  StartTlsSocketFactory(Network::TransportSocketFactoryPtr raw_socket_factory,
-                        Network::TransportSocketFactoryPtr tls_socket_factory)
+  StartTlsSocketFactory(Network::UpstreamTransportSocketFactoryPtr raw_socket_factory,
+                        Network::UpstreamTransportSocketFactoryPtr tls_socket_factory)
       : raw_socket_factory_(std::move(raw_socket_factory)),
         tls_socket_factory_(std::move(tls_socket_factory)) {}
 
@@ -121,8 +121,8 @@ public:
   absl::string_view defaultServerNameIndication() const override { return ""; }
 
 private:
-  Network::TransportSocketFactoryPtr raw_socket_factory_;
-  Network::TransportSocketFactoryPtr tls_socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr raw_socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr tls_socket_factory_;
 };
 
 class StartTlsDownstreamSocketFactory : public Network::DownstreamTransportSocketFactory,

@@ -140,7 +140,7 @@ TransportSocketPtr createRawBufferSocket();
  * Create a transport socket factory for testing purposes.
  * @return TransportSocketFactoryPtr the transport socket factory to use with a cluster
  */
-TransportSocketFactoryPtr createRawBufferSocketFactory();
+UpstreamTransportSocketFactoryPtr createRawBufferSocketFactory();
 
 /**
  * Create a transport socket factory for testing purposes.

@@ -33,7 +33,7 @@ public:
   TransportSocketCallbacks* callbacks_{};
 };
 
-class MockTransportSocketFactory : public TransportSocketFactory {
+class MockTransportSocketFactory : public UpstreamTransportSocketFactory {
 public:
   MockTransportSocketFactory();
   ~MockTransportSocketFactory() override;

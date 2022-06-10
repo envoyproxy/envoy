@@ -37,7 +37,7 @@ QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::st
 // socket for QUIC in current implementation. This factory doesn't provides a
 // transport socket, instead, its derived class provides TLS context config for
 // server and client.
-class QuicTransportSocketFactoryBase : public Network::CommonTransportSocketFactory,
+class QuicTransportSocketFactoryBase : public Network::CommonUpstreamTransportSocketFactory,
                                        protected Logger::Loggable<Logger::Id::quic> {
 public:
   QuicTransportSocketFactoryBase(Stats::Scope& store, const std::string& perspective)
@@ -46,7 +46,7 @@ public:
   // To be called right after construction.
   virtual void initialize() PURE;
 
-  // Network::TransportSocketFactory
+  // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr /*options*/) const override {
     PANIC("not implemented");
@@ -179,7 +179,7 @@ class QuicClientTransportSocketConfigFactory
       public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
   // Server::Configuration::UpstreamTransportSocketConfigFactory
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
 

@@ -51,7 +51,7 @@ TapSocketFactory::TapSocketFactory(
     Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_thread_dispatcher,
-    Network::TransportSocketFactoryPtr&& transport_socket_factory)
+    Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
                           singleton_manager, tls, main_thread_dispatcher),
       PassthroughFactory(std::move(transport_socket_factory)) {}

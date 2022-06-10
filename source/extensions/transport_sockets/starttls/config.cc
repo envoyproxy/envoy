@@ -30,7 +30,8 @@ DownstreamStartTlsSocketFactory::createTransportSocketFactory(
                                                            std::move(tls_socket_factory));
 }
 
-Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTransportSocketFactory(
+Network::UpstreamTransportSocketFactoryPtr
+UpstreamStartTlsSocketFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
 
@@ -40,11 +41,11 @@ Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTranspor
   auto& raw_socket_config_factory = rawSocketConfigFactory();
   auto& tls_socket_config_factory = tlsSocketConfigFactory();
 
-  Network::TransportSocketFactoryPtr raw_socket_factory =
+  Network::UpstreamTransportSocketFactoryPtr raw_socket_factory =
       raw_socket_config_factory.createTransportSocketFactory(outer_config.cleartext_socket_config(),
                                                              context);
 
-  Network::TransportSocketFactoryPtr tls_socket_factory =
+  Network::UpstreamTransportSocketFactoryPtr tls_socket_factory =
       tls_socket_config_factory.createTransportSocketFactory(outer_config.tls_socket_config(),
                                                              context);
 

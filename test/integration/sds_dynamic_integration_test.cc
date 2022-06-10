@@ -315,7 +315,7 @@ resources:
   }
 
 protected:
-  Network::TransportSocketFactoryPtr client_ssl_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
   bool dual_cert_{false};
 };
 

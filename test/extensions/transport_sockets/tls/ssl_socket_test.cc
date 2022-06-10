@@ -5397,7 +5397,7 @@ protected:
   Network::ListenerPtr listener_;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext upstream_tls_context_;
   Envoy::Ssl::ClientContextSharedPtr client_ctx_;
-  Network::TransportSocketFactoryPtr client_ssl_socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr client_ssl_socket_factory_;
   Network::ClientConnectionPtr client_connection_;
   Network::TransportSocket* client_transport_socket_{};
   Network::ConnectionPtr server_connection_;

@@ -27,7 +27,7 @@ public:
   UpstreamTcpStatsSocketFactory(
       Server::Configuration::TransportSocketFactoryContext& context,
       const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
-      Network::TransportSocketFactoryPtr&& inner_factory);
+      Network::UpstreamTransportSocketFactoryPtr&& inner_factory);
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;

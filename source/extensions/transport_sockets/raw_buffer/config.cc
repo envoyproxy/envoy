@@ -12,7 +12,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace RawBuffer {
 
-Network::TransportSocketFactoryPtr UpstreamRawBufferSocketFactory::createTransportSocketFactory(
+Network::UpstreamTransportSocketFactoryPtr
+UpstreamRawBufferSocketFactory::createTransportSocketFactory(
     const Protobuf::Message&, Server::Configuration::TransportSocketFactoryContext&) {
   return std::make_unique<Network::RawBufferSocketFactory>();
 }

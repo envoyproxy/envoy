@@ -40,7 +40,7 @@ void XfccIntegrationTest::TearDown() {
   context_manager_.reset();
 }
 
-Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(bool mtls) {
+Network::UpstreamTransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(bool mtls) {
   const std::string yaml_tls = R"EOF(
 common_tls_context:
   validation_context:
@@ -97,7 +97,7 @@ common_tls_context:
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
       config, factory_context_);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
-  return Network::TransportSocketFactoryPtr{
+  return Network::UpstreamTransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
           std::move(cfg), *context_manager_, *client_stats_store)};
 }

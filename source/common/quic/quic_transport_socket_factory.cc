@@ -33,7 +33,7 @@ ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyCon
       envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>();
 }
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config,
     Server::Configuration::TransportSocketFactoryContext& context) {

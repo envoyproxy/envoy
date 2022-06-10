@@ -47,7 +47,7 @@ class UpstreamStartTlsSocketFactory
           Server::Configuration::UpstreamTransportSocketConfigFactory,
           envoy::extensions::transport_sockets::starttls::v3::UpstreamStartTlsConfig> {
 public:
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
 };

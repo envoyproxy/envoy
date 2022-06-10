@@ -21,7 +21,7 @@ class UpstreamTapSocketConfigFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
       public TapSocketConfigFactory {
 public:
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
 };

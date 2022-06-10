@@ -27,7 +27,7 @@ TcpStatsSocketFactory::TcpStatsSocketFactory(
 UpstreamTcpStatsSocketFactory::UpstreamTcpStatsSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& context,
     const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
-    Network::TransportSocketFactoryPtr&& inner_factory)
+    Network::UpstreamTransportSocketFactoryPtr&& inner_factory)
     : TcpStatsSocketFactory(context, config), PassthroughFactory(std::move(inner_factory)) {}
 
 Network::TransportSocketPtr UpstreamTcpStatsSocketFactory::createTransportSocket(
@@ -76,7 +76,7 @@ class UpstreamTcpStatsConfigFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
       public TcpStatsConfigFactory {
 public:
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override {
     const auto& outer_config = MessageUtil::downcastAndValidate<

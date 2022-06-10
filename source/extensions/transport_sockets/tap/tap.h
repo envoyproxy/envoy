@@ -34,9 +34,9 @@ public:
                    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
                    Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
                    Event::Dispatcher& main_thread_dispatcher,
-                   Network::TransportSocketFactoryPtr&& transport_socket_factory);
+                   Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory);
 
-  // Network::TransportSocketFactory
+  // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
 };
@@ -51,7 +51,7 @@ public:
       Event::Dispatcher& main_thread_dispatcher,
       Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory);
 
-  // Network::TransportSocketFactory
+  // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr createDownstreamTransportSocket() const override;
 };
 

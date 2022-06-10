@@ -128,10 +128,10 @@ private:
 };
 
 /**
- * An implementation of Network::TransportSocketFactory for TsiSocket
+ * An implementation of Network::UpstreamTransportSocketFactory for TsiSocket
  */
 class TsiSocketFactory : public Network::DownstreamTransportSocketFactory,
-                         public Network::CommonTransportSocketFactory {
+                         public Network::CommonUpstreamTransportSocketFactory {
 public:
   TsiSocketFactory(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
 

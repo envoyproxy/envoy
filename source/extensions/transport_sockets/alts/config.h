@@ -19,7 +19,7 @@ class UpstreamAltsTransportSocketConfigFactory
     : public AltsTransportSocketConfigFactory,
       public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
-  Network::TransportSocketFactoryPtr
+  Network::UpstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message&,
                                Server::Configuration::TransportSocketFactoryContext&) override;
 };

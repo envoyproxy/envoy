@@ -31,7 +31,8 @@ private:
   TimeSource& time_source_;
 };
 
-Network::TransportSocketFactoryPtr UpstreamTapSocketConfigFactory::createTransportSocketFactory(
+Network::UpstreamTransportSocketFactoryPtr
+UpstreamTapSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
   const auto& outer_config =
