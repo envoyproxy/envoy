@@ -90,6 +90,7 @@ public:
       // If create listener filter chain failed, it means the listener is missing
       // config due to the ECDS. Then close the connection directly.
       active_socket->socket_->close();
+      ASSERT(active_socket->iter_ == active_socket->accept_filters_.end());
     }
 
     // Move active_socket to the sockets_ list if filter iteration needs to continue later.
