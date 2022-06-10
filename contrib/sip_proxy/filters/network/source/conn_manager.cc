@@ -474,7 +474,8 @@ FilterStatus ConnectionManager::ActiveTrans::messageBegin(MessageMetadataSharedP
       ENVOY_LOG(debug, "sip application exception: {}", ex.what());
       sendLocalReply(ex, false);
     } catch (EnvoyException& ex) {
-      ENVOY_CONN_LOG(error, "sip response error: {}", parent_.read_callbacks_->connection(), ex.what());
+      ENVOY_CONN_LOG(error, "sip response error: {}", parent_.read_callbacks_->connection(),
+                     ex.what());
       onError(ex.what());
     }
     return ret;
