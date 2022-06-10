@@ -224,7 +224,7 @@ public:
   MOCK_METHOD(bool, recreateStream, (const ResponseHeaderMap* headers));
   MOCK_METHOD(void, addUpstreamSocketOptions, (const Network::Socket::OptionsSharedPtr& options));
   MOCK_METHOD(Network::Socket::OptionsSharedPtr, getUpstreamSocketOptions, (), (const));
-  MOCK_METHOD(Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
+  MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
   MOCK_METHOD(void, traversePerFilterConfig,
               (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
 
@@ -313,7 +313,7 @@ public:
   MOCK_METHOD(void, setEncoderBufferLimit, (uint32_t));
   MOCK_METHOD(uint32_t, encoderBufferLimit, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
-  MOCK_METHOD(Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
+  MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
   MOCK_METHOD(void, traversePerFilterConfig,
               (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
 

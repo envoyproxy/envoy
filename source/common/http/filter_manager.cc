@@ -277,7 +277,8 @@ void ActiveStreamFilterBase::resetIdleTimer() {
   parent_.filter_manager_callbacks_.resetIdleTimer();
 }
 
-Router::RouteSpecificFilterConfig* ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
+const Router::RouteSpecificFilterConfig*
+ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
   ASSERT(base_filter_ != nullptr);
   auto route = parent_.filter_manager_callbacks_.route(nullptr);
   if (route == nullptr) {
@@ -297,6 +298,7 @@ Router::RouteSpecificFilterConfig* ActiveStreamFilterBase::mostSpecificPerFilter
 void ActiveStreamFilterBase::traversePerFilterConfig(
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
   ASSERT(base_filter_ != nullptr);
+  auto route = parent_.filter_manager_callbacks_.route(nullptr);
   if (route == nullptr) {
     return;
   }
