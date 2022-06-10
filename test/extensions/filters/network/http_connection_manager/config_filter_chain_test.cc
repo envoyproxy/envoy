@@ -109,6 +109,49 @@ http_filters:
   EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound));
 }
 
+// Test the filter name or config name can be set correctly.
+TEST_F(FilterChainTest, FilterNameTest) {
+  const std::string yaml_config = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: encoder-decoder-buffer-filter
+- name: custom-route-name
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_config), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+
+  Http::MockFilterChainFactoryCallbacks callbacks;
+  EXPECT_CALL(callbacks, addStreamFilter(_))
+      .WillOnce(Invoke([](Http::StreamFilterSharedPtr filter) {
+        EXPECT_EQ("encoder-decoder-buffer-filter", filter->filterName());
+        EXPECT_EQ("encoder-decoder-buffer-filter", filter->customName());
+      }));
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_))
+      .WillOnce(Invoke([](Http::StreamDecoderFilterSharedPtr filter) {
+        EXPECT_EQ("envoy.filters.http.router", filter->filterName());
+        EXPECT_EQ("custom-route-name", filter->customName());
+      }));
+  config.createFilterChain(callbacks);
+}
+
 // Tests where upgrades are configured on via the HCM.
 TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(basic_config_);
