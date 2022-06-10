@@ -229,6 +229,7 @@ public:
               (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
 
   // Http::StreamDecoderFilterCallbacks
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void sendLocalReply_(Code code, absl::string_view body,
                        std::function<void(ResponseHeaderMap& headers)> modify_headers,
                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
