@@ -103,7 +103,7 @@ message BuildVersion {
 }
 
 // Version and identification for an Envoy extension.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Extension {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Extension";
 
@@ -121,7 +121,8 @@ message Extension {
   // [#not-implemented-hide:] Type descriptor of extension configuration proto.
   // [#comment:TODO(yanavlasov): Link to the doc with existing configuration protos.]
   // [#comment:TODO(yanavlasov): Add tests when PR #9391 lands.]
-  string type_descriptor = 3;
+  string type_descriptor = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The version is a property of the extension and maintained independently
   // of other extensions and the Envoy API.
@@ -130,6 +131,9 @@ message Extension {
 
   // Indicates that the extension is present but was disabled via dynamic configuration.
   bool disabled = 5;
+
+  // Type URLs of extension configuration protos.
+  repeated string type_urls = 6;
 }
 
 // Identifies a specific Envoy instance. The node identifier is presented to the
