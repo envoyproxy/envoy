@@ -50,6 +50,18 @@ genrule(
 envoy_genjson(
     name = "data_srcs",
     srcs = [":manifest.json"],
+    # manifest:
+    #   validated protodoc manifest (from `docs/protodoc_manifest.yaml`)
+    #   contains edge config examples.
+    # extensions/contrib_extensions:
+    #    extensions metadata (from `source/extensions/extensions_metdata.yaml`
+    #    and `contrib/extensions_metadata.yaml`)
+    # extension/contrib_extension_categories
+    #    index of extensions_categories -> extension (taken from metadata)
+    # extension_status_values:
+    #    schema for possible extension status (eg wip/stable)
+    # extension_security_postures:
+    #    schema for possible security postures (eg un/trusted up/downstream)
     filter = """
     {manifest: .[0],
      extensions: .[1],
