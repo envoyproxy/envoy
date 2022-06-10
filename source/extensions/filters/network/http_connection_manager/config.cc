@@ -170,7 +170,7 @@ public:
     callback_.addAccessLogHandler(std::move(handler));
   }
 
-  Event::Dispatcher& dispatcher() override { callback_.dispatcher(); }
+  Event::Dispatcher& dispatcher() override { return callback_.dispatcher(); }
 
   absl::string_view custom_name_;
   absl::string_view filter_name_;

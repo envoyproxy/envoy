@@ -42,7 +42,7 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 
 using FilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Filer::NamedHttpFilterFactoryCb,
+    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
                                         Server::Configuration::FactoryContext>;
 
 /**
