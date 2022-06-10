@@ -37,16 +37,15 @@ QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::st
 // socket for QUIC in current implementation. This factory doesn't provides a
 // transport socket, instead, its derived class provides TLS context config for
 // server and client.
-class QuicTransportSocketFactoryBase : public Network::CommonUpstreamTransportSocketFactory,
-                                       protected Logger::Loggable<Logger::Id::quic> {
+class QuicTransportSocketFactoryBase : protected Logger::Loggable<Logger::Id::quic> {
 public:
   QuicTransportSocketFactoryBase(Stats::Scope& store, const std::string& perspective)
       : stats_(generateStats(store, perspective)) {}
 
+  virtual ~QuicTransportSocketFactoryBase() = default;
+
   // To be called right after construction.
   virtual void initialize() PURE;
-
-  bool implementsSecureTransport() const override { return true; }
 
 protected:
   virtual void onSecretUpdated() PURE;
@@ -67,6 +66,7 @@ public:
   Network::TransportSocketPtr createDownstreamTransportSocket() const override {
     PANIC("not implemented");
   }
+  bool implementsSecureTransport() const override { return true; }
 
   void initialize() override {
     config_->setSecretUpdateCallback([this]() {
@@ -96,13 +96,15 @@ private:
   bool enable_early_data_;
 };
 
-class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
+class QuicClientTransportSocketFactory : public Network::CommonUpstreamTransportSocketFactory,
+                                         public QuicTransportSocketFactoryBase {
 public:
   QuicClientTransportSocketFactory(
       Ssl::ClientContextConfigPtr config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
 
   void initialize() override {}
+  bool implementsSecureTransport() const override { return true; }
   bool supportsAlpn() const override { return true; }
   absl::string_view defaultServerNameIndication() const override {
     return clientContextConfig().serverNameIndication();
