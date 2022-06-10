@@ -42,7 +42,7 @@ message Audience {
 
 // Token Cache configuration.
 message TokenCacheConfig {
-  // The number of cache entries.
+  // The number of cache entries. The maximum number of entries is INT64_MAX as it is constrained by underlying cache implementation.
   // Default value 0 (i.e., proto3 defaults) disables the cache by default. Other default values will enable the cache.
-  google.protobuf.Int64Value cache_size = 1;
+  google.protobuf.UInt64Value cache_size = 1 [(validate.rules).uint64 = {lte: 9223372036854775807}];
 }
