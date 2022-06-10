@@ -26,6 +26,8 @@ BBR
 BIDIRECTIONAL
 BSON
 BPF
+Bdecoded
+Bencoded
 Repick
 TRA
 btree

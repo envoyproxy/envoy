@@ -126,7 +126,7 @@ std::string ConfigHelper::tcpProxyConfig() {
         name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-          stat_prefix: tcp_stats
+          stat_prefix: tcpproxy_stats
           cluster: cluster_0
 )EOF");
 }
