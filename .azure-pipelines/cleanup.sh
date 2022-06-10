@@ -34,5 +34,13 @@ sudo apt-get purge -y --no-upgrade "${PURGE_PACKAGES[@]}"
 
 dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -rn
 
+MORE_BLOAT=(
+    /usr/local/lib/android/
+    /opt/hostedtoolcache
+    /usr/local/.ghcup
+    /usr/share/dotnet)
+echo "Remove leftover bloat: ${MORE_BLOAT[*]}"
+sudo rm -rf "${MORE_BLOAT[@]}"
+
 echo "Disk space after package removal"
 df -h
