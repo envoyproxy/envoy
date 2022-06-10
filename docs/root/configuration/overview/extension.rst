@@ -99,6 +99,7 @@ Listener Filters
 For Listener filters, the discovery service configuration is: :ref:`dynamic listener filter
 re-configuration<envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`.
 Note, the dynamic listener filter config is only supported in TCP listeners.
+If the dynamic config is missing, the connection will be rejected until a valid config is updated.
 
 Listener filter Extension config discovery service has a :ref:`statistics
 <subscription_statistics>` tree rooted at listener.<address>. (or listener.<stat_prefix>. if :ref:`stat_prefix
