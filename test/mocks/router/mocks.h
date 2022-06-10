@@ -570,7 +570,7 @@ class MockGenericConnPool : public GenericConnPool {
 
 class MockUpstreamToDownstream : public UpstreamToDownstream {
 public:
-  MOCK_METHOD(const RouteEntry&, routeEntry, (), (const));
+  MOCK_METHOD(const Route&, route, (), (const));
   MOCK_METHOD(const Network::Connection&, connection, (), (const));
 
   MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));

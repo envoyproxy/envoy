@@ -1309,9 +1309,9 @@ public:
 class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
 public:
   /**
-   * @return return the routeEntry for the downstream stream.
+   * @return return the route for the downstream stream.
    */
-  virtual const RouteEntry& routeEntry() const PURE;
+  virtual const Route& route() const PURE;
   /**
    * @return return the connection for the downstream stream.
    */
