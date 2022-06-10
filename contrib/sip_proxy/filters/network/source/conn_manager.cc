@@ -469,13 +469,13 @@ FilterStatus ConnectionManager::ActiveTrans::messageBegin(MessageMetadataSharedP
     MessageMetadataSharedPtr metadata = absl::any_cast<MessageMetadataSharedPtr>(filter_context_);
     FilterStatus ret = FilterStatus::StopIteration;
     try {
-        ret = filter->messageBegin(metadata);
+      ret = filter->messageBegin(metadata);
     } catch (AppException& ex) {
-        ENVOY_LOG(debug, "sip application exception: {}", ex.what());
-        sendLocalReply(ex, false);
+      ENVOY_LOG(debug, "sip application exception: {}", ex.what());
+      sendLocalReply(ex, false);
     } catch (EnvoyException& ex) {
-        ENVOY_CONN_LOG(error, "sip response error: {}", parent_.read_callbacks_->connection(), ex.what());
-        onError(ex.what());
+      ENVOY_CONN_LOG(error, "sip response error: {}", parent_.read_callbacks_->connection(), ex.what());
+      onError(ex.what());
     }
     return ret;
   };
