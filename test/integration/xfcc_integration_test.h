@@ -48,7 +48,7 @@ public:
 
   void TearDown() override;
 
-  Network::TransportSocketFactoryPtr createUpstreamSslContext();
+  Network::DownstreamTransportSocketFactoryPtr createUpstreamSslContext();
   Network::TransportSocketFactoryPtr createClientSslContext(bool mtls);
   Network::ClientConnectionPtr makeTcpClientConnection();
   Network::ClientConnectionPtr makeTlsClientConnection();
