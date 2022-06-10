@@ -48,6 +48,10 @@ genrule(
 )
 
 envoy_genjson(
+    # This prepares the data for `protodoc`
+    # As protodoc can be run many times while building the api docs, all
+    # data is prepared, validated and normalized before being passed to
+    # `protodoc`
     name = "data_srcs",
     srcs = [":manifest.json"],
     # manifest:
