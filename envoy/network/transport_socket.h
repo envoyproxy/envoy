@@ -248,19 +248,6 @@ public:
    * @return bool whether the transport socket implements secure transport.
    */
   virtual bool implementsSecureTransport() const PURE;
-
-  /**
-   * Returns true if the transport socket created by this factory supports some form of ALPN
-   * negotiation.
-   */
-  virtual bool supportsAlpn() const { return false; }
-
-  /**
-   * Returns the default SNI for transport sockets created by this factory.
-   * This will return an empty string view if the transport sockets created are
-   * not client-side TLS sockets.
-   */
-  virtual absl::string_view defaultServerNameIndication() const PURE;
 };
 
 /**
@@ -276,6 +263,19 @@ public:
    */
   virtual TransportSocketPtr
   createTransportSocket(TransportSocketOptionsConstSharedPtr options) const PURE;
+
+  /**
+   * Returns true if the transport socket created by this factory supports some form of ALPN
+   * negotiation.
+   */
+  virtual bool supportsAlpn() const { return false; }
+
+  /**
+   * Returns the default SNI for transport sockets created by this factory.
+   * This will return an empty string view if the transport sockets created are
+   * not client-side TLS sockets.
+   */
+  virtual absl::string_view defaultServerNameIndication() const PURE;
 
   /**
    * @param key supplies a vector of bytes to which the option should append hash key data that will

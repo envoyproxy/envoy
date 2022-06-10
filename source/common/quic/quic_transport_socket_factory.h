@@ -46,13 +46,7 @@ public:
   // To be called right after construction.
   virtual void initialize() PURE;
 
-  // Network::UpstreamTransportSocketFactory
-  Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr /*options*/) const override {
-    PANIC("not implemented");
-  }
   bool implementsSecureTransport() const override { return true; }
-  bool supportsAlpn() const override { return true; }
 
 protected:
   virtual void onSecretUpdated() PURE;
@@ -93,7 +87,6 @@ public:
   }
 
   bool earlyDataEnabled() const { return enable_early_data_; }
-  absl::string_view defaultServerNameIndication() const override { return ""; }
 
 protected:
   void onSecretUpdated() override { stats_.context_config_update_by_sds_.inc(); }
@@ -110,6 +103,7 @@ public:
       Server::Configuration::TransportSocketFactoryContext& factory_context);
 
   void initialize() override {}
+  bool supportsAlpn() const override { return true; }
   absl::string_view defaultServerNameIndication() const override {
     return clientContextConfig().serverNameIndication();
   }

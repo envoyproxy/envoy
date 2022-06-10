@@ -143,7 +143,6 @@ public:
 
   Network::TransportSocketPtr createDownstreamTransportSocket() const override;
   bool implementsSecureTransport() const override;
-  absl::string_view defaultServerNameIndication() const override { return ""; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;

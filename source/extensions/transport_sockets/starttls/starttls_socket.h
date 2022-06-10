@@ -137,7 +137,6 @@ public:
 
   Network::TransportSocketPtr createDownstreamTransportSocket() const override;
   bool implementsSecureTransport() const override { return false; }
-  absl::string_view defaultServerNameIndication() const override { return ""; }
 
 private:
   Network::DownstreamTransportSocketFactoryPtr raw_socket_factory_;
