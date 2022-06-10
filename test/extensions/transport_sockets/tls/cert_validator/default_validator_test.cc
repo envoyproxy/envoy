@@ -192,7 +192,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
             default_validator
                 ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr,
                                     /*ssl_extended_info=*/nullptr,
-                                    /*transport_socket_options=*/nullptr, *ssl_ctx, "", false,
+                                    /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false,
                                     SSL_AD_INTERNAL_ERROR)
                 .status);
 }
@@ -212,7 +212,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithEmptyCertChain) {
   EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
             default_validator
                 ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &extended_socket_info,
-                                    /*transport_socket_options=*/nullptr, *ssl_ctx, "", false,
+                                    /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false,
                                     SSL_AD_INTERNAL_ERROR)
                 .status);
   EXPECT_EQ(extended_socket_info.certificateValidationStatus(),

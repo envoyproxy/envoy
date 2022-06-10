@@ -29,7 +29,8 @@ public:
   virtual Event::Dispatcher& dispatcher() const PURE;
   virtual bool isServer() const PURE;
   virtual const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() const PURE;
-  virtual absl::string_view getEchNameOverrride() const PURE;
+  virtual Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext
+  extraValidationContext() const PURE;
 };
 
 using EnvoyQuicProofVerifyContextPtr = std::unique_ptr<EnvoyQuicProofVerifyContext>;

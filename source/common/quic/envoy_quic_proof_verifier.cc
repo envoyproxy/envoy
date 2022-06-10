@@ -118,7 +118,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
           ->customVerifyCertChainForQuic(
               *cert_chain, std::unique_ptr<QuicValidateResultCallback>(envoy_callback),
               verify_context->isServer(), verify_context->transportSocketOptions().get(),
-              verify_context->getEchNameOverrride());
+              verify_context->extraValidationContext());
   if (result.status == ValidationResults::ValidationStatus::Pending) {
     // Retain leaf cert while asynchronously verifying the cert chain.
     envoy_callback->storeLeafCert(certs[0]);

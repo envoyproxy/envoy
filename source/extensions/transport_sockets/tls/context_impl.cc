@@ -495,18 +495,12 @@ ContextImpl::customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_s
     ENVOY_LOG(debug, "verify cert failed: no cert chain");
     return {ValidationResults::ValidationStatus::Failed, SSL_AD_INTERNAL_ERROR, absl::nullopt};
   }
-  const char* name = nullptr;
-  size_t name_len = 0;
-#ifndef BORINGSSL_FIPS
-  SSL_get0_ech_name_override(ssl, &name, &name_len);
-#endif
-  absl::string_view ech_name_override(name, name_len);
   ASSERT(cert_validator_);
   // Do not provide async callback here, but defer its creation to extended_socket_info if the
   // validation is async.
   ValidationResults result = cert_validator_->doVerifyCertChain(
       *cert_chain, nullptr, extended_socket_info, transport_socket_options, *SSL_get_SSL_CTX(ssl),
-      ech_name_override, SSL_is_server(ssl), current_tls_alert);
+      {}, SSL_is_server(ssl), current_tls_alert);
   if (result.status != ValidationResults::ValidationStatus::Pending) {
     extended_socket_info->onCertificateValidationCompleted(
         result.status == ValidationResults::ValidationStatus::Successful);
@@ -1255,7 +1249,7 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509)& intermediates
 ValidationResults ContextImpl::customVerifyCertChainForQuic(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
     const Network::TransportSocketOptions* transport_socket_options,
-    absl::string_view ech_name_override) {
+    const CertValidator::ExtraValidationContext& validation_context) {
   ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
   ASSERT(!tls_contexts_.empty());
   // It doesn't matter which SSL context is used, because they share the same cert validation
@@ -1267,7 +1261,7 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
   }
   ValidationResults result = cert_validator_->doVerifyCertChain(
       cert_chain, std::move(callback), /*extended_socket_info=*/nullptr, transport_socket_options,
-      *ssl_ctx, ech_name_override, is_server, SSL_AD_CERTIFICATE_UNKNOWN);
+      *ssl_ctx, validation_context, is_server, SSL_AD_CERTIFICATE_UNKNOWN);
   return result;
 }
 

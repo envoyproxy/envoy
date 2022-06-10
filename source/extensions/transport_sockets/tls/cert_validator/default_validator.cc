@@ -308,7 +308,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptions* transport_socket_options, SSL_CTX& ssl_ctx,
-    absl::string_view ech_name_override, bool is_server, uint8_t current_tls_alert) {
+    const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server,
+    uint8_t current_tls_alert) {
   if (sk_X509_num(&cert_chain) == 0) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(
@@ -332,11 +333,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
         !X509_STORE_CTX_set_default(ctx.get(), is_server ? "ssl_client" : "ssl_server") ||
         // Anything non-default in "param" should overwrite anything in the ctx.
         !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(ctx.get()),
-                                SSL_CTX_get0_param(&ssl_ctx)) ||
-        // ClientHelloOuter connections use a different name.
-        (!ech_name_override.empty() &&
-         !X509_VERIFY_PARAM_set1_host(X509_STORE_CTX_get0_param(ctx.get()),
-                                      ech_name_override.data(), ech_name_override.size()))) {
+                                SSL_CTX_get0_param(&ssl_ctx))) {
       OPENSSL_PUT_ERROR(SSL, ERR_R_X509_LIB);
       if (ssl_extended_info) {
         ssl_extended_info->setCertificateValidationStatus(

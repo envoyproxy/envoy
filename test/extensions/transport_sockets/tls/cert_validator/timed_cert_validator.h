@@ -31,7 +31,8 @@ public:
   doVerifyCertChain(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
                     Ssl::SslExtendedSocketInfo* ssl_extended_info,
                     const Network::TransportSocketOptions* transport_socket_options,
-                    SSL_CTX& ssl_ctx, absl::string_view ech_name_override, bool is_server,
+                    SSL_CTX& ssl_ctx,
+                    const CertValidator::ExtraValidationContext& validation_context, bool is_server,
                     uint8_t current_tls_alert) override;
 
   bool validationPending() const { return validation_timer_->enabled(); }
@@ -41,7 +42,7 @@ private:
   std::chrono::milliseconds validation_time_out_ms_;
   Ssl::ValidateResultCallbackPtr callback_;
   std::vector<std::string> cert_chain_in_str_;
-  std::string ech_name_override_;
+  CertValidator::ExtraValidationContext validation_context_;
 };
 
 class TimedCertValidatorFactory : public CertValidatorFactory {

@@ -30,11 +30,10 @@ public:
     return transport_socket_options_;
   }
 
-  absl::string_view getEchNameOverrride() const override {
-    const char* name = nullptr;
-    size_t name_len = 0;
-    SSL_get0_ech_name_override(ssl_info_.ssl(), &name, &name_len);
-    return {name, name_len};
+  Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext
+  extraValidationContext() const override {
+    ASSERT(ssl_info_.ssl());
+    return {};
   }
 
 private:
