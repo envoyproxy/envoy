@@ -556,6 +556,8 @@ public:
   const Address::Instance& remoteAddress() const {
     return *connectionInfoProvider().remoteAddress();
   }
+
+  Ssl::ConnectionInfoConstSharedPtr ssl() const { return connectionInfoProvider().sslConnection(); }
 };
 
 /**
