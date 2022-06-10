@@ -425,7 +425,6 @@ public:
     http_health_check:
       service_name_matcher:
         safe_regex:
-          google_re2: {}
           regex: 'locations-.*-.*$'
       path: /healthcheck
     )EOF";

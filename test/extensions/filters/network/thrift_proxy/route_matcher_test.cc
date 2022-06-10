@@ -330,7 +330,6 @@ routes:
       - name: "x-version"
         string_match:
           safe_regex:
-            google_re2: {}
             regex: "0.[5-9]"
     route:
       cluster: "cluster1"

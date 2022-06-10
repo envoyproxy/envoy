@@ -820,7 +820,6 @@ filter:
       name: test-header
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "\\d{3}"
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog

@@ -158,7 +158,6 @@ request_rules:
       value: foo
       regex_value_rewrite:
         pattern:
-          google_re2: {}
           regex: "^/(cluster[\\d\\w-]+)/?.*$"
         substitution: "\\1"
   )EOF";
@@ -177,7 +176,6 @@ request_rules:
       value: foo
       regex_value_rewrite:
         pattern:
-          google_re2: {}
           regex: "^/(cluster[\\d\\w-]+)/?.*$"
         substitution: "\\1"
   )EOF";

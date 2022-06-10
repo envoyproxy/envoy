@@ -47,7 +47,6 @@ public:
                     - name: "x-header-2"
                       string_match:
                         safe_regex:
-                          google_re2: {}
                           regex: "0.[5-9]"
                     - name: "x-header-3"
                       range_match:

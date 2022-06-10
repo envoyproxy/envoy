@@ -172,7 +172,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -221,7 +220,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -261,7 +259,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -302,7 +299,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -439,7 +435,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "\\d{3}test"
     route:
         cluster: user_service_dubbo_server

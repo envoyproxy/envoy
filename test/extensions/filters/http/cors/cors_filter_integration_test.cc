@@ -23,7 +23,6 @@ public:
           {
             auto* cors = virtual_host->mutable_cors();
             auto* regex = cors->add_allow_origin_string_match()->mutable_safe_regex();
-            regex->mutable_google_re2();
             regex->set_regex(".*");
             cors->set_allow_headers("content-type,x-grpc-web");
             cors->set_allow_methods("GET,POST");
@@ -73,7 +72,6 @@ public:
             auto* cors = route->mutable_route()->mutable_cors();
             auto* safe_regex =
                 cors->mutable_allow_origin_string_match()->Add()->mutable_safe_regex();
-            safe_regex->mutable_google_re2();
             safe_regex->set_regex(".*\\.envoyproxy\\.io");
           }
 

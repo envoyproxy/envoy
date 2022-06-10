@@ -61,7 +61,7 @@ TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
 // Regression test for https://github.com/envoyproxy/envoy/pull/21069 making
 // sure that the default error_level limits are not applied before runtime is
 // created. As described by the linked issue, this simply bypasses regex size checks.
-TEST_P(StatsIntegrationTest, WithLargeRegex) {
+TEST_P(StatsIntegrationTest, DEPRECATED_FEATURE_TEST(WithLargeGoogleRE2Regex)) {
   // This limit of 1000 will be ignored.
   config_helper_.addRuntimeOverride("re2.max_program_size.error_level", "1000");
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
