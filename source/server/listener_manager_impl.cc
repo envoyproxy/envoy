@@ -180,8 +180,9 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
     if (proto_config.config_type_case() ==
         envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
-      RELEASE_ASSERT(false, "For UDP listener, the dynamic listener filter configuration "
-                            "is not supported yet. This is wrong config. Abort Envoy.");
+      throw EnvoyException(fmt::format("UDP listener filter: {} is configured with "
+                                       "unsupported dynamic configuration",
+                                       proto_config.name()));
       return ret;
     }
     // Now see if there is a factory that will accept the config.
