@@ -198,6 +198,12 @@ message Shelf {
   int64 id = 1;
   // A theme of the shelf (fiction, poetry, etc).
   string theme = 2;
+
+  // To test json name is percentage decoded
+  string search_decoded = 3 [json_name = "search[decoded]"];
+
+  // To test json name is percentage encoded
+  string search_encoded = 4 [json_name = "search%5Bencoded%5D"];
 }
 
 // A book resource.
