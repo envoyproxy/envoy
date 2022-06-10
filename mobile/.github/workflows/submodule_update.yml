@@ -34,7 +34,7 @@ jobs:
         echo "::set-output name=maintainer::$current"
     - name: Create PR
       if: steps.state.outputs.dirty == 'true'
-      uses: peter-evans/create-pull-request@v3
+      uses: peter-evans/create-pull-request@923ad837f191474af6b1721408744feb989a4c27
       with:
         token: ${{ secrets.CREDENTIALS_GITHUB_PUSH_TOKEN }}
         title: Update Envoy
