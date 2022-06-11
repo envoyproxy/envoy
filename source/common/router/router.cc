@@ -659,10 +659,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ =
-      createRetryState(route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_,
-                       route_stats_config_ != nullptr?*route_stats_config_:RouteStatsConfigOptConstRef(), config_.runtime_, config_.random_,
-                       callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
+  retry_state_ = createRetryState(
+      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_,
+      route_stats_config_ != nullptr ? *route_stats_config_ : RouteStatsConfigOptConstRef(),
+      config_.runtime_, config_.random_, callbacks_->dispatcher(), config_.timeSource(),
+      route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys.
@@ -1852,9 +1853,10 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 RetryStatePtr
 ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                              const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                             RouteStatsConfigOptConstRef route_stats_config, Runtime::Loader& runtime,
-                             Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                             TimeSource& time_source, Upstream::ResourcePriority priority) {
+                             RouteStatsConfigOptConstRef route_stats_config,
+                             Runtime::Loader& runtime, Random::RandomGenerator& random,
+                             Event::Dispatcher& dispatcher, TimeSource& time_source,
+                             Upstream::ResourcePriority priority) {
   std::unique_ptr<RetryStateImpl> retry_state =
       RetryStateImpl::create(policy, request_headers, cluster, vcluster, route_stats_config,
                              runtime, random, dispatcher, time_source, priority);

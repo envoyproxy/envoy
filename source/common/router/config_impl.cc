@@ -655,17 +655,16 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               path_redirect_);
   }
   if (!route.stat_prefix().empty()) {
-    route_stats_context_ = std::make_unique<RouteStatsContext>(Stats::StatNameManagedStorage(route.stat_prefix(), factory_context.scope().symbolTable()));
-        const RouteStatNames& route_stat_names = factory_context.routerContext().routeStatNames();
+    route_stats_context_ = std::make_unique<RouteStatsContext>(
+        Stats::StatNameManagedStorage(route.stat_prefix(), factory_context.scope().symbolTable()));
+    const RouteStatNames& route_stat_names = factory_context.routerContext().routeStatNames();
     route_stats_context_->route_stats_scope_ = Stats::Utility::scopeFromStatNames(
-    factory_context.scope(), {
-        route_stat_names.vhost_, vhost.statName(), route_stat_names.route_, route_stats_context_->route_stat_name_storage_.statName()
-    });
-    route_stats_context_->route_stats_config_ = 
-        std::make_shared<RouteStatsConfig>(
-            route_stats_context_->route_stat_name_storage_.statName(),
-            generateRouteStats(*route_stats_context_->route_stats_scope_,
-                               route_stat_names));
+        factory_context.scope(),
+        {route_stat_names.vhost_, vhost.statName(), route_stat_names.route_,
+         route_stats_context_->route_stat_name_storage_.statName()});
+    route_stats_context_->route_stats_config_ = std::make_shared<RouteStatsConfig>(
+        route_stats_context_->route_stat_name_storage_.statName(),
+        generateRouteStats(*route_stats_context_->route_stats_scope_, route_stat_names));
   }
 
   if (route.route().has_early_data_policy()) {
