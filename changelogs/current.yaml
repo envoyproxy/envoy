@@ -231,6 +231,9 @@ new_features:
 - area: router
   change: |
     added :ref:`stat_prefix <envoy_v3_api_field_config.route.v3.Route.stat_prefix>` support to generate route level statistics.
+- area: matching
+  change : |
+    added support for matching authenticated inputs in network and HTTP matching data.
 
 deprecated:
 - area: dubbo_proxy
