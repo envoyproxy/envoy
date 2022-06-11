@@ -277,7 +277,7 @@ private:
 
 class Timestamp {
 public:
-  enum Resolution { Millisecond };
+  enum Resolution { Millisecond, Microsecond, Undefined };
 };
 
 } // namespace Lua

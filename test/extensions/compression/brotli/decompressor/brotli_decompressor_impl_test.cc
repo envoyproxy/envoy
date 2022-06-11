@@ -25,6 +25,32 @@ protected:
   static constexpr uint32_t default_input_size{796};
 };
 
+// Detect excessive compression ratio by compressing a long whitespace string
+// into a very small chunk of data and decompressing it again.
+TEST_F(BrotliDecompressorImplTest, DetectExcessiveCompressionRatio) {
+  const absl::string_view ten_whitespaces = "          ";
+  Brotli::Compressor::BrotliCompressorImpl compressor{
+      default_quality,
+      default_window_bits,
+      default_input_block_bits,
+      false,
+      Brotli::Compressor::BrotliCompressorImpl::EncoderMode::Default,
+      4096};
+  Buffer::OwnedImpl buffer;
+
+  for (int i = 0; i < 1000; i++) {
+    buffer.add(ten_whitespaces);
+  }
+
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
+
+  Buffer::OwnedImpl output_buffer;
+  Stats::IsolatedStoreImpl stats_store{};
+  BrotliDecompressorImpl decompressor{stats_store, "test.", 16, false};
+  decompressor.decompress(buffer, output_buffer);
+  EXPECT_EQ(1, stats_store.counterFromString("test.brotli_error").value());
+}
+
 // Exercises compression and decompression by compressing some data, decompressing it and then
 // comparing compressor's input/checksum with decompressor's output/checksum.
 TEST_F(BrotliDecompressorImplTest, CompressAndDecompress) {

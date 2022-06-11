@@ -247,7 +247,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -331,6 +331,13 @@ message Http1ProtocolOptions {
   // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 7;
+
+  // Allows sending fully qualified URLs when proxying the first line of the
+  // response. By default, Envoy will only send the path components in the first line.
+  // If this is true, Envoy will create a fully qualified URI composing scheme
+  // (inferred if not present), host (from the host/:authority header) and path
+  // (from first line or :path header).
+  bool send_fully_qualified_url = 8;
 }
 
 message KeepaliveSettings {
