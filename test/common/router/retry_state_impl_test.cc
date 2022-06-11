@@ -56,7 +56,7 @@ public:
   void setup(Http::RequestHeaderMap& request_headers) {
 
     state_ = RetryStateImpl::create(policy_, request_headers, cluster_, &virtual_cluster_,
-                                    &route_stats_config_, runtime_, random_, dispatcher_,
+                                    route_stats_config_, runtime_, random_, dispatcher_,
                                     test_time_.timeSystem(), Upstream::ResourcePriority::Default);
   }
 

@@ -875,14 +875,11 @@ private:
   struct RouteStatsContext {
     RouteStatsConfigSharedPtr route_stats_config_;
     Stats::ScopeSharedPtr route_stats_scope_;
-    const Stats::StatNameManagedStorage& route_stat_name_storage_;
+    const Stats::StatNameManagedStorage route_stat_name_storage_;
 
   public:
-    RouteStatsContext(RouteStatsConfigSharedPtr route_stats_config,
-                      Stats::ScopeSharedPtr route_stats_scope,
-                      Stats::StatNameManagedStorage& route_stat_name_storage)
-        : route_stats_config_(route_stats_config), route_stats_scope_(route_stats_scope),
-          route_stat_name_storage_(route_stat_name_storage) {}
+    RouteStatsContext(Stats::StatNameManagedStorage route_stat_name_storage)
+        : route_stat_name_storage_(std::move(route_stat_name_storage)) {}
   };
 
   using RouteStatsContextPtr = std::unique_ptr<RouteStatsContext>;
@@ -956,7 +953,6 @@ private:
   const bool append_xfh_;
   const std::string cluster_name_;
   RouteStatsContextPtr route_stats_context_{};
-  const Stats::StatNameManagedStorage route_stat_name_storage_;
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;

@@ -519,7 +519,7 @@ private:
   virtual RetryStatePtr
   createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                    const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                   const RouteStatsConfig* route_stats_config, Runtime::Loader& runtime,
+                   RouteStatsConfigOptConstRef route_stats_config, Runtime::Loader& runtime,
                    Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                    TimeSource& time_source, Upstream::ResourcePriority priority) PURE;
 
@@ -621,7 +621,7 @@ private:
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                                  const Upstream::ClusterInfo& cluster,
                                  const VirtualCluster* vcluster,
-                                 const RouteStatsConfig* route_stats_config,
+                                 RouteStatsConfigOptConstRef route_stats_config,
                                  Runtime::Loader& runtime, Random::RandomGenerator& random,
                                  Event::Dispatcher& dispatcher, TimeSource& time_source,
                                  Upstream::ResourcePriority priority) override;

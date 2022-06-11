@@ -483,7 +483,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
       append_xfh_(route.route().append_x_forwarded_host()), cluster_name_(route.route().cluster()),
-      route_stat_name_storage_(route.stat_prefix(), factory_context.scope().symbolTable()),
       cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -656,19 +655,17 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               path_redirect_);
   }
   if (!route.stat_prefix().empty()) {
-    Stats::StatNameManagedStorage route_stat_name_storage =
-        Stats::StatNameManagedStorage(route.stat_prefix(), factory_context.scope().symbolTable());
-    Stats::ScopeSharedPtr route_stats_scope = Stats::Utility::scopeFromStatNames(
-        *factory_context.scope().scopeFromStatName(
-            factory_context.routerContext().routeStatNames().vhost_),
-        {vhost.statName(), factory_context.routerContext().routeStatNames().route_,
-         route_stat_name_storage_.statName()});
-    route_stats_context_ = std::make_unique<RouteStatsContext>(
+    route_stats_context_ = std::make_unique<RouteStatsContext>(Stats::StatNameManagedStorage(route.stat_prefix(), factory_context.scope().symbolTable()));
+        const RouteStatNames& route_stat_names = factory_context.routerContext().routeStatNames();
+    route_stats_context_->route_stats_scope_ = Stats::Utility::scopeFromStatNames(
+    factory_context.scope(), {
+        route_stat_names.vhost_, vhost.statName(), route_stat_names.route_, route_stats_context_->route_stat_name_storage_.statName()
+    });
+    route_stats_context_->route_stats_config_ = 
         std::make_shared<RouteStatsConfig>(
-            route_stat_name_storage_.statName(),
-            generateRouteStats(*route_stats_scope,
-                               factory_context.routerContext().routeStatNames())),
-        route_stats_scope, route_stat_name_storage);
+            route_stats_context_->route_stat_name_storage_.statName(),
+            generateRouteStats(*route_stats_context_->route_stats_scope_,
+                               route_stat_names));
   }
 
   if (route.route().has_early_data_policy()) {

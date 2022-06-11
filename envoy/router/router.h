@@ -568,6 +568,7 @@ public:
 };
 
 using RouteStatsConfigSharedPtr = std::shared_ptr<RouteStatsConfig>;
+using RouteStatsConfigOptConstRef = OptRef<const RouteStatsConfig>;
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
