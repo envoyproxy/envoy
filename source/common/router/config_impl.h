@@ -534,9 +534,6 @@ public:
     }
     return nullptr;
   }
-  static RouteStats generateRouteStats(Stats::Scope& scope, const RouteStatNames& stat_names) {
-    return RouteStats{stat_names, scope};
-  }
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
   }
@@ -873,13 +870,22 @@ private:
   };
 
   struct RouteStatsContext {
-    RouteStatsConfigSharedPtr route_stats_config_;
-    Stats::ScopeSharedPtr route_stats_scope_;
     const Stats::StatNameManagedStorage route_stat_name_storage_;
+    Stats::ScopeSharedPtr route_stats_scope_;
+    RouteStatsConfigSharedPtr route_stats_config_;
 
   public:
-    RouteStatsContext(Stats::StatNameManagedStorage route_stat_name_storage)
-        : route_stat_name_storage_(std::move(route_stat_name_storage)) {}
+    RouteStatsContext(Stats::Scope& scope, const RouteStatNames& route_stat_names, const Stats::StatName& vhost_stat_name, const std::string& stat_prefix)
+        : route_stat_name_storage_(stat_prefix, scope.symbolTable()){
+          route_stats_scope_ = Stats::Utility::scopeFromStatNames(
+        scope,
+        {route_stat_names.vhost_, vhost_stat_name, route_stat_names.route_,
+         route_stat_name_storage_.statName()});
+          route_stats_config_ = std::make_shared<RouteStatsConfig>(
+        route_stat_name_storage_.statName(),
+        RouteStats{route_stat_names, *route_stats_scope_}
+        );
+        }
   };
 
   using RouteStatsContextPtr = std::unique_ptr<RouteStatsContext>;

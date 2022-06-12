@@ -567,7 +567,6 @@ public:
       : route_stat_name_(stat_name), route_stats_(route_stats) {}
 };
 
-using RouteStatsConfigSharedPtr = std::shared_ptr<RouteStatsConfig>;
 using RouteStatsConfigOptConstRef = OptRef<const RouteStatsConfig>;
 
 /**

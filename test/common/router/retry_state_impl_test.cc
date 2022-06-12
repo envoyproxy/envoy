@@ -168,9 +168,8 @@ public:
   NiceMock<TestRetryPolicy> policy_;
   NiceMock<Upstream::MockClusterInfo> cluster_;
   TestVirtualCluster virtual_cluster_;
-  Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::StatNameManagedStorage stat_name_{"fake_route", *symbol_table_};
   Stats::IsolatedStoreImpl stats_store_;
+  Stats::StatNameManagedStorage stat_name_{"fake_route", stats_store_.symbolTable()};
   RouteStatNames stat_names_{stats_store_.symbolTable()};
   RouteStatsConfig route_stats_config_{stat_name_.statName(),
                                        RouteStats{stat_names_, stats_store_}};
