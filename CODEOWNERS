@@ -59,6 +59,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/tracers/skywalking @wbpcode @lizan @Shikugawa
 # quic extension
 /*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
+# UDP packet writer
+/*/extensions/udp_packet_writer/ @danzh2010 @RyanTheOptimist @alyssawilk
 # zookeeper_proxy extension
 /*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
@@ -254,6 +256,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/ip_tagging @rgs1 @alyssawilk
 # cors
 /*/extensions/filters/http/cors @wbpcode @daixiang0
+# Header Validators
+/*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

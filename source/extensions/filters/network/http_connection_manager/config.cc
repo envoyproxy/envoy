@@ -683,7 +683,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
 
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
       config_discovery, name, context_, stats_prefix_, last_filter_in_current_config,
-      filter_chain_type);
+      filter_chain_type, nullptr);
   filter_factories.push_back(std::move(filter_config_provider));
 }
 

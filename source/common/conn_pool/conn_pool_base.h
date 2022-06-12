@@ -75,6 +75,12 @@ public:
   // Returns the number of active streams on this connection.
   virtual uint32_t numActiveStreams() const PURE;
 
+  // Return true if it is ready to dispatch the next stream.
+  virtual bool readyForStream() const {
+    ASSERT(!supportsEarlyData());
+    return state_ == State::Ready;
+  }
+
   // This function is called onStreamClosed to see if there was a negative delta
   // and (if necessary) update associated bookkeeping.
   // HTTP/1 and TCP pools can not have negative delta so the default implementation simply returns
@@ -82,17 +88,24 @@ public:
   virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
 
   enum class State {
-    Connecting, // Connection is not yet established.
-    Ready,      // Additional streams may be immediately dispatched to this connection.
-    Busy,       // Connection is at its concurrent stream limit.
-    Draining,   // No more streams can be dispatched to this connection, and it will be closed
-    // when all streams complete.
-    Closed // Connection is closed and object is queued for destruction.
+    Connecting,        // Connection is not yet established.
+    ReadyForEarlyData, // Any additional early data stream can be immediately dispatched to this
+                       // connection.
+    Ready,             // Additional streams may be immediately dispatched to this connection.
+    Busy,              // Connection is at its concurrent stream limit.
+    Draining,          // No more streams can be dispatched to this connection, and it will be
+                       // closed when all streams complete.
+    Closed             // Connection is closed and object is queued for destruction.
   };
 
   State state() const { return state_; }
 
   void setState(State state) {
+    if (state == State::ReadyForEarlyData && !supportsEarlyData()) {
+      IS_ENVOY_BUG("Unable to set state to ReadyForEarlyData in a client which does not support "
+                   "early data.");
+      return;
+    }
     // If the client is transitioning to draining, update the remaining
     // streams and pool and cluster capacity.
     if (state == State::Draining) {
@@ -104,7 +117,10 @@ public:
   // Sets the remaining streams to 0, and updates pool and cluster capacity.
   virtual void drain();
 
-  virtual bool hasHandshakeCompleted() const { return state_ != State::Connecting; }
+  virtual bool hasHandshakeCompleted() const {
+    ASSERT(!supportsEarlyData());
+    return state_ != State::Connecting;
+  }
 
   ConnPoolImplBase& parent_;
   // The count of remaining streams allowed for this connection.
@@ -130,6 +146,10 @@ public:
   bool timed_out_{false};
   // TODO(danzh) remove this once http codec exposes the handshake state for h3.
   bool has_handshake_completed_{false};
+
+protected:
+  // HTTP/3 subclass should override this.
+  virtual bool supportsEarlyData() const { return false; }
 
 private:
   State state_{State::Connecting};
@@ -287,8 +307,12 @@ public:
   // Called when an upstream is ready to serve pending streams.
   void onUpstreamReady();
 
+  // Called when an upstream is ready to serve early data streams.
+  void onUpstreamReadyForEarlyData(ActiveClient& client);
+
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
+  virtual void onConnectFailed(Envoy::ConnectionPool::ActiveClient&) {}
 
   enum class ConnectionResult {
     FailedToCreateConnection,
@@ -309,7 +333,7 @@ protected:
 
   // A helper function which determines if a canceled pending connection should
   // be closed as excess or not.
-  bool connectingConnectionIsExcess() const;
+  bool connectingConnectionIsExcess(const ActiveClient& client) const;
 
   // A helper function which determines if a new incoming stream should trigger
   // connection preconnect.
@@ -355,11 +379,19 @@ protected:
   // Clients that are not ready to handle additional streams because they are Connecting.
   std::list<ActiveClientPtr> connecting_clients_;
 
+  // Clients that are ready to handle additional early data streams because they have 0-RTT
+  // credentials.
+  std::list<ActiveClientPtr> early_data_clients_;
+
   // The number of streams that can be immediately dispatched
   // if all Connecting connections become connected.
   uint32_t connecting_stream_capacity_{0};
 
 private:
+  // Drain all the clients in the given list.
+  // Prerequisite: the given clients shouldn't be idle.
+  void drainClients(std::list<ActiveClientPtr>& clients);
+
   std::list<PendingStreamPtr> pending_streams_;
 
   // The number of streams currently attached to clients.

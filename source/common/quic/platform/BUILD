@@ -46,6 +46,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quic_core_flags_list_lib",
         "@com_github_google_quiche//:quic_core_protocol_flags_list_lib",
     ],
@@ -108,17 +109,6 @@ envoy_quiche_platform_impl_cc_library(
         "abseil_node_hash_set",
     ],
     tags = ["nofips"],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_error_code_wrappers_impl_lib",
-    hdrs = [
-        "quiche_error_code_wrappers_impl.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quiche_common_platform_export",
-    ],
 )
 
 envoy_quiche_platform_impl_cc_library(

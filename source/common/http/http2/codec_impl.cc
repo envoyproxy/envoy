@@ -300,9 +300,15 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
     // configurable if necessary.
     // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
-    modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
-    if (!headers.Path()) {
-      modified_headers->setPath("/");
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
+      modified_headers->removeScheme();
+      modified_headers->removePath();
+      modified_headers->removeProtocol();
+    } else {
+      modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
+      if (!headers.Path()) {
+        modified_headers->setPath("/");
+      }
     }
     encodeHeadersBase(*modified_headers, end_stream);
   } else {
@@ -1092,13 +1098,18 @@ const ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) c
   return const_cast<ConnectionImpl*>(this)->getStream(stream_id);
 }
 
-ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
+ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id) {
   StreamImpl* stream;
   if (use_new_codec_wrapper_) {
     stream = static_cast<StreamImpl*>(adapter_->GetStreamUserData(stream_id));
   } else {
     stream = static_cast<StreamImpl*>(nghttp2_session_get_stream_user_data(session_, stream_id));
   }
+  return stream;
+}
+
+ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   SLOW_ASSERT(stream != nullptr || !slowContainsStreamId(stream_id));
   return stream;
 }
@@ -1376,7 +1387,7 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
                  stream_id);
 
   // Set details of error_code in the stream whenever we have one.
-  StreamImpl* stream = getStream(stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (stream != nullptr) {
     stream->setDetails(Http2ResponseCodeDetails::get().errorDetails(error_code));
   }

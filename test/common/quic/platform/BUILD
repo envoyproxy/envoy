@@ -114,7 +114,10 @@ envoy_quiche_platform_impl_cc_test_library(
 envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_test_impl_lib",
     hdrs = ["quiche_test_impl.h"],
-    deps = ["//source/common/common:assert_lib"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "@com_github_google_quiche//:quiche_common_platform",
+    ],
 )
 
 envoy_quiche_platform_impl_cc_test_library(
