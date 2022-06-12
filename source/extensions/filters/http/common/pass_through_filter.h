@@ -8,6 +8,14 @@ namespace Http {
 // A decoder filter which passes all data through with Continue status.
 class PassThroughDecoderFilter : public virtual StreamDecoderFilter {
 public:
+  // Explicit move assignment to eliminate virtual-move-assign warning.
+  PassThroughDecoderFilter& operator=(PassThroughDecoderFilter&& filter) noexcept {
+    PassThroughDecoderFilter::StreamDecoderFilter::operator=(std::move(filter));
+    decoder_callbacks_ = filter.decoder_callbacks_;
+    return *this;
+  }
+  PassThroughDecoderFilter& operator=(const PassThroughDecoderFilter&) = default;
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     return Http::FilterHeadersStatus::Continue;
@@ -29,6 +37,14 @@ protected:
 // An encoder filter which passes all data through with Continue status.
 class PassThroughEncoderFilter : public virtual StreamEncoderFilter {
 public:
+  // Explicit move assignment to eliminate virtual-move-assign warning.
+  PassThroughEncoderFilter& operator=(PassThroughEncoderFilter&& filter) noexcept {
+    PassThroughEncoderFilter::StreamEncoderFilter::operator=(std::move(filter));
+    encoder_callbacks_ = filter.encoder_callbacks_;
+    return *this;
+  }
+  PassThroughEncoderFilter& operator=(const PassThroughEncoderFilter&) = default;
+
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;

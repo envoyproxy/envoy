@@ -745,6 +745,15 @@ public:
  */
 class StreamDecoderFilter : public virtual StreamFilterBase {
 public:
+  // Explicit move assignment to avoid duplicate moves of virtual base StreamFilterBase and to
+  // eliminate virtual-move-assign warning.
+  StreamDecoderFilter& operator=(StreamDecoderFilter&& filter) noexcept {
+    // Use copy semantics rather than move semantics here.
+    StreamDecoderFilter::StreamFilterBase::operator=(filter);
+    return *this;
+  }
+  StreamDecoderFilter& operator=(const StreamDecoderFilter&) = default;
+
   /**
    * Called with decoded headers, optionally indicating end of stream.
    * @param headers supplies the decoded headers map.
@@ -961,6 +970,15 @@ public:
  */
 class StreamEncoderFilter : public virtual StreamFilterBase {
 public:
+  // Explicit move assignment to avoid duplicate moves of virtual base StreamFilterBase and to
+  // eliminate virtual-move-assign warning.
+  StreamEncoderFilter& operator=(StreamEncoderFilter&& filter) noexcept {
+    // Use copy semantics rather than move semantics here.
+    StreamEncoderFilter::StreamFilterBase::operator=(filter);
+    return *this;
+  }
+  StreamEncoderFilter& operator=(const StreamEncoderFilter&) = default;
+
   /**
    * Called with supported 1xx headers.
    *
@@ -1031,12 +1049,10 @@ using StreamEncoderFilterSharedPtr = std::shared_ptr<StreamEncoderFilter>;
  */
 class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEncoderFilter {
 public:
-  // Explicit move assignment to avoid duplicate moves of virtual base StreamFilterBase and to
-  // eliminate virtual-move-assign warning.
+  // Explicit move assignment to eliminate virtual-move-assign warning.
   StreamFilter& operator=(StreamFilter&& filter) noexcept {
-    // Use copy semantics rather than move semantics here.
-    StreamFilter::StreamDecoderFilter::operator=(filter);
-    StreamFilter::StreamEncoderFilter::operator=(filter);
+    StreamFilter::StreamDecoderFilter::operator=(std::move(filter));
+    StreamFilter::StreamEncoderFilter::operator=(std::move(filter));
     return *this;
   }
   StreamFilter& operator=(const StreamFilter&) = default;
