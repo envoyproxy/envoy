@@ -655,7 +655,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               path_redirect_);
   }
   if (!route.stat_prefix().empty()) {
-      route_stats_context_ = std::make_unique<RouteStatsContext>(factory_context.scope(), factory_context.routerContext().routeStatNames(), vhost.statName(), route.stat_prefix());
+    route_stats_context_ = std::make_unique<RouteStatsContext>(
+        factory_context.scope(), factory_context.routerContext().routeStatNames(), vhost.statName(),
+        route.stat_prefix());
   }
 
   if (route.route().has_early_data_policy()) {

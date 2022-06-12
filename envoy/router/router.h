@@ -1063,9 +1063,9 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return RouteStatsConfigSharedPtr the config needed to generate route level stats.
+   * @return RouteStatsConfigOptConstRef the config needed to generate route level stats.
    */
-  virtual const RouteStatsConfigSharedPtr routeStatsConfig() const PURE;
+  virtual const RouteStatsConfigOptConstRef routeStatsConfig() const PURE;
 
   /**
    * @return EarlyDataPolicy& the configured early data option.

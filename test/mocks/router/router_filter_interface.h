@@ -50,7 +50,9 @@ public:
   MOCK_METHOD(const UpstreamRequest*, finalUpstreamRequest, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
 
-  const RouteStatsConfigSharedPtr routeStatsConfig() const override { return nullptr; }
+  const RouteStatsConfigOptConstRef routeStatsConfig() const override {
+    return RouteStatsConfigOptConstRef();
+  }
 
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<MockRoute> route_;

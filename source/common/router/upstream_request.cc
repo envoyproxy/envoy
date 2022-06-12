@@ -431,8 +431,7 @@ void UpstreamRequest::onPoolReady(
     // here.
     parent_.requestVcluster()->stats().upstream_rq_total_.inc();
   }
-
-  if (parent_.routeStatsConfig()) {
+  if (parent_.routeStatsConfig().has_value()) {
     // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
     // callback. Hence, the upstream request increases the route level upstream_rq_total_ stat
     // here.

@@ -403,7 +403,9 @@ public:
   MOCK_METHOD(const std::string&, routeName, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
 
-  const RouteStatsConfigSharedPtr routeStatsConfig() const override { return nullptr; }
+  const RouteStatsConfigOptConstRef routeStatsConfig() const override {
+    return RouteStatsConfigOptConstRef();
+  }
 
   std::string cluster_name_{"fake_cluster"};
   std::string route_name_{"fake_route_name"};

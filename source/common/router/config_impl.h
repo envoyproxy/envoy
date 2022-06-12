@@ -528,11 +528,11 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const RouteStatsConfigSharedPtr routeStatsConfig() const override {
-    if (route_stats_context_) {
-      return route_stats_context_->route_stats_config_;
+  const RouteStatsConfigOptConstRef routeStatsConfig() const override {
+    if (route_stats_context_ != nullptr) {
+      return *route_stats_context_->route_stats_config_;
     }
-    return nullptr;
+    return RouteStatsConfigOptConstRef();
   }
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
@@ -737,7 +737,7 @@ public:
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return parent_->connectConfig();
     }
-    const RouteStatsConfigSharedPtr routeStatsConfig() const override {
+    const RouteStatsConfigOptConstRef routeStatsConfig() const override {
       return parent_->routeStatsConfig();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
@@ -872,20 +872,18 @@ private:
   struct RouteStatsContext {
     const Stats::StatNameManagedStorage route_stat_name_storage_;
     Stats::ScopeSharedPtr route_stats_scope_;
-    RouteStatsConfigSharedPtr route_stats_config_;
+    std::unique_ptr<RouteStatsConfig> route_stats_config_{};
 
   public:
-    RouteStatsContext(Stats::Scope& scope, const RouteStatNames& route_stat_names, const Stats::StatName& vhost_stat_name, const std::string& stat_prefix)
-        : route_stat_name_storage_(stat_prefix, scope.symbolTable()){
-          route_stats_scope_ = Stats::Utility::scopeFromStatNames(
-        scope,
-        {route_stat_names.vhost_, vhost_stat_name, route_stat_names.route_,
-         route_stat_name_storage_.statName()});
-          route_stats_config_ = std::make_shared<RouteStatsConfig>(
-        route_stat_name_storage_.statName(),
-        RouteStats{route_stat_names, *route_stats_scope_}
-        );
-        }
+    RouteStatsContext(Stats::Scope& scope, const RouteStatNames& route_stat_names,
+                      const Stats::StatName& vhost_stat_name, const std::string& stat_prefix)
+        : route_stat_name_storage_(stat_prefix, scope.symbolTable()) {
+      route_stats_scope_ = Stats::Utility::scopeFromStatNames(
+          scope, {route_stat_names.vhost_, vhost_stat_name, route_stat_names.route_,
+                  route_stat_name_storage_.statName()});
+      route_stats_config_ = std::make_unique<RouteStatsConfig>(
+          route_stat_name_storage_.statName(), RouteStats{route_stat_names, *route_stats_scope_});
+    }
   };
 
   using RouteStatsContextPtr = std::unique_ptr<RouteStatsContext>;

@@ -330,7 +330,8 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
         internal_request,
         route_entry_->virtualHost().statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
-        route_stats_config_ ? route_stats_config_->route_stat_name_ : config_.empty_stat_name_,
+        route_stats_config_.has_value() ? route_stats_config_->route_stat_name_
+                                        : config_.empty_stat_name_,
         config_.zone_name_,
         upstream_zone,
         is_canary};
@@ -465,9 +466,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
-  if (route_entry_->routeStatsConfig()) {
-    route_stats_config_ = route_entry_->routeStatsConfig();
-  }
+  route_stats_config_ = route_entry_->routeStatsConfig();
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.getPathValue());
 
@@ -659,11 +658,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ = createRetryState(
-      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_,
-      route_stats_config_ != nullptr ? *route_stats_config_ : RouteStatsConfigOptConstRef(),
-      config_.runtime_, config_.random_, callbacks_->dispatcher(), config_.timeSource(),
-      route_entry_->priority());
+  retry_state_ =
+      createRetryState(route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_,
+                       route_stats_config_, config_.runtime_, config_.random_,
+                       callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys.
@@ -947,7 +945,7 @@ void Filter::onResponseTimeout() {
       if (request_vcluster_) {
         request_vcluster_->stats().upstream_rq_timeout_.inc();
       }
-      if (route_stats_config_) {
+      if (route_stats_config_.has_value()) {
         route_stats_config_->route_stats_.upstream_rq_timeout_.inc();
       }
 
@@ -1585,7 +1583,8 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
         internal_request,
         route_entry_->virtualHost().statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
-        route_stats_config_ ? route_stats_config_->route_stat_name_ : config_.empty_stat_name_,
+        route_stats_config_.has_value() ? route_stats_config_->route_stat_name_
+                                        : config_.empty_stat_name_,
         config_.zone_name_,
         upstreamZone(upstream_request.upstreamHost())};
 
