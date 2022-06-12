@@ -772,8 +772,8 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
     if (config.has_value()) {
       Filter::NamedHttpFilterFactoryCb& factory_cb = config.value().get();
 
-      // Set custom name and filter name by the helper to avoid to set the names by every filter
-      // itself.
+      // Set custom name and filter name by the helper to avoid to set the names by every
+      // filter itself.
       FilterChainFactoryCallbacksNameHelper callbacks_with_name_helper(
           filter_config_provider->name(), factory_cb.first, callbacks);
       factory_cb.second(callbacks_with_name_helper);

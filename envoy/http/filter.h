@@ -642,7 +642,8 @@ public:
 };
 
 /**
- * Hepler used to set and get stream filter names.
+ * Hepler used to set and get stream filter names. This is to avoid having to implement
+ * these method for every filter.
  */
 class StreamFilterNameHepler {
 public:
@@ -1028,7 +1029,18 @@ using StreamEncoderFilterSharedPtr = std::shared_ptr<StreamEncoderFilter>;
 /**
  * A filter that handles both encoding and decoding.
  */
-class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEncoderFilter {};
+class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEncoderFilter {
+public:
+  // Explicit move assignment to avoid duplicate moves of virtual base StreamFilterBase and to
+  // eliminate virtual-move-assign warning.
+  StreamFilter& operator=(StreamFilter&& filter) noexcept {
+    // Use copy semantics rather than move semantics here.
+    StreamFilter::StreamDecoderFilter::operator=(filter);
+    StreamFilter::StreamEncoderFilter::operator=(filter);
+    return *this;
+  }
+  StreamFilter& operator=(const StreamFilter&) = default;
+};
 
 using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
