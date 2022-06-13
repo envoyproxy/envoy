@@ -51,6 +51,67 @@ cleanRouteConfig(envoy::config::route::v3::RouteConfiguration route_config) {
   return clean_config;
 }
 
+bool validateMatcherConfig(const xds::type::matcher::v3::Matcher& matcher);
+
+bool validateOnMatchConfig(const xds::type::matcher::v3::Matcher::OnMatch& on_match) {
+  if (on_match.has_matcher() && !validateMatcherConfig(on_match.matcher())) {
+    return false;
+  }
+  if (on_match.action().typed_config().type_url().find("envoy.config.route.v3.Route") !=
+      std::string::npos) {
+    envoy::config::route::v3::Route on_match_route_action_config;
+    MessageUtil::unpackTo(on_match.action().typed_config(), on_match_route_action_config);
+    ENVOY_LOG_MISC(trace, "typed_config of on_match.action is: {}",
+                   on_match_route_action_config.DebugString());
+    if (isUnsupportedRouteConfig(on_match_route_action_config, true)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool validateMatcherConfig(const xds::type::matcher::v3::Matcher& matcher) {
+  if (matcher.has_matcher_list()) {
+    if (std::any_of(
+            std::begin(matcher.matcher_list().matchers()),
+            std::end(matcher.matcher_list().matchers()),
+            [](const xds::type::matcher::v3::Matcher::MatcherList::FieldMatcher& field_matcher) {
+              return !validateOnMatchConfig(field_matcher.on_match());
+            })) {
+      ENVOY_LOG_MISC(debug, "matcher.matcher_list contains at least one entry that is invalid");
+      return false;
+    }
+  } else if (matcher.has_matcher_tree()) {
+    if (matcher.matcher_tree().has_exact_match_map()) {
+      if (std::any_of(std::begin(matcher.matcher_tree().exact_match_map().map()),
+                      std::end(matcher.matcher_tree().exact_match_map().map()),
+                      [](const auto& matcher_entry) {
+                        return !validateOnMatchConfig(matcher_entry.second);
+                      })) {
+        ENVOY_LOG_MISC(
+            debug,
+            "matcher.matcher_tree.exact_match_map contains at least one entry that is invalid");
+        return false;
+      }
+    } else if (matcher.matcher_tree().has_prefix_match_map()) {
+      if (std::any_of(std::begin(matcher.matcher_tree().prefix_match_map().map()),
+                      std::end(matcher.matcher_tree().prefix_match_map().map()),
+                      [](const auto& matcher_entry) {
+                        return !validateOnMatchConfig(matcher_entry.second);
+                      })) {
+        ENVOY_LOG_MISC(debug, "matcher.matcher_tree.prefix_match_map contains at least one "
+                              "entry that is invalid");
+        return false;
+      }
+    }
+  }
+  if (matcher.on_no_match().has_action() && !validateOnMatchConfig(matcher.on_no_match())) {
+    ENVOY_LOG_MISC(debug, "matcher.on_no_match.action not sufficient for processing");
+    return false;
+  }
+  return true;
+}
+
 // Check configuration for size and unimplemented/missing options.
 bool validateConfig(const test::common::router::RouteTestCase& input) {
   const auto input_size = input.ByteSizeLong();
@@ -64,18 +125,8 @@ bool validateConfig(const test::common::router::RouteTestCase& input) {
       ENVOY_LOG_MISC(debug, "retry_policy_typed_config: not implemented");
       return false;
     }
-    if (virtual_host.has_matcher() && virtual_host.matcher().on_no_match().has_action() &&
-        virtual_host.matcher().on_no_match().action().typed_config().type_url().find(
-            "envoy.config.route.v3.Route") != std::string::npos) {
-      envoy::config::route::v3::Route on_no_match_route_action_config;
-      MessageUtil::unpackTo(virtual_host.matcher().on_no_match().action().typed_config(),
-                            on_no_match_route_action_config);
-      ENVOY_LOG_MISC(trace, "typed_config of virtual_host.matcher.on_no_match.action is: {}",
-                     on_no_match_route_action_config.DebugString());
-      if (isUnsupportedRouteConfig(on_no_match_route_action_config, true)) {
-        ENVOY_LOG_MISC(debug, "matcher.on_no_match.action not sufficient for processing");
-        return false;
-      }
+    if (virtual_host.has_matcher() && !validateMatcherConfig(virtual_host.matcher())) {
+      return false;
     }
   }
   return true;
