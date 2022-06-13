@@ -238,24 +238,11 @@ public:
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;
 
 /**
- * A factory for creating transport sockets.
- **/
-class TransportSocketFactoryBase {
-public:
-  virtual ~TransportSocketFactoryBase() = default;
-
-  /**
-   * @return bool whether the transport socket implements secure transport.
-   */
-  virtual bool implementsSecureTransport() const PURE;
-};
-
-/**
  * A factory for creating upstream transport sockets. It will be associated to clusters.
  */
-class UpstreamTransportSocketFactory : public virtual TransportSocketFactoryBase {
+class UpstreamTransportSocketFactory {
 public:
-  ~UpstreamTransportSocketFactory() override = default;
+  virtual ~UpstreamTransportSocketFactory() = default;
 
   /**
    * @param options for creating the transport socket
@@ -263,6 +250,11 @@ public:
    */
   virtual TransportSocketPtr
   createTransportSocket(TransportSocketOptionsConstSharedPtr options) const PURE;
+
+  /**
+   * @return bool whether the transport socket implements secure transport.
+   */
+  virtual bool implementsSecureTransport() const PURE;
 
   /**
    * Returns true if the transport socket created by this factory supports some form of ALPN
@@ -290,9 +282,9 @@ public:
 /**
  * A factory for creating downstream transport sockets. It will be associated to listeners.
  */
-class DownstreamTransportSocketFactory : public virtual TransportSocketFactoryBase {
+class DownstreamTransportSocketFactory {
 public:
-  ~DownstreamTransportSocketFactory() override = default;
+  virtual ~DownstreamTransportSocketFactory() = default;
 
   /**
    * @return Network::TransportSocketPtr a transport socket to be passed to server connection.

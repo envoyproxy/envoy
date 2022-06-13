@@ -38,10 +38,6 @@ public:
     ASSERT(transport_socket_factory_ != nullptr);
   }
 
-  bool implementsSecureTransport() const override {
-    return transport_socket_factory_->implementsSecureTransport();
-  }
-
 protected:
   // The wrapped factory.
   Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_;

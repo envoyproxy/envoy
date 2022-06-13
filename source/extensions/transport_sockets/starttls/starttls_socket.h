@@ -136,7 +136,6 @@ public:
         tls_socket_factory_(std::move(tls_socket_factory)) {}
 
   Network::TransportSocketPtr createDownstreamTransportSocket() const override;
-  bool implementsSecureTransport() const override { return false; }
 
 private:
   Network::DownstreamTransportSocketFactoryPtr raw_socket_factory_;

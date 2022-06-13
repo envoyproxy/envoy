@@ -66,7 +66,6 @@ public:
   Network::TransportSocketPtr createDownstreamTransportSocket() const override {
     PANIC("not implemented");
   }
-  bool implementsSecureTransport() const override { return true; }
 
   void initialize() override {
     config_->setSecretUpdateCallback([this]() {
