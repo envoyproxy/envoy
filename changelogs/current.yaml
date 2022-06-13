@@ -124,6 +124,10 @@ bug_fixes:
 - area: upstream
   change: |
     Fixed the LOGICAL_DNS and STRICT_DNS clusters to work for IPv6.
+- area: thrift_proxy
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.stat_prefix>`
+    is properly extracted.
 
 removed_config_or_runtime:
 - area: compressor
