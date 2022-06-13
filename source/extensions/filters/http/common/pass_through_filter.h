@@ -10,8 +10,8 @@ class PassThroughDecoderFilter : public virtual StreamDecoderFilter {
 public:
   // Explicit move assignment to eliminate virtual-move-assign warning.
   PassThroughDecoderFilter& operator=(PassThroughDecoderFilter&& filter) noexcept {
-    PassThroughDecoderFilter::StreamDecoderFilter::operator=(std::move(filter));
     decoder_callbacks_ = filter.decoder_callbacks_;
+    PassThroughDecoderFilter::StreamDecoderFilter::operator=(std::move(filter));
     return *this;
   }
   PassThroughDecoderFilter& operator=(const PassThroughDecoderFilter&) = default;
@@ -39,8 +39,8 @@ class PassThroughEncoderFilter : public virtual StreamEncoderFilter {
 public:
   // Explicit move assignment to eliminate virtual-move-assign warning.
   PassThroughEncoderFilter& operator=(PassThroughEncoderFilter&& filter) noexcept {
-    PassThroughEncoderFilter::StreamEncoderFilter::operator=(std::move(filter));
     encoder_callbacks_ = filter.encoder_callbacks_;
+    PassThroughEncoderFilter::StreamEncoderFilter::operator=(std::move(filter));
     return *this;
   }
   PassThroughEncoderFilter& operator=(const PassThroughEncoderFilter&) = default;
