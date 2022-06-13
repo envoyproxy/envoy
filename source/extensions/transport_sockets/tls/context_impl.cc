@@ -1,7 +1,5 @@
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 
-#include <openssl/ssl.h>
-
 #include <algorithm>
 #include <cstdint>
 #include <memory>
@@ -438,7 +436,7 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
   auto cert = bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl));
   const Network::TransportSocketOptions* transport_socket_options = nullptr;
-  if (tls_async_cert_validation_) {
+  if (impl->tls_async_cert_validation_) {
     auto transport_socket_options_shared_ptr_ptr =
         static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(SSL_get_app_data(ssl));
     ASSERT(transport_socket_options_shared_ptr_ptr);
