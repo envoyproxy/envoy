@@ -65,8 +65,8 @@ bool validateConfig(const test::common::router::RouteTestCase& input) {
       return false;
     }
     if (virtual_host.has_matcher() && virtual_host.matcher().on_no_match().has_action() &&
-        virtual_host.matcher().on_no_match().action().name() ==
-            "type.googleapis.com/envoy.config.route.v3.Route") {
+        virtual_host.matcher().on_no_match().action().typed_config().type_url().find(
+            "envoy.config.route.v3.Route") != std::string::npos) {
       envoy::config::route::v3::Route on_no_match_route_action_config;
       MessageUtil::unpackTo(virtual_host.matcher().on_no_match().action().typed_config(),
                             on_no_match_route_action_config);
@@ -91,7 +91,9 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   static NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   try {
     TestUtility::validate(input);
-    ConfigImpl config(cleanRouteConfig(input.config()), OptionalHttpFilters(), factory_context,
+    const auto cleaned_route_config = cleanRouteConfig(input.config());
+    ENVOY_LOG_MISC(debug, "cleaned route config: {}", cleaned_route_config.DebugString());
+    ConfigImpl config(cleaned_route_config, OptionalHttpFilters(), factory_context,
                       ProtobufMessage::getNullValidationVisitor(), true);
     auto headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.headers());
     auto route = config.route(headers, stream_info, input.random_value());
