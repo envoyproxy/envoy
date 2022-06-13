@@ -597,8 +597,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   if (default_regex_engine.has_typed_config()) {
     Regex::EngineFactory& factory =
         Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
-    regex_engine_ = factory.createEngine(default_regex_engine.typed_config(),
-                                         validation_context_.staticValidationVisitor());
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    regex_engine_ = factory.createEngine(*config,
+                                         serverFactoryContext().messageValidationVisitor());
     Regex::EngineSingleton::clear();
     Regex::EngineSingleton::initialize(regex_engine_.get());
   }
