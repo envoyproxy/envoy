@@ -87,9 +87,17 @@ const std::string config_header = R"(
 - &dns_multiple_addresses true
 - &dns_preresolve_hostnames []
 - &dns_refresh_rate 60s
-- &dns_resolver_name envoy.network.dns_resolver.cares
+)"
+#if defined(__APPLE__)
+R"(- &dns_resolver_name envoy.network.dns_resolver.apple
+- &dns_resolver_config {"@type":"type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig"}
+)"
+#else
+R"(- &dns_resolver_name envoy.network.dns_resolver.cares
 - &dns_resolver_config {"@type":"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig"}
-- &enable_drain_post_dns_refresh false
+)"
+#endif
+R"(- &enable_drain_post_dns_refresh false
 - &enable_interface_binding false
 - &h2_connection_keepalive_idle_interval 100000s
 - &h2_connection_keepalive_timeout 10s
