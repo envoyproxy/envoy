@@ -169,24 +169,65 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
     return status;
   }
 
-  // Add RSA padding to the the hash. Only `PSS` padding is supported.
-  // TODO(ipuustin): add PKCS #1 v1.5 padding scheme later if requested.
-  if (!SSL_is_signature_algorithm_rsa_pss(signature_algorithm)) {
-    ops->logDebugMsg("non-supported RSA padding");
-    return status;
-  }
-
   uint8_t* msg;
   size_t msg_len;
 
-  msg_len = RSA_size(rsa.get());
-  msg = static_cast<uint8_t*>(OPENSSL_malloc(msg_len));
-  if (msg == nullptr) {
-    return status;
-  }
-  if (!RSA_padding_add_PKCS1_PSS_mgf1(rsa.get(), msg, hash, md, nullptr, -1)) {
-    OPENSSL_free(msg);
-    return status;
+  // Add RSA padding to the the hash. `PSS` and `PKCS#1` v1.5 padding schemes are supported.
+  if (SSL_is_signature_algorithm_rsa_pss(signature_algorithm)) {
+    msg_len = RSA_size(rsa.get());
+    msg = static_cast<uint8_t*>(OPENSSL_malloc(msg_len));
+    if (msg == nullptr) {
+      return status;
+    }
+
+    if (!RSA_padding_add_PKCS1_PSS_mgf1(rsa.get(), msg, hash, md, nullptr, -1)) {
+      OPENSSL_free(msg);
+      return status;
+    }
+  } else {
+    // PKCS#1 1.5
+    int prefix_allocated = 0;
+    if (!RSA_add_pkcs1_prefix(&msg, &msg_len, &prefix_allocated, EVP_MD_type(md), hash, hash_len)) {
+      if (prefix_allocated) {
+        OPENSSL_free(msg);
+      }
+      return status;
+    }
+
+    // RFC 8017 section 9.2
+
+    unsigned long rsa_len = RSA_size(rsa.get());
+    // Header is 3 bytes, padding is min 8 bytes
+    unsigned long header_len = 3;
+    unsigned long padding_len = rsa_len - msg_len - header_len;
+
+    if (padding_len < 8) {
+      OPENSSL_free(msg);
+      return status;
+    }
+
+    uint8_t* full_msg = static_cast<uint8_t*>(OPENSSL_malloc(rsa_len));
+    if (full_msg == nullptr) {
+      if (prefix_allocated) {
+        OPENSSL_free(msg);
+      }
+      return status;
+    }
+
+    int idx = 0;
+    full_msg[idx++] = 0x0;                     // first header byte
+    full_msg[idx++] = 0x1;                     // second header byte
+    memset(full_msg + idx, 0xff, padding_len); // padding
+    idx += padding_len;
+    full_msg[idx++] = 0x0;                // third header byte
+    memcpy(full_msg + idx, msg, msg_len); // NOLINT(safe-memcpy)
+
+    if (prefix_allocated) {
+      OPENSSL_free(msg);
+    }
+
+    msg = full_msg;
+    msg_len = rsa_len;
   }
 
   // Create MB context which will be used for this particular

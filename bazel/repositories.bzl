@@ -8,6 +8,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.file_system_buffer",
     "envoy.filters.http.language",
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
@@ -223,6 +224,8 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
     external_http_archive("rules_pkg")
+    external_http_archive("com_github_aignas_rules_shellcheck")
+    external_http_archive("aspect_bazel_lib")
     _com_github_fdio_vpp_vcl()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
@@ -492,26 +495,6 @@ def _com_github_facebook_zstd():
 
 def _com_google_cel_cpp():
     external_http_archive("com_google_cel_cpp")
-    external_http_archive("rules_antlr")
-
-    # Parser dependencies
-    # TODO: upgrade this when cel is upgraded to use the latest version
-    external_http_archive(name = "rules_antlr")
-    external_http_archive(
-        name = "antlr4_runtimes",
-        build_file_content = """
-package(default_visibility = ["//visibility:public"])
-cc_library(
-    name = "cpp",
-    srcs = glob(["runtime/Cpp/runtime/src/**/*.cpp"]),
-    hdrs = glob(["runtime/Cpp/runtime/src/**/*.h"]),
-    includes = ["runtime/Cpp/runtime/src"],
-)
-""",
-        patch_args = ["-p1"],
-        # Patches ASAN violation of initialization fiasco
-        patches = ["@envoy//bazel:antlr.patch"],
-    )
 
 def _com_github_google_perfetto():
     external_http_archive(
@@ -887,6 +870,7 @@ def _com_googlesource_chromium_zlib():
 def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
+        patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(
@@ -896,14 +880,6 @@ def _com_github_google_quiche():
     native.bind(
         name = "quiche_http2_adapter",
         actual = "@com_github_google_quiche//:http2_adapter",
-    )
-    native.bind(
-        name = "quiche_http2_platform",
-        actual = "@com_github_google_quiche//:http2_platform",
-    )
-    native.bind(
-        name = "quiche_spdy_platform",
-        actual = "@com_github_google_quiche//:spdy_platform",
     )
     native.bind(
         name = "quiche_quic_platform",
@@ -1013,7 +989,11 @@ def _proxy_wasm_cpp_host():
     external_http_archive(name = "proxy_wasm_cpp_host")
 
 def _emsdk():
-    external_http_archive(name = "emsdk")
+    external_http_archive(
+        name = "emsdk",
+        patch_args = ["-p2"],
+        patches = ["@envoy//bazel:emsdk.patch"],
+    )
 
 def _com_github_google_jwt_verify():
     external_http_archive("com_github_google_jwt_verify")

@@ -16,7 +16,6 @@ public:
   void createL1Envoy();
 
   IntegrationTestServerPtr l1_server_;
-  Thread::SkipAsserts skip_;
 };
 
 void MultiEnvoyTest::createL1Envoy() {
@@ -53,7 +52,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiEnvoyTest,
 // This test does not currently support mixed protocol hops, or much of the other envoy test
 // framework knobs.
 TEST_P(MultiEnvoyTest, SimpleRequestAndResponse) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.no_runtime_singleton", "true");
+  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "true");
   initialize();
   createL1Envoy();
 
@@ -75,7 +74,7 @@ TEST_P(MultiEnvoyTest, SimpleRequestAndResponse) {
 
 // Similar to SimpleRequestAndResponse but tear down the L2 first.
 TEST_P(MultiEnvoyTest, SimpleRequestAndResponseL2Teardown) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.no_runtime_singleton", "true");
+  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "true");
   initialize();
   createL1Envoy();
 

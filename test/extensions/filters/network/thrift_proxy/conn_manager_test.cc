@@ -30,6 +30,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -90,6 +91,8 @@ public:
   ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {
     route_config_provider_manager_ =
         std::make_unique<Router::RouteConfigProviderManagerImpl>(context_.admin_);
+    ON_CALL(*context_.access_log_manager_.file_, write(_))
+        .WillByDefault(SaveArg<0>(&access_log_data_));
   }
   ~ThriftConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -104,17 +107,67 @@ public:
   }
   void initializeFilter() { initializeFilter(""); }
 
+  std::string accessLogConfig(bool drain_response_header = false) const {
+    std::vector<std::string> fields = {
+        "%DYNAMIC_METADATA(thrift.proxy:method)%",
+        "%DYNAMIC_METADATA(thrift.proxy:cluster)%",
+        "passthrough_enabled=%DYNAMIC_METADATA(thrift.proxy:passthrough)%",
+        "%DYNAMIC_METADATA(thrift.proxy:request:transport_type)%",
+        "%DYNAMIC_METADATA(thrift.proxy:request:protocol_type)%",
+        "%DYNAMIC_METADATA(thrift.proxy:request:message_type)%",
+        "%DYNAMIC_METADATA(thrift.proxy:response:transport_type)%",
+        "%DYNAMIC_METADATA(thrift.proxy:response:protocol_type)%",
+        "%DYNAMIC_METADATA(thrift.proxy:response:message_type)%",
+        "%DYNAMIC_METADATA(thrift.proxy:response:reply_type)%",
+        "%BYTES_RECEIVED%",
+        "%BYTES_SENT%",
+        "%DURATION%",
+        "%UPSTREAM_HOST%",
+    };
+
+    if (drain_response_header) {
+      fields.push_back("%RESP(:drain)%");
+    }
+
+    return fmt::format(R"EOF(
+access_log:
+  - name: accesslog
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: /dev/null
+      log_format:
+        text_format_source:
+          inline_string: "{}\n"
+)EOF",
+                       absl::StrJoin(fields, " "));
+  }
+
+  std::string defaultYamlConfig(bool drain_response_header = false) {
+    return fmt::format(R"EOF(
+route_config:
+  name: routes
+  validate_clusters: false
+  routes:
+    - match:
+        method_name: name
+      route:
+        cluster: cluster
+stat_prefix: test
+{}
+)EOF",
+                       accessLogConfig(drain_response_header));
+  }
+
   void initializeFilter(const std::string& yaml,
                         const std::vector<std::string>& cluster_names = {}) {
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
     if (yaml.empty()) {
-      config.set_stat_prefix("test");
+      TestUtility::loadFromYaml(defaultYamlConfig(), config);
     } else {
       TestUtility::loadFromYaml(yaml, config);
-      TestUtility::validate(config);
     }
 
-    config.set_stat_prefix("test");
+    TestUtility::validate(config);
 
     initializeFilter(config, cluster_names);
   }
@@ -156,6 +209,11 @@ public:
     filter_ = std::make_unique<ConnectionManager>(
         *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
+    ON_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
+        .WillByDefault(Invoke([this](const std::string& key, const ProtobufWkt::Struct& obj) {
+          (*filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata())[key]
+              .MergeFrom(obj);
+        }));
     filter_->onNewConnection();
 
     // NOP currently.
@@ -392,7 +450,7 @@ public:
       EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
     }
 
-    initializeFilter();
+    initializeFilter(defaultYamlConfig(true));
     writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
     checkDecoderEventsCalledToFilters(MessageType::Call, 0x0F, MessageType::Reply, 0x0F);
@@ -415,7 +473,7 @@ public:
     EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
     const auto header =
-        callbacks->responseMetadata()->headers().get(ThriftProxy::Headers::get().Drain);
+        callbacks->responseMetadata()->responseHeaders().get(ThriftProxy::Headers::get().Drain);
 
     if (draining) {
       EXPECT_FALSE(header.empty());
@@ -439,6 +497,12 @@ public:
     EXPECT_EQ(1U, store_.counter("test.response_success").value());
     EXPECT_EQ(0U, store_.counter("test.response_error").value());
     EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
+
+    std::string expected_access_log =
+        fmt::format("name cluster passthrough_enabled=false framed binary call framed binary reply "
+                    "success 0 0 0 - {}\n",
+                    draining ? "true" : "-");
+    EXPECT_EQ(access_log_data_.value(), expected_access_log);
   }
 
   void checkDecoderEventsCalledToFilters(MessageType req_msg_type, int32_t req_seq_id,
@@ -608,6 +672,7 @@ public:
     }
   }
 
+  StringViewSaver access_log_data_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
   std::shared_ptr<ThriftFilters::MockEncoderFilter> encoder_filter_;
@@ -643,6 +708,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCall) {
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
@@ -661,6 +728,9 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
+
+  EXPECT_EQ(access_log_data_,
+            "name cluster passthrough_enabled=false framed binary oneway - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
@@ -700,6 +770,9 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
+
+  EXPECT_EQ(access_log_data_,
+            "name cluster passthrough_enabled=false framed binary oneway - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesFrameSplitAcrossBuffers) {
@@ -716,6 +789,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesFrameSplitAcrossBuffers) {
 
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesInvalidMsgType) {
@@ -729,6 +804,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesInvalidMsgType) {
   EXPECT_EQ(1U, store_.counter("test.request_invalid_type").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
@@ -770,6 +847,9 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
+
+  EXPECT_EQ(access_log_data_,
+            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin) {
@@ -786,6 +866,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) {
@@ -828,6 +910,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 // Tests that OnData handles non-thrift input. Regression test for crash on invalid input.
@@ -839,6 +923,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesGarbageRequest) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnEvent) {
@@ -960,6 +1046,8 @@ route_config:
   callbacks->continueDecoding();
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponse) { testRequestResponse(false); }
@@ -998,6 +1086,9 @@ TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary reply success 0 0 0 -\n");
 }
 
 // Tests that the downstream request's sequence number is used for the response.
@@ -1040,6 +1131,9 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary reply success 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
@@ -1075,6 +1169,9 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary exception - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
@@ -1109,6 +1206,9 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary reply error 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
@@ -1144,6 +1244,10 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
   EXPECT_EQ(1U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(
+      access_log_data_,
+      "name cluster passthrough_enabled=false framed binary call framed binary call - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
@@ -1187,6 +1291,9 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
+
+  EXPECT_EQ(access_log_data_,
+            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
@@ -1229,6 +1336,9 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
+
+  EXPECT_EQ(access_log_data_,
+            "name cluster passthrough_enabled=false header binary call - - - - 0 0 0 -\n");
 }
 
 // Tests that a request is routed and a non-thrift response is handled.
@@ -1264,6 +1374,9 @@ TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_,
+            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
@@ -1306,6 +1419,9 @@ TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(0U, stats_.request_active_.value());
+
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary reply success 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
@@ -1717,6 +1833,14 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
         buffer.add("response");
         return DirectResponse::ResponseType::SuccessReply;
       }));
+  {
+    InSequence s;
+    EXPECT_CALL(*custom_decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*custom_encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*bidirectional_filter_, onLocalReply(_, _));
+  }
 
   // First filter sends local reply.
   EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
@@ -1738,6 +1862,9 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
+
+  EXPECT_EQ(access_log_data_,
+            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
 }
 
 // Tests multiple filters where one invokes sendLocalReply with an error reply.
@@ -1760,6 +1887,15 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
         return DirectResponse::ResponseType::ErrorReply;
       }));
 
+  {
+    InSequence s;
+    EXPECT_CALL(*custom_decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*custom_encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*bidirectional_filter_, onLocalReply(_, _));
+  }
+
   // First filter sends local reply.
   EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
@@ -1780,6 +1916,9 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_,
+            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
 }
 
 // sendLocalReply does nothing, when the remote closed the connection.
@@ -1816,6 +1955,9 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_,
+            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
 }
 
 // Tests a decoder filter that modifies data.
@@ -1834,13 +1976,13 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
 
   EXPECT_CALL(*custom_decoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        EXPECT_THAT(*metadata, HasNoHeaders());
-        metadata->headers().addCopy(key, "value");
+        EXPECT_THAT(*metadata, HasNoRequestHeaders());
+        metadata->requestHeaders().addCopy(key, "value");
         return FilterStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        const auto header = metadata->headers().get(key);
+        const auto header = metadata->requestHeaders().get(key);
         EXPECT_FALSE(header.empty());
         EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
@@ -1890,13 +2032,13 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
 
   EXPECT_CALL(*encoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        EXPECT_THAT(*metadata, HasNoHeaders());
-        metadata->headers().addCopy(key, "value");
+        EXPECT_THAT(*metadata, HasNoResponseHeaders());
+        metadata->responseHeaders().addCopy(key, "value");
         return FilterStatus::Continue;
       }));
   EXPECT_CALL(*custom_encoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        const auto header = metadata->headers().get(key);
+        const auto header = metadata->responseHeaders().get(key);
         EXPECT_FALSE(header.empty());
         EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
@@ -1963,6 +2105,8 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 // TODO(caitong93): use TEST_P to avoid duplicating test cases
@@ -1993,10 +2137,12 @@ payload_passthrough: true
 }
 
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughOnDataHandlesThriftOneWay) {
-  const std::string yaml = R"EOF(
+  const std::string yaml = fmt::format(R"EOF(
 stat_prefix: test
 payload_passthrough: true
-)EOF";
+{}
+)EOF",
+                                       accessLogConfig());
 
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
@@ -2016,13 +2162,18 @@ payload_passthrough: true
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
+
+  EXPECT_EQ(access_log_data_,
+            "name - passthrough_enabled=true framed binary oneway - - - - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRequestAndExceptionResponse) {
-  const std::string yaml = R"EOF(
+  const std::string yaml = fmt::format(R"EOF(
 stat_prefix: test
 payload_passthrough: true
-)EOF";
+{}
+)EOF",
+                                       accessLogConfig());
 
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
@@ -2058,13 +2209,19 @@ payload_passthrough: true
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(
+      access_log_data_,
+      "name - passthrough_enabled=true framed binary call framed binary exception - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRequestAndErrorResponse) {
-  const std::string yaml = R"EOF(
+  const std::string yaml = fmt::format(R"EOF(
 stat_prefix: test
 payload_passthrough: true
-)EOF";
+{}
+)EOF",
+                                       accessLogConfig());
 
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
@@ -2100,13 +2257,19 @@ payload_passthrough: true
   EXPECT_EQ(1U, store_.counter("test.response_passthrough").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(
+      access_log_data_,
+      "name - passthrough_enabled=true framed binary call framed binary reply error 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRequestAndInvalidResponse) {
-  const std::string yaml = R"EOF(
+  const std::string yaml = fmt::format(R"EOF(
 stat_prefix: test
 payload_passthrough: true
-)EOF";
+{}
+)EOF",
+                                       accessLogConfig());
 
   initializeFilter(yaml);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
@@ -2142,6 +2305,9 @@ payload_passthrough: true
   EXPECT_EQ(1U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
+
+  EXPECT_EQ(access_log_data_,
+            "name - passthrough_enabled=true framed binary call framed binary call - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRouting) {

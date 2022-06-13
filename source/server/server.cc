@@ -276,7 +276,7 @@ void InstanceImpl::updateServerStats() {
   server_stats_->total_connections_.set(listener_manager_->numConnections() +
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
-      sslContextManager().daysUntilFirstCertExpires());
+      sslContextManager().daysUntilFirstCertExpires().value_or(0));
 
   auto secs_until_ocsp_response_expires =
       sslContextManager().secondsUntilFirstOcspResponseExpires();
@@ -502,6 +502,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   }
 
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    auto registered_types = ext.second->registeredTypes();
     for (const auto& name : ext.second->allRegisteredNames()) {
       auto* extension = bootstrap_.mutable_node()->add_extensions();
       extension->set_name(std::string(name));
@@ -511,6 +512,13 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
         *extension->mutable_version() = version.value();
       }
       extension->set_disabled(ext.second->isFactoryDisabled(name));
+      auto it = registered_types.find(name);
+      if (it != registered_types.end()) {
+        std::sort(it->second.begin(), it->second.end());
+        for (const auto& type_url : it->second) {
+          extension->add_type_urls(type_url);
+        }
+      }
     }
   }
 
@@ -619,7 +627,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
-  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.no_runtime_singleton", false)) {
+  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.remove_runtime_singleton", true)) {
     runtime_ = std::move(runtime_ptr);
   } else {
     runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));

@@ -4,7 +4,6 @@ load(
 )
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
-load("@envoy_repo//:version.bzl", "VERSION")
 
 licenses(["notice"])  # Apache 2
 
@@ -42,32 +41,6 @@ filegroup(
 filegroup(
     name = "proto_examples",
     srcs = glob(["root/**/*.pb"]),
-)
-
-genrule(
-    name = "v2_redirects",
-    outs = ["v2_redirects.txt"],
-    cmd = """
-    jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/"))
-          | with_entries(.value |= sub("^envoy/";"api-v2/"))
-          | to_entries[]
-          | "\\(.value)\t\t\\(.key)"' \\
-        $(location :v2_mapping.json) > $@
-    """,
-    tools = [":v2_mapping.json"],
-)
-
-genrule(
-    name = "redirects",
-    outs = ["envoy-redirects.txt"],
-    cmd = """
-    cat $(location :redirects.txt) > $@ \\
-    && cat $(location :v2_redirects) >> $@
-    """,
-    tools = [
-        ":redirects.txt",
-        ":v2_redirects",
-    ],
 )
 
 genrule(
@@ -152,12 +125,11 @@ genrule(
 
 pkg_files(
     name = "sphinx_base",
-    srcs = glob(
-        [
-            "conf.py",
-            "_ext/*",
-        ],
-    ) + [":redirects"],
+    srcs = [
+        ":conf.py",
+        ":redirects.txt",
+        ":versions.yaml",
+    ],
     strip_prefix = "/docs",
 )
 
@@ -169,18 +141,19 @@ pkg_files(
 
 pkg_files(
     name = "sphinx_inventories",
-    srcs = ["inventories"],
+    srcs = glob(["inventories/**/*"]),
+    strip_prefix = "",
 )
 
 genrule(
     name = "version_histories",
     outs = ["version_histories.tar"],
     cmd = """
-    $(location //tools/docs:generate_version_histories) \
-        %s \
-        $@
-    """ % VERSION,
+    $(location //tools/docs:generate_version_histories) $@
+    """,
     tools = [
+        ":versions.yaml",
+        "//:VERSION.txt",
         "//changelogs",
         "//changelogs:sections.yaml",
         "//tools/docs:generate_version_histories",
@@ -237,13 +210,14 @@ genrule(
     name = "html",
     outs = ["html.tar"],
     cmd = """
-    $(location //tools/docs:sphinx_runner) \\
-         --build_sha="$${BUILD_SHA:-}" \\
-         --docs_tag="$${DOCS_TAG:-}" \\
-         --version_file=$(location //:VERSION.txt) \\
-         --validator_path=$(location //tools/config_validation:validate_fragment) \\
-         --descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text) \\
-         $(location rst) \\
+    $(location //tools/docs:sphinx_runner) \
+         $${SPHINX_RUNNER_ARGS:-} \
+         --build_sha="$${BUILD_SHA:-}" \
+         --docs_tag="$${DOCS_TAG:-}" \
+         --version_file=$(location //:VERSION.txt) \
+         --validator_path=$(location //tools/config_validation:validate_fragment) \
+         --descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text) \
+         $(location rst) \
          $@
     """,
     exec_tools = [

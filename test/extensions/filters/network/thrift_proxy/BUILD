@@ -225,6 +225,7 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         ":utility_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
@@ -341,7 +342,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    shard_count = 4,
+    shard_count = 12,
     deps = [
         ":integration_lib",
         ":utility_lib",

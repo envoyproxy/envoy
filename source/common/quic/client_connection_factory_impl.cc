@@ -33,7 +33,9 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,
     Network::Address::InstanceConstSharedPtr server_addr,
     Network::Address::InstanceConstSharedPtr local_addr, QuicStatNames& quic_stat_names,
-    OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope) {
+    OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options) {
   // TODO: Quic should take into account the set_local_interface_name_on_upstream_connections config
   // and call maybeSetInterfaceName based on that upon acquiring a local socket.
   // Similar to what is done in ClientConnectionImpl::onConnected().
@@ -43,7 +45,7 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   ASSERT(!quic_versions.empty());
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
-      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, nullptr);
+      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, options);
 
   // TODO (danzh) move this temporary config and initial RTT configuration to h3 pool.
   quic::QuicConfig config = info_impl->quic_config_;
@@ -60,7 +62,8 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   return std::make_unique<EnvoyQuicClientSession>(
       config, quic_versions, std::move(connection), server_id, std::move(crypto_config),
       &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
-      info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache, scope);
+      info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache, scope,
+      transport_socket_options);
 }
 
 } // namespace Quic
