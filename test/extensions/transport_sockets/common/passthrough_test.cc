@@ -116,6 +116,18 @@ TEST(PassthroughFactoryTest, TestDelegation) {
   }
 }
 
+TEST(PassthroughFactoryTest, TestDownstreamDelegation) {
+  auto inner_factory_ptr =
+      std::make_unique<NiceMock<Network::MockDownstreamTransportSocketFactory>>();
+  Network::MockDownstreamTransportSocketFactory* inner_factory = inner_factory_ptr.get();
+  Network::DownstreamTransportSocketFactoryPtr factory{std::move(inner_factory_ptr)};
+
+  {
+    EXPECT_CALL(*inner_factory, implementsSecureTransport());
+    factory->implementsSecureTransport();
+  }
+}
+
 } // namespace
 } // namespace TransportSockets
 } // namespace Extensions
