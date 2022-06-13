@@ -2068,7 +2068,7 @@ virtual_hosts:
                   ->routeName(),
               "catchall-route");
   }
-  // Set ignore_port_in_host_matching to true, and port will be ignored.
+  // Set ignore_port_in_host_matching to true, and path-parameters will be ignored.
   route_configuration.set_ignore_path_parameters_in_path_matching(true);
   {
     TestConfigImpl config(route_configuration, factory_context_, true);
@@ -2076,6 +2076,20 @@ virtual_hosts:
                   ->routeEntry()
                   ->routeName(),
               "business-specific-route");
+    EXPECT_EQ(
+        config
+            .route(genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d#foo=bar", "GET"),
+                   0)
+            ->routeEntry()
+            ->routeName(),
+        "business-specific-route");
+    EXPECT_EQ(
+        config
+            .route(genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d;&foo=bar", "GET"),
+                   0)
+            ->routeEntry()
+            ->routeName(),
+        "business-specific-route");
   }
 }
 
