@@ -304,7 +304,7 @@ public:
   virtual bool downstreamEndStream() const PURE;
   virtual uint32_t attemptCount() const PURE;
   virtual const VirtualCluster* requestVcluster() const PURE;
-  virtual const RouteEntry* routeEntry() const PURE;
+  virtual const Route* route() const PURE;
   virtual const std::list<UpstreamRequestPtr>& upstreamRequests() const PURE;
   virtual const UpstreamRequest* finalUpstreamRequest() const PURE;
   virtual TimeSource& timeSource() PURE;
@@ -488,7 +488,7 @@ public:
   bool downstreamEndStream() const override { return downstream_end_stream_; }
   uint32_t attemptCount() const override { return attempt_count_; }
   const VirtualCluster* requestVcluster() const override { return request_vcluster_; }
-  const RouteEntry* routeEntry() const override { return route_entry_; }
+  const Route* route() const override { return route_.get(); }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const override {
     return upstream_requests_;
   }
