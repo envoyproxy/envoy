@@ -438,6 +438,8 @@ Network::TransportSocketPtr ServerSslSocketFactory::createDownstreamTransportSoc
   }
 }
 
+bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
+
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   auto ctx = manager_.createSslServerContext(stats_scope_, *config_, server_names_);

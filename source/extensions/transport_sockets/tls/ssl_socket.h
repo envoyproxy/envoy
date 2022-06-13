@@ -142,6 +142,7 @@ public:
   ~ServerSslSocketFactory() override;
 
   Network::TransportSocketPtr createDownstreamTransportSocket() const override;
+  bool implementsSecureTransport() const override;
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
