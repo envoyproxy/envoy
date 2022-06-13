@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "source/common/common/fancy_logger.h"
+#include "source/common/common/fine_grain_logger.h"
 #include "source/common/common/logger.h"
 #include "source/server/admin/utils.h"
 
@@ -172,7 +172,7 @@ absl::Status LogsHandler::changeLogLevels(
   } else {
     std::vector<std::pair<SpdLoggerSharedPtr, spdlog::level::level_enum>> loggers_to_change;
     for (auto& it : changes) {
-      // TODO(timonwong) FineGrainLogContext::getFineGrainLogEntry should accept
+      // TODO(timonwong) FineGrainLogContext::getFineGrainLogEntry should accept 
       // absl::string_view as key.
       SpdLoggerSharedPtr logger =
           getFineGrainLogContext().getFineGrainLogEntry(std::string(it.first));
