@@ -59,6 +59,7 @@ private:
 };
 
 class GoogleReEngineFactory : public EngineFactory {
+public:
   EnginePtr createEngine(const Protobuf::Message& config,
                          ProtobufMessage::ValidationVisitor& validation_visitor) override;
 

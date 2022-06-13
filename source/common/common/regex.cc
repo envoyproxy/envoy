@@ -105,6 +105,8 @@ ProtobufTypes::MessagePtr GoogleReEngineFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::regex_engines::v3::GoogleRE2>();
 }
 
+REGISTER_FACTORY(GoogleReEngineFactory, EngineFactory);
+
 static EngineLoader* engine_ = new EngineLoader(std::make_unique<GoogleReEngine>());
 
 std::regex Utility::parseStdRegex(const std::string& regex, std::regex::flag_type flags) {
