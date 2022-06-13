@@ -92,8 +92,9 @@ sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
     'envoy.docs.sphinx_runner.ext.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig',
-    'sphinx.ext.intersphinx', 'sphinx_tabs.tabs', 'sphinx_copybutton', 'validating_code_block',
-    'sphinxext.rediraffe', 'powershell_lexer'
+    'sphinx.ext.intersphinx', 'sphinx_tabs.tabs', 'sphinx_copybutton',
+    'envoy.docs.sphinx_runner.ext.validating_code_block', 'sphinxext.rediraffe',
+    'envoy.docs.sphinx_runner.ext.powershell_lexer'
 ]
 
 release_level = _config('release_level')

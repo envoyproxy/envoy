@@ -1738,6 +1738,12 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
             filter_state->parent(), StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
+  // Make sure that relevant information makes it from the original stream info
+  // to the new one. Generally this should consist of all downstream related
+  // data, and not include upstream related data.
+  (*connection_manager_.streams_.begin())
+      ->filter_manager_.streamInfo()
+      .setFromForRecreateStream(filter_manager_.streamInfo());
   new_stream.decodeHeaders(std::move(request_headers_), !proxy_body);
   if (proxy_body) {
     // This functionality is currently only used for internal redirects, which the router only
