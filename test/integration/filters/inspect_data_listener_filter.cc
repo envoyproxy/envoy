@@ -26,53 +26,53 @@ public:
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
-    FANCY_LOG(debug, "in InspectDataListenerFilter::onAccept");
+    FINE_GRAIN_LOG(debug, "in InspectDataListenerFilter::onAccept");
     cb_ = &cb;
     if (max_read_bytes_ != 0) {
-      FANCY_LOG(debug, "in InspectDataListenerFilter::onAccept, expect more data");
+      FINE_GRAIN_LOG(debug, "in InspectDataListenerFilter::onAccept, expect more data");
       return Network::FilterStatus::StopIteration;
     }
     if (config_->close_connection_) {
-      FANCY_LOG(debug,
-                "in InspectDataListenerFilter::onAccept, close socket and stop the iteration.");
+      FINE_GRAIN_LOG(
+          debug, "in InspectDataListenerFilter::onAccept, close socket and stop the iteration.");
       cb_->socket().ioHandle().close();
       return Network::FilterStatus::StopIteration;
     }
-    FANCY_LOG(debug, "in InspectDataListenerFilter::onAccept, continue");
+    FINE_GRAIN_LOG(debug, "in InspectDataListenerFilter::onAccept, continue");
     return Network::FilterStatus::Continue;
   }
 
   size_t maxReadBytes() const override { return max_read_bytes_; }
 
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override {
-    FANCY_LOG(debug, "in InspectDataListenerFilter::onData");
+    FINE_GRAIN_LOG(debug, "in InspectDataListenerFilter::onData");
     if (buffer.rawSlice().len_ >= max_read_bytes_) {
       if (config_->close_connection_) {
-        FANCY_LOG(debug,
-                  "in InspectDataListenerFilter::onData, close socket and stop the iteration.");
+        FINE_GRAIN_LOG(
+            debug, "in InspectDataListenerFilter::onData, close socket and stop the iteration.");
         cb_->socket().ioHandle().close();
         return Network::FilterStatus::StopIteration;
       } else {
         if (config_->drain_) {
-          FANCY_LOG(debug, "in InspectDataListenerFilter::onData, drain the {} bytes data.",
-                    max_read_bytes_);
+          FINE_GRAIN_LOG(debug, "in InspectDataListenerFilter::onData, drain the {} bytes data.",
+                         max_read_bytes_);
           buffer.drain(max_read_bytes_);
         }
         if (max_read_bytes_ < config_->new_max_read_bytes_) {
           max_read_bytes_ = config_->new_max_read_bytes_;
-          FANCY_LOG(debug,
-                    "in InspectDataListenerFilter::onData, increase max_read_bytes to {} and "
-                    "wating for more data.",
-                    max_read_bytes_);
+          FINE_GRAIN_LOG(debug,
+                         "in InspectDataListenerFilter::onData, increase max_read_bytes to {} and "
+                         "wating for more data.",
+                         max_read_bytes_);
           return Network::FilterStatus::StopIteration;
         }
-        FANCY_LOG(
+        FINE_GRAIN_LOG(
             debug,
             "in InspectDataListenerFilter::onData, get enough data and continue the iteration.");
         return Network::FilterStatus::Continue;
       }
     } else {
-      FANCY_LOG(
+      FINE_GRAIN_LOG(
           debug,
           "in InspectDataListenerFilter::onData, waiting for more data and stop the iteration.");
       return Network::FilterStatus::StopIteration;

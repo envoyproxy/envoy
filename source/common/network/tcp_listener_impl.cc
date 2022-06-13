@@ -111,7 +111,7 @@ void TcpListenerImpl::enable() {
   if (bind_to_port_) {
     socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read);
   } else {
-    FANCY_LOG(debug, "The listener cannot be enabled since it's not bind to port.");
+    FINE_GRAIN_LOG(debug, "The listener cannot be enabled since it's not bind to port.");
   }
 }
 
@@ -119,7 +119,7 @@ void TcpListenerImpl::disable() {
   if (bind_to_port_) {
     socket_->ioHandle().enableFileEvents(0);
   } else {
-    FANCY_LOG(debug, "The listener cannot be disable since it's not bind to port.");
+    FINE_GRAIN_LOG(debug, "The listener cannot be disable since it's not bind to port.");
   }
 }
 
