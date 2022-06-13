@@ -69,17 +69,15 @@ follows:
 Discovery service
 ^^^^^^^^^^^^^^^^^
 
-HTTP Filters
-
 Extension configuration can be supplied dynamically from an :ref:`xDS
 management server<xds_protocol>` using :ref:`ExtensionConfiguration discovery
 service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>`.
 The name field in the extension configuration acts as the resource identifier.
-For example, HTTP connection manager supports :ref:`dynamic filter
-re-configuration<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.config_discovery>`
-for HTTP filters.
 
-HTTP filter Extension config discovery service has a :ref:`statistics
+For HTTP filters, HTTP connection manager supports :ref:`dynamic filter
+re-configuration<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.config_discovery>`.
+
+HTTP filter extension config discovery service has a :ref:`statistics
 <subscription_statistics>` tree rooted at
 *extension_config_discovery.<stat_prefix>.<extension_config_name>*. For HTTP
 filters, the value of *<stat_prefix>* is *http_filter*. In addition to the
@@ -93,12 +91,9 @@ common subscription statistics, it also provides the following:
   config_fail, Counter, Total number of failed configuration updates
   config_conflict, Counter, Total number of conflicting applications of configuration updates; this may happen when a new listener cannot reuse a subscribed extension configuration due to an invalid type URL.
 
-
-Listener Filters
-
 For Listener filters, the discovery service configuration is: :ref:`dynamic listener filter
 re-configuration<envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`.
-Note, the dynamic listener filter config is only supported in TCP listeners.
+The dynamic listener filter config is only supported in TCP listeners.
 If the dynamic config is missing, the connection will be rejected until a valid config is updated.
 
 Listener filter Extension config discovery service has a :ref:`statistics
