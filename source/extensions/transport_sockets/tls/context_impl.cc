@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 
+#include <openssl/ssl.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <memory>
@@ -622,6 +624,9 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   }
 
   if (options && !options->verifySubjectAltNameListOverride().empty()) {
+    if (!tls_async_cert_validation_) {
+      SSL_set_app_data(ssl_con.get(), options.get());
+    }
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
 
