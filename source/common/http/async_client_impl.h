@@ -197,8 +197,8 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
-    const Router::RouteStatsConfigOptConstRef routeStatsConfig() const override {
-      return Router::RouteStatsConfigOptConstRef();
+    const Router::RouteStatsContextOptConstRef routeStatsContext() const override {
+      return Router::RouteStatsContextOptConstRef();
     }
     Http::Code clusterNotFoundResponseCode() const override {
       return Http::Code::InternalServerError;

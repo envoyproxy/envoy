@@ -304,7 +304,7 @@ public:
   virtual bool downstreamEndStream() const PURE;
   virtual uint32_t attemptCount() const PURE;
   virtual const VirtualCluster* requestVcluster() const PURE;
-  virtual const RouteStatsConfigOptConstRef routeStatsConfig() const PURE;
+  virtual const RouteStatsContextOptConstRef routeStatsContext() const PURE;
   virtual const Route* route() const PURE;
   virtual const std::list<UpstreamRequestPtr>& upstreamRequests() const PURE;
   virtual const UpstreamRequest* finalUpstreamRequest() const PURE;
@@ -489,8 +489,8 @@ public:
   bool downstreamEndStream() const override { return downstream_end_stream_; }
   uint32_t attemptCount() const override { return attempt_count_; }
   const VirtualCluster* requestVcluster() const override { return request_vcluster_; }
-  const RouteStatsConfigOptConstRef routeStatsConfig() const override {
-    return route_stats_config_;
+  const RouteStatsContextOptConstRef routeStatsContext() const override {
+    return route_stats_context_;
   }
   const Route* route() const override { return route_.get(); }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const override {
@@ -521,7 +521,7 @@ private:
   virtual RetryStatePtr
   createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                    const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                   RouteStatsConfigOptConstRef route_stats_config, Runtime::Loader& runtime,
+                   RouteStatsContextOptConstRef route_stats_context, Runtime::Loader& runtime,
                    Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                    TimeSource& time_source, Upstream::ResourcePriority priority) PURE;
 
@@ -577,7 +577,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
-  RouteStatsConfigOptConstRef route_stats_config_;
+  RouteStatsContextOptConstRef route_stats_context_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
   FilterUtility::HedgingParams hedging_params_;
@@ -623,7 +623,7 @@ private:
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                                  const Upstream::ClusterInfo& cluster,
                                  const VirtualCluster* vcluster,
-                                 RouteStatsConfigOptConstRef route_stats_config,
+                                 RouteStatsContextOptConstRef route_stats_context,
                                  Runtime::Loader& runtime, Random::RandomGenerator& random,
                                  Event::Dispatcher& dispatcher, TimeSource& time_source,
                                  Upstream::ResourcePriority priority) override;

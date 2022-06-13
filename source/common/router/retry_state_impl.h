@@ -28,7 +28,7 @@ public:
   static std::unique_ptr<RetryStateImpl>
   create(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
          const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-         RouteStatsConfigOptConstRef route_stats_config, Runtime::Loader& runtime,
+         RouteStatsContextOptConstRef route_stats_context, Runtime::Loader& runtime,
          Random::RandomGenerator& random, Event::Dispatcher& dispatcher, TimeSource& time_source,
          Upstream::ResourcePriority priority);
   ~RetryStateImpl() override;
@@ -99,7 +99,7 @@ public:
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                 RouteStatsConfigOptConstRef route_stats_config, Runtime::Loader& runtime,
+                 RouteStatsContextOptConstRef route_stats_context, Runtime::Loader& runtime,
                  Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                  TimeSource& time_source, Upstream::ResourcePriority priority,
                  bool auto_configured_for_http3,
@@ -117,7 +117,7 @@ private:
 
   const Upstream::ClusterInfo& cluster_;
   const VirtualCluster* vcluster_;
-  RouteStatsConfigOptConstRef route_stats_config_{};
+  RouteStatsContextOptConstRef route_stats_context_{};
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;

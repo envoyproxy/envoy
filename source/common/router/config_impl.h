@@ -528,11 +528,11 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const RouteStatsConfigOptConstRef routeStatsConfig() const override {
+  const RouteStatsContextOptConstRef routeStatsContext() const override {
     if (route_stats_context_ != nullptr) {
-      return *route_stats_context_->route_stats_config_;
+      return *route_stats_context_;
     }
-    return RouteStatsConfigOptConstRef();
+    return RouteStatsContextOptConstRef();
   }
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
@@ -737,8 +737,8 @@ public:
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return parent_->connectConfig();
     }
-    const RouteStatsConfigOptConstRef routeStatsConfig() const override {
-      return parent_->routeStatsConfig();
+    const RouteStatsContextOptConstRef routeStatsContext() const override {
+      return parent_->routeStatsContext();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
     const EarlyDataPolicy& earlyDataPolicy() const override { return parent_->earlyDataPolicy(); }
@@ -868,25 +868,6 @@ private:
     std::string fractional_runtime_key_{};
     envoy::type::v3::FractionalPercent fractional_runtime_default_{};
   };
-
-  struct RouteStatsContext {
-    const Stats::StatNameManagedStorage route_stat_name_storage_;
-    Stats::ScopeSharedPtr route_stats_scope_;
-    std::unique_ptr<RouteStatsConfig> route_stats_config_{};
-
-  public:
-    RouteStatsContext(Stats::Scope& scope, const RouteStatNames& route_stat_names,
-                      const Stats::StatName& vhost_stat_name, const std::string& stat_prefix)
-        : route_stat_name_storage_(stat_prefix, scope.symbolTable()) {
-      route_stats_scope_ = Stats::Utility::scopeFromStatNames(
-          scope, {route_stat_names.vhost_, vhost_stat_name, route_stat_names.route_,
-                  route_stat_name_storage_.statName()});
-      route_stats_config_ = std::make_unique<RouteStatsConfig>(
-          route_stat_name_storage_.statName(), RouteStats{route_stat_names, *route_stats_scope_});
-    }
-  };
-
-  using RouteStatsContextPtr = std::unique_ptr<RouteStatsContext>;
 
   /**
    * Returns a vector of request header parsers which applied or will apply header transformations

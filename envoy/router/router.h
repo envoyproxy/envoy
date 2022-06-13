@@ -556,18 +556,28 @@ MAKE_STAT_NAMES_STRUCT(RouteStatNames, ALL_ROUTE_STATS);
 MAKE_STATS_STRUCT(RouteStats, RouteStatNames, ALL_ROUTE_STATS);
 
 /**
- * RouteStatsConfig defines config needed to generate all route level stats.
+ * RouteStatsContext defines config needed to generate all route level stats.
  */
-struct RouteStatsConfig {
-  Stats::StatName route_stat_name_;
-  mutable RouteStats route_stats_;
+struct RouteStatsContext {
+private:
+  const Stats::StatNameManagedStorage route_stat_name_storage_;
+  Stats::ScopeSharedPtr route_stats_scope_;
 
 public:
-  RouteStatsConfig(Stats::StatName stat_name, const RouteStats& route_stats)
-      : route_stat_name_(stat_name), route_stats_(route_stats) {}
+  Stats::StatName route_stat_name_;
+  mutable RouteStats route_stats_;
+  RouteStatsContext(Stats::Scope& scope, const RouteStatNames& route_stat_names,
+                    const Stats::StatName& vhost_stat_name, const std::string& stat_prefix)
+      : route_stat_name_storage_(stat_prefix, scope.symbolTable()),
+        route_stats_scope_(Stats::Utility::scopeFromStatNames(
+            scope, {route_stat_names.vhost_, vhost_stat_name, route_stat_names.route_,
+                    route_stat_name_storage_.statName()})),
+        route_stat_name_(route_stat_name_storage_.statName()),
+        route_stats_(route_stat_names, *route_stats_scope_) {}
 };
 
-using RouteStatsConfigOptConstRef = OptRef<const RouteStatsConfig>;
+using RouteStatsContextPtr = std::unique_ptr<RouteStatsContext>;
+using RouteStatsContextOptConstRef = OptRef<const RouteStatsContext>;
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -1063,9 +1073,9 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return RouteStatsConfigOptConstRef the config needed to generate route level stats.
+   * @return RouteStatsContextOptConstRef the config needed to generate route level stats.
    */
-  virtual const RouteStatsConfigOptConstRef routeStatsConfig() const PURE;
+  virtual const RouteStatsContextOptConstRef routeStatsContext() const PURE;
 
   /**
    * @return EarlyDataPolicy& the configured early data option.
