@@ -45,6 +45,16 @@ public:
   //
   // Note that order matters in this enum because it's assumed that life span grows as enum number
   // grows.
+  //
+  // Note that for more accurate book-keeping it is recommended to subscribe to
+  // the stream callbacks instead of relying on the destruction of the filter
+  // state.
+  //
+  // As a special case, objects that are marked as shared with the upstream
+  // become bound to the upstream connection life span, regardless of the
+  // original life span. That means, for example, that a shared request span
+  // object may outlive the original request when it is shared, because it may
+  // be captured by an upstream connection for the original downstream request.
   enum LifeSpan { FilterChain, Request, Connection, TopSpan = Connection };
 
   class Object {
@@ -65,6 +75,9 @@ public:
      */
     virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
   };
+
+  using Objects = std::vector<std::pair<std::string, std::shared_ptr<Object>>;
+  using ObjectsPtr = std::unique_ptr<Objects>;
 
   virtual ~FilterState() = default;
 
@@ -156,6 +169,20 @@ public:
    * either the top LifeSpan or the parent is not yet created.
    */
   virtual FilterStateSharedPtr parent() const PURE;
+
+  /**
+   * Mark a filter state object as shared with the upstream. Shared filter
+   * state objects are copied by reference from the downstream requests and
+   * connections to the upstream connection filter state, and also participate
+   * in the hashing decisions in the transport socket options when
+   * connections are re-used between downstream requests.
+   **/
+  virtual void markAsSharedWithUpstream(absl::string_view data_name) PURE;
+
+  /**
+   * @return objects that are shared with the upstream connection.
+   **/
+  virtual Objects objectsSharedWithUpstream() const PURE;
 };
 
 } // namespace StreamInfo
