@@ -11,6 +11,7 @@
 #include "envoy/type/matcher/v3/number.pb.h"
 #include "envoy/type/matcher/v3/path.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
+#include "envoy/type/matcher/v3/pattern.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
 #include "source/common/common/regex.h"
@@ -86,6 +87,29 @@ public:
   bool match(absl::string_view) const override { return true; }
 };
 
+template <class PatternMatcherType = envoy::type::matcher::v3::PatternMatcher>
+class PatternMatcherImpl {
+public:
+  explicit PatternMatcherImpl(const PatternMatcherType& pattern_matcher)
+      : pattern_matcher_(pattern_matcher) {
+    absl::StatusOr<std::string> status =
+        matching::ConvertURLPatternSyntaxToRegex(pattern_matcher_.pattern());
+    if (!status.ok()) {
+      ExceptionUtil::throwEnvoyException("unable to parse pattern url to regex");
+    }
+    path_template_match_regex_ = *std::move(status);
+  }
+  explicit PatternMatcherImpl(){};
+
+  bool match(absl::string_view value) const {
+    return matching::IsPatternMatch(value, path_template_match_regex_);
+  }
+  const PatternMatcherType pattern_matcher_;
+
+protected:
+  std::string path_template_match_regex_;
+};
+
 template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
 class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
@@ -100,15 +124,9 @@ public:
         // Cache the lowercase conversion of the Contains matcher for future use
         lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
       }
-    } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kPattern) {
-      absl::StatusOr<std::string> status =
-          matching::ConvertURLPatternSyntaxToRegex(matcher_.pattern());
-      if (!status.ok()) {
-        ExceptionUtil::throwEnvoyException("unable to parse pattern url to regex");
-      }
-      path_template_match_regex_ = *std::move(status);
     }
   }
+  explicit StringMatcherImpl(){};
 
   // StringMatcher
   bool match(const absl::string_view value) const override {
@@ -128,8 +146,8 @@ public:
                  : absl::StrContains(value, matcher_.contains());
     case StringMatcherType::MatchPatternCase::kSafeRegex:
       return regex_->match(value);
-    case StringMatcherType::MatchPatternCase::kPattern:
-      return matching::IsPatternMatch(value, path_template_match_regex_);
+      //    case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPattern:
+      //      return matching::IsPatternMatch(value, path_template_match_regex_);
     case StringMatcherType::MatchPatternCase::MATCH_PATTERN_NOT_SET:
       break;
     }
@@ -137,7 +155,6 @@ public:
   }
 
   bool match(const ProtobufWkt::Value& value) const override {
-
     if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
       return false;
     }
@@ -203,8 +220,12 @@ private:
 
 class PathMatcher : public StringMatcher {
 public:
-  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path) : matcher_(path.path()) {}
-  PathMatcher(const envoy::type::matcher::v3::StringMatcher& matcher) : matcher_(matcher) {}
+  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path)
+      : matcher_(path.path()), pattern_based_match_(false) {}
+  PathMatcher(const envoy::type::matcher::v3::StringMatcher& matcher)
+      : matcher_(matcher), pattern_based_match_(false) {}
+  PathMatcher(const envoy::type::matcher::v3::PatternMatcher& matcher)
+      : pattern_matcher_(matcher), pattern_based_match_(true) {}
 
   static PathMatcherConstSharedPtr createExact(const std::string& exact, bool ignore_case);
   static PathMatcherConstSharedPtr createPrefix(const std::string& prefix, bool ignore_case);
@@ -216,6 +237,8 @@ public:
 
 private:
   const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
+  const PatternMatcherImpl<envoy::type::matcher::v3::PatternMatcher> pattern_matcher_;
+  const bool pattern_based_match_;
 };
 
 } // namespace Matchers

@@ -5047,7 +5047,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Cannot specify both prefix_rewrite and regex_rewrite");
+      "Specify only one of prefix_rewrite, regex_rewrite or pattern_rewrite");
 }
 
 TEST_F(RouteMatcherTest, TestPatternRewriteConfigLoad) {
@@ -8461,7 +8461,7 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, PathPatternMatch) {
+TEST_F(RouteMatcherTest, SimplePathPatternMatch) {
 
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -8472,33 +8472,76 @@ virtual_hosts:
           path_template_match: "/rest/{lang}/{state}"
           case_sensitive: false
         route: { cluster: path-pattern-cluster}
-      - match:
-          prefix: "/"
-        route: { cluster: default-cluster}
   )EOF";
 
-  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster"}, {});
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster", "default-cluster"},
+                                                       {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  // Exact matches
-  //  EXPECT_EQ("path-pattern-cluster",
-  //            config.route(genHeaders("path.prefix.com", "/rest/english/wa", "GET"), 0)
-  //                ->routeEntry()
-  //                ->clusterName());
-  //  EXPECT_EQ("path-separated-cluster",
-  //            config.route(genHeaders("path.prefix.com", "/rest/span/li/?param=true", "GET"), 0)
-  //                ->routeEntry()
-  //                ->clusterName());
-  //  EXPECT_EQ("path-separated-cluster",
-  //            config.route(genHeaders("path.prefix.com", "/rest/french/po/#fragment", "GET"), 0)
-  //                ->routeEntry()
-  //                ->clusterName());
-  //
-  //  // Non-matching prefixes
-  //  EXPECT_EQ("default-cluster",
-  //            config.route(genHeaders("path.prefix.com", "/rest/apithing", "GET"), 0)
-  //                ->routeEntry()
-  //                ->clusterName());
+  // Pattern matches
+  EXPECT_EQ("path-pattern-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/english/wa", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-pattern-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/spanish/mexico", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+}
+
+TEST_F(RouteMatcherTest, MixedPathPatternMatch) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_template_match: "/rest/{lang}/{state}"
+          case_sensitive: false
+        route: { cluster: path-pattern-cluster-one}
+      - match:
+          path_template_match: "/boo/{go}/{fly}/{bat}"
+          case_sensitive: false
+        route: { cluster: path-pattern-cluster-two}
+      - match:
+          path_template_match: "/foo/boo/{go}/{fly}/{bat}/{sno}"
+          case_sensitive: false
+        route: { cluster: path-pattern-cluster-three}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"path-pattern-cluster-one", "path-pattern-cluster-two", "path-pattern-cluster-three"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // Pattern matches
+  EXPECT_EQ("path-pattern-cluster-one",
+            config.route(genHeaders("path.prefix.com", "/rest/english/wa", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-pattern-cluster-one",
+            config.route(genHeaders("path.prefix.com", "/rest/spanish/mexico", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  EXPECT_EQ("path-pattern-cluster-two",
+            config.route(genHeaders("path.prefix.com", "/boo/go/fly/bat", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-pattern-cluster-two",
+            config.route(genHeaders("path.prefix.com", "/boo/snow/flew/cone", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  EXPECT_EQ("path-pattern-cluster-three",
+            config.route(genHeaders("path.prefix.com", "/foo/boo/hat/bat/bat/sat", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ(
+      "path-pattern-cluster-three",
+      config.route(genHeaders("path.prefix.com", "/foo/boo/spanish/mexico/lisk/fisl", "GET"), 0)
+          ->routeEntry()
+          ->clusterName());
 }
 
 TEST_F(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
