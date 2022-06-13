@@ -1437,8 +1437,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                             bool insert_envoy_original_path) const {
-  absl::string_view path = Http::PathUtil::removeQueryAndFragment(
-      sanitizePathBeforePathMatching(headers.getPathValue()));
+  absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing
   // the route cache. We should consider if ASSERT-ing is the desired behavior in this case.
   ASSERT(path_matcher_->match(path));
@@ -1517,7 +1516,8 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
   if (!RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return nullptr;
   }
-  absl::string_view sanitized_path = sanitizePathBeforePathMatching(headers.getPathValue());
+  absl::string_view sanitized_path = sanitizePathBeforePathMatching(
+      Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
   if (sanitized_path.size() >= prefix_.size() && path_matcher_->match(sanitized_path) &&
       (sanitized_path.size() == prefix_.size() || sanitized_path[prefix_.size()] == '/')) {
     return clusterEntry(headers, random_value);
