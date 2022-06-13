@@ -12,7 +12,7 @@ namespace Envoy {
 
 using SpdLoggerSharedPtr = std::shared_ptr<spdlog::logger>;
 using FineGrainLogMap = absl::flat_hash_map<std::string, SpdLoggerSharedPtr>;
-using FineGrainLogMapPtr = std::shared_ptr<FineGrainLogMap>;
+using FineGrainLogMapSharedPtr = std::shared_ptr<FineGrainLogMap>;
 using FineGrainLogLevelMap = absl::flat_hash_map<std::string, spdlog::level::level_enum>;
 
 constexpr int kLogLevelMax = 6; // spdlog level is in [0, 6].
@@ -140,7 +140,7 @@ private:
   /**
    * Map that stores <key, logger> pairs, key can be the file name.
    */
-  FineGrainLogMapPtr fine_grain_log_map_ ABSL_GUARDED_BY(fine_grain_log_lock_) =
+  FineGrainLogMapSharedPtr fine_grain_log_map_ ABSL_GUARDED_BY(fine_grain_log_lock_) =
       std::make_shared<FineGrainLogMap>();
 
   /**

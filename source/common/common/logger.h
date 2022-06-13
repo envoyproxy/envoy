@@ -306,7 +306,7 @@ private:
   bool enable_fine_grain_logging_;
   Context* const save_context_;
 
-  std::string fine_grain_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
+  std::string fine_grain_log_format_;
   spdlog::level::level_enum fine_grain_default_level_ = spdlog::level::info;
 };
 

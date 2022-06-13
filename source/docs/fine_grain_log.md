@@ -1,5 +1,5 @@
 ## Fine-Grain Logger: Flexible Granularity Log Control in Envoy
-### **Note**: there is a name conversion, and previous is **Fancy** Logger
+### **Note**: this was renamed from **Fancy** Logger as the name was opaque and didn't reflect its fine grain logging capabilities.
 
 ### Overview
 Fine-Grain Logger is a logger with finer grained log level control and runtime logger update using administration interface. Compared to the existing logger in Envoy, Fine-Grain Logger provides file level control which can be easily extended to finer grained logger with function or line level control, and it is completely automatic and never requires developers to explicitly specify the logging component. Besides, it has a comparable speed as Envoy's logger.

@@ -2,7 +2,6 @@
 #include "envoy/event/file_event.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/fine_grain_logger.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
@@ -310,10 +309,10 @@ TEST_F(IoHandleImplTest, FlowControl) {
   auto& internal_buffer = *io_handle_->getWriteBuffer();
   while (internal_buffer.length() > 0) {
     SCOPED_TRACE(internal_buffer.length());
-    FINE_GRAIN_LOG(debug, "internal buffer length = {}", internal_buffer.length());
+    ENVOY_LOG_MISC(debug, "internal buffer length = {}", internal_buffer.length());
     EXPECT_TRUE(io_handle_->isReadable());
     bool writable = io_handle_->isWritable();
-    FINE_GRAIN_LOG(debug, "internal buffer length = {}, writable = {}", internal_buffer.length(),
+    ENVOY_LOG_MISC(debug, "internal buffer length = {}, writable = {}", internal_buffer.length(),
                    writable);
     if (writable) {
       writable_flipped = true;
@@ -956,7 +955,7 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
   EXPECT_FALSE(io_handle_peer_->isWritable());
 
   io_handle_->shutdown(ENVOY_SHUT_WR);
-  FINE_GRAIN_LOG(debug, "after {} shutdown write", static_cast<void*>(io_handle_.get()));
+  ENVOY_LOG_MISC(debug, "after {} shutdown write", static_cast<void*>(io_handle_.get()));
 
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());

@@ -335,14 +335,10 @@ TEST(FineGrainLog, Iteration) {
   getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::info);
   std::string output = getFineGrainLogContext().listFineGrainLoggers();
   EXPECT_THAT(output, HasSubstr("   " __FILE__ ": 2\n"));
-  std::string log_format = "[%T.%e][%t][%l][%n] %v";
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::err);
-  // setDefaultFineGrainLogLevelFormat relies on previous default and might cause error online
-  // getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(spdlog::level::warn, log_format);
+
   FINE_GRAIN_LOG(warn, "Warning: now level is warning, format changed (Date removed).");
   FINE_GRAIN_LOG(warn, getFineGrainLogContext().listFineGrainLoggers());
-  // EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(),
-  //           spdlog::level::warn); // note fine_grain_default_level isn't changed
 }
 
 TEST(FineGrainLog, Context) {
@@ -355,8 +351,6 @@ TEST(FineGrainLog, Context) {
   Logger::Context::enableFineGrainLogger();
   EXPECT_EQ(Logger::Context::useFineGrainLogger(), true);
   EXPECT_EQ(Logger::Context::getFineGrainLogFormat(), "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v");
-  // EXPECT_EQ(Logger::Context::getFineGrainDefaultLevel(),
-  //           spdlog::level::err); // default is error in test environment
 }
 
 } // namespace Envoy

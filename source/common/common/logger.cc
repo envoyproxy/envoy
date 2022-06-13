@@ -220,7 +220,7 @@ void Context::disableFineGrainLogger() {
 
 std::string Context::getFineGrainLogFormat() {
   if (!current_context) { // Context is not instantiated in benchmark test
-    return "[%Y-%m-%d %T.%e][%t][%l] %v";
+    return "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v";
   }
   return current_context->fine_grain_log_format_;
 }

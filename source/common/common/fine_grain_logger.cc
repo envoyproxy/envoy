@@ -2,8 +2,11 @@
 
 #include <atomic>
 #include <memory>
+#include <tuple>
 
 #include "source/common/common/logger.h"
+
+#include "absl/strings/str_join.h"
 
 using spdlog::level::level_enum;
 
@@ -78,7 +81,8 @@ std::string FineGrainLogContext::listFineGrainLoggers() ABSL_LOCKS_EXCLUDED(fine
   std::string info = "";
   absl::ReaderMutexLock l(&fine_grain_log_lock_);
   for (const auto& it : *fine_grain_log_map_) {
-    info += fmt::format("   {}: {}\n", it.first, static_cast<int>(it.second->level()));
+    absl::StrAppend(&info, "   ",
+                    absl::StrJoin(std::make_tuple(it.first, it.second->level()), ": "), "\n");
   }
   return info;
 }
