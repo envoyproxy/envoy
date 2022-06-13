@@ -3,6 +3,8 @@
 #include <memory>
 
 #include "envoy/common/matchers.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/protobuf/message_validator.h"
 
 namespace Envoy {
 namespace Regex {
@@ -36,6 +38,22 @@ public:
    * @param regex the regex expression match string
    */
   virtual CompiledMatcherPtr matcher(const std::string& regex) const PURE;
+};
+
+using EnginePtr = std::shared_ptr<Engine>;
+
+/**
+ * Factory for Engine.
+ */
+class EngineFactory : public Config::TypedFactory {
+public:
+  /**
+   * Creates an Engine from the provided config.
+   */
+  virtual EnginePtr createEngine(const Protobuf::Message& config,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+
+  std::string category() const override { return "envoy.regex_engines"; }
 };
 
 } // namespace Regex

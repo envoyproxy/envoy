@@ -4,11 +4,12 @@
 #include <regex>
 
 #include "envoy/common/regex.h"
+#include "envoy/registry/registry.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/common/regex_engine.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "re2/re2.h"
@@ -46,24 +47,27 @@ private:
   const re2::RE2 regex_;
 };
 
-class GoogleReEngine : public EngineBase {
+class GoogleReEngine : public Engine {
 public:
+  GoogleReEngine();
+  GoogleReEngine(uint32_t max_program_size, uint32_t warn_program_size);
   CompiledMatcherPtr matcher(const std::string& regex) const override;
 
-  // Server::Configuration::BootstrapExtensionFactory
-  Server::BootstrapExtensionPtr
-  createBootstrapExtension(const Protobuf::Message& config,
-                           Server::Configuration::ServerFactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override { return "envoy.extensions.regex_engine.google_re2"; };
-
 private:
-  uint32_t max_program_size_{100};
-  uint32_t warn_program_size_{UINT32_MAX};
+  uint32_t max_program_size_;
+  uint32_t warn_program_size_;
 };
 
-DECLARE_FACTORY(GoogleReEngine);
+class GoogleReEngineFactory : public EngineFactory {
+  EnginePtr createEngine(const Protobuf::Message& config,
+                         ProtobufMessage::ValidationVisitor& validation_visitor) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+  std::string name() const override { return "envoy.regex_engines.google_re2"; };
+};
+
+using EngineSingleton = InjectableSingleton<Engine>;
+using EngineLoader = ScopedInjectableLoader<Engine>;
 
 enum class Type { Re2, StdRegex };
 

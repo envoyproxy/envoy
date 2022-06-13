@@ -592,13 +592,15 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     }
   }
 
-  if (!bootstrap_.default_regex_engine().empty()) {
-    auto& engine_name = bootstrap_.default_regex_engine();
-    auto engine = const_cast<Regex::Engine*>(Regex::engine(engine_name));
-    if (engine != nullptr) {
-      Regex::EngineSingleton::clear();
-      Regex::EngineSingleton::initialize(engine);
-    }
+  // Initialize the regex engine and inject to singleton.
+  const auto& default_regex_engine = bootstrap_.default_regex_engine();
+  if (default_regex_engine.has_typed_config()) {
+    Regex::EngineFactory& factory =
+        Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
+    regex_engine_ = factory.createEngine(default_regex_engine.typed_config(),
+                                         validation_context_.staticValidationVisitor());
+    Regex::EngineSingleton::clear();
+    Regex::EngineSingleton::initialize(regex_engine_.get());
   }
 
   // Workers get created first so they register for thread local updates.

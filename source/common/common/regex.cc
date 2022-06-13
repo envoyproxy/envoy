@@ -1,8 +1,8 @@
 #include "source/common/common/regex.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/extensions/regex_engine/v3/google_re2.pb.h"
-#include "envoy/extensions/regex_engine/v3/google_re2.pb.validate.h"
+#include "envoy/extensions/regex_engines/v3/google_re2.pb.h"
+#include "envoy/extensions/regex_engines/v3/google_re2.pb.validate.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 #include "envoy/type/matcher/v3/regex.pb.validate.h"
 
@@ -79,30 +79,31 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(
   }
 }
 
+GoogleReEngine::GoogleReEngine() : GoogleReEngine(100, UINT32_MAX) {}
+
+GoogleReEngine::GoogleReEngine(uint32_t max_program_size, uint32_t warn_program_size)
+    : max_program_size_(max_program_size), warn_program_size_(warn_program_size) {}
+
 CompiledMatcherPtr GoogleReEngine::matcher(const std::string& regex) const {
   return std::make_unique<CompiledGoogleReMatcher>(regex, max_program_size_, warn_program_size_);
 }
 
-Server::BootstrapExtensionPtr GoogleReEngine::createBootstrapExtension(
-    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& factory_context) {
-  const auto google_re2_config =
-      MessageUtil::downcastAndValidate<const envoy::extensions::regex_engine::v3::GoogleRE2&>(
-          config, factory_context.messageValidationVisitor());
-  if (google_re2_config.has_max_program_size()) {
-    max_program_size_ = google_re2_config.max_program_size().value();
-  }
-  max_program_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(google_re2_config, max_program_size, 100);
-  warn_program_size_ =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(google_re2_config, warn_program_size, UINT32_MAX);
+EnginePtr
+GoogleReEngineFactory::createEngine(const Protobuf::Message& config,
+                                    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  const auto google_re2 =
+      MessageUtil::downcastAndValidate<const envoy::extensions::regex_engines::v3::GoogleRE2&>(
+          config, validation_visitor);
+  uint32_t max_program_size = PROTOBUF_GET_WRAPPED_OR_DEFAULT(google_re2, max_program_size, 100);
+  uint32_t warn_program_size =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(google_re2, warn_program_size, UINT32_MAX);
 
-  return std::make_unique<EngineExtension>(*this);
+  return std::make_shared<GoogleReEngine>(max_program_size, warn_program_size);
 }
 
-ProtobufTypes::MessagePtr GoogleReEngine::createEmptyConfigProto() {
-  return std::make_unique<envoy::extensions::regex_engine::v3::GoogleRE2>();
+ProtobufTypes::MessagePtr GoogleReEngineFactory::createEmptyConfigProto() {
+  return std::make_unique<envoy::extensions::regex_engines::v3::GoogleRE2>();
 }
-
-REGISTER_FACTORY(GoogleReEngine, Server::Configuration::BootstrapExtensionFactory);
 
 static EngineLoader* engine_ = new EngineLoader(std::make_unique<GoogleReEngine>());
 
