@@ -116,11 +116,19 @@ TEST(PassthroughFactoryTest, TestDelegation) {
   }
 }
 
+class DownstreamTestFactory : public DownstreamPassthroughFactory {
+public:
+  DownstreamTestFactory(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory)
+      : DownstreamPassthroughFactory(std::move(transport_socket_factory)) {}
+
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override { return nullptr; }
+};
+
 TEST(PassthroughFactoryTest, TestDownstreamDelegation) {
   auto inner_factory_ptr =
       std::make_unique<NiceMock<Network::MockDownstreamTransportSocketFactory>>();
   Network::MockDownstreamTransportSocketFactory* inner_factory = inner_factory_ptr.get();
-  Network::DownstreamTransportSocketFactoryPtr factory{std::move(inner_factory_ptr)};
+  auto factory = std::make_unique<DownstreamTestFactory>(std::move(inner_factory_ptr));
 
   {
     EXPECT_CALL(*inner_factory, implementsSecureTransport());
