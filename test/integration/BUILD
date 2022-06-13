@@ -1065,8 +1065,8 @@ envoy_cc_test(
     srcs = ["regex_engine_integration_test.cc"],
     deps = [
         ":integration_lib",
-        "//source/common/common:regex_engine_lib",
         "//source/common/common:regex_lib",
+        "@envoy_api//envoy/extensions/regex_engines/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
