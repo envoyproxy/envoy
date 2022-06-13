@@ -331,9 +331,9 @@ message Bootstrap {
   // ProtoBuf format. The default value is "envoy.pftrace".
   string perf_tracing_file_path = 33;
 
-  // Optional overriding of default regex engine. The value must be the name of one of the
-  // regex engine factories initialized through a bootstrap extension.
-  string default_regex_engine = 34;
+  // Optional overriding of default regex engine.
+  // If the value is not specified, Google RE2 will be used by default.
+  core.v3.TypedExtensionConfig default_regex_engine = 34;
 }
 
 // Administration interface :ref:`operations documentation

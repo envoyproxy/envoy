@@ -1,15 +1,15 @@
 syntax = "proto3";
 
-package envoy.extensions.regex_engine.v3;
+package envoy.extensions.regex_engines.v3;
 
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.regex_engine.v3";
+option java_package = "io.envoyproxy.envoy.extensions.regex_engines.v3";
 option java_outer_classname = "GoogleRe2Proto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/regex_engine/v3;regex_enginev3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/regex_engines/v3;regex_enginesv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Google RE2]
