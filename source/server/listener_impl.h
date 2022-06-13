@@ -28,6 +28,18 @@
 namespace Envoy {
 namespace Server {
 
+/**
+ * All missing listener config stats. @see stats_macros.h
+ */
+#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(extension_config_missing)
+
+/**
+ * Struct definition for all missing listener config stats. @see stats_macros.h
+ */
+struct MissingListenerConfigStats {
+  ALL_MISSING_LISTENER_CONFIG_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 class ListenerMessageUtil {
 public:
   /**
@@ -469,6 +481,7 @@ private:
       transport_factory_context_;
 
   Quic::QuicStatNames& quic_stat_names_;
+  MissingListenerConfigStats missing_listener_config_stats_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
