@@ -168,7 +168,6 @@
   [definitions appendFormat:@"- &h2_delay_keepalive_timeout %@\n",
                             self.h2ExtendKeepaliveTimeout ? @"true" : @"false"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
-  [definitions appendFormat:@"- &dns_resolver_name envoy.network.dns_resolver.apple\n"];
   [definitions appendFormat:@"- &enable_drain_post_dns_refresh %@\n",
                             self.enableDrainPostDnsRefresh ? @"true" : @"false"];
   // No additional values are currently needed for Apple-based DNS resolver.
