@@ -1051,8 +1051,10 @@ class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEn
 public:
   // Explicit move assignment to eliminate virtual-move-assign warning.
   StreamFilter& operator=(StreamFilter&& filter) noexcept {
-    StreamFilter::StreamDecoderFilter::operator=(std::move(filter));
-    StreamFilter::StreamEncoderFilter::operator=(std::move(filter));
+    StreamFilter::StreamDecoderFilter::operator=(
+        std::move(filter)); // NOLINT(bugprone-use-after-move)
+    StreamFilter::StreamEncoderFilter::operator=(
+        std::move(filter)); // NOLINT(bugprone-use-after-move)
     return *this;
   }
   StreamFilter& operator=(const StreamFilter&) = default;
