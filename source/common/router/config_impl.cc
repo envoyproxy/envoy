@@ -673,6 +673,18 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
                                                        random_value);
 }
 
+absl::string_view
+RouteEntryImplBase::sanitizePathBeforePathMatching(const absl::string_view path) const {
+  absl::string_view ret = path;
+  if (vhost_.globalRouteConfig().ignorePathParametersInPathMatching()) {
+    auto pos = ret.find_first_of(";");
+    if (pos != absl::string_view::npos) {
+      ret.remove_suffix(ret.length() - pos);
+    }
+  }
+  return ret;
+}
+
 bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const {
   bool matches = true;
 
@@ -1375,7 +1387,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(headers.getPathValue())) {
+      path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -1404,7 +1416,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(headers.getPathValue())) {
+      path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
     return clusterEntry(headers, random_value);
   }
 
@@ -1425,9 +1437,9 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                             bool insert_envoy_original_path) const {
-  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-  // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
-  // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
+  absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+  // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing
+  // the route cache. We should consider if ASSERT-ing is the desired behavior in this case.
   ASSERT(path_matcher_->match(path));
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
@@ -1442,8 +1454,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-    if (path_matcher_->match(path)) {
+    if (path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
       return clusterEntry(headers, random_value);
     }
   }
@@ -1505,9 +1516,10 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
   if (!RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return nullptr;
   }
-  absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-  if (path.size() >= prefix_.size() && path_matcher_->match(path) &&
-      (path.size() == prefix_.size() || path[prefix_.size()] == '/')) {
+  absl::string_view sanitized_path = sanitizePathBeforePathMatching(
+      Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
+  if (sanitized_path.size() >= prefix_.size() && path_matcher_->match(sanitized_path) &&
+      (sanitized_path.size() == prefix_.size() || sanitized_path[prefix_.size()] == '/')) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -1865,7 +1877,8 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()),
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
-                                          DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
+                                          DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
+      ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()) {
   if (!config.request_mirror_policies().empty()) {
     shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
