@@ -375,8 +375,7 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
       accept_nodata_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cares_accept_nodata")) {
   if (dns_lookup_family == DnsLookupFamily::Auto ||
-      dns_lookup_family == DnsLookupFamily::V4Preferred ||
-      dns_lookup_family == DnsLookupFamily::All) {
+      dns_lookup_family == DnsLookupFamily::V4Preferred) {
     dual_resolution_ = true;
   }
 
@@ -389,10 +388,8 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
   case DnsLookupFamily::Auto:
     family_ = AF_INET6;
     break;
-  // NOTE: DnsLookupFamily::All performs both lookups concurrently as addresses from both families
-  // are being requested.
   case DnsLookupFamily::All:
-    lookup_all_ = true;
+    family_ = AF_UNSPEC;
     break;
   }
 }
@@ -403,12 +400,7 @@ DnsResolverImpl::AddrInfoPendingResolution::~AddrInfoPendingResolution() {
 }
 
 void DnsResolverImpl::AddrInfoPendingResolution::startResolution() {
-  if (lookup_all_) {
-    startResolutionImpl(AF_INET);
-    startResolutionImpl(AF_INET6);
-  } else {
-    startResolutionImpl(family_);
-  }
+  startResolutionImpl(family_);
 }
 
 void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family) {
