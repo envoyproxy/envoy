@@ -18,14 +18,8 @@ namespace {
 // Limit the size of the input.
 static const size_t MaxInputSize = 64 * 1024;
 
-bool isUnsupportedRouteConfig(const envoy::config::route::v3::Route& route,
-                              bool extended_check = false) {
+bool isUnsupportedRouteConfig(const envoy::config::route::v3::Route& route) {
   if (route.has_filter_action() || route.has_non_forwarding_action()) {
-    return true;
-  }
-  if (extended_check && route.has_route() &&
-      !(route.route().has_cluster_specifier_plugin() || route.route().has_cluster() ||
-        route.route().has_cluster_header() || route.route().has_weighted_clusters())) {
     return true;
   }
   return false;
@@ -57,15 +51,17 @@ bool validateOnMatchConfig(const xds::type::matcher::v3::Matcher::OnMatch& on_ma
   if (on_match.has_matcher() && !validateMatcherConfig(on_match.matcher())) {
     return false;
   }
-  if (on_match.action().typed_config().type_url().find("envoy.config.route.v3.Route") !=
+  // Only envoy...Route is allowed as typed_config here.
+  if (on_match.action().typed_config().type_url().find("envoy.config.route.v3.Route") ==
       std::string::npos) {
-    envoy::config::route::v3::Route on_match_route_action_config;
-    MessageUtil::unpackTo(on_match.action().typed_config(), on_match_route_action_config);
-    ENVOY_LOG_MISC(trace, "typed_config of on_match.action is: {}",
-                   on_match_route_action_config.DebugString());
-    if (isUnsupportedRouteConfig(on_match_route_action_config, true)) {
-      return false;
-    }
+    return false;
+  }
+  envoy::config::route::v3::Route on_match_route_action_config;
+  MessageUtil::unpackTo(on_match.action().typed_config(), on_match_route_action_config);
+  ENVOY_LOG_MISC(trace, "typed_config of on_match.action is: {}",
+                 on_match_route_action_config.DebugString());
+  if (isUnsupportedRouteConfig(on_match_route_action_config)) {
+    return false;
   }
   return true;
 }
@@ -134,13 +130,13 @@ bool validateConfig(const test::common::router::RouteTestCase& input) {
 
 // TODO(htuch): figure out how to generate via a genrule from config_impl_test the full corpus.
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
-  if (!validateConfig(input)) {
-    return;
-  }
-
   static NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   static NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   try {
+    if (!validateConfig(input)) {
+      return;
+    }
+
     TestUtility::validate(input);
     const auto cleaned_route_config = cleanRouteConfig(input.config());
     ENVOY_LOG_MISC(debug, "cleaned route config: {}", cleaned_route_config.DebugString());
