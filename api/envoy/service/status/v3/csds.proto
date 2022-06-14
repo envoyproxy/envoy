@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.status.v3;
 
-import "envoy/admin/v3/config_dump.proto";
+import "envoy/admin/v3/config_dump_shared.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/node.proto";
 
