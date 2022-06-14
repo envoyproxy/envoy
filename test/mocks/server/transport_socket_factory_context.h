@@ -48,6 +48,7 @@ public:
   testing::NiceMock<Server::MockOptions> options_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+  Singleton::ManagerImpl singleton_manager_;
 };
 } // namespace Configuration
 } // namespace Server

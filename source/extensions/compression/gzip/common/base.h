@@ -12,7 +12,6 @@ namespace Zlib {
 /**
  * Shared code between the compressor and the decompressor.
  */
-// TODO(junr03): move to extensions tree once the compressor side is moved to extensions.
 class Base {
 public:
   Base(uint64_t chunk_size, std::function<void(z_stream*)> zstream_deleter);

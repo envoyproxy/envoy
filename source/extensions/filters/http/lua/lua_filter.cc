@@ -141,6 +141,7 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
           [](lua_State* state) {
             lua_newtable(state);
             { LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond); }
+            { LUA_ENUM(state, MICROSECOND, Timestamp::Resolution::Microsecond); }
             lua_setglobal(state, "EnvoyTimestampResolution");
           },
           // Add more initializers here.
@@ -645,6 +646,44 @@ int StreamHandleWrapper::luaTimestamp(lua_State* state) {
   }
 
   return 1;
+}
+
+int StreamHandleWrapper::luaTimestampString(lua_State* state) {
+  auto now = time_source_.systemTime().time_since_epoch();
+
+  absl::string_view unit_parameter = luaL_optstring(state, 2, "");
+  auto resolution = getTimestampResolution(unit_parameter);
+  if (resolution == Timestamp::Resolution::Millisecond) {
+    auto milliseconds_since_epoch =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    std::string timestamp = std::to_string(milliseconds_since_epoch);
+    lua_pushstring(state, timestamp.c_str());
+  } else if (resolution == Timestamp::Resolution::Microsecond) {
+    auto microseconds_since_epoch =
+        std::chrono::duration_cast<std::chrono::microseconds>(now).count();
+    std::string timestamp = std::to_string(microseconds_since_epoch);
+    lua_pushstring(state, timestamp.c_str());
+  } else {
+    luaL_error(state, "timestamp format must be MILLISECOND or MICROSECOND.");
+  }
+  return 1;
+}
+
+enum Timestamp::Resolution
+StreamHandleWrapper::getTimestampResolution(absl::string_view unit_parameter) {
+  auto resolution = Timestamp::Resolution::Undefined;
+
+  absl::uint128 resolution_as_int_from_state = 0;
+  if (unit_parameter.empty()) {
+    resolution = Timestamp::Resolution::Millisecond;
+  } else if (absl::SimpleAtoi(unit_parameter, &resolution_as_int_from_state) &&
+             resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Millisecond)) {
+    resolution = Timestamp::Resolution::Millisecond;
+  } else if (absl::SimpleAtoi(unit_parameter, &resolution_as_int_from_state) &&
+             resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Microsecond)) {
+    resolution = Timestamp::Resolution::Microsecond;
+  }
+  return resolution;
 }
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,

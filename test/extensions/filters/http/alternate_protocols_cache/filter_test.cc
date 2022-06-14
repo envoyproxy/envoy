@@ -102,11 +102,16 @@ TEST_F(FilterTest, ValidAltSvc) {
       std::make_shared<Network::MockResolvedAddress>("1.2.3.4:443", "1.2.3.4:443");
   Network::MockIp ip;
   std::string hostname = "host1";
-  std::shared_ptr<Upstream::MockHostDescription> hd =
-      std::make_shared<Upstream::MockHostDescription>();
-  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_CALL(callbacks_, streamInfo()).Times(2).WillOnce(ReturnRef(stream_info));
-  stream_info.upstreamInfo()->setUpstreamHost(hd);
+  StreamInfo::MockStreamInfo stream_info;
+
+  EXPECT_CALL(callbacks_, streamInfo())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, upstreamInfo()).Times(testing::AtLeast(1));
+  // Get the pointer to MockHostDescription.
+  std::shared_ptr<const Upstream::MockHostDescription> hd =
+      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
+          stream_info.upstreamInfo()->upstreamHost());
   EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
   EXPECT_CALL(*hd, address()).WillOnce(Return(address));
   EXPECT_CALL(*address, ip()).WillOnce(Return(&ip));
