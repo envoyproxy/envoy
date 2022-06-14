@@ -262,11 +262,14 @@ public:
                        const Address::InstanceConstSharedPtr& remote_address,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsConstSharedPtr& transport_options);
+
   ClientConnectionImpl(Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsConstSharedPtr& transport_options);
 
   // Network::ClientConnection
   void connect() override;

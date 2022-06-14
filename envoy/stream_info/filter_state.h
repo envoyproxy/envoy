@@ -26,7 +26,24 @@ using FilterStateSharedPtr = std::shared_ptr<FilterState>;
  */
 class FilterState {
 public:
-  enum class StateType { ReadOnly, Mutable };
+  enum StateType {
+    // Readonly objects must be set once.
+    ReadOnly = 0x1,
+
+    // Mutable objects can be overwritten with the same state type, life span, and name.
+    Mutable = 0,
+
+    // Mark a filter state object as shared with the upstream connection.
+    // Shared filter state objects are copied by reference from the downstream
+    // requests and connections to the upstream connection filter state, and
+    // also participate in the hashing decisions in the transport socket
+    // options when connections are re-used between downstream requests.
+    SharedWithUpstreamConnection = 0x2,
+
+    // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
+    LastFlag = SharedWithUpstreamConnection,
+  };
+
   // Objects stored in the FilterState may have different life span. Life span is what controls
   // how long an object stored in FilterState lives. Implementation of this interface actually
   // stores objects in a (reverse) tree manner - multiple FilterStateImpl with shorter life span may
@@ -76,7 +93,13 @@ public:
     virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
   };
 
-  using Objects = std::vector<std::pair<std::string, std::shared_ptr<Object>>;
+  struct FilterObject {
+    std::shared_ptr<Object> data_;
+    FilterState::StateType state_type_;
+    std::string name_{""};
+  };
+
+  using Objects = std::vector<FilterObject>;
   using ObjectsPtr = std::unique_ptr<Objects>;
 
   virtual ~FilterState() = default;
@@ -171,18 +194,9 @@ public:
   virtual FilterStateSharedPtr parent() const PURE;
 
   /**
-   * Mark a filter state object as shared with the upstream. Shared filter
-   * state objects are copied by reference from the downstream requests and
-   * connections to the upstream connection filter state, and also participate
-   * in the hashing decisions in the transport socket options when
-   * connections are re-used between downstream requests.
+   * @return filter objects that are shared with the upstream connection.
    **/
-  virtual void markAsSharedWithUpstream(absl::string_view data_name) PURE;
-
-  /**
-   * @return objects that are shared with the upstream connection.
-   **/
-  virtual Objects objectsSharedWithUpstream() const PURE;
+  virtual ObjectsPtr objectsSharedWithUpstreamConnection() const PURE;
 };
 
 } // namespace StreamInfo

@@ -23,10 +23,10 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
   const auto& it = data_storage_.find(data_name);
   if (it != data_storage_.end()) {
     // We have another object with same data_name. Check for mutability
-    // violations namely: readonly data cannot be overwritten. mutable data
+    // violations namely: readonly data cannot be overwritten, mutable data
     // cannot be overwritten by readonly data.
     const FilterStateImpl::FilterObject* current = it->second.get();
-    if (current->state_type_ == FilterState::StateType::ReadOnly) {
+    if (current->state_type_ & FilterState::StateType::ReadOnly) {
       throw EnvoyException("FilterState::setData<T> called twice on same ReadOnly state.");
     }
 
@@ -76,7 +76,7 @@ FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
   }
 
   FilterStateImpl::FilterObject* current = it->second.get();
-  if (current->state_type_ == FilterState::StateType::ReadOnly) {
+  if (current->state_type_ & FilterState::StateType::ReadOnly) {
     throw EnvoyException("FilterState tried to access immutable data as mutable.");
   }
 
@@ -88,6 +88,17 @@ bool FilterStateImpl::hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) 
     return parent_ && parent_->hasDataAtOrAboveLifeSpan(life_span);
   }
   return !data_storage_.empty() || (parent_ && parent_->hasDataAtOrAboveLifeSpan(life_span));
+}
+
+FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() const {
+  auto objects = parent_ ? parent_->objectsSharedWithUpstreamConnection()
+                         : std::make_unique<FilterState::Objects>();
+  for (const auto& [name, object] : data_storage_) {
+    if (object->state_type_ & StateType::SharedWithUpstreamConnection) {
+      objects->push_back({object->data_, object->state_type_, name});
+    }
+  }
+  return objects;
 }
 
 bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {

@@ -433,7 +433,8 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
       address_list_[next_address_++], connection_construction_state_.source_address_,
       connection_construction_state_.socket_factory_.createTransportSocket(
           connection_construction_state_.transport_socket_options_),
-      connection_construction_state_.options_);
+      connection_construction_state_.options_,
+      connection_construction_state_.transport_socket_options_);
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id_, next_address_);
   callbacks_wrappers_.push_back(std::make_unique<ConnectionCallbacksWrapper>(*this, *connection));
   connection->addConnectionCallbacks(*callbacks_wrappers_.back());

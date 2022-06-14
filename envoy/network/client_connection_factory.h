@@ -26,12 +26,12 @@ public:
    * @return Network::ClientConnectionPtr The created connection. It's never nullptr but the return
    * connection may be closed upon return.
    */
-  virtual Network::ClientConnectionPtr
-  createClientConnection(Event::Dispatcher& dispatcher,
-                         Network::Address::InstanceConstSharedPtr address,
-                         Network::Address::InstanceConstSharedPtr source_address,
-                         Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
+  virtual Network::ClientConnectionPtr createClientConnection(
+      Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr address,
+      Network::Address::InstanceConstSharedPtr source_address,
+      Network::TransportSocketPtr&& transport_socket,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options = nullptr) PURE;
 };
 
 } // namespace Network

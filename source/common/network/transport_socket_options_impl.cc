@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/common/hashable.h"
+
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/application_protocol.h"
@@ -39,6 +41,14 @@ void CommonTransportSocketFactory::hashKey(std::vector<uint8_t>& key,
   const auto& alpn_fallback = options->applicationProtocolFallback();
   for (const auto& protocol : alpn_fallback) {
     pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
+  }
+
+  for (const auto& object : options->filterStateObjects()) {
+    if (auto hashable = dynamic_cast<const Hashable*>(object.data_.get()); hashable != nullptr) {
+      if (auto hash = hashable->hash(); hash) {
+        pushScalarToByteVector(hash.value(), key);
+      }
+    }
   }
 }
 
@@ -79,7 +89,8 @@ TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterSt
 
   return std::make_shared<Network::TransportSocketOptionsImpl>(
       server_name, std::move(subject_alt_names), std::move(application_protocols),
-      std::move(alpn_fallback), proxy_protocol_options, filter_state);
+      std::move(alpn_fallback), proxy_protocol_options,
+      filter_state->objectsSharedWithUpstreamConnection());
 }
 
 } // namespace Network

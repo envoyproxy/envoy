@@ -340,14 +340,13 @@ Network::ClientConnectionPtr HostImpl::createConnection(
          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
 
   Network::ClientConnectionPtr connection =
-      address_list.size() > 1
-          ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
-                dispatcher, address_list, cluster.sourceAddress(), socket_factory,
-                transport_socket_options, connection_options)
-          : dispatcher.createClientConnection(
-                address, cluster.sourceAddress(),
-                socket_factory.createTransportSocket(std::move(transport_socket_options)),
-                connection_options);
+      address_list.size() > 1 ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
+                                    dispatcher, address_list, cluster.sourceAddress(),
+                                    socket_factory, transport_socket_options, connection_options)
+                              : dispatcher.createClientConnection(
+                                    address, cluster.sourceAddress(),
+                                    socket_factory.createTransportSocket(transport_socket_options),
+                                    connection_options, transport_socket_options);
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
