@@ -68,6 +68,8 @@ minor_behavior_changes:
   change: |
     add an ignore_port_in_host_matching config entry in RouteConfiguration. When set to true, port number(if any) in host
     header is ignored during host matching.
+  change: |
+    add an ignore_path_parameters_in_path_matching config entry in RouteConfiguration. When set to true, path-parameters(rfc1808) is ignored during path matching.
 - area: lua
   change: |
     lua ``respond`` api will call ``sendLocalReply`` instead of ``encodeHeaders`` and ``encodeData``.
@@ -189,6 +191,9 @@ new_features:
 - area: thrift
   change: |
     added support for preserving header keys.
+- area: thrift
+  change: |
+    added support for propogating connection draining if local replies try to end downstream.
 - area: thrift
   change: |
     added support onLocalReply to inform filters of local replies.

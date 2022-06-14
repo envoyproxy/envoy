@@ -977,11 +977,19 @@ void ConnectionManager::ActiveRpc::onLocalReply(const MessageMetadata& metadata,
 
 void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response, bool end_stream) {
   ASSERT(!under_on_local_reply_);
-  metadata_->setSequenceId(original_sequence_id_);
+  localReplyMetadata_ = metadata_->createResponseMetadata();
+  localReplyMetadata_->setSequenceId(original_sequence_id_);
 
-  onLocalReply(*metadata_, end_stream);
+  onLocalReply(*localReplyMetadata_, end_stream);
 
-  parent_.sendLocalReply(*metadata_, response, end_stream);
+  if (end_stream &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_connection_draining")) {
+    localReplyMetadata_->responseHeaders().addReferenceKey(Headers::get().Drain, "true");
+    ConnectionManager& cm = parent_;
+    cm.stats_.downstream_response_drain_close_.inc();
+  }
+
+  parent_.sendLocalReply(*localReplyMetadata_, response, end_stream);
 
   if (end_stream) {
     return;
