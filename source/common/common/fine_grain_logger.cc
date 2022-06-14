@@ -1,9 +1,12 @@
-#include "source/common/common/fancy_logger.h"
+#include "source/common/common/fine_grain_logger.h"
 
 #include <atomic>
 #include <memory>
+#include <tuple>
 
 #include "source/common/common/logger.h"
+
+#include "absl/strings/str_join.h"
 
 using spdlog::level::level_enum;
 
@@ -12,7 +15,7 @@ namespace Envoy {
 /**
  * Implements a lock from BasicLockable, to avoid dependency problem of thread.h.
  */
-class FancyBasicLockable : public Thread::BasicLockable {
+class FineGrainLogBasicLockable : public Thread::BasicLockable {
 public:
   // BasicLockable
   void lock() ABSL_EXCLUSIVE_LOCK_FUNCTION() override { mutex_.Lock(); }
@@ -23,22 +26,22 @@ private:
   absl::Mutex mutex_;
 };
 
-SpdLoggerSharedPtr FancyContext::getFancyLogEntry(std::string key)
-    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  absl::ReaderMutexLock l(&fancy_log_lock_);
-  auto it = fancy_log_map_->find(key);
-  if (it != fancy_log_map_->end()) {
+SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntry(std::string key)
+    ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
+  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  auto it = fine_grain_log_map_->find(key);
+  if (it != fine_grain_log_map_->end()) {
     return it->second;
   }
   return nullptr;
 }
 
-void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger)
-    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  absl::WriterMutexLock l(&fancy_log_lock_);
-  auto it = fancy_log_map_->find(key);
+void FineGrainLogContext::initFineGrainLogger(std::string key, std::atomic<spdlog::logger*>& logger)
+    ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
+  absl::WriterMutexLock l(&fine_grain_log_lock_);
+  auto it = fine_grain_log_map_->find(key);
   spdlog::logger* target;
-  if (it == fancy_log_map_->end()) {
+  if (it == fine_grain_log_map_->end()) {
     target = createLogger(key);
   } else {
     target = it->second.get();
@@ -46,26 +49,27 @@ void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>
   logger.store(target);
 }
 
-bool FancyContext::setFancyLogger(std::string key, level_enum log_level)
-    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  absl::ReaderMutexLock l(&fancy_log_lock_);
-  auto it = fancy_log_map_->find(key);
-  if (it != fancy_log_map_->end()) {
+bool FineGrainLogContext::setFineGrainLogger(std::string key, level_enum log_level)
+    ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
+  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  auto it = fine_grain_log_map_->find(key);
+  if (it != fine_grain_log_map_->end()) {
     it->second->set_level(log_level);
     return true;
   }
   return false;
 }
 
-void FancyContext::setDefaultFancyLevelFormat(spdlog::level::level_enum level, std::string format)
-    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  if (level == Logger::Context::getFancyDefaultLevel() &&
-      format == Logger::Context::getFancyLogFormat()) {
+void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level_enum level,
+                                                            std::string format)
+    ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
+  if (level == Logger::Context::getFineGrainDefaultLevel() &&
+      format == Logger::Context::getFineGrainLogFormat()) {
     return;
   }
-  absl::ReaderMutexLock l(&fancy_log_lock_);
-  for (const auto& it : *fancy_log_map_) {
-    if (it.second->level() == Logger::Context::getFancyDefaultLevel()) {
+  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  for (const auto& it : *fine_grain_log_map_) {
+    if (it.second->level() == Logger::Context::getFineGrainDefaultLevel()) {
       // if logger is default level now
       it.second->set_level(level);
     }
@@ -73,33 +77,34 @@ void FancyContext::setDefaultFancyLevelFormat(spdlog::level::level_enum level, s
   }
 }
 
-std::string FancyContext::listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  std::string info = "";
-  absl::ReaderMutexLock l(&fancy_log_lock_);
-  for (const auto& it : *fancy_log_map_) {
-    info += fmt::format("   {}: {}\n", it.first, static_cast<int>(it.second->level()));
-  }
+std::string FineGrainLogContext::listFineGrainLoggers() ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
+  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  std::string info =
+      absl::StrJoin(*fine_grain_log_map_, "\n", [](std::string* out, const auto& log_pair) {
+        absl::StrAppend(out, "  ", log_pair.first, ": ", log_pair.second->level());
+      });
   return info;
 }
 
-void FancyContext::setAllFancyLoggers(spdlog::level::level_enum level)
-    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  absl::ReaderMutexLock l(&fancy_log_lock_);
-  for (const auto& it : *fancy_log_map_) {
+void FineGrainLogContext::setAllFineGrainLoggers(spdlog::level::level_enum level)
+    ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
+  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  for (const auto& it : *fine_grain_log_map_) {
     it.second->set_level(level);
   }
 }
 
-FancyLogLevelMap FancyContext::getAllFancyLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  FancyLogLevelMap log_levels;
-  absl::ReaderMutexLock l(&fancy_log_lock_);
-  for (const auto& it : *fancy_log_map_) {
+FineGrainLogLevelMap FineGrainLogContext::getAllFineGrainLogLevelsForTest()
+    ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
+  FineGrainLogLevelMap log_levels;
+  absl::ReaderMutexLock l(&fine_grain_log_lock_);
+  for (const auto& it : *fine_grain_log_map_) {
     log_levels[it.first] = it.second->level();
   }
   return log_levels;
 }
 
-bool FancyContext::safeFileNameMatch(absl::string_view pattern, absl::string_view str) {
+bool FineGrainLogContext::safeFileNameMatch(absl::string_view pattern, absl::string_view str) {
   while (true) {
     if (pattern.empty()) {
       // `pattern` is exhausted; succeed if all of `str` was consumed matching it.
@@ -131,18 +136,18 @@ bool FancyContext::safeFileNameMatch(absl::string_view pattern, absl::string_vie
   }
 }
 
-void FancyContext::initSink() {
+void FineGrainLogContext::initSink() {
   spdlog::sink_ptr sink = Logger::Registry::getSink();
   Logger::DelegatingLogSinkSharedPtr sp = std::static_pointer_cast<Logger::DelegatingLogSink>(sink);
   if (!sp->hasLock()) {
-    static FancyBasicLockable tlock;
+    static FineGrainLogBasicLockable tlock;
     sp->setLock(tlock);
     sp->setShouldEscape(false);
   }
 }
 
-spdlog::logger* FancyContext::createLogger(const std::string& key)
-    ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_) {
+spdlog::logger* FineGrainLogContext::createLogger(const std::string& key)
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(fine_grain_log_lock_) {
   SpdLoggerSharedPtr new_logger =
       std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
   if (!Logger::Registry::getSink()->hasLock()) { // occurs in benchmark test
@@ -150,15 +155,15 @@ spdlog::logger* FancyContext::createLogger(const std::string& key)
   }
 
   new_logger->set_level(getLogLevel(key));
-  new_logger->set_pattern(Logger::Context::getFancyLogFormat());
+  new_logger->set_pattern(Logger::Context::getFineGrainLogFormat());
   new_logger->flush_on(level_enum::critical);
-  fancy_log_map_->insert(std::make_pair(key, new_logger));
+  fine_grain_log_map_->insert(std::make_pair(key, new_logger));
   return new_logger.get();
 }
 
-void FancyContext::updateVerbositySetting(
+void FineGrainLogContext::updateVerbositySetting(
     const std::vector<std::pair<absl::string_view, int>>& updates) {
-  absl::WriterMutexLock ul(&fancy_log_lock_);
+  absl::WriterMutexLock ul(&fine_grain_log_lock_);
   log_update_info_.clear();
   for (const auto& [glob, level] : updates) {
     if (level < kLogLevelMin || level > kLogLevelMax) {
@@ -170,13 +175,13 @@ void FancyContext::updateVerbositySetting(
     appendVerbosityLogUpdate(glob, static_cast<level_enum>(level));
   }
 
-  for (auto& [key, logger] : *fancy_log_map_) {
+  for (auto& [key, logger] : *fine_grain_log_map_) {
     logger->set_level(getLogLevel(key));
   }
 }
 
-void FancyContext::appendVerbosityLogUpdate(absl::string_view update_pattern,
-                                            level_enum log_level) {
+void FineGrainLogContext::appendVerbosityLogUpdate(absl::string_view update_pattern,
+                                                   level_enum log_level) {
   for (const auto& info : log_update_info_) {
     if (safeFileNameMatch(info.update_pattern, update_pattern)) {
       // This is a memory optimization to avoid storing patterns that will never
@@ -188,9 +193,9 @@ void FancyContext::appendVerbosityLogUpdate(absl::string_view update_pattern,
   log_update_info_.emplace_back(std::string(update_pattern), update_is_path, log_level);
 }
 
-level_enum FancyContext::getLogLevel(absl::string_view file) const {
+level_enum FineGrainLogContext::getLogLevel(absl::string_view file) const {
   if (log_update_info_.empty()) {
-    return Logger::Context::getFancyDefaultLevel();
+    return Logger::Context::getFineGrainDefaultLevel();
   }
 
   // Get basename for file.
@@ -221,9 +226,11 @@ level_enum FancyContext::getLogLevel(absl::string_view file) const {
     }
   }
 
-  return Logger::Context::getFancyDefaultLevel();
+  return Logger::Context::getFineGrainDefaultLevel();
 }
 
-FancyContext& getFancyContext() { MUTABLE_CONSTRUCT_ON_FIRST_USE(FancyContext); }
+FineGrainLogContext& getFineGrainLogContext() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(FineGrainLogContext);
+}
 
 } // namespace Envoy
