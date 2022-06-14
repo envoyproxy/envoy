@@ -1309,9 +1309,9 @@ public:
 class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
 public:
   /**
-   * @return return the routeEntry for the downstream stream.
+   * @return return the route for the downstream stream.
    */
-  virtual const RouteEntry& routeEntry() const PURE;
+  virtual const Route& route() const PURE;
   /**
    * @return return the connection for the downstream stream.
    */
@@ -1357,7 +1357,7 @@ public:
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                           const StreamInfo::StreamInfo& info,
+                           StreamInfo::StreamInfo& info,
                            absl::optional<Http::Protocol> protocol) PURE;
 
   // @return the UpstreamToDownstream interface for this stream.

@@ -115,6 +115,13 @@ basis:
 Where possible, we prefer the latest release version for external dependencies, rather than main
 branch GitHub SHA tarballs.
 
+Available updates for most of our dependencies can be tracked on the Github issue tracker here:
+
+https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+newer+release+available
+
+If you intend to update a dependency, please assign the relevant ticket to yourself and/or associate
+any Pull Request (eg by adding `Fix #1234`) with the issue.
+
 ## Dependency shepherds
 
 Sign-off from the [dependency

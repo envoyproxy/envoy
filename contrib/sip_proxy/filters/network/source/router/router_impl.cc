@@ -103,7 +103,6 @@ RouteConstSharedPtr RouteMatcher::route(MessageMetadata& metadata) const {
   for (const auto& route : routes_) {
     RouteConstSharedPtr route_entry = route->matches(metadata);
     if (nullptr != route_entry) {
-      ENVOY_LOG(debug, "route matched!");
       return route_entry;
     }
   }

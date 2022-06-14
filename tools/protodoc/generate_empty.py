@@ -4,25 +4,11 @@
 import json
 import os
 import pathlib
-import string
 import sys
 import tarfile
 
-import protodoc
-
-EMPTY_EXTENSION_DOCS_TEMPLATE = string.Template(
-    """$header
-
-$description
-
-$reflink
-
-This extension does not have a structured configuration, `google.protobuf.Empty
-<https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#empty>`_ should be used
-instead.
-
-$extension
-""")
+import protodoc as protodoc
+from tools.protodoc.jinja import env as jinja_env
 
 
 def generate_empty_extension_docs(extension, details, api_extensions_root):
@@ -35,8 +21,8 @@ def generate_empty_extension_docs(extension, details, api_extensions_root):
         reflink = '%s %s.' % (
             details['title'], protodoc.format_internal_link(
                 'configuration overview', details['ref']))
-    content = EMPTY_EXTENSION_DOCS_TEMPLATE.substitute(
-        header=protodoc.format_header('=', details['title']),
+    content = jinja_env.get_template("empty.rst.tpl").render(
+        header=details['title'],
         description=description,
         reflink=reflink,
         extension=protodoc.format_extension(extension))
