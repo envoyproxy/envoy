@@ -937,7 +937,7 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const bool append_xfh_;
   const std::string cluster_name_;
-  RouteStatsContextPtr route_stats_context_{};
+  RouteStatsContextPtr route_stats_context_;
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;

@@ -282,7 +282,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
       vcluster_->stats().upstream_rq_retry_success_.inc();
     }
     if (route_stats_context_.has_value()) {
-      route_stats_context_->route_stats_.upstream_rq_retry_success_.inc();
+      route_stats_context_->stats().upstream_rq_retry_success_.inc();
     }
   }
 
@@ -300,7 +300,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
       vcluster_->stats().upstream_rq_retry_limit_exceeded_.inc();
     }
     if (route_stats_context_.has_value()) {
-      route_stats_context_->route_stats_.upstream_rq_retry_limit_exceeded_.inc();
+      route_stats_context_->stats().upstream_rq_retry_limit_exceeded_.inc();
     }
     return RetryStatus::NoRetryLimitExceeded;
   }
@@ -313,7 +313,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
       vcluster_->stats().upstream_rq_retry_overflow_.inc();
     }
     if (route_stats_context_.has_value()) {
-      route_stats_context_->route_stats_.upstream_rq_retry_overflow_.inc();
+      route_stats_context_->stats().upstream_rq_retry_overflow_.inc();
     }
     return RetryStatus::NoOverflow;
   }
@@ -329,7 +329,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
     vcluster_->stats().upstream_rq_retry_.inc();
   }
   if (route_stats_context_.has_value()) {
-    route_stats_context_->route_stats_.upstream_rq_retry_.inc();
+    route_stats_context_->stats().upstream_rq_retry_.inc();
   }
   if (would_retry == RetryDecision::RetryWithBackoff) {
     backoff_callback_ = callback;

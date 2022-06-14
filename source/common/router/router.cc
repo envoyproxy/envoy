@@ -330,7 +330,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
         internal_request,
         route_entry_->virtualHost().statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
-        route_stats_context_.has_value() ? route_stats_context_->route_stat_name_
+        route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_.empty_stat_name_,
         config_.zone_name_,
         upstream_zone,
@@ -946,7 +946,7 @@ void Filter::onResponseTimeout() {
         request_vcluster_->stats().upstream_rq_timeout_.inc();
       }
       if (route_stats_context_.has_value()) {
-        route_stats_context_->route_stats_.upstream_rq_timeout_.inc();
+        route_stats_context_->stats().upstream_rq_timeout_.inc();
       }
 
       if (upstream_request->upstreamHost()) {
@@ -1583,7 +1583,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
         internal_request,
         route_entry_->virtualHost().statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
-        route_stats_context_.has_value() ? route_stats_context_->route_stat_name_
+        route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_.empty_stat_name_,
         config_.zone_name_,
         upstreamZone(upstream_request.upstreamHost())};

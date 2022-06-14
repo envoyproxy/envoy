@@ -117,7 +117,7 @@ private:
 
   const Upstream::ClusterInfo& cluster_;
   const VirtualCluster* vcluster_;
-  RouteStatsContextOptConstRef route_stats_context_{};
+  RouteStatsContextOptConstRef route_stats_context_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
