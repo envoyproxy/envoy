@@ -3,7 +3,7 @@
 GCP Authentication Filter
 =========================
 This filter is used to fetch authentication tokens from GCP compute metadata server(https://cloud.google.com/run/docs/securing/service-identity#identity_tokens).
-In multiple services architecture where these services likely need to communicate withe each other, authenticating service-to-service(https://cloud.google.com/run/docs/authenticating/service-to-service) is required because many of these services may be private and require credentials for access.
+In multiple services architecture where these services likely need to communicate with each other, authenticating service-to-service(https://cloud.google.com/run/docs/authenticating/service-to-service) is required because many of these services may be private and require credentials for access.
 
 Configuration
 -------------
