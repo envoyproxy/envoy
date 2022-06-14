@@ -27,7 +27,8 @@ public:
         name: envoy.key_value.file_based
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
-          filename: {})EOF", filename_);
+          filename: {})EOF",
+                                    filename_);
   }
 
   void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
@@ -109,7 +110,8 @@ typed_config:
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}
 )EOF",
-        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests, key_value_config_);
+        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests,
+        key_value_config_);
 
     TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
     cluster_.mutable_circuit_breakers()
@@ -171,8 +173,8 @@ typed_config:
   envoy::config::cluster::v3::Cluster cluster_;
   std::string cache_file_value_contents_;
   bool use_cache_file_{};
-  std::string filename_{};
-  std::string key_value_config_{};
+  std::string filename_;
+  std::string key_value_config_;
 };
 
 int64_t getHeaderValue(const Http::ResponseHeaderMap& headers, absl::string_view name) {
@@ -305,7 +307,6 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainAndNoCaching) {
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
 }
-
 
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with
 // its existing hosts.
