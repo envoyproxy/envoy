@@ -191,6 +191,9 @@ new_features:
     added support for preserving header keys.
 - area: thrift
   change: |
+    added support for propogating connection draining if local replies try to end downstream.
+- area: thrift
+  change: |
     added support onLocalReply to inform filters of local replies.
 - area: thrift
   change: |
