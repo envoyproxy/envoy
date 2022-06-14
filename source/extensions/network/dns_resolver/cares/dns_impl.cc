@@ -399,9 +399,7 @@ DnsResolverImpl::AddrInfoPendingResolution::~AddrInfoPendingResolution() {
   ASSERT(pending_resolutions_ == 0);
 }
 
-void DnsResolverImpl::AddrInfoPendingResolution::startResolution() {
-  startResolutionImpl(family_);
-}
+void DnsResolverImpl::AddrInfoPendingResolution::startResolution() { startResolutionImpl(family_); }
 
 void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family) {
   pending_resolutions_++;
