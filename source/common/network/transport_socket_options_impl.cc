@@ -9,6 +9,7 @@
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/application_protocol.h"
+#include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_subject_alt_names.h"
@@ -52,6 +53,7 @@ TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterSt
   std::vector<std::string> subject_alt_names;
   std::vector<std::string> alpn_fallback;
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
+  std::unique_ptr<const TransportSocketOptions::ProxyInfo> proxy_info;
 
   if (auto typed_data =
           filter_state->getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
@@ -77,9 +79,15 @@ TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterSt
     proxy_protocol_options.emplace(typed_data->value());
   }
 
+  if (auto typed_data =
+          filter_state->getDataReadOnly<FilterStateProxyInfo>(FilterStateProxyInfo::key());
+      typed_data != nullptr) {
+    proxy_info = std::make_unique<TransportSocketOptions::ProxyInfo>("host", typed_data->address());
+  }
+
   return std::make_shared<Network::TransportSocketOptionsImpl>(
       server_name, std::move(subject_alt_names), std::move(application_protocols),
-      std::move(alpn_fallback), proxy_protocol_options, filter_state);
+      std::move(alpn_fallback), proxy_protocol_options, filter_state, std::move(proxy_info));
 }
 
 } // namespace Network

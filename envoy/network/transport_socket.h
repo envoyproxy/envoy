@@ -230,6 +230,22 @@ public:
    */
   virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
 
+  // Information for use by the http_11_proxy transport socket.
+  struct ProxyInfo {
+    ProxyInfo(std::string hostname, Network::Address::InstanceConstSharedPtr address)
+        : hostname(hostname), proxy_address(address) {}
+    // The hostname of the original request, to be used in CONNECT request if
+    // the underlying transport is TLS.
+    std::string hostname;
+    // The address of the proxy, where connections should be routed to.
+    Network::Address::InstanceConstSharedPtr proxy_address;
+  };
+
+  /**
+   * @return any proxy information if sending to an intermediate proxy over HTTP/1.1.
+   */
+  virtual const std::unique_ptr<const ProxyInfo>& proxyInfo() const PURE;
+
   /**
    * @return filter state from the downstream request or connection.
    */

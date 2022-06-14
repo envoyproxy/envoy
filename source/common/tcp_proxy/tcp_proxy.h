@@ -356,7 +356,6 @@ public:
 
     return {};
   }
-
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
   }

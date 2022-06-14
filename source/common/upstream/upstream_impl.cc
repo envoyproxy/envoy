@@ -279,6 +279,16 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
+  // If the transport socket options indicate the connection should be
+  // redirected to a proxy, create the TCP connection to the proxy's address not
+  // the host's address.
+  if (transport_socket_options && transport_socket_options->proxyInfo()) {
+    return {createConnection(dispatcher, cluster(),
+                             transport_socket_options->proxyInfo()->proxy_address,
+                             {transport_socket_options->proxyInfo()->proxy_address},
+                             transportSocketFactory(), options, transport_socket_options),
+            shared_from_this()};
+  }
   return {createConnection(dispatcher, cluster(), address(), addressList(),
                            transportSocketFactory(), options, transport_socket_options),
           shared_from_this()};

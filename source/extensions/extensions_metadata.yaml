@@ -715,6 +715,11 @@ envoy.transport_sockets.upstream_proxy_protocol:
   - envoy.transport_sockets.upstream
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.transport_sockets.upstream_http_11_proxy:
+  categories:
+  - envoy.transport_sockets.upstream
+  security_posture: unknown
+  status: alpha
 envoy.upstreams.http.generic:
   categories:
   - envoy.upstreams
