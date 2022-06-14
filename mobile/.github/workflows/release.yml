@@ -126,6 +126,8 @@ jobs:
             --config=remote-ci-macos \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //:ios_xcframework
+      - name: 'Move Envoy.xcframework.zip'
+        run: mv bazel-bin/library/swift/Envoy.xcframework.zip .
       - uses: actions/upload-artifact@v2
         with:
           name: ios_framework
