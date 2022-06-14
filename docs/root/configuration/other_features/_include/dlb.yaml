@@ -4,4 +4,4 @@ static_resources:
       extend_balance:
         name: envoy.network.connection_balance.dlb
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.dlb.v3alpha.Dlb
+          "@type": type.googleapis.com/envoy.extensions.network.connection_balance.dlb.v3alpha.Dlb

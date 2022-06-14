@@ -47,5 +47,5 @@ CONTRIB_EXTENSIONS = {
     # Connection Balance extensions
     #
 
-    "envoy.network.connection_balance.dlb":                     "//contrib/dlb/source:connection_balancer",
+    "envoy.network.connection_balance.dlb":                     "//contrib/network/connection_balance/dlb/source:connection_balancer",
 }

@@ -3,7 +3,7 @@
 Dlb Connection Balancer
 =======================
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.dlb.v3alpha.Dlb>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.network.connection_balance.dlb.v3alpha.Dlb>`
 
 
 This connection balancer extension provides Envoy with low latency networking by integrating with `Intel DLB <https://networkbuilders.intel.com/solutionslibrary/queue-management-and-load-balancing-on-intel-architecture>`_ through the libdlb library.

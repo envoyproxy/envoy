@@ -708,8 +708,7 @@ void ListenerImpl::buildSocketOptions() {
         break;
       }
       case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::BALANCE_TYPE_NOT_SET: {
-        ENVOY_LOG(warn, "No valid balance type, switch to default NOP connection balancer");
-        break;
+        throw EnvoyException("No valid balance type for connection balance");
       }
       }
     } else {
