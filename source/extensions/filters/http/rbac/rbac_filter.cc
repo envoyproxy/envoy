@@ -5,6 +5,7 @@
 #include "source/common/http/matching/inputs.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/matching/inputs.h"
+#include "source/common/ssl/matching/inputs.h"
 
 #include "absl/strings/str_join.h"
 
@@ -35,7 +36,16 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
           envoy::extensions::matching::common_inputs::network::v3::ServerNameInput::descriptor()
               ->full_name())},
       {TypeUtil::descriptorFullNameToTypeUrl(
-          envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name())}};
+          envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::ssl::v3::UriSanInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::ssl::v3::DnsSanInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::ssl::v3::SubjectInput::descriptor()
+              ->full_name())}};
   if (allowed_inputs_set.contains(type_url)) {
     return absl::OkStatus();
   }
