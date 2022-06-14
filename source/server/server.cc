@@ -600,8 +600,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     auto config = Config::Utility::translateAnyToFactoryConfig(
         default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
         factory);
-    regex_engine_ = factory.createEngine(*config,
-                                         serverFactoryContext().messageValidationVisitor());
+    regex_engine_ =
+        factory.createEngine(*config, serverFactoryContext().messageValidationVisitor());
     Regex::EngineSingleton::clear();
     Regex::EngineSingleton::initialize(regex_engine_.get());
   }
