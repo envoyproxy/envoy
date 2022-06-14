@@ -1121,7 +1121,7 @@ filegroup(
     srcs = glob([
         "dlb/libdlb/**",
     ]),
-    visibility = ["@envoy//contrib/dlb/source:__pkg__"],
+    visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
 )
 """,
         patch_args = ["-p1"],
