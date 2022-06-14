@@ -187,11 +187,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "minimal_logger_lib",
     srcs = [
-        "fancy_logger.cc",
+        "fine_grain_logger.cc",
         "logger.cc",
     ],
     hdrs = [
-        "fancy_logger.h",
+        "fine_grain_logger.h",
         "json_escape_string.h",
         "logger.h",
     ],
