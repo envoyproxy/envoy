@@ -1,0 +1,16 @@
+config {
+  name: "envoy.filters.http.file_system_buffer"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig"
+    value: "\"\002\022\000"
+  }
+}
+data {
+  trailers {
+  }
+}
+upstream_data {
+  http_body {
+    data: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+  }
+}
