@@ -28,7 +28,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // The protocol is designed as a streaming-first. It utilizes watch-like subscription model.
 // The data plane groups requests into Quota Buckets as directed by the filter config,
-// and periodically reported to the RLQS server among with the Bucket identifier, :ref:`BucketId
+// and periodically reports them to the RLQS server along with the Bucket identifier, :ref:`BucketId
 // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>`. Once RLQS server has collected enough
 // reports to make a decision, it'll send back the assignment with the rate limiting instructions.
 //
@@ -88,7 +88,7 @@ message RateLimitQuotaUsageReports {
   // changes, close the stream, and reopen a new one with the different domain.
   string domain = 1 [(validate.rules).string = {min_len: 1}];
 
-  // An list of quota usage reports. In most cases the order doesn't matter, except the case when
+  // A list of quota usage reports. In most cases the order doesn't matter, except the case when
   // the list contains multiple reports of the same ``BucketId``. Then the earlier report must come
   // first.
   repeated BucketQuotaUsage bucket_quota_usages = 2 [(validate.rules).repeated = {min_items: 1}];
