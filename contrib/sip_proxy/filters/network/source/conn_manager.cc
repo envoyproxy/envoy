@@ -215,7 +215,7 @@ void ConnectionManager::continueHandling(MessageMetadataSharedPtr metadata,
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
     sendLocalReply(*(decoder_->metadata()), ex, false);
 
-    absl::string_view&& k = decoder_->metadata()->transactionId().value();
+    absl::string_view k = decoder_->metadata()->transactionId().value();
     if (transactions_.find(k) != transactions_.end()) {
       transactions_[k]->setLocalResponseSent(true);
     }
@@ -236,7 +236,7 @@ void ConnectionManager::dispatch() {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
     sendLocalReply(*(decoder_->metadata()), ex, false);
 
-    std::string&& k = std::string(decoder_->metadata()->transactionId().value());
+    absl::string_view k = decoder_->metadata()->transactionId().value();
     if (transactions_.find(k) != transactions_.end()) {
       transactions_[k]->setLocalResponseSent(true);
     }
