@@ -1,3 +1,5 @@
+#include "contrib/network/connection_balance/dlb/source/connection_balancer_impl.h"
+
 #include <bits/types/FILE.h>
 #include <sys/eventfd.h>
 #include <unistd.h>
@@ -5,8 +7,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <memory>
-
-#include "contrib/network/connection_balance/dlb/source/connection_balancer_impl.h"
 
 #ifndef DLB_DISABLED
 #include "dlb.h"
@@ -99,6 +99,10 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
   }
 
   const int num = context.options().concurrency();
+  if (num > 32) {
+    ExceptionUtil::throwEnvoyException("Dlb connection balanncer only supports 32 worker threads, "
+                                       "please decrease the number of threads by `--concurrency`");
+  }
 
   for (int i = 0; i < num; i++) {
     int tx_port_id = createLdbPort(domain, cap, ldb_pool_id, dir_pool_id);

@@ -283,4 +283,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/vcl/ @florincoras @KfreeZ
 /contrib/hyperscan/ @zhxie @soulxu
 /contrib/language/ @diceride @diceride
-/contrib/dlb/ @daixiang0
+/contrib/dlb/ @mattklein123 @daixiang0

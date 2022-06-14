@@ -9,7 +9,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-
 make(
     name = "dlb",
     includes = [],
@@ -42,7 +41,7 @@ envoy_cc_contrib_extension(
         "//source/server:active_tcp_listener",
         "@envoy_api//contrib/envoy/extensions/network/connection_balance/dlb/v3alpha:pkg_cc_proto",
     ] + select({
-         "//bazel:linux_x86_64": [
+        "//bazel:linux_x86_64": [
             ":dlb",
         ],
         "//conditions:default": [
