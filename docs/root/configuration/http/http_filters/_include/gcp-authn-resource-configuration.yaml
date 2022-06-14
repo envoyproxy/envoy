@@ -1,7 +1,7 @@
 static_resources:
   clusters:
     // cluster for fake destination service which has typed metadata that contains 
-    // the audience information. 
+    // the audience information.
     - typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
