@@ -2038,6 +2038,61 @@ virtual_hosts:
   }
 }
 
+// Tests that when 'ignore_path_parameters_in_path_matching' is true, port from host header
+// is ignored in host matching.
+TEST_F(RouteMatcherTest, IgnorePathParametersInPathMatching) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match:
+      path: "/path-bluh"
+    name: "business-specific-route"
+    route:
+      cluster: local_service_grpc
+  - match:
+      prefix: ""
+    name: "catchall-route"
+    route:
+      cluster: default-boring-service
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"local_service_grpc", "default-boring-service"}, {});
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true);
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET"), 0)
+                  ->routeEntry()
+                  ->routeName(),
+              "catchall-route");
+  }
+  // Set ignore_port_in_host_matching to true, and path-parameters will be ignored.
+  route_configuration.set_ignore_path_parameters_in_path_matching(true);
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true);
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET"), 0)
+                  ->routeEntry()
+                  ->routeName(),
+              "business-specific-route");
+    EXPECT_EQ(
+        config
+            .route(genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d#foo=bar", "GET"),
+                   0)
+            ->routeEntry()
+            ->routeName(),
+        "business-specific-route");
+    EXPECT_EQ(
+        config
+            .route(genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d;&foo=bar", "GET"),
+                   0)
+            ->routeEntry()
+            ->routeName(),
+        "business-specific-route");
+  }
+}
+
 // Tests that when 'ignore_port_in_host_matching' is true, port from host header
 // is ignored in host matching.
 TEST_F(RouteMatcherTest, IgnorePortInHostMatching) {
