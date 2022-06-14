@@ -162,7 +162,7 @@ FineGrainLogContext& getFineGrainLogContext();
     static std::atomic<spdlog::logger*> flogger{0};                                                \
     spdlog::logger* local_flogger = flogger.load(std::memory_order_relaxed);                       \
     if (!local_flogger) {                                                                          \
-      ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, flogger);              \
+      ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, flogger);                    \
       local_flogger = flogger.load(std::memory_order_relaxed);                                     \
     }                                                                                              \
     if (ENVOY_LOG_COMP_LEVEL(*local_flogger, LEVEL)) {                                             \
@@ -190,7 +190,7 @@ FineGrainLogContext& getFineGrainLogContext();
  */
 #define FINE_GRAIN_FLUSH_LOG()                                                                     \
   do {                                                                                             \
-    SpdLoggerSharedPtr p = ::Envoy::getFineGrainLogContext().getFineGrainLogEntry(__FILE__); \
+    SpdLoggerSharedPtr p = ::Envoy::getFineGrainLogContext().getFineGrainLogEntry(__FILE__);       \
     if (p) {                                                                                       \
       p->flush();                                                                                  \
     }                                                                                              \
