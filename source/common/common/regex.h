@@ -22,9 +22,6 @@ class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
   explicit CompiledGoogleReMatcher(const std::string& regex, bool do_program_size_check);
 
-  explicit CompiledGoogleReMatcher(const std::string& regex, uint32_t max_program_size,
-                                   uint32_t warn_program_size);
-
   explicit CompiledGoogleReMatcher(const xds::type::matcher::v3::RegexMatcher& config)
       : CompiledGoogleReMatcher(config.regex(), false) {}
 
@@ -49,13 +46,7 @@ private:
 
 class GoogleReEngine : public Engine {
 public:
-  GoogleReEngine();
-  GoogleReEngine(uint32_t max_program_size, uint32_t warn_program_size);
   CompiledMatcherPtr matcher(const std::string& regex) const override;
-
-private:
-  uint32_t max_program_size_;
-  uint32_t warn_program_size_;
 };
 
 class GoogleReEngineFactory : public EngineFactory {

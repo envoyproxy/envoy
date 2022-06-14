@@ -42,26 +42,6 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
   }
 }
 
-CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
-                                                 uint32_t max_program_size,
-                                                 uint32_t warn_program_size)
-    : CompiledGoogleReMatcher(regex, false) {
-  const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
-
-  if (regex_program_size > max_program_size) {
-    throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
-                                     "{}. Increase configured max program size if necessary.",
-                                     regex, regex_program_size, max_program_size));
-  }
-
-  if (regex_program_size > warn_program_size) {
-    ENVOY_LOG_MISC(warn,
-                   "regex '{}' RE2 program size of {} > warn program size of {}. Increase "
-                   "configured warn program size if necessary.",
-                   regex, regex_program_size, warn_program_size);
-  }
-}
-
 CompiledGoogleReMatcher::CompiledGoogleReMatcher(
     const envoy::type::matcher::v3::RegexMatcher& config)
     : CompiledGoogleReMatcher(config.regex(), !config.google_re2().has_max_program_size()) {
@@ -79,13 +59,8 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(
   }
 }
 
-GoogleReEngine::GoogleReEngine() : GoogleReEngine(100, UINT32_MAX) {}
-
-GoogleReEngine::GoogleReEngine(uint32_t max_program_size, uint32_t warn_program_size)
-    : max_program_size_(max_program_size), warn_program_size_(warn_program_size) {}
-
 CompiledMatcherPtr GoogleReEngine::matcher(const std::string& regex) const {
-  return std::make_unique<CompiledGoogleReMatcher>(regex, max_program_size_, warn_program_size_);
+  return std::make_unique<CompiledGoogleReMatcher>(regex, true);
 }
 
 EnginePtr
@@ -94,11 +69,8 @@ GoogleReEngineFactory::createEngine(const Protobuf::Message& config,
   const auto google_re2 =
       MessageUtil::downcastAndValidate<const envoy::extensions::regex_engines::v3::GoogleRE2&>(
           config, validation_visitor);
-  uint32_t max_program_size = PROTOBUF_GET_WRAPPED_OR_DEFAULT(google_re2, max_program_size, 100);
-  uint32_t warn_program_size =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(google_re2, warn_program_size, UINT32_MAX);
 
-  return std::make_shared<GoogleReEngine>(max_program_size, warn_program_size);
+  return std::make_shared<GoogleReEngine>();
 }
 
 ProtobufTypes::MessagePtr GoogleReEngineFactory::createEmptyConfigProto() {
