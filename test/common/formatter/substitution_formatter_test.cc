@@ -2943,6 +2943,80 @@ TEST(SubstitutionFormatterTest, StructFormatterClusterMetadataNoClusterInfoTest)
   }
 }
 
+TEST(SubstitutionFormatterTest, StructFormatterUpstreamHostMetadataTest) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
+  Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
+  std::string body;
+
+  const auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  populateMetadataTestData(*metadata);
+  // Get pointers to MockUpstreamInfo  and MockHostDescription.
+  std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
+      std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(stream_info.upstreamInfo());
+  std::shared_ptr<const Upstream::MockHostDescription> mock_host_description =
+      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
+          mock_upstream_info->upstreamHost());
+  EXPECT_CALL(*mock_host_description, metadata()).WillRepeatedly(Return(metadata));
+
+  absl::node_hash_map<std::string, std::string> expected_json_map = {
+      {"test_key", "test_value"},
+      {"test_obj", "{\"inner_key\":\"inner_value\"}"},
+      {"test_obj.inner_key", "inner_value"},
+      {"test_obj.non_existing_key", "-"},
+  };
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    test_key: '%UPSTREAM_METADATA(com.test:test_key)%'
+    test_obj: '%UPSTREAM_METADATA(com.test:test_obj)%'
+    test_obj.inner_key: '%UPSTREAM_METADATA(com.test:test_obj:inner_key)%'
+    test_obj.non_existing_key: '%UPSTREAM_METADATA(com.test:test_obj:non_existing_key)%'
+  )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, false, false);
+
+  verifyStructOutput(
+      formatter.format(request_header, response_header, response_trailer, stream_info, body),
+      expected_json_map);
+}
+
+TEST(SubstitutionFormatterTest, StructFormatterUpstreamHostMetadataNullPtrs) {
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
+  Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
+  std::string body;
+
+  absl::node_hash_map<std::string, std::string> expected_json_map = {{"test_key", "-"}};
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    test_key: '%UPSTREAM_METADATA(com.test:test_key)%'
+  )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, false, false);
+
+  // Empty optional (absl::nullopt)
+  {
+    EXPECT_CALL(Const(stream_info), upstreamInfo()).WillOnce(Return(absl::nullopt));
+    verifyStructOutput(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        expected_json_map);
+    testing::Mock::VerifyAndClearExpectations(&stream_info);
+  }
+  // Empty host description info (nullptr)
+  {
+    std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
+        std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(stream_info.upstreamInfo());
+    EXPECT_CALL(*mock_upstream_info, upstreamHost()).WillOnce(Return(nullptr));
+    verifyStructOutput(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        expected_json_map);
+  }
+}
+
 TEST(SubstitutionFormatterTest, StructFormatterFilterStateTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
