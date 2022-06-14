@@ -336,7 +336,7 @@ private:
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
 
     absl::any filter_context_;
-    bool local_response_sent_ : 1;
+    bool local_response_sent_;
 
     /* Used by Router */
     std::shared_ptr<Router::TransactionInfos> transaction_infos_;
