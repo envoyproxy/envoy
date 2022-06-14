@@ -100,8 +100,9 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
 
   const int num = context.options().concurrency();
   if (num > 32) {
-    ExceptionUtil::throwEnvoyException("Dlb connection balanncer only supports 32 worker threads, "
-                                       "please decrease the number of threads by `--concurrency`");
+    ExceptionUtil::throwEnvoyException(
+        "Dlb connection balanncer only supports up to 32 worker threads, "
+        "please decrease the number of threads by `--concurrency`");
   }
 
   for (int i = 0; i < num; i++) {
