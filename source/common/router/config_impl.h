@@ -528,11 +528,11 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const RouteStatsContextOptConstRef routeStatsContext() const override {
+  const RouteStatsContextOptRef routeStatsContext() const override {
     if (route_stats_context_ != nullptr) {
       return *route_stats_context_;
     }
-    return RouteStatsContextOptConstRef();
+    return RouteStatsContextOptRef();
   }
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
@@ -737,7 +737,7 @@ public:
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return parent_->connectConfig();
     }
-    const RouteStatsContextOptConstRef routeStatsContext() const override {
+    const RouteStatsContextOptRef routeStatsContext() const override {
       return parent_->routeStatsContext();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }

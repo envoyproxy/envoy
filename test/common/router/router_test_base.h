@@ -30,7 +30,7 @@ public:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
                                  const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 RouteStatsContextOptConstRef, Runtime::Loader&,
+                                 RouteStatsContextOptRef, Runtime::Loader&,
                                  Random::RandomGenerator&, Event::Dispatcher&, TimeSource&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);

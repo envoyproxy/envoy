@@ -576,11 +576,11 @@ private:
   const Stats::StatNameManagedStorage route_stat_name_storage_;
   Stats::ScopeSharedPtr route_stats_scope_;
   Stats::StatName route_stat_name_;
-  mutable RouteStats route_stats_;
+  RouteStats route_stats_;
 };
 
 using RouteStatsContextPtr = std::unique_ptr<RouteStatsContext>;
-using RouteStatsContextOptConstRef = OptRef<const RouteStatsContext>;
+using RouteStatsContextOptRef = OptRef<RouteStatsContext>;
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -1076,9 +1076,9 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return RouteStatsContextOptConstRef the config needed to generate route level stats.
+   * @return RouteStatsContextOptRef the config needed to generate route level stats.
    */
-  virtual const RouteStatsContextOptConstRef routeStatsContext() const PURE;
+  virtual const RouteStatsContextOptRef routeStatsContext() const PURE;
 
   /**
    * @return EarlyDataPolicy& the configured early data option.

@@ -13,8 +13,8 @@ public:
       : DelegatingRouteEntry(std::move(base_route)), custom_cluster_name_(cluster_name_override) {}
 
   const std::string& clusterName() const override { return custom_cluster_name_; }
-  const RouteStatsContextOptConstRef routeStatsContext() const override {
-    return RouteStatsContextOptConstRef();
+  const RouteStatsContextOptRef routeStatsContext() const override {
+    return RouteStatsContextOptRef();
   }
 
 private:

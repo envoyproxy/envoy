@@ -1852,10 +1852,9 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 RetryStatePtr
 ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                              const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                             RouteStatsContextOptConstRef route_stats_context,
-                             Runtime::Loader& runtime, Random::RandomGenerator& random,
-                             Event::Dispatcher& dispatcher, TimeSource& time_source,
-                             Upstream::ResourcePriority priority) {
+                             RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
+                             Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                             TimeSource& time_source, Upstream::ResourcePriority priority) {
   std::unique_ptr<RetryStateImpl> retry_state =
       RetryStateImpl::create(policy, request_headers, cluster, vcluster, route_stats_context,
                              runtime, random, dispatcher, time_source, priority);

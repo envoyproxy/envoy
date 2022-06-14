@@ -28,7 +28,7 @@ bool clusterSupportsHttp3AndTcpFallback(const Upstream::ClusterInfo& cluster) {
 std::unique_ptr<RetryStateImpl>
 RetryStateImpl::create(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                        const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                       RouteStatsContextOptConstRef route_stats_context, Runtime::Loader& runtime,
+                       RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
                        Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                        TimeSource& time_source, Upstream::ResourcePriority priority) {
   std::unique_ptr<RetryStateImpl> ret;
@@ -67,7 +67,7 @@ RetryStateImpl::create(const RetryPolicy& route_policy, Http::RequestHeaderMap& 
 RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
                                Http::RequestHeaderMap& request_headers,
                                const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                               RouteStatsContextOptConstRef route_stats_context,
+                               RouteStatsContextOptRef route_stats_context,
                                Runtime::Loader& runtime, Random::RandomGenerator& random,
                                Event::Dispatcher& dispatcher, TimeSource& time_source,
                                Upstream::ResourcePriority priority, bool auto_configured_for_http3,
