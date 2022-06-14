@@ -748,7 +748,7 @@ public:
   // Explicit move assignment to avoid duplicate moves of virtual base StreamFilterBase and to
   // eliminate virtual-move-assign warning.
   StreamDecoderFilter& operator=(StreamDecoderFilter&& filter) noexcept {
-    // Use copy semantics rather than move semantics here.
+    // Use copy semantics rather than move semantics for StreamFilterBase.
     StreamDecoderFilter::StreamFilterBase::operator=(filter);
     return *this;
   }
@@ -973,7 +973,7 @@ public:
   // Explicit move assignment to avoid duplicate moves of virtual base StreamFilterBase and to
   // eliminate virtual-move-assign warning.
   StreamEncoderFilter& operator=(StreamEncoderFilter&& filter) noexcept {
-    // Use copy semantics rather than move semantics here.
+    // Use copy semantics rather than move semantics for StreamFilterBase.
     StreamEncoderFilter::StreamFilterBase::operator=(filter);
     return *this;
   }
@@ -1047,18 +1047,7 @@ using StreamEncoderFilterSharedPtr = std::shared_ptr<StreamEncoderFilter>;
 /**
  * A filter that handles both encoding and decoding.
  */
-class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEncoderFilter {
-public:
-  // Explicit move assignment to eliminate virtual-move-assign warning.
-  StreamFilter& operator=(StreamFilter&& filter) noexcept {
-    StreamFilter::StreamDecoderFilter::operator=(
-        std::move(filter)); // NOLINT(bugprone-use-after-move)
-    StreamFilter::StreamEncoderFilter::operator=(
-        std::move(filter)); // NOLINT(bugprone-use-after-move)
-    return *this;
-  }
-  StreamFilter& operator=(const StreamFilter&) = default;
-};
+class StreamFilter : public StreamDecoderFilter, public StreamEncoderFilter {};
 
 using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
