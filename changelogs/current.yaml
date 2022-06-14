@@ -228,12 +228,12 @@ new_features:
 - area: dubbo_proxy
   change: |
     added :ref:`metadata_match <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.metadata_match>` support to the dubbo proxy.
-- area: rbac
-  change: |
-    added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
 - area: matching
   change : |
     added support for matching authenticated inputs in network and HTTP matching data.
+- area: rbac
+  change: |
+    added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
 
 deprecated:
 - area: dubbo_proxy
