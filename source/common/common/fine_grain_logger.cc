@@ -78,12 +78,11 @@ void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level
 }
 
 std::string FineGrainLogContext::listFineGrainLoggers() ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
-  std::string info = "";
   absl::ReaderMutexLock l(&fine_grain_log_lock_);
-  for (const auto& it : *fine_grain_log_map_) {
-    absl::StrAppend(&info, "   ",
-                    absl::StrJoin(std::make_tuple(it.first, it.second->level()), ": "), "\n");
-  }
+  std::string info =
+      absl::StrJoin(*fine_grain_log_map_, "\n", [](std::string* out, const auto& log_pair) {
+        absl::StrAppend(out, "  ", log_pair.first, ": ", log_pair.second->level());
+      });
   return info;
 }
 

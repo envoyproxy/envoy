@@ -334,7 +334,7 @@ TEST(FineGrainLog, Iteration) {
   FINE_GRAIN_LOG(info, "Info: iteration test begins.");
   getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::info);
   std::string output = getFineGrainLogContext().listFineGrainLoggers();
-  EXPECT_THAT(output, HasSubstr("   " __FILE__ ": 2\n"));
+  EXPECT_THAT(output, HasSubstr("  " __FILE__ ": 2"));
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::err);
 
   FINE_GRAIN_LOG(warn, "Warning: now level is warning, format changed (Date removed).");

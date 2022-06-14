@@ -64,6 +64,7 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
     response.add("active loggers:\n");
     std::string logger_info = getFineGrainLogContext().listFineGrainLoggers();
     response.add(logger_info);
+    response.add("\n");
   }
 
   return rc;

@@ -37,8 +37,8 @@ TEST(FineGrainLog, safeFileNameMatch) {
 
 TEST(FineGrainLog, updateCurrentFilePath) {
   Logger::Context::enableFineGrainLogger();
+  FINE_GRAIN_LOG(critical, "critical: initialize a fine grain logger for test.");
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::info);
-  FINE_GRAIN_LOG(info, "Info: verbosityUpdateCurrentFile test begins.");
   FINE_GRAIN_LOG(debug, "Debug: you shouldn't see this message!");
 
   absl::string_view file_path = __FILE__;
@@ -56,7 +56,7 @@ TEST(FineGrainLog, updateCurrentFilePath) {
 TEST(FineGrainLog, updateBasename) {
   Logger::Context::enableFineGrainLogger();
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::info);
-  FINE_GRAIN_LOG(info, "Info: verbosityUpdateCurrentFile test begins.");
+  FINE_GRAIN_LOG(info, "Info: verbosityUpdateBasename test begins.");
   FINE_GRAIN_LOG(debug, "Debug: you shouldn't see this message!");
 
   absl::string_view file_path = __FILE__;
