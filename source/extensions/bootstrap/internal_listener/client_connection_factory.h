@@ -25,7 +25,8 @@ public:
                          Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+                         const Network::ConnectionSocket::OptionsSharedPtr& options,
+                         Network::TransportSocketOptionsConstSharedPtr transport_options) override;
   // The slot is owned by the internal listener registry extension. Once that extension is
   // initialized, this slot is available. The ClientConnectionFactory has two potential user cases.
   // 1. The per worker thread connection handler populates the per worker listener registry.

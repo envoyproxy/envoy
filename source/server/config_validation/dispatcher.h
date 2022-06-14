@@ -22,7 +22,8 @@ public:
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr,
                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+                         const Network::ConnectionSocket::OptionsSharedPtr& options,
+                         Network::TransportSocketOptionsConstSharedPtr transport_options) override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
                                       Runtime::Loader& runtime, bool bind_to_port,
                                       bool ignore_global_conn_limit) override;

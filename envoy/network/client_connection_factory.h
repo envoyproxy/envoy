@@ -31,7 +31,7 @@ public:
       Network::Address::InstanceConstSharedPtr source_address,
       Network::TransportSocketPtr&& transport_socket,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
-      const Network::TransportSocketOptionsConstSharedPtr& transport_options = nullptr) PURE;
+      Network::TransportSocketOptionsConstSharedPtr transport_options = nullptr) PURE;
 };
 
 } // namespace Network
