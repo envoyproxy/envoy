@@ -43,8 +43,11 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     const auto filter_it = filter_metadata.find(std::string(FilterName));
     if (filter_it != filter_metadata.end()) {
       envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-      MessageUtil::unpackTo(filter_it->second, audience);
-      audience_str_ = audience.url();
+      if (filter_it->second.UnpackTo(&audience)) {
+        audience_str_ = audience.url();
+      } else {
+        ENVOY_LOG(error, "Failed to parse the audience message: {}", audience.DebugString());
+      }
     }
   }
 
