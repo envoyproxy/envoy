@@ -183,10 +183,12 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     pending_response_.status_ = ResolutionStatus::Success;
 
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
+      bool can_process_v4 = (!parent_.filter_unroutable_families_ || available_interfaces_.v4_available_);
+      bool can_process_v6 = (!parent_.filter_unroutable_families_ || available_interfaces_.v6_available_);
 
       struct ares_addrinfo_node *next = addrinfo->nodes;
       while (next) {
-        if (next->ai_family == AF_INET) {
+        if (next->ai_family == AF_INET && can_process_v4) {
           sockaddr_in address;
           memset(&address, 0, sizeof(address));
           address.sin_family = AF_INET;
@@ -196,7 +198,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
           pending_response_.address_list_.emplace_back(
               DnsResponse(std::make_shared<const Address::Ipv4Instance>(&address),
                           std::chrono::seconds(next->ai_ttl)));
-        } else if (next->ai_family == AF_INET6) {
+        } else if (next->ai_family == AF_INET6 && can_process_v6) {
           sockaddr_in6 address;
           memset(&address, 0, sizeof(address));
           address.sin6_family = AF_INET6;
