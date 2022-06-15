@@ -560,7 +560,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   // Envoy exceptions will only be caught here when compiled for 64-bit arches.
   // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Exceptions/Articles/Exceptions64Bit.html
   @try {
-    return (int)run_engine(_engineHandle, configYAML.UTF8String, logLevel.UTF8String);
+    return (int)run_engine(_engineHandle, configYAML.UTF8String, logLevel.UTF8String, "");
   } @catch (NSException *exception) {
     NSLog(@"[Envoy] exception caught: %@", exception);
     [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:self];

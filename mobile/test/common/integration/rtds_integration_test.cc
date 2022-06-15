@@ -23,29 +23,6 @@
 namespace Envoy {
 namespace {
 
-void validateStreamIntel(const envoy_final_stream_intel& final_intel) {
-  EXPECT_EQ(-1, final_intel.dns_start_ms);
-  EXPECT_EQ(-1, final_intel.dns_end_ms);
-
-  // This test doesn't do TLS.
-  EXPECT_EQ(-1, final_intel.ssl_start_ms);
-  EXPECT_EQ(-1, final_intel.ssl_end_ms);
-
-  ASSERT_NE(-1, final_intel.stream_start_ms);
-  ASSERT_NE(-1, final_intel.connect_start_ms);
-  ASSERT_NE(-1, final_intel.connect_end_ms);
-  ASSERT_NE(-1, final_intel.sending_start_ms);
-  ASSERT_NE(-1, final_intel.sending_end_ms);
-  ASSERT_NE(-1, final_intel.response_start_ms);
-  ASSERT_NE(-1, final_intel.stream_end_ms);
-
-  ASSERT_LE(final_intel.stream_start_ms, final_intel.connect_start_ms);
-  ASSERT_LE(final_intel.connect_start_ms, final_intel.connect_end_ms);
-  ASSERT_LE(final_intel.connect_end_ms, final_intel.sending_start_ms);
-  ASSERT_LE(final_intel.sending_start_ms, final_intel.sending_end_ms);
-  ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
-}
-
 envoy::config::cluster::v3::Cluster
 createSingleEndpointClusterConfig(const std::string& cluster_name,
                                   const std::string& loopbackAddr) {
@@ -109,7 +86,7 @@ envoy::config::bootstrap::v3::Admin adminConfig(const std::string& loopbackAddr)
         address: {}
         port_value: 0
   )EOF",
-                                       Platform::null_device_path, loopbackAddr);
+                                       ::Platform::null_device_path, loopbackAddr);
 
   envoy::config::bootstrap::v3::Admin config;
   TestUtility::loadFromYaml(yaml, config);
@@ -120,10 +97,11 @@ class RtdsIntegrationTest : public BaseClientIntegrationTest,
                             public Grpc::DeltaSotwIntegrationParamTest {
 public:
   RtdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {
+    override_builder_config_ = true; // The builder does not yet have RTDS support.
+    expect_dns_ = false;             // TODO(alyssawilk) debug.
     create_xds_upstream_ = true;
     sotw_or_delta_ = sotwOrDelta();
-    default_request_headers_.setScheme("https");
-    default_request_headers_.addCopy("x-envoy-mobile-upstream-protocol", "http2");
+    scheme_ = "https";
 
     if (sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw ||
         sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
@@ -160,6 +138,8 @@ public:
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       bootstrap.mutable_admin()->MergeFrom(adminConfig(loopbackAddr()));
     });
+    admin_filename_ = TestEnvironment::temporaryPath("admin_address.txt");
+    setAdminAddressPathForTests(admin_filename_);
   }
 
   void SetUp() override {
@@ -167,14 +147,22 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
-  void TearDown() override { cleanup(); }
+  void TearDown() override {
+    cleanup();
+    BaseClientIntegrationTest::TearDown();
+  }
+
+  void createEnvoy() override {
+    BaseClientIntegrationTest::createEnvoy();
+    std::string admin_str = TestEnvironment::readFileToStringForTest(admin_filename_);
+    auto addr = Network::Utility::parseInternetAddressAndPort(admin_str);
+    registerPort("admin", addr->ip()->port());
+  }
 
   void initialize() override {
     BaseClientIntegrationTest::initialize();
     // Register admin port.
-    registerTestServerPorts({});
-    initial_load_success_ = test_server_->counter("runtime.load_success")->value();
-    initial_keys_ = test_server_->gauge("runtime.num_keys")->value();
+    // registerTestServerPorts({});
 
     acceptXdsConnection();
   }
@@ -226,7 +214,7 @@ protected:
   }
 
   uint32_t initial_load_success_{};
-  uint32_t initial_keys_{};
+  std::string admin_filename_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest,
@@ -236,44 +224,10 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   addRuntimeRtdsConfig();
   initialize();
 
-  bridge_callbacks_.on_data = [](envoy_data c_data, bool end_stream, envoy_stream_intel,
-                                 void* context) -> void* {
-    if (end_stream) {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "");
-    } else {
-      EXPECT_EQ(c_data.length, 10);
-    }
-    callbacks_called* cc_ = static_cast<callbacks_called*>(context);
-    cc_->on_data_calls++;
-    release_envoy_data(c_data);
-    return nullptr;
-  };
-
-  // Build a set of request headers.
-  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
-                                   std::to_string(request_data.length()));
-
-  envoy_headers c_headers = Http::Utility::toBridgeHeaders(default_request_headers_);
-
-  // Build body data
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-
-  // Build a set of request trailers.
-  // TODO: update the autonomous upstream to assert on trailers, or to send trailers back.
-  Http::TestRequestTrailerMapImpl trailers;
-  envoy_headers c_trailers = Http::Utility::toBridgeHeaders(trailers);
-
-  // Create a stream.
-  dispatcher_->post([&]() -> void {
-    http_client_->startStream(stream_, bridge_callbacks_, false);
-    http_client_->sendHeaders(stream_, c_headers, false);
-    http_client_->sendData(stream_, c_data, false);
-    http_client_->sendTrailers(stream_, c_trailers);
-  });
+  // Send a request on the data plane.
+  stream_->sendHeaders(default_request_headers_, true);
   terminal_callback_.waitReady();
 
-  validateStreamIntel(cc_.final_intel);
   EXPECT_EQ(cc_.on_headers_calls, 1);
   EXPECT_EQ(cc_.status, "200");
   EXPECT_EQ(cc_.on_data_calls, 2);
@@ -282,8 +236,6 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(cc_.on_error_calls, 0);
   EXPECT_EQ(cc_.on_header_consumed_bytes_from_response, 13);
   EXPECT_EQ(cc_.on_complete_received_byte_count, 41);
-  // stream_success gets charged for 2xx status codes.
-  test_server_->waitForCounterEq("http.client.stream_success", 1);
 
   // Check that the Runtime config is from the static layer.
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
@@ -301,7 +253,6 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
-  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
 
   // Verify that the Runtime config values are from the RTDS response.
   EXPECT_EQ("bar", getRuntimeKey("foo"));

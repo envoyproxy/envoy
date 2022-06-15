@@ -59,16 +59,22 @@ void sendRequest(Platform::EngineSharedPtr engine, Status& status,
                  absl::Notification& stream_complete) {
   auto stream_prototype = engine->streamClient()->newStreamPrototype();
   auto stream = (*stream_prototype)
-                    .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream) {
+                    .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream,
+                                      envoy_stream_intel) {
                       status.status_code = headers->httpStatus();
                       status.end_stream = end_stream;
                     })
-                    .setOnComplete([&]() { stream_complete.Notify(); })
-                    .setOnError([&](Platform::EnvoyErrorSharedPtr envoy_error) {
+                    .setOnComplete([&](envoy_stream_intel, envoy_final_stream_intel) {
+                      stream_complete.Notify();
+                    })
+                    .setOnError([&](Platform::EnvoyErrorSharedPtr envoy_error, envoy_stream_intel,
+                                    envoy_final_stream_intel) {
                       (void)envoy_error;
                       stream_complete.Notify();
                     })
-                    .setOnCancel([&]() { stream_complete.Notify(); })
+                    .setOnCancel([&](envoy_stream_intel, envoy_final_stream_intel) {
+                      stream_complete.Notify();
+                    })
                     .start();
 
   auto request_headers =

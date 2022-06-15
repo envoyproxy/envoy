@@ -37,6 +37,7 @@ Features:
 - iOS: add support for integrating Envoy Mobile via the Swift Package Manager
 - android: create simple persistent SharedPreferencesStore (:issue: `#2319 <2319>`)
 - iOS: A documentation archive is now included in the GitHub release artifact (:issue: `#2335 <2335>`)
+- api: improved C++ APIs compatibility with Java / Kotlin / Swift (:issue `#2362 <2362>`)
 
 0.4.6 (April 26, 2022)
 ========================

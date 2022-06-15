@@ -182,8 +182,9 @@ envoy_engine_t init_engine(envoy_engine_callbacks callbacks, envoy_logger logger
   return Envoy::EngineHandle::initEngine(callbacks, logger, event_tracker);
 }
 
-envoy_status_t run_engine(envoy_engine_t engine, const char* config, const char* log_level) {
-  return Envoy::EngineHandle::runEngine(engine, config, log_level);
+envoy_status_t run_engine(envoy_engine_t engine, const char* config, const char* log_level,
+                          const char* admin_path) {
+  return Envoy::EngineHandle::runEngine(engine, config, log_level, admin_path);
 }
 
 void terminate_engine(envoy_engine_t engine) { Envoy::EngineHandle::terminateEngine(engine); }

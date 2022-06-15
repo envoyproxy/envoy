@@ -17,13 +17,18 @@ namespace Platform {
 class Stream;
 using StreamSharedPtr = std::shared_ptr<Stream>;
 
-using OnHeadersCallback = std::function<void(ResponseHeadersSharedPtr headers, bool end_stream)>;
+using OnHeadersCallback = std::function<void(ResponseHeadersSharedPtr headers, bool end_stream,
+                                             envoy_stream_intel intel)>;
 using OnDataCallback = std::function<void(envoy_data data, bool end_stream)>;
-using OnTrailersCallback = std::function<void(ResponseTrailersSharedPtr trailers)>;
-using OnErrorCallback = std::function<void(EnvoyErrorSharedPtr error)>;
-using OnCompleteCallback = std::function<void()>;
-using OnCancelCallback = std::function<void()>;
-using OnSendWindowAvailableCallback = std::function<void()>;
+using OnTrailersCallback =
+    std::function<void(ResponseTrailersSharedPtr trailers, envoy_stream_intel intel)>;
+using OnErrorCallback = std::function<void(EnvoyErrorSharedPtr error, envoy_stream_intel intel,
+                                           envoy_final_stream_intel final_intel)>;
+using OnCompleteCallback =
+    std::function<void(envoy_stream_intel intel, envoy_final_stream_intel final_intel)>;
+using OnCancelCallback =
+    std::function<void(envoy_stream_intel intel, envoy_final_stream_intel final_intel)>;
+using OnSendWindowAvailableCallback = std::function<void(envoy_stream_intel intel)>;
 
 // See library/common/types/c_types.h for what these callbacks should do.
 struct StreamCallbacks : public std::enable_shared_from_this<StreamCallbacks> {

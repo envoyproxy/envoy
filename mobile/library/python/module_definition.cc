@@ -30,7 +30,7 @@
 #include "library/cc/stream_client.h"
 #include "library/cc/stream_prototype.h"
 #include "library/cc/upstream_http_protocol.h"
-
+#include "library/common/types/c_types.h"
 #include "library/common/types/c_types.h"
 
 #include "library/python/engine_builder_shim.h"
@@ -147,6 +147,16 @@ PYBIND11_MODULE(envoy_engine, m) {
       .def("set", &RequestTrailersBuilder::set)
       .def("remove", &RequestTrailersBuilder::remove)
       .def("build", &RequestTrailersBuilder::build);
+
+  py::class_<envoy_stream_intel>(m, "StreamIntel")
+      .def("stream_start_ms", [](envoy_stream_intel intel) { return intel.stream_id; })
+      .def("connection_id", [](envoy_stream_intel intel) { return intel.connection_id; })
+      .def("attempt_count", [](envoy_stream_intel intel) { return intel.attempt_count; })
+      .def("consumed_bytes_from_response",
+           [](envoy_stream_intel intel) { return intel.consumed_bytes_from_response; });
+
+  py::class_<envoy_final_stream_intel>(m, "FinalStreamIntel")
+      .def("response_flags", [](envoy_final_stream_intel intel) { return intel.response_flags; });
 
   py::class_<ResponseHeaders, ResponseHeadersSharedPtr>(m, "ResponseHeaders")
       .def("__getitem__", &ResponseHeaders::operator[])

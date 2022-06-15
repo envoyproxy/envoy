@@ -93,6 +93,11 @@ EngineBuilder& EngineBuilder::setDeviceOs(const std::string& device_os) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setStreamIdleTimeoutSeconds(int stream_idle_timeout_seconds) {
+  this->stream_idle_timeout_seconds_ = stream_idle_timeout_seconds;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::enableGzip(bool gzip_on) {
   this->gzip_filter_ = gzip_on;
   return *this;
@@ -166,10 +171,16 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_event_tracker null_tracker{};
 
-  auto config_str = this->generateConfigStr();
+  std::string config_str;
+  if (config_override_for_tests_.empty()) {
+    config_str = this->generateConfigStr();
+  } else {
+    config_str = config_override_for_tests_;
+  }
   auto envoy_engine =
       init_engine(this->callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
-  run_engine(envoy_engine, config_str.c_str(), logLevelToString(this->log_level_).c_str());
+  run_engine(envoy_engine, config_str.c_str(), logLevelToString(this->log_level_).c_str(),
+             this->admin_address_path_for_tests_.c_str());
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend

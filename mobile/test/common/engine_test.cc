@@ -50,7 +50,7 @@ struct TestEngineHandle {
   envoy_engine_t handle_;
   TestEngineHandle(envoy_engine_callbacks callbacks, const std::string& level) {
     handle_ = init_engine(callbacks, {}, {});
-    run_engine(handle_, MINIMAL_TEST_CONFIG.c_str(), level.c_str());
+    run_engine(handle_, MINIMAL_TEST_CONFIG.c_str(), level.c_str(), "");
   }
 
   void terminate() { terminate_engine(handle_); }
