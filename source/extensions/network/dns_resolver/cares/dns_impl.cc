@@ -188,29 +188,27 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
       bool can_process_v6 =
           (!parent_.filter_unroutable_families_ || available_interfaces_.v6_available_);
 
-      struct ares_addrinfo_node* next = addrinfo->nodes;
-      while (next) {
-        if (next->ai_family == AF_INET && can_process_v4) {
+      for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
+        if (ai->ai_family == AF_INET && can_process_v4) {
           sockaddr_in address;
           memset(&address, 0, sizeof(address));
           address.sin_family = AF_INET;
           address.sin_port = 0;
-          address.sin_addr = reinterpret_cast<sockaddr_in*>(next->ai_addr)->sin_addr;
+          address.sin_addr = reinterpret_cast<sockaddr_in*>(ai->ai_addr)->sin_addr;
 
           pending_response_.address_list_.emplace_back(
               DnsResponse(std::make_shared<const Address::Ipv4Instance>(&address),
-                          std::chrono::seconds(next->ai_ttl)));
-        } else if (next->ai_family == AF_INET6 && can_process_v6) {
+                          std::chrono::seconds(ai->ai_ttl)));
+        } else if (ai->ai_family == AF_INET6 && can_process_v6) {
           sockaddr_in6 address;
           memset(&address, 0, sizeof(address));
           address.sin6_family = AF_INET6;
           address.sin6_port = 0;
-          address.sin6_addr = reinterpret_cast<sockaddr_in6*>(next->ai_addr)->sin6_addr;
+          address.sin6_addr = reinterpret_cast<sockaddr_in6*>(ai->ai_addr)->sin6_addr;
           pending_response_.address_list_.emplace_back(
               DnsResponse(std::make_shared<const Address::Ipv6Instance>(address),
-                          std::chrono::seconds(next->ai_ttl)));
+                          std::chrono::seconds(ai->ai_ttl)));
         }
-        next = next->ai_next;
       }
     }
 
