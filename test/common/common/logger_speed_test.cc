@@ -61,7 +61,7 @@ static void fineGrainLogFastPath(benchmark::State& state) {
   // control log length to be the same as normal Envoy below
   std::string msg(100 - strlen(__FILE__) + 4, '.');
   spdlog::level::level_enum lv = state.range(1) ? spdlog::level::trace : spdlog::level::info;
-  getFineGrainLogContext().setFineGrainLogger(FINE_GRAIN_KEY, lv);
+  getFineGrainLogContext().setFineGrainLogger(__FILE__, lv);
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
