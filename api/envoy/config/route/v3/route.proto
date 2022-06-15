@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
@@ -134,6 +134,12 @@ message RouteConfiguration {
   // NOTE: this option will not strip the port number (if any) contained in route config
   // :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.domains field.
   bool ignore_port_in_host_matching = 14;
+
+  // Ignore path-parameters in path-matching.
+  // Before RFC3986, URI were like(RFC1808): <scheme>://<net_loc>/<path>;<params>?<query>#<fragment>
+  // Envoy by default takes ":path" as "<path>;<params>".
+  // For users who want to only match path on the "<path>" portion, this option should be true.
+  bool ignore_path_parameters_in_path_matching = 15;
 }
 
 message Vhds {

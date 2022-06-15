@@ -304,12 +304,16 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
       parent_.resetDownstreamConnection();
     } else {
       close_downstream = close_downstream_on_error_;
-      parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
-                                          fmt::format("connection failure '{}'",
-                                                      (upstream_host_ != nullptr)
-                                                          ? upstream_host_->address()->asString()
-                                                          : "to upstream")),
-                             close_downstream);
+      parent_.sendLocalReply(
+          AppException(
+              AppExceptionType::InternalError,
+              fmt::format("connection failure: {} '{}'",
+                          reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure
+                              ? "remote connection failure"
+                              : "timeout",
+                          (upstream_host_ != nullptr) ? upstream_host_->address()->asString()
+                                                      : "to upstream")),
+          close_downstream);
     }
     break;
   }
