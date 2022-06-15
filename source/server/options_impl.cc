@@ -104,7 +104,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                       cmd, false);
   TCLAP::SwitchArg enable_fine_grain_logging(
       "", "enable-fine-grain-logging",
-      "Logger mode: enable file level log control(Fancy Logger)or not", cmd, false);
+      "Logger mode: enable file level log control (Fine-Grain Logger) or not", cmd, false);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
