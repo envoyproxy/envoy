@@ -991,11 +991,12 @@ private:
  * Route entry implementation for pattern path match routing.
  */
 class PathTemplateRouteEntryImpl : public RouteEntryImplBase {
- public:
-  PathTemplateRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
-                       const OptionalHttpFilters& optional_http_filters,
-                       Server::Configuration::ServerFactoryContext& factory_context,
-                       ProtobufMessage::ValidationVisitor& validator);
+public:
+  PathTemplateRouteEntryImpl(const VirtualHostImpl& vhost,
+                             const envoy::config::route::v3::Route& route,
+                             const OptionalHttpFilters& optional_http_filters,
+                             Server::Configuration::ServerFactoryContext& factory_context,
+                             ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return path_template_match_; }
