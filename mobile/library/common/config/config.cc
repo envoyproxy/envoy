@@ -509,6 +509,7 @@ layered_runtime:
       static_layer:
         envoy:
           # This disables envoy bug stats, which are filtered out of our stats inclusion list anyway
+          # Global stats do not play well with engines with limited lifetimes
           disallow_global_stats: true
           reloadable_features:
             allow_multiple_dns_addresses: *dns_multiple_addresses
