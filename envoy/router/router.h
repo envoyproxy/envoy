@@ -736,8 +736,7 @@ enum class PathMatchType {
   Exact,
   Regex,
   PathSeparatedPrefix,
-  Pattern
-
+  Pattern,
 };
 
 /**

@@ -998,8 +998,8 @@ class PathTemplateRouteEntryImpl : public RouteEntryImplBase {
                        ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override { return pattern_; }
-  PathMatchType matchType() const override { return PathMatchType::Template; }
+  const std::string& matcher() const override { return path_template_match_; }
+  PathMatchType matchType() const override { return PathMatchType::Pattern; }
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
@@ -1015,8 +1015,8 @@ class PathTemplateRouteEntryImpl : public RouteEntryImplBase {
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
-  const std::string pattern_;
-  const Matchers::PathMatcherConstSharedPtr pattern_matcher_;
+  const std::string path_template_match_;
+  const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
 /**

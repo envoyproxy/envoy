@@ -543,7 +543,7 @@ message RouteMatch {
     // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
     string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
 
-    string path_template_match = 15;
+    string path_template_match = 15 [(validate.rules).string = {min_len: 1}];
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
