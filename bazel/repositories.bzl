@@ -745,6 +745,10 @@ def _com_google_protobuf():
     )
 
     for platform in PROTOC_VERSIONS:
+        # Ideally we dont use a private build artefact as done here.
+        # If `rules_proto` implements protoc toolchains in the future (currently it
+        # is there, but is empty) we should remove these and use that rule
+        # instead.
         external_http_archive(
             "com_google_protobuf_protoc_%s" % platform,
             build_file = "@rules_proto//proto/private:BUILD.protoc",

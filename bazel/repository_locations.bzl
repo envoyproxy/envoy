@@ -1,5 +1,10 @@
 # This should match the schema defined in external_deps.bzl.
 
+# These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
+# and both must match the names from the protobuf releases (see
+# https://github.com/protocolbuffers/protobuf/releases).
+# The names change in upcoming versions.
+# The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
     linux_aarch_64 = "95584939e733bdd6ffb8245616b2071f565cd4c28163b6c21c8f936a9ee20861",
     linux_ppcle_64 = "5c22cc91c87e4396bf4c68fb66ba655e2eda251935c7893f08016313933f6944",
@@ -1191,7 +1196,7 @@ def _compiled_protoc_deps(locations, versions):
     for platform, sha in versions.items():
         locations["com_google_protobuf_protoc_%s" % platform] = dict(
             project_name = "Protocol Buffers (protoc) %s" % platform,
-            project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
+            project_desc = "Protoc compiler for protobuf (%s)" % platform,
             project_url = "https://developers.google.com/protocol-buffers",
             version = "3.19.4",
             sha256 = sha,
