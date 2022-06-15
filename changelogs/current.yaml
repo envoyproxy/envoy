@@ -4,6 +4,17 @@ behavior_changes:
 - area: tls-inspector
   change: |
     the listener filter tls inspector's stats ``connection_closed`` and ``read_error`` are removed. The new stats are introduced for listener, ``downstream_peek_remote_close`` and ``read_error`` :ref:`listener stats <config_listener_stats>`.
+- area: listener
+  change: |
+    Fixed metric tag extraction so that :ref:stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>
+    is properly extracted. This changes the Prometheus name from
+    envoy_listener_myprefix_downstream_cx_overflow{} to envoy_listener_downstream_cx_overflow{envoy_listener_address="myprefix"}.
+    This does not affect the Prometheus name if stat_prefix is not set.
+- area: thrift_proxy
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.stat_prefix>`
+    is properly extracted. This changes the Prometheus name from
+    envoy_thrift_myprefix_request{} to envoy_thrift_request{envoy_thrift_prefix="myprefix"}.
 
 minor_behavior_changes:
 - area: thrift
@@ -122,10 +133,6 @@ bug_fixes:
 - area: tcp_proxy
   change: |
     Fixed an issue using the cluster wide CONNECT termination so it will successfully proxy payloads.
-- area: listener
-  change: |
-    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`
-    is properly extracted.
 - area: upstream
   change: |
     Fixed the LOGICAL_DNS and STRICT_DNS clusters to work for IPv6.
