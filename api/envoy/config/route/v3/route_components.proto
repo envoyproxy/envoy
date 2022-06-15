@@ -1044,7 +1044,7 @@ message RouteAction {
   //   ``/aaa/yyy/bbb``.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
 
-  string pattern_rewrite = 41;
+  string pattern_rewrite = 41 [(validate.rules).string = {min_len: 1}];
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with

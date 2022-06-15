@@ -4,8 +4,6 @@ package envoy.type.matcher.v3;
 
 import "validate/validate.proto";
 
-import "udpa/annotations/status.proto";
-
 option java_package = "io.envoyproxy.envoy.type.matcher";
 option java_outer_classname = "PatternProto";
 option java_multiple_files = true;
@@ -18,10 +16,9 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // [#next-free-field: 3]
 message PatternMatcher {
 
-  string pattern = 1;
+  string pattern = 1 [(validate.rules).string = {min_len: 1}];
 
-  // If true, indicates the exact/prefix/suffix matching should be case insensitive. This has no
-  // effect for the safe_regex match.
+  // If true, indicates the pattern matching should be case insensitive.
   // For example, the matcher *data* will match both input string *Data* and *data* if set to true.
   bool ignore_case = 2;
 }

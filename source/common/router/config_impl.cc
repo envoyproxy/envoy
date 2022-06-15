@@ -928,7 +928,6 @@ void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
 // portion was matched.
 absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
     const Http::RequestHeaderMap& headers, absl::string_view matched_path) const {
-  ENVOY_LOG(debug, "currentUrlPathAfterRewriteWithMatchedPath");
   absl::optional<std::string> container;
   const auto& rewrite = getPathRewrite(headers, container);
   if (!rewrite.empty() || regex_rewrite_ != nullptr) {
