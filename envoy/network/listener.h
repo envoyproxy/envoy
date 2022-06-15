@@ -146,6 +146,7 @@ public:
   virtual FilterChainFactory& filterChainFactory() PURE;
 
   /**
+   * TODO(soulxu): This will be removed when multiple addresses listener implemented.
    * @return ListenSocketFactory& the factory to create listen socket.
    */
   virtual ListenSocketFactory& listenSocketFactory() PURE;
