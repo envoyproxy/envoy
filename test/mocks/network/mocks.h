@@ -229,7 +229,7 @@ public:
   ~MockFilterChain() override;
 
   // Network::DrainableFilterChain
-  MOCK_METHOD(const TransportSocketFactory&, transportSocketFactory, (), (const));
+  MOCK_METHOD(const DownstreamTransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, transportSocketConnectTimeout, (), (const));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());

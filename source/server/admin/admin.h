@@ -439,7 +439,7 @@ private:
     AdminFilterChain() {} // NOLINT(modernize-use-equals-default)
 
     // Network::FilterChain
-    const Network::TransportSocketFactory& transportSocketFactory() const override {
+    const Network::DownstreamTransportSocketFactory& transportSocketFactory() const override {
       return transport_socket_factory_;
     }
 

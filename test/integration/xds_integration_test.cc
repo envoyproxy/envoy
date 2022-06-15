@@ -207,7 +207,7 @@ public:
   }
 
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Network::TransportSocketFactoryPtr context_;
+  Network::UpstreamTransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   bool matcher_;
 };
@@ -495,7 +495,7 @@ public:
   }
 
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Network::TransportSocketFactoryPtr context_;
+  Network::UpstreamTransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   Network::Address::InstanceConstSharedPtr address_;
   bool use_default_balancer_{false};

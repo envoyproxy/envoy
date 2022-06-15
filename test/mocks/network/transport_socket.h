@@ -36,7 +36,7 @@ public:
   TransportSocketCallbacks* callbacks_{};
 };
 
-class MockTransportSocketFactory : public TransportSocketFactory {
+class MockTransportSocketFactory : public UpstreamTransportSocketFactory {
 public:
   MockTransportSocketFactory();
   ~MockTransportSocketFactory() override;
@@ -48,6 +48,15 @@ public:
               (const));
   MOCK_METHOD(void, hashKey,
               (std::vector<uint8_t> & key, TransportSocketOptionsConstSharedPtr options), (const));
+};
+
+class MockDownstreamTransportSocketFactory : public DownstreamTransportSocketFactory {
+public:
+  MockDownstreamTransportSocketFactory();
+  ~MockDownstreamTransportSocketFactory() override;
+
+  MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(TransportSocketPtr, createDownstreamTransportSocket, (), (const));
 };
 
 } // namespace Network

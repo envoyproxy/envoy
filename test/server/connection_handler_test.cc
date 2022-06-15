@@ -56,8 +56,8 @@ public:
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()),
         access_log_(std::make_shared<AccessLog::MockInstance>()) {
     ON_CALL(*filter_chain_, transportSocketFactory)
-        .WillByDefault(ReturnPointee(std::shared_ptr<Network::TransportSocketFactory>{
-            Network::Test::createRawBufferSocketFactory()}));
+        .WillByDefault(ReturnPointee(std::shared_ptr<Network::DownstreamTransportSocketFactory>{
+            Network::Test::createRawBufferDownstreamSocketFactory()}));
     ON_CALL(*filter_chain_, networkFilterFactories)
         .WillByDefault(ReturnPointee(std::make_shared<std::vector<Network::FilterFactoryCb>>()));
     ON_CALL(*listener_filter_matcher_, matches(_)).WillByDefault(Return(false));

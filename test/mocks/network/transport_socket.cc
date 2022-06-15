@@ -25,5 +25,8 @@ MockTransportSocket::~MockTransportSocket() = default;
 MockTransportSocketFactory::MockTransportSocketFactory() = default;
 MockTransportSocketFactory::~MockTransportSocketFactory() = default;
 
+MockDownstreamTransportSocketFactory::MockDownstreamTransportSocketFactory() = default;
+MockDownstreamTransportSocketFactory::~MockDownstreamTransportSocketFactory() = default;
+
 } // namespace Network
 } // namespace Envoy
