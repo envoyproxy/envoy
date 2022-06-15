@@ -173,7 +173,7 @@ public:
    * A context from the caller of an async client.
    */
   struct ParentContext {
-    const StreamInfo::StreamInfo* stream_info;
+    const StreamInfo::StreamInfo* stream_info{nullptr};
   };
 
   /**

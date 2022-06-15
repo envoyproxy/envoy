@@ -7,7 +7,7 @@ namespace Network {
 
 HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
     Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
-    Address::InstanceConstSharedPtr source_address, TransportSocketFactory& socket_factory,
+    Address::InstanceConstSharedPtr source_address, UpstreamTransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const Upstream::HostDescriptionConstSharedPtr& host,
     const ConnectionSocket::OptionsSharedPtr options)

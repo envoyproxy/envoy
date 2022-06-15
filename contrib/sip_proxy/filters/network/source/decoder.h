@@ -255,7 +255,6 @@ private:
   class OK200HeaderHandler : public HeaderHandler {
   public:
     using HeaderHandler::HeaderHandler;
-    int processCseq(absl::string_view& header) override;
   };
 
   class GeneralHeaderHandler : public HeaderHandler {

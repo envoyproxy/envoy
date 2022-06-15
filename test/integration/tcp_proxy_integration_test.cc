@@ -1436,9 +1436,9 @@ class MysqlIntegrationTest : public TcpProxyIntegrationTest {
 public:
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
-      Network::TransportSocketFactoryPtr factory =
+      Network::DownstreamTransportSocketFactoryPtr factory =
           upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
-                        : Network::Test::createRawBufferSocketFactory();
+                        : Network::Test::createRawBufferDownstreamSocketFactory();
       auto endpoint = upstream_address_fn_(i);
       fake_upstreams_.emplace_back(
           new FakeMysqlUpstream(std::move(factory), endpoint, upstreamConfig()));

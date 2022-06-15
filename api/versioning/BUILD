@@ -173,6 +173,7 @@ proto_library(
         "//envoy/extensions/load_balancing_policies/wrr_locality/v3:pkg",
         "//envoy/extensions/matching/common_inputs/environment_variable/v3:pkg",
         "//envoy/extensions/matching/common_inputs/network/v3:pkg",
+        "//envoy/extensions/matching/common_inputs/ssl/v3:pkg",
         "//envoy/extensions/matching/input_matchers/consistent_hashing/v3:pkg",
         "//envoy/extensions/matching/input_matchers/ip/v3:pkg",
         "//envoy/extensions/network/dns_resolver/apple/v3:pkg",

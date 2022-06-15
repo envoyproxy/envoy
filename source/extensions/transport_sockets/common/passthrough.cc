@@ -24,6 +24,10 @@ absl::string_view PassthroughSocket::failureReason() const {
 
 bool PassthroughSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
 
+Api::SysCallIntResult PassthroughSocket::connect(Network::ConnectionSocket& socket) {
+  return transport_socket_->connect(socket);
+}
+
 void PassthroughSocket::closeSocket(Network::ConnectionEvent event) {
   transport_socket_->closeSocket(event);
 }

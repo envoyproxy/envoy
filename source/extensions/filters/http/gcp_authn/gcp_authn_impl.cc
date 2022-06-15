@@ -31,7 +31,6 @@ Http::RequestMessagePtr buildRequest(absl::string_view url) {
 void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessagePtr&& request) {
   // Cancel any active requests.
   cancel();
-
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 

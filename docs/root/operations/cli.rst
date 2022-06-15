@@ -157,7 +157,7 @@ following are the command line options that Envoy supports.
   *(optional)* This flag enables application log sanitization to escape C-style escape sequences.
   This can be used to prevent a single log line from spanning multiple lines in the underlying log.
   This sanitizes all escape sequences in `this list <https://en.cppreference.com/w/cpp/language/escape>`_.
-  Note that each line's trailing whitespace characters (such as EOL characters) will not be escaped.
+  Note that each line's final EOL character will not be escaped to preserve line format.
 
 .. option:: --restart-epoch <integer>
 

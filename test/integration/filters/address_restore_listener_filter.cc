@@ -15,7 +15,7 @@ class FakeOriginalDstListenerFilter : public Network::ListenerFilter {
 public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
-    FANCY_LOG(debug, "in FakeOriginalDstListenerFilter::onAccept");
+    ENVOY_LOG_MISC(debug, "in FakeOriginalDstListenerFilter::onAccept");
     Network::ConnectionSocket& socket = cb.socket();
     auto local_address = socket.connectionInfoProvider().localAddress();
     if (local_address != nullptr &&
@@ -26,9 +26,9 @@ public:
       socket.connectionInfoProvider().restoreLocalAddress(
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 80));
     }
-    FANCY_LOG(debug, "current local socket address is {} restored = {}",
-              socket.connectionInfoProvider().localAddress()->asString(),
-              socket.connectionInfoProvider().localAddressRestored());
+    ENVOY_LOG_MISC(debug, "current local socket address is {} restored = {}",
+                   socket.connectionInfoProvider().localAddress()->asString(),
+                   socket.connectionInfoProvider().localAddressRestored());
     return Network::FilterStatus::Continue;
   }
 
