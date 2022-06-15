@@ -183,10 +183,12 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     pending_response_.status_ = ResolutionStatus::Success;
 
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
-      bool can_process_v4 = (!parent_.filter_unroutable_families_ || available_interfaces_.v4_available_);
-      bool can_process_v6 = (!parent_.filter_unroutable_families_ || available_interfaces_.v6_available_);
+      bool can_process_v4 =
+          (!parent_.filter_unroutable_families_ || available_interfaces_.v4_available_);
+      bool can_process_v6 =
+          (!parent_.filter_unroutable_families_ || available_interfaces_.v6_available_);
 
-      struct ares_addrinfo_node *next = addrinfo->nodes;
+      struct ares_addrinfo_node* next = addrinfo->nodes;
       while (next) {
         if (next->ai_family == AF_INET && can_process_v4) {
           sockaddr_in address;
