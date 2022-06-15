@@ -330,7 +330,7 @@ message Route {
   //
   //    We do not recommend setting up a stat prefix for
   //    every application endpoint. This is both not easily maintainable and
-  //    statistics use a non-trivial amount of memory(approximately 1k per route).
+  //    statistics use a non-trivial amount of memory(approximately 1KiB per route).
   string stat_prefix = 19;
 }
 
