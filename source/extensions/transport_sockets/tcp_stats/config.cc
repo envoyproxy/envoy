@@ -30,10 +30,9 @@ UpstreamTcpStatsSocketFactory::UpstreamTcpStatsSocketFactory(
     Network::UpstreamTransportSocketFactoryPtr&& inner_factory)
     : TcpStatsSocketFactory(context, config), PassthroughFactory(std::move(inner_factory)) {}
 
-Network::TransportSocketPtr
-UpstreamTcpStatsSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
-                                             Upstream::HostDescriptionConstSharedPtr host) const {
->>>>>>> upstream/main
+Network::TransportSocketPtr UpstreamTcpStatsSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsConstSharedPtr options,
+    Upstream::HostDescriptionConstSharedPtr host) const {
 #if defined(__linux__)
   auto inner_socket = transport_socket_factory_->createTransportSocket(options, host);
   if (inner_socket == nullptr) {

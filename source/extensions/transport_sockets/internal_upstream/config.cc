@@ -24,7 +24,7 @@ public:
     return std::make_unique<
         envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport>();
   }
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override {
     const auto& outer_config =
@@ -139,7 +139,7 @@ InternalSocketFactory::InternalSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& context,
     const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
         config_proto,
-    Network::TransportSocketFactoryPtr&& inner_factory)
+    Network::UpstreamTransportSocketFactoryPtr&& inner_factory)
     : PassthroughFactory(std::move(inner_factory)), config_(config_proto, context.scope()) {}
 
 Network::TransportSocketPtr

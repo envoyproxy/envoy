@@ -56,7 +56,7 @@ public:
       Server::Configuration::TransportSocketFactoryContext& context,
       const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
           config_proto,
-      Network::TransportSocketFactoryPtr&& inner_factory);
+      Network::UpstreamTransportSocketFactoryPtr&& inner_factory);
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
