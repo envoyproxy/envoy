@@ -76,6 +76,9 @@ minor_behavior_changes:
     This means that encoder filters will be correctly invoked, including adding configured response
     headers, etc. This behavioral change can be reverted by setting runtime guard
     ``envoy.reloadable_features.lua_respond_with_send_local_reply`` to false.
+- area: logging
+  change: |
+    changed flag ``--log-format-escaped`` to only log one trailing newline per log line.
 
 bug_fixes:
 - area: http
