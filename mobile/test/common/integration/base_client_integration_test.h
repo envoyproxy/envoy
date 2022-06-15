@@ -46,7 +46,6 @@ protected:
   void TearDown();
 
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
-  Http::ClientPtr http_client_{};
   envoy_http_callbacks bridge_callbacks_;
   ConditionalInitializer terminal_callback_;
   callbacks_called cc_{0, 0, 0, 0, 0, 0, 0, "", &terminal_callback_, {}};
