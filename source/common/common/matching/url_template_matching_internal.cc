@@ -30,9 +30,9 @@ namespace url_template_matching_internal {
 
 namespace {
 
-unsigned long bdn_pattern_matching_max_variables_per_url = 5;
-unsigned long bdn_pattern_matching_max_variable_name_len = 16;
-unsigned long bdn_pattern_matching_min_variable_name_len = 1;
+unsigned long pattern_matching_max_variables_per_url = 5;
+unsigned long pattern_matching_max_variable_name_len = 16;
+unsigned long pattern_matching_min_variable_name_len = 1;
 
 // Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
 constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
@@ -218,13 +218,13 @@ GatherCaptureNames(struct ParsedUrlPattern pattern) {
     if (!std::holds_alternative<Variable>(segment)) {
       continue;
     }
-    if (captured_variables.size() >= bdn_pattern_matching_max_variables_per_url) {
+    if (captured_variables.size() >= pattern_matching_max_variables_per_url) {
       return absl::InvalidArgumentError("Exceeded variable count limit");
     }
     absl::string_view var_name = std::get<Variable>(segment).var_name;
 
-    if (var_name.size() < bdn_pattern_matching_min_variable_name_len ||
-        var_name.size() > bdn_pattern_matching_max_variable_name_len) {
+    if (var_name.size() < pattern_matching_min_variable_name_len ||
+        var_name.size() > pattern_matching_max_variable_name_len) {
       return absl::InvalidArgumentError("Invalid variable length");
     }
     if (captured_variables.contains(var_name)) {
