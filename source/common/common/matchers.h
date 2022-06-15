@@ -146,8 +146,6 @@ public:
                  : absl::StrContains(value, matcher_.contains());
     case StringMatcherType::MatchPatternCase::kSafeRegex:
       return regex_->match(value);
-      //    case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPattern:
-      //      return matching::IsPatternMatch(value, path_template_match_regex_);
     case StringMatcherType::MatchPatternCase::MATCH_PATTERN_NOT_SET:
       break;
     }

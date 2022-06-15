@@ -652,6 +652,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     if (!prefix_rewrite_.empty() || route.route().has_regex_rewrite()) {
       throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or pattern_rewrite");
     }
+
+    if (!matching::IsValidPathTemplateRewritePattern(pattern_rewrite_)) {
+      throw EnvoyException(fmt::format("pattern_rewrite {} is invalid", pattern_rewrite_));
+    }
   }
 
   if (!prefix_rewrite_.empty()) {
@@ -774,7 +778,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Restore the port if this was a CONNECT request.
-  // Note this will restore the port for HTTP/2 CONNECT-upgrades as well as as HTTP/1.1 style
+  // Note this will restore the port for HTTP/2 CONNECT-upgrades as well as HTTP/1.1 style
   // CONNECT requests.
   if (Http::HeaderUtility::getPortStart(headers.getHostValue()) == absl::string_view::npos) {
     if (auto typed_state = stream_info.filterState().getDataReadOnly<OriginalConnectPort>(
@@ -924,6 +928,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
 // portion was matched.
 absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
     const Http::RequestHeaderMap& headers, absl::string_view matched_path) const {
+  ENVOY_LOG(debug, "currentUrlPathAfterRewriteWithMatchedPath");
   absl::optional<std::string> container;
   const auto& rewrite = getPathRewrite(headers, container);
   if (!rewrite.empty() || regex_rewrite_ != nullptr) {
@@ -949,23 +954,28 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
     auto just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
 
     absl::StatusOr<std::string> regex_pattern =
-        matching::ConvertURLPatternSyntaxToRegex(pattern_rewrite_);
+        matching::ConvertURLPatternSyntaxToRegex(matched_path);
     if (!regex_pattern.ok()) {
-      throw EnvoyException("Unable to parse url pattern regex");
+      throw EnvoyException("Unable to parse url pattern regex ConvertURLPatternSyntaxToRegex");
     }
     std::string regex_pattern_str = *std::move(regex_pattern);
 
     absl::StatusOr<envoy::config::route::v3::RouteUrlRewritePattern> rewrite_pattern =
-        matching::ParseRewritePattern(just_path, regex_pattern_str);
+        matching::ParseRewritePattern(pattern_rewrite_, regex_pattern_str);
 
     if (!rewrite_pattern.ok()) {
-      throw EnvoyException("Unable to parse url rewrite pattern");
+      throw EnvoyException("Unable to parse url rewrite pattern RouteUrlRewritePattern");
     }
-    envoy::config::route::v3::RouteUrlRewritePattern rewrite_pattern_str =
+
+    envoy::config::route::v3::RouteUrlRewritePattern rewrite_pattern_proto =
         *std::move(rewrite_pattern);
 
     absl::StatusOr<std::string> new_path =
-        matching::RewriteURLTemplatePattern(just_path, regex_pattern_str, rewrite_pattern_str);
+        matching::RewriteURLTemplatePattern(just_path, regex_pattern_str, rewrite_pattern_proto);
+
+    if (!new_path.ok()) {
+      throw EnvoyException("Unable rewrite url to new URL RewriteURLTemplatePattern");
+    }
 
     return *std::move(new_path);
   }
@@ -1405,18 +1415,37 @@ PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      template_(route.match().path_template_match()),
-      // done setting up path matchers for template pattern
-      path_matcher_(Matchers::PathMatcher::createPattern(template_, !case_sensitive_)) {}
+      path_template_match_(route.match().path_template_match()) {
+
+  if (!matching::IsValidPathTemplateMatchPattern(path_template_match_)) {
+    throw EnvoyException(fmt::format("path_template_match {} is invalid", path_template_match_));
+  }
+
+  absl::StatusOr<std::string> status =
+      matching::ConvertURLPatternSyntaxToRegex(path_template_match_);
+  if (!status.ok()) {
+    throw EnvoyException(fmt::format("path_template_match {} is invalid", path_template_match_));
+  }
+
+  std::string path_template_match_regex = *std::move(status);
+  if (!pattern_rewrite_.empty() &&
+      !matching::IsValidSharedVariableSet(pattern_rewrite_, path_template_match_regex)) {
+    throw EnvoyException(
+        fmt::format("mismatch between path_template_match {} and pattern_rewrite {}",
+                    path_template_match_, pattern_rewrite_));
+  }
+
+  path_matcher_ = Matchers::PathMatcher::createPattern(path_template_match_, !case_sensitive_);
+}
 
 void PathTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                    bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, template_, insert_envoy_original_path);
+  finalizePathHeader(headers, path_template_match_, insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathTemplateRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, template_);
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_template_match_);
 }
 
 // done setting up pattern match

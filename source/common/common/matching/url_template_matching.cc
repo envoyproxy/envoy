@@ -149,4 +149,17 @@ RewriteURLTemplatePattern(absl::string_view url, absl::string_view capture_regex
   return rewritten_url;
 }
 
+bool IsValidPathTemplateMatchPattern(const std::string& path_template_match) {
+  return ConvertURLPatternSyntaxToRegex(path_template_match).ok();
+}
+
+bool IsValidPathTemplateRewritePattern(const std::string& path_template_rewrite) {
+  return ParseRewritePatternHelper(path_template_rewrite).ok();
+}
+
+bool IsValidSharedVariableSet(const std::string& path_template_rewrite,
+                              absl::string_view capture_regex) {
+  return ParseRewritePattern(path_template_rewrite, capture_regex).ok();
+}
+
 } // namespace matching

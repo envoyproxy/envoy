@@ -189,9 +189,7 @@ absl::StatusOr<ParsedResult<Variable>> ConsumeVariable(absl::string_view pattern
         return status.status();
       }
       var_match = *std::move(status);
-      //
-      //      ASSIGN_OR_RETURN(var_match,
-      //                       AlsoUpdatePattern<Operator>(ConsumeOperator, &var_patt));
+
     } else {
 
       absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(ConsumeLiteral, &var_patt);
@@ -199,9 +197,6 @@ absl::StatusOr<ParsedResult<Variable>> ConsumeVariable(absl::string_view pattern
         return status.status();
       }
       var_match = *std::move(status);
-
-      //      ASSIGN_OR_RETURN(var_match,
-      //                       AlsoUpdatePattern<Literal>(ConsumeLiteral, &var_patt));
     }
     var.var_match.push_back(var_match);
     if (!var_patt.empty()) {
@@ -277,6 +272,7 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
 
   static const LazyRE2 printable_regex = {"^/[[:graph:]]*$"};
   if (!RE2::FullMatch(ToStringPiece(url_pattern), *printable_regex)) {
+
     return absl::InvalidArgumentError("Invalid pattern");
   }
 
@@ -293,9 +289,6 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
         return status.status();
       }
       segment = *std::move(status);
-      //
-      //      ASSIGN_OR_RETURN(
-      //          segment, AlsoUpdatePattern<Operator>(ConsumeOperator, &url_pattern));
     } else if (url_pattern[0] == '{') {
 
       absl::StatusOr<Variable> status = AlsoUpdatePattern<Variable>(ConsumeVariable, &url_pattern);
@@ -303,9 +296,6 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
         return status.status();
       }
       segment = *std::move(status);
-
-      //      ASSIGN_OR_RETURN(
-      //          segment, AlsoUpdatePattern<Variable>(ConsumeVariable, &url_pattern));
     } else {
 
       absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(ConsumeLiteral, &url_pattern);
@@ -313,9 +303,6 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
         return status.status();
       }
       segment = *std::move(status);
-
-      //      ASSIGN_OR_RETURN(
-      //          segment, AlsoUpdatePattern<Literal>(ConsumeLiteral, &url_pattern));
     }
     parsed_pattern.parsed_segments.push_back(segment);
 
@@ -336,10 +323,7 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
           return status.status();
         }
         parsed_pattern.suffix = *std::move(status);
-        //
-        //        ASSIGN_OR_RETURN(
-        //            parsed_pattern.suffix,
-        //            AlsoUpdatePattern<Literal>(ConsumeLiteral, &url_pattern));
+
         if (!url_pattern.empty()) {
           // Suffix didn't consume whole remaining pattern ('/' in url_pattern).
           return absl::InvalidArgumentError("Prefix match not supported.");
@@ -355,8 +339,6 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
   }
   parsed_pattern.captured_variables = *std::move(status);
 
-  //  ASSIGN_OR_RETURN(parsed_pattern.captured_variables,
-  //                   GatherCaptureNames(parsed_pattern));
   absl::Status validate_status = ValidateNoOperatorAfterTextGlob(parsed_pattern);
   if (!validate_status.ok()) {
     return validate_status;

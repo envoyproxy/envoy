@@ -988,7 +988,6 @@ private:
   EarlyDataPolicyPtr early_data_policy_;
 };
 
-
 /**
  * Route entry implementation for pattern path match routing.
  */
@@ -1001,7 +1000,7 @@ public:
                              ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override { return template_; }
+  const std::string& matcher() const override { return path_template_match_; }
   PathMatchType matchType() const override { return PathMatchType::Pattern; }
 
   // Router::Matchable
@@ -1018,9 +1017,9 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
-  const std::string template_;
+  const std::string path_template_match_;
   // todo
-  const Matchers::PathMatcherConstSharedPtr path_matcher_;
+  Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
 /**
