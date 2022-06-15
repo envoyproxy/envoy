@@ -20,7 +20,7 @@ This extension may be referenced by the qualified name ``{{extension}}``
 
 {% for type_url in type_urls %}
 {% if type_url.startswith('envoy.') %}
-  - :ref:`type.googleapis.com/{{type_url}} <envoy_api_msg_{{type_url[6:]}}>`
+  - :ref:`type.googleapis.com/{{type_url}} <envoy_v3_api_msg_{{type_url[6:]}}>`
 {% else %}
   - ``type.googleapis.com/{{type_url}}``
 {% endif %}
