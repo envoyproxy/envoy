@@ -934,6 +934,37 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SslSocketTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+TEST_P(SslSocketTest, ServerTransportSocketOptions) {
+  Stats::TestUtil::TestStore server_stats_store;
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_async_cert_validation", true);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF";
+  ;
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
+  ContextManagerImpl manager(time_system_);
+  ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
+                                                   server_stats_store, std::vector<std::string>{});
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options(
+      new Network::TransportSocketOptionsImpl());
+  auto ssl_socket = server_ssl_socket_factory.createTransportSocket(transport_socket_options);
+  auto ssl_handshaker = dynamic_cast<const SslHandshakerImpl*>(ssl_socket->ssl().get());
+  auto shared_ptr_ptr = static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(
+      SSL_get_app_data(ssl_handshaker->ssl()));
+  ASSERT_NE(nullptr, shared_ptr_ptr);
+  EXPECT_EQ(transport_socket_options.get(), (*shared_ptr_ptr).get());
+}
+
 TEST_P(SslSocketTest, GetCertDigest) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
