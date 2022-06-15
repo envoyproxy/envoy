@@ -393,6 +393,12 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
                          "listener_manager.dispatcher.loop_duration_us", {worker_id});
+
+  // Thrift Proxy Prefix
+  Tag thrift_prefix;
+  thrift_prefix.name_ = tag_names.THRIFT_PREFIX;
+  thrift_prefix.value_ = "thrift_prefix";
+  regex_tester.testRegex("thrift.thrift_prefix.response", "thrift.response", {thrift_prefix});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {
