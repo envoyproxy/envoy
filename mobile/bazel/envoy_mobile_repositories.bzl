@@ -70,12 +70,12 @@ def upstream_envoy_overrides():
     )
 
 def swift_repos():
-    # https://github.com/bazelbuild/rules_apple/pull/1488
+    # https://github.com/bazelbuild/rules_apple/pull/1492
     http_archive(
         name = "build_bazel_rules_apple",
-        sha256 = "0f2275197c950d82fc5defc81cfe53a71e4c9cae2d79852df1b2e9d0f0fb9fcf",
-        strip_prefix = "rules_apple-ac43c1e467564d9df6b3355ff93fcaf224f2c0f9",
-        url = "https://github.com/bazelbuild/rules_apple/archive/ac43c1e467564d9df6b3355ff93fcaf224f2c0f9.tar.gz",
+        sha256 = "80b54235cc7b4118ae5a644c2375a41995bb24868b1e58793b9ca99d9adf4c34",
+        strip_prefix = "rules_apple-029eab0a6bbb4147d227d623721b205eb62aca9c",
+        url = "https://github.com/bazelbuild/rules_apple/archive/029eab0a6bbb4147d227d623721b205eb62aca9c.tar.gz",
     )
 
     # https://github.com/bazelbuild/rules_swift/pull/838
@@ -100,10 +100,12 @@ def swift_repos():
         url = "https://github.com/realm/SwiftLint/releases/download/0.47.1/portable_swiftlint.zip",
     )
 
+    # https://github.com/buildbuddy-io/rules_xcodeproj/pull/552
     http_archive(
         name = "com_github_buildbuddy_io_rules_xcodeproj",
-        sha256 = "5a902801e2337fc14faeb2613d70202f2dd4755bba3d94ba068c1f622edba89e",
-        url = "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/0.3.0/release.tar.gz",
+        sha256 = "23c0b0a4a76725350deaaa70e0dedd27f3a2f449ef05ab7959577bc9eafe27ad",
+        strip_prefix = "rules_xcodeproj-0f6e85cf892f6739ee489b931699595559f5d805",
+        url = "https://github.com/buildbuddy-io/rules_xcodeproj/archive/0f6e85cf892f6739ee489b931699595559f5d805.tar.gz",
     )
 
 def kotlin_repos():
