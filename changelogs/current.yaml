@@ -182,6 +182,9 @@ new_features:
 - area: http3
   change: |
     added :ref:`early_data_policy <envoy_v3_api_field_config.route.v3.RouteAction.early_data_policy>` extension to allow upstream HTTP/3 sending requests over early data. If no extension is configured, HTTP/3 pool will send safe requests as early data to the host if the pool already cached 0-RTT credentials of that host. If those requests fail and the underlying connection pool supports TCP fallback, the request may be retried automatically. If the :ref:`default extension <envoy_v3_api_msg_extensions.early_data.v3.DefaultEarlyDataPolicy>` is configured, no requests are allowed to be sent as early data. Note that if any customized extension configures non-safe requests to be allowed over early data, the Envoy will not automatically retry them. If desired, explicitly config their :ref:`retry_policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>`. This feature requires both ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3`` and ``envoy.reloadable_features.http3_sends_early_data`` to be turned on.
+- area: listener
+  change: |
+    added dynamic listener filter configuration for listener filters. :ref:`dynamic listener filter re-configuration<envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`. This dynamic listener filter configuration is only supported in TCP listeners.
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.

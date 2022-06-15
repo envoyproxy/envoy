@@ -121,9 +121,6 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
-    ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrError(
-                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
     // dynamic listener filter configuration
     if (proto_config.config_type_case() ==
         envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
@@ -150,6 +147,9 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
           createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
+      ENVOY_LOG(debug, "  config: {}",
+                MessageUtil::getJsonStringFromMessageOrError(
+                    static_cast<const Protobuf::Message&>(proto_config.typed_config())));
       // For static configuration, now see if there is a factory that will accept the config.
       auto& factory =
           Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
@@ -178,7 +178,13 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
-
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      throw EnvoyException(fmt::format("UDP listener filter: {} is configured with "
+                                       "unsupported dynamic configuration",
+                                       proto_config.name()));
+      return ret;
+    }
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
