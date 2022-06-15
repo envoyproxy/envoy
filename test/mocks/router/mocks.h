@@ -570,7 +570,7 @@ class MockGenericConnPool : public GenericConnPool {
 
 class MockUpstreamToDownstream : public UpstreamToDownstream {
 public:
-  MOCK_METHOD(const RouteEntry&, routeEntry, (), (const));
+  MOCK_METHOD(const Route&, route, (), (const));
   MOCK_METHOD(const Network::Connection&, connection, (), (const));
 
   MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));
@@ -599,7 +599,7 @@ public:
               (std::unique_ptr<GenericUpstream> && upstream,
                Upstream::HostDescriptionConstSharedPtr host,
                const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
+               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
   MOCK_METHOD(UpstreamToDownstream&, upstreamToDownstream, ());
 
   NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;

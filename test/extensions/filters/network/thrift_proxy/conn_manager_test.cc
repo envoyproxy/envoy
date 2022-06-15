@@ -1833,6 +1833,14 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
         buffer.add("response");
         return DirectResponse::ResponseType::SuccessReply;
       }));
+  {
+    InSequence s;
+    EXPECT_CALL(*custom_decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*custom_encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*bidirectional_filter_, onLocalReply(_, _));
+  }
 
   // First filter sends local reply.
   EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
@@ -1878,6 +1886,15 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
         buffer.add("response");
         return DirectResponse::ResponseType::ErrorReply;
       }));
+
+  {
+    InSequence s;
+    EXPECT_CALL(*custom_decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*custom_encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*encoder_filter_, onLocalReply(_, _));
+    EXPECT_CALL(*bidirectional_filter_, onLocalReply(_, _));
+  }
 
   // First filter sends local reply.
   EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
@@ -2064,6 +2081,14 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
 }
 
 TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.thrift_connection_draining", "true"}});
+  // Ensure we close the downstream connection when the upstream connection is closed.
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.close_downstream_on_upstream_error", "true"}});
+  // We want the Drain header to be set by RemoteClose which triggers end downstream in local reply.
+  EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(false));
+
   initializeFilter();
   writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
@@ -2086,6 +2111,15 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("test.downstream_response_drain_close").value());
+
+  // Upstream connection is closed by remote. Hence we expect the downstream connection to be
+  // closed after the response is sent. Drain header is set to hint downstream not to use the
+  // connection.
+  const auto header =
+      callbacks->responseMetadata()->responseHeaders().get(ThriftProxy::Headers::get().Drain);
+  EXPECT_FALSE(header.empty());
+  EXPECT_EQ("true", header[0]->value().getStringView());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 

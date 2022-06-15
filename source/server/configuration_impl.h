@@ -11,6 +11,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
@@ -81,7 +82,7 @@ public:
    * TODO(sumukhs): Coalesce with the above as they are very similar
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
-                               const std::vector<Network::ListenerFilterFactoryCb>& factories);
+                               const Filter::ListenerFilterFactoriesList& factories);
 
   /**
    * Given a UdpListenerFilterManager and a list of factories, create a new filter chain. Chain

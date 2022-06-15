@@ -4670,14 +4670,14 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
   // Extract listener_factory_context avoid accessing private member.
   ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
       .WillByDefault(
-          Invoke([&listener_factory_context](
+          Invoke([&listener_factory_context, this](
                      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                          filters,
                      Configuration::ListenerFactoryContext& context)
-                     -> std::vector<Network::ListenerFilterFactoryCb> {
+                     -> Filter::ListenerFilterFactoriesList {
             listener_factory_context = &context;
-            return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(filters,
-                                                                                     context);
+            return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+                filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
           }));
   server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
@@ -5166,6 +5166,23 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
                             "unstable packet proxying. Configure the reuse_port listener option "
                             "or set concurrency = 1.");
   EXPECT_EQ(0, manager_->listeners().size());
+}
+
+// Envoy throws exceptions for UDP listener with dynamic filter config.
+TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerWithDynamicFilterConfig) {
+  auto listener = createIPv4Listener("UdpListener");
+  listener.mutable_address()->mutable_socket_address()->set_protocol(
+      envoy::config::core::v3::SocketAddress::UDP);
+  auto* listener_filter = listener.add_listener_filters();
+  listener_filter->set_name("bar");
+  // Adding basic dynamic listener filter config.
+  auto* discovery = listener_filter->mutable_config_discovery();
+  discovery->add_type_urls(
+      "type.googleapis.com/test.integration.filters.TestUdpListenerFilterConfig");
+  discovery->set_apply_default_config_without_warming(false);
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(listener), EnvoyException,
+      "UDP listener filter: bar is configured with unsupported dynamic configuration");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {

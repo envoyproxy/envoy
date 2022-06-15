@@ -303,6 +303,52 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   cleanupUpstreamAndDownstream();
 }
 
+// Test internal redirect to a cluster removed during the backend think time.
+TEST_P(CdsIntegrationTest, TwoClustersAndRedirects) {
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(1);
+        route->mutable_route()
+            ->mutable_internal_redirect_policy()
+            ->mutable_redirect_response_codes()
+            ->Add(302);
+      });
+
+  // Tell Envoy that cluster_2 is here.
+  initialize();
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster2_}, {}, "42");
+  // The '3' includes the fake CDS server.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  // Tell Envoy that cluster_1 is gone.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {cluster2_}, {}, {ClusterName1}, "43");
+  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  default_request_headers_.setPath("/cluster2");
+  default_request_headers_.setContentLength("4");
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  Buffer::OwnedImpl data("body");
+  encoder_decoder.first.encodeData(data, true);
+  auto& response = encoder_decoder.second;
+
+  ASSERT_TRUE(fake_upstreams_[UpstreamIndex2]->waitForHttpConnection(*dispatcher_,
+                                                                     fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  Http::TestResponseHeaderMapImpl redirect_response{
+      {":status", "302"}, {"content-length", "0"}, {"location", "http://host/cluster1"}};
+
+  // Send a response to the original request redirecting to the deleted cluster.
+  upstream_request_->encodeHeaders(redirect_response, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
 // Tests that when Envoy's delta xDS stream dis/reconnects, Envoy can inform the server of the
 // resources it already has: the reconnected stream need not start with a state-of-the-world update.
 TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {

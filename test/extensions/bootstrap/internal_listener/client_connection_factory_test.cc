@@ -3,7 +3,7 @@
 #include "envoy/network/listen_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/fancy_logger.h"
+#include "source/common/common/fine_grain_logger.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/bootstrap/internal_listener/client_connection_factory.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
@@ -25,7 +25,7 @@ namespace InternalListener {
 
 namespace {
 
-class MockInternalListenerManger : public Network::InternalListenerManager {
+class MockInternalListenerManager : public Network::InternalListenerManager {
 public:
   MOCK_METHOD(Network::InternalListenerOptRef, findByAddress,
               (const Network::Address::InstanceConstSharedPtr&));
@@ -53,7 +53,7 @@ public:
   }
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  MockInternalListenerManger internal_listener_manager_;
+  MockInternalListenerManager internal_listener_manager_;
   std::shared_ptr<ThreadLocalRegistryImpl> registry_{std::make_shared<ThreadLocalRegistryImpl>()};
   ThreadLocal::MockInstance tls_allocator_;
   std::unique_ptr<ThreadLocal::TypedSlot<ThreadLocalRegistryImpl>> tls_slot_;
@@ -68,6 +68,13 @@ public:
 
 class MockInternalListener : public Network::InternalListener {
 public:
+  MOCK_METHOD(uint64_t, listenerTag, ());
+  MOCK_METHOD(Network::Listener*, listener, ());
+  MOCK_METHOD(void, pauseListening, ());
+  MOCK_METHOD(void, resumeListening, ());
+  MOCK_METHOD(void, shutdownListener, ());
+  MOCK_METHOD(void, updateListenerConfig, (Network::ListenerConfig&));
+  MOCK_METHOD(void, onFilterChainDraining, (const std::list<const Network::FilterChain*>&));
   MOCK_METHOD(void, onAccept, (Network::ConnectionSocketPtr &&));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 };

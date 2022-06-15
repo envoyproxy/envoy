@@ -230,6 +230,7 @@ public:
   virtual void maybeAddSentinelBufferFragment(Buffer::Instance&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
+  bool sendFullyQualifiedUrl() const { return codec_settings_.send_fully_qualified_url_; }
   HeaderKeyFormatterOptConstRef formatter() const {
     return makeOptRefFromPtr(encode_only_header_key_formatter_.get());
   }

@@ -147,7 +147,12 @@ class RedisClusterIntegrationTest : public testing::TestWithParam<Network::Addre
 public:
   RedisClusterIntegrationTest(const std::string& config = testConfig(), int num_upstreams = 2)
       : BaseIntegrationTest(GetParam(), config), num_upstreams_(num_upstreams),
-        version_(GetParam()) {}
+        version_(GetParam()) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat 'redis.redis_stats.command.sadd.total' and
+    // stat_prefix 'redis_stats'.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
   void initialize() override {
     setUpstreamCount(num_upstreams_);

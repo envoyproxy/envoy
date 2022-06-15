@@ -4,6 +4,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/logger.h"
 #include "source/extensions/compression/zstd/common/base.h"
 #include "source/extensions/compression/zstd/common/dictionary_manager.h"
 
@@ -40,6 +41,7 @@ struct ZstdDecompressorStats {
  */
 class ZstdDecompressorImpl : public Common::Base,
                              public Envoy::Compression::Decompressor::Decompressor,
+                             public Logger::Loggable<Logger::Id::decompression>,
                              NonCopyable {
 public:
   ZstdDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,

@@ -720,7 +720,8 @@ TEST_P(ThriftRouterRainidayTest, PoolRemoteConnectionFailure) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(".*connection failure: remote connection failure.*"));
         EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_CALL(callbacks_, continueDecoding()).Times(GetParam() ? 0 : 1);
@@ -771,7 +772,7 @@ TEST_P(ThriftRouterRainidayTest, PoolTimeout) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure: timeout.*"));
         EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_CALL(
@@ -1029,7 +1030,8 @@ TEST_P(ThriftRouterRainidayTest, UnexpectedUpstreamRemoteClose) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(".*connection failure: remote connection failure.*"));
         EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_CALL(callbacks_, onReset()).Times(0);
@@ -1061,7 +1063,8 @@ TEST_F(ThriftRouterTest, DontCloseConnectionTwice) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(".*connection failure: remote connection failure.*"));
         EXPECT_TRUE(end_stream);
       }));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -1328,7 +1331,7 @@ TEST_F(ThriftRouterTest, PoolTimeoutUpstreamTimeMeasurement) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure: timeout.*"));
         EXPECT_TRUE(end_stream);
       }));
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(

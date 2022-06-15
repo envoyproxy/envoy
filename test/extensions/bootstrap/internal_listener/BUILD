@@ -63,3 +63,24 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "active_internal_listener_test",
+    srcs = ["active_internal_listener_test.cc"],
+    extension_names = ["envoy.bootstrap.internal_listener"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:connection_balancer_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//source/extensions/bootstrap/internal_listener:active_internal_listener",
+        "//source/extensions/bootstrap/internal_listener:thread_local_registry",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:connection_handler_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/server:utility_lib",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
