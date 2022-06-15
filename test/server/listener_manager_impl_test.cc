@@ -5168,6 +5168,23 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
   EXPECT_EQ(0, manager_->listeners().size());
 }
 
+// Envoy throws exceptions for UDP listener with dynamic filter config.
+TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerWithDynamicFilterConfig) {
+  auto listener = createIPv4Listener("UdpListener");
+  listener.mutable_address()->mutable_socket_address()->set_protocol(
+      envoy::config::core::v3::SocketAddress::UDP);
+  auto* listener_filter = listener.add_listener_filters();
+  listener_filter->set_name("bar");
+  // Adding basic dynamic listener filter config.
+  auto* discovery = listener_filter->mutable_config_discovery();
+  discovery->add_type_urls(
+      "type.googleapis.com/test.integration.filters.TestUdpListenerFilterConfig");
+  discovery->set_apply_default_config_without_warming(false);
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(listener), EnvoyException,
+      "UDP listener filter: bar is configured with unsupported dynamic configuration");
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
     name: SockoptsListener

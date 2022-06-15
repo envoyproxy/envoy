@@ -624,6 +624,10 @@ public:
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
+  // Sanitizes the |path| before passing it to PathMatcher, if configured, this method makes the
+  // path matching to ignore the path-parameters.
+  absl::string_view sanitizePathBeforePathMatching(const absl::string_view path) const;
+
   class DynamicRouteEntry : public RouteEntry, public Route {
   public:
     DynamicRouteEntry(const RouteEntryImplBase* parent, const std::string& name)
@@ -1265,6 +1269,9 @@ public:
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
 
   ClusterSpecifierPluginSharedPtr clusterSpecifierPlugin(absl::string_view provider) const;
+  bool ignorePathParametersInPathMatching() const {
+    return ignore_path_parameters_in_path_matching_;
+  }
 
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
@@ -1279,6 +1286,7 @@ private:
   std::vector<ShadowPolicyPtr> shadow_policies_;
   // Cluster specifier plugins/providers.
   absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
+  const bool ignore_path_parameters_in_path_matching_;
 };
 
 /**

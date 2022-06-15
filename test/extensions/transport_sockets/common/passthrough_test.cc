@@ -1,3 +1,4 @@
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/extensions/transport_sockets/common/passthrough.h"
 
 #include "test/mocks/buffer/mocks.h"
@@ -43,6 +44,16 @@ TEST_F(PassthroughTest, ProtocolDefersToInnerSocket) {
 TEST_F(PassthroughTest, FailureReasonDefersToInnerSocket) {
   EXPECT_CALL(*inner_socket_, failureReason());
   passthrough_socket_->failureReason();
+}
+
+// Test connect method defers to inner socket
+TEST_F(PassthroughTest, ConnectDefersToInnerSocket) {
+  auto io_handle = std::make_unique<Network::IoSocketHandleImpl>();
+  Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
+  ON_CALL(*inner_socket_, connect(_)).WillByDefault(testing::Return(Api::SysCallIntResult{0, 0}));
+
+  EXPECT_CALL(*inner_socket_, connect(testing::Ref(socket)));
+  passthrough_socket_->connect(socket);
 }
 
 // Test canFlushClose method defers to inner socket
