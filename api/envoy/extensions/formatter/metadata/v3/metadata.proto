@@ -20,6 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * DYNAMIC
 // * CLUSTER
 // * ROUTE
+// * UPSTREAM_HOST
 //
 // See :ref:`here <config_access_log>` for more information on access log configuration.
 
@@ -51,7 +52,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //  .. note::
 //
 //    METADATA(DYNAMIC:NAMESPACE:KEY):Z is equivalent to :ref:`DYNAMIC_METADATA(NAMESPACE:KEY):Z<config_access_log_format_dynamic_metadata>`
-//    METADATA(CLUSTER:NAMESPACE:KEY):Z is equivalent to :ref:`CLUSTER_METADATA(NAMASPACE:KEY):Z<config_access_log_format_cluster_metadata>`
+//    METADATA(CLUSTER:NAMESPACE:KEY):Z is equivalent to :ref:`CLUSTER_METADATA(NAMESPACE:KEY):Z<config_access_log_format_cluster_metadata>`
+//    METADATA(UPSTREAM_HOST:NAMESPACE:KEY):Z is equivalent to :ref:`UPSTREAM_METADATA(NAMESPACE:KEY):Z<config_access_log_format_upstream_host_metadata>`
 
 message Metadata {
 }
