@@ -35,7 +35,11 @@ CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3::Cach
                          const std::string&, Stats::Scope&, TimeSource& time_source,
                          HttpCache& http_cache)
     : time_source_(time_source), cache_(http_cache),
-      vary_allow_list_(config.allowed_vary_headers()) {}
+      vary_allow_list_(config.allowed_vary_headers()) {
+#ifdef ENVOY_CONFIG_COVERAGE
+  CHECK(0);
+#endif
+}
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;
