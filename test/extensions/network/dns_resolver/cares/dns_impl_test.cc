@@ -1576,7 +1576,9 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAAA) {
   EXPECT_NE(nullptr,
             resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Preferred));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::All));
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
