@@ -7,6 +7,8 @@
 
 #include "envoy/network/transport_socket.h"
 
+#include "source/common/network/listen_socket_impl.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -21,6 +23,7 @@ public:
   MOCK_METHOD(std::string, protocol, (), (const));
   MOCK_METHOD(absl::string_view, failureReason, (), (const));
   MOCK_METHOD(bool, canFlushClose, ());
+  MOCK_METHOD(Api::SysCallIntResult, connect, (Network::ConnectionSocket & socket));
   MOCK_METHOD(void, closeSocket, (Network::ConnectionEvent event));
   MOCK_METHOD(IoResult, doRead, (Buffer::Instance & buffer));
   MOCK_METHOD(IoResult, doWrite, (Buffer::Instance & buffer, bool end_stream));
