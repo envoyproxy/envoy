@@ -334,7 +334,7 @@ message HeaderValueOption {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HeaderValueOption";
 
-  // Describes the supported actions types for header append action.
+  // [#not-implemented-hide:] Describes the supported actions types for header append action.
   enum HeaderAppendAction {
     // This action will append the specified value to the existing values if the header
     // already exists. If the header doesn't exist then this will add the header with
