@@ -51,10 +51,6 @@ class BaseThriftIntegrationTest : public BaseIntegrationTest {
 public:
   BaseThriftIntegrationTest()
       : BaseIntegrationTest(Network::Address::IpVersion::v4, thrift_config_) {
-    // TODO(https://github.com/envoyproxy/envoy/issues/20201): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'thrift.thrift_stats.route_missing' and stat_prefix
-    // 'thrift_stats'.
-    skip_tag_extraction_rule_check_ = true;
   }
 
   /**
