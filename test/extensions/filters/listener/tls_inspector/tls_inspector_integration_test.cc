@@ -133,7 +133,7 @@ filter_disabled:
   }
 
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Network::TransportSocketFactoryPtr context_;
+  Network::UpstreamTransportSocketFactoryPtr context_;
   ConnectionStatusCallbacks connect_callbacks_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   Network::ClientConnectionPtr client_;

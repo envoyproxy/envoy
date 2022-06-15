@@ -109,7 +109,7 @@ TEST_F(PassthroughTest, ConfigureInitialCongestionWindowDefersToInnerSocket) {
 TEST(PassthroughFactoryTest, TestDelegation) {
   auto inner_factory_ptr = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
   Network::MockTransportSocketFactory* inner_factory = inner_factory_ptr.get();
-  Network::TransportSocketFactoryPtr factory{std::move(inner_factory_ptr)};
+  Network::UpstreamTransportSocketFactoryPtr factory{std::move(inner_factory_ptr)};
 
   {
     EXPECT_CALL(*inner_factory, implementsSecureTransport());
@@ -124,6 +124,26 @@ TEST(PassthroughFactoryTest, TestDelegation) {
     std::vector<uint8_t> key;
     EXPECT_CALL(*inner_factory, hashKey(_, _));
     factory->hashKey(key, nullptr);
+  }
+}
+
+class DownstreamTestFactory : public DownstreamPassthroughFactory {
+public:
+  DownstreamTestFactory(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory)
+      : DownstreamPassthroughFactory(std::move(transport_socket_factory)) {}
+
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override { return nullptr; }
+};
+
+TEST(PassthroughFactoryTest, TestDownstreamDelegation) {
+  auto inner_factory_ptr =
+      std::make_unique<NiceMock<Network::MockDownstreamTransportSocketFactory>>();
+  Network::MockDownstreamTransportSocketFactory* inner_factory = inner_factory_ptr.get();
+  auto factory = std::make_unique<DownstreamTestFactory>(std::move(inner_factory_ptr));
+
+  {
+    EXPECT_CALL(*inner_factory, implementsSecureTransport());
+    factory->implementsSecureTransport();
   }
 }
 

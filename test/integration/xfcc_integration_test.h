@@ -48,8 +48,8 @@ public:
 
   void TearDown() override;
 
-  Network::TransportSocketFactoryPtr createUpstreamSslContext();
-  Network::TransportSocketFactoryPtr createClientSslContext(bool mtls);
+  Network::DownstreamTransportSocketFactoryPtr createUpstreamSslContext();
+  Network::UpstreamTransportSocketFactoryPtr createClientSslContext(bool mtls);
   Network::ClientConnectionPtr makeTcpClientConnection();
   Network::ClientConnectionPtr makeTlsClientConnection();
   Network::ClientConnectionPtr makeMtlsClientConnection();
@@ -62,9 +62,9 @@ public:
 
 private:
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Network::TransportSocketFactoryPtr client_tls_ssl_ctx_;
-  Network::TransportSocketFactoryPtr client_mtls_ssl_ctx_;
-  Network::TransportSocketFactoryPtr upstream_ssl_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr client_tls_ssl_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr client_mtls_ssl_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr upstream_ssl_ctx_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 } // namespace Xfcc

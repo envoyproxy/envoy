@@ -91,7 +91,8 @@ private:
 
 SINGLETON_MANAGER_REGISTRATION(alts_shared_state);
 
-Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
+template <class TransportSocketFactoryPtr>
+TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     const Protobuf::Message& message, bool is_upstream,
     Server::Configuration::TransportSocketFactoryContext& factory_ctxt) {
   // A reference to this is held in the factory closure to keep the singleton
@@ -147,19 +148,21 @@ ProtobufTypes::MessagePtr AltsTransportSocketConfigFactory::createEmptyConfigPro
   return std::make_unique<envoy::extensions::transport_sockets::alts::v3::Alts>();
 }
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 UpstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& factory_ctxt) {
-  return createTransportSocketFactoryHelper(message, /* is_upstream */ true, factory_ctxt);
+  return createTransportSocketFactoryHelper<Network::UpstreamTransportSocketFactoryPtr>(
+      message, /* is_upstream */ true, factory_ctxt);
 }
 
-Network::TransportSocketFactoryPtr
+Network::DownstreamTransportSocketFactoryPtr
 DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& factory_ctxt,
     const std::vector<std::string>&) {
-  return createTransportSocketFactoryHelper(message, /* is_upstream */ false, factory_ctxt);
+  return createTransportSocketFactoryHelper<Network::DownstreamTransportSocketFactoryPtr>(
+      message, /* is_upstream */ false, factory_ctxt);
 }
 
 REGISTER_FACTORY(UpstreamAltsTransportSocketConfigFactory,
