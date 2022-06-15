@@ -10,7 +10,8 @@ namespace Platform {
 
 namespace {
 
-void* c_on_headers(envoy_headers headers, bool end_stream, envoy_stream_intel, void* context) {
+void* c_on_headers(envoy_headers headers, bool end_stream, envoy_stream_intel intel,
+                   void* context) {
   auto stream_callbacks = *static_cast<StreamCallbacksSharedPtr*>(context);
   if (stream_callbacks->on_headers.has_value()) {
     auto raw_headers = envoyHeadersAsRawHeaderMap(headers);
@@ -22,7 +23,9 @@ void* c_on_headers(envoy_headers headers, bool end_stream, envoy_stream_intel, v
       builder.set(pair.first, pair.second);
     }
     auto on_headers = stream_callbacks->on_headers.value();
-    on_headers(builder.build(), end_stream);
+    on_headers(builder.build(), end_stream, intel);
+  } else {
+    release_envoy_headers(headers);
   }
   return context;
 }
@@ -32,11 +35,13 @@ void* c_on_data(envoy_data data, bool end_stream, envoy_stream_intel, void* cont
   if (stream_callbacks->on_data.has_value()) {
     auto on_data = stream_callbacks->on_data.value();
     on_data(data, end_stream);
+  } else {
+    release_envoy_data(data);
   }
   return context;
 }
 
-void* c_on_trailers(envoy_headers metadata, envoy_stream_intel, void* context) {
+void* c_on_trailers(envoy_headers metadata, envoy_stream_intel intel, void* context) {
   auto stream_callbacks = *static_cast<StreamCallbacksSharedPtr*>(context);
   if (stream_callbacks->on_trailers.has_value()) {
     auto raw_headers = envoyHeadersAsRawHeaderMap(metadata);
@@ -45,13 +50,15 @@ void* c_on_trailers(envoy_headers metadata, envoy_stream_intel, void* context) {
       builder.set(pair.first, pair.second);
     }
     auto on_trailers = stream_callbacks->on_trailers.value();
-    on_trailers(builder.build());
+    on_trailers(builder.build(), intel);
+  } else {
+    release_envoy_headers(metadata);
   }
   return context;
 }
 
-void* c_on_error(envoy_error raw_error, envoy_stream_intel, envoy_final_stream_intel,
-                 void* context) {
+void* c_on_error(envoy_error raw_error, envoy_stream_intel intel,
+                 envoy_final_stream_intel final_intel, void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_error.has_value()) {
@@ -60,40 +67,41 @@ void* c_on_error(envoy_error raw_error, envoy_stream_intel, envoy_final_stream_i
     error->message = Data::Utility::copyToString(raw_error.message);
     error->attempt_count = absl::optional<int>(raw_error.attempt_count);
     auto on_error = stream_callbacks->on_error.value();
-    on_error(error);
+    on_error(error, intel, final_intel);
   }
+  release_envoy_error(raw_error);
   delete stream_callbacks_ptr;
   return nullptr;
 }
 
-void* c_on_complete(envoy_stream_intel, envoy_final_stream_intel, void* context) {
+void* c_on_complete(envoy_stream_intel intel, envoy_final_stream_intel final_intel, void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_complete.has_value()) {
     auto on_complete = stream_callbacks->on_complete.value();
-    on_complete();
+    on_complete(intel, final_intel);
   }
   delete stream_callbacks_ptr;
   return nullptr;
 }
 
-void* c_on_cancel(envoy_stream_intel, envoy_final_stream_intel, void* context) {
+void* c_on_cancel(envoy_stream_intel intel, envoy_final_stream_intel final_intel, void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_cancel.has_value()) {
     auto on_cancel = stream_callbacks->on_cancel.value();
-    on_cancel();
+    on_cancel(intel, final_intel);
   }
   delete stream_callbacks_ptr;
   return nullptr;
 }
 
-void* c_on_send_window_available(envoy_stream_intel, void* context) {
+void* c_on_send_window_available(envoy_stream_intel intel, void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_send_window_available.has_value()) {
     auto on_send_window_available = stream_callbacks->on_send_window_available.value();
-    on_send_window_available();
+    on_send_window_available(intel);
   }
   delete stream_callbacks_ptr;
   return nullptr;

@@ -23,11 +23,12 @@ envoy_engine_t EngineHandle::initEngine(envoy_engine_callbacks callbacks, envoy_
   return 1;
 }
 
-envoy_status_t EngineHandle::runEngine(envoy_engine_t, const char* config, const char* log_level) {
+envoy_status_t EngineHandle::runEngine(envoy_engine_t, const char* config, const char* log_level,
+                                       const char* admin_address_path) {
   // This will change once multiple engine support is in place.
   // https://github.com/envoyproxy/envoy-mobile/issues/332
   if (auto e = engine()) {
-    e->run(config, log_level);
+    e->run(config, log_level, admin_address_path);
     return ENVOY_SUCCESS;
   }
 

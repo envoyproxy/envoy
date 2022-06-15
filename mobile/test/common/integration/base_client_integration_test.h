@@ -2,6 +2,9 @@
 
 #include "test/integration/integration.h"
 
+#include "library/cc/engine_builder.h"
+#include "library/cc/stream.h"
+#include "library/cc/stream_prototype.h"
 #include "library/common/http/client.h"
 #include "library/common/types/c_types.h"
 
@@ -29,7 +32,7 @@ Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers);
 //
 // TODO(junr03): move this to derive from the ApiListenerIntegrationTest after moving that class
 // into a test lib.
-class BaseClientIntegrationTest : public BaseIntegrationTest {
+class BaseClientIntegrationTest : public BaseIntegrationTest, public Platform::EngineBuilder {
 public:
   BaseClientIntegrationTest(Network::Address::IpVersion ip_version);
   virtual ~BaseClientIntegrationTest() = default;
@@ -37,14 +40,27 @@ public:
 protected:
   virtual void initialize() override;
   virtual void cleanup();
+  void createEnvoy() override;
+  void threadRoutine(absl::Notification& engine_running);
+  // Must be called manually by subclasses in their TearDown();
+  void TearDown();
 
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
   Http::ClientPtr http_client_{};
   envoy_http_callbacks bridge_callbacks_;
   ConditionalInitializer terminal_callback_;
   callbacks_called cc_{0, 0, 0, 0, 0, 0, 0, "", &terminal_callback_, {}};
-  Http::TestRequestHeaderMapImpl default_request_headers_;
-  envoy_stream_t stream_{1};
+  std::shared_ptr<Platform::RequestHeaders> default_request_headers_;
+  absl::flat_hash_map<std::string, std::string> custom_headers_;
+  Event::DispatcherPtr full_dispatcher_;
+  Platform::StreamPrototypeSharedPtr stream_prototype_;
+  Platform::StreamSharedPtr stream_;
+  Platform::EngineSharedPtr engine_;
+  Thread::ThreadPtr envoy_thread_;
+  std::string scheme_ = "http";
+  bool explicit_flow_control_ = false;
+  bool expect_dns_ = true;
+  bool override_builder_config_ = false;
 };
 
 } // namespace Envoy

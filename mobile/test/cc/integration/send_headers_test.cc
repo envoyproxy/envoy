@@ -69,16 +69,20 @@ TEST(TestSendHeaders, CanSendHeaders) {
   Platform::StreamSharedPtr stream;
   auto stream_prototype = engine->streamClient()->newStreamPrototype();
 
-  stream_prototype->setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream) {
-    status.status_code = headers->httpStatus();
-    status.end_stream = end_stream;
-  });
-  stream_prototype->setOnComplete([&]() { stream_complete.Notify(); });
-  stream_prototype->setOnError([&](Platform::EnvoyErrorSharedPtr envoy_error) {
-    (void)envoy_error;
-    stream_complete.Notify();
-  });
-  stream_prototype->setOnCancel([&]() { stream_complete.Notify(); });
+  stream_prototype->setOnHeaders(
+      [&](Platform::ResponseHeadersSharedPtr headers, bool end_stream, envoy_stream_intel) {
+        status.status_code = headers->httpStatus();
+        status.end_stream = end_stream;
+      });
+  stream_prototype->setOnComplete(
+      [&](envoy_stream_intel, envoy_final_stream_intel) { stream_complete.Notify(); });
+  stream_prototype->setOnError(
+      [&](Platform::EnvoyErrorSharedPtr envoy_error, envoy_stream_intel, envoy_final_stream_intel) {
+        (void)envoy_error;
+        stream_complete.Notify();
+      });
+  stream_prototype->setOnCancel(
+      [&](envoy_stream_intel, envoy_final_stream_intel) { stream_complete.Notify(); });
 
   stream = stream_prototype->start();
 
