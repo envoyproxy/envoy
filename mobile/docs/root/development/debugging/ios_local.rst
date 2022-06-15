@@ -55,21 +55,15 @@ compiled source files in C/C++/Objective-C/Objective-C++/Swift:
 Running on a real iPhone
 ------------------------
 
-Although building and running on a physical device is
-`not yet officially supported <https://github.com/buildbuddy-io/rules_xcodeproj/issues/285>`_
-by rules_xcodeproj, following these steps may work:
+You can build and run the example iOS apps on a physical iPhone by
+following these steps:
 
-1. Add ``build --ios_multi_cpus=arm64`` to ``.bazelrc``.
-2. Add a ``.mobileprovision`` provisioning profile capable of signing
-   the app you want to run next to its ``BUILD`` file.
-   E.g. ``examples/swift/hello_world/dev.mobileprovision``
-3. Set the provisioning profile on the ``ios_application`` you want to
-   run. E.g. ``provisioning_profile = "dev.mobileprovision",``
-4. Remove all apps without a provisioning profile from the ``xcodeproj``
-   configuration in Envoy Mobile's root ``BUILD`` file.
-5. Follow the same steps as defined in the
+1. Set the ``TEAM_ID`` value in ``examples/BUILD`` to your Apple
+   Developer Team ID found in the
+   `Apple Developer Portal <https://developer.apple.com/account/#!/membership>`_.
+2. If needed, change the ``PROFILE_NAME`` value to the name shown by
+   clicking the (i) next to "Xcode Managed Profile" in Xcode's
+   "Signing and Capabilities" tab.
+3. Follow the same steps as defined in the
    :ref:`Using the Xcode GUI <using_xcode>` section above, but
    targeting your device instead of a simulator.
-
-*Note: You may need to clean from Xcode with cmd-shift-k between device
-runs.*

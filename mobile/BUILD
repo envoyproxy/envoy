@@ -1,6 +1,10 @@
 load("@build_bazel_rules_android//android:rules.bzl", "aar_import")
 load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_framework_import")
 load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
+load(
+    "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:experimental.bzl",
+    "device_and_simulator",
+)
 load("@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:xcodeproj.bzl", "xcodeproj")
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
@@ -95,6 +99,20 @@ genrule(
     tools = ["@kotlin_formatter//file"],
 )
 
+device_and_simulator(
+    name = "ios_examples",
+    tags = ["manual"],
+    targets = [
+        # TODO(jpsim): Fix Objective-C app support
+        # "//examples/objective-c/hello_world:app",
+        "//examples/swift/async_await:app",
+        "//examples/swift/hello_world:app",
+        "//test/swift/apps/baseline:app",
+        "//test/swift/apps/experimental:app",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 xcodeproj(
     name = "xcodeproj",
     archived_bundles_allowed = True,
@@ -108,12 +126,7 @@ xcodeproj(
         "//library/objective-c:envoy_engine_objc_lib",
         "//library/common:envoy_main_interface_lib",
         # Apps
-        # TODO(jpsim): Fix Objective-C app support
-        # "//examples/objective-c/hello_world:app",
-        "//examples/swift/async_await:app",
-        "//examples/swift/hello_world:app",
-        "//test/swift/apps/baseline:app",
-        "//test/swift/apps/experimental:app",
+        "//:ios_examples",
         # Tests
         "//experimental/swift:quic_stream_test",
         "//test/objective-c:envoy_bridge_utility_test",
