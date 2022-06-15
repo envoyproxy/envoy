@@ -42,6 +42,7 @@ public:
   virtual bool disableFactory(absl::string_view) PURE;
   virtual bool isFactoryDisabled(absl::string_view) const PURE;
   virtual absl::flat_hash_map<std::string, std::vector<std::string>> registeredTypes() const PURE;
+  virtual absl::string_view canonicalFactoryName(absl::string_view) const PURE;
 };
 
 template <class Base> class FactoryRegistryProxyImpl : public FactoryRegistryProxy {
@@ -71,6 +72,10 @@ public:
 
   absl::flat_hash_map<std::string, std::vector<std::string>> registeredTypes() const override {
     return FactoryRegistry::registeredTypes();
+  }
+
+  absl::string_view canonicalFactoryName(absl::string_view name) const override {
+    return FactoryRegistry::canonicalFactoryName(name);
   }
 };
 

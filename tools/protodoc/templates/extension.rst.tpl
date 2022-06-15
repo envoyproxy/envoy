@@ -13,3 +13,16 @@ This extension may be referenced by the qualified name ``{{extension}}``
 {% for cat in categories %}
   - :ref:`{{cat}} <extension_category_{{cat}}>`
 {% endfor %}
+
+{% if type_urls|length > 0 %}
+.. tip::
+  This extension can be configured with the following type URLs:
+
+{% for type_url in type_urls %}
+{% if type_url.startswith('envoy.') %}
+  - :ref:`type.googleapis.com/{{type_url}} <envoy_api_msg_{{type_url[6:]}}>`
+{% else %}
+  - ``type.googleapis.com/{{type_url}}``
+{% endif %}
+{% endfor %}
+{% endif %}

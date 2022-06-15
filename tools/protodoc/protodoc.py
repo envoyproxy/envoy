@@ -183,6 +183,7 @@ def format_extension(extension):
         security_posture = EXTENSION_SECURITY_POSTURES[
             extension_metadata['security_posture']].strip()
         categories = extension_metadata["categories"]
+        type_urls = extension_metadata.get('type_urls') or []
     except KeyError as e:
         sys.stderr.write(
             f"\n\nDid you forget to add '{extension}' to extensions_build_config.bzl, "
@@ -195,7 +196,8 @@ def format_extension(extension):
         contrib=contrib,
         status=status,
         security_posture=security_posture,
-        categories=categories)
+        categories=categories,
+        type_urls=type_urls)
     return f"\n{extension}\n"
 
 
