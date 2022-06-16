@@ -1089,7 +1089,7 @@ message RouteAction {
     // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
     // is set.
     string host_rewrite_literal = 6
-    [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
