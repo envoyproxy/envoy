@@ -1,7 +1,6 @@
 static_resources:
   clusters:
-    // cluster for fake destination service which has typed metadata that contains 
-    // the audience information.
+    // Cluster for fake destination service which has typed metadata that contains the audience information.
     - typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -24,7 +23,7 @@ static_resources:
             url: http://test.com
       connect_timeout: 5s
       name: cluster_0
-    // cluster for fake metadata server
+    // Cluster for fake metadata server.
     - typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -51,10 +50,11 @@ static_resources:
           inline_string: DUMMY_INLINE_BYTES
         password:
           inline_string: DUMMY_INLINE_BYTES
-  dynamic_resources:
-    lds_config:
-      resource_api_version: V3
-      path: /tmp/envoy_test_tmp.eth42V/170599_1647616221474515
+
+dynamic_resources:
+  lds_config:
+    resource_api_version: V3
+    path: /tmp/envoy_test_tmp.eth42V/170599_1647616221474515
   admin:
     access_log:
       - typed_config:

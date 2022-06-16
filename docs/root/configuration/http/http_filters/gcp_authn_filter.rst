@@ -10,6 +10,7 @@ Configuration
 This filter should be configured with the name ``envoy.filters.http.gcp_authn``.
 
 The filter configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig>` has three fields:
+
 * Field ``http_uri`` specifies the HTTP URI for fetching the from `GCE Metadata Server <https://cloud.google.com/compute/docs/metadata/overview>`_. The URL format is ``http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]``. The ``AUDIENCE`` field is provided by configuration, please see more details below.
 
 * Field ``retry_policy`` specifies the retry policy if fetching tokens failed. This field is optional. If it is not configured, the filter will be fail-closed (i.e., reject the requests).
@@ -18,9 +19,9 @@ The filter configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.fil
 
 The audience configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience>` is the URL of the destionation service, which is the receving service that calling service is invoking. This information is provided through cluster metadata :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`
 
-The token cache configuration :ref:v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Token>. This is used to avoid the redundant queries to authentication server (GCE metadata server in the context of this filter) for duplicated tokens.
+The token cache configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Token>` is used to avoid the redundant queries to authentication server (GCE metadata server in the context of this filter) for duplicated tokens.
 
-Coniguration example
+Configuration example
 --------------------
 Static and dynamic resouce configuration example:
 
