@@ -38,13 +38,11 @@ fi
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_db_target=@envoy_api//:all_protos ${FREEZE_ARG} \
   @envoy_api//versioning:active_protos @envoy_api//versioning:frozen_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
 
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+    //tools/proto_format:proto_targets
+
 # Find all source protos.
-PROTO_TARGETS=()
-for proto_type in active frozen; do
-    protos=$(bazel query "labels(srcs, labels(deps, @envoy_api//versioning:${proto_type}_protos))")
-    while read -r line; do PROTO_TARGETS+=("$line"); done \
-        <<< "$protos"
-done
+read -ra PROTO_TARGETS <<< "$(tr '\n' ' ' < bazel-bin/tools/proto_format/proto_targets.txt)"
 
 # Setup for proto_sync.py.
 TOOLS="$(dirname "$(dirname "$(realpath "$0")")")"
