@@ -63,6 +63,15 @@ constexpr int messageTruncatedOption() {
 
 namespace Network {
 
+bool IoSocketHandleImpl::alwaysUseV6OnAndroid() {
+#ifndef __ANDROID_API__
+  return false;
+#else
+  // TODO(mattklein123): Check runtime.
+  return true;
+#endif
+}
+
 IoSocketHandleImpl::~IoSocketHandleImpl() {
   if (SOCKET_VALID(fd_)) {
     IoSocketHandleImpl::close();
@@ -466,7 +475,22 @@ IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
-  return Api::OsSysCallsSingleton::get().connect(fd_, address->sockAddr(), address->sockAddrLen());
+  auto sockaddr_to_use = address->sockAddr();
+#ifdef __ANDROID_API__
+  sockaddr_storage ss;
+  if (sockaddr_to_use->sa_family == AF_INET && alwaysUseV6OnAndroid()) {
+    const sockaddr_in& sin4 = reinterpret_cast<const sockaddr_in&>(*sockaddr_to_use);
+
+    memset(&ss, 0, sizeof(ss));
+    sockaddr_in6& sin6 = reinterpret_cast<sockaddr_in6&>(ss);
+    sin6.sin6_family = AF_INET6;
+    sin6.sin6_port = sin4.sin_port;
+    sin6.sin6_addr.s6_addr32[3] = sin4.sin_addr.s_addr;
+    sockaddr_to_use = reinterpret_cast<sockaddr*>(&ss);
+  }
+#endif
+
+  return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, address->sockAddrLen());
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::setOption(int level, int optname, const void* optval,
