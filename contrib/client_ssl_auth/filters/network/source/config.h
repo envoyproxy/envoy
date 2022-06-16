@@ -1,10 +1,10 @@
 #pragma once
 
-#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
-#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.validate.h"
-
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"
+
+#include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
+#include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
