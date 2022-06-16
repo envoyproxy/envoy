@@ -593,8 +593,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   }
 
   // Initialize the regex engine and inject to singleton.
-  const auto& default_regex_engine = bootstrap_.default_regex_engine();
-  if (default_regex_engine.has_typed_config()) {
+  if (bootstrap_.has_default_regex_engine()) {
+    const auto& default_regex_engine = bootstrap_.default_regex_engine();
     Regex::EngineFactory& factory =
         Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
     auto config = Config::Utility::translateAnyToFactoryConfig(
