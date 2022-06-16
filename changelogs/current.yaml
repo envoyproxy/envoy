@@ -38,6 +38,9 @@ minor_behavior_changes:
   change: |
     changing the behavior for CONNECT and upgrade requests over HTTP/1.1 to not delay close. This behavioral change
     can be reverted by setting ``envoy.reloadable_features.no_delay_close_for_upgrades`` to false.
+- area: http
+  change: |
+    the :ref:`dynamo filter <config_http_filters_dynamo>` has been moved to :ref:`contrib images <install_contrib>`.
 - area: http-cache
   change: |
     http cache filter ``getCache`` interface changed from returning a reference to
