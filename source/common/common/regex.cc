@@ -63,13 +63,8 @@ CompiledMatcherPtr GoogleReEngine::matcher(const std::string& regex) const {
   return std::make_unique<CompiledGoogleReMatcher>(regex, true);
 }
 
-EnginePtr
-GoogleReEngineFactory::createEngine(const Protobuf::Message& config,
-                                    ProtobufMessage::ValidationVisitor& validation_visitor) {
-  const auto google_re2 =
-      MessageUtil::downcastAndValidate<const envoy::extensions::regex_engines::v3::GoogleRE2&>(
-          config, validation_visitor);
-
+EnginePtr GoogleReEngineFactory::createEngine(const Protobuf::Message&,
+                                              ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<GoogleReEngine>();
 }
 
