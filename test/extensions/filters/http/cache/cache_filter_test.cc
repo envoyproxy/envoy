@@ -762,47 +762,28 @@ TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
   }
 }
 
-TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterState1) {
-  EXPECT_ENVOY_BUG(
-      CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation, FilterState::Initial),
-      "Unexpected filter state");
-}
-TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterState2) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
-                                                    FilterState::DecodeServingFromCache),
-                   "Unexpected filter state");
-}
-TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterState3) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(CacheEntryStatus::RequiresValidation,
-                                                    FilterState::Destroyed),
-                   "Unexpected filter state");
+class LookupStatusTest
+    : public ::testing::TestWithParam<std::tuple<absl::optional<CacheEntryStatus>, FilterState>> {
+protected:
+  absl::optional<CacheEntryStatus> cacheEntryStatus() { return std::get<0>(GetParam()); }
+  FilterState filterState() { return std::get<1>(GetParam()); }
+};
+
+TEST_P(LookupStatusTest, ResolveLookupStatusUnexpectedState) {
+  EXPECT_EQ(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse),
+            LookupStatus::Unknown);
 }
 
-TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterStateNullopt1) {
-  EXPECT_ENVOY_BUG(
-      CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::ValidatingCachedResponse),
-      "Unexpected filter state");
-}
-TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterStateNullopt2) {
-  EXPECT_ENVOY_BUG(
-      CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::DecodeServingFromCache),
-      "Unexpected filter state");
-}
-TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterStateNullopt3) {
-  EXPECT_ENVOY_BUG(
-      CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::EncodeServingFromCache),
-      "Unexpected filter state");
-}
-TEST_F(CacheFilterTest, ResolveLookupStatusUnexpectedFilterStateNullopt4) {
-  EXPECT_ENVOY_BUG(CacheFilter::resolveLookupStatus(absl::nullopt, FilterState::Destroyed),
-                   "Unexpected filter state");
-}
-
-TEST_F(CacheFilterTest, ResolveLookupStatusUnhandledCacheEntryStatus) {
-  EXPECT_ENVOY_BUG(
-      CacheFilter::resolveLookupStatus(static_cast<CacheEntryStatus>(99), FilterState::Initial),
-      "Unhandled CacheEntryStatus");
-}
+INSTANTIATE_TEST_SUITE_P(
+    LookupStatusTest, LookupStatusTest,
+    testing::Values(std::make_tuple(CacheEntryStatus::RequiresValidation, FilterState::Initial),
+                    std::make_tuple(CacheEntryStatus::RequiresValidation,
+                                    FilterState::DecodeServingFromCache),
+                    std::make_tuple(CacheEntryStatus::RequiresValidation, FilterState::Destroyed),
+                    std::make_tuple(absl::nullopt, FilterState::ValidatingCachedResponse),
+                    std::make_tuple(absl::nullopt, FilterState::DecodeServingFromCache),
+                    std::make_tuple(absl::nullopt, FilterState::EncodeServingFromCache),
+                    std::make_tuple(absl::nullopt, FilterState::Destroyed)));
 
 // A new type alias for a different type of tests that use the exact same class
 using ValidationHeadersTest = CacheFilterTest;

@@ -210,9 +210,11 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
       case FilterState::DecodeServingFromCache:
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::Destroyed:
-        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
-                                  "response required validation, but filter state is ",
-                                  filter_state));
+        // TODO (capoferro): ENVOY_BUG prevents code coverage from working. When we fix that, we
+        // should convert this to an ENVOY_BUG.
+        ENVOY_LOG(error, absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
+                                      "response required validation, but filter state is ",
+                                      filter_state));
       }
       return LookupStatus::Unknown;
     }
@@ -223,9 +225,12 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
     case CacheEntryStatus::LookupError:
       return LookupStatus::LookupError;
     }
-    IS_ENVOY_BUG(absl::StrCat(
-        "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
-        std::to_string(static_cast<int>(filter_state))));
+    // TODO (capoferro): ENVOY_BUG prevents code coverage from working. When we fix that, we should
+    // convert this to an ENVOY_BUG.
+    ENVOY_LOG(error,
+              absl::StrCat(
+                  "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
+                  std::to_string(static_cast<int>(filter_state))));
     return LookupStatus::Unknown;
   }
   // Either decodeHeaders decided not to do a cache lookup (because the
@@ -246,9 +251,9 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
   case FilterState::ResponseServedFromCache:
     ABSL_FALLTHROUGH_INTENDED;
   case FilterState::Destroyed:
-    IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: "
-                              "lookup_result_ is empty but filter state is ",
-                              filter_state));
+    ENVOY_LOG(error, absl::StrCat("Unexpected filter state in requestCacheStatus: "
+                                  "lookup_result_ is empty but filter state is ",
+                                  filter_state));
   }
   return LookupStatus::Unknown;
 }
