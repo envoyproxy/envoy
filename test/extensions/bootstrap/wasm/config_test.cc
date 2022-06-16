@@ -24,12 +24,12 @@ using Extensions::Bootstrap::Wasm::WasmServicePtr;
 class WasmFactoryTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmFactoryTest() {
-    if (std::get<0>(GetParam()).empty()){
+    if (std::get<0>(GetParam()).empty()) {
       config_.mutable_config()->mutable_vm_config()->set_runtime(
-        absl::StrCat("envoy.wasm.runtime.", "v8"));
+          absl::StrCat("envoy.wasm.runtime.", "v8"));
     } else {
       config_.mutable_config()->mutable_vm_config()->set_runtime(
-        absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+          absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
     }
     if (std::get<0>(GetParam()) != "null") {
       config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
@@ -115,7 +115,7 @@ TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
   }
   config_.mutable_config()->mutable_vm_config()->set_runtime("");
 
-  // Expect no exceptions when runtime is unspecified 
+  // Expect no exceptions when runtime is unspecified
   EXPECT_NO_THROW(initializeWithConfig(config_));
 }
 
