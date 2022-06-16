@@ -70,10 +70,8 @@ public:
   void onAboveWriteBufferHighWatermark() override { disableDataFromDownstreamForFlowControl(); }
   void onBelowWriteBufferLowWatermark() override { enableDataFromDownstreamForFlowControl(); }
   // UpstreamToDownstream
-  const RouteEntry& routeEntry() const override;
+  const Route& route() const override;
   const Network::Connection& connection() const override;
-
-  // UpstreamToDownstream
   const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
     return stream_options_;
   }

@@ -270,6 +270,9 @@ settings:
     }
 
     // transportEnd throw envoyException
+    filter_->decoder_->reassemble(buffer_);
+    filter_->decoder_->metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
+    filter_->decoder_->decode();
     filter_->read_callbacks_->connection().setDelayedCloseTimeout(std::chrono::milliseconds(1));
     filter_->read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     ConnectionManager::ActiveTransPtr trans1 =

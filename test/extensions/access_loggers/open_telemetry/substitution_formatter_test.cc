@@ -711,17 +711,22 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
   StreamInfo::MockStreamInfo stream_info;
   std::string body;
 
-  stream_info.upstream_info_ = std::make_shared<StreamInfo::UpstreamInfoImpl>();
-  stream_info.upstream_info_->setUpstreamFilterState(
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
+  const StreamInfo::FilterStateSharedPtr upstream_filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
+  upstream_filter_state->setData("test_key",
+                                 std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                 StreamInfo::FilterState::StateType::ReadOnly);
+  upstream_filter_state->setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
+                                 StreamInfo::FilterState::StateType::ReadOnly);
 
-  stream_info.upstream_info_->upstreamFilterState()->setData(
-      "test_key", std::make_unique<Router::StringAccessorImpl>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
-  stream_info.upstream_info_->upstreamFilterState()->setData(
-      "test_obj", std::make_unique<TestSerializedStructFilterState>(),
-      StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(stream_info, upstreamInfo()).Times(testing::AtLeast(1));
+  // Get pointer to MockUpstreamInfo.
+  std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
+      std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(stream_info.upstreamInfo());
   EXPECT_CALL(Const(stream_info), upstreamInfo()).Times(testing::AtLeast(1));
+  EXPECT_CALL(Const(*mock_upstream_info), upstreamFilterState())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(upstream_filter_state));
 
   OpenTelemetryFormatMap expected = {{"test_key", "\"test_value\""},
                                      {"test_obj", "{\"inner_key\":\"inner_value\"}"}};

@@ -492,7 +492,7 @@ gdb bazel-bin/test/common/http/async_client_impl_test
 
 We need to use `-c dbg` Bazel option to generate debugging symbols and without
 that GDB will not be very useful. The debugging symbols are stored as separate
-debugging information files (`.dwo` files) and we can build a DWARF package file
+debugging information files (`.dwp` files) and we can build a DWARF package file
 with `.dwp ` target. The `.dwp` file need to be presented in the same folder with the
 binary for a full debugging experience.
 

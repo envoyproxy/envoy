@@ -19,7 +19,7 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
 static constexpr uint32_t kDefaultTimeoutMs = 300;
 
 std::string getSni(const Network::TransportSocketOptionsConstSharedPtr& options,
-                   Network::TransportSocketFactory& transport_socket_factory) {
+                   Network::UpstreamTransportSocketFactory& transport_socket_factory) {
   if (options && options->serverNameOverride().has_value()) {
     return options->serverNameOverride().value();
   }

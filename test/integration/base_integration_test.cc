@@ -103,9 +103,13 @@ void BaseIntegrationTest::initialize() {
   createUpstreams();
   createXdsUpstream();
   createEnvoy();
+
+  if (!skip_tag_extraction_rule_check_) {
+    checkForMissingTagExtractionRules();
+  }
 }
 
-Network::TransportSocketFactoryPtr
+Network::DownstreamTransportSocketFactoryPtr
 BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string yaml = absl::StrFormat(
@@ -152,9 +156,9 @@ void BaseIntegrationTest::createUpstreams() {
 }
 void BaseIntegrationTest::createUpstream(Network::Address::InstanceConstSharedPtr endpoint,
                                          FakeUpstreamConfig& config) {
-  Network::TransportSocketFactoryPtr factory = upstream_tls_
-                                                   ? createUpstreamTlsContext(config)
-                                                   : Network::Test::createRawBufferSocketFactory();
+  Network::DownstreamTransportSocketFactoryPtr factory =
+      upstream_tls_ ? createUpstreamTlsContext(config)
+                    : Network::Test::createRawBufferDownstreamSocketFactory();
   if (autonomous_upstream_) {
     fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint, config,
                                                         autonomous_allow_incomplete_streams_));
@@ -694,4 +698,67 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
   return AssertionSuccess();
 }
 
+// Attempt to heuristically discover missing tag-extraction rules when new stats are added.
+// This is done by looking through the entire config for fields named `stat_prefix`, and then
+// validating that those values do not appear in the tag-extracted name of any stat. The alternate
+// approach of looking for the prefix in the extracted tags was more difficult because in the tests
+// some prefix values are reused (leading to false negatives) and some tests have base configuration
+// that sets a stat_prefix but don't produce any stats at all with that configuration (leading to
+// false positives).
+//
+// To add a rule, see `source/common/config/well_known_names.cc`.
+//
+// This is done in all integration tests because it is testing new stats and scopes that are created
+// for which the author isn't aware that tag extraction rules need to be written, and thus the
+// author wouldn't think to write tests for that themselves.
+void BaseIntegrationTest::checkForMissingTagExtractionRules() {
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
+  EXPECT_TRUE(response->complete());
+  if (!response->complete()) {
+    // Allow the rest of the test to complete for better diagnostic information about the failure.
+    return;
+  }
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+
+  std::vector<std::string> stat_prefixes;
+  Json::ObjectCallback find_stat_prefix = [&](const std::string& name,
+                                              const Json::Object& root) -> bool {
+    // Looking for `stat_prefix` is based on precedent for how this is usually named in the config.
+    // If there are other names used for a similar purpose, this check could be expanded to add them
+    // also.
+    if (name == "stat_prefix") {
+      auto prefix = root.asString();
+      if (!prefix.empty()) {
+        stat_prefixes.push_back(prefix);
+      }
+    } else if (root.isObject()) {
+      root.iterate(find_stat_prefix);
+    } else if (root.isArray()) {
+      std::vector<Json::ObjectSharedPtr> elements = root.asObjectArray();
+      for (const auto& element : elements) {
+        find_stat_prefix("", *element);
+      }
+    }
+    return true;
+  };
+  find_stat_prefix("", *json);
+  ENVOY_LOG_MISC(debug, "discovered stat_prefixes {}", stat_prefixes);
+
+  auto check_metric = [&](auto& metric) {
+    // Validate that the `stat_prefix` string doesn't appear in the tag-extracted name, indicating
+    // that it wasn't extracted.
+    const std::string tag_extracted_name = metric.tagExtractedName();
+    for (const std::string& stat_prefix : stat_prefixes) {
+      EXPECT_EQ(tag_extracted_name.find(stat_prefix), std::string::npos)
+          << "Missing stat tag-extraction rule for stat '" << tag_extracted_name
+          << "' and stat_prefix '" << stat_prefix << "'";
+    }
+  };
+  test_server_->statStore().forEachCounter(nullptr, check_metric);
+  test_server_->statStore().forEachGauge(nullptr, check_metric);
+  test_server_->statStore().forEachHistogram(nullptr, check_metric);
+}
 } // namespace Envoy

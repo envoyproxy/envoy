@@ -119,6 +119,10 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
+    // This test tracks the number of buffers created, and the tag extraction check uses some
+    // buffers, so disable it in this test.
+    skip_tag_extraction_rule_check_ = true;
+
     if (streamBufferAccounting()) {
       buffer_factory_ =
           std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
@@ -318,6 +322,10 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
+    // This test tracks the number of buffers created, and the tag extraction check uses some
+    // buffers, so disable it in this test.
+    skip_tag_extraction_rule_check_ = true;
+
     if (streamBufferAccounting()) {
       buffer_factory_ =
           std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
