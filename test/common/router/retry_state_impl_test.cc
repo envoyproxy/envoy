@@ -742,7 +742,8 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersSetViaRequestHeader) {
 
     expectTimerCreateAndEnable();
 
-    Http::TestResponseHeaderMapImpl response_headers{{"x-upstream-pushback", "yes"}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                     {"x-upstream-pushback", "yes"}};
     EXPECT_EQ(RetryStatus::Yes,
               state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
   }
@@ -755,7 +756,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersSetViaRequestHeader) {
 
     expectTimerCreateAndEnable();
 
-    Http::TestResponseHeaderMapImpl response_headers{{"foobar", "false"}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foobar", "false"}};
     EXPECT_EQ(RetryStatus::Yes,
               state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
   }
