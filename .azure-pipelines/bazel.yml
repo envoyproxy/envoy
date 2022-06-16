@@ -57,7 +57,7 @@ steps:
       BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
 
-  displayName: "Run CI script"
+  displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |
     echo "disk space at end of build:"
