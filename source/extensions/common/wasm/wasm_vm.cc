@@ -74,9 +74,9 @@ bool EnvoyWasmVmIntegration::getNullVmFunction(std::string_view function_name, b
 
 WasmVmPtr createWasmVm(absl::string_view runtime) {
   if (runtime.empty()) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
-                        "Failed to create Wasm VM with unspecified runtime");
-    return nullptr;
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), info,
+                        "Wasm VM runtime is unspecified, set to envoy.wasm.runtime.v8");
+    runtime = "envoy.wasm.runtime.v8";
   }
 
   auto runtime_factory = Registry::FactoryRegistry<WasmRuntimeFactory>::getFactory(runtime);

@@ -24,8 +24,13 @@ using Extensions::Bootstrap::Wasm::WasmServicePtr;
 class WasmFactoryTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmFactoryTest() {
-    config_.mutable_config()->mutable_vm_config()->set_runtime(
+    if (std::get<0>(GetParam()).empty()){
+      config_.mutable_config()->mutable_vm_config()->set_runtime(
+        absl::StrCat("envoy.wasm.runtime.", "v8"));
+    } else {
+      config_.mutable_config()->mutable_vm_config()->set_runtime(
         absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+    }
     if (std::get<0>(GetParam()) != "null") {
       config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
           TestEnvironment::substitute(
@@ -105,11 +110,13 @@ TEST_P(WasmFactoryTest, MissingImport) {
 }
 
 TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
   config_.mutable_config()->mutable_vm_config()->set_runtime("");
 
-  EXPECT_THROW_WITH_REGEX(
-      initializeWithConfig(config_), EnvoyException,
-      "Proto constraint validation failed \\(WasmServiceValidationError\\.Config");
+  // Expect no exceptions when runtime is unspecified 
+  EXPECT_NO_THROW(initializeWithConfig(config_));
 }
 
 TEST_P(WasmFactoryTest, UnknownRuntime) {
