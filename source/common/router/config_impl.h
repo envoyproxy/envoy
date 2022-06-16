@@ -986,7 +986,6 @@ private:
   EarlyDataPolicyPtr early_data_policy_;
 };
 
-
 /**
  * Route entry implementation for pattern path match routing.
  */
