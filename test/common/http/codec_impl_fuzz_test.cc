@@ -786,9 +786,16 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
   try {
     // Validate input early.
     TestUtility::validate(input);
+#ifdef FUZZ_CODEC_http1
     codecFuzz(input, HttpVersion::Http1);
+#endif
+#ifdef FUZZ_CODEC_nghttp2
     codecFuzz(input, HttpVersion::Http2Nghttp2);
+#endif
+#ifdef FUZZ_CODEC_wrapped_nghttp2
     codecFuzz(input, HttpVersion::Http2WrappedNghttp2);
+#endif
+#ifdef FUZZ_CODEC_oghttp2
     // Prevent oghttp2 from aborting the program.
     // If when disabling the FATAL log abort the fuzzer will create a test that reaches an
     // inconsistent state (and crashes/accesses inconsistent memory), then it will be a bug we'll
@@ -796,6 +803,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     // happen in production environments.
     quiche::setDFatalExitDisabled(true);
     codecFuzz(input, HttpVersion::Http2Oghttp2);
+#endif
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }
