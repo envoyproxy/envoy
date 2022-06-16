@@ -6847,6 +6847,40 @@ virtual_hosts:
                    .allowsEarlyDataForRequest(bar_request2));
 }
 
+TEST_F(RouteMatcherTest, ConfigRouteStats) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+    stat_prefix: "foo_prefix"
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+      early_data_policy:
+        name: envoy.route.early_data_policy.default
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.early_data.v3.DefaultEarlyDataPolicy
+ )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // Validate that route has stats config if stat_prefix is configured.
+  Http::TestRequestHeaderMapImpl foo_request1 = genHeaders("www.lyft.com", "/foo", "GET");
+  EXPECT_EQ(true, config.route(foo_request1, 0)->routeEntry()->routeStatsContext().has_value());
+
+  // Validate that route does not have stats config if stat_prefix is configured.
+  Http::TestRequestHeaderMapImpl bar_request1 = genHeaders("www.lyft.com", "/bar", "GET");
+  EXPECT_EQ(false, config.route(bar_request1, 0)->routeEntry()->routeStatsContext().has_value());
+}
+
 class CustomRequestHeadersTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(CustomRequestHeadersTest, AddNewHeader) {
