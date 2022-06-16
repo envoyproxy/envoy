@@ -5053,13 +5053,13 @@ virtual_hosts:
 TEST_F(RouteMatcherTest, TestPatternRewriteConfigLoad) {
   const std::string yaml = R"EOF(
 virtual_hosts:
-- name: pattern_rewrite
+- name: path_template_rewrite
   domains: ["*"]
   routes:
   - match:
       path_template_match: "/bar/{country}/{lang}"
     route:
-      pattern_rewrite: "/bar/{lang}/{country}"
+      path_template_rewrite: "/bar/{lang}/{country}"
       cluster: www2
   )EOF";
 
