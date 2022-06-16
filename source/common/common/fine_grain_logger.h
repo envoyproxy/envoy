@@ -64,8 +64,8 @@ public:
 
   /**
    * Sets the default verbosity log level and format when updating context. It is used in Context
-   * during intitialization or the enable process. Basically, it will reset FineGrainLogContext and
-   * clear any privous verbosity updates.
+   * during initialization or the enable process. Basically, it will reset FineGrainLogContext and
+   * clear any previous verbosity updates.
    */
   void setDefaultFineGrainLogLevelFormat(spdlog::level::level_enum level, const std::string& format)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
@@ -113,7 +113,7 @@ public:
    * verbosity_default_level_ could be different from fine_grain_default_level_ in Context after
    * calling this method.
    */
-  void updateVerbosityDefalutLevel(spdlog::level::level_enum level)
+  void updateVerbosityDefaultLevel(spdlog::level::level_enum level)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**

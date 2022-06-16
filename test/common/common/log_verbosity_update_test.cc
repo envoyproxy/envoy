@@ -63,14 +63,14 @@ TEST(FineGrainLog, verbosityDefaultLevelUpdate) {
 
   // Clear verbosity update info at first.
   getFineGrainLogContext().updateVerbositySetting({});
-  getFineGrainLogContext().updateVerbosityDefalutLevel(spdlog::level::debug);
+  getFineGrainLogContext().updateVerbosityDefaultLevel(spdlog::level::debug);
 
   FINE_GRAIN_LOG(debug, "Debug: now level is debug");
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
   EXPECT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::debug);
 
-  getFineGrainLogContext().updateVerbosityDefalutLevel(spdlog::level::debug);
+  getFineGrainLogContext().updateVerbosityDefaultLevel(spdlog::level::debug);
   p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
   EXPECT_EQ(p->level(), spdlog::level::debug);
 }
@@ -86,7 +86,7 @@ TEST(FineGrainLog, verbosityUpdatePriority) {
   const std::pair<absl::string_view, int> update =
       std::make_pair(file_path, static_cast<int>(spdlog::level::debug));
   getFineGrainLogContext().updateVerbositySetting({update});
-  getFineGrainLogContext().updateVerbosityDefalutLevel(spdlog::level::trace);
+  getFineGrainLogContext().updateVerbosityDefaultLevel(spdlog::level::trace);
 
   FINE_GRAIN_LOG(debug, "Debug: now level is debug");
   FINE_GRAIN_LOG(trace, "Trace: you should not see this message");

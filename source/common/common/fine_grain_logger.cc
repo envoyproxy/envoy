@@ -166,7 +166,7 @@ spdlog::logger* FineGrainLogContext::createLogger(const std::string& key)
   return new_logger.get();
 }
 
-void FineGrainLogContext::updateVerbosityDefalutLevel(level_enum level) {
+void FineGrainLogContext::updateVerbosityDefaultLevel(level_enum level) {
   absl::WriterMutexLock ul(&fine_grain_log_lock_);
   if (level == verbosity_default_level_) {
     return;
