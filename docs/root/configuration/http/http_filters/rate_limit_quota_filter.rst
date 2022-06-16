@@ -166,15 +166,3 @@ Dynamic Metadata
 ----------------
 
 TODO
-
-Runtime
--------
-
-The HTTP rate limit quota filter supports the following runtime settings:
-
-rate_limit_quota.http_filter_enabled
-  % of requests that will call the rate limit service. Defaults to 100.
-
-rate_limit_quota.http_filter_enforcing
-  % of requests that that will have the rate limit service decision enforced. Defaults to 100.
-  This can be used to test what would happen before fully enforcing the outcome.

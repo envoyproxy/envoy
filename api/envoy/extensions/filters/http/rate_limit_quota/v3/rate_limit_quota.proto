@@ -113,6 +113,28 @@ message RateLimitQuotaFilterConfig {
   // Refer to :ref:`Unified Matcher API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`
   // documentation for more information on the matcher trees.
   xds.type.matcher.v3.Matcher bucket_matchers = 3 [(validate.rules).message = {required: true}];
+
+  // If set, this will enable -- but not necessarily enforce -- the rate limit for the given
+  // fraction of requests.
+  // Defaults to 0% of requests for safety.
+  config.core.v3.RuntimeFractionalPercent filter_enabled = 4;
+
+  // If set, this will enforce the rate limit decisions for the given fraction of requests.
+  // For requests that are not enforced the filter will still obtain the quota and include it
+  // in the load computation, however the request will always be allowed regardless of the outcome
+  // of quota application. This allows validation or testing of the rate limiting service
+  // infrastructure without disrupting existing traffic.
+  //
+  // Note: this only applies to the fraction of enabled requests.
+  //
+  // Defaults to 0% of requests for safety.
+  config.core.v3.RuntimeFractionalPercent filter_enforced = 5;
+
+  // Specifies a list of HTTP headers that should be added to each request that
+  // has been rate limited and is also forwarded upstream. This can only occur when the
+  // filter is enabled but not enforced.
+  repeated config.core.v3.HeaderValueOption request_headers_to_add_when_not_enforced = 6
+      [(validate.rules).repeated = {max_items: 10}];
 }
 
 // Per-route and per-host configuration overrides. The more specific definition completely
@@ -251,6 +273,7 @@ message RateLimitQuotaBucketSettings {
 
     // Specifies a list of HTTP headers that should be added to each response for requests that
     // have been rate limited. Applies both to plain HTTP, and gRPC requests.
+    // The headers are added even when the rate limit quota was not enforced.
     repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
         [(validate.rules).repeated = {max_items: 10}];
   }
@@ -274,8 +297,7 @@ message RateLimitQuotaBucketSettings {
 
         // Dynamic value — evaluated for each request. Must produce a string output, which becomes
         // the value in the :ref:`BucketId <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>`
-        // map.
-        // [#extension-category: envoy.matching.http.input]
+        // map. For example, extensions with the ``envoy.matching.http.input`` category can be used.
         config.core.v3.TypedExtensionConfig custom_value = 2;
       }
     }
