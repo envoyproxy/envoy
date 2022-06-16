@@ -122,6 +122,11 @@ public:
    */
   static bool safeFileNameMatch(absl::string_view pattern, absl::string_view str);
 
+  /**
+   * Default fine-grain log format.
+   */
+  static const char* kDefaultFineGrainLogFormat;
+
 private:
   /**
    * Initializes sink for the initialization of loggers, needed only in benchmark test.
