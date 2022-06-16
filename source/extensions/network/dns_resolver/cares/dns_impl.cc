@@ -406,7 +406,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolution() { startResolu
 
 void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family) {
   pending_resolutions_++;
-  if (parent_.filter_unroutable_families_) {
+  if (parent_.filter_unroutable_families_ && family != AF_UNSPEC) {
     switch (family) {
     case AF_INET:
       if (!available_interfaces_.v4_available_) {
