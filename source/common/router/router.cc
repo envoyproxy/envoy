@@ -322,17 +322,19 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
     Stats::StatName upstream_zone = upstreamZone(upstream_host);
-    Http::CodeStats::ResponseStatInfo info{config_.scope_,
-                                           cluster_->statsScope(),
-                                           config_.empty_stat_name_,
-                                           response_status_code,
-                                           internal_request,
-                                           route_entry_->virtualHost().statName(),
-                                           request_vcluster_ ? request_vcluster_->statName()
-                                                             : config_.empty_stat_name_,
-                                           config_.zone_name_,
-                                           upstream_zone,
-                                           is_canary};
+    Http::CodeStats::ResponseStatInfo info{
+        config_.scope_,
+        cluster_->statsScope(),
+        config_.empty_stat_name_,
+        response_status_code,
+        internal_request,
+        route_entry_->virtualHost().statName(),
+        request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
+        route_stats_context_.has_value() ? route_stats_context_->statName()
+                                         : config_.empty_stat_name_,
+        config_.zone_name_,
+        upstream_zone,
+        is_canary};
 
     Http::CodeStats& code_stats = httpContext().codeStats();
     code_stats.chargeResponseStat(info, exclude_http_code_stats_);
@@ -343,6 +345,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                                  alt_stat_prefix_->statName(),
                                                  response_status_code,
                                                  internal_request,
+                                                 config_.empty_stat_name_,
                                                  config_.empty_stat_name_,
                                                  config_.empty_stat_name_,
                                                  config_.zone_name_,
@@ -463,6 +466,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
+  route_stats_context_ = route_entry_->routeStatsContext();
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.getPathValue());
 
@@ -654,9 +658,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ = createRetryState(
-      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, config_.runtime_,
-      config_.random_, callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
+  retry_state_ =
+      createRetryState(route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_,
+                       route_stats_context_, config_.runtime_, config_.random_,
+                       callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys.
@@ -939,6 +944,9 @@ void Filter::onResponseTimeout() {
       cluster_->stats().upstream_rq_timeout_.inc();
       if (request_vcluster_) {
         request_vcluster_->stats().upstream_rq_timeout_.inc();
+      }
+      if (route_stats_context_.has_value()) {
+        route_stats_context_->stats().upstream_rq_timeout_.inc();
       }
 
       if (upstream_request->upstreamHost()) {
@@ -1566,17 +1574,19 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
     Http::CodeStats& code_stats = httpContext().codeStats();
-    Http::CodeStats::ResponseTimingInfo info{config_.scope_,
-                                             cluster_->statsScope(),
-                                             config_.empty_stat_name_,
-                                             response_time,
-                                             upstream_request.upstreamCanary(),
-                                             internal_request,
-                                             route_entry_->virtualHost().statName(),
-                                             request_vcluster_ ? request_vcluster_->statName()
-                                                               : config_.empty_stat_name_,
-                                             config_.zone_name_,
-                                             upstreamZone(upstream_request.upstreamHost())};
+    Http::CodeStats::ResponseTimingInfo info{
+        config_.scope_,
+        cluster_->statsScope(),
+        config_.empty_stat_name_,
+        response_time,
+        upstream_request.upstreamCanary(),
+        internal_request,
+        route_entry_->virtualHost().statName(),
+        request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
+        route_stats_context_.has_value() ? route_stats_context_->statName()
+                                         : config_.empty_stat_name_,
+        config_.zone_name_,
+        upstreamZone(upstream_request.upstreamHost())};
 
     code_stats.chargeResponseTiming(info);
 
@@ -1587,6 +1597,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
                                                response_time,
                                                upstream_request.upstreamCanary(),
                                                internal_request,
+                                               config_.empty_stat_name_,
                                                config_.empty_stat_name_,
                                                config_.empty_stat_name_,
                                                config_.zone_name_,
@@ -1838,16 +1849,15 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
                        [](const auto& req) -> bool { return req->awaitingHeaders(); });
 }
 
-RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
-                                           Http::RequestHeaderMap& request_headers,
-                                           const Upstream::ClusterInfo& cluster,
-                                           const VirtualCluster* vcluster, Runtime::Loader& runtime,
-                                           Random::RandomGenerator& random,
-                                           Event::Dispatcher& dispatcher, TimeSource& time_source,
-                                           Upstream::ResourcePriority priority) {
+RetryStatePtr
+ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
+                             const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                             RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
+                             Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                             TimeSource& time_source, Upstream::ResourcePriority priority) {
   std::unique_ptr<RetryStateImpl> retry_state =
-      RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
-                             dispatcher, time_source, priority);
+      RetryStateImpl::create(policy, request_headers, cluster, vcluster, route_stats_context,
+                             runtime, random, dispatcher, time_source, priority);
   if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or
