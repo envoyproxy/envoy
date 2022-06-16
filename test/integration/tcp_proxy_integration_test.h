@@ -35,7 +35,7 @@ public:
                              const std::string& data_to_send_downstream);
 
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Network::TransportSocketFactoryPtr context_;
+  Network::UpstreamTransportSocketFactoryPtr context_;
   ConnectionStatusCallbacks connect_callbacks_;
   MockWatermarkBuffer* client_write_buffer_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;

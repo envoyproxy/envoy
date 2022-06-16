@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Network {
 
 TEST(RawBufferSocketFactory, RawBufferSocketFactory) {
-  TransportSocketFactoryPtr factory = Envoy::Network::Test::createRawBufferSocketFactory();
+  UpstreamTransportSocketFactoryPtr factory = Envoy::Network::Test::createRawBufferSocketFactory();
   EXPECT_FALSE(factory->implementsSecureTransport());
   std::vector<uint8_t> keys;
   factory->hashKey(keys, nullptr);

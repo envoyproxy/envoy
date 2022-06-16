@@ -154,6 +154,9 @@ TagNameValues::TagNameValues() {
 
   // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
   addTokenized(ROUTE, "vhost.*.route.$.**");
+  
+  // thrift.(<stat_prefix>.)*
+  addTokenized(THRIFT_PREFIX, "thrift.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

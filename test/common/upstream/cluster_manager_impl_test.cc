@@ -466,7 +466,7 @@ class AlpnTestConfigFactory
     : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
 public:
   std::string name() const override { return "envoy.transport_sockets.alpn"; }
-  Network::TransportSocketFactoryPtr
+  Network::UpstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message&,
                                Server::Configuration::TransportSocketFactoryContext&) override {
     return std::make_unique<AlpnSocketFactory>();

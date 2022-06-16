@@ -160,8 +160,8 @@ public:
 
   // Contexts needed by raw buffer and tls transport sockets.
   std::unique_ptr<Ssl::ContextManager> tls_context_manager_;
-  Network::TransportSocketFactoryPtr tls_context_;
-  Network::TransportSocketFactoryPtr cleartext_context_;
+  Network::UpstreamTransportSocketFactoryPtr tls_context_;
+  Network::UpstreamTransportSocketFactoryPtr cleartext_context_;
 
   MockWatermarkBuffer* client_write_buffer_{nullptr};
   ConnectionStatusCallbacks connect_callbacks_;
@@ -203,7 +203,7 @@ void StartTlsIntegrationTest::initialize() {
 
   auto factory =
       std::make_unique<Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory>();
-  cleartext_context_ = Network::TransportSocketFactoryPtr{
+  cleartext_context_ = Network::UpstreamTransportSocketFactoryPtr{
       factory->createTransportSocketFactory(*config, factory_context_)};
 
   // Setup factories and contexts for tls transport socket.

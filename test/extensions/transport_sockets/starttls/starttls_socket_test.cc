@@ -177,8 +177,8 @@ TEST(StartTls, BasicFactoryTest) {
   NiceMock<Network::MockTransportSocketFactory>* ssl_factory =
       new NiceMock<Network::MockTransportSocketFactory>;
   std::unique_ptr<StartTlsSocketFactory> factory = std::make_unique<StartTlsSocketFactory>(
-      Network::TransportSocketFactoryPtr(raw_buffer_factory),
-      Network::TransportSocketFactoryPtr(ssl_factory));
+      Network::UpstreamTransportSocketFactoryPtr(raw_buffer_factory),
+      Network::UpstreamTransportSocketFactoryPtr(ssl_factory));
   ASSERT_FALSE(factory->implementsSecureTransport());
   std::vector<uint8_t> key;
   factory->hashKey(key, nullptr);

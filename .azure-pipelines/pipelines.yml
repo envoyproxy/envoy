@@ -184,8 +184,6 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
     - template: bazel.yml
       parameters:
         ciTarget: bazel.release
@@ -347,8 +345,6 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
     - bash: |
         echo "disk space at beginning of build:"
         df -h
