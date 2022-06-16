@@ -204,10 +204,12 @@ bool Context::useFineGrainLogger() {
 void Context::enableFineGrainLogger() {
   if (current_context) {
     current_context->enable_fine_grain_logging_ = true;
-    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(current_context->log_level_,
-                                                               current_context->log_format_);
+    // We should set log_level_ and log_format_ as new fine-grain log default before calling
+    // setDefaultFineGrainLogLevelFormat().
     current_context->fine_grain_default_level_ = current_context->log_level_;
     current_context->fine_grain_log_format_ = current_context->log_format_;
+    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(current_context->log_level_,
+                                                               current_context->log_format_);
     if (current_context->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
       current_context->fine_grain_log_format_ =
           absl::StrReplaceAll(current_context->log_format_, {{"[%n]", ""}});
