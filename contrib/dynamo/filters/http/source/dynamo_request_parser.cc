@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/dynamo/dynamo_request_parser.h"
+#include "contrib/dynamo/filters/http/source/dynamo_request_parser.h"
 
 #include <cmath>
 #include <cstdint>
