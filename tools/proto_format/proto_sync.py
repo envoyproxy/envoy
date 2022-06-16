@@ -5,6 +5,7 @@
 
 import argparse
 from collections import defaultdict
+import functools
 import multiprocessing as mp
 import os
 import pathlib
@@ -15,18 +16,8 @@ import subprocess
 import sys
 import tempfile
 
-from api_proto_plugin import utils
-
-from importlib.util import spec_from_loader, module_from_spec
-from importlib.machinery import SourceFileLoader
-
-# api/bazel/external_protos_deps.bzl must have a .bzl suffix for Starlark
-# import, so we are forced to this workaround.
-_external_proto_deps_spec = spec_from_loader(
-    'external_proto_deps',
-    SourceFileLoader('external_proto_deps', 'api/bazel/external_proto_deps.bzl'))
-external_proto_deps = module_from_spec(_external_proto_deps_spec)
-_external_proto_deps_spec.loader.exec_module(external_proto_deps)
+from tools.api_proto_plugin import utils
+from tools.proto_format.data import data
 
 # These .proto import direct path prefixes are already handled by
 # api_proto_package() as implicit dependencies.
@@ -134,7 +125,7 @@ def get_abs_rel_destination_path(dst_root, src):
     return dst, rel_dst_path
 
 
-def proto_print(src, dst):
+def proto_print(protoprint, descriptor, src, dst):
     """Pretty-print FileDescriptorProto to a destination file.
 
     Args:
@@ -142,15 +133,10 @@ def proto_print(src, dst):
         dst: destination path for formatted proto.
     """
     print('proto_print %s' % dst)
-    subprocess.check_output([
-        'bazel-bin/tools/protoxform/protoprint', src,
-        str(dst),
-        './bazel-bin/tools/protoxform/protoprint.runfiles/envoy/tools/type_whisperer/api_type_db.pb_text',
-        'API_VERSION.txt'
-    ])
+    subprocess.check_output([protoprint, src, str(dst), descriptor, 'API_VERSION.txt'])
 
 
-def sync_proto_file(dst_srcs):
+def sync_proto_file(protoprint, descriptor, dst_srcs):
     """Pretty-print a proto descriptor from protoxform.py Bazel cache artifacts."
 
     Args:
@@ -161,13 +147,13 @@ def sync_proto_file(dst_srcs):
     # If we only have one candidate source for a destination, just pretty-print.
     if len(srcs) == 1:
         src = srcs[0]
-        proto_print(src, dst)
+        proto_print(protoprint, descriptor, src, dst)
     else:
         # We should only see an active and next major version candidate from
         # previous version today.
         assert (len(srcs) == 2)
         active_src = [s for s in srcs if s.endswith('active_or_frozen.proto')][0]
-        proto_print(active_src, dst)
+        proto_print(protoprint, descriptor, active_src, dst)
         src = active_src
     rel_dst_path = get_destination_path(src)
     return ['//%s:pkg' % str(rel_dst_path.parent)]
@@ -207,9 +193,8 @@ def get_import_deps(proto_path):
                     imports.append('@com_github_cncf_udpa//xds/core/v3:pkg')
                     continue
                 # Explicit remapping for external deps, compute paths for envoy/*.
-                if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:
-                    imports.append(
-                        external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP[import_path])
+                if import_path in data["external_proto_deps"]["imports"]:
+                    imports.append(data["external_proto_deps"]["imports"][import_path])
                     continue
                 if import_path.startswith('envoy/') or import_path.startswith('contrib/'):
                     # Ignore package internal imports.
@@ -353,13 +338,15 @@ def should_sync(path, api_proto_modified_files, py_tools_modified_files):
     return False
 
 
-def sync(api_root, mode, is_ci, labels):
+def sync(api_root, mode, protoprint, descriptor, is_ci):
+    # this is currently assumed by the script
+    os.chdir(pathlib.Path(api_root).absolute().parent)
     api_proto_modified_files = git_modified_files('api', 'proto')
     py_tools_modified_files = git_modified_files('tools', 'py')
     with tempfile.TemporaryDirectory() as tmp:
         dst_dir = pathlib.Path(tmp).joinpath("b")
         paths = []
-        for label in labels:
+        for label in data["proto_targets"]:
             paths.append(utils.bazel_bin_path_for_output_artifact(label, '.active_or_frozen.proto'))
             paths.append(
                 utils.bazel_bin_path_for_output_artifact(
@@ -375,7 +362,8 @@ def sync(api_root, mode, is_ci, labels):
                     src_path = str(pathlib.Path(api_root, rel_dst_path))
                     shutil.copy(src_path, abs_dst_path)
         with mp.Pool() as p:
-            pkg_deps = p.map(sync_proto_file, dst_src_paths.items())
+            pkg_deps = p.map(
+                functools.partial(sync_proto_file, protoprint, descriptor), dst_src_paths.items())
         sync_build_files(mode, dst_dir)
 
         current_api_dir = pathlib.Path(tmp).joinpath("a")
@@ -431,8 +419,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['check', 'fix'])
     parser.add_argument('--api_root', default='./api')
+    parser.add_argument('--protoprint')
+    parser.add_argument('--descriptor')
     parser.add_argument('--ci', action="store_true", default=False)
-    parser.add_argument('labels', nargs='*')
     args = parser.parse_args()
 
-    sync(args.api_root, args.mode, args.ci, args.labels)
+    sync(
+        args.api_root, args.mode, str(pathlib.Path(args.protoprint).absolute()),
+        str(pathlib.Path(args.descriptor).absolute()), args.ci)
