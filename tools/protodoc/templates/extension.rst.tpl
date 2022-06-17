@@ -15,7 +15,6 @@ This extension may be referenced by the qualified name ``{{extension}}``
 {% endfor %}
 
 {% if type_urls|length > 0 %}
-.. tip::
   This extension can be configured with the following type URLs:
 
 {% for type_url in type_urls %}
