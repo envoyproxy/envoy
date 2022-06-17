@@ -316,10 +316,14 @@ public:
           // For HTTP1 we need to see if the given direction supports encoding
           // trailers.
           if (response && http1_allow_server_trailers_) {
+            // TODO(kbaichoo): guard to see if can encode trailers by seeing if
+            // content length missing from hdrs so we support trailers.
             state.response_encoder_->encodeTrailers(
                 fromSanitizedHeaders<TestResponseTrailerMapImpl>(directional_action.trailers()));
             encoded_trailers = true;
           } else if (!response && http1_allow_client_trailers_) {
+            // TODO(kbaichoo): guard to see if can encode trailers by seeing if
+            // content length missing from hdrs so we support trailers.
             state.request_encoder_->encodeTrailers(
                 fromSanitizedHeaders<TestRequestTrailerMapImpl>(directional_action.trailers()));
             encoded_trailers = true;
@@ -424,7 +428,11 @@ public:
         ENVOY_LOG_MISC(debug, "Setting dispatching action  on {} in state {} {}", stream_index_,
                        static_cast<int>(request_.stream_state_),
                        static_cast<int>(response_.stream_state_));
-        auto request_action = stream_action.dispatching_action().directional_action_selector_case();
+        // auto request_action =
+        // stream_action.dispatching_action().directional_action_selector_case();
+        //  I think we should have it be on the reuqest action taken, not on
+        //  what the dispatching_action e.g. what to do in response is...
+        auto request_action = stream_action.request().directional_action_selector_case();
         if (request_action == test::common::http::DirectionalAction::kHeaders) {
           EXPECT_CALL(request_.request_decoder_, decodeHeaders_(_, _))
               .WillOnce(InvokeWithoutArgs(
@@ -445,9 +453,15 @@ public:
                 }
               }));
         } else if (request_action == test::common::http::DirectionalAction::kTrailers) {
-          EXPECT_CALL(request_.request_decoder_, decodeTrailers_(_))
-              .WillOnce(InvokeWithoutArgs(
-                  [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+          // TODO(kbaichoo): guard trailers by http2 or allowing trailers on
+          // both h1 sides (otherwise won't get encoded or handed to
+          // decodeTrailer)
+          if (http_protocol_ > Protocol::Http11 ||
+              (http1_allow_client_trailers_ && http1_allow_server_trailers_)) {
+            EXPECT_CALL(request_.request_decoder_, decodeTrailers_(_))
+                .WillOnce(InvokeWithoutArgs(
+                    [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+          }
         }
       }
       // Perform the stream action.
