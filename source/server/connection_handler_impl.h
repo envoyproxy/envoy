@@ -92,6 +92,9 @@ private:
 
     using ListenerMethodFn = std::function<void(Network::ConnectionHandler::ActiveListener&)>;
 
+    /**
+     * A helper to execute specific method on each PerAddressActiveListenerDetails item.
+     */
     void invokeListenerMethod(ListenerMethodFn fn) {
       std::for_each(per_address_details_list_.begin(), per_address_details_list_.end(),
                     [&fn](std::shared_ptr<PerAddressActiveListenerDetails>& details) {
@@ -99,23 +102,26 @@ private:
                     });
     }
 
+    /**
+     * Add an ActiveListener into the list.
+     */
     template <class ActiveListener>
     void addActiveListener(Network::ListenerConfig& config,
                            const Network::ListenSocketFactoryPtr& socket_factory,
                            UnitFloat& listener_reject_fraction, bool disable_listeners,
                            ActiveListener&& listener) {
-      auto pre_address_details = std::make_shared<PerAddressActiveListenerDetails>();
-      pre_address_details->typed_listener_ = *listener;
-      pre_address_details->listener_ = std::move(listener);
-      pre_address_details->address_ = socket_factory->localAddress();
+      auto per_address_details = std::make_shared<PerAddressActiveListenerDetails>();
+      per_address_details->typed_listener_ = *listener;
+      per_address_details->listener_ = std::move(listener);
+      per_address_details->address_ = socket_factory->localAddress();
       if (disable_listeners) {
-        pre_address_details->listener_->pauseListening();
+        per_address_details->listener_->pauseListening();
       }
-      if (auto* listener = pre_address_details->listener_->listener(); listener != nullptr) {
+      if (auto* listener = per_address_details->listener_->listener(); listener != nullptr) {
         listener->setRejectFraction(listener_reject_fraction);
       }
-      pre_address_details->listener_tag_ = config.listenerTag();
-      per_address_details_list_.emplace_back(pre_address_details);
+      per_address_details->listener_tag_ = config.listenerTag();
+      per_address_details_list_.emplace_back(per_address_details);
     }
   };
 

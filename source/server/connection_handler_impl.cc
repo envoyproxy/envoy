@@ -105,8 +105,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
 
   ASSERT(!listener_map_by_tag_.contains(config.listenerTag()));
 
-  for (auto& per_address_details : details->per_address_details_list_) {
-    // This map only store the new listener.
+  for (const auto& per_address_details : details->per_address_details_list_) {
+    // This map only stores the new listener.
     if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
             per_address_details->typed_listener_)) {
       tcp_listener_map_by_address_.insert_or_assign(per_address_details->address_->asStringView(),
@@ -154,7 +154,7 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
       listener_iter != listener_map_by_tag_.end()) {
     // listener_map_by_address_ may already update to the new listener. Compare it with the one
     // which find from listener_map_by_tag_, only delete it when it is same listener.
-    for (auto& per_address_details : listener_iter->second->per_address_details_list_) {
+    for (const auto& per_address_details : listener_iter->second->per_address_details_list_) {
       auto& address = per_address_details->address_;
       auto address_view = address->asStringView();
       if (tcp_listener_map_by_address_.contains(address_view) &&
