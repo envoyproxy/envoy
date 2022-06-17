@@ -404,8 +404,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          "listener.downstream_cx_active", {listener_address, worker_id});
 
   // Server worker id
-  regex_tester.testRegex("server.worker_123.watchdog_miss",
-                         "server.watchdog_miss", {worker_id});
+  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.watchdog_miss", {worker_id});
 
   // Thrift Proxy Prefix
   Tag thrift_prefix;
