@@ -2,11 +2,12 @@
 
 #include <string>
 
-#include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.h"
-#include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
+
+#include "contrib/envoy/extensions/filters/http/dynamo/v3/dynamo.pb.h"
+#include "contrib/envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

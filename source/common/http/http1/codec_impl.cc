@@ -384,7 +384,7 @@ static constexpr absl::string_view HTTP_10_RESPONSE_PREFIX = "HTTP/1.0 ";
 void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
   started_response_ = true;
 
-  // The contract is that client codecs must ensure that :status is present.
+  // The contract is that client codecs must ensure that :status is present and valid.
   ASSERT(headers.Status() != nullptr);
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 

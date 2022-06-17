@@ -260,13 +260,13 @@ public:
     envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
     auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
     inner_factory_ = inner_factory.get();
-    factory_ =
-        std::make_unique<TcpStatsSocketFactory>(context_, proto_config, std::move(inner_factory));
+    factory_ = std::make_unique<UpstreamTcpStatsSocketFactory>(context_, proto_config,
+                                                               std::move(inner_factory));
   }
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
-  std::unique_ptr<TcpStatsSocketFactory> factory_;
+  std::unique_ptr<UpstreamTcpStatsSocketFactory> factory_;
 };
 
 // Test createTransportSocket returns nullptr if inner call returns nullptr

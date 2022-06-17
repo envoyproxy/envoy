@@ -145,9 +145,7 @@ inline Http::FilterHeadersStatus HttpFilterFuzzer::sendHeaders(Http::StreamEncod
   // Status must be a valid unsigned long. If not set, the utility function below will throw
   // an exception on the data path of some filters. This should never happen in production, so catch
   // the exception and set to a default value.
-  try {
-    (void)Http::Utility::getResponseStatus(response_headers_);
-  } catch (const Http::CodecClientException& e) {
+  if (!Http::Utility::getResponseStatusOrNullopt(response_headers_).has_value()) {
     response_headers_.setStatus(200);
   }
 

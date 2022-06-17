@@ -15,41 +15,58 @@ using testing::Invoke;
 
 namespace Envoy {
 namespace Logger {
+namespace {
 
 TEST(LoggerTest, StackingStderrSinkDelegate) {
   StderrSinkDelegate stacked(Envoy::Logger::Registry::getSink());
 }
 
 TEST(LoggerEscapeTest, LinuxEOL) {
-  EXPECT_EQ("line 1 \\n line 2\n", DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"));
+#ifdef _WIN32
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"), "line 1 \\n line 2\\n");
+#else
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"), "line 1 \\n line 2\n");
+#endif
+}
+
+TEST(LoggerEscapeTest, MultipleTrailingLinxEOL) {
+#ifdef _WIN32
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line1\n\n"), "line1\\n\\n");
+#else
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line1\n\n"), "line1\\n\n");
+#endif
 }
 
 TEST(LoggerEscapeTest, WindowEOL) {
-  EXPECT_EQ("line 1 \\n line 2\r\n", DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"));
+#ifdef _WIN32
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"), "line 1 \\n line 2\r\n");
+#else
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"), "line 1 \\n line 2\\r\n");
+#endif
 }
 
 TEST(LoggerEscapeTest, NoTrailingWhitespace) {
-  EXPECT_EQ("line 1 \\n line 2", DelegatingLogSink::escapeLogLine("line 1 \n line 2"));
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2"), "line 1 \\n line 2");
 }
 
 TEST(LoggerEscapeTest, NoWhitespace) {
-  EXPECT_EQ("line1", DelegatingLogSink::escapeLogLine("line1"));
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line1"), "line1");
 }
 
 TEST(LoggerEscapeTest, AnyTrailingWhitespace) {
-  EXPECT_EQ("line 1 \\t tab 1 \\n line 2\t\n",
-            DelegatingLogSink::escapeLogLine("line 1 \t tab 1 \n line 2\t\n"));
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \t tab 1 \n line 2\t\t"),
+            "line 1 \\t tab 1 \\n line 2\\t\\t");
 }
 
 TEST(LoggerEscapeTest, WhitespaceOnly) {
   // 8 spaces
-  EXPECT_EQ("        ", DelegatingLogSink::escapeLogLine("        "));
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("        "), "        ");
 
   // Any whitespace characters
-  EXPECT_EQ("\r\n\t \r\n \n", DelegatingLogSink::escapeLogLine("\r\n\t \r\n \n"));
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("\r\n\t \r\n \n\t"), "\\r\\n\\t \\r\\n \\n\\t");
 }
 
-TEST(LoggerEscapeTest, Empty) { EXPECT_EQ("", DelegatingLogSink::escapeLogLine("")); }
+TEST(LoggerEscapeTest, Empty) { EXPECT_EQ(DelegatingLogSink::escapeLogLine(""), ""); }
 
 TEST(JsonEscapeTest, Escape) {
   const auto expect_json_escape = [](absl::string_view to_be_escaped, absl::string_view escaped) {
@@ -248,5 +265,6 @@ TEST(LoggerTest, LogWithLogDetails) {
   ENVOY_LOG_MISC(info, "hello");
 }
 
+} // namespace
 } // namespace Logger
 } // namespace Envoy
