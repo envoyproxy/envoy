@@ -17,7 +17,7 @@ using FineGrainLogLevelMap = absl::flat_hash_map<std::string, spdlog::level::lev
 
 constexpr int kLogLevelMax = 6; // spdlog level is in [0, 6].
 constexpr int kLogLevelMin = 0;
-static const char* kDefaultFineGrainLogFormat = "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v";
+inline const char* kDefaultFineGrainLogFormat = "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v";
 
 /**
  * Data struct that stores the necessary verbosity log update info.
