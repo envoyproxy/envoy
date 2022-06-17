@@ -364,7 +364,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
   // Exactly one of config_path and config_yaml should be specified.
-  if (config_path.empty() && config_yaml.empty() && config_proto.ByteSize() == 0) {
+  if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
     throw EnvoyException("At least one of --config-path or --config-yaml or Options::configProto() "
                          "should be non-empty");
   }
@@ -378,7 +378,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
-  if (config_proto.ByteSize() != 0) {
+  if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);

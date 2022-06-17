@@ -40,6 +40,7 @@ API_BUILD_SYSTEM_IMPORT_PREFIXES = [
 # Each of the following contrib extensions are allowed to be in the v3 namespace. Indicate why.
 CONTRIB_V3_ALLOW_LIST = [
     # Extensions moved from core to contrib.
+    'envoy.extensions.filters.http.dynamo.v3',
     'envoy.extensions.filters.http.squash.v3',
     'envoy.extensions.filters.network.kafka_broker.v3',
     'envoy.extensions.filters.network.mysql_proxy.v3',
