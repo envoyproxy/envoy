@@ -234,13 +234,6 @@ envoy.filters.http.dynamic_forward_proxy:
   type_urls:
   - envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
   - envoy.extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig
-envoy.filters.http.dynamo:
-  categories:
-  - envoy.filters.http
-  security_posture: requires_trusted_downstream_and_upstream
-  status: stable
-  type_urls:
-  - envoy.extensions.filters.http.dynamo.v3.Dynamo
 envoy.filters.http.ext_authz:
   categories:
   - envoy.filters.http

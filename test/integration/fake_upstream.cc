@@ -506,7 +506,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
 }
 
 FakeUpstream::FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config)
-    : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
+    : FakeUpstream(Network::Test::createRawBufferDownstreamSocketFactory(),
                    Network::SocketPtr{new Network::UdsListenSocket(
                        std::make_shared<Network::Address::PipeInstance>(uds_path))},
                    config) {}
@@ -541,22 +541,22 @@ makeListenSocket(const FakeUpstreamConfig& config,
 
 FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
-    : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
+    : FakeUpstream(Network::Test::createRawBufferDownstreamSocketFactory(),
                    makeListenSocket(config, makeAddress(port, version)), config) {}
 
-FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                            const Network::Address::InstanceConstSharedPtr& address,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory), makeListenSocket(config, address), config) {
 }
 
-FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory),
                    makeListenSocket(config, makeAddress(port, version)), config) {}
 
-FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
     : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
       http3_options_(config.http3_options_), quic_options_(config.quic_options_),

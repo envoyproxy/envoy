@@ -528,6 +528,12 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  const RouteStatsContextOptRef routeStatsContext() const override {
+    if (route_stats_context_ != nullptr) {
+      return *route_stats_context_;
+    }
+    return RouteStatsContextOptRef();
+  }
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
   }
@@ -623,6 +629,10 @@ public:
   void traversePerFilterConfig(
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+
+  // Sanitizes the |path| before passing it to PathMatcher, if configured, this method makes the
+  // path matching to ignore the path-parameters.
+  absl::string_view sanitizePathBeforePathMatching(const absl::string_view path) const;
 
   class DynamicRouteEntry : public RouteEntry, public Route {
   public:
@@ -730,6 +740,9 @@ public:
     }
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return parent_->connectConfig();
+    }
+    const RouteStatsContextOptRef routeStatsContext() const override {
+      return parent_->routeStatsContext();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
     const EarlyDataPolicy& earlyDataPolicy() const override { return parent_->earlyDataPolicy(); }
@@ -928,6 +941,7 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const bool append_xfh_;
   const std::string cluster_name_;
+  RouteStatsContextPtr route_stats_context_;
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;
@@ -1265,6 +1279,9 @@ public:
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
 
   ClusterSpecifierPluginSharedPtr clusterSpecifierPlugin(absl::string_view provider) const;
+  bool ignorePathParametersInPathMatching() const {
+    return ignore_path_parameters_in_path_matching_;
+  }
 
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
@@ -1279,6 +1296,7 @@ private:
   std::vector<ShadowPolicyPtr> shadow_policies_;
   // Cluster specifier plugins/providers.
   absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
+  const bool ignore_path_parameters_in_path_matching_;
 };
 
 /**

@@ -90,7 +90,7 @@ public:
   MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
   void metadata(MetadataConstSharedPtr) override {}
 
-  Network::TransportSocketFactory& transportSocketFactory() const override {
+  Network::UpstreamTransportSocketFactory& transportSocketFactory() const override {
     return logical_host_->transportSocketFactory();
   }
   const ClusterInfo& cluster() const override { return logical_host_->cluster(); }

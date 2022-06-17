@@ -30,6 +30,13 @@ Network::TransportSocketPtr StartTlsSocketFactory::createTransportSocket(
       transport_socket_options);
 }
 
+Network::TransportSocketPtr
+StartTlsDownstreamSocketFactory::createDownstreamTransportSocket() const {
+  return std::make_unique<StartTlsSocket>(raw_socket_factory_->createDownstreamTransportSocket(),
+                                          tls_socket_factory_->createDownstreamTransportSocket(),
+                                          nullptr);
+}
+
 } // namespace StartTls
 } // namespace TransportSockets
 } // namespace Extensions

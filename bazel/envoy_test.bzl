@@ -8,6 +8,7 @@ load(":envoy_pch.bzl", "envoy_pch_copts")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
+    "envoy_dbg_linkopts",
     "envoy_external_dep_path",
     "envoy_linkstatic",
     "envoy_select_force_libcpp",
@@ -105,7 +106,7 @@ def envoy_cc_fuzz_test(
     native.cc_test(
         name = name,
         copts = envoy_copts("@envoy", test = True),
-        linkopts = _envoy_test_linkopts() + select({
+        linkopts = _envoy_test_linkopts() + envoy_dbg_linkopts() + select({
             "@envoy//bazel:libfuzzer": ["-fsanitize=fuzzer"],
             "//conditions:default": [],
         }),

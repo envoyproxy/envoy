@@ -385,6 +385,10 @@ TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstShar
   return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_);
 }
 
+Network::TransportSocketPtr TsiSocketFactory::createDownstreamTransportSocket() const {
+  return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_);
+}
+
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions
