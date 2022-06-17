@@ -458,7 +458,8 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
 }
 
 TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdateWithoutUdpInplaceUpdateSupport) {
-  runtime_.mergeValues({{"envoy.reloadable_features.udp_listener_updates_filter_chain_in_place", "false"}});
+  runtime_.mergeValues(
+      {{"envoy.reloadable_features.udp_listener_updates_filter_chain_in_place", "false"}});
   InSequence s;
   uint64_t old_listener_tag = 1;
   uint64_t new_listener_tag = 2;

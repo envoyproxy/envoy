@@ -2186,7 +2186,8 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdateWithoutUdpInplaceSupport) {
-  runtime_.mergeValues({{"envoy.reloadable_features.udp_listener_updates_filter_chain_in_place", "false"}});
+  runtime_.mergeValues(
+      {{"envoy.reloadable_features.udp_listener_updates_filter_chain_in_place", "false"}});
   InSequence s;
   uint64_t old_listener_tag = 1;
   uint64_t new_listener_tag = 2;
@@ -2212,7 +2213,8 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdateWithoutUdpInplaceSupport) 
       new_listener_tag, true, false, "test_listener", /* Network::Listener */ nullptr,
       &new_listener_callbacks, mock_connection_balancer, nullptr, Network::Socket::Type::Stream,
       std::chrono::milliseconds(15000), false, overridden_filter_chain_manager);
-  EXPECT_CALL(new_test_listener->socketFactory(), socketType()).WillOnce(Return(Network::Socket::Type::Stream));
+  EXPECT_CALL(new_test_listener->socketFactory(), socketType())
+      .WillOnce(Return(Network::Socket::Type::Stream));
   handler_->addListener(old_listener_tag, *new_test_listener, runtime_);
   ASSERT_EQ(new_listener_callbacks, nullptr)
       << "new listener should be inplace added and callback should not change";
