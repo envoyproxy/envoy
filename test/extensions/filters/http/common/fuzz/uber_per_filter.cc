@@ -131,6 +131,7 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   } else if (filter_name == "envoy.filters.http.file_system_buffer") {
     // Limit the number of threads to create to kMaxAsyncFileManagerThreadCount
     cleanFileSystemBufferConfig(message);
+    with_main_event_loop_ = true;
   }
 }
 
@@ -176,6 +177,10 @@ void UberFilterFuzzer::perFilterSetup() {
   ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault([this]() -> const Buffer::Instance* {
     return decoding_buffer_;
   });
+
+  // For filters that need main event loop.
+  ON_CALL(encoder_callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(*main_dispatcher_));
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(*main_dispatcher_));
 }
 
 } // namespace HttpFilters

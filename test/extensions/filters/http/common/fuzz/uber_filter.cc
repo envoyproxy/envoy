@@ -1,6 +1,8 @@
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 
+#include "source/common/common/thread_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/event/dispatcher_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -13,7 +15,11 @@ namespace Extensions {
 namespace HttpFilters {
 
 UberFilterFuzzer::UberFilterFuzzer()
-    : async_request_{&cluster_manager_.thread_local_cluster_.async_client_} {
+    : async_request_{&cluster_manager_.thread_local_cluster_.async_client_},
+      thread_factory_(Thread::threadFactoryForTest()) {
+  ON_CALL(api_, threadFactory()).WillByDefault(testing::ReturnRef(thread_factory_));
+  main_dispatcher_ =
+      std::make_unique<Event::DispatcherImpl>("filter_fuzz_test", api_, api_.time_system_);
   // This is a decoder filter.
   ON_CALL(filter_callback_, addStreamDecoderFilter(_))
       .WillByDefault(Invoke([&](Http::StreamDecoderFilterSharedPtr filter) -> void {
@@ -85,6 +91,16 @@ void UberFilterFuzzer::fuzz(
     HttpFilterFuzzer::accessLog(access_logger_.get(), stream_info_);
   }
 
+  if (with_main_event_loop_) {
+    // Ensure the event loop gets at least one event to end the test.
+    auto end_timer =
+        main_dispatcher_->createTimer([]() { ENVOY_LOG_MISC(trace, "server timer fired"); });
+    end_timer->enableTimer(std::chrono::milliseconds(5000));
+    // If we were successful, run any pending events on the main thread's dispatcher loop. These
+    // might be, for example, pending DNS resolution callbacks. If they generate exceptions, we want
+    // to explode and fail the test, hence we do this outside of the try-catch above.
+    main_dispatcher_->run(Event::DispatcherImpl::RunType::Block);
+  }
   reset();
 }
 
@@ -101,6 +117,7 @@ void UberFilterFuzzer::reset() {
 
   access_logger_.reset();
   HttpFilterFuzzer::reset();
+  with_main_event_loop_ = false;
 }
 
 } // namespace HttpFilters
