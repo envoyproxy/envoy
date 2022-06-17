@@ -859,10 +859,9 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
 
   streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
   ENVOY_STREAM_LOG(
-      trace, "Request seq_id: {}, method: {}, frame size: {}, cluster:{}, headers:\n{}", *this,
+      trace, "Request seq_id: {}, method: {}, frame size: {}, headers:\n{}", *this,
       metadata_->sequenceId(), metadata->hasMethodName() ? metadata->methodName() : "-",
-      metadata->hasFrameSize() ? metadata->frameSize() : -1,
-      route_ptr ? route_ptr->routeEntry()->clusterName() : "-", metadata->requestHeaders());
+      metadata->hasFrameSize() ? metadata->frameSize() : -1, metadata->requestHeaders());
 
   return applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
 }
