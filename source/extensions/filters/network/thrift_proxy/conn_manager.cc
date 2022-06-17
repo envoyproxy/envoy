@@ -324,6 +324,13 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
 
   ConnectionManager& cm = parent_.parent_;
 
+  ENVOY_STREAM_LOG(
+      trace, "Response message_type: {}, seq_id: {}, method: {}, frame size: {}, headers:\n{}",
+      parent_,
+      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-",
+      metadata_->sequenceId(), metadata->hasMethodName() ? metadata->methodName() : "-",
+      metadata->hasFrameSize() ? metadata->frameSize() : -1, metadata->responseHeaders());
+
   // Check if the upstream host is draining.
   //
   // Note: the drain header needs to be checked here in messageBegin, and not transportBegin, so
@@ -341,6 +348,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
     // call so that the header is added after all upstream headers passed, due to messageBegin
     // possibly not getting headers in transportBegin.
     if (cm.drain_decision_.drainClose()) {
+      ENVOY_STREAM_LOG(debug, "propogate Drain header for drain close decision", parent_);
       // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
       // over)?
       metadata->responseHeaders().addReferenceKey(Headers::get().Drain, "true");
@@ -363,12 +371,6 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
 
   parent_.streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
 
-  ENVOY_STREAM_LOG(
-      trace, "Response message_type: {}, seq_id: {}, method: {}, frame size: {}, headers:\n{}",
-      parent_, metadata_->sequenceId(),
-      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-",
-      metadata->hasMethodName() ? metadata->methodName() : "-",
-      metadata->hasFrameSize() ? metadata->frameSize() : -1, metadata->responseHeaders());
   return parent_.applyEncoderFilters(DecoderEvent::MessageBegin, metadata, protocol_converter_);
 }
 
