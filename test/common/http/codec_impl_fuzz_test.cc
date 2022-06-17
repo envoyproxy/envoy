@@ -810,6 +810,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     codecFuzzHttp1(input);
 #endif
 #ifdef FUZZ_PROTOCOL_http2
+    // We wrap the calls to *codecFuzz* through these functions in order for
+    // the codec name to explicitly be in any stacktrace.
     codecFuzzHttp2Nghttp2(input);
     codecFuzzHttp2WrappedNghttp2(input);
     // Prevent oghttp2 from aborting the program.
