@@ -103,7 +103,6 @@ RouteConstSharedPtr RouteMatcher::route(MessageMetadata& metadata) const {
   for (const auto& route : routes_) {
     RouteConstSharedPtr route_entry = route->matches(metadata);
     if (nullptr != route_entry) {
-      ENVOY_LOG(debug, "route matched!");
       return route_entry;
     }
   }
@@ -439,6 +438,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                                             upstream_request_started);
     } else {
       ENVOY_STREAM_LOG(debug, "no destination without load balance", *callbacks_);
+      throw AppException(AppExceptionType::UnknownMethod, "envoy no endpoint found");
       return FilterStatus::StopIteration;
     }
   }

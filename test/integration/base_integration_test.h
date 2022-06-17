@@ -357,8 +357,9 @@ public:
     return *fake_upstreams_.back();
   }
 
-  FakeUpstream& addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                                Http::CodecType type) {
+  FakeUpstream&
+  addFakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
+                  Http::CodecType type) {
     auto config = configWithType(type);
     fake_upstreams_.emplace_back(
         std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
@@ -446,7 +447,7 @@ protected:
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   bool upstream_tls_{false};
 
-  Network::TransportSocketFactoryPtr
+  Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};

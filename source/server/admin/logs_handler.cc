@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "source/common/common/fancy_logger.h"
+#include "source/common/common/fine_grain_logger.h"
 #include "source/common/common/logger.h"
 #include "source/server/admin/utils.h"
 
@@ -53,7 +53,7 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
     }
   }
 
-  if (!Logger::Context::useFancyLogger()) {
+  if (!Logger::Context::useFineGrainLogger()) {
     response.add("active loggers:\n");
     for (const Logger::Logger& logger : Logger::Registry::loggers()) {
       response.add(fmt::format("  {}: {}\n", logger.name(), logger.levelString()));
@@ -62,8 +62,9 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
     response.add("\n");
   } else {
     response.add("active loggers:\n");
-    std::string logger_info = getFancyContext().listFancyLoggers();
+    std::string logger_info = getFineGrainLogContext().listFineGrainLoggers();
     response.add(logger_info);
+    response.add("\n");
   }
 
   return rc;
@@ -132,19 +133,20 @@ absl::Status LogsHandler::changeLogLevel(const Http::Utility::QueryParams& param
 }
 
 void LogsHandler::changeAllLogLevels(spdlog::level::level_enum level) {
-  if (!Logger::Context::useFancyLogger()) {
+  if (!Logger::Context::useFineGrainLogger()) {
     ENVOY_LOG(info, "change all log levels: level='{}'", spdlog::level::level_string_views[level]);
     Logger::Registry::setLogLevel(level);
   } else {
-    // Level setting with Fancy Logger.
-    FANCY_LOG(info, "change all log levels: level='{}'", spdlog::level::level_string_views[level]);
-    getFancyContext().setAllFancyLoggers(level);
+    // Level setting with Fine-Grain Logger.
+    FINE_GRAIN_LOG(info, "change all log levels: level='{}'",
+                   spdlog::level::level_string_views[level]);
+    getFineGrainLogContext().setAllFineGrainLoggers(level);
   }
 }
 
 absl::Status LogsHandler::changeLogLevels(
     const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes) {
-  if (!Logger::Context::useFancyLogger()) {
+  if (!Logger::Context::useFineGrainLogger()) {
     std::vector<std::pair<Logger::Logger*, spdlog::level::level_enum>> loggers_to_change;
     for (Logger::Logger& logger : Logger::Registry::loggers()) {
       auto name_level_itr = changes.find(logger.name());
@@ -171,8 +173,7 @@ absl::Status LogsHandler::changeLogLevels(
   } else {
     std::vector<std::pair<SpdLoggerSharedPtr, spdlog::level::level_enum>> loggers_to_change;
     for (auto& it : changes) {
-      // TODO(timonwong) FancyContext::getFancyLogEntry should accept absl::string_view as key.
-      SpdLoggerSharedPtr logger = getFancyContext().getFancyLogEntry(std::string(it.first));
+      SpdLoggerSharedPtr logger = getFineGrainLogContext().getFineGrainLogEntry(it.first);
       if (!logger) {
         return absl::InvalidArgumentError("unknown logger name");
       }
@@ -184,8 +185,8 @@ absl::Status LogsHandler::changeLogLevels(
       SpdLoggerSharedPtr logger = it.first;
       spdlog::level::level_enum level = it.second;
 
-      FANCY_LOG(info, "change log level: name='{}' level='{}'", logger->name(),
-                spdlog::level::level_string_views[level]);
+      FINE_GRAIN_LOG(info, "change log level: name='{}' level='{}'", logger->name(),
+                     spdlog::level::level_string_views[level]);
       logger->set_level(level);
     }
   }

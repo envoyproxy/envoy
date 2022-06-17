@@ -589,7 +589,7 @@ TEST_F(HdsTest, TestSocketContext) {
             params.validation_visitor_, params.api_, params.options_, params.access_log_manager_);
 
         // Create a mock socket_factory for the scope of this unit test.
-        std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
+        std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =
             std::make_unique<Network::MockTransportSocketFactory>();
 
         // set socket_matcher object in test scope.
@@ -1041,7 +1041,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
             params.validation_visitor_, params.api_, params.options_, params.access_log_manager_);
 
         // Create a mock socket_factory for the scope of this unit test.
-        std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
+        std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =
             std::make_unique<Network::MockTransportSocketFactory>();
 
         // set socket_matcher object in test scope.

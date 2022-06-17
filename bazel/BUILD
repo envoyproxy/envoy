@@ -594,6 +594,30 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "apple_dbg",
+    match_all = [
+        ":apple",
+        ":dbg_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_fastbuild",
+    match_all = [
+        ":apple",
+        ":fastbuild_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_non_opt",
+    match_any = [
+        ":apple_dbg",
+        ":apple_fastbuild",
+    ],
+)
+
+selects.config_setting_group(
     name = "linux",
     match_any = [
         ":linux_aarch64",

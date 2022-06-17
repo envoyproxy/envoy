@@ -89,9 +89,10 @@ void MessageMetadata::addEPOperation(
     const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
         local_services) {
   if (header.find(";ep=") != absl::string_view::npos) {
-    // already Contact have ep
+    // already have ep
     return;
   }
+
   auto pos = header.find(">");
   if (pos == absl::string_view::npos) {
     // no url

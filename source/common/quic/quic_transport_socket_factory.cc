@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Quic {
 
-Network::TransportSocketFactoryPtr
+Network::DownstreamTransportSocketFactoryPtr
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& /*server_names*/) {
@@ -33,7 +33,7 @@ ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyCon
       envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>();
 }
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config,
     Server::Configuration::TransportSocketFactoryContext& context) {

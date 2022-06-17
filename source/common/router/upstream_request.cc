@@ -217,7 +217,7 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   DUMP_DETAILS(request_headers);
 }
 
-const RouteEntry& UpstreamRequest::routeEntry() const { return *parent_.routeEntry(); }
+const Route& UpstreamRequest::route() const { return *parent_.route(); }
 
 const Network::Connection& UpstreamRequest::connection() const {
   return *parent_.callbacks()->connection();
@@ -431,6 +431,12 @@ void UpstreamRequest::onPoolReady(
     // here.
     parent_.requestVcluster()->stats().upstream_rq_total_.inc();
   }
+  if (parent_.routeStatsContext().has_value()) {
+    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
+    // callback. Hence, the upstream request increases the route level upstream_rq_total_ stat
+    // here.
+    parent_.routeStatsContext()->stats().upstream_rq_total_.inc();
+  }
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
@@ -490,9 +496,10 @@ void UpstreamRequest::onPoolReady(
 
   calling_encode_headers_ = true;
   auto* headers = parent_.downstreamHeaders();
-  if (parent_.routeEntry()->autoHostRewrite() && !host->hostname().empty()) {
+  const auto* route_entry = parent_.route()->routeEntry();
+  if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
-                                   parent_.routeEntry()->appendXfh());
+                                   route_entry->appendXfh());
   }
 
   if (span_ != nullptr) {

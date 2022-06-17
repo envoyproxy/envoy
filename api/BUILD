@@ -72,6 +72,7 @@ proto_library(
     name = "v3_protos",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
         "//contrib/envoy/extensions/filters/http/language/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
         "//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg",
@@ -157,7 +158,6 @@ proto_library(
         "//envoy/extensions/filters/http/csrf/v3:pkg",
         "//envoy/extensions/filters/http/decompressor/v3:pkg",
         "//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg",
-        "//envoy/extensions/filters/http/dynamo/v3:pkg",
         "//envoy/extensions/filters/http/ext_authz/v3:pkg",
         "//envoy/extensions/filters/http/ext_proc/v3:pkg",
         "//envoy/extensions/filters/http/fault/v3:pkg",
@@ -232,6 +232,7 @@ proto_library(
         "//envoy/extensions/key_value/file_based/v3:pkg",
         "//envoy/extensions/matching/common_inputs/environment_variable/v3:pkg",
         "//envoy/extensions/matching/common_inputs/network/v3:pkg",
+        "//envoy/extensions/matching/common_inputs/ssl/v3:pkg",
         "//envoy/extensions/matching/input_matchers/consistent_hashing/v3:pkg",
         "//envoy/extensions/matching/input_matchers/ip/v3:pkg",
         "//envoy/extensions/network/dns_resolver/apple/v3:pkg",

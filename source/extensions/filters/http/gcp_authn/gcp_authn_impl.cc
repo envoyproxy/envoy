@@ -31,7 +31,6 @@ Http::RequestMessagePtr buildRequest(absl::string_view url) {
 void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessagePtr&& request) {
   // Cancel any active requests.
   cancel();
-
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
@@ -70,7 +69,7 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
 
 void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
                                Http::ResponseMessagePtr&& response) {
-  auto status = Envoy::Http::Utility::getResponseStatusNoThrow(response->headers());
+  auto status = Envoy::Http::Utility::getResponseStatusOrNullopt(response->headers());
   active_request_ = nullptr;
   if (status.has_value()) {
     uint64_t status_code = status.value();
