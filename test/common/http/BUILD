@@ -81,12 +81,16 @@ envoy_proto_library(
     deps = ["//test/fuzz:common_proto"],
 )
 
+# TODO(kbaichoo): We split the fuzzer by protocol to allow the fuzzer to
+# better explore the individual protocols and catagorize failures for the
+# particular protocol that fails. In the future we might want to further
+# split out the codec fuzzer to better model the individual protocols.
 [
     envoy_cc_fuzz_test(
-        name = "%s_codec_impl_fuzz_test" % codec_type,
+        name = "%s_codec_impl_fuzz_test" % http_protocol,
         srcs = ["codec_impl_fuzz_test.cc"],
         corpus = "codec_impl_corpus",
-        defines = ["FUZZ_CODEC_%s" % codec_type],
+        defines = ["FUZZ_PROTOCOL_%s" % http_protocol],
         deps = [
             ":codec_impl_fuzz_proto_cc_proto",
             "//source/common/http:conn_manager_lib",
@@ -100,11 +104,9 @@ envoy_proto_library(
             "//test/test_common:test_runtime_lib",
         ],
     )
-    for codec_type in [
+    for http_protocol in [
         "http1",
-        "nghttp2",
-        "wrapped_nghttp2",
-        "oghttp2",
+        "http2",
     ]
 ]
 
