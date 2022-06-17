@@ -6,7 +6,6 @@ Local rate limit
 * Local rate limiting :ref:`architecture overview <arch_overview_local_rate_limit>`
 * :ref:`v3 API reference
   <envoy_v3_api_msg_extensions.filters.network.local_ratelimit.v3.LocalRateLimit>`
-* This filter should be configured with the name *envoy.filters.network.local_ratelimit*.
 
 .. note::
   The token bucket is shared across all workers, thus the rate limits are applied per Envoy process.

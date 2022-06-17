@@ -10,7 +10,6 @@ and the required service name, method name, parameter name,
 and parameter value for routing.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.DubboProxy>`
-* This filter should be configured with the name *envoy.filters.network.dubbo_proxy*.
 
 .. _config_network_filters_dubbo_proxy_stats:
 

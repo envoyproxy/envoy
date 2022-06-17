@@ -5,7 +5,6 @@ AWS Lambda
 ==========
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.Config>`
-* This filter should be configured with the name *envoy.filters.http.aws_lambda*.
 
 .. attention::
 

@@ -43,10 +43,6 @@ For more information on CSRF please refer to the pages below.
 * https://seclab.stanford.edu/websec/csrf/csrf.pdf
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.csrf.v3.CsrfPolicy>`
 
-  .. note::
-
-    This filter should be configured with the name *envoy.filters.http.csrf*.
-
 .. _csrf-configuration:
 
 Configuration

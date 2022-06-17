@@ -17,7 +17,6 @@ will include the name of the matched policy that caused the deny in the format o
 filter and the upstream backend.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`
-* This filter should be configured with the name *envoy.filters.http.rbac*.
 
 Per-Route Configuration
 -----------------------

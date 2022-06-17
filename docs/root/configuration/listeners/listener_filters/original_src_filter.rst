@@ -4,7 +4,6 @@ Original Source
 ===============
 
 * :ref:`Listener filter v3 API reference <envoy_v3_api_msg_extensions.filters.listener.original_src.v3.OriginalSrc>`
-* This filter should be configured with the name *envoy.filters.listener.original_src*.
 
 The original source listener filter replicates the downstream remote address of the connection on
 the upstream side of Envoy. For example, if a downstream connection connects to Envoy with IP

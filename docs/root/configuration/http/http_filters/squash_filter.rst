@@ -23,7 +23,6 @@ Configuration
 -------------
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.squash.v3.Squash>`
-* This filter should be configured with the name *envoy.filters.http.squash*.
 
 How it works
 ------------

@@ -16,7 +16,6 @@ will include the name of the matched policy that caused the deny in the format o
 RBAC filter and the upstream backend.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>`
-* This filter should be configured with the name *envoy.filters.network.rbac*.
 
 Statistics
 ----------

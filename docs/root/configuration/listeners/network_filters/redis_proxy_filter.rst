@@ -5,7 +5,6 @@ Redis proxy
 
 * Redis :ref:`architecture overview <arch_overview_redis>`
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>`
-* This filter should be configured with the name *envoy.filters.network.redis_proxy*.
 
 .. _config_network_filters_redis_proxy_stats:
 

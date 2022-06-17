@@ -6,7 +6,6 @@ Connection Limit Filter
 * Connection limiting :ref:`architecture overview <arch_overview_connection_limit>`
 * :ref:`v3 API reference
   <envoy_v3_api_msg_extensions.filters.network.connection_limit.v3.ConnectionLimit>`
-* This filter should be configured with the name *envoy.filters.network.connection_limit*.
 
 Overview
 --------

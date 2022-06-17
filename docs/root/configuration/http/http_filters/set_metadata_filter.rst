@@ -3,7 +3,6 @@
 Set Metadata
 ============
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.set_metadata.v3.Config>`
-* This filter should be configured with the name *envoy.filters.http.set_metadata*.
 
 This filters adds or updates dynamic metadata with static data.
 

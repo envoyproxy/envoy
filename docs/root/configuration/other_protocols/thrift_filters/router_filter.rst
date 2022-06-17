@@ -8,7 +8,6 @@ scenarios. The filter's main job is to follow the instructions specified in the 
 :ref:`route table <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration>`.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.router.v3.Router>`
-* This filter should be configured with the name *envoy.filters.thrift.router*.
 
 Statistics
 ----------

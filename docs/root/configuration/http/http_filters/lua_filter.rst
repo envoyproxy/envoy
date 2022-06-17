@@ -57,7 +57,6 @@ Configuration
 -------------
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
-* This filter should be configured with the name *envoy.filters.http.lua*.
 
 A simple example of configuring Lua HTTP filter that contains only :ref:`inline_code
 <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` is as follow:

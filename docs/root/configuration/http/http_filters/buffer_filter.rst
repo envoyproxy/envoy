@@ -12,7 +12,6 @@ already. The behavior can be disabled using the runtime feature
 `envoy.reloadable_features.buffer_filter_populate_content_length`.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.buffer.v3.Buffer>`
-* This filter should be configured with the name *envoy.filters.http.buffer*.
 
 Per-Route Configuration
 -----------------------

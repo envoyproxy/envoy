@@ -4,7 +4,6 @@ UDP proxy
 =========
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
-* This filter should be configured with the name *envoy.filters.udp_listener.udp_proxy*
 
 Overview
 --------

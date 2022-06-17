@@ -20,8 +20,6 @@ Following are supported JWT alg:
 Configuration
 -------------
 
-This filter should be configured with the name *envoy.filters.http.jwt_authn*.
-
 This HTTP :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>` has two fields:
 
 * Field *providers* specifies how a JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and where to output its payload.

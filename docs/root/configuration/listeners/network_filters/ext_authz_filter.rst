@@ -5,7 +5,6 @@ External Authorization
 
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
 * :ref:`Network filter v3 API reference <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`
-* This filter should be configured with the name *envoy.filters.network.ext_authz*.
 
 The external authorization network filter calls an external authorization service to check if the
 incoming request is authorized or not. If the request is deemed unauthorized by the network filter

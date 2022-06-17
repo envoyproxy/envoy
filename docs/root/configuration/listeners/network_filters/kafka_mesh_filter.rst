@@ -9,7 +9,6 @@ clusters, depending on configured forwarding rules. Corresponding message versio
 Kafka 3.2.0 are supported.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh>`
-* This filter should be configured with the name *envoy.filters.network.kafka_mesh*.
 
 .. attention::
 

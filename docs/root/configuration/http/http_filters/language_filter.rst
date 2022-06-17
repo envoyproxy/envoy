@@ -5,7 +5,6 @@ Language
 ========
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.language.v3alpha.Language>`
-* This filter should be configured with the name *envoy.filters.http.language*.
 
 .. attention::
 

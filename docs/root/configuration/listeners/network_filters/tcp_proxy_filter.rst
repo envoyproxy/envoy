@@ -5,7 +5,6 @@ TCP proxy
 
 * TCP proxy :ref:`architecture overview <arch_overview_tcp_proxy>`
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.tcp_proxy.v3.TcpProxy>`
-* This filter should be configured with the name *envoy.filters.network.tcp_proxy*.
 
 .. _config_network_filters_tcp_proxy_dynamic_cluster:
 

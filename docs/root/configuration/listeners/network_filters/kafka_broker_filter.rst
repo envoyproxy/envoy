@@ -12,7 +12,6 @@ that could not be decoded (due to Kafka client or broker running a newer version
 this filter) are forwarded as-is.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.kafka_broker.v3.KafkaBroker>`
-* This filter should be configured with the name *envoy.filters.network.kafka_broker*.
 
 .. attention::
 
