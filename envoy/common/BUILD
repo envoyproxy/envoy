@@ -61,7 +61,7 @@ envoy_cc_library(
     deps = [
         ":matchers_interface",
         "//envoy/config:typed_config_interface",
-        "//envoy/protobuf:message_validator_interface",
+        "//envoy/server:factory_context_interface",
     ],
 )
 

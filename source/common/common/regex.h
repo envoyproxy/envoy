@@ -51,8 +51,9 @@ public:
 
 class GoogleReEngineFactory : public EngineFactory {
 public:
-  EnginePtr createEngine(const Protobuf::Message& config,
-                         ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  EnginePtr
+  createEngine(const Protobuf::Message& config,
+               Server::Configuration::ServerFactoryContext& server_factory_context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override { return "envoy.regex_engines.google_re2"; };

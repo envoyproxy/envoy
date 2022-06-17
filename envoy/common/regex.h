@@ -4,7 +4,7 @@
 
 #include "envoy/common/matchers.h"
 #include "envoy/config/typed_config.h"
-#include "envoy/protobuf/message_validator.h"
+#include "envoy/server/factory_context.h"
 
 namespace Envoy {
 namespace Regex {
@@ -50,8 +50,9 @@ public:
   /**
    * Creates an Engine from the provided config.
    */
-  virtual EnginePtr createEngine(const Protobuf::Message& config,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual EnginePtr
+  createEngine(const Protobuf::Message& config,
+               Server::Configuration::ServerFactoryContext& server_factory_context) PURE;
 
   std::string category() const override { return "envoy.regex_engines"; }
 };

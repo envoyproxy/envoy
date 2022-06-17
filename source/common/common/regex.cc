@@ -64,7 +64,7 @@ CompiledMatcherPtr GoogleReEngine::matcher(const std::string& regex) const {
 }
 
 EnginePtr GoogleReEngineFactory::createEngine(const Protobuf::Message&,
-                                              ProtobufMessage::ValidationVisitor&) {
+                                              Server::Configuration::ServerFactoryContext&) {
   return std::make_shared<GoogleReEngine>();
 }
 
