@@ -77,8 +77,8 @@ int main(int argc, char** argv) {
 
   // Reduce logs so benchmark output is readable.
   Thread::MutexBasicLockable lock;
-  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFancyLogFormat(), lock,
-                                  false};
+  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
+                                  lock, false};
 
   skip_expensive_benchmarks = skip_switch.getValue();
 

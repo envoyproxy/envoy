@@ -214,11 +214,17 @@ void ConnectionManager::continueHandling(MessageMetadataSharedPtr metadata,
   } catch (const AppException& ex) {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
     sendLocalReply(*(decoder_->metadata()), ex, false);
+
+    absl::string_view k = decoder_->metadata()->transactionId().value();
+    if (transactions_.find(k) != transactions_.end()) {
+      transactions_[k]->setLocalResponseSent(true);
+    }
+
+    decoder_->complete();
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
 
-    // Transport/protocol mismatch (including errors in automatic detection). Just hang up
-    // since we don't know how to encode a response.
+    // Still unaware how to handle this, just close the connection
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -230,7 +236,7 @@ void ConnectionManager::dispatch() {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
     sendLocalReply(*(decoder_->metadata()), ex, false);
 
-    std::string&& k = std::string(decoder_->metadata()->transactionId().value());
+    absl::string_view k = decoder_->metadata()->transactionId().value();
     if (transactions_.find(k) != transactions_.end()) {
       transactions_[k]->setLocalResponseSent(true);
     }
@@ -239,8 +245,7 @@ void ConnectionManager::dispatch() {
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
 
-    // Transport/protocol mismatch (including errors in automatic detection). Just hang up
-    // since we don't know how to encode a response.
+    // Still unaware how to handle this, just close the connection
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }

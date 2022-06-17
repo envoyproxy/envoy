@@ -608,7 +608,7 @@ public:
   FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config);
 
   // Creates a fake upstream bound to the specified |address|.
-  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+  FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                const Network::Address::InstanceConstSharedPtr& address,
                const FakeUpstreamConfig& config);
 
@@ -616,8 +616,9 @@ public:
   FakeUpstream(uint32_t port, Network::Address::IpVersion version,
                const FakeUpstreamConfig& config);
 
-  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
-               Network::Address::IpVersion version, const FakeUpstreamConfig& config);
+  FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
+               uint32_t port, Network::Address::IpVersion version,
+               const FakeUpstreamConfig& config);
   ~FakeUpstream() override;
 
   Http::CodecType httpType() { return http_type_; }
@@ -712,7 +713,7 @@ protected:
   const Http::CodecType http_type_;
 
 private:
-  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+  FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                Network::SocketPtr&& connection, const FakeUpstreamConfig& config);
 
   class FakeListenSocketFactory : public Network::ListenSocketFactory {

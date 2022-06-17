@@ -23,7 +23,7 @@ public:
   void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data) {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
-    Network::TransportSocketFactoryPtr transport_socket_factory =
+    Network::DownstreamTransportSocketFactoryPtr transport_socket_factory =
         config_factory_.createTransportSocketFactory(proto_config, context_, {});
     EXPECT_EQ(expect_early_data,
               static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory)

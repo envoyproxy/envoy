@@ -49,7 +49,7 @@ public:
     addFakeUpstream(createUpstreamSslContext(), Http::CodecType::HTTP1);
   }
 
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
+  Network::DownstreamTransportSocketFactoryPtr createUpstreamSslContext() {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     auto* tls_cert = common_tls_context->add_tls_certificates();
