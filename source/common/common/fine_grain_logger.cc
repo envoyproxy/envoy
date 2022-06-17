@@ -26,7 +26,7 @@ private:
   absl::Mutex mutex_;
 };
 
-SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntry(std::string key)
+SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntry(absl::string_view key)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   absl::ReaderMutexLock l(&fine_grain_log_lock_);
   auto it = fine_grain_log_map_->find(key);
@@ -36,7 +36,8 @@ SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntry(std::string key)
   return nullptr;
 }
 
-void FineGrainLogContext::initFineGrainLogger(std::string key, std::atomic<spdlog::logger*>& logger)
+void FineGrainLogContext::initFineGrainLogger(const std::string& key,
+                                              std::atomic<spdlog::logger*>& logger)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   absl::WriterMutexLock l(&fine_grain_log_lock_);
   auto it = fine_grain_log_map_->find(key);
@@ -49,7 +50,7 @@ void FineGrainLogContext::initFineGrainLogger(std::string key, std::atomic<spdlo
   logger.store(target);
 }
 
-bool FineGrainLogContext::setFineGrainLogger(std::string key, level_enum log_level)
+bool FineGrainLogContext::setFineGrainLogger(absl::string_view key, level_enum log_level)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   absl::ReaderMutexLock l(&fine_grain_log_lock_);
   auto it = fine_grain_log_map_->find(key);
@@ -61,7 +62,7 @@ bool FineGrainLogContext::setFineGrainLogger(std::string key, level_enum log_lev
 }
 
 void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level_enum level,
-                                                            std::string format)
+                                                            const std::string& format)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   if (level == Logger::Context::getFineGrainDefaultLevel() &&
       format == Logger::Context::getFineGrainLogFormat()) {

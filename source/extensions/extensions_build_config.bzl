@@ -88,7 +88,6 @@ EXTENSIONS = {
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     "envoy.filters.http.decompressor":                  "//source/extensions/filters/http/decompressor:config",
     "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
-    "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.ext_proc":                      "//source/extensions/filters/http/ext_proc:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",

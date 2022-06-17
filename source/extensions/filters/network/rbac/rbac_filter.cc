@@ -4,6 +4,8 @@
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/network/matching/inputs.h"
+#include "source/common/ssl/matching/inputs.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/str_join.h"
@@ -13,14 +15,54 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
+absl::Status ActionValidationVisitor::performDataInputValidation(
+    const Envoy::Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
+  static absl::flat_hash_set<std::string> allowed_inputs_set{
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(envoy::extensions::matching::common_inputs::network::
+                                                 v3::DestinationPortInput::descriptor()
+                                                     ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::SourceIPInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::SourcePortInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::DirectSourceIPInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::ServerNameInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::ssl::v3::UriSanInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::ssl::v3::DnsSanInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::ssl::v3::SubjectInput::descriptor()
+              ->full_name())}};
+  if (allowed_inputs_set.contains(type_url)) {
+    return absl::OkStatus();
+  }
+
+  return absl::InvalidArgumentError(fmt::format("RBAC network filter cannot match '{}'", type_url));
+}
+
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope,
+    Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(),
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
-      engine_(Filters::Common::RBAC::createEngine(proto_config, validation_visitor)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config, validation_visitor)),
+      engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
+                                                  action_validation_visitor_)),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(
+          proto_config, context, validation_visitor, action_validation_visitor_)),
       enforcement_type_(proto_config.enforcement_type()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {

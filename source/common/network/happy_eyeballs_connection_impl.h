@@ -38,7 +38,7 @@ public:
   HappyEyeballsConnectionImpl(Event::Dispatcher& dispatcher,
                               const std::vector<Address::InstanceConstSharedPtr>& address_list,
                               Address::InstanceConstSharedPtr source_address,
-                              TransportSocketFactory& socket_factory,
+                              UpstreamTransportSocketFactory& socket_factory,
                               TransportSocketOptionsConstSharedPtr transport_socket_options,
                               const ConnectionSocket::OptionsSharedPtr options);
 
@@ -197,7 +197,7 @@ private:
   // State which is needed to construct a new connection.
   struct ConnectionConstructionState {
     Address::InstanceConstSharedPtr source_address_;
-    TransportSocketFactory& socket_factory_;
+    UpstreamTransportSocketFactory& socket_factory_;
     TransportSocketOptionsConstSharedPtr transport_socket_options_;
     const ConnectionSocket::OptionsSharedPtr options_;
   };

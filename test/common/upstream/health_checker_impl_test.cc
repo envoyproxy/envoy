@@ -1100,7 +1100,7 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
   auto socket_factory = new Network::MockTransportSocketFactory();
   EXPECT_CALL(*socket_factory, implementsSecureTransport()).WillRepeatedly(Return(true));
   auto transport_socket_match = new NiceMock<Upstream::MockTransportSocketMatcher>(
-      Network::TransportSocketFactoryPtr(socket_factory));
+      Network::UpstreamTransportSocketFactoryPtr(socket_factory));
   cluster_->info_->transport_socket_matcher_.reset(transport_socket_match);
 
   EXPECT_CALL(*socket_factory, createTransportSocket(ApplicationProtocolListEq("http1")));
