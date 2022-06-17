@@ -255,6 +255,9 @@ new_features:
 - area: matching
   change : |
     added support for matching authenticated inputs in network and HTTP matching data.
+- area: rbac
+  change: |
+    added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
 
 deprecated:
 - area: dubbo_proxy
