@@ -7,7 +7,7 @@ envoy.access_loggers.file:
   - envoy.extensions.access_loggers.file.v3.FileAccessLog
 envoy.access_loggers.extension_filters.cel:
   categories:
-  - envoy.access_logger.extension_filters
+  - envoy.access_loggers.extension_filters
   security_posture: unknown
   status: alpha
   type_urls:

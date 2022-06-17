@@ -1,6 +1,6 @@
 .. _extension_{{extension}}:
 
-This extension may be referenced by the qualified name ``{{extension}}``
+This extension has the qualified name ``{{extension}}``
 {{contrib}}
 .. note::
   {{status | indent(2) }}
