@@ -173,10 +173,7 @@ absl::Status LogsHandler::changeLogLevels(
   } else {
     std::vector<std::pair<SpdLoggerSharedPtr, spdlog::level::level_enum>> loggers_to_change;
     for (auto& it : changes) {
-      // TODO(timonwong) FineGrainLogContext::getFineGrainLogEntry should accept
-      // absl::string_view as key.
-      SpdLoggerSharedPtr logger =
-          getFineGrainLogContext().getFineGrainLogEntry(std::string(it.first));
+      SpdLoggerSharedPtr logger = getFineGrainLogContext().getFineGrainLogEntry(it.first);
       if (!logger) {
         return absl::InvalidArgumentError("unknown logger name");
       }

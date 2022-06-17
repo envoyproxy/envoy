@@ -98,7 +98,7 @@ private:
   SslHandshakerImplSharedPtr info_;
 };
 
-class ClientSslSocketFactory : public Network::CommonTransportSocketFactory,
+class ClientSslSocketFactory : public Network::CommonUpstreamTransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
@@ -131,7 +131,7 @@ private:
   Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
 };
 
-class ServerSslSocketFactory : public Network::CommonTransportSocketFactory,
+class ServerSslSocketFactory : public Network::DownstreamTransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
@@ -141,10 +141,8 @@ public:
 
   ~ServerSslSocketFactory() override;
 
-  Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override;
   bool implementsSecureTransport() const override;
-  absl::string_view defaultServerNameIndication() const override { return ""; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;

@@ -38,7 +38,7 @@ public:
     // Add autonomous upstream.
     auto endpoint = upstream_address_fn_(0);
     fake_upstreams_.emplace_back(new AutonomousUpstream(
-        Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
+        Network::Test::createRawBufferDownstreamSocketFactory(), endpoint->ip()->port(),
         endpoint->ip()->version(), upstreamConfig(), true));
 
     // Add ratelimit upstream.
