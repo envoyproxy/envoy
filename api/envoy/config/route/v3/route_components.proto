@@ -568,7 +568,8 @@ message RouteMatch {
     // * ``/videos/{file}`` would match ``/videos/1080p5000_00001.m4s``
     //
     // * ``/**.mpd`` would match ``/content/123/india/dash/55/manifest.mpd``
-    string path_template_match = 15 [(validate.rules).string = {min_len: 1}];
+    string path_template_match = 15
+          [(validate.rules).string = {min_len: 1, max_len: 256}];
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
