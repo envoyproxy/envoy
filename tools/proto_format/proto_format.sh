@@ -23,9 +23,6 @@ read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 # Generate //versioning:active_protos.
 ./tools/proto_format/active_protos_gen.py ./api > ./api/versioning/BUILD
 
-# This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
-BAZEL_BUILD_OPTIONS+=("--remote_download_outputs=all")
-
 # If the specified command is 'freeze', we tell protoxform to adjust package version status to
 # reflect a major version freeze and then do a regular 'fix'.
 PROTO_SYNC_CMD="$1"
