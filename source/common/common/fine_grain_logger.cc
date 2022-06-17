@@ -26,8 +26,6 @@ private:
   absl::Mutex mutex_;
 };
 
-const char* FineGrainLogContext::kDefaultFineGrainLogFormat = "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v";
-
 SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntry(absl::string_view key)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   absl::ReaderMutexLock l(&fine_grain_log_lock_);
@@ -38,7 +36,7 @@ SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntry(absl::string_view k
   return nullptr;
 }
 
-spdlog::level::level_enum FineGrainLogContext::getVerbosityDefaultLevel() {
+spdlog::level::level_enum FineGrainLogContext::getVerbosityDefaultLevel() const {
   absl::ReaderMutexLock l(&fine_grain_log_lock_);
   return verbosity_default_level_;
 }
@@ -73,10 +71,9 @@ void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   absl::WriterMutexLock wl(&fine_grain_log_lock_);
   verbosity_default_level_ = level;
-  verbosity_update_info_.clear();
-  for (const auto& it : *fine_grain_log_map_) {
-    it.second->set_level(level);
-    it.second->set_pattern(format);
+  for (auto& [key, logger] : *fine_grain_log_map_) {
+    logger->set_level(getLogLevel(key));
+    logger->set_pattern(format);
   }
 }
 

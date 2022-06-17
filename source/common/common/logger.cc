@@ -187,7 +187,7 @@ void Context::activate() {
   fine_grain_log_format_ = log_format_;
   if (enable_fine_grain_logging_) {
     if (log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
-      fine_grain_log_format_ = FineGrainLogContext::kDefaultFineGrainLogFormat;
+      fine_grain_log_format_ = kDefaultFineGrainLogFormat;
     }
     getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(fine_grain_default_level_,
                                                                fine_grain_log_format_);
@@ -207,7 +207,7 @@ void Context::enableFineGrainLogger() {
     current_context->fine_grain_default_level_ = current_context->log_level_;
     current_context->fine_grain_log_format_ = current_context->log_format_;
     if (current_context->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
-      current_context->fine_grain_log_format_ = FineGrainLogContext::kDefaultFineGrainLogFormat;
+      current_context->fine_grain_log_format_ = kDefaultFineGrainLogFormat;
     }
     getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(
         current_context->fine_grain_default_level_, current_context->fine_grain_log_format_);
@@ -222,7 +222,7 @@ void Context::disableFineGrainLogger() {
 
 std::string Context::getFineGrainLogFormat() {
   if (!current_context) { // Context is not instantiated in benchmark test
-    return FineGrainLogContext::kDefaultFineGrainLogFormat;
+    return kDefaultFineGrainLogFormat;
   }
   return current_context->fine_grain_log_format_;
 }

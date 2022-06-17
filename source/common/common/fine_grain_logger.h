@@ -17,6 +17,7 @@ using FineGrainLogLevelMap = absl::flat_hash_map<std::string, spdlog::level::lev
 
 constexpr int kLogLevelMax = 6; // spdlog level is in [0, 6].
 constexpr int kLogLevelMin = 0;
+static const char* kDefaultFineGrainLogFormat = "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v";
 
 /**
  * Data struct that stores the necessary verbosity log update info.
@@ -47,7 +48,8 @@ public:
   /**
    * Gets the default verbosity log level.
    */
-  spdlog::level::level_enum getVerbosityDefaultLevel() ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
+  spdlog::level::level_enum getVerbosityDefaultLevel() const
+      ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
    * Initializes Fine-Grain Logger, gets log level from setting vector, and registers it in global
@@ -63,9 +65,9 @@ public:
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
-   * Sets the default verbosity log level and format when updating context. It is used in Context
-   * during initialization or the enable process. Basically, it will reset FineGrainLogContext and
-   * clear any previous verbosity updates.
+   * Sets the default verbosity log level and format when updating context. It will update all the
+   * loggers based on new level and verbosity info vector. It is used in Context during
+   * initialization or the enable process.
    */
   void setDefaultFineGrainLogLevelFormat(spdlog::level::level_enum level, const std::string& format)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
@@ -106,8 +108,8 @@ public:
 
   /**
    * Updates all the loggers based on the new default verbosity log level.
-   * The priority of verbosity_update_info_ is higher than verbosity_default_level_. It will change
-   * the level of all the loggers which are not matched with verbosity_update_info_ to new default
+   * The default verbosity log level is overridable if the verbosity undate vector is not empty.
+   * All the loggers which are not matched with verbosity_update_info_ are set to new default
    * log level.
    *
    * verbosity_default_level_ could be different from fine_grain_default_level_ in Context after
@@ -121,11 +123,6 @@ public:
    * and wildcards may match /. No support for bracket expressions [...].
    */
   static bool safeFileNameMatch(absl::string_view pattern, absl::string_view str);
-
-  /**
-   * Default fine-grain log format.
-   */
-  static const char* kDefaultFineGrainLogFormat;
 
 private:
   /**
@@ -157,7 +154,7 @@ private:
   /**
    * Lock for the following global map and update vector (not for the corresponding loggers).
    */
-  absl::Mutex fine_grain_log_lock_;
+  mutable absl::Mutex fine_grain_log_lock_;
 
   /**
    * Map that stores <key, logger> pairs, key can be the file name.
@@ -167,11 +164,13 @@ private:
 
   /**
    * Vector that stores <update, level> pairs, key can be the file basename or glob expressions.
+   * It will override the default verbosity log level.
    */
   std::vector<VerbosityLogUpdateInfo> verbosity_update_info_ ABSL_GUARDED_BY(fine_grain_log_lock_);
 
   /**
    * Default verbosity log level. It could be different from fine_grain_default_level_ in Context.
+   * It is overridable if verbosity_update_info_ is not empty.
    */
   spdlog::level::level_enum
       verbosity_default_level_ ABSL_GUARDED_BY(fine_grain_log_lock_) = spdlog::level::info;

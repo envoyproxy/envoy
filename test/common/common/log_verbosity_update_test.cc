@@ -49,7 +49,7 @@ TEST(FineGrainLog, updateCurrentFilePath) {
 
   FINE_GRAIN_LOG(debug, "Debug: now level is debug");
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::debug);
 }
 
@@ -67,7 +67,7 @@ TEST(FineGrainLog, verbosityDefaultLevelUpdate) {
 
   FINE_GRAIN_LOG(debug, "Debug: now level is debug");
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::debug);
 
   getFineGrainLogContext().updateVerbosityDefaultLevel(spdlog::level::debug);
@@ -91,7 +91,7 @@ TEST(FineGrainLog, verbosityUpdatePriority) {
   FINE_GRAIN_LOG(debug, "Debug: now level is debug");
   FINE_GRAIN_LOG(trace, "Trace: you should not see this message");
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::debug);
 }
 
@@ -112,7 +112,7 @@ TEST(FineGrainLog, updateBasename) {
 
   FINE_GRAIN_LOG(debug, "Debug: now level is debug");
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::debug);
 }
 
@@ -130,10 +130,10 @@ TEST(FineGrainLog, multipleUpdatesBasename) {
   getFineGrainLogContext().updateVerbositySetting({update_1, update_2});
 
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(file_1);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::debug);
   p = getFineGrainLogContext().getFineGrainLogEntry(file_2);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
 }
 
@@ -149,10 +149,10 @@ TEST(FineGrainLog, multipleMatchesBasename) {
   getFineGrainLogContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(file_1);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
   p = getFineGrainLogContext().getFineGrainLogEntry(file_2);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
 }
 
@@ -170,13 +170,13 @@ TEST(FineGrainLog, globStarUpdate) {
   getFineGrainLogContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(file_1);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
   p = getFineGrainLogContext().getFineGrainLogEntry(file_2);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
   p = getFineGrainLogContext().getFineGrainLogEntry(file_3);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
 
   const std::pair<absl::string_view, int> update_2 =
@@ -238,13 +238,13 @@ TEST(FineGrainLog, globQuestionUpdate) {
   getFineGrainLogContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(file_1);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
   p = getFineGrainLogContext().getFineGrainLogEntry(file_2);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
   p = getFineGrainLogContext().getFineGrainLogEntry(file_3);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), getFineGrainLogContext().getVerbosityDefaultLevel());
 
   const std::pair<absl::string_view, int> update_2 =
@@ -270,15 +270,18 @@ TEST(FineGrainLog, inOrderGlobUpdate) {
   getFineGrainLogContext().updateVerbositySetting({update_1, update_2});
 
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(file_1);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
 }
 
+// This is to verify the memory optimization to avoid storing patterns that will
+// never match due to exit early semantics.
 TEST(FineGrainLog, earlyExitGlobUpdate) {
   const std::string file_1 = "envoy/src/foo.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
   getFineGrainLogContext().initFineGrainLogger(file_1, flogger);
 
+  // f?? appears before ff?.
   const std::pair<absl::string_view, int> update_1 =
       std::make_pair("f??", static_cast<int>(spdlog::level::warn));
   const std::pair<absl::string_view, int> update_2 =
@@ -286,7 +289,7 @@ TEST(FineGrainLog, earlyExitGlobUpdate) {
   getFineGrainLogContext().updateVerbositySetting({update_1, update_2});
 
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(file_1);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
 }
 
@@ -299,7 +302,7 @@ TEST(FineGrainLog, invalidGlobLevelUpdate) {
   getFineGrainLogContext().updateVerbositySetting({update_1});
 
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(file_1);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), getFineGrainLogContext().getVerbosityDefaultLevel());
 }
 
