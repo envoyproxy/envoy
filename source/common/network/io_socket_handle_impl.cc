@@ -476,21 +476,27 @@ IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
   auto sockaddr_to_use = address->sockAddr();
+  auto sockaddr_len_to_use = address->sockAddrLen();
 #ifdef __ANDROID_API__
-  sockaddr_storage ss;
+  sockaddr_in6 sin6;
   if (sockaddr_to_use->sa_family == AF_INET && alwaysUseV6OnAndroid()) {
     const sockaddr_in& sin4 = reinterpret_cast<const sockaddr_in&>(*sockaddr_to_use);
 
-    memset(&ss, 0, sizeof(ss));
-    sockaddr_in6& sin6 = reinterpret_cast<sockaddr_in6&>(ss);
+    // Android always uses IPv6 dual stack. Convert IPv4 to the IPv6 mapped address when
+    // connecting.
+    memset(&sin6, 0, sizeof(sin6));
     sin6.sin6_family = AF_INET6;
     sin6.sin6_port = sin4.sin_port;
+    sin6.sin6_addr.s6_addr32[2] = htonl(0xffff);
     sin6.sin6_addr.s6_addr32[3] = sin4.sin_addr.s_addr;
-    sockaddr_to_use = reinterpret_cast<sockaddr*>(&ss);
+    ASSERT(IN6_IS_ADDR_V4MAPPED(&sin6.sin6_addr));
+
+    sockaddr_to_use = reinterpret_cast<sockaddr*>(&sin6);
+    sockaddr_len_to_use = sizeof(sin6);
   }
 #endif
 
-  return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, address->sockAddrLen());
+  return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::setOption(int level, int optname, const void* optval,
