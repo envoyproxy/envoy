@@ -40,16 +40,16 @@ CONTRIB_EXTENSIONS = {
     "envoy.bootstrap.vcl":                                      "//contrib/vcl/source:config",
 
     #
-    # Regex engines
-    #
-
-    "envoy.bootstrap.hyperscan":                                "//contrib/hyperscan/bootstrap/source:config",
-
-    #
     # Input matchers
     #
 
     "envoy.matching.input_matchers.hyperscan":                  "//contrib/hyperscan/matching/input_matchers/source:config",
+
+    #
+    # Regex engines
+    #
+
+    "envoy.regex_engines.hyperscan":                            "//contrib/hyperscan/regex_engines/source:config",
 
     #
     # Connection Balance extensions

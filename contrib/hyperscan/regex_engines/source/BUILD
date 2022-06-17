@@ -1,12 +1,23 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
+    "envoy_cc_library",
     "envoy_contrib_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
+
+envoy_cc_library(
+    name = "regex_lib",
+    srcs = ["regex.cc"],
+    hdrs = ["regex.h"],
+    deps = [
+        "//contrib/hyperscan/matching/input_matchers/source:matcher_lib",
+        "//envoy/common:regex_interface",
+    ],
+)
 
 envoy_cc_contrib_extension(
     name = "config",
@@ -19,12 +30,11 @@ envoy_cc_contrib_extension(
         ],
     }),
     deps = [
-        "//envoy/thread_local:thread_local_interface",
-        "//source/common/common:regex_engine_lib",
-        "@envoy_api//contrib/envoy/extensions/bootstrap/hyperscan/v3alpha:pkg_cc_proto",
+        "//envoy/common:regex_interface",
+        "@envoy_api//contrib/envoy/extensions/regex_engines/hyperscan/v3alpha:pkg_cc_proto",
     ] + select({
         "//bazel:linux_x86_64": [
-            "//contrib/hyperscan/matching/input_matchers/source:matcher_lib",
+            ":regex_lib",
         ],
         "//conditions:default": [
         ],

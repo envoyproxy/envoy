@@ -12,7 +12,8 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
-        "//contrib/hyperscan/bootstrap/source:config",
+        "//contrib/hyperscan/regex_engines/source:config",
         "//test/integration:integration_lib",
+        "@envoy_api//contrib/envoy/extensions/regex_engines/hyperscan/v3alpha:pkg_cc_proto",
     ],
 )

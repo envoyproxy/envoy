@@ -1,34 +1,30 @@
 #include "test/integration/base_integration_test.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/hyperscan/bootstrap/source/config.h"
+#include "contrib/hyperscan/regex_engines/source/config.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace Matching {
-namespace InputMatchers {
+namespace Regex {
 namespace Hyperscan {
 
 class HyperscanIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public BaseIntegrationTest {
 public:
-  HyperscanIntegrationTest() : BaseIntegrationTest(GetParam(), config()) {}
+  HyperscanIntegrationTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfigNoListeners()) {}
 
-  void initializeConfig(const std::string& param) {
-    config_helper_.addBootstrapExtension(fmt::format(R"EOF(
-name: envoy.bootstrap.hyperscan
-typed_config:
-  '@type': type.googleapis.com/envoy.extensions.bootstrap.hyperscan.v3alpha.Hyperscan
-  {}
-    )EOF",
-                                                     param));
-  }
-
-  static std::string config() {
-    return absl::StrCat(ConfigHelper::baseConfigNoListeners(), R"EOF(
-default_regex_engine: envoy.bootstrap.hyperscan
-    )EOF");
+  void initializeConfig(bool caseless) {
+    config_helper_.addConfigModifier(
+        [caseless](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          envoy::extensions::regex_engines::hyperscan::v3alpha::Hyperscan hyperscan;
+          if (caseless) {
+            hyperscan.set_caseless(true);
+          }
+          bootstrap.mutable_default_regex_engine()->set_name("envoy.regex_engines.hyperscan");
+          bootstrap.mutable_default_regex_engine()->mutable_typed_config()->PackFrom(hyperscan);
+        });
   }
 };
 
@@ -38,11 +34,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, HyperscanIntegrationTest,
 
 // Verify that matching will be performed successfully.
 TEST_P(HyperscanIntegrationTest, Hyperscan) {
-  initializeConfig("");
+  initializeConfig(false);
   initialize();
-
-  auto* engine = Envoy::Regex::engine("envoy.bootstrap.hyperscan");
-  ASSERT_EQ(Envoy::Regex::EngineSingleton::getExisting(), engine);
 
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_regex() = "^/asdf/.+";
@@ -55,11 +48,8 @@ TEST_P(HyperscanIntegrationTest, Hyperscan) {
 
 // Verify that matching will be performed case-insensitively.
 TEST_P(HyperscanIntegrationTest, HyperscanWithParam) {
-  initializeConfig("caseless: true");
+  initializeConfig(true);
   initialize();
-
-  auto* engine = Envoy::Regex::engine("envoy.bootstrap.hyperscan");
-  ASSERT_EQ(Envoy::Regex::EngineSingleton::getExisting(), engine);
 
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_regex() = "^/asdf/.+";
@@ -75,9 +65,6 @@ TEST_P(HyperscanIntegrationTest, ReplaceAll) {
   initializeConfig("");
   initialize();
 
-  auto* engine = Envoy::Regex::engine("envoy.bootstrap.hyperscan");
-  ASSERT_EQ(Envoy::Regex::EngineSingleton::getExisting(), engine);
-
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_regex() = "b+";
 
@@ -87,7 +74,6 @@ TEST_P(HyperscanIntegrationTest, ReplaceAll) {
 };
 
 } // namespace Hyperscan
-} // namespace InputMatchers
-} // namespace Matching
+} // namespace Regex
 } // namespace Extensions
 } // namespace Envoy
