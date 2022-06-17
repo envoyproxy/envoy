@@ -37,24 +37,9 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
     ${FREEZE_ARG} \
     //tools/protoxform:api_protoxform
 
-# Find all source protos.
-PROTO_TARGETS=()
-for proto_type in active frozen; do
-    protos=$(bazel query "labels(srcs, labels(deps, @envoy_api//versioning:${proto_type}_protos))")
-    while read -r line; do PROTO_TARGETS+=("$line"); done \
-        <<< "$protos"
-done
-
-# Setup for proto_sync.py.
-TOOLS="$(dirname "$(dirname "$(realpath "$0")")")"
-# To satisfy dependency on api_proto_plugin.
-export PYTHONPATH="$TOOLS"
-# Build protoprint for use in proto_sync.py.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint
-
 # Copy back the FileDescriptorProtos that protoxform emitted to the source tree. This involves
 # pretty-printing to format with protoprint.
-./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" "${PROTO_TARGETS[@]}" --ci
+bazel run //tools/proto_format:proto_sync -- "--mode=${PROTO_SYNC_CMD}" --ci
 
 # Need to regenerate //versioning:active_protos before building type DB below if freezing.
 if [[ "$1" == "freeze" ]]; then
