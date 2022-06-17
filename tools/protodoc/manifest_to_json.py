@@ -4,16 +4,16 @@ import sys
 
 from google.protobuf import json_format
 
-sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
+from envoy.base.utils import ProtobufValidator
 
-from tools.config_validation import validate_fragment
 from tools.protodoc import manifest_pb2
 from tools.protodoc.protodoc_manifest_untyped import data as protodoc_manifest_untyped
 
 
-def main(output):
+def main(descriptor, output):
     # Load as YAML, emit as JSON and then parse as proto to provide type
     # checking.
+    proto_set = ProtobufValidator(descriptor)
     manifest = json_format.Parse(json.dumps(protodoc_manifest_untyped), manifest_pb2.Manifest())
     result = {}
     for field_name in manifest.fields:
@@ -22,7 +22,7 @@ def main(output):
         parts = field_name.split(".")
         name = ".".join(parts[:-1])
         part = parts[-1]
-        validate_fragment.validate_fragment(name, {part: example})
+        proto_set.validate_fragment({part: example}, name)
         result[field_name] = dict(note=field.edge_config.note, example=example)
     pathlib.Path(output).write_text(json.dumps(result))
 
