@@ -828,8 +828,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"listener.admin.downstream_cx_destroy", "listener.admin.downstream_cx_destroy"}};
 
   tag_extracted_gauge_map = {
-      {listenerStatPrefix("worker_0.downstream_cx_active"),
-       "listener.downstream_cx_active"},
+      {listenerStatPrefix("worker_0.downstream_cx_active"), "listener.downstream_cx_active"},
       {listenerStatPrefix("downstream_cx_active"), "listener.downstream_cx_active"},
       {listenerStatPrefix("downstream_pre_cx_active"), "listener.downstream_pre_cx_active"},
       {"listener.admin.downstream_cx_active", "listener.admin.downstream_cx_active"},
