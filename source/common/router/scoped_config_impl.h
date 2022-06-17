@@ -9,7 +9,6 @@
 #include "envoy/router/router.h"
 #include "envoy/router/scopes.h"
 #include "envoy/thread_local/thread_local.h"
-
 #include "source/common/common/hash.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
@@ -90,11 +89,13 @@ public:
     return config_proto_;
   }
   const std::string& scopeName() const { return config_proto_.name(); }
+  uint64_t configHash() const { return config_hash_; }
 
 private:
   envoy::config::route::v3::ScopedRouteConfiguration config_proto_;
   ScopeKey scope_key_;
   ConfigConstSharedPtr route_config_;
+  const uint64_t config_hash_;
 };
 using ScopedRouteInfoConstSharedPtr = std::shared_ptr<const ScopedRouteInfo>;
 // Ordered map for consistent config dumping.

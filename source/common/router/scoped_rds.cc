@@ -283,6 +283,11 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       throw EnvoyException("route_configuration_name is empty.");
     }
     const std::string scope_name = scoped_route_config.name();
+    if (const auto& scope_info_iter = scoped_route_map_.find(scope_name);
+        scope_info_iter != scoped_route_map_.end() &&
+        scope_info_iter->second->configHash() == MessageUtil::hash(scoped_route_config)) {
+      continue;
+    }
     rds.set_route_config_name(scoped_route_config.route_configuration_name());
     std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
     std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
@@ -436,6 +441,7 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
   auto new_scoped_route_info = std::make_shared<ScopedRouteInfo>(
       envoy::config::route::v3::ScopedRouteConfiguration(iter->second->configProto()),
       std::move(new_rds_config));
+  scoped_route_map_[new_scoped_route_info->scopeName()] = new_scoped_route_info;
   applyConfigUpdate([new_scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
                         -> ConfigProvider::ConfigConstSharedPtr {
     auto* thread_local_scoped_config =
