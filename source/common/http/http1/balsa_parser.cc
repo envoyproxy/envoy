@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "source/common/common/assert.h"
+#include "source/common/http/headers.h"
 
 #include "absl/strings/match.h"
 
@@ -14,10 +15,6 @@ using ::quiche::BalsaHeaders;
 namespace Envoy {
 namespace Http {
 namespace Http1 {
-
-namespace {
-constexpr absl::string_view kHttp11Suffix = "HTTP/1.1";
-} // anonymous namespace
 
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length)
     : connection_(connection) {
@@ -58,7 +55,9 @@ ParserStatus BalsaParser::getStatus() const { return status_; }
 
 uint16_t BalsaParser::statusCode() const { return headers_.parsed_response_code(); }
 
-bool BalsaParser::isHttp11() const { return absl::EndsWith(headers_.first_line(), kHttp11Suffix); }
+bool BalsaParser::isHttp11() const {
+  return absl::EndsWith(headers_.first_line(), Http::Headers::get().ProtocolStrings.Http11String);
+}
 
 absl::optional<uint64_t> BalsaParser::contentLength() const {
   if (!headers_.content_length_valid()) {

@@ -11,6 +11,8 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
+// This class wraps BalsaFrame and BalsaHeaders into a Parser implementation
+// to be used by ConnectionImpl.
 class BalsaParser : public Parser, public quiche::BalsaVisitorInterface {
 public:
   BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length);
