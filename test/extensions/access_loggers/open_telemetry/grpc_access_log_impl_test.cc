@@ -188,7 +188,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
 }
 
-TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreationCustomTag) {
+TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreationResourceAttributes) {
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
   config.mutable_common_config()->set_log_name("test_log");
   config.mutable_common_config()->set_transport_api_version(
@@ -202,9 +202,15 @@ values:
 - key: host_name
   value:
     string_value: test_host_name
+- key: k8s.pod.uid
+  value:
+    string_value: xxxx-xxxx-xxxx-xxxx
+- key: k8s.pod.createtimestamp
+  value:
+     int_value: 1655429509
   )EOF";
   TestUtility::loadFromYaml(kv_yaml, keyValueList);
-  *config.mutable_resources() = keyValueList;
+  *config.mutable_resource_attributes() = keyValueList;
 
   GrpcAccessLoggerSharedPtr logger =
       logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
@@ -227,6 +233,12 @@ values:
         - key: "host_name"
           value:
             string_value: "test_host_name"
+        - key: k8s.pod.uid
+          value:
+            string_value: xxxx-xxxx-xxxx-xxxx
+        - key: k8s.pod.createtimestamp
+          value:
+            int_value: 1655429509
     instrumentation_library_logs:
       - logs:
           - severity_text: "test-severity-text"

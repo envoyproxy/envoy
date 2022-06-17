@@ -56,7 +56,7 @@ void GrpcAccessLoggerImpl::initMessageRoot(
   *resource->add_attributes() = getStringKeyValue("cluster_name", local_info.clusterName());
   *resource->add_attributes() = getStringKeyValue("node_name", local_info.nodeName());
 
-  for (const auto& pair : config.resources().values()) {
+  for (const auto& pair : config.resource_attributes().values()) {
     *resource->add_attributes() = pair;
   }
 }
