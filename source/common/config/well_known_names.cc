@@ -152,11 +152,19 @@ TagNameValues::TagNameValues() {
   // listener_manager.(worker_<id>.)*
   addRe2(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
 
+  // listener.<address|stat_prefix>.(worker_<id>.)*
+  addRe2(WORKER_ID, R"(^listener\.<ADDRESS>\.((worker_\d+)\.))", "");
+  addRe2(WORKER_ID, R"(^listener\.<TAG_VALUE>\.((worker_\d+)\.))", "");
+
+  // sever.(worker_<id>.)*
+  addRe2(WORKER_ID, R"(^server\.((worker_\d+)\.))", "");
+
   // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
   addTokenized(ROUTE, "vhost.*.route.$.**");
 
   // thrift.(<stat_prefix>.)*
   addTokenized(THRIFT_PREFIX, "thrift.$.**");
+
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
