@@ -50,7 +50,7 @@ message CacheConfig {
   }
 
   // Config specific to the cache storage implementation.
-  // [#extension-category: envoy.filters.http.cache]
+  // [#extension-category: envoy.http.cache]
   google.protobuf.Any typed_config = 1 [(validate.rules).any = {required: true}];
 
   // List of matching rules that defines allowed *Vary* headers.

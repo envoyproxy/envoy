@@ -62,7 +62,6 @@ categories:
 - envoy.compression.decompressor
 - envoy.config.validators
 - envoy.filters.http
-- envoy.filters.http.cache
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
@@ -70,6 +69,7 @@ categories:
 - envoy.grpc_credentials
 - envoy.guarddog_actions
 - envoy.health_checkers
+- envoy.http.cache
 - envoy.http.header_validators
 - envoy.http.stateful_header_formatters
 - envoy.internal_redirect_predicates

@@ -26,11 +26,20 @@ envoy.access_loggers.open_telemetry:
   status: stable
   type_urls:
   - envoy.extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig
-envoy.access_loggers.stream:
+envoy.access_loggers.stdout:
   categories:
   - envoy.access_loggers
   security_posture: robust_to_untrusted_downstream
   status: stable
+  type_urls:
+  - envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+envoy.access_loggers.stderr:
+  categories:
+  - envoy.access_loggers
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.extensions.access_loggers.stream.v3.StderrAccessLog
 envoy.access_loggers.tcp_grpc:
   categories:
   - envoy.access_loggers
@@ -59,11 +68,13 @@ envoy.bootstrap.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.wasm.v3.WasmService
-envoy.cache.simple_http_cache:
+envoy.extensions.http.cache.simple:
   categories:
-  - envoy.filters.http.cache
+  - envoy.http.cache
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: wip
+  type_urls:
+  - envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig
 envoy.clusters.aggregate:
   categories:
   - envoy.clusters
@@ -341,6 +352,8 @@ envoy.filters.http.kill_request:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
   status: stable
+  type_urls:
+  - envoy.extensions.filters.http.kill_request.v3.KillRequest
 envoy.filters.http.local_ratelimit:
   categories:
   - envoy.filters.http
