@@ -15,6 +15,12 @@ This task is needed to run everytime after:
 
 There are additional tools for VS Code located in [`tools/vscode`](../tools/vscode) directory.
 
+Note:
+Current config assums you use `vscode` to develop. If you use other user like `root` to develop, please update `remoteUser` field in [`devcontainer.json`](devcontainer.json) as below:
+```json
+"remoteUser": "root",
+```
+
 ## Advanced Usages
 
 ### Using Remote Build Execution
