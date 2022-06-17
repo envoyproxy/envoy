@@ -164,33 +164,36 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
 
 DlbConnectionBalanceFactory::~DlbConnectionBalanceFactory() {
 #ifndef DLB_DISABLED
-  for (dlb_port_hdl_t port : rx_ports) {
-    if (dlb_disable_port(port)) {
-      ENVOY_LOG(error, "dlb_disable_port {}", errorDetails(errno));
+  if (dlb != nullptr) {
+    for (dlb_port_hdl_t port : rx_ports) {
+      if (dlb_disable_port(port)) {
+        ENVOY_LOG(error, "dlb_disable_port {}", errorDetails(errno));
+      }
+      if (dlb_detach_port(port) == -1) {
+        ENVOY_LOG(error, "dlb_detach_port {}", errorDetails(errno));
+      }
     }
-    if (dlb_detach_port(port) == -1) {
-      ENVOY_LOG(error, "dlb_detach_port {}", errorDetails(errno));
+    for (dlb_port_hdl_t port : tx_ports) {
+      if (dlb_disable_port(port)) {
+        ENVOY_LOG(error, "dlb_disable_port {}", errorDetails(errno));
+      }
+      if (dlb_detach_port(port) == -1) {
+        ENVOY_LOG(error, "dlb_detach_port {}", errorDetails(errno));
+      }
     }
-  }
-  for (dlb_port_hdl_t port : tx_ports) {
-    if (dlb_disable_port(port)) {
-      ENVOY_LOG(error, "dlb_disable_port {}", errorDetails(errno));
+    if (dlb_detach_sched_domain(domain) == -1) {
+      ENVOY_LOG(error, "dlb_detach_sched_domain {}", errorDetails(errno));
     }
-    if (dlb_detach_port(port) == -1) {
-      ENVOY_LOG(error, "dlb_detach_port {}", errorDetails(errno));
+
+    if (dlb_reset_sched_domain(dlb, domain_id) == -1) {
+      ENVOY_LOG(error, "dlb_reset_sched_domain {}", errorDetails(errno));
     }
-  }
-  if (dlb_detach_sched_domain(domain) == -1) {
-    ENVOY_LOG(error, "dlb_detach_sched_domain {}", errorDetails(errno));
+
+    if (dlb_close(dlb) == -1) {
+      ENVOY_LOG(error, "dlb_close {}", errorDetails(errno));
+    }
   }
 
-  if (dlb_reset_sched_domain(dlb, domain_id) == -1) {
-    ENVOY_LOG(error, "dlb_reset_sched_domain {}", errorDetails(errno));
-  }
-
-  if (dlb_close(dlb) == -1) {
-    ENVOY_LOG(error, "dlb_close {}", errorDetails(errno));
-  }
 #endif
   for (int fd : efds) {
     if (close(fd) == -1) {
