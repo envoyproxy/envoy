@@ -1576,6 +1576,9 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAAA) {
   EXPECT_NE(nullptr,
             resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Preferred));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // When DnsLookupFamily::All is provided, both IPv4 and IPv6 queries are sent by c-ares in the
+  // same getifaddrs operation. If one of them fails with `FORMERR`, the whole operation will fail.
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
