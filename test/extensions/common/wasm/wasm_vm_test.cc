@@ -49,7 +49,11 @@ protected:
   Stats::ScopeSharedPtr scope_;
 };
 
-TEST_F(BaseVmTest, NoRuntime) { EXPECT_NE(createWasmVm(""), nullptr); }
+TEST_F(BaseVmTest, UnSpecifiedRuntime) { 
+  auto wasm_vm = createWasmVm("");
+  EXPECT_TRUE(wasm_vm != nullptr);
+  EXPECT_TRUE(wasm_vm->getEngineName() == "v8");
+}
 
 TEST_F(BaseVmTest, BadRuntime) { EXPECT_EQ(createWasmVm("envoy.wasm.runtime.invalid"), nullptr); }
 

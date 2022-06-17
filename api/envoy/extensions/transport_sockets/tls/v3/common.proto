@@ -274,7 +274,7 @@ message SubjectAltNameMatcher {
   type.matcher.v3.StringMatcher matcher = 2 [(validate.rules).message = {required: true}];
 }
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -483,4 +483,6 @@ message CertificateValidationContext {
   // though this can be system-dependent.
   // https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_verify_depth.html
   google.protobuf.UInt32Value max_verify_depth = 16 [(validate.rules).uint32 = {lte: 100}];
+  
+  bool intermediate_ca = 17
 }
