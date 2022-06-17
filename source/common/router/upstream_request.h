@@ -130,7 +130,7 @@ public:
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
   bool hadUpstream() const { return had_upstream_; }
   // Copy the dynamic meta data from downstream to l4 upstream
-  void copyDynamicMetaDataFromDownstream(StreamInfo::StreamInfo& l4_stream_info);
+  void copyDynamicMetaDataFromL4Downstream(StreamInfo::StreamInfo& l4_stream_info);
 
 private:
   StreamInfo::UpstreamTiming& upstreamTiming() {

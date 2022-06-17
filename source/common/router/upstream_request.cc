@@ -224,7 +224,7 @@ const Network::Connection& UpstreamRequest::connection() const {
   return *parent_.callbacks()->connection();
 }
 
-void UpstreamRequest::copyDynamicMetaDataFromDownstream(StreamInfo::StreamInfo& l4_stream_info) {
+void UpstreamRequest::copyDynamicMetaDataFromL4Downstream(StreamInfo::StreamInfo& l4_stream_info) {
   if (parent_.callbacks()->connection() != nullptr) {
     const StreamInfo::StreamInfo& downstream_streamInfo =
         parent_.callbacks()->connection()->streamInfo();
@@ -541,7 +541,7 @@ void UpstreamRequest::onPoolReady(
         [this]() -> void { onStreamMaxDurationReached(); });
     max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
-  copyDynamicMetaDataFromDownstream(info);
+  copyDynamicMetaDataFromL4Downstream(info);
 
   const Http::Status status =
       upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());

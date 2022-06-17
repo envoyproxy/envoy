@@ -59,8 +59,9 @@ public:
   const std::string ZooKeeperProxy = "envoy.filters.network.zookeeper_proxy";
   // WebAssembly filter
   const std::string Wasm = "envoy.filters.network.wasm";
-  // Copy dynamic metadata from downstream to upstream
-  const std::string DownToUp = "envoy.filters.network.down_up";
+  // A common namespace which will propagated the dynamic metadata from
+  // downstream to upstream
+  const std::string DownToUp = "envoy.common.down_up";
 };
 
 using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;

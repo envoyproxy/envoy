@@ -32,6 +32,29 @@ public:
                                     false, true};
 };
 
+TEST_F(UpstreamRequestTest, CopyDynamicMetaData) {
+  Event::SimulatedTimeSystem test_time_;
+  StreamInfo::StreamInfoImpl l4_stream_info(test_time_, nullptr);
+  auto connection = router_filter_interface_.callbacks_.connection();
+  auto data_value = 8888;
+  ProtobufWkt::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+  auto val = ProtobufWkt::Value();
+  val.set_number_value(data_value);
+  fields.insert({"envoy.common.test", val});
+  const_cast<Network::Connection*>(connection)
+      ->streamInfo()
+      .setDynamicMetadata("envoy.common.down_up", metadata);
+  upstream_request_.copyDynamicMetaDataFromL4Downstream(l4_stream_info);
+  auto metadata1 = l4_stream_info.dynamicMetadata().filter_metadata();
+  auto down2up = metadata1.find("envoy.common.down_up");
+  EXPECT_TRUE(down2up != metadata1.end());
+  auto data = down2up->second.fields();
+  auto value = data.find("envoy.common.test");
+  EXPECT_TRUE(value != data.end());
+  EXPECT_EQ(data_value, value->second.number_value());
+}
+
 // UpstreamRequest is responsible processing for passing 101 upgrade headers to onUpstreamHeaders.
 TEST_F(UpstreamRequestTest, Decode101UpgradeHeaders) {
   auto upgrade_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
