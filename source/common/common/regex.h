@@ -59,7 +59,6 @@ public:
 };
 
 using EngineSingleton = InjectableSingleton<Engine>;
-using EngineLoader = ScopedInjectableLoader<Engine>;
 
 enum class Type { Re2, StdRegex };
 
@@ -85,6 +84,11 @@ public:
   static CompiledMatcherPtr parseRegex(const RegexMatcherType& matcher) {
     // Fallback deprecated engine type in regex matcher.
     if (matcher.has_google_re2()) {
+      return std::make_unique<CompiledGoogleReMatcher>(matcher);
+    }
+
+    // Fallback not specific engine.
+    if (!EngineSingleton::getExisting()) {
       return std::make_unique<CompiledGoogleReMatcher>(matcher);
     }
 

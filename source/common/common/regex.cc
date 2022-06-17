@@ -74,8 +74,6 @@ ProtobufTypes::MessagePtr GoogleReEngineFactory::createEmptyConfigProto() {
 
 REGISTER_FACTORY(GoogleReEngineFactory, EngineFactory);
 
-static EngineLoader* engine_ = new EngineLoader(std::make_unique<GoogleReEngine>());
-
 std::regex Utility::parseStdRegex(const std::string& regex, std::regex::flag_type flags) {
   // TODO(zuercher): In the future, PGV (https://github.com/envoyproxy/protoc-gen-validate)
   // annotations may allow us to remove this in favor of direct validation of regular
