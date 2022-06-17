@@ -167,7 +167,8 @@ parseRouteConfigurationFromYaml(const std::string& yaml) {
 
 class ConfigImplTestBase {
 protected:
-  ConfigImplTestBase() : api_(Api::createApiForTest()) {
+  ConfigImplTestBase()
+      : api_(Api::createApiForTest()), engine_(std::make_unique<Regex::GoogleReEngine>()) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
@@ -332,6 +333,7 @@ most_specific_header_mutations_wins: {0}
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Event::SimulatedTimeSystem test_time_;
+  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};

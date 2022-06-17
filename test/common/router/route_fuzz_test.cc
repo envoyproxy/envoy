@@ -56,6 +56,7 @@ bool validateConfig(const test::common::router::RouteTestCase& input) {
 
 // TODO(htuch): figure out how to generate via a genrule from config_impl_test the full corpus.
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   if (!validateConfig(input)) {
     return;
   }

@@ -88,11 +88,6 @@ public:
       return std::make_unique<CompiledGoogleReMatcher>(matcher);
     }
 
-    // Fallback not specific engine.
-    if (!EngineSingleton::getExisting()) {
-      return std::make_unique<CompiledGoogleReMatcher>(matcher);
-    }
-
     return EngineSingleton::get().matcher(matcher.regex());
   }
 };

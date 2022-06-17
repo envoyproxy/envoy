@@ -601,9 +601,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
         default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
         factory);
     regex_engine_ = factory.createEngine(*config, serverFactoryContext());
-    Regex::EngineSingleton::clear();
-    Regex::EngineSingleton::initialize(regex_engine_.get());
+  } else {
+    regex_engine_ = std::make_shared<Regex::GoogleReEngine>();
   }
+  Regex::EngineSingleton::clear();
+  Regex::EngineSingleton::initialize(regex_engine_.get());
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
