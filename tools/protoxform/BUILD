@@ -1,4 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary")
+load("//tools/protoxform:protoxform.bzl", "protoxform_rule")
 
 licenses(["notice"])  # Apache 2
 
@@ -44,5 +45,13 @@ py_binary(
         "@com_google_googleapis//google/api:annotations_py_proto",
         "@com_google_protobuf//:protobuf_python",
         "@envoy_api//envoy/annotations:pkg_py_proto",
+    ],
+)
+
+protoxform_rule(
+    name = "api_protoxform",
+    deps = [
+        "@envoy_api//versioning:active_protos",
+        "@envoy_api//versioning:frozen_protos",
     ],
 )
