@@ -51,7 +51,7 @@ protected:
 
 TEST_F(BaseVmTest, UnSpecifiedRuntime) {
   auto wasm_vm = createWasmVm("");
-  EXPECT_TRUE(wasm_vm != nullptr);
+  EXPECT_TRUE(wasm_vm.get() != nullptr);
   EXPECT_TRUE(wasm_vm->getEngineName() == "v8");
 }
 
