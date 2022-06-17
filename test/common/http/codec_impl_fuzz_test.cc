@@ -300,6 +300,7 @@ public:
       break;
     }
     case test::common::http::DirectionalAction::kTrailers: {
+      bool encoded_trailers = false;
       // Allow trailers for http >= 2 or for http1x only, when they are configured.
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingDataOrTrailers) {
         if (http_protocol_ > Protocol::Http11) {
@@ -310,31 +311,26 @@ public:
             state.request_encoder_->encodeTrailers(
                 fromSanitizedHeaders<TestRequestTrailerMapImpl>(directional_action.trailers()));
           }
-
+          encoded_trailers = true;
         } else {
-          // http1 see if the side supports encoding trailers...
-          // fake encoding data if trailer not supported...
-          if (response) {
-            if (http1_allow_server_trailers_) {
-              state.response_encoder_->encodeTrailers(
-                  fromSanitizedHeaders<TestResponseTrailerMapImpl>(directional_action.trailers()));
-            } else {
-              Buffer::OwnedImpl buff;
-              buff.add("Hello");
-              state.response_encoder_->encodeData(buff, true);
-            }
-          } else {
-            if (http1_allow_client_trailers_) {
-              state.request_encoder_->encodeTrailers(
-                  fromSanitizedHeaders<TestRequestTrailerMapImpl>(directional_action.trailers()));
-            } else {
-              Buffer::OwnedImpl buff;
-              buff.add("Hello");
-              state.request_encoder_->encodeData(buff, true);
-            }
+          // For HTTP1 we need to see if the given direction supports encoding
+          // trailers.
+          if (response && http1_allow_server_trailers_) {
+            state.response_encoder_->encodeTrailers(
+                fromSanitizedHeaders<TestResponseTrailerMapImpl>(directional_action.trailers()));
+            encoded_trailers = true;
+          } else if (!response && http1_allow_client_trailers_) {
+            state.request_encoder_->encodeTrailers(
+                fromSanitizedHeaders<TestRequestTrailerMapImpl>(directional_action.trailers()));
+            encoded_trailers = true;
           }
         }
+      }
 
+      // If we encoded trailers then the stream can transition to
+      // being completed. If we didn't e.g. if H1 didn't support
+      // then we should avoid closing this...
+      if (encoded_trailers) {
         state.stream_state_ = StreamState::Closed;
         state.closeLocal();
       }
