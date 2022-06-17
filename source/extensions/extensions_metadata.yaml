@@ -1166,18 +1166,24 @@ envoy.matching.inputs.uri_san:
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
+  type_urls:
+  - envoy.extensions.matching.common_inputs.ssl.v3.UriSanInput
 envoy.matching.inputs.dns_san:
   categories:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
+  type_urls:
+  - envoy.extensions.matching.common_inputs.ssl.v3.DnsSanInput
 envoy.matching.inputs.subject:
   categories:
   - envoy.matching.http.input
   - envoy.matching.network.input
   security_posture: unknown
   status: alpha
+  type_urls:
+  - envoy.extensions.matching.common_inputs.ssl.v3.SubjectInput
 envoy.matching.custom_matchers.trie_matcher:
   categories:
   - envoy.matching.network.custom_matchers
