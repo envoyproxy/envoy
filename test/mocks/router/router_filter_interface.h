@@ -50,6 +50,10 @@ public:
   MOCK_METHOD(const UpstreamRequest*, finalUpstreamRequest, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
 
+  const RouteStatsContextOptRef routeStatsContext() const override {
+    return RouteStatsContextOptRef();
+  }
+
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<MockRoute> route_;
   NiceMock<Network::MockConnection> client_connection_;

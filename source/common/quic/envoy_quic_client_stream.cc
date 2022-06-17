@@ -190,7 +190,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   const absl::optional<uint64_t> optional_status =
-      Http::Utility::getResponseStatusNoThrow(*headers);
+      Http::Utility::getResponseStatusOrNullopt(*headers);
   if (!optional_status.has_value()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),

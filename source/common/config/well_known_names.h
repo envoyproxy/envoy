@@ -129,6 +129,8 @@ public:
   const std::string RESPONSE_CODE_CLASS = "envoy.response_code_class";
   // Route config name for RDS updates
   const std::string RDS_ROUTE_CONFIG = "envoy.rds_route_config";
+  // Request route given by the Router http filter
+  const std::string ROUTE = "envoy.route";
   // Listener manager worker id
   const std::string WORKER_ID = "envoy.worker_id";
   // Stats prefix for the Thrift Proxy network filter
