@@ -90,7 +90,7 @@ public:
   FineGrainLogLevelMap getAllFineGrainLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
-   * Updates all the loggers based on the verbosity updates <(file, level) ...>.
+   * Updates all loggers based on the verbosity updates <(file, level) ...>.
    * It supports file basename and glob "*" and "?" pattern, eg. ("foo", 2), ("foo/b*", 3)
    * Patterns including a slash character are matched against full path names, while those
    * without are matched against base names (by removing one suffix) only.
@@ -107,7 +107,7 @@ public:
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
-   * Updates all the loggers based on the new default verbosity log level.
+   * Updates all loggers based on the new default verbosity log level.
    * The default verbosity log level is overridable if the verbosity undate vector is not empty.
    * All the loggers which are not matched with verbosity_update_info_ are set to new default
    * log level.
