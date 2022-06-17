@@ -25,7 +25,8 @@ def envoy_all_extensions(denylist = []):
 # Core extensions needed to run Envoy's integration tests.
 _core_extensions = [
     "envoy.access_loggers.file",
-    "envoy.access_loggers.stream",
+    "envoy.access_loggers.stderr",
+    "envoy.access_loggers.stdout",
     "envoy.filters.http.router",
     "envoy.filters.http.health_check",
     "envoy.filters.network.http_connection_manager",
