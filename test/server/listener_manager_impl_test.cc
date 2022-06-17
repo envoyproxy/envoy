@@ -6706,12 +6706,12 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
   auto* extend_balance_config = connection_balance_config->mutable_extend_balance();
   extend_balance_config->set_name("envoy.network.connection_balance.test");
   extend_balance_config->mutable_typed_config()->set_type_url(
-      "type.googleapis.com/google.protobuf.Struct");
+      "type.googleapis.com/google.protobuf.test");
 
   EXPECT_THROW_WITH_MESSAGE(
       new ListenerImpl(listener, "version", *manager_, "foo", true, false,
                        /*hash=*/static_cast<uint64_t>(0), 1),
-      EnvoyException, "Didn't find a registered implementation for type: 'google.protobuf.Struct'");
+      EnvoyException, "Didn't find a registered implementation for type: 'google.protobuf.test'");
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));

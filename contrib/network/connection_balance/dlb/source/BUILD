@@ -3,6 +3,10 @@ load(
     "envoy_cc_contrib_extension",
     "envoy_contrib_package",
 )
+load(
+    "//contrib:all_contrib_extensions.bzl",
+    "envoy_contrib_linux_x86_64_constraints",
+)
 load("@rules_foreign_cc//foreign_cc:defs.bzl", "make")
 
 licenses(["notice"])  # Apache 2
@@ -16,6 +20,7 @@ make(
     out_static_libs = ["libdlb.a"],
     postfix_script = "mv libdlb.a $INSTALLDIR/lib && rm -rf $INSTALLDIR/include && mkdir -p $INSTALLDIR/include && cp -L *.h $INSTALLDIR/include",
     tags = ["skip_on_windows"],
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     targets = ["libdlb.a"],
 )
 
