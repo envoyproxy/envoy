@@ -300,6 +300,7 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
 
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (response_started_) {
+      ENVOY_LOG(warn, "reset downstream connection for a partial response");
       // Error occurred after a partial response, propagate the reset to the downstream.
       parent_.resetDownstreamConnection();
     } else {
@@ -317,6 +318,9 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     }
     break;
   }
+
+  ENVOY_LOG(debug, "upstream reset complete reason {} (close_downstream={})",
+            static_cast<int>(reason), close_downstream);
   return close_downstream;
 }
 

@@ -363,6 +363,12 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
 
   parent_.streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
 
+  ENVOY_STREAM_LOG(
+      trace, "Response message_type: {}, seq_id: {}, method: {}, frame size: {}, headers:\n{}",
+      parent_, metadata_->sequenceId(),
+      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-",
+      metadata->hasMethodName() ? metadata->methodName() : "-",
+      metadata->hasFrameSize() ? metadata->frameSize() : -1, metadata->responseHeaders());
   return parent_.applyEncoderFilters(DecoderEvent::MessageBegin, metadata, protocol_converter_);
 }
 
@@ -520,6 +526,8 @@ ConnectionManager::ActiveRpc::applyFilters(FilterType* filter,
       !filter ? filter_list.begin() : std::next(filter->entry());
   for (; entry != filter_list.end(); entry++) {
     const FilterStatus status = filter_action_((*entry)->decodeEventHandler());
+    ENVOY_STREAM_LOG(trace, "apply filter called: filter={} status={}", *this,
+                     static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (local_response_sent_) {
       // The filter called sendLocalReply but _did not_ close the connection.
       // We return FilterStatus::Continue irrespective of the current result,
@@ -848,6 +856,11 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
       metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
 
   streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
+  ENVOY_STREAM_LOG(
+      trace, "Request seq_id: {}, method: {}, frame size: {}, cluster:{}, headers:\n{}", *this,
+      metadata_->sequenceId(), metadata->hasMethodName() ? metadata->methodName() : "-",
+      metadata->hasFrameSize() ? metadata->frameSize() : -1,
+      route_ptr ? route_ptr->routeEntry()->clusterName() : "-", metadata->requestHeaders());
 
   return applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
 }
@@ -977,6 +990,8 @@ void ConnectionManager::ActiveRpc::onLocalReply(const MessageMetadata& metadata,
 
 void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response, bool end_stream) {
   ASSERT(!under_on_local_reply_);
+  ENVOY_STREAM_LOG(debug, "Sending local reply, end_stream: {}, seq_id: {}", *this, end_stream,
+                   original_sequence_id_);
   localReplyMetadata_ = metadata_->createResponseMetadata();
   localReplyMetadata_->setSequenceId(original_sequence_id_);
 
@@ -1034,6 +1049,7 @@ ThriftFilters::ResponseStatus ConnectionManager::ActiveRpc::upstreamData(Buffer:
 }
 
 void ConnectionManager::ActiveRpc::resetDownstreamConnection() {
+  ENVOY_CONN_LOG(debug, "resetting downstream connection", parent_.read_callbacks_->connection());
   parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
