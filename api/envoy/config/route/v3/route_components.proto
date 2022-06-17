@@ -1110,7 +1110,8 @@ message RouteAction {
   // * The path pattern ``/content/{format}/{lang}/{id}/{file}.vtt`` paired with a substitution
   //   string of ``/{lang}/{format}/{file}.vtt`` would transform ``/content/hls/en-us/12345/en_193913.vtt``
   //   into ``/en-us/hls/en_193913.vtt``.
-  string path_template_rewrite = 41;
+  string path_template_rewrite = 41
+        [(validate.rules).string = {min_len: 1, max_len: 256}];
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
