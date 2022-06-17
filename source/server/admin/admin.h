@@ -390,6 +390,7 @@ private:
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::ListenSocketFactory& listenSocketFactory() override {
+      ASSERT(parent_.socket_factories_.size() == 1);
       return *parent_.socket_factories_[0];
     }
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {

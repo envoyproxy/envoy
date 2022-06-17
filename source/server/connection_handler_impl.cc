@@ -44,7 +44,6 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
 
   auto details = std::make_unique<ActiveListenerDetails>();
   if (config.internalListenerConfig().has_value()) {
-    auto pre_address_details = std::make_shared<PerAddressActiveListenerDetails>();
     // Ensure the this ConnectionHandlerImpl link to the thread local registry. Ideally this step
     // should be done only once. However, an extra phase and interface is overkill.
     Network::InternalListenerRegistry& internal_listener_registry =
