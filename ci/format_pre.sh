@@ -10,7 +10,7 @@ CURRENT=""
 # AZP appears to make lines with this prefix red
 BASH_ERR_PREFIX="##[error]: "
 
-DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format_pre.diff}"
+DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format.diff}"
 
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
@@ -50,6 +50,13 @@ bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
 CURRENT=spelling
 "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
+
+# TODO(phlax): move these to bazel rules
+CURRENT=check_format_test
+"${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
+
+CURRENT=check_format
+"${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2
