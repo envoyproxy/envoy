@@ -120,7 +120,9 @@ protected:
         .WillRepeatedly(ReturnRef(filter_chain_manager_));
     quic_listener_ =
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
-            scoped_runtime_.loader(), 0, connection_handler_, *dispatcher_, listener_config_));
+            scoped_runtime_.loader(), 0, connection_handler_,
+            listener_config_.listenSocketFactory().getListenSocket(0), *dispatcher_,
+            listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
     quic::QuicCryptoServerConfig& crypto_config =
         ActiveQuicListenerPeer::cryptoConfig(*quic_listener_);

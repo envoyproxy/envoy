@@ -65,14 +65,6 @@ void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,
-                                           Event::Dispatcher& dispatcher,
-                                           Network::ListenerConfig& config)
-    : ActiveRawUdpListener(worker_index, concurrency, parent,
-                           config.listenSocketFactory().getListenSocket(worker_index), dispatcher,
-                           config) {}
-
-ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
-                                           Network::UdpConnectionHandler& parent,
                                            Network::SocketSharedPtr listen_socket_ptr,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)

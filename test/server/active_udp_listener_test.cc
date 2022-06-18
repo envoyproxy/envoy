@@ -77,8 +77,8 @@ public:
   }
 
   void setup() {
-    active_listener_ =
-        std::make_unique<ActiveRawUdpListener>(0, 1, conn_handler_, dispatcher_, listener_config_);
+    active_listener_ = std::make_unique<ActiveRawUdpListener>(0, 1, conn_handler_, listen_socket_,
+                                                              dispatcher_, listener_config_);
   }
 
   std::string listener_stat_prefix_{"listener_stat_prefix"};
