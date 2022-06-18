@@ -219,6 +219,7 @@ public:
    * @param runtime the runtime for this server.
    * @param worker_index The index of the worker this listener is being created on.
    * @param parent is the owner of the created ActiveListener objects.
+   * @param listen_socket_ptr is the UDP socket.
    * @param dispatcher is used to create actual UDP listener.
    * @param config provides information needed to create ActiveUdpListener and
    * UdpListener objects.
@@ -226,8 +227,9 @@ public:
    */
   virtual ConnectionHandler::ActiveUdpListenerPtr
   createActiveUdpListener(Runtime::Loader& runtime, uint32_t worker_index,
-                          UdpConnectionHandler& parent, Event::Dispatcher& dispatcher,
-                          Network::ListenerConfig& config) PURE;
+                          UdpConnectionHandler& parent,
+                          Network::SocketSharedPtr&& listen_socket_ptr,
+                          Event::Dispatcher& dispatcher, Network::ListenerConfig& config) PURE;
 
   /**
    * @return true if the UDP passing through listener doesn't form stateful connections.
