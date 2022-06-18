@@ -55,9 +55,8 @@ private:
 
 class RouteStatsContextImpl : public RouteStatsContext {
 public:
-  explicit RouteStatsContextImpl(Stats::Scope& scope, const RouteStatNames& route_stat_names,
-                                 const Stats::StatName& vhost_stat_name,
-                                 const std::string& stat_prefix);
+  RouteStatsContextImpl(Stats::Scope& scope, const RouteStatNames& route_stat_names,
+                        const Stats::StatName& vhost_stat_name, const std::string& stat_prefix);
 
   ~RouteStatsContextImpl() override = default;
 
