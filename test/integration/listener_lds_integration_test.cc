@@ -964,6 +964,7 @@ TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersClientCloseConnectionWit
         ->mutable_listeners(0)
         ->mutable_listener_filters_timeout()
         ->MergeFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(1000000));
+    bootstrap.mutable_static_resources()->mutable_listeners(0)->set_stat_prefix("listener_0");
   });
 
   std::string data = "hello";
@@ -975,6 +976,7 @@ TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersClientCloseConnectionWit
   if (result == true) {
     tcp_client->waitForDisconnect();
   }
+  test_server_->waitForCounterEq("listener.listener_0.downstream_listener_filter_remote_close", 1);
 }
 
 // Only update the order of listener filters, ensure the listener filters
