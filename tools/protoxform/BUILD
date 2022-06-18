@@ -50,6 +50,7 @@ py_binary(
 
 protoxform_rule(
     name = "api_protoxform",
+    visibility = ["//visibility:public"],
     deps = [
         "@envoy_api//versioning:active_protos",
         "@envoy_api//versioning:frozen_protos",
