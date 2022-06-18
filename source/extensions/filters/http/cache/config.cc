@@ -30,7 +30,7 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
   }
   ProtobufTypes::MessagePtr cache_policy_config = cache_policy_factory->createEmptyConfigProto();
   MessageUtil::unpackTo(config.typed_cache_policy_config(), *cache_policy_config);
-  // Use a shared_ptr here because FilterFactoryCb is reuseable, so we cannot
+  // Use a shared_ptr here because FilterFactoryCb is reusable, so we cannot
   // use CallAtMostOnce to move the unique_ptr into the lambda.
   std::shared_ptr<Protobuf::Message> shared_cache_policy_config(cache_policy_config.release());
 
