@@ -44,6 +44,7 @@ FilterStatus UpstreamRequest::start() {
 }
 
 void UpstreamRequest::releaseConnection(const bool close) {
+  ENVOY_LOG(debug, "releasing connection, close: {}", close);
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
     conn_pool_handle_ = nullptr;
@@ -59,10 +60,14 @@ void UpstreamRequest::releaseConnection(const bool close) {
   }
 }
 
-void UpstreamRequest::resetStream() { releaseConnection(true); }
+void UpstreamRequest::resetStream() {
+  ENVOY_LOG(debug, "reset stream");
+  releaseConnection(true);
+}
 
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                     Upstream::HostDescriptionConstSharedPtr host) {
+  ENVOY_LOG(debug, "on pool failure");
   conn_pool_handle_ = nullptr;
 
   // Mimic an upstream reset.
@@ -159,6 +164,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     }
 
     if (callbacks.responseMetadata()->isDraining()) {
+      ENVOY_LOG(debug, "got draining signal");
       stats_.incCloseDrain(cluster);
       resetStream();
     }
