@@ -11,7 +11,7 @@ public:
   DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
 
   // MySQLProxy::Decoder
-  void onData(Buffer::Instance& data, bool is_upstream) override;
+  Decoder::Result onData(Buffer::Instance& data, bool is_upstream) override;
   MySQLSession& getSession() override { return session_; }
 
 private:

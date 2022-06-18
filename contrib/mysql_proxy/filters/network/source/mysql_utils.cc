@@ -216,6 +216,36 @@ DecodeStatus BufferHelper::peekHdr(Buffer::Instance& buffer, uint32_t& len, uint
   return DecodeStatus::Success;
 }
 
+DecodeStatus BufferHelper::readSecureBytes(Buffer::Instance& buffer, size_t len,
+                                           std::unique_ptr<SecureBytes>& out) {
+  if (buffer.length() < len) {
+    return DecodeStatus::Failure;
+  }
+
+  out = std::make_unique<SecureBytes>(len);
+
+  // Copy data into secure memory, then zero the source buffer slices.
+  uint64_t copied = 0;
+  auto slices = buffer.getRawSlices();
+
+  for (const auto& slice : slices) {
+    if (copied == len) {
+      break;
+    }
+
+    const uint64_t chunk = std::min(static_cast<uint64_t>(slice.len_), len - copied);
+    auto* src = static_cast<uint8_t*>(slice.mem_);
+
+    std::memcpy(out->data() + copied, src, chunk);
+    sodium_memzero(src, chunk);
+
+    copied += chunk;
+  }
+
+  buffer.drain(len);
+  return DecodeStatus::Success;
+}
+
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

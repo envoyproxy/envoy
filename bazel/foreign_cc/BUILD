@@ -219,6 +219,27 @@ cc_library(
     deps = ["unicode_icu_build"],
 )
 
+configure_make(
+    name = "libsodium",
+    configure_in_place = True,
+    configure_options = [
+        "--disable-shared",
+        "--enable-static",
+        "--disable-asm",
+        "--without-pthreads",
+    ],
+    env = select({
+        "//bazel:clang_build": {
+            "AR": "$(AR)",
+            "RANLIB": "$(AR) -s",
+        },
+        "//conditions:default": {},
+    }),
+    lib_source = "@libsodium//:all",
+    out_static_libs = ["libsodium.a"],
+    tags = ["skip_on_windows"],
+)
+
 envoy_cmake(
     name = "libsxg",
     build_args = select({

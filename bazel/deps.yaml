@@ -257,6 +257,18 @@ libprotobuf_mutator:
   license: "Apache-2.0"
   license_url: "https://github.com/google/libprotobuf-mutator/blob/v{version}/LICENSE"
 
+libsodium:
+  project_name: "libsodium"
+  project_desc: "A modern, portable, easy-to-use crypto library for secure memory and zeroing"
+  project_url: "https://github.com/jedisct1/libsodium"
+  release_date: "2024-08-23"
+  use_category:
+  - other
+  extensions:
+  - envoy.filters.network.mysql_proxy
+  license: "ISC"
+  license_url: "https://github.com/jedisct1/libsodium/blob/{version}/LICENSE"
+
 libsxg:
   project_name: "libsxg"
   project_desc: "Signed HTTP Exchange library"

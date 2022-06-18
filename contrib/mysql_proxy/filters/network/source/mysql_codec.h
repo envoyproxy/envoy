@@ -33,6 +33,10 @@ constexpr uint8_t MYSQL_RESP_MORE = 0x01;
 constexpr uint8_t MYSQL_RESP_AUTH_SWITCH = 0xfe;
 constexpr uint8_t MYSQL_RESP_ERR = 0xff;
 
+constexpr uint8_t MYSQL_CACHINGSHA2_FAST_AUTH_SUCCESS = 0x03;
+constexpr uint8_t MYSQL_CACHINGSHA2_FULL_AUTH_REQUIRED = 0x04;
+constexpr uint8_t MYSQL_REQUEST_PUBLIC_KEY = 0x02;
+
 constexpr uint8_t EOF_MARKER = 0xfe;
 constexpr uint8_t ERR_MARKER = 0xff;
 
@@ -102,6 +106,7 @@ constexpr uint8_t LENENCODINT_3BYTES = 0xfd;
 constexpr uint8_t LENENCODINT_8BYTES = 0xfe;
 
 constexpr uint32_t DEFAULT_MAX_PACKET_SIZE = (1 << 24) - 1; // 16M-1
+constexpr uint32_t SSL_CONNECTION_REQUEST_PACKET_SIZE = 32;
 constexpr uint8_t MIN_PROTOCOL_VERSION = 10;
 
 constexpr char MYSQL_STR_END = '\0';
