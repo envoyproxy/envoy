@@ -53,12 +53,13 @@ private:
   GenericConnPoolFactory* generic_conn_pool_factory_;
 };
 
-class RouteStatsContextImpl: public RouteStatsContext {
+class RouteStatsContextImpl : public RouteStatsContext {
 public:
   explicit RouteStatsContextImpl(Stats::Scope& scope, const RouteStatNames& route_stat_names,
-                    const Stats::StatName& vhost_stat_name, const std::string& stat_prefix);
+                                 const Stats::StatName& vhost_stat_name,
+                                 const std::string& stat_prefix);
 
-~RouteStatsContextImpl() override = default;
+  ~RouteStatsContextImpl() override = default;
 
   const Stats::StatName statName() const override { return route_stat_name_; }
   const RouteStats& stats() const override { return route_stats_; }

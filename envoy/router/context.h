@@ -40,14 +40,14 @@ public:
  */
 class RouteStatsContext {
 public:
-virtual ~RouteStatsContext() = default;
+  virtual ~RouteStatsContext() = default;
 
   /**
    * @return stat name for route specific stats.
    */
   virtual const Stats::StatName statName() const PURE;
 
-    /**
+  /**
    * @return a struct containing stats for route stats.
    */
   virtual const RouteStats& stats() const PURE;
