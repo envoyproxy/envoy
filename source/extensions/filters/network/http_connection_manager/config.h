@@ -133,7 +133,7 @@ public:
       FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
+  void createFilterChain(Http::FilterChainManager& manager) override;
   using FilterFactoriesList =
       std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
   struct FilterConfig {
@@ -142,7 +142,7 @@ public:
   };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-                                Http::FilterChainFactoryCallbacks& callbacks) override;
+                                Http::FilterChainManager& manager) override;
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
@@ -248,7 +248,7 @@ private:
                              FilterFactoriesList& filter_factories,
                              const std::string& filter_chain_type,
                              bool last_filter_in_current_config);
-  void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,
+  void createFilterChainForFactories(Http::FilterChainManager& manager,
                                      const FilterFactoriesList& filter_factories);
 
   /**

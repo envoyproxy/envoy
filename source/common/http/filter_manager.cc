@@ -279,33 +279,28 @@ void ActiveStreamFilterBase::resetIdleTimer() {
 
 const Router::RouteSpecificFilterConfig*
 ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
-  ASSERT(base_filter_ != nullptr);
   auto route = parent_.filter_manager_callbacks_.route(nullptr);
   if (route == nullptr) {
     return nullptr;
   }
 
-  std::string custom_name(base_filter_->customName());
-  auto* result = route->mostSpecificPerFilterConfig(custom_name);
+  auto* result = route->mostSpecificPerFilterConfig(custom_name_);
 
   if (result == nullptr) {
-    std::string filter_name(base_filter_->filterName());
-    result = route->mostSpecificPerFilterConfig(filter_name);
+    result = route->mostSpecificPerFilterConfig(filter_name_);
   }
   return result;
 }
 
 void ActiveStreamFilterBase::traversePerFilterConfig(
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
-  ASSERT(base_filter_ != nullptr);
   auto route = parent_.filter_manager_callbacks_.route(nullptr);
   if (route == nullptr) {
     return;
   }
 
   bool handled = false;
-  std::string custom_name(base_filter_->customName());
-  route->traversePerFilterConfig(custom_name,
+  route->traversePerFilterConfig(custom_name_,
                                  [&handled, &cb](const Router::RouteSpecificFilterConfig& config) {
                                    handled = true;
                                    cb(config);
@@ -315,8 +310,7 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
     return;
   }
 
-  std::string filter_name(base_filter_->filterName());
-  route->traversePerFilterConfig(filter_name, cb);
+  route->traversePerFilterConfig(filter_name_, cb);
 }
 
 bool ActiveStreamDecoderFilter::canContinue() {
@@ -484,11 +478,14 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
   }
 }
 
-void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
-                                                 bool dual_filter) {
-  ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
+void FilterManager::FilterChainFactoryCallbacksImpl::addStreamDecoderFilterWorker(
+    StreamDecoderFilterSharedPtr filter, bool dual_filter) {
+  auto raw_filter = filter.get();
 
-  filter->setDecoderFilterCallbacks(*wrapper);
+  ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(
+      manager_, std::move(filter), dual_filter, context_.custom_name, context_.filter_name));
+
+  raw_filter->setDecoderFilterCallbacks(*wrapper);
   // Note: configured decoder filters are appended to decoder_filters_.
   // This means that if filters are configured in the following order (assume all three filters are
   // both decoder/encoder filters):
@@ -497,14 +494,18 @@ void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr fi
   //     - B
   //     - C
   // The decoder filter chain will iterate through filters A, B, C.
-  LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
+  LinkedList::moveIntoListBack(std::move(wrapper), manager_.decoder_filters_);
 }
 
-void FilterManager::addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
-                                                 bool dual_filter) {
-  ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
+void FilterManager::FilterChainFactoryCallbacksImpl::addStreamEncoderFilterWorker(
+    StreamEncoderFilterSharedPtr filter, bool dual_filter) {
 
-  filter->setEncoderFilterCallbacks(*wrapper);
+  auto raw_filter = filter.get();
+
+  ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(
+      manager_, std::move(filter), dual_filter, context_.custom_name, context_.filter_name));
+
+  raw_filter->setEncoderFilterCallbacks(*wrapper);
   // Note: configured encoder filters are prepended to encoder_filters_.
   // This means that if filters are configured in the following order (assume all three filters are
   // both decoder/encoder filters):
@@ -513,11 +514,12 @@ void FilterManager::addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr fi
   //     - B
   //     - C
   // The encoder filter chain will iterate through filters C, B, A.
-  LinkedList::moveIntoList(std::move(wrapper), encoder_filters_);
+  LinkedList::moveIntoList(std::move(wrapper), manager_.encoder_filters_);
 }
 
-void FilterManager::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
-  access_log_handlers_.push_back(handler);
+void FilterManager::postFilterFactory(FilterFacotryContext context, FilterFactoryCb& factory) {
+  FilterChainFactoryCallbacksImpl callbacks(*this, context);
+  factory(callbacks);
 }
 
 void FilterManager::maybeContinueDecoding(
@@ -821,7 +823,7 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
 void FilterManager::maybeEndDecode(bool end_stream) {
   // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
   if (end_stream && !remoteDecodeComplete()) {
-    stream_info_.downstreamTiming().onLastDownstreamRxByteReceived(dispatcher().timeSource());
+    stream_info_.downstreamTiming().onLastDownstreamRxByteReceived(dispatcher_.timeSource());
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
   }
 }

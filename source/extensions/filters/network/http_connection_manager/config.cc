@@ -93,6 +93,11 @@ public:
   }
 };
 
+static Http::FilterFactoryCb MissingConfigFilterFactory =
+    [](Http::FilterChainFactoryCallbacks& cb) {
+      cb.addStreamDecoderFilter(std::make_shared<MissingConfigFilter>());
+    };
+
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
     PathWithEscapedSlashesAction
     getPathWithEscapedSlashesActionRuntimeOverride(Server::Configuration::FactoryContext& context) {
@@ -765,26 +770,21 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 }
 
 void HttpConnectionManagerConfig::createFilterChainForFactories(
-    Http::FilterChainFactoryCallbacks& callbacks, const FilterFactoriesList& filter_factories) {
+    Http::FilterChainManager& manager, const FilterFactoriesList& filter_factories) {
   bool added_missing_config_filter = false;
   for (const auto& filter_config_provider : filter_factories) {
     auto config = filter_config_provider->config();
     if (config.has_value()) {
       Filter::NamedHttpFilterFactoryCb& factory_cb = config.value().get();
-
-      // Set custom name and filter name by the helper to avoid to set the names by every
-      // filter itself.
-      FilterChainFactoryCallbacksNameHelper callbacks_with_name_helper(
-          filter_config_provider->name(), factory_cb.first, callbacks);
-      factory_cb.second(callbacks_with_name_helper);
+      manager.postFilterFactory({filter_config_provider->name(), factory_cb.first},
+                                factory_cb.second);
       continue;
     }
 
     // If a filter config is missing after warming, inject a local reply with status 500.
     if (!added_missing_config_filter) {
       ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
-      callbacks.addStreamDecoderFilter(
-          Http::StreamDecoderFilterSharedPtr{std::make_shared<MissingConfigFilter>()});
+      manager.postFilterFactory({}, MissingConfigFilterFactory);
       added_missing_config_filter = true;
     } else {
       ENVOY_LOG(trace, "Provider {} missing a filter config", filter_config_provider->name());
@@ -792,14 +792,14 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
   }
 }
 
-void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
+void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& callbacks) {
   createFilterChainForFactories(callbacks, filter_factories_);
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainFactoryCallbacks& callbacks) {
+    Http::FilterChainManager& callbacks) {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
