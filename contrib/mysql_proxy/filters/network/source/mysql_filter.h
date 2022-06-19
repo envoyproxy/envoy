@@ -91,7 +91,7 @@ public:
   void onCommand(Command& message) override;
   void onCommandResponse(CommandResponse&) override{};
 
-  void doDecode(Buffer::Instance& buffer);
+  void doDecode(Buffer::Instance& buffer, bool is_upstream);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
   MySQLSession& getSession() { return decoder_->getSession(); }
 

@@ -38,7 +38,7 @@ class Decoder {
 public:
   virtual ~Decoder() = default;
 
-  virtual void onData(Buffer::Instance& data) PURE;
+  virtual void onData(Buffer::Instance& data, bool is_upstream) PURE;
   virtual MySQLSession& getSession() PURE;
 
   const Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes& getAttributes() const {

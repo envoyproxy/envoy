@@ -11,8 +11,10 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t len) {
-  ENVOY_LOG(trace, "mysql_proxy: parsing message, seq {}, len {}", seq, len);
+void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t len,
+                               bool is_upstream) {
+  ENVOY_LOG(trace, "mysql_proxy: parsing message, seq {}, len {}, is_upstream {}", seq, len,
+            is_upstream);
   // Run the MySQL state machine
   switch (session_.getState()) {
   case MySQLSession::State::Init: {
@@ -70,6 +72,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     }
     case MYSQL_RESP_MORE: {
       msg = std::make_unique<AuthMoreMessage>();
+      state = MySQLSession::State::AuthSwitchMore;
       break;
     }
     default:
@@ -92,7 +95,9 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
 
   case MySQLSession::State::AuthSwitchMore: {
     uint8_t resp_code;
-    if (BufferHelper::peekUint8(message, resp_code) != DecodeStatus::Success) {
+    if (is_upstream) {
+      break;
+    } else if (BufferHelper::peekUint8(message, resp_code) != DecodeStatus::Success) {
       session_.setState(MySQLSession::State::NotHandled);
       break;
     }
@@ -107,7 +112,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     }
     case MYSQL_RESP_MORE: {
       msg = std::make_unique<AuthMoreMessage>();
-      state = MySQLSession::State::AuthSwitchResp;
+      state = MySQLSession::State::AuthSwitchMore;
       break;
     }
     case MYSQL_RESP_ERR: {
@@ -115,10 +120,6 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
       // stop parsing auth req/response, attempt to resync in command state
       state = MySQLSession::State::Resync;
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
-      break;
-    }
-    case MYSQL_RESP_AUTH_SWITCH: {
-      msg = std::make_unique<AuthSwitchMessage>();
       break;
     }
     default:
@@ -165,7 +166,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
             static_cast<int>(session_.getState()));
 }
 
-bool DecoderImpl::decode(Buffer::Instance& data) {
+bool DecoderImpl::decode(Buffer::Instance& data, bool is_upstream) {
   ENVOY_LOG(trace, "mysql_proxy: decoding {} bytes", data.length());
   uint32_t len = 0;
   uint8_t seq = 0;
@@ -205,7 +206,7 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   session_.setExpectedSeq(seq + 1);
 
   const ssize_t data_len = data.length();
-  parseMessage(data, seq, len);
+  parseMessage(data, seq, len, is_upstream);
   const ssize_t consumed_len = data_len - data.length();
   data.drain(len - consumed_len); // Ensure that the whole message was consumed
 
@@ -213,10 +214,10 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   return true;
 }
 
-void DecoderImpl::onData(Buffer::Instance& data) {
+void DecoderImpl::onData(Buffer::Instance& data, bool is_upstream) {
   // TODO(venilnoronha): handle messages over 16 mb. See
   // https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
-  while (!BufferHelper::endOfBuffer(data) && decode(data)) {
+  while (!BufferHelper::endOfBuffer(data) && decode(data, is_upstream)) {
   }
 }
 

@@ -227,7 +227,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake41ErrTest) {
 
 /**
  * Test MySQL Handshake with protocol version 41
- * Server responds with Error
+ * Server responds with Auth More Data
  * SM: greeting(p=10) -> challenge-req(v41) -> serv-resp-more
  */
 TEST_F(MySQLFilterTest, MySqlHandshake41AuthMoreTest) {
@@ -251,7 +251,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake41AuthMoreTest) {
   std::string srv_resp_data = encodeClientLoginResp(MYSQL_RESP_MORE);
   Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(*server_resp_data, false));
-  EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
+  EXPECT_EQ(MySQLSession::State::AuthSwitchMore, filter_->getSession().getState());
 }
 
 /**
@@ -589,7 +589,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchErrFailResync) {
 }
 
 /**
- * Negative Testing MySQL Handshake with protocol version 320
+ * MySQL Handshake with protocol version 320
  * Server responds with Auth Switch More
  * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-auth-switch ->
  * -> auth_switch_resp -> serv-resp-auth-switch-more
@@ -624,7 +624,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchMoreandMore) {
   std::string srv_resp_ok_data = encodeClientLoginResp(MYSQL_RESP_MORE, 1);
   Buffer::InstancePtr server_resp_ok_data(new Buffer::OwnedImpl(srv_resp_ok_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(*server_resp_ok_data, false));
-  EXPECT_EQ(MySQLSession::State::AuthSwitchResp, filter_->getSession().getState());
+  EXPECT_EQ(MySQLSession::State::AuthSwitchMore, filter_->getSession().getState());
 }
 
 /**
