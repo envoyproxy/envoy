@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 
-# Take protoxform artifacts and pretty-print with protoprint.py.
+# Mangle protoxform and protoprint artifacts.
 
 import argparse
-import functools
-import multiprocessing as mp
+from collections import defaultdict
 import os
 import pathlib
 import re
 import shutil
 import string
-import subprocess
 import tarfile
 import tempfile
-from collections import defaultdict
 
 from tools.proto_format.data import data
 
@@ -49,7 +46,7 @@ api_proto_package($fields)
 
 IMPORT_REGEX = re.compile('import "(.*)";')
 SERVICE_REGEX = re.compile('service \w+ {')
-PACKAGE_REGEX = re.compile('\npackage: "([^"]*)"')
+PACKAGE_REGEX = re.compile('\npackage ([a-z0-9_\.]*);')
 PREVIOUS_MESSAGE_TYPE_REGEX = re.compile(r'previous_message_type\s+=\s+"([^"]*)";')
 
 
@@ -82,10 +79,10 @@ def get_destination_path(src):
     """
     src_path = pathlib.Path(src)
     contents = src_path.read_text(encoding='utf8')
-    matches = re.findall(PACKAGE_REGEX, contents)
+    matches = PACKAGE_REGEX.findall(contents)
     if len(matches) != 1:
         raise RequiresReformatError(
-            "Expect {} has only one package declaration but has {}".format(src, len(matches)))
+            f"Expect {src} has only one package declaration but has {len(matches)}\n{contents}")
     package = matches[0]
     dst_path = pathlib.Path(
         get_directory_from_package(package)).joinpath(src_path.name.split('.')[0] + ".proto")
@@ -109,36 +106,22 @@ def get_destination_path(src):
     return dst_path
 
 
-def proto_print(protoprint, descriptor, src, dst):
-    """Pretty-print FileDescriptorProto to a destination file.
-
-    Args:
-        src: source path for FileDescriptorProto.
-        dst: destination path for formatted proto.
-    """
-    print('proto_print %s' % dst)
-    subprocess.check_output([protoprint, src, str(dst), descriptor, 'API_VERSION.txt'])
-
-
-def sync_proto_file(protoprint, descriptor, dst_srcs):
+def sync_proto_file(srcs, dst):
     """Pretty-print a proto descriptor from protoxform.py Bazel cache artifacts."
 
     Args:
         dst_srcs: destination/sources path tuple.
     """
-    dst, srcs = dst_srcs
     assert (len(srcs) > 0)
     # If we only have one candidate source for a destination, just pretty-print.
     if len(srcs) == 1:
         src = srcs[0]
-        proto_print(protoprint, descriptor, src, dst)
     else:
         # We should only see an active and next major version candidate from
         # previous version today.
         assert (len(srcs) == 2)
-        active_src = [s for s in srcs if s.endswith('active_or_frozen.proto')][0]
-        proto_print(protoprint, descriptor, active_src, dst)
-        src = active_src
+        src = [s for s in srcs if s.endswith('active_or_frozen.proto')][0]
+    shutil.copy(src, dst)
     rel_dst_path = get_destination_path(src)
     return ['//%s:pkg' % str(rel_dst_path.parent)]
 
@@ -255,15 +238,19 @@ def sync_build_files(cmd, dst_root):
             f.write(build_contents)
 
 
-def format_api(api_root, mode, protoprint, descriptor, outfile, xformed):
+def format_api(api_root, mode, outfile, xformed, printed):
     # this is currently assumed by protoprint
     os.chdir(pathlib.Path(api_root).parent)
 
     with tempfile.TemporaryDirectory() as tmp:
         dst_dir = pathlib.Path(tmp)
+        printed_dir = dst_dir.joinpath("printed")
+        printed_dir.mkdir()
+        with tarfile.open(printed) as tar:
+            tar.extractall(printed_dir)
+
         xformed_dir = dst_dir.joinpath("xformed")
         xformed_dir.mkdir()
-
         with tarfile.open(xformed) as tar:
             tar.extractall(xformed_dir)
 
@@ -273,15 +260,16 @@ def format_api(api_root, mode, protoprint, descriptor, outfile, xformed):
         for label in data["proto_targets"]:
             _label = label[len('@envoy_api//'):].replace(':', '/')
             for suffix in ["active_or_frozen", "next_major_version_candidate"]:
-                path = xformed_dir.joinpath(f"pkg/{_label}.{suffix}.proto")
-                if path.exists() and os.stat(path).st_size > 0:
+                xpath = xformed_dir.joinpath(f"pkg/{_label}.{suffix}.proto")
+                path = printed_dir.joinpath(f"{_label}.proto")
+
+                if xpath.exists() and os.stat(xpath).st_size > 0:
                     target = dst_dir.joinpath(_label)
                     target.parent.mkdir(exist_ok=True, parents=True)
                     dst_src_paths[str(target)].append(str(path))
 
-        # TODO(phlax): Move this to an aspect or at least just parse the descriptor once.
-        with mp.Pool() as p:
-            p.map(functools.partial(sync_proto_file, protoprint, descriptor), dst_src_paths.items())
+        for k, v in dst_src_paths.items():
+            sync_proto_file(v, k)
         sync_build_files(mode, dst_dir)
 
         # These support files are handled manually.
@@ -291,6 +279,7 @@ def format_api(api_root, mode, protoprint, descriptor, outfile, xformed):
             copy_dst_dir.mkdir(exist_ok=True, parents=True)
             shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
 
+        shutil.rmtree(str(printed_dir))
         shutil.rmtree(str(xformed_dir))
         with tarfile.open(outfile, "w") as tar:
             tar.add(dst_dir, arcname=".")
@@ -300,13 +289,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['check', 'fix'])
     parser.add_argument('--api_root', default='./api')
-    parser.add_argument('--protoprint')
-    parser.add_argument('--descriptor')
     parser.add_argument('--outfile')
+    parser.add_argument('--protoprinted')
     parser.add_argument('--xformed')
     args = parser.parse_args()
 
     format_api(
-        args.api_root, args.mode, str(pathlib.Path(args.protoprint).absolute()),
-        str(pathlib.Path(args.descriptor).absolute()), str(pathlib.Path(args.outfile).absolute()),
-        args.xformed)
+        args.api_root, args.mode, str(pathlib.Path(args.outfile).absolute()),
+        str(pathlib.Path(args.xformed).absolute()), args.protoprinted)

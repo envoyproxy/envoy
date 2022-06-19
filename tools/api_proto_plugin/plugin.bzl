@@ -23,6 +23,12 @@ def _path_ignoring_repository(f):
 def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     # Compute output files from the current proto_library node's dependencies.
     transitive_outputs = depset(transitive = [dep.output_groups[output_group] for dep in ctx.rule.attr.deps])
+
+    # TODO(phlax): Return `ProtoInfo` from `proto` aspects, and this should
+    #    not be necessary.
+    if ProtoInfo not in target:
+        return [OutputGroupInfo(**{output_group: transitive_outputs})]
+
     proto_sources = [
         f
         for f in target[ProtoInfo].direct_sources
