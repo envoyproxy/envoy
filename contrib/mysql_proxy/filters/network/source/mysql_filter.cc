@@ -30,7 +30,7 @@ Network::FilterStatus MySQLFilter::onData(Buffer::Instance& data, bool) {
   // This can be removed once we are more confident of this code.
   if (sniffing_) {
     read_buffer_.add(data);
-    doDecode(read_buffer_);
+    doDecode(read_buffer_, true);
   }
   return Network::FilterStatus::Continue;
 }
@@ -40,12 +40,12 @@ Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool) {
   // This can be removed once we are more confident of this code.
   if (sniffing_) {
     write_buffer_.add(data);
-    doDecode(write_buffer_);
+    doDecode(write_buffer_, false);
   }
   return Network::FilterStatus::Continue;
 }
 
-void MySQLFilter::doDecode(Buffer::Instance& buffer) {
+void MySQLFilter::doDecode(Buffer::Instance& buffer, bool is_upstream) {
   // Clear dynamic metadata.
   envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
@@ -58,7 +58,7 @@ void MySQLFilter::doDecode(Buffer::Instance& buffer) {
   }
 
   try {
-    decoder_->onData(buffer);
+    decoder_->onData(buffer, is_upstream);
   } catch (EnvoyException& e) {
     ENVOY_LOG(info, "mysql_proxy: decoding error: {}", e.what());
     config_->stats_.decoder_errors_.inc();
