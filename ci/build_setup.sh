@@ -82,7 +82,7 @@ function cleanup() {
 }
 
 cleanup
-# trap cleanup EXIT
+trap cleanup EXIT
 
 "$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
 
