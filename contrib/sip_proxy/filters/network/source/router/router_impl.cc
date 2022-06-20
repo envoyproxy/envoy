@@ -136,11 +136,18 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
   QueryStatus ret = QueryStatus::Stop;
 
   if (type == "ep") {
-    if ((metadata->header(HeaderType::Route).empty() &&
-         metadata->header(HeaderType::TopLine).hasParam("ep"))) {
-      host = std::string(metadata->header(HeaderType::TopLine).param("ep"));
-    } else if (metadata->header(HeaderType::Route).hasParam("ep")) {
-      host = std::string(metadata->header(HeaderType::Route).param("ep"));
+    // For REGISTER, ep comes from Authorization header with opaque, and opaque is set when parse
+    // Authorization
+    if (metadata->methodType() == MethodType::Register && metadata->opaque().has_value()) {
+      host = std::string(metadata->opaque().value());
+    } else {
+      // Handler other Requests except REGISTER
+      if ((metadata->header(HeaderType::Route).empty() &&
+           metadata->header(HeaderType::TopLine).hasParam("ep"))) {
+        host = std::string(metadata->header(HeaderType::TopLine).param("ep"));
+      } else if (metadata->header(HeaderType::Route).hasParam("ep")) {
+        host = std::string(metadata->header(HeaderType::Route).param("ep"));
+      }
     }
 
     if (!host.empty()) {
@@ -219,14 +226,19 @@ FilterStatus Router::handleAffinity() {
                                             aff.subscribe());
         }
       }
-    } else if ((metadata->methodType() != MethodType::Register && options->sessionAffinity()) ||
-               (metadata->methodType() == MethodType::Register &&
-                options->registrationAffinity())) {
+    } else if (metadata->methodType() != MethodType::Register && options->sessionAffinity()) {
       metadata->setStopLoadBalance(false);
 
       if ((metadata->header(HeaderType::Route).empty() &&
            metadata->header(HeaderType::TopLine).hasParam("ep")) ||
           (metadata->header(HeaderType::Route).hasParam("ep"))) {
+        metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
+      }
+    } else if (metadata->methodType() == MethodType::Register && options->registrationAffinity()) {
+      metadata->setStopLoadBalance(false);
+
+      // For REGISTER, opaque is set when parse Authorization, opaque works as same as ep
+      if (metadata->opaque().has_value()) {
         metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
       }
     }
