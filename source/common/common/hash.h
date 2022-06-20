@@ -45,7 +45,7 @@ public:
   static uint64_t djb2CaseInsensitiveHash(absl::string_view input) {
     uint64_t hash = 5381;
     for (unsigned char c : input) {
-      hash += ((hash << 5) + hash) + absl::ascii_tolower(c);
+      hash = ((hash << 5) + hash) + absl::ascii_tolower(c);
     };
     return hash;
   }

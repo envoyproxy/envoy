@@ -451,7 +451,7 @@ TEST(StringUtil, StringViewFindToken) {
 }
 
 TEST(StringUtil, StringViewCaseInsensitiveHash) {
-  EXPECT_EQ(8972312556107145900U, StringUtil::CaseInsensitiveHash()("hello world"));
+  EXPECT_EQ(13876786532495509697U, StringUtil::CaseInsensitiveHash()("hello world"));
 }
 
 TEST(StringUtil, StringViewCaseInsensitiveCompare) {
