@@ -1,4 +1,4 @@
-1.20.6 (June 16, 2022)
+1.20.5 (June 16, 2022)
 ======================
 
 Incompatible Behavior Changes
@@ -13,7 +13,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* ci: fix disk space issue that have prevented publication.
+* docker: update Docker images (``distroless`` -> ``d65ac1a``) to resolve CVE issues in container packages.
 
 Removed Config or Runtime
 -------------------------
