@@ -478,46 +478,7 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
   }
 }
 
-void FilterManager::FilterChainFactoryCallbacksImpl::addStreamDecoderFilterWorker(
-    StreamDecoderFilterSharedPtr filter, bool dual_filter) {
-  auto raw_filter = filter.get();
-
-  ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(
-      manager_, std::move(filter), dual_filter, context_.custom_name, context_.filter_name));
-
-  raw_filter->setDecoderFilterCallbacks(*wrapper);
-  // Note: configured decoder filters are appended to decoder_filters_.
-  // This means that if filters are configured in the following order (assume all three filters are
-  // both decoder/encoder filters):
-  //   http_filters:
-  //     - A
-  //     - B
-  //     - C
-  // The decoder filter chain will iterate through filters A, B, C.
-  LinkedList::moveIntoListBack(std::move(wrapper), manager_.decoder_filters_);
-}
-
-void FilterManager::FilterChainFactoryCallbacksImpl::addStreamEncoderFilterWorker(
-    StreamEncoderFilterSharedPtr filter, bool dual_filter) {
-
-  auto raw_filter = filter.get();
-
-  ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(
-      manager_, std::move(filter), dual_filter, context_.custom_name, context_.filter_name));
-
-  raw_filter->setEncoderFilterCallbacks(*wrapper);
-  // Note: configured encoder filters are prepended to encoder_filters_.
-  // This means that if filters are configured in the following order (assume all three filters are
-  // both decoder/encoder filters):
-  //   http_filters:
-  //     - A
-  //     - B
-  //     - C
-  // The encoder filter chain will iterate through filters C, B, A.
-  LinkedList::moveIntoList(std::move(wrapper), manager_.encoder_filters_);
-}
-
-void FilterManager::postFilterFactory(FilterFacotryContext context, FilterFactoryCb& factory) {
+void FilterManager::applyFilterFactoryCb(FilterFacotryContext context, FilterFactoryCb& factory) {
   FilterChainFactoryCallbacksImpl callbacks(*this, context);
   factory(callbacks);
 }

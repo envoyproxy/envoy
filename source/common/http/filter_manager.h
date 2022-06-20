@@ -170,7 +170,9 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                             bool dual_filter, absl::string_view custom_name,
                             absl::string_view filter_name)
       : ActiveStreamFilterBase(parent, dual_filter, custom_name, filter_name),
-        handle_(std::move(filter)) {}
+        handle_(std::move(filter)) {
+    handle_->setDecoderFilterCallbacks(*this);
+  }
 
   // ActiveStreamFilterBase
   bool canContinue() override;
@@ -267,7 +269,9 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                             bool dual_filter, absl::string_view custom_name,
                             absl::string_view filter_name)
       : ActiveStreamFilterBase(parent, dual_filter, custom_name, filter_name),
-        handle_(std::move(filter)) {}
+        handle_(std::move(filter)) {
+    handle_->setEncoderFilterCallbacks(*this);
+  }
 
   // ActiveStreamFilterBase
   bool canContinue() override;
@@ -639,8 +643,35 @@ public:
     DUMP_DETAILS(&stream_info_);
   }
 
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+    access_log_handlers_.push_back(std::move(handler));
+  }
+  void addStreamDecoderFilter(ActiveStreamDecoderFilterPtr filter) {
+    // Note: configured decoder filters are appended to decoder_filters_.
+    // This means that if filters are configured in the following order (assume all three filters
+    // are both decoder/encoder filters):
+    //   http_filters:
+    //     - A
+    //     - B
+    //     - C
+    // The decoder filter chain will iterate through filters A, B, C.
+    LinkedList::moveIntoListBack(std::move(filter), decoder_filters_);
+  }
+  void addStreamEncoderFilter(ActiveStreamEncoderFilterPtr filter) {
+    // Note: configured encoder filters are prepended to encoder_filters_.
+    // This means that if filters are configured in the following order (assume all three filters
+    // are both decoder/encoder filters):
+    //   http_filters:
+    //     - A
+    //     - B
+    //     - C
+    // The encoder filter chain will iterate through filters C, B, A.
+    LinkedList::moveIntoList(std::move(filter), encoder_filters_);
+  }
+  void addStreamFilterBase(StreamFilterBase* filter) { filters_.push_back(filter); }
+
   // FilterChainManager
-  void postFilterFactory(FilterFacotryContext context, FilterFactoryCb& factory) override;
+  void applyFilterFactoryCb(FilterFacotryContext context, FilterFactoryCb& factory) override;
 
   void log() {
     RequestHeaderMap* request_headers = nullptr;
@@ -840,33 +871,34 @@ private:
         : manager_(manager), context_(context) {}
 
     void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
-      manager_.filters_.push_back(filter.get());
-      addStreamDecoderFilterWorker(std::move(filter), false);
+      manager_.addStreamFilterBase(filter.get());
+      manager_.addStreamDecoderFilter(std::make_unique<ActiveStreamDecoderFilter>(
+          manager_, std::move(filter), false, context_.custom_name, context_.filter_name));
     }
 
     void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
-      manager_.filters_.push_back(filter.get());
-      addStreamEncoderFilterWorker(std::move(filter), false);
+      manager_.addStreamFilterBase(filter.get());
+      manager_.addStreamEncoderFilter(std::make_unique<ActiveStreamEncoderFilter>(
+          manager_, std::move(filter), false, context_.custom_name, context_.filter_name));
     }
 
     void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
       StreamDecoderFilter* decoder_filter = filter.get();
-      manager_.filters_.push_back(decoder_filter);
+      manager_.addStreamFilterBase(decoder_filter);
 
-      addStreamDecoderFilterWorker(filter, true);
-      addStreamEncoderFilterWorker(std::move(filter), true);
+      manager_.addStreamDecoderFilter(std::make_unique<ActiveStreamDecoderFilter>(
+          manager_, filter, true, context_.custom_name, context_.filter_name));
+      manager_.addStreamEncoderFilter(std::make_unique<ActiveStreamEncoderFilter>(
+          manager_, std::move(filter), true, context_.custom_name, context_.filter_name));
     }
 
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
-      manager_.access_log_handlers_.push_back(std::move(handler));
+      manager_.addAccessLogHandler(std::move(handler));
     }
 
     Event::Dispatcher& dispatcher() override { return manager_.dispatcher_; }
 
   private:
-    void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
-    void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
-
     FilterManager& manager_;
     const Http::FilterFacotryContext& context_;
   };

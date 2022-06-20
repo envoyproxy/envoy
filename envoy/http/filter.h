@@ -302,21 +302,6 @@ public:
    * Called when filter activity indicates that the stream idle timeout should be reset.
    */
   virtual void resetIdleTimer() PURE;
-
-  /**
-   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
-   * host's. Or nullptr if none of them exist.
-   */
-  virtual const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const PURE;
-
-  /**
-   * Fold all the available per route filter configs, invoking the callback with each config (if
-   * it is present). Iteration of the configs is in order of specificity. That means that the
-   * callback will be called first for a config on a Virtual host, then a route, and finally a route
-   * entry (weighted cluster). If a config is not present, the callback will not be invoked.
-   */
-  virtual void traversePerFilterConfig(
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
 };
 
 /**
@@ -642,33 +627,6 @@ public:
 };
 
 /**
- * Hepler used to set and get stream filter names. This is to avoid having to implement
- * these method for every filter.
- */
-class StreamFilterNameHepler {
-public:
-  /**
-   * Get custom filter name of current filter instance. This name typically should be the
-   * name of HttpFilter proto configuration.
-   */
-  absl::string_view customName() const { return custom_name_; }
-  /**
-   * Get filter name of current filter instance.
-   */
-  absl::string_view filterName() const { return filter_name_; }
-
-  void setCustomName(absl::string_view view) { custom_name_ = std::string(view); }
-  void setFilterName(absl::string_view view) { filter_name_ = std::string(view); }
-
-protected:
-  // TODO(wbpcode): typically, the custom name and filter name have longer lifetime than the
-  // stream filter instances. We can simply keep string view here to avoid unnecessary copy
-  // and memory allocation. Currently, new strings are still always created for safety.
-  std::string custom_name_;
-  std::string filter_name_;
-};
-
-/**
  * Common base class for both decoder and encoder filters. Functions here are related to the
  * lifecycle of a filter. Currently the life cycle is as follows:
  * - All filters receive onStreamComplete()
@@ -681,7 +639,7 @@ protected:
  * - onDestroy is used to cleanup all pending filter resources like pending http requests and
  * timers.
  */
-class StreamFilterBase : public StreamFilterNameHepler {
+class StreamFilterBase {
 public:
   virtual ~StreamFilterBase() = default;
 
@@ -701,7 +659,7 @@ public:
    * onDestroy() invoked. Filters that cross-register as access log handlers receive log() before
    * onDestroy().
    */
-  virtual void onDestroy() {}
+  virtual void onDestroy() PURE;
 
   /**
    * Called when a match result occurs that isn't handled by the filter manager.
@@ -743,17 +701,8 @@ public:
 /**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter : public virtual StreamFilterBase {
+class StreamDecoderFilter : public StreamFilterBase {
 public:
-  // Explicit move assignment to avoid duplicate moves of virtual base StreamFilterBase and to
-  // eliminate virtual-move-assign warning.
-  StreamDecoderFilter& operator=(StreamDecoderFilter&& filter) noexcept {
-    // Use copy semantics rather than move semantics for StreamFilterBase.
-    StreamDecoderFilter::StreamFilterBase::operator=(filter);
-    return *this;
-  }
-  StreamDecoderFilter& operator=(const StreamDecoderFilter&) = default;
-
   /**
    * Called with decoded headers, optionally indicating end of stream.
    * @param headers supplies the decoded headers map.
@@ -968,17 +917,8 @@ public:
 /**
  * Stream encoder filter interface.
  */
-class StreamEncoderFilter : public virtual StreamFilterBase {
+class StreamEncoderFilter : public StreamFilterBase {
 public:
-  // Explicit move assignment to avoid duplicate moves of virtual base StreamFilterBase and to
-  // eliminate virtual-move-assign warning.
-  StreamEncoderFilter& operator=(StreamEncoderFilter&& filter) noexcept {
-    // Use copy semantics rather than move semantics for StreamFilterBase.
-    StreamEncoderFilter::StreamFilterBase::operator=(filter);
-    return *this;
-  }
-  StreamEncoderFilter& operator=(const StreamEncoderFilter&) = default;
-
   /**
    * Called with supported 1xx headers.
    *
@@ -1047,7 +987,7 @@ using StreamEncoderFilterSharedPtr = std::shared_ptr<StreamEncoderFilter>;
 /**
  * A filter that handles both encoding and decoding.
  */
-class StreamFilter : public StreamDecoderFilter, public StreamEncoderFilter {};
+class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEncoderFilter {};
 
 using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
@@ -1124,35 +1064,6 @@ public:
 using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
 /**
- * Simple struct of additional contextual information of filter factory, e.g. custom filter name
- * from configuration, canonical filter name, etc.
- */
-struct FilterFacotryContext {
-  // Custom filter name from configuration.
-  absl::string_view custom_name;
-  // Canonical filter name.
-  absl::string_view filter_name;
-};
-
-/**
- * The filter chain manager is provided by the connection manager to the filter chain factory.
- * The filter chain factory will post the filter factory context and filter factory to the
- * filter chain manager to create filter and construct HTTP stream filter chain.
- */
-class FilterChainManager {
-public:
-  virtual ~FilterChainManager() = default;
-
-  /**
-   * Post filter factory context and filter factory to the filter chain manager. The filter
-   * chain manager will create filter instance based on the context and factory internally.
-   * @param context supplies additional contextual information of filter factory.
-   * @param factory factory function used to create filter instances.
-   */
-  virtual void postFilterFactory(FilterFacotryContext context, FilterFactoryCb& factory) PURE;
-};
-
-/**
  * A FilterChainFactory is used by a connection manager to create an HTTP level filter chain when a
  * new stream is created on the connection (either locally or remotely). Typically it would be
  * implemented by a configuration engine that would install a set of filters that are able to
@@ -1164,24 +1075,24 @@ public:
 
   /**
    * Called when a new HTTP stream is created on the connection.
-   * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
-   *                FilterChainManager.
+   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
+   *                  FilterChainFactoryCallbacks.
    */
-  virtual void createFilterChain(FilterChainManager& manager) PURE;
+  virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) PURE;
 
   /**
    * Called when a new upgrade stream is created on the connection.
    * @param upgrade supplies the upgrade header from downstream
    * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.
-   * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
-   *                FilterChainManager.
+   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
+   *                  FilterChainFactoryCallbacks.
    * @return true if upgrades of this type are allowed and the filter chain has been created.
    *    returns false if this upgrade type is not configured, and no filter chain is created.
    */
   using UpgradeMap = std::map<std::string, bool>;
   virtual bool createUpgradeFilterChain(absl::string_view upgrade,
                                         const UpgradeMap* per_route_upgrade_map,
-                                        FilterChainManager& manager) PURE;
+                                        FilterChainFactoryCallbacks& callbacks) PURE;
 };
 
 } // namespace Http

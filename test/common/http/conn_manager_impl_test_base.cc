@@ -112,18 +112,21 @@ void HttpConnectionManagerImplTest::setupFilterChain(int num_decoder_filters,
   for (int req = 0; req < num_requests; req++) {
     EXPECT_CALL(filter_factory_, createFilterChain(_))
         .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
-                          this](FilterChainFactoryCallbacks& callbacks) -> void {
+                          this](FilterChainManager& manager) -> void {
           if (log_handler_.get()) {
-            callbacks.addAccessLogHandler(log_handler_);
+            auto factory = createLogHandlerFactoryCb(log_handler_);
+            manager.applyFilterFactoryCb({}, factory);
           }
           for (int i = 0; i < num_decoder_filters; i++) {
-            callbacks.addStreamDecoderFilter(
+            auto factory = createDecoderFilterFactoryCb(
                 StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
+            manager.applyFilterFactoryCb({}, factory);
           }
 
           for (int i = 0; i < num_encoder_filters; i++) {
-            callbacks.addStreamEncoderFilter(
+            auto factory = createEncoderFilterFactoryCb(
                 StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
+            manager.applyFilterFactoryCb({}, factory);
           }
         }));
 

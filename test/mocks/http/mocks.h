@@ -171,16 +171,39 @@ public:
   MOCK_METHOD(RequestEncoder&, newStream, (ResponseDecoder & response_decoder));
 };
 
+class MockFilterChainFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
+public:
+  MockFilterChainFactoryCallbacks();
+  ~MockFilterChainFactoryCallbacks() override;
+
+  MOCK_METHOD(void, addStreamDecoderFilter, (Http::StreamDecoderFilterSharedPtr filter));
+  MOCK_METHOD(void, addStreamEncoderFilter, (Http::StreamEncoderFilterSharedPtr filter));
+  MOCK_METHOD(void, addStreamFilter, (Http::StreamFilterSharedPtr filter));
+  MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+};
+
+class MockFilterChainManager : public FilterChainManager {
+public:
+  MockFilterChainManager();
+  ~MockFilterChainManager() override;
+
+  // Http::FilterChainManager
+  MOCK_METHOD(void, applyFilterFactoryCb, (FilterFacotryContext context, FilterFactoryCb& factory));
+
+  NiceMock<MockFilterChainFactoryCallbacks> callbacks_;
+};
+
 class MockFilterChainFactory : public FilterChainFactory {
 public:
   MockFilterChainFactory();
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  MOCK_METHOD(void, createFilterChain, (FilterChainFactoryCallbacks & callbacks));
+  MOCK_METHOD(void, createFilterChain, (FilterChainManager & manager));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
-               FilterChainFactoryCallbacks& callbacks));
+               FilterChainManager& manager));
 };
 
 class MockStreamFilterCallbacksBase {
@@ -502,18 +525,6 @@ public:
   MOCK_METHOD(void, sendTrailers, (RequestTrailerMap & trailers));
   MOCK_METHOD(void, reset, ());
   MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
-};
-
-class MockFilterChainFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
-public:
-  MockFilterChainFactoryCallbacks();
-  ~MockFilterChainFactoryCallbacks() override;
-
-  MOCK_METHOD(void, addStreamDecoderFilter, (Http::StreamDecoderFilterSharedPtr filter));
-  MOCK_METHOD(void, addStreamEncoderFilter, (Http::StreamEncoderFilterSharedPtr filter));
-  MOCK_METHOD(void, addStreamFilter, (Http::StreamFilterSharedPtr filter));
-  MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 };
 
 class MockDownstreamWatermarkCallbacks : public DownstreamWatermarkCallbacks {

@@ -776,15 +776,15 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
     auto config = filter_config_provider->config();
     if (config.has_value()) {
       Filter::NamedHttpFilterFactoryCb& factory_cb = config.value().get();
-      manager.postFilterFactory({filter_config_provider->name(), factory_cb.first},
-                                factory_cb.second);
+      manager.applyFilterFactoryCb({filter_config_provider->name(), factory_cb.first},
+                                   factory_cb.second);
       continue;
     }
 
     // If a filter config is missing after warming, inject a local reply with status 500.
     if (!added_missing_config_filter) {
       ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
-      manager.postFilterFactory({}, MissingConfigFilterFactory);
+      manager.applyFilterFactoryCb({}, MissingConfigFilterFactory);
       added_missing_config_filter = true;
     } else {
       ENVOY_LOG(trace, "Provider {} missing a filter config", filter_config_provider->name());
