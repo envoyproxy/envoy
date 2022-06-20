@@ -303,7 +303,7 @@ public:
   DrainManager& localDrainManager() const {
     return listener_factory_context_->listener_factory_context_base_->drainManager();
   }
-  void setSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
+  void addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
   const std::string& versionInfo() const { return version_info_; }
@@ -421,11 +421,11 @@ private:
   // Helpers for constructor.
   void buildAccessLog();
   void buildInternalListener();
-  void validateConfig(Network::Socket::Type socket_type);
-  void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
-  void buildListenSocketOptions(Network::Socket::Type socket_type);
-  void createListenerFilterFactories(Network::Socket::Type socket_type);
-  void validateFilterChains(Network::Socket::Type socket_type);
+  void validateConfig();
+  void buildUdpListenerFactory(uint32_t concurrency);
+  void buildListenSocketOptions();
+  void createListenerFilterFactories();
+  void validateFilterChains();
   void buildFilterChains();
   void buildConnectionBalancer(const Network::Address::Instance& address);
   void buildSocketOptions();
@@ -439,6 +439,7 @@ private:
 
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
+  const Network::Socket::Type socket_type_;
 
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   const bool bind_to_port_;

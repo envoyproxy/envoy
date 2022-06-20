@@ -323,7 +323,9 @@ public:
     void setDirection(envoy::config::core::v3::TrafficDirection direction) {
       direction_ = direction;
     }
-    Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
+    Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
+      return *connection_balancer_;
+    }
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return access_logs_;
     }

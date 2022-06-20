@@ -299,6 +299,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
+      socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
       bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
@@ -378,16 +379,15 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 
   buildAccessLog();
-  auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
-  validateConfig(socket_type);
+  validateConfig();
   // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
   // listener factory can provide additional options.
-  buildUdpListenerFactory(socket_type, concurrency);
-  buildListenSocketOptions(socket_type);
-  createListenerFilterFactories(socket_type);
-  validateFilterChains(socket_type);
+  buildUdpListenerFactory(concurrency);
+  buildListenSocketOptions();
+  createListenerFilterFactories();
+  validateFilterChains();
   buildFilterChains();
-  if (socket_type != Network::Socket::Type::Datagram) {
+  if (socket_type_ != Network::Socket::Type::Datagram) {
     buildSocketOptions();
     buildOriginalDstListenerFilter();
     buildProxyProtocolListenerFilter();
@@ -407,8 +407,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash)
-    : parent_(parent), address_(origin.address_), bind_to_port_(shouldBindToPort(config)),
-      mptcp_enabled_(config.enable_mptcp()),
+    : parent_(parent), address_(origin.address_), socket_type_(origin.socket_type_),
+      bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -446,14 +446,13 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
   buildAccessLog();
-  auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
-  validateConfig(socket_type);
-  buildListenSocketOptions(socket_type);
-  createListenerFilterFactories(socket_type);
-  validateFilterChains(socket_type);
+  validateConfig();
+  buildListenSocketOptions();
+  createListenerFilterFactories();
+  validateFilterChains();
   buildFilterChains();
   buildInternalListener();
-  if (socket_type == Network::Socket::Type::Stream) {
+  if (socket_type_ == Network::Socket::Type::Stream) {
     // Apply the options below only for TCP.
     buildSocketOptions();
     buildOriginalDstListenerFilter();
@@ -462,9 +461,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   }
 }
 
-void ListenerImpl::validateConfig(Network::Socket::Type socket_type) {
+void ListenerImpl::validateConfig() {
   if (mptcp_enabled_) {
-    if (socket_type != Network::Socket::Type::Stream) {
+    if (socket_type_ != Network::Socket::Type::Stream) {
       throw EnvoyException(
           fmt::format("listener {}: enable_mptcp can only be used with TCP listeners", name_));
     }
@@ -529,9 +528,8 @@ void ListenerImpl::buildInternalListener() {
   }
 }
 
-void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
-                                           uint32_t concurrency) {
-  if (socket_type != Network::Socket::Type::Datagram) {
+void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
+  if (socket_type_ != Network::Socket::Type::Datagram) {
     return;
   }
   if (!reuse_port_ && concurrency > 1) {
@@ -582,7 +580,7 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   }
 }
 
-void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
+void ListenerImpl::buildListenSocketOptions() {
   // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
   // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
   if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
@@ -601,7 +599,7 @@ void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config_.socket_options()));
   }
-  if (socket_type == Network::Socket::Type::Datagram) {
+  if (socket_type_ == Network::Socket::Type::Datagram) {
     // Needed for recvmsg to return destination address in IP header.
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
@@ -619,9 +617,9 @@ void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
   }
 }
 
-void ListenerImpl::createListenerFilterFactories(Network::Socket::Type socket_type) {
+void ListenerImpl::createListenerFilterFactories() {
   if (!config_.listener_filters().empty()) {
-    switch (socket_type) {
+    switch (socket_type_) {
     case Network::Socket::Type::Datagram:
       udp_listener_filter_factories_ = parent_.factory_.createUdpListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
@@ -634,9 +632,9 @@ void ListenerImpl::createListenerFilterFactories(Network::Socket::Type socket_ty
   }
 }
 
-void ListenerImpl::validateFilterChains(Network::Socket::Type socket_type) {
+void ListenerImpl::validateFilterChains() {
   if (config_.filter_chains().empty() && !config_.has_default_filter_chain() &&
-      (socket_type == Network::Socket::Type::Stream ||
+      (socket_type_ == Network::Socket::Type::Stream ||
        !udp_listener_config_->listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified

@@ -2107,7 +2107,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdateWithoutUdpInplaceSupport) 
 
   TestListener* old_test_listener =
       addListener(old_listener_tag, true, false, "test_listener", old_listener,
-                  &old_listener_callbacks, mock_connection_balancer, &current_handler);
+                  &old_listener_callbacks, nullptr, mock_connection_balancer, &current_handler);
   EXPECT_CALL(old_test_listener->socketFactory(), localAddress())
       .WillRepeatedly(ReturnRef(local_address_));
   handler_->addListener(absl::nullopt, *old_test_listener, runtime_);
@@ -2117,10 +2117,11 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdateWithoutUdpInplaceSupport) 
 
   auto overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
-  TestListener* new_test_listener = addListener(
-      new_listener_tag, true, false, "test_listener", /* Network::Listener */ nullptr,
-      &new_listener_callbacks, mock_connection_balancer, nullptr, Network::Socket::Type::Stream,
-      std::chrono::milliseconds(15000), false, overridden_filter_chain_manager);
+  TestListener* new_test_listener =
+      addListener(new_listener_tag, true, false, "test_listener", /* Network::Listener */ nullptr,
+                  &new_listener_callbacks, nullptr, mock_connection_balancer, nullptr,
+                  Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
+                  overridden_filter_chain_manager);
   EXPECT_CALL(new_test_listener->socketFactory(), socketType())
       .WillOnce(Return(Network::Socket::Type::Stream));
   handler_->addListener(old_listener_tag, *new_test_listener, runtime_);

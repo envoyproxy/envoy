@@ -326,7 +326,7 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
                                                const Network::Address::Instance& address) {
   auto active_listener = findActiveListenerByTag(listener_tag);
   if (active_listener.has_value()) {
-    for (auto& details : active_listener->get().per_address_details_) {
+    for (auto& details : active_listener->get().per_address_details_list_) {
       if (*details->address_ == address) {
         ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
                    details->typed_listener_) &&
