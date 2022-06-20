@@ -31,17 +31,17 @@ public:
   /**
    * @return the span's version as a hex string.
    */
-  absl::string_view version() const { return version_; }
+  std::string version() const { return version_; }
 
   /**
    * @return the span's parent id as a hex string.
    */
-  absl::string_view parentId() const { return parent_id_; }
+  std::string parentId() const { return parent_id_; }
 
   /**
    * @return the trace id as an integer.
    */
-  absl::string_view traceId() const { return trace_id_; }
+  std::string traceId() const { return trace_id_; }
 
   /**
    * @return the sampled flag.
@@ -49,9 +49,9 @@ public:
   bool sampled() const { return sampled_; }
 
 private:
-  const absl::string_view version_;
-  const absl::string_view trace_id_;
-  const absl::string_view parent_id_;
+  const std::string version_;
+  const std::string trace_id_;
+  const std::string parent_id_;
   const bool sampled_{false};
 };
 
