@@ -330,12 +330,7 @@ class RedisProxyIntegrationTest : public testing::TestWithParam<Network::Address
 public:
   RedisProxyIntegrationTest(const std::string& config = CONFIG, int num_upstreams = 2)
       : BaseIntegrationTest(GetParam(), config), num_upstreams_(num_upstreams),
-        version_(GetParam()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'redis.redis_stats.command.ttl.error' and
-    // stat_prefix 'redis_stats'.
-    skip_tag_extraction_rule_check_ = true;
-  }
+        version_(GetParam()) {}
 
   // This method encodes a fake upstream's IP address and TCP port in the
   // same format as one would expect from a Redis server in
