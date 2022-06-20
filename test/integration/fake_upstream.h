@@ -810,9 +810,7 @@ private:
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return udp_listener_config_; }
-    Network::InternalListenerConfigOptRef internalListenerConfig() override {
-      return {};
-    }
+    Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return connection_balancer_;
     }
