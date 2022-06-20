@@ -12,6 +12,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP Cache Policy]
 
-// [#extension: envoy.filters.http.cache_policy]
+// [#extension: envoy.filters.http.cache.cache_policy]
 message CachePolicyConfig {
 }
