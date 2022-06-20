@@ -331,7 +331,7 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
         ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
                    details->typed_listener_) &&
                details->listener_->listener() != nullptr);
-        return Network::BalancedConnectionHandlerOptRef(details->tcpListener().value().get());
+        return {details->tcpListener().value().get()};
       }
     }
   }
