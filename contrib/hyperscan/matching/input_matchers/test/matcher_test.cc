@@ -154,7 +154,7 @@ TEST_F(MatcherTest, InvalidRegex) {
 
 // Verify that replace all works correctly.
 TEST_F(MatcherTest, ReplaceAll) {
-  setup("b+", HS_FLAG_SOM_LEFTMOST);
+  setup("b+", 0);
 
   EXPECT_EQ(matcher_->replaceAll("yabba dabba doo", "d"), "yada dada doo");
 }

@@ -10,7 +10,6 @@ HyperscanEngine::HyperscanEngine(unsigned int flag, ThreadLocal::SlotAllocator& 
 
 Envoy::Regex::CompiledMatcherPtr HyperscanEngine::matcher(const std::string& regex) const {
   std::vector<const char*> expressions{regex.c_str()};
-  // Enable leftmost start of match reporting for replaceAll interface.
   std::vector<unsigned int> flags{flag_};
   std::vector<unsigned int> ids{0};
 

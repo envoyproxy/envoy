@@ -59,9 +59,9 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
     int compile_err_expression = compile_err->expression;
 
     if (compile_err_expression < 0) {
-      ENVOY_LOG_MISC(warn, "unable to compile SOM database: {}.", compile_err_message);
+      ENVOY_LOG_MISC(warn, "unable to compile SOM database: {}", compile_err_message);
     } else {
-      ENVOY_LOG_MISC(warn, "unable to compile pattern '{}': {}.",
+      ENVOY_LOG_MISC(warn, "unable to compile SOM pattern '{}': {}",
                      expressions.at(compile_err_expression), compile_err_message);
     }
   }
@@ -86,7 +86,7 @@ bool Matcher::match(absl::string_view value) const {
       },
       &matched);
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
-    ENVOY_LOG_MISC(error, "unable to scan, error code {}.", err);
+    ENVOY_LOG_MISC(error, "unable to scan, error code {}", err);
   }
 
   return matched;
@@ -109,7 +109,7 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
       },
       &founds);
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
-    ENVOY_LOG_MISC(error, "unable to scan, error code {}.", err);
+    ENVOY_LOG_MISC(error, "unable to scan, error code {}", err);
     return std::string(value);
   }
 
