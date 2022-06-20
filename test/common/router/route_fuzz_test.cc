@@ -101,7 +101,8 @@ bool validateMatcherConfig(const xds::type::matcher::v3::Matcher& matcher) {
       }
     }
   }
-  if (matcher.on_no_match().has_action() && !validateOnMatchConfig(matcher.on_no_match())) {
+  if ((matcher.on_no_match().has_action() || matcher.on_no_match().has_matcher()) &&
+      !validateOnMatchConfig(matcher.on_no_match())) {
     ENVOY_LOG_MISC(debug, "matcher.on_no_match.action not sufficient for processing");
     return false;
   }
