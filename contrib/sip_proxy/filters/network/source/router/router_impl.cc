@@ -168,19 +168,12 @@ FilterStatus Router::handleAffinity() {
   auto& metadata = metadata_;
   std::string host;
 
-#if 1
-  // TODO To be deleted
+  // ONLY used for NOKIA P-Cookie-IP-Mapping
   if (metadata->pCookieIpMap().has_value()) {
-    ENVOY_LOG(trace, "Updata pCookieIpMap in tra");
     auto [key, val] = metadata->pCookieIpMap().value();
-    callbacks_->traHandler()->retrieveTrafficRoutingAssistant("lskpmc", key, *callbacks_, host);
-    if (host != val) {
-      callbacks_->traHandler()->updateTrafficRoutingAssistant(
-          "lskpmc", metadata->pCookieIpMap().value().first,
-          metadata->pCookieIpMap().value().second);
-    }
+    ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
+    callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val);
   }
-#endif
 
   const std::shared_ptr<const ProtocolOptionsConfig> options =
       cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
@@ -678,16 +671,11 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
     auto active_trans = parent_.getTransaction(std::string(transaction_id));
     if (active_trans) {
+      // ONLY used for NOKIA P-Cookie-IP-Mapping
       if (metadata->pCookieIpMap().has_value()) {
-        ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", metadata->pCookieIpMap().value().first,
-                  metadata->pCookieIpMap().value().second);
         auto [key, val] = metadata->pCookieIpMap().value();
-        std::string host;
-        active_trans->traHandler()->retrieveTrafficRoutingAssistant("lskpmc", key, *active_trans,
-                                                                    host);
-        if (host != val) {
-          active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val);
-        }
+        ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
+        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val);
       }
 
       active_trans->startUpstreamResponse();
