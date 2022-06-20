@@ -6701,6 +6701,8 @@ TEST(ListenerEnableReusePortTest, All) {
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceConfig) {
+// Envoy always use ExactBalance at WIN32, so ignore it.
+#ifndef WIN32
   auto listener = createIPv4Listener("TCPListener");
   auto* connection_balance_config = listener.mutable_connection_balance_config();
   auto* extend_balance_config = connection_balance_config->mutable_extend_balance();
@@ -6712,6 +6714,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
       new ListenerImpl(listener, "version", *manager_, "foo", true, false,
                        /*hash=*/static_cast<uint64_t>(0), 1),
       EnvoyException, "Didn't find a registered implementation for type: 'google.protobuf.test'");
+#endif
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));
