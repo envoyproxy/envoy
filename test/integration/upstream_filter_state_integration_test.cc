@@ -58,7 +58,7 @@ public:
 
 class SocketFactory : public Extensions::TransportSockets::PassthroughFactory {
 public:
-  SocketFactory(Network::TransportSocketFactoryPtr&& inner_factory)
+  SocketFactory(Network::UpstreamTransportSocketFactoryPtr&& inner_factory)
       : PassthroughFactory(std::move(inner_factory)) {}
 
   Network::TransportSocketPtr
@@ -79,7 +79,7 @@ public:
     return std::make_unique<test::integration::upstream_socket::v3::Config>();
   }
 
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override {
     const auto& outer_config =

@@ -8,6 +8,7 @@ namespace Router {
 
 struct StatNames;
 struct VirtualClusterStatNames;
+struct RouteStatNames;
 
 class Context {
 public:
@@ -22,6 +23,11 @@ public:
    * @return a struct containing StatNames for virtual cluster stats.
    */
   virtual const VirtualClusterStatNames& virtualClusterStatNames() const PURE;
+
+  /**
+   * @return a struct containing StatNames for route level stats.
+   */
+  virtual const RouteStatNames& routeStatNames() const PURE;
 
   /**
    * @return a reference to the default generic connection pool factory.
