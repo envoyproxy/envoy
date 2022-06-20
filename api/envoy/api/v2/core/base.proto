@@ -33,7 +33,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // pool and circuit breaking settings for each priority level. This means that
 // even for HTTP/2 requests, two physical connections will be used to an
 // upstream host. In the future Envoy will likely support true HTTP/2 priority
-// over a single upstream connection.
+// over a single upstream connection. ARBITRARY CHANGE.
 enum RoutingPriority {
   DEFAULT = 0;
   HIGH = 1;
