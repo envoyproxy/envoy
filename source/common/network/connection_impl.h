@@ -22,7 +22,7 @@ class TestPauseFilter;
 
 namespace Network {
 
-class HappyEyeballsConnectionImpl;
+class MultiConnectionBaseImpl;
 
 /**
  * Utility functions for the connection implementation.
@@ -187,7 +187,7 @@ protected:
   bool bind_error_{false};
 
 private:
-  friend class HappyEyeballsConnectionImpl;
+  friend class MultiConnectionBaseImpl;
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
 

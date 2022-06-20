@@ -18,8 +18,42 @@ namespace Envoy {
 namespace Network {
 
 /**
- * Implementation of ClientConnection which transparently attempts connections to
- * multiple different IP addresses, and uses the first connection that succeeds.
+ * An abstract class for providing next ClientConnectionPtr that can should used by
+ * the HappyEyeballsConnectionImpl. Classes can inherit this class to provide
+ * different kinds of connection creation strategies.
+ */
+class ConnectionProvider {
+public:
+  virtual ~ConnectionProvider() = default;
+
+  /**
+   * Whether there's still next connection to try.
+   */
+  virtual bool hasNextConnection() PURE;
+
+  /**
+   * Create next client connection.
+   */
+  virtual ClientConnectionPtr createNextConnection(const uint64_t id) PURE;
+
+  /**
+   * Return the index for the next connection.
+   *
+   */
+  virtual size_t nextConnection() PURE;
+
+  /**
+   * Return the total count of connections the connection provider will make.
+   *
+   */
+  virtual size_t totalConnections() PURE;
+};
+
+using ConnectionProviderPtr = std::unique_ptr<ConnectionProvider>;
+
+/**
+ * Implementation of ClientConnection which transparently attempts connections
+ * provided by a ConnectionProvider, and uses the first connection that succeeds.
  * After a connection is established, all methods simply delegate to the
  * underlying connection. However, before the connection is established
  * their behavior depends on their semantics. For anything which can result
@@ -28,21 +62,15 @@ namespace Network {
  * which point they are replayed to the underlying connection. For simple methods
  * they are applied to each open connection and applied when creating new ones.
  *
- * See the Happy Eyeballs RFC at https://datatracker.ietf.org/doc/html/rfc6555
- * TODO(RyanTheOptimist): Implement the Happy Eyeballs address sorting algorithm
- * either in the class or in the resolution code.
+ * This is originally a part of the HapppyEyeballsConnectionImpl but split for
+ * broader use cases.
  */
-class HappyEyeballsConnectionImpl : public ClientConnection,
-                                    Logger::Loggable<Logger::Id::happy_eyeballs> {
+class MultiConnectionBaseImpl : public ClientConnection,
+                                Logger::Loggable<Logger::Id::multi_connection> {
 public:
-  HappyEyeballsConnectionImpl(Event::Dispatcher& dispatcher,
-                              const std::vector<Address::InstanceConstSharedPtr>& address_list,
-                              Address::InstanceConstSharedPtr source_address,
-                              UpstreamTransportSocketFactory& socket_factory,
-                              TransportSocketOptionsConstSharedPtr transport_socket_options,
-                              const ConnectionSocket::OptionsSharedPtr options);
+  MultiConnectionBaseImpl(Event::Dispatcher& dispatcher, ConnectionProviderPtr connection_provider);
 
-  ~HappyEyeballsConnectionImpl() override;
+  ~MultiConnectionBaseImpl() override;
 
   // Network::ClientConnection
   void connect() override;
@@ -102,20 +130,12 @@ public:
   void hashKey(std::vector<uint8_t>& hash_key) const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
-  // Returns a new vector containing the contents of |address_list| sorted
-  // with address families interleaved, as per Section 4 of RFC 8305, Happy
-  // Eyeballs v2. It is assumed that the list must already be sorted as per
-  // Section 6 of RFC6724, which happens in the DNS implementations (ares_getaddrinfo()
-  // and Apple DNS).
-  static std::vector<Address::InstanceConstSharedPtr>
-  sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& address_list);
-
 private:
   // ConnectionCallbacks which will be set on an ClientConnection which
-  // sends connection events back to the HappyEyeballsConnectionImpl.
+  // sends connection events back to the MultiConnectionBaseImpl.
   class ConnectionCallbacksWrapper : public ConnectionCallbacks {
   public:
-    ConnectionCallbacksWrapper(HappyEyeballsConnectionImpl& parent, ClientConnection& connection)
+    ConnectionCallbacksWrapper(MultiConnectionBaseImpl& parent, ClientConnection& connection)
         : parent_(parent), connection_(connection) {}
 
     void onEvent(ConnectionEvent event) override { parent_.onEvent(event, this); }
@@ -123,19 +143,19 @@ private:
     void onAboveWriteBufferHighWatermark() override {
       // No data will be written to the connection while the wrapper is associated with it,
       // so the write buffer should never hit the high watermark.
-      IS_ENVOY_BUG("Unexpected data written to happy eyeballs connection");
+      IS_ENVOY_BUG("Unexpected data written to MultiConnectionBaseImpl");
     }
 
     void onBelowWriteBufferLowWatermark() override {
       // No data will be written to the connection while the wrapper is associated with it,
       // so the write buffer should never hit the high watermark.
-      IS_ENVOY_BUG("Unexpected data drained from happy eyeballs connection");
+      IS_ENVOY_BUG("Unexpected data drained from MultiConnectionBaseImpl");
     }
 
     ClientConnection& connection() { return connection_; }
 
   private:
-    HappyEyeballsConnectionImpl& parent_;
+    MultiConnectionBaseImpl& parent_;
     ClientConnection& connection_;
   };
 
@@ -207,12 +227,8 @@ private:
 
   Event::Dispatcher& dispatcher_;
 
-  // List of addresses to attempt to connect to.
-  const std::vector<Address::InstanceConstSharedPtr> address_list_;
-  // Index of the next address to use.
-  size_t next_address_ = 0;
+  ConnectionProviderPtr connection_provider_;
 
-  ConnectionConstructionState connection_construction_state_;
   PerConnectionState per_connection_state_;
   PostConnectState post_connect_state_;
 

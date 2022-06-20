@@ -172,9 +172,9 @@ TEST_F(HappyEyeballsConnectionImplTest, DisallowedFunctions) {
   startConnect();
 
   EXPECT_ENVOY_BUG(connection_callbacks_[0]->onAboveWriteBufferHighWatermark(),
-                   "Unexpected data written to happy eyeballs connection");
+                   "Unexpected data written to MultiConnectionBaseImpl");
   EXPECT_ENVOY_BUG(connection_callbacks_[0]->onBelowWriteBufferLowWatermark(),
-                   "Unexpected data drained from happy eyeballs connection");
+                   "Unexpected data drained from MultiConnectionBaseImpl");
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondSuccess) {
@@ -1073,26 +1073,26 @@ TEST_F(HappyEyeballsConnectionImplTest, SortAddresses) {
 
   // All v4 address so unchanged.
   std::vector<Address::InstanceConstSharedPtr> v4_list = {ip_v4_1, ip_v4_2, ip_v4_3, ip_v4_4};
-  EXPECT_EQ(v4_list, HappyEyeballsConnectionImpl::sortAddresses(v4_list));
+  EXPECT_EQ(v4_list, HappyEyeballsConnectionProvider::sortAddresses(v4_list));
 
   // All v6 address so unchanged.
   std::vector<Address::InstanceConstSharedPtr> v6_list = {ip_v6_1, ip_v6_2, ip_v6_3, ip_v6_4};
-  EXPECT_EQ(v6_list, HappyEyeballsConnectionImpl::sortAddresses(v6_list));
+  EXPECT_EQ(v6_list, HappyEyeballsConnectionProvider::sortAddresses(v6_list));
 
   std::vector<Address::InstanceConstSharedPtr> v6_then_v4 = {ip_v6_1, ip_v6_2, ip_v4_1, ip_v4_2};
   std::vector<Address::InstanceConstSharedPtr> interleaved = {ip_v6_1, ip_v4_1, ip_v6_2, ip_v4_2};
-  EXPECT_EQ(interleaved, HappyEyeballsConnectionImpl::sortAddresses(v6_then_v4));
+  EXPECT_EQ(interleaved, HappyEyeballsConnectionProvider::sortAddresses(v6_then_v4));
 
   std::vector<Address::InstanceConstSharedPtr> v6_then_single_v4 = {ip_v6_1, ip_v6_2, ip_v6_3,
                                                                     ip_v4_1};
   std::vector<Address::InstanceConstSharedPtr> interleaved2 = {ip_v6_1, ip_v4_1, ip_v6_2, ip_v6_3};
-  EXPECT_EQ(interleaved2, HappyEyeballsConnectionImpl::sortAddresses(v6_then_single_v4));
+  EXPECT_EQ(interleaved2, HappyEyeballsConnectionProvider::sortAddresses(v6_then_single_v4));
 
   std::vector<Address::InstanceConstSharedPtr> mixed = {ip_v6_1, ip_v6_2, ip_v6_3, ip_v4_1,
                                                         ip_v4_2, ip_v4_3, ip_v4_4, ip_v6_4};
   std::vector<Address::InstanceConstSharedPtr> interleaved3 = {ip_v6_1, ip_v4_1, ip_v6_2, ip_v4_2,
                                                                ip_v6_3, ip_v4_3, ip_v6_4, ip_v4_4};
-  EXPECT_EQ(interleaved3, HappyEyeballsConnectionImpl::sortAddresses(mixed));
+  EXPECT_EQ(interleaved3, HappyEyeballsConnectionProvider::sortAddresses(mixed));
 }
 
 } // namespace Network

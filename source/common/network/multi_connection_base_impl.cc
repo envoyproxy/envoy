@@ -1,33 +1,30 @@
-#include "source/common/network/happy_eyeballs_connection_impl.h"
+#include "source/common/network/multi_connection_base_impl.h"
 
 #include <vector>
 
 namespace Envoy {
 namespace Network {
 
-HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
-    Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
-    Address::InstanceConstSharedPtr source_address, UpstreamTransportSocketFactory& socket_factory,
-    TransportSocketOptionsConstSharedPtr transport_socket_options,
-    const ConnectionSocket::OptionsSharedPtr options)
+MultiConnectionBaseImpl::MultiConnectionBaseImpl(Event::Dispatcher& dispatcher,
+                                                 ConnectionProviderPtr connection_provider)
     : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher),
-      address_list_(sortAddresses(address_list)),
-      connection_construction_state_(
-          {source_address, socket_factory, transport_socket_options, options}),
+      connection_provider_(std::move(connection_provider)),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
-  ENVOY_LOG_EVENT(debug, "happy_eyeballs_new_cx", "[C{}] addresses={}", id_, address_list_.size());
+  ENVOY_LOG_EVENT(debug, "multi_connection_new_cx", "[C{}] connections={}", id_,
+                  connection_provider_->totalConnections());
+
   connections_.push_back(createNextConnection());
 }
 
-HappyEyeballsConnectionImpl::~HappyEyeballsConnectionImpl() = default;
+MultiConnectionBaseImpl::~MultiConnectionBaseImpl() = default;
 
-void HappyEyeballsConnectionImpl::connect() {
+void MultiConnectionBaseImpl::connect() {
   ENVOY_BUG(!connect_finished_, "connection already connected");
   connections_[0]->connect();
   maybeScheduleNextAttempt();
 }
 
-void HappyEyeballsConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
+void MultiConnectionBaseImpl::addWriteFilter(WriteFilterSharedPtr filter) {
   if (connect_finished_) {
     connections_[0]->addWriteFilter(filter);
     return;
@@ -37,7 +34,7 @@ void HappyEyeballsConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
   post_connect_state_.write_filters_.push_back(filter);
 }
 
-void HappyEyeballsConnectionImpl::addFilter(FilterSharedPtr filter) {
+void MultiConnectionBaseImpl::addFilter(FilterSharedPtr filter) {
   if (connect_finished_) {
     connections_[0]->addFilter(filter);
     return;
@@ -47,7 +44,7 @@ void HappyEyeballsConnectionImpl::addFilter(FilterSharedPtr filter) {
   post_connect_state_.filters_.push_back(filter);
 }
 
-void HappyEyeballsConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
+void MultiConnectionBaseImpl::addReadFilter(ReadFilterSharedPtr filter) {
   if (connect_finished_) {
     connections_[0]->addReadFilter(filter);
     return;
@@ -57,7 +54,7 @@ void HappyEyeballsConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
   post_connect_state_.read_filters_.push_back(filter);
 }
 
-void HappyEyeballsConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
+void MultiConnectionBaseImpl::removeReadFilter(ReadFilterSharedPtr filter) {
   if (connect_finished_) {
     connections_[0]->removeReadFilter(filter);
     return;
@@ -74,7 +71,7 @@ void HappyEyeballsConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
   IS_ENVOY_BUG("Failed to remove read filter");
 }
 
-bool HappyEyeballsConnectionImpl::initializeReadFilters() {
+bool MultiConnectionBaseImpl::initializeReadFilters() {
   if (connect_finished_) {
     return connections_[0]->initializeReadFilters();
   }
@@ -87,7 +84,7 @@ bool HappyEyeballsConnectionImpl::initializeReadFilters() {
   return true;
 }
 
-void HappyEyeballsConnectionImpl::addBytesSentCallback(Connection::BytesSentCb cb) {
+void MultiConnectionBaseImpl::addBytesSentCallback(Connection::BytesSentCb cb) {
   if (connect_finished_) {
     connections_[0]->addBytesSentCallback(cb);
     return;
@@ -97,7 +94,7 @@ void HappyEyeballsConnectionImpl::addBytesSentCallback(Connection::BytesSentCb c
   post_connect_state_.bytes_sent_callbacks_.push_back(cb);
 }
 
-void HappyEyeballsConnectionImpl::enableHalfClose(bool enabled) {
+void MultiConnectionBaseImpl::enableHalfClose(bool enabled) {
   if (!connect_finished_) {
     per_connection_state_.enable_half_close_ = enabled;
   }
@@ -106,15 +103,13 @@ void HappyEyeballsConnectionImpl::enableHalfClose(bool enabled) {
   }
 }
 
-bool HappyEyeballsConnectionImpl::isHalfCloseEnabled() {
-  return connections_[0]->isHalfCloseEnabled();
-}
+bool MultiConnectionBaseImpl::isHalfCloseEnabled() { return connections_[0]->isHalfCloseEnabled(); }
 
-std::string HappyEyeballsConnectionImpl::nextProtocol() const {
+std::string MultiConnectionBaseImpl::nextProtocol() const {
   return connections_[0]->nextProtocol();
 }
 
-void HappyEyeballsConnectionImpl::noDelay(bool enable) {
+void MultiConnectionBaseImpl::noDelay(bool enable) {
   if (!connect_finished_) {
     per_connection_state_.no_delay_ = enable;
   }
@@ -123,7 +118,7 @@ void HappyEyeballsConnectionImpl::noDelay(bool enable) {
   }
 }
 
-void HappyEyeballsConnectionImpl::readDisable(bool disable) {
+void MultiConnectionBaseImpl::readDisable(bool disable) {
   if (connect_finished_) {
     connections_[0]->readDisable(disable);
     return;
@@ -140,7 +135,7 @@ void HappyEyeballsConnectionImpl::readDisable(bool disable) {
   }
 }
 
-void HappyEyeballsConnectionImpl::detectEarlyCloseWhenReadDisabled(bool value) {
+void MultiConnectionBaseImpl::detectEarlyCloseWhenReadDisabled(bool value) {
   if (!connect_finished_) {
     per_connection_state_.detect_early_close_when_read_disabled_ = value;
   }
@@ -149,7 +144,7 @@ void HappyEyeballsConnectionImpl::detectEarlyCloseWhenReadDisabled(bool value) {
   }
 }
 
-bool HappyEyeballsConnectionImpl::readEnabled() const {
+bool MultiConnectionBaseImpl::readEnabled() const {
   if (!connect_finished_) {
     return !post_connect_state_.read_disable_count_.has_value() ||
            post_connect_state_.read_disable_count_ == 0;
@@ -157,41 +152,40 @@ bool HappyEyeballsConnectionImpl::readEnabled() const {
   return connections_[0]->readEnabled();
 }
 
-ConnectionInfoSetter& HappyEyeballsConnectionImpl::connectionInfoSetter() {
+ConnectionInfoSetter& MultiConnectionBaseImpl::connectionInfoSetter() {
   return connections_[0]->connectionInfoSetter();
 }
 
-const ConnectionInfoProvider& HappyEyeballsConnectionImpl::connectionInfoProvider() const {
+const ConnectionInfoProvider& MultiConnectionBaseImpl::connectionInfoProvider() const {
   return connections_[0]->connectionInfoProvider();
 }
 
-ConnectionInfoProviderSharedPtr
-HappyEyeballsConnectionImpl::connectionInfoProviderSharedPtr() const {
+ConnectionInfoProviderSharedPtr MultiConnectionBaseImpl::connectionInfoProviderSharedPtr() const {
   return connections_[0]->connectionInfoProviderSharedPtr();
 }
 
 absl::optional<Connection::UnixDomainSocketPeerCredentials>
-HappyEyeballsConnectionImpl::unixSocketPeerCredentials() const {
+MultiConnectionBaseImpl::unixSocketPeerCredentials() const {
   return connections_[0]->unixSocketPeerCredentials();
 }
 
-Ssl::ConnectionInfoConstSharedPtr HappyEyeballsConnectionImpl::ssl() const {
+Ssl::ConnectionInfoConstSharedPtr MultiConnectionBaseImpl::ssl() const {
   return connections_[0]->ssl();
 }
 
-Connection::State HappyEyeballsConnectionImpl::state() const {
+Connection::State MultiConnectionBaseImpl::state() const {
   if (!connect_finished_) {
     ASSERT(connections_[0]->state() == Connection::State::Open);
   }
   return connections_[0]->state();
 }
 
-bool HappyEyeballsConnectionImpl::connecting() const {
+bool MultiConnectionBaseImpl::connecting() const {
   ASSERT(connect_finished_ || connections_[0]->connecting());
   return connections_[0]->connecting();
 }
 
-void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
+void MultiConnectionBaseImpl::write(Buffer::Instance& data, bool end_stream) {
   if (connect_finished_) {
     connections_[0]->write(data, end_stream);
     return;
@@ -218,7 +212,7 @@ void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream)
   post_connect_state_.end_stream_ = end_stream;
 }
 
-void HappyEyeballsConnectionImpl::setBufferLimits(uint32_t limit) {
+void MultiConnectionBaseImpl::setBufferLimits(uint32_t limit) {
   if (!connect_finished_) {
     ASSERT(!per_connection_state_.buffer_limits_.has_value());
     per_connection_state_.buffer_limits_ = limit;
@@ -231,9 +225,9 @@ void HappyEyeballsConnectionImpl::setBufferLimits(uint32_t limit) {
   }
 }
 
-uint32_t HappyEyeballsConnectionImpl::bufferLimit() const { return connections_[0]->bufferLimit(); }
+uint32_t MultiConnectionBaseImpl::bufferLimit() const { return connections_[0]->bufferLimit(); }
 
-bool HappyEyeballsConnectionImpl::aboveHighWatermark() const {
+bool MultiConnectionBaseImpl::aboveHighWatermark() const {
   if (!connect_finished_) {
     // Writes are deferred, so return the watermark status from the deferred write buffer.
     return post_connect_state_.write_buffer_.has_value() &&
@@ -243,32 +237,32 @@ bool HappyEyeballsConnectionImpl::aboveHighWatermark() const {
   return connections_[0]->aboveHighWatermark();
 }
 
-const ConnectionSocket::OptionsSharedPtr& HappyEyeballsConnectionImpl::socketOptions() const {
+const ConnectionSocket::OptionsSharedPtr& MultiConnectionBaseImpl::socketOptions() const {
   // Note, this might change before connect finishes.
   return connections_[0]->socketOptions();
 }
 
-absl::string_view HappyEyeballsConnectionImpl::requestedServerName() const {
+absl::string_view MultiConnectionBaseImpl::requestedServerName() const {
   // Note, this might change before connect finishes.
   return connections_[0]->requestedServerName();
 }
 
-StreamInfo::StreamInfo& HappyEyeballsConnectionImpl::streamInfo() {
+StreamInfo::StreamInfo& MultiConnectionBaseImpl::streamInfo() {
   // Note, this might change before connect finishes.
   return connections_[0]->streamInfo();
 }
 
-const StreamInfo::StreamInfo& HappyEyeballsConnectionImpl::streamInfo() const {
+const StreamInfo::StreamInfo& MultiConnectionBaseImpl::streamInfo() const {
   // Note, this might change before connect finishes.
   return connections_[0]->streamInfo();
 }
 
-absl::string_view HappyEyeballsConnectionImpl::transportFailureReason() const {
+absl::string_view MultiConnectionBaseImpl::transportFailureReason() const {
   // Note, this might change before connect finishes.
   return connections_[0]->transportFailureReason();
 }
 
-bool HappyEyeballsConnectionImpl::startSecureTransport() {
+bool MultiConnectionBaseImpl::startSecureTransport() {
   if (!connect_finished_) {
     per_connection_state_.start_secure_transport_ = true;
   }
@@ -281,17 +275,17 @@ bool HappyEyeballsConnectionImpl::startSecureTransport() {
   return ret;
 }
 
-absl::optional<std::chrono::milliseconds> HappyEyeballsConnectionImpl::lastRoundTripTime() const {
+absl::optional<std::chrono::milliseconds> MultiConnectionBaseImpl::lastRoundTripTime() const {
   // Note, this might change before connect finishes.
   return connections_[0]->lastRoundTripTime();
 }
 
-absl::optional<uint64_t> HappyEyeballsConnectionImpl::congestionWindowInBytes() const {
+absl::optional<uint64_t> MultiConnectionBaseImpl::congestionWindowInBytes() const {
   // Note, this value changes constantly even within the same connection.
   return connections_[0]->congestionWindowInBytes();
 }
 
-void HappyEyeballsConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) {
+void MultiConnectionBaseImpl::addConnectionCallbacks(ConnectionCallbacks& cb) {
   if (connect_finished_) {
     connections_[0]->addConnectionCallbacks(cb);
     return;
@@ -301,7 +295,7 @@ void HappyEyeballsConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb
   post_connect_state_.connection_callbacks_.push_back(&cb);
 }
 
-void HappyEyeballsConnectionImpl::removeConnectionCallbacks(ConnectionCallbacks& cb) {
+void MultiConnectionBaseImpl::removeConnectionCallbacks(ConnectionCallbacks& cb) {
   if (connect_finished_) {
     connections_[0]->removeConnectionCallbacks(cb);
     return;
@@ -318,7 +312,7 @@ void HappyEyeballsConnectionImpl::removeConnectionCallbacks(ConnectionCallbacks&
   IS_ENVOY_BUG("Failed to remove connection callbacks");
 }
 
-void HappyEyeballsConnectionImpl::close(ConnectionCloseType type) {
+void MultiConnectionBaseImpl::close(ConnectionCloseType type) {
   if (connect_finished_) {
     connections_[0]->close(type);
     return;
@@ -346,14 +340,14 @@ void HappyEyeballsConnectionImpl::close(ConnectionCloseType type) {
   connections_[0]->close(type);
 }
 
-Event::Dispatcher& HappyEyeballsConnectionImpl::dispatcher() {
+Event::Dispatcher& MultiConnectionBaseImpl::dispatcher() {
   ASSERT(&dispatcher_ == &connections_[0]->dispatcher());
   return connections_[0]->dispatcher();
 }
 
-uint64_t HappyEyeballsConnectionImpl::id() const { return id_; }
+uint64_t MultiConnectionBaseImpl::id() const { return id_; }
 
-void HappyEyeballsConnectionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
+void MultiConnectionBaseImpl::hashKey(std::vector<uint8_t>& hash_key) const {
   // Pack the id into sizeof(id_) uint8_t entries in the hash_key vector.
   hash_key.reserve(hash_key.size() + sizeof(id_));
   for (unsigned i = 0; i < sizeof(id_); ++i) {
@@ -361,7 +355,7 @@ void HappyEyeballsConnectionImpl::hashKey(std::vector<uint8_t>& hash_key) const 
   }
 }
 
-void HappyEyeballsConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
+void MultiConnectionBaseImpl::setConnectionStats(const ConnectionStats& stats) {
   if (!connect_finished_) {
     per_connection_state_.connection_stats_ = std::make_unique<ConnectionStats>(stats);
   }
@@ -370,7 +364,7 @@ void HappyEyeballsConnectionImpl::setConnectionStats(const ConnectionStats& stat
   }
 }
 
-void HappyEyeballsConnectionImpl::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
+void MultiConnectionBaseImpl::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
   if (!connect_finished_) {
     per_connection_state_.delayed_close_timeout_ = timeout;
   }
@@ -379,9 +373,9 @@ void HappyEyeballsConnectionImpl::setDelayedCloseTimeout(std::chrono::millisecon
   }
 }
 
-void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
+void MultiConnectionBaseImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
-  os << spaces << "HappyEyeballsConnectionImpl " << this << DUMP_MEMBER(id_)
+  os << spaces << "MultiConnectionBaseImpl " << this << DUMP_MEMBER(id_)
      << DUMP_MEMBER(connect_finished_) << "\n";
 
   for (auto& connection : connections_) {
@@ -389,52 +383,9 @@ void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) 
   }
 }
 
-namespace {
-bool hasMatchingAddressFamily(const Address::InstanceConstSharedPtr& a,
-                              const Address::InstanceConstSharedPtr& b) {
-  return (a->type() == Address::Type::Ip && b->type() == Address::Type::Ip &&
-          a->ip()->version() == b->ip()->version());
-}
-
-} // namespace
-
-std::vector<Address::InstanceConstSharedPtr>
-HappyEyeballsConnectionImpl::sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& in) {
-  std::vector<Address::InstanceConstSharedPtr> address_list;
-  address_list.reserve(in.size());
-  // Iterator which will advance through all addresses matching the first family.
-  auto first = in.begin();
-  // Iterator which will advance through all addresses not matching the first family.
-  // This initial value is ignored and will be overwritten in the loop below.
-  auto other = in.begin();
-  while (first != in.end() || other != in.end()) {
-    if (first != in.end()) {
-      address_list.push_back(*first);
-      first = std::find_if(first + 1, in.end(),
-                           [&](const auto& val) { return hasMatchingAddressFamily(in[0], val); });
-    }
-
-    if (other != in.end()) {
-      other = std::find_if(other + 1, in.end(),
-                           [&](const auto& val) { return !hasMatchingAddressFamily(in[0], val); });
-
-      if (other != in.end()) {
-        address_list.push_back(*other);
-      }
-    }
-  }
-  ASSERT(address_list.size() == in.size());
-  return address_list;
-}
-
-ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
-  ASSERT(next_address_ < address_list_.size());
-  auto connection = dispatcher_.createClientConnection(
-      address_list_[next_address_++], connection_construction_state_.source_address_,
-      connection_construction_state_.socket_factory_.createTransportSocket(
-          connection_construction_state_.transport_socket_options_),
-      connection_construction_state_.options_);
-  ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id_, next_address_);
+ClientConnectionPtr MultiConnectionBaseImpl::createNextConnection() {
+  ASSERT(connection_provider_->hasNextConnection());
+  auto connection = connection_provider_->createNextConnection(id_);
   callbacks_wrappers_.push_back(std::make_unique<ConnectionCallbacksWrapper>(*this, *connection));
   connection->addConnectionCallbacks(*callbacks_wrappers_.back());
 
@@ -465,35 +416,35 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
   return connection;
 }
 
-void HappyEyeballsConnectionImpl::tryAnotherConnection() {
+void MultiConnectionBaseImpl::tryAnotherConnection() {
   ENVOY_LOG(trace, "Trying another connection.");
   connections_.push_back(createNextConnection());
   connections_.back()->connect();
   maybeScheduleNextAttempt();
 }
 
-void HappyEyeballsConnectionImpl::maybeScheduleNextAttempt() {
-  if (next_address_ >= address_list_.size()) {
+void MultiConnectionBaseImpl::maybeScheduleNextAttempt() {
+  if (!connection_provider_->hasNextConnection()) {
     return;
   }
   ENVOY_LOG(trace, "Scheduling next attempt.");
   next_attempt_timer_->enableTimer(std::chrono::milliseconds(300));
 }
 
-void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
-                                          ConnectionCallbacksWrapper* wrapper) {
+void MultiConnectionBaseImpl::onEvent(ConnectionEvent event, ConnectionCallbacksWrapper* wrapper) {
   switch (event) {
   case ConnectionEvent::Connected: {
-    ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_cx_ok", "address={}", *this, next_address_);
+    ENVOY_CONN_LOG_EVENT(debug, "multi_connection_cx_ok", "connection={}", *this,
+                         connection_provider_->nextConnection());
     break;
   }
   case ConnectionEvent::LocalClose:
   case ConnectionEvent::RemoteClose: {
-    ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_cx_attempt_failed", "address={}", *this,
-                         next_address_);
+    ENVOY_CONN_LOG_EVENT(debug, "multi_connection_cx_attempt_failed", "connection={}", *this,
+                         connection_provider_->nextConnection());
     // This connection attempt has failed. If possible, start another connection attempt
     // immediately, instead of waiting for the timer.
-    if (next_address_ < address_list_.size()) {
+    if (connection_provider_->hasNextConnection()) {
       ENVOY_LOG(trace, "Disabling next attempt timer.");
       next_attempt_timer_->disableTimer();
       tryAnotherConnection();
@@ -507,8 +458,8 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
     ASSERT(connections_.size() == 1);
     // This connection attempt failed but there are no more attempts to be made, so pass
     // the failure up by setting up this connection as the final one.
-    ENVOY_CONN_LOG_EVENT(debug, "happy_eyeballs_cx_failed", "addresses={}", *this,
-                         address_list_.size());
+    ENVOY_CONN_LOG_EVENT(debug, "multi_connection_cx_failed", "connections={}", *this,
+                         connection_provider_->totalConnections());
     break;
   }
   case ConnectionEvent::ConnectedZeroRtt: {
@@ -521,8 +472,8 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
   setUpFinalConnection(event, wrapper);
 }
 
-void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
-                                                       ConnectionCallbacksWrapper* wrapper) {
+void MultiConnectionBaseImpl::setUpFinalConnection(ConnectionEvent event,
+                                                   ConnectionCallbacksWrapper* wrapper) {
   ASSERT(event != ConnectionEvent::ConnectedZeroRtt);
   connect_finished_ = true;
   ENVOY_LOG(trace, "Disabling next attempt timer due to final connection.");
@@ -600,7 +551,7 @@ void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
   }
 }
 
-void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallbacksWrapper* wrapper) {
+void MultiConnectionBaseImpl::cleanupWrapperAndConnection(ConnectionCallbacksWrapper* wrapper) {
   wrapper->connection().removeConnectionCallbacks(*wrapper);
   for (auto it = connections_.begin(); it != connections_.end();) {
     if (it->get() == &(wrapper->connection())) {
@@ -621,13 +572,13 @@ void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallback
   }
 }
 
-void HappyEyeballsConnectionImpl::onWriteBufferLowWatermark() {
+void MultiConnectionBaseImpl::onWriteBufferLowWatermark() {
   // Only called when moving write data from the deferred write buffer to
   // the underlying connection. In this case, the connection callbacks must
   // not be notified since this should be transparent to the callbacks.
 }
 
-void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() {
+void MultiConnectionBaseImpl::onWriteBufferHighWatermark() {
   ASSERT(!connect_finished_);
   for (auto callback : post_connect_state_.connection_callbacks_) {
     if (callback) {
