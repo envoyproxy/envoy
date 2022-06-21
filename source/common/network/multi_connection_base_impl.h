@@ -62,7 +62,7 @@ using ConnectionProviderPtr = std::unique_ptr<ConnectionProvider>;
  * which point they are replayed to the underlying connection. For simple methods
  * they are applied to each open connection and applied when creating new ones.
  *
- * This is originally a part of the HapppyEyeballsConnectionImpl but split for
+ * This is originally a part of the `HapppyEyeballsConnectionImpl` but split for
  * broader use cases.
  */
 class MultiConnectionBaseImpl : public ClientConnection,

@@ -12,7 +12,6 @@ MultiConnectionBaseImpl::MultiConnectionBaseImpl(Event::Dispatcher& dispatcher,
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
   ENVOY_LOG_EVENT(debug, "multi_connection_new_cx", "[C{}] connections={}", id_,
                   connection_provider_->totalConnections());
-
   connections_.push_back(createNextConnection());
 }
 

@@ -1,7 +1,5 @@
 #include "source/common/network/multi_connection_base_impl.h"
 
-#include "multi_connection_base_impl.h"
-
 namespace Envoy {
 namespace Network {
 
