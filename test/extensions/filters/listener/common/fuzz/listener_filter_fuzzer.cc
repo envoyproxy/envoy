@@ -35,10 +35,16 @@ ListenerFilterWithDataFuzzer::ListenerFilterWithDataFuzzer()
       connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
       name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
       init_manager_(nullptr) {
-  EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
-  EXPECT_CALL(socket_factory_, localAddress())
+  socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
+              socketType())
+      .WillOnce(Return(Network::Socket::Type::Stream));
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
+              localAddress())
       .WillRepeatedly(ReturnRef(socket_->connectionInfoProvider().localAddress()));
-  EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
+              getListenSocket(_))
+      .WillOnce(Return(socket_));
   connection_handler_->addListener(absl::nullopt, *this, runtime_);
   conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                               Network::Address::InstanceConstSharedPtr(),
