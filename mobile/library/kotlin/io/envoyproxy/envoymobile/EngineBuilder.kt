@@ -46,6 +46,7 @@ open class EngineBuilder(
   private var enableGzip = true
   private var enableBrotli = false
   private var enableInterfaceBinding = false
+  private var forceIPv6 = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
   private var h2ExtendKeepaliveTimeout = false
@@ -281,6 +282,19 @@ open class EngineBuilder(
    */
   fun enableInterfaceBinding(enableInterfaceBinding: Boolean): EngineBuilder {
     this.enableInterfaceBinding = enableInterfaceBinding
+    return this
+  }
+
+  /**
+   * Specify whether to remap IPv4 addresses to the IPv6 space and always force connections
+   * to use IPv6. Note this is an experimental option and should be enabled with caution.
+   *
+   * @param forceIPv6 whether to force connections to use IPv6.
+   *
+   * @return This builder.
+   */
+  fun forceIPv6(forceIPv6: Boolean): EngineBuilder {
+    this.forceIPv6 = forceIPv6
     return this
   }
 
@@ -571,6 +585,7 @@ open class EngineBuilder(
       enableBrotli,
       enableHappyEyeballs,
       enableInterfaceBinding,
+      forceIPv6,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
       h2ExtendKeepaliveTimeout,
