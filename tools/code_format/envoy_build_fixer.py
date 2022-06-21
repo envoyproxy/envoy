@@ -114,7 +114,7 @@ def buildifier_lint(contents):
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE)
     if r.returncode != 0:
-        raise EnvoyBuildFixerError('buildozer execution failed: %s' % r)
+        raise EnvoyBuildFixerError('buildifier execution failed: %s' % r)
     return r.stdout.decode('utf-8')
 
 

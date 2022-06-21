@@ -249,7 +249,7 @@ public:
                                                           *context_.conn_manager_config_,
                                                           /*via=*/"", stream_info_, /*node_id=*/"");
           // Check for validity of response-status explicitly, as encodeHeaders() might throw.
-          if (!Utility::getResponseStatusNoThrow(headers).has_value()) {
+          if (!Utility::getResponseStatusOrNullopt(headers).has_value()) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
           state.response_encoder_->encodeHeaders(headers, end_stream);

@@ -796,7 +796,10 @@ private:
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::ListenSocketFactory& listenSocketFactory() override {
-      return *parent_.socket_factory_;
+      return *parent_.socket_factories_[0];
+    }
+    std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
+      return parent_.socket_factories_;
     }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
@@ -846,7 +849,7 @@ private:
   const envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   envoy::config::listener::v3::QuicProtocolOptions quic_options_;
   Network::SocketSharedPtr socket_;
-  Network::ListenSocketFactoryPtr socket_factory_;
+  std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   ConditionalInitializer server_initialized_;
   // Guards any objects which can be altered both in the upstream thread and the
   // main test thread.

@@ -361,7 +361,7 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
 }
 
 Http::Status HeaderUtility::checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers) {
-  const absl::optional<uint64_t> status = Utility::getResponseStatusNoThrow(headers);
+  const absl::optional<uint64_t> status = Utility::getResponseStatusOrNullopt(headers);
   if (!status.has_value()) {
     return absl::InvalidArgumentError(
         absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Status.get()));
