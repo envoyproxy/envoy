@@ -245,13 +245,14 @@ public:
         if (response) {
           auto headers =
               fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.headers());
-          ConnectionManagerUtility::mutateResponseHeaders(headers, &request_.request_headers_,
-                                                          *context_.conn_manager_config_,
-                                                          /*via=*/"", stream_info_, /*node_id=*/"");
-          // Check for validity of response-status explicitly, as encodeHeaders() might throw.
+          // Check for validity of response-status explicitly, as mutateResponseHeaders() and
+          // encodeHeaders() might bug.
           if (!Utility::getResponseStatusOrNullopt(headers).has_value()) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
+          ConnectionManagerUtility::mutateResponseHeaders(headers, &request_.request_headers_,
+                                                          *context_.conn_manager_config_,
+                                                          /*via=*/"", stream_info_, /*node_id=*/"");
           state.response_encoder_->encodeHeaders(headers, end_stream);
         } else {
           state.request_encoder_
