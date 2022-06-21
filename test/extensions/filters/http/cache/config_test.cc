@@ -1,5 +1,5 @@
 #include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
-#include "envoy/extensions/filters/http/cache/cache_policy/v3/cache_policy.pb.h"
+#include "envoy/extensions/filters/http/cache/v3/cache_policy.pb.h"
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 
 #include "source/extensions/filters/http/cache/cache_filter.h"
