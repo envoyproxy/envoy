@@ -286,7 +286,8 @@ ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
 
   auto* result = route->mostSpecificPerFilterConfig(custom_name_);
 
-  if (result == nullptr) {
+  if (result == nullptr && filter_name_ != custom_name_) {
+    // Fallback to use filter name.
     result = route->mostSpecificPerFilterConfig(filter_name_);
   }
   return result;
@@ -306,7 +307,7 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
                                    cb(config);
                                  });
 
-  if (handled) {
+  if (handled || filter_name_ == custom_name_) {
     return;
   }
 
