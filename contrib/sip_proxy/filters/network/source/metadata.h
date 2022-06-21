@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 
 #include "source/common/common/assert.h"
@@ -155,6 +156,9 @@ public:
     }
   };
 
+  void addXEnvoyOriginIngressHeader(absl::string_view value);
+  void addNewMsgHeader(HeaderType type,  absl::string_view value);
+
   void addEPOperation(
       size_t raw_offset, absl::string_view& header, HeaderType type,
       const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
@@ -193,6 +197,8 @@ private:
   MsgType msg_type_;
   MethodType method_type_;
   std::vector<std::vector<SipHeader>> headers_{HeaderType::HeaderMaxNum};
+  std::vector<std::vector<SipHeader>> new_headers_{HeaderType::HeaderMaxNum};
+  absl::string_view::size_type new_headers_pos_ = 0;
 
   std::vector<Operation> operation_list_;
   absl::optional<absl::string_view> ep_{};

@@ -1,6 +1,7 @@
 #include "contrib/sip_proxy/filters/network/source/metadata.h"
 
 #include "re2/re2.h"
+#include "sip.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -116,6 +117,25 @@ void MessageMetadata::setTransactionId(absl::string_view data) {
     end_index = data.size();
   }
   transaction_id_ = data.substr(start_index, end_index - start_index);
+}
+
+void MessageMetadata::addXEnvoyOriginIngressHeader(absl::string_view value) {
+  addNewMsgHeader(HeaderType::XEnvoyOriginIngress, value);
+}
+
+void MessageMetadata::addNewMsgHeader(HeaderType type,  absl::string_view value) {
+  //new_headers_[type].emplace_back(SipHeader(type, value));
+
+  if (new_headers_pos_ == 0) {
+    // place new headers before the content headers
+    new_headers_pos_ = raw_msg_.find("Content");
+  }
+  absl::string_view str_type = HeaderTypes::get().header2Str(type);
+  std::string header = std::string(str_type) + ": " + std::string(value) + "\r\n";
+
+  setOperation(
+    Operation(OperationType::Insert, new_headers_pos_, 
+    InsertOperationValue(std::move(header))));
 }
 
 void MessageMetadata::addEPOperation(

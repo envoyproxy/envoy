@@ -26,9 +26,10 @@ enum HeaderType {
   WAuth,
   Auth,
   PCookieIPMap,
+  XEnvoyOriginIngress,
   Other,
   InvalidFormat,
-  HeaderMaxNum
+  HeaderMaxNum,
 };
 
 enum class MsgType { Request, Response, ErrorMsg };
@@ -87,6 +88,11 @@ public:
     }
   }
 
+  absl::string_view header2Str(const HeaderType type) const {
+    const auto& result = sip_header_type_reverse_map_.find(type);
+    return result->second;
+  }
+
 private:
   const std::map<absl::string_view, HeaderType> sip_header_type_map_{
       {"Call-ID", HeaderType::CallId},
@@ -103,7 +109,26 @@ private:
       {"WWW-Authenticate", HeaderType::WAuth},
       {"Authorization", HeaderType::Auth},
       {"TopLine", HeaderType::TopLine},
-      {"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap}};
+      {"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap},
+      {"X-Envoy-Origin-Ingress", HeaderType::XEnvoyOriginIngress}};
+
+  // fixme - consider building this map from the sip_header_type_map_ or some other pattern which avoids dups
+  const std::map<HeaderType, absl::string_view> sip_header_type_reverse_map_{
+      {HeaderType::CallId, "Call-ID"},
+      {HeaderType::Via, "Via"},
+      {HeaderType::To, "To"},
+      {HeaderType::From, "From"},
+      {HeaderType::Contact, "Contact"},
+      {HeaderType::RRoute, "Record-Route"},
+      {HeaderType::Cseq, "CSeq"},
+      {HeaderType::Route, "Route"},
+      {HeaderType::Path,"Path"},
+      {HeaderType::Event, "Event"},
+      {HeaderType::SRoute, "Service-Route"},
+      {HeaderType::WAuth, "WWW-Authenticate"},
+      {HeaderType::Auth, "Authorization"},
+      {HeaderType::PCookieIPMap, "P-Nokia-Cookie-IP-Mapping"},
+      {HeaderType::XEnvoyOriginIngress, "X-Envoy-Origin-Ingress"}};
 };
 
 using HeaderTypes = ConstSingleton<HeaderTypeMap>;

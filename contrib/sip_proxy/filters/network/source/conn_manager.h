@@ -15,6 +15,7 @@
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/common/common/random_generator.h"
 
 #include "absl/types/any.h"
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
@@ -106,7 +107,29 @@ public:
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
-  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
+  Network::FilterStatus onNewConnection() override {
+    // fixme - we need a somethign better than integer thread number here 
+    // - ideally some sort of base64(host@uuid) which is stored at the thread level and passed to each filter instance
+    std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString();
+    
+    // fixme - sja3Hash or connectionID doesn't appear to be populated
+    // downstream_conn_id_ = read_callbacks_->connection().connectionInfoProvider().ja3Hash().data();
+    // also going to need a unique value for the connection - e.g base64(remoteIPport@host@uuid)
+    Random::RandomGeneratorImpl random;
+    std::string remote_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
+    std::string local_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
+    std::string uuid = random.uuid();
+    downstream_conn_id_ = remote_address + "@" + local_address + "@" + uuid;
+
+    ENVOY_LOG(debug, "thread_id={}, downstream_connection_id={}", thread_id, downstream_conn_id_);
+
+    std::cerr << "ThreadIDx: " << thread_id << " Ds Connid: " << read_callbacks_->connection().connectionInfoProvider().ja3Hash() << std::endl;
+    
+    local_origin_ingress_id_ = downstream_conn_id_ + ";downstream_conn_id=" + thread_id;
+
+    return Network::FilterStatus::Continue; 
+  }
+
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks&) override;
 
   // Network::ConnectionCallbacks
@@ -366,6 +389,9 @@ private:
   Server::Configuration::FactoryContext& context_;
 
   std::shared_ptr<TrafficRoutingAssistantHandler> tra_handler_;
+
+  std::string downstream_conn_id_;
+  std::string local_origin_ingress_id_;
 
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;

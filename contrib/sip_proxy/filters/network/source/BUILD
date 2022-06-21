@@ -67,6 +67,7 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/common:random_generator_lib"
     ],
 )
 
