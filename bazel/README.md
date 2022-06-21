@@ -270,6 +270,16 @@ for how to update or override dependencies.
 1. `bazel build envoy` from the Envoy source directory. Add `-c opt` for an optimized release build or
    `-c dbg` for an unoptimized, fully instrumented debugging build.
 
+## Running Envoy via CLI
+
+After Envoy is built, it can be executed via CLI.
+
+For example, if Envoy was built using the `bazel build -c opt //source/exe:envoy-static` command, then it can be executed from the project's root directory by running:
+
+```
+bazel-bin/source/exe/envoy-static --config-path /path/to/your/envoy/config.yaml
+```
+
 ## Building Envoy with the CI Docker image
 
 Envoy can also be built with the Docker image used for CI, by installing Docker and executing the following.
