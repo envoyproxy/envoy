@@ -511,7 +511,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     if (state_.decoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace,
                        "decodeHeaders filter iteration aborted due to local reply: filter={}",
-                       *this, (*entry)->handle_->customName());
+                       *this, (*entry)->custom_name_);
       status = FilterHeadersStatus::StopIteration;
     }
 
@@ -521,7 +521,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
-                     (*entry)->handle_->customName(), static_cast<uint64_t>(status));
+                     (*entry)->custom_name_, static_cast<uint64_t>(status));
 
     (*entry)->decode_headers_called_ = true;
 
@@ -653,10 +653,10 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
     }
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
-                     (*entry)->handle_->customName(), static_cast<uint64_t>(status));
+                     (*entry)->custom_name_, static_cast<uint64_t>(status));
     if (state_.decoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace, "decodeData filter iteration aborted due to local reply: filter={}",
-                       *this, (*entry)->handle_->customName());
+                       *this, (*entry)->custom_name_);
       return;
     }
 
@@ -742,11 +742,11 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
-                     (*entry)->handle_->customName(), static_cast<uint64_t>(status));
+                     (*entry)->custom_name_, static_cast<uint64_t>(status));
     if (state_.decoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace,
                        "decodeTrailers filter iteration aborted due to local reply: filter={}",
-                       *this, (*entry)->handle_->customName());
+                       *this, (*entry)->custom_name_);
       status = FilterTrailersStatus::StopIteration;
     }
 
@@ -777,7 +777,7 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
 
     FilterMetadataStatus status = (*entry)->handle_->decodeMetadata(metadata_map);
     ENVOY_STREAM_LOG(trace, "decode metadata called: filter={} status={}, metadata: {}", *this,
-                     (*entry)->handle_->customName(), static_cast<uint64_t>(status), metadata_map);
+                     (*entry)->custom_name_, static_cast<uint64_t>(status), metadata_map);
   }
 }
 
@@ -1003,7 +1003,7 @@ void FilterManager::encode1xxHeaders(ActiveStreamEncoderFilter* filter,
     FilterHeadersStatus status = (*entry)->handle_->encode1xxHeaders(headers);
     state_.filter_call_state_ &= ~FilterCallState::Encode1xxHeaders;
     ENVOY_STREAM_LOG(trace, "encode 1xx continue headers called: filter={} status={}", *this,
-                     (*entry)->handle_->customName(), static_cast<uint64_t>(status));
+                     (*entry)->custom_name_, static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfter1xxHeadersCallback(status)) {
       return;
     }
@@ -1046,7 +1046,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     if (state_.encoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace,
                        "encodeHeaders filter iteration aborted due to local reply: filter={}",
-                       *this, (*entry)->handle_->customName());
+                       *this, (*entry)->custom_name_);
       status = FilterHeadersStatus::StopIteration;
     }
 
@@ -1056,7 +1056,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
-                     (*entry)->handle_->customName(), static_cast<uint64_t>(status));
+                     (*entry)->custom_name_, static_cast<uint64_t>(status));
 
     (*entry)->encode_headers_called_ = true;
 
@@ -1128,7 +1128,7 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
 
     FilterMetadataStatus status = (*entry)->handle_->encodeMetadata(*metadata_map_ptr);
     ENVOY_STREAM_LOG(trace, "encode metadata called: filter={} status={}", *this,
-                     (*entry)->handle_->customName(), static_cast<uint64_t>(status));
+                     (*entry)->custom_name_, static_cast<uint64_t>(status));
   }
   // TODO(soya3129): update stats with metadata.
 
@@ -1210,7 +1210,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
     if (state_.encoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace, "encodeData filter iteration aborted due to local reply: filter={}",
-                       *this, (*entry)->handle_->customName());
+                       *this, (*entry)->custom_name_);
       status = FilterDataStatus::StopIterationNoBuffer;
     }
     if ((*entry)->end_stream_) {
@@ -1221,7 +1221,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
     }
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
-                     (*entry)->handle_->customName(), static_cast<uint64_t>(status));
+                     (*entry)->custom_name_, static_cast<uint64_t>(status));
 
     if (!trailers_exists_at_start && filter_manager_callbacks_.responseTrailers() &&
         trailers_added_entry == encoder_filters_.end()) {
@@ -1266,7 +1266,7 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::EncodeTrailers;
     ENVOY_STREAM_LOG(trace, "encode trailers called: filter={} status={}", *this,
-                     (*entry)->handle_->customName(), static_cast<uint64_t>(status));
+                     (*entry)->custom_name_, static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
       return;
     }
