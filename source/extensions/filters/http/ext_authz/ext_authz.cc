@@ -370,6 +370,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                              empty_stat_name,
                                              empty_stat_name,
                                              empty_stat_name,
+                                             empty_stat_name,
                                              false};
       config_->httpContext().codeStats().chargeResponseStat(info, false);
     }

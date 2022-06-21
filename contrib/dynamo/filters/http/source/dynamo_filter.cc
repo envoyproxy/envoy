@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/dynamo/dynamo_filter.h"
+#include "contrib/dynamo/filters/http/source/dynamo_filter.h"
 
 #include <chrono>
 #include <cstdint>
@@ -12,10 +12,10 @@
 #include "source/common/http/exception.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
-#include "source/extensions/filters/http/dynamo/dynamo_request_parser.h"
-#include "source/extensions/filters/http/dynamo/dynamo_stats.h"
 
 #include "absl/container/fixed_array.h"
+#include "contrib/dynamo/filters/http/source/dynamo_request_parser.h"
+#include "contrib/dynamo/filters/http/source/dynamo_stats.h"
 
 namespace Envoy {
 namespace Extensions {

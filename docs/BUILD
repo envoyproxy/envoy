@@ -72,6 +72,8 @@ genrule(
     ],
 )
 
+# These `proto_srcs` need to match the srcs in //tools/protodoc:api_v3_protodoc
+# TODO: figure a way to automate these queries from the `protodoc_rule`
 genquery(
     name = "v3_proto_srcs",
     expression = "labels(srcs, labels(deps, @envoy_api//:v3_protos))",
@@ -82,6 +84,18 @@ genquery(
     name = "xds_proto_srcs",
     expression = "labels(srcs, labels(deps, @envoy_api//:xds_protos))",
     scope = ["@envoy_api//:xds_protos"],
+)
+
+genrule(
+    name = "proto_srcs",
+    outs = ["proto_srcs.txt"],
+    cmd = """
+    cat $(location :v3_proto_srcs) $(location :xds_proto_srcs)  > $@
+    """,
+    tools = [
+        ":v3_proto_srcs",
+        ":xds_proto_srcs",
+    ],
 )
 
 genrule(
@@ -99,26 +113,12 @@ genrule(
     name = "api_rst",
     srcs = [
         "//tools/protodoc:api_v3_protodoc",
-        ":v3_proto_srcs",
+        ":proto_srcs",
     ],
     outs = ["api_rst.tar"],
     cmd = """
     $(location //tools/docs:generate_api_rst) \\
-        $(location v3_proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
-    """,
-    tools = ["//tools/docs:generate_api_rst"],
-)
-
-genrule(
-    name = "xds_rst",
-    srcs = [
-        "//tools/protodoc:xds_protodoc",
-        ":xds_proto_srcs",
-    ],
-    outs = ["xds_rst.tar"],
-    cmd = """
-    $(location //tools/docs:generate_api_rst) \\
-        $(location xds_proto_srcs) $(locations //tools/protodoc:xds_protodoc) $@
+        $(location proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
     """,
     tools = ["//tools/docs:generate_api_rst"],
 )
@@ -202,7 +202,6 @@ pkg_tar(
         ":extensions_security_rst",
         ":external_deps_rst",
         ":version_history_rst",
-        ":xds_rst",
     ],
 )
 
@@ -215,16 +214,14 @@ genrule(
          --build_sha="$${BUILD_SHA:-}" \
          --docs_tag="$${DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
-         --validator_path=$(location //tools/config_validation:validate_fragment) \
-         --descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text) \
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \\
          $(location rst) \
          $@
     """,
     exec_tools = [
         "//tools/docs:sphinx_runner",
         ":rst",
-        "//tools/config_validation:validate_fragment",
-        "//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text",
         "//:VERSION.txt",
+        "@envoy_api//:v3_proto_set",
     ],
 )

@@ -40,7 +40,7 @@ void XfccIntegrationTest::TearDown() {
   context_manager_.reset();
 }
 
-Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(bool mtls) {
+Network::UpstreamTransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(bool mtls) {
   const std::string yaml_tls = R"EOF(
 common_tls_context:
   validation_context:
@@ -97,12 +97,12 @@ common_tls_context:
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
       config, factory_context_);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
-  return Network::TransportSocketFactoryPtr{
+  return Network::UpstreamTransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
           std::move(cfg), *context_manager_, *client_stats_store)};
 }
 
-Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
+Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   auto* common_tls_context = tls_context.mutable_common_tls_context();
   auto* tls_cert = common_tls_context->add_tls_certificates();

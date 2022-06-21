@@ -1,12 +1,12 @@
-#include "source/extensions/filters/http/dynamo/config.h"
+#include "contrib/dynamo/filters/http/source/config.h"
 
 #include <string>
 
-#include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/filters/http/dynamo/dynamo_filter.h"
-#include "source/extensions/filters/http/dynamo/dynamo_stats.h"
+#include "contrib/dynamo/filters/http/source/dynamo_filter.h"
+#include "contrib/dynamo/filters/http/source/dynamo_stats.h"
+#include "contrib/envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

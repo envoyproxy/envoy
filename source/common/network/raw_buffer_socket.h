@@ -33,13 +33,16 @@ private:
   TransportSocketCallbacks* callbacks_{};
 };
 
-class RawBufferSocketFactory : public CommonTransportSocketFactory {
+class RawBufferSocketFactory : public DownstreamTransportSocketFactory,
+                               public CommonUpstreamTransportSocketFactory {
 public:
-  // Network::TransportSocketFactory
+  // Network::UpstreamTransportSocketFactory
   TransportSocketPtr
   createTransportSocket(TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   absl::string_view defaultServerNameIndication() const override { return ""; }
+  // Network::DownstreamTransportSocketFactory
+  TransportSocketPtr createDownstreamTransportSocket() const override;
 };
 
 } // namespace Network

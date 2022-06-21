@@ -1,9 +1,8 @@
 #include <string>
 
-#include "source/extensions/filters/http/dynamo/dynamo_stats.h"
-
 #include "test/mocks/stats/mocks.h"
 
+#include "contrib/dynamo/filters/http/source/dynamo_stats.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
