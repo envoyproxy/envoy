@@ -302,6 +302,21 @@ public:
    * Called when filter activity indicates that the stream idle timeout should be reset.
    */
   virtual void resetIdleTimer() PURE;
+
+  /**
+   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
+   * host's. Or nullptr if none of them exist.
+   */
+  virtual const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const PURE;
+
+  /**
+   * Fold all the available per route filter configs, invoking the callback with each config (if
+   * it is present). Iteration of the configs is in order of specificity. That means that the
+   * callback will be called first for a config on a Virtual host, then a route, and finally a route
+   * entry (weighted cluster). If a config is not present, the callback will not be invoked.
+   */
+  virtual void traversePerFilterConfig(
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
 };
 
 /**
