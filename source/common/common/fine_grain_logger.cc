@@ -75,7 +75,7 @@ void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level
   }
 
   absl::ReaderMutexLock rl(&fine_grain_log_lock_);
-  for (auto& [key, logger] : *fine_grain_log_map_) {
+  for (const auto& [key, logger] : *fine_grain_log_map_) {
     logger->set_level(getLogLevel(key));
     logger->set_pattern(format);
   }
@@ -175,7 +175,7 @@ void FineGrainLogContext::updateVerbosityDefaultLevel(level_enum level) {
   }
 
   absl::ReaderMutexLock rl(&fine_grain_log_lock_);
-  for (auto& [key, logger] : *fine_grain_log_map_) {
+  for (const auto& [key, logger] : *fine_grain_log_map_) {
     logger->set_level(getLogLevel(key));
   }
 }
@@ -194,7 +194,7 @@ void FineGrainLogContext::updateVerbositySetting(
     appendVerbosityLogUpdate(glob, static_cast<level_enum>(level));
   }
 
-  for (auto& [key, logger] : *fine_grain_log_map_) {
+  for (const auto& [key, logger] : *fine_grain_log_map_) {
     logger->set_level(getLogLevel(key));
   }
 }
