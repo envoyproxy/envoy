@@ -255,7 +255,7 @@ new_features:
 - area: matching
   change : |
     added support for matching authenticated inputs in network and HTTP matching data.
-- area: netwrk
+- area: network
   change: |
     the :ref:`client ssl auth filter <config_network_filters_client_ssl_auth>` has been moved to :ref:`contrib images <install_contrib>`.
 - area: rbac
