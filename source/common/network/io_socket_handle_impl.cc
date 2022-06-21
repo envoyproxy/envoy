@@ -64,7 +64,7 @@ constexpr int messageTruncatedOption() {
 
 namespace Network {
 
-bool IoSocketHandleImpl::alwaysUseV6OnAndroid() {
+bool IoSocketHandleImpl::forceV6ForAndroid() {
 #ifndef __ANDROID_API__
   return false;
 #else
@@ -479,7 +479,7 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
   auto sockaddr_len_to_use = address->sockAddrLen();
 #ifdef __ANDROID_API__
   sockaddr_in6 sin6;
-  if (sockaddr_to_use->sa_family == AF_INET && alwaysUseV6OnAndroid()) {
+  if (sockaddr_to_use->sa_family == AF_INET && forceV6ForAndroid()) {
     const sockaddr_in& sin4 = reinterpret_cast<const sockaddr_in&>(*sockaddr_to_use);
 
     // Android always uses IPv6 dual stack. Convert IPv4 to the IPv6 mapped address when
@@ -569,6 +569,9 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
+  // TODO(mattklein123): If forceV6ForAndroid() is true, we should probably remap back to IPv4 from
+  // the mapped IPv6 address. Currently though it doesn't look like we use this function in the
+  // client path so this probably doesn't matter. If it turns out to matter we can fix this.
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 

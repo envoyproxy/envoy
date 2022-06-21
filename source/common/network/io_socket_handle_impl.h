@@ -21,7 +21,7 @@ public:
    * Check whether we are a) on Android and b) configured via runtime to always use v6 sockets.
    * This appears to be what Android OS does for all platform sockets.
    */
-  static bool alwaysUseV6OnAndroid();
+  static bool forceV6ForAndroid();
 
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                               absl::optional<int> domain = absl::nullopt)
