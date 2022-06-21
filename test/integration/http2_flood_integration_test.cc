@@ -1158,8 +1158,8 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   EXPECT_EQ(1, test_server_->counter("http2.rx_messaging_error")->value());
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.invalid.header.field"));
   // expect Downstream Protocol Error
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.invalid.header.field"));
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("DPE"));
 }
 
