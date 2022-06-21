@@ -103,8 +103,6 @@ public:
                  absl::string_view expected_message);
   void testRequestHeadersExceedLimit(std::string header_string, std::string error_message,
                                      absl::string_view details = "");
-  void testTrailersExceedLimit(std::string trailer_string, std::string error_message,
-                               bool enable_trailers);
   void testRequestHeadersAccepted(std::string header_string);
   // Used to test if trailers are decoded/encoded
   void expectTrailersTest(bool enable_trailers);
@@ -230,48 +228,6 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_string,
-                                                            std::string error_message,
-                                                            bool enable_trailers) {
-  initialize();
-  // Make a new 'codec' with the right settings
-  codec_settings_.enable_trailers_ = enable_trailers;
-  codec_ = std::make_unique<Http1::ServerConnectionImpl>(
-      connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
-  std::string exception_reason;
-  NiceMock<MockRequestDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
-
-  if (enable_trailers) {
-    EXPECT_CALL(decoder, decodeHeaders_(_, false));
-    EXPECT_CALL(decoder, decodeData(_, false));
-  } else {
-    EXPECT_CALL(decoder, decodeData(_, false));
-    EXPECT_CALL(decoder, decodeData(_, true));
-  }
-
-  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\n"
-                           "Host: host\r\n"
-                           "Transfer-Encoding: chunked\r\n\r\n"
-                           "4\r\n"
-                           "body\r\n0\r\n");
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
-  buffer = Buffer::OwnedImpl(trailer_string);
-  if (enable_trailers) {
-    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
-    status = codec_->dispatch(buffer);
-    EXPECT_TRUE(isCodecProtocolError(status));
-    EXPECT_EQ(status.message(), error_message);
-  } else {
-    // If trailers are not enabled, we expect Envoy to simply skip over the large
-    // trailers as if nothing has happened!
-    status = codec_->dispatch(buffer);
-    EXPECT_TRUE(status.ok());
-  }
-}
 void Http1ServerConnectionImplTest::testRequestHeadersExceedLimit(std::string header_string,
                                                                   std::string error_message,
                                                                   absl::string_view details) {
@@ -1736,8 +1692,6 @@ TEST_F(Http1ServerConnectionImplTest, DoubleRequest) {
 
 TEST_F(Http1ServerConnectionImplTest, RequestWithTrailersDropped) { expectTrailersTest(false); }
 
-TEST_F(Http1ServerConnectionImplTest, RequestWithTrailersKept) { expectTrailersTest(true); }
-
 TEST_F(Http1ServerConnectionImplTest, IgnoreUpgradeH2c) {
   initialize();
 
@@ -2841,44 +2795,6 @@ TEST_F(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
   auto status = codec_->dispatch(response);
   EXPECT_TRUE(status.ok());
-}
-
-TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejected) {
-  // Default limit of 60 KiB
-  std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
-  testTrailersExceedLimit(long_string, "trailers size exceeds limit", true);
-}
-
-TEST_F(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
-  // Construct partial headers with a long field name that exceeds the default limit of 60KiB.
-  std::string long_string = "bigfield" + std::string(60 * 1024, 'q');
-  testTrailersExceedLimit(long_string, "trailers size exceeds limit", true);
-}
-
-// Tests that the default limit for the number of request headers is 100.
-TEST_F(Http1ServerConnectionImplTest, ManyTrailersRejected) {
-  // Send a request with 101 headers.
-  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n", "trailers count exceeds limit",
-                          true);
-}
-
-TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
-  // Default limit of 60 KiB
-  std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
-  testTrailersExceedLimit(long_string, "trailers size exceeds limit", false);
-}
-
-TEST_F(Http1ServerConnectionImplTest, LargeTrailerFieldRejectedIgnored) {
-  // Default limit of 60 KiB
-  std::string long_string = "bigfield" + std::string(60 * 1024, 'q') + ": value\r\n\r\n\r\n";
-  testTrailersExceedLimit(long_string, "trailers size exceeds limit", false);
-}
-
-// Tests that the default limit for the number of request headers is 100.
-TEST_F(Http1ServerConnectionImplTest, ManyTrailersIgnored) {
-  // Send a request with 101 headers.
-  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n", "trailers count exceeds limit",
-                          false);
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {

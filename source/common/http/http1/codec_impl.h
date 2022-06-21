@@ -433,6 +433,7 @@ private:
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
+  const MessageType type_;
 };
 
 /**

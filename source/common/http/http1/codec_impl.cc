@@ -499,7 +499,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
-      max_headers_count_(max_headers_count) {
+      max_headers_count_(max_headers_count), type_(type) {
   parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
 }
 
@@ -737,7 +737,7 @@ Status ConnectionImpl::onHeaderFieldImpl(const char* data, size_t length) {
   // We previously already finished up the headers, these headers are
   // now trailers.
   if (header_parsing_state_ == HeaderParsingState::Done) {
-    if (!enableTrailers()) {
+    if (!enableTrailers() || (type_ == MessageType::Request)) {
       // Ignore trailers.
       return okStatus();
     }
@@ -759,7 +759,8 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
 
   getBytesMeter().addHeaderBytesReceived(length);
 
-  if (header_parsing_state_ == HeaderParsingState::Done && !enableTrailers()) {
+  if (header_parsing_state_ == HeaderParsingState::Done &&
+      (!enableTrailers() || type_ == MessageType::Request)) {
     // Ignore trailers.
     return okStatus();
   }
