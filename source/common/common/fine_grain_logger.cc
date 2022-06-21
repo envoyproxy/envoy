@@ -69,8 +69,12 @@ bool FineGrainLogContext::setFineGrainLogger(absl::string_view key, level_enum l
 void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level_enum level,
                                                             const std::string& format)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
-  absl::WriterMutexLock wl(&fine_grain_log_lock_);
-  verbosity_default_level_ = level;
+  {
+    absl::WriterMutexLock wl(&fine_grain_log_lock_);
+    verbosity_default_level_ = level;
+  }
+
+  absl::ReaderMutexLock rl(&fine_grain_log_lock_);
   for (auto& [key, logger] : *fine_grain_log_map_) {
     logger->set_level(getLogLevel(key));
     logger->set_pattern(format);
@@ -162,12 +166,15 @@ spdlog::logger* FineGrainLogContext::createLogger(const std::string& key)
 }
 
 void FineGrainLogContext::updateVerbosityDefaultLevel(level_enum level) {
-  absl::WriterMutexLock ul(&fine_grain_log_lock_);
-  if (level == verbosity_default_level_) {
-    return;
+  {
+    absl::WriterMutexLock wl(&fine_grain_log_lock_);
+    if (level == verbosity_default_level_) {
+      return;
+    }
+    verbosity_default_level_ = level;
   }
 
-  verbosity_default_level_ = level;
+  absl::ReaderMutexLock rl(&fine_grain_log_lock_);
   for (auto& [key, logger] : *fine_grain_log_map_) {
     logger->set_level(getLogLevel(key));
   }

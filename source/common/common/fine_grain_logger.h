@@ -149,10 +149,11 @@ private:
    * match in verbosity_update_info_.
    */
   spdlog::level::level_enum getLogLevel(absl::string_view file) const
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(fine_grain_log_lock_);
+      ABSL_SHARED_LOCKS_REQUIRED(fine_grain_log_lock_);
 
   /**
-   * Lock for the following global map and update vector (not for the corresponding loggers).
+   * Lock for the following global map, update vector, and default log level
+   * (not for the corresponding loggers).
    */
   mutable absl::Mutex fine_grain_log_lock_;
 
