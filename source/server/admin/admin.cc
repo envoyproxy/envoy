@@ -249,8 +249,11 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
+void AdminImpl::createFilterChain(Http::FilterChainManager& manager) {
+  Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
+    callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
+  };
+  manager.applyFilterFactoryCb({}, factory);
 }
 
 namespace {

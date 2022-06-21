@@ -111,9 +111,9 @@ public:
                                     Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
+  void createFilterChain(Http::FilterChainManager& manager) override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainFactoryCallbacks&) override {
+                                Http::FilterChainManager&) override {
     return false;
   }
 
