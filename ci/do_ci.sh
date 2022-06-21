@@ -7,7 +7,7 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "docs" ||  \
-          "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" || "$1" == "tooling" \
+          "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" \
           || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "verify_build_examples" \
           || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
@@ -479,6 +479,13 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
 
+  echo "Run protoxform test"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
+
+  # TODO(phlax): move this to a bazel rule
+  echo "check_format_test..."
+  "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
+
   echo "fix_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix
@@ -498,6 +505,9 @@ elif [[ "$CI_TARGET" == "docs" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "deps" ]]; then
 
+  echo "dependency validate_test..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate_test
+
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
   time bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate
@@ -512,20 +522,6 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   # Run pip requirements tests
   echo "check pip..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
-
-  exit 0
-elif [[ "$CI_TARGET" == "tooling" ]]; then
-  setup_clang_toolchain
-
-  echo "Run protoxform test"
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
-
-  # TODO(phlax): move this to a bazel rule
-  echo "check_format_test..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
-
-  echo "dependency validate_test..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate_test
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then

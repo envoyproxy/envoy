@@ -102,7 +102,7 @@ private:
 
 class FilterChainImpl : public Network::DrainableFilterChain {
 public:
-  FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+  FilterChainImpl(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                   std::vector<Network::FilterFactoryCb>&& filters_factory,
                   std::chrono::milliseconds transport_socket_connect_timeout,
                   absl::string_view name)
@@ -111,7 +111,7 @@ public:
         transport_socket_connect_timeout_(transport_socket_connect_timeout), name_(name) {}
 
   // Network::FilterChain
-  const Network::TransportSocketFactory& transportSocketFactory() const override {
+  const Network::DownstreamTransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
   }
   std::chrono::milliseconds transportSocketConnectTimeout() const override {
@@ -132,7 +132,7 @@ public:
 
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
-  const Network::TransportSocketFactoryPtr transport_socket_factory_;
+  const Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
   const std::chrono::milliseconds transport_socket_connect_timeout_;
   const std::string name_;

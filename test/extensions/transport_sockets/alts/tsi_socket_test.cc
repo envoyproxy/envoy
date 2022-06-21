@@ -906,7 +906,7 @@ protected:
 
     socket_factory_ = std::make_unique<TsiSocketFactory>(handshaker_factory, nullptr);
   }
-  Network::TransportSocketFactoryPtr socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr socket_factory_;
 };
 
 TEST_F(TsiSocketFactoryTest, CreateTransportSocket) {

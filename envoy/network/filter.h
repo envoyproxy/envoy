@@ -389,7 +389,7 @@ public:
    * @return const TransportSocketFactory& a transport socket factory to be used by the new
    * connection.
    */
-  virtual const TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual const DownstreamTransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
    * @return std::chrono::milliseconds the amount of time to wait for the transport socket to report

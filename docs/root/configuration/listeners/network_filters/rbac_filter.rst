@@ -3,10 +3,10 @@
 Role Based Access Control (RBAC) Network Filter
 ===============================================
 
-The RBAC network filter is used to authorize actions (permissions) by identified downstream clients
-(principals). This is useful to explicitly manage callers to an application and protect it from
-unexpected or forbidden agents. The filter supports configuration with either a safe-list (ALLOW) or
-block-list (DENY) set of policies based on properties of the connection (IPs, ports, SSL subject).
+The RBAC network filter is used to authorize actions by identified downstream clients. This is useful
+to explicitly manage callers to an application and protect it from unexpected or forbidden agents.
+The filter supports configuration with either a safe-list (ALLOW) or block-list (DENY) set of policies,
+or a matcher with different actions, based on properties of the connection (IPs, ports, SSL subject).
 This filter also supports policy in both enforcement and shadow modes. Shadow mode won't effect real
 users, it is used to test that a new set of policies work before rolling out to production.
 

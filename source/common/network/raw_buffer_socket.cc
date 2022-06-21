@@ -91,6 +91,10 @@ RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsConstSharedP
   return std::make_unique<RawBufferSocket>();
 }
 
+TransportSocketPtr RawBufferSocketFactory::createDownstreamTransportSocket() const {
+  return std::make_unique<RawBufferSocket>();
+}
+
 bool RawBufferSocketFactory::implementsSecureTransport() const { return false; }
 
 } // namespace Network

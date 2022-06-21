@@ -555,7 +555,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
           ReturnRef(*active_listener2)));
 
   auto filter_factory_callback = std::make_shared<std::vector<Network::FilterFactoryCb>>();
-  auto transport_socket_factory = Network::Test::createRawBufferSocketFactory();
+  auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
 
   EXPECT_CALL(conn_handler_, incNumConnections());

@@ -136,9 +136,9 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_by
   const size_t bytes_to_send_old = bytes_to_send_;
   bytes_to_send_ += delta;
   if (delta < 0) {
-    ASSERT(bytes_to_send_old > bytes_to_send_);
+    ENVOY_BUG(bytes_to_send_old > bytes_to_send_, "Underflowed");
   } else {
-    ASSERT(bytes_to_send_old <= bytes_to_send_);
+    ENVOY_BUG(bytes_to_send_old <= bytes_to_send_, "Overflowed");
   }
   write_buffer_watermark_simulation_.checkHighWatermark(bytes_to_send_);
   write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);

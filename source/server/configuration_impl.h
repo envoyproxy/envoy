@@ -82,8 +82,7 @@ public:
    * TODO(sumukhs): Coalesce with the above as they are very similar
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
-                               const Filter::ListenerFilterFactoriesList& factories,
-                               Stats::Scope& stats_scope);
+                               const Filter::ListenerFilterFactoriesList& factories);
 
   /**
    * Given a UdpListenerFilterManager and a list of factories, create a new filter chain. Chain
