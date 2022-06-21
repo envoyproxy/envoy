@@ -143,46 +143,6 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
       KEEP_UNCHANGED;
 }
 
-class FilterChainFactoryCallbacksNameHelper : public Http::FilterChainFactoryCallbacks {
-public:
-  FilterChainFactoryCallbacksNameHelper(absl::string_view custom_name,
-                                        absl::string_view filter_name,
-                                        Http::FilterChainFactoryCallbacks& callback)
-      : custom_name_(custom_name), filter_name_(filter_name), callback_(callback) {}
-
-  void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
-    filter->setCustomName(custom_name_);
-    filter->setFilterName(filter_name_);
-
-    callback_.addStreamDecoderFilter(std::move(filter));
-  }
-
-  void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
-    filter->setCustomName(custom_name_);
-    filter->setFilterName(filter_name_);
-
-    callback_.addStreamEncoderFilter(std::move(filter));
-  }
-
-  void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
-    filter->setCustomName(custom_name_);
-    filter->setFilterName(filter_name_);
-
-    callback_.addStreamFilter(std::move(filter));
-  }
-
-  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
-    callback_.addAccessLogHandler(std::move(handler));
-  }
-
-  Event::Dispatcher& dispatcher() override { return callback_.dispatcher(); }
-
-  absl::string_view custom_name_;
-  absl::string_view filter_name_;
-
-  Http::FilterChainFactoryCallbacks& callback_;
-};
-
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
