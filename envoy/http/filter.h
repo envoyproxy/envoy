@@ -1079,6 +1079,35 @@ public:
 using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
 /**
+ * Simple struct of additional contextual information of filter factory, e.g. custom filter name
+ * from configuration, canonical filter name, etc.
+ */
+struct FilterFacotryContext {
+  // Custom filter name from configuration.
+  absl::string_view custom_name;
+  // Canonical filter name.
+  absl::string_view filter_name;
+};
+
+/**
+ * The filter chain manager is provided by the connection manager to the filter chain factory.
+ * The filter chain factory will post the filter factory context and filter factory to the
+ * filter chain manager to create filter and construct HTTP stream filter chain.
+ */
+class FilterChainManager {
+public:
+  virtual ~FilterChainManager() = default;
+
+  /**
+   * Post filter factory context and filter factory to the filter chain manager. The filter
+   * chain manager will create filter instance based on the context and factory internally.
+   * @param context supplies additional contextual information of filter factory.
+   * @param factory factory function used to create filter instances.
+   */
+  virtual void applyFilterFactoryCb(FilterFacotryContext context, FilterFactoryCb& factory) PURE;
+};
+
+/**
  * A FilterChainFactory is used by a connection manager to create an HTTP level filter chain when a
  * new stream is created on the connection (either locally or remotely). Typically it would be
  * implemented by a configuration engine that would install a set of filters that are able to
@@ -1090,24 +1119,24 @@ public:
 
   /**
    * Called when a new HTTP stream is created on the connection.
-   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
-   *                  FilterChainFactoryCallbacks.
+   * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
+   *                FilterChainManager.
    */
-  virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) PURE;
+  virtual void createFilterChain(FilterChainManager& manager) PURE;
 
   /**
    * Called when a new upgrade stream is created on the connection.
    * @param upgrade supplies the upgrade header from downstream
    * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.
-   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
-   *                  FilterChainFactoryCallbacks.
+   * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
+   *                FilterChainManager.
    * @return true if upgrades of this type are allowed and the filter chain has been created.
    *    returns false if this upgrade type is not configured, and no filter chain is created.
    */
   using UpgradeMap = std::map<std::string, bool>;
   virtual bool createUpgradeFilterChain(absl::string_view upgrade,
                                         const UpgradeMap* per_route_upgrade_map,
-                                        FilterChainFactoryCallbacks& callbacks) PURE;
+                                        FilterChainManager& manager) PURE;
 };
 
 } // namespace Http
