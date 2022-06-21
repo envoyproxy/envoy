@@ -60,6 +60,7 @@ class EnvoyConfigurationTest {
     enableBrotli: Boolean = false,
     enableHappyEyeballs: Boolean = false,
     enableInterfaceBinding: Boolean = false,
+    forceIPv6: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
     h2ConnectionKeepaliveTimeoutSeconds: Int = 333,
     h2ExtendKeepaliveTimeout: Boolean = false,
@@ -92,6 +93,7 @@ class EnvoyConfigurationTest {
       enableBrotli,
       enableHappyEyeballs,
       enableInterfaceBinding,
+      forceIPv6,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
       h2ExtendKeepaliveTimeout,
@@ -138,6 +140,9 @@ class EnvoyConfigurationTest {
 
     // Interface Binding
     assertThat(resolvedTemplate).contains("&enable_interface_binding false")
+
+    // Forcing IPv6
+    assertThat(resolvedTemplate).contains("&android_force_ipv6 false")
 
     // H2 Ping
     assertThat(resolvedTemplate).contains("&h2_connection_keepalive_idle_interval 0.222s")
@@ -192,6 +197,7 @@ class EnvoyConfigurationTest {
       enableGzip = false,
       enableBrotli = true,
       enableInterfaceBinding = true,
+      forceIPv6 = true,
       h2ExtendKeepaliveTimeout = true
     )
 
@@ -219,6 +225,9 @@ class EnvoyConfigurationTest {
 
     // Interface Binding
     assertThat(resolvedTemplate).contains("&enable_interface_binding true")
+
+    // Forcing IPv6
+    assertThat(resolvedTemplate).contains("&android_force_ipv6 true")
   }
 
   @Test
