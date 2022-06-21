@@ -108,7 +108,7 @@ public:
 
   /**
    * Updates all loggers based on the new default verbosity log level.
-   * The default verbosity log level is overridable if the verbosity undate vector is not empty.
+   * The default verbosity log level is overridable if the verbosity update vector is not empty.
    * All the loggers which are not matched with verbosity_update_info_ are set to new default
    * log level.
    *
