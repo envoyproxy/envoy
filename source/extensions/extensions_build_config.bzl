@@ -227,7 +227,7 @@ EXTENSIONS = {
     #
     # CacheFilter plugins
     #
-    "envoy.filters.http.cache_policy":                  "//source/extensions/filters/http/cache/cache_policy:config",
+    "envoy.filters.http.cache_policy":                  "//source/extensions/filters/http/cache:cache_policy_lib",
     "envoy.cache.simple_http_cache":                    "//source/extensions/filters/http/cache/simple_http_cache:config",
 
     #
