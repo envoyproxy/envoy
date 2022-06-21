@@ -37,9 +37,11 @@ public:
     Stats::StatName to_zone = pool_.add(to_az);
     Stats::StatName vhost_name = pool_.add(request_vhost_name);
     Stats::StatName vcluster_name = pool_.add(request_vcluster_name);
+    Stats::StatName empty_stat_name;
     Http::CodeStats::ResponseStatInfo info{
-        global_store_, cluster_scope_, prefix,    code,    internal_request,
-        vhost_name,    vcluster_name,  from_zone, to_zone, canary};
+        global_store_,    cluster_scope_, prefix,        code,
+        internal_request, vhost_name,     vcluster_name, empty_stat_name,
+        from_zone,        to_zone,        canary};
 
     code_stats_.chargeResponseStat(info, false);
   }
@@ -232,6 +234,7 @@ TEST_F(CodeUtilityTest, PerZoneStats) {
 TEST_F(CodeUtilityTest, ResponseTimingTest) {
   Stats::MockStore global_store;
   Stats::MockStore cluster_scope;
+  Stats::StatName empty_stat_name;
 
   Stats::StatNameManagedStorage prefix("prefix", *symbol_table_);
   Http::CodeStats::ResponseTimingInfo info{global_store,
@@ -242,6 +245,7 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
                                            true,
                                            pool_.add("vhost_name"),
                                            pool_.add("req_vcluster_name"),
+                                           empty_stat_name,
                                            pool_.add("from_az"),
                                            pool_.add("to_az")};
 

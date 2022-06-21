@@ -78,7 +78,7 @@ def clang_format(contents):
     Returns:
         clang-formatted string
     """
-    clang_format_path = os.getenv("CLANG_FORMAT", "clang-format-11")
+    clang_format_path = os.getenv("CLANG_FORMAT", "clang-format")
     return subprocess.run(
         [clang_format_path,
          '--style=%s' % CLANG_FORMAT_STYLE, '--assume-filename=.proto'],

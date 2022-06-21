@@ -23,7 +23,7 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
 }
 
 const Envoy::Ssl::ClientContextConfig&
-getConfig(Network::TransportSocketFactory& transport_socket_factory) {
+getConfig(Network::UpstreamTransportSocketFactory& transport_socket_factory) {
   return dynamic_cast<Quic::QuicClientTransportSocketFactory&>(transport_socket_factory)
       .clientContextConfig();
 }

@@ -349,7 +349,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               parent_.server_.singletonManager(), parent_.server_.threadLocal(),
               validation_visitor_, parent_.server_.api(), parent_.server_.options(),
               parent_.server_.accessLogManager())),
-      quic_stat_names_(parent_.quicStatNames()) {
+      quic_stat_names_(parent_.quicStatNames()),
+      missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
+          POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
 
   if ((address_->type() == Network::Address::Type::Ip &&
        config.address().socket_address().ipv4_compat()) &&
@@ -440,7 +442,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                             parent_.inPlaceFilterChainUpdate(*this);
                           }),
       transport_factory_context_(origin.transport_factory_context_),
-      quic_stat_names_(parent_.quicStatNames()) {
+      quic_stat_names_(parent_.quicStatNames()),
+      missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
+          POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   validateConfig(socket_type);
@@ -832,8 +836,14 @@ bool ListenerImpl::createNetworkFilterChain(
 }
 
 bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {
-  return Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_,
-                                                             listenerScope());
+  if (Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_)) {
+    return true;
+  } else {
+    ENVOY_LOG(debug, "New connection accepted while missing configuration. "
+                     "Close socket and stop the iteration onAccept.");
+    missing_listener_config_stats_.extension_config_missing_.inc();
+    return false;
+  }
 }
 
 void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManager& manager,
@@ -872,8 +882,8 @@ ListenerImpl::~ListenerImpl() {
 Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 void ListenerImpl::setSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
-  ASSERT(!socket_factory_);
-  socket_factory_ = std::move(socket_factory);
+  ASSERT(socket_factories_.empty());
+  socket_factories_.emplace_back(std::move(socket_factory));
 }
 
 bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,

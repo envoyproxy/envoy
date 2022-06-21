@@ -175,7 +175,7 @@ public:
   virtual bool logFormatEscaped() const PURE;
 
   /**
-   * @return const bool logger mode: whether to use Fancy Logger.
+   * @return const bool logger mode: whether to use Fine-Grain Logger.
    */
   virtual bool enableFineGrainLogging() const PURE;
 

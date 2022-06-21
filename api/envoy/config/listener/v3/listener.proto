@@ -32,13 +32,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
 
+// The additional address the listener is listening on.
+// [#not-implemented-hide:]
+message AdditionalAddress {
+  core.v3.Address address = 1;
+}
+
 // Listener list collections. Entries are *Listener* resources or references.
 // [#not-implemented-hide:]
 message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -108,6 +114,12 @@ message Listener {
   // Linux as the actual port will be allocated by the OS.
   // Required unless *api_listener* or *listener_specifier* is populated.
   core.v3.Address address = 2;
+
+  // The additional addresses the listener should listen on. The addresses must be unique across all
+  // listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in a single listener,
+  // all addresses use the same protocol, and multiple internal addresses are not supported.
+  // [#not-implemented-hide:]
+  repeated AdditionalAddress additional_addresses = 33;
 
   // Optional prefix to use on listener stats. If empty, the stats will be rooted at
   // `listener.<address as string>.`. If non-empty, stats will be rooted at

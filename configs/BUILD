@@ -80,6 +80,7 @@ py_binary(
     name = "example_configs_validation",
     srcs = ["example_configs_validation.py"],
     args = (
+        "--descriptor_path=$(location @envoy_api//:v3_proto_set)",
         "$(locations :configs) ",
         "$(locations //examples:configs) ",
         "$(locations //docs:configs) ",
@@ -88,8 +89,7 @@ py_binary(
         ":configs",
         "//docs:configs",
         "//examples:configs",
+        "@envoy_api//:v3_proto_set",
     ],
-    deps = [
-        "//tools/config_validation:validate_fragment",
-    ],
+    deps = [requirement("envoy.base.utils")],
 )

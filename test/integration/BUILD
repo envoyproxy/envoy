@@ -1397,7 +1397,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 3,
+    shard_count = 7,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",

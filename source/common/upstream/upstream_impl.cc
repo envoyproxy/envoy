@@ -265,7 +265,7 @@ HostDescriptionImpl::HostDescriptionImpl(
           : Network::Utility::getAddressWithPort(*dest_address, health_check_config.port_value());
 }
 
-Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(
+Network::UpstreamTransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(
     const Network::Address::InstanceConstSharedPtr& dest_address,
     const envoy::config::core::v3::Metadata* metadata) const {
   auto match = cluster_->transportSocketMatcher().resolve(metadata);
@@ -307,7 +307,7 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata) const {
 
-  Network::TransportSocketFactory& factory =
+  Network::UpstreamTransportSocketFactory& factory =
       (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
                             : transportSocketFactory();
   return {createConnection(dispatcher, cluster(), healthCheckAddress(), {}, factory, nullptr,
@@ -319,7 +319,7 @@ Network::ClientConnectionPtr HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
     const Network::Address::InstanceConstSharedPtr& address,
     const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
-    Network::TransportSocketFactory& socket_factory,
+    Network::UpstreamTransportSocketFactory& socket_factory,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
@@ -1012,7 +1012,7 @@ ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
   return nullptr;
 }
 
-Network::TransportSocketFactoryPtr createTransportSocketFactory(
+Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
     const envoy::config::cluster::v3::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   // If the cluster config doesn't have a transport socket configured, override with the default
