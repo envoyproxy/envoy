@@ -779,6 +779,26 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   server_connection.dispatcher_.to_delete_.clear();
 }
 
+#ifdef FUZZ_PROTOCOL_http1
+void codecFuzzHttp1(const test::common::http::CodecImplFuzzTestCase& input) {
+  codecFuzz(input, HttpVersion::Http1);
+}
+#endif
+
+#ifdef FUZZ_PROTOCOL_http2
+void codecFuzzHttp2Nghttp2(const test::common::http::CodecImplFuzzTestCase& input) {
+  codecFuzz(input, HttpVersion::Http2Nghttp2);
+}
+
+void codecFuzzHttp2WrappedNghttp2(const test::common::http::CodecImplFuzzTestCase& input) {
+  codecFuzz(input, HttpVersion::Http2WrappedNghttp2);
+}
+
+void codecFuzzHttp2Oghttp2(const test::common::http::CodecImplFuzzTestCase& input) {
+  codecFuzz(input, HttpVersion::Http2Oghttp2);
+}
+#endif
+
 } // namespace
 
 // Fuzz the H1/H2 codec implementations.
@@ -786,16 +806,22 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
   try {
     // Validate input early.
     TestUtility::validate(input);
-    codecFuzz(input, HttpVersion::Http1);
-    codecFuzz(input, HttpVersion::Http2Nghttp2);
-    codecFuzz(input, HttpVersion::Http2WrappedNghttp2);
+#ifdef FUZZ_PROTOCOL_http1
+    codecFuzzHttp1(input);
+#endif
+#ifdef FUZZ_PROTOCOL_http2
+    // We wrap the calls to *codecFuzz* through these functions in order for
+    // the codec name to explicitly be in any stacktrace.
+    codecFuzzHttp2Nghttp2(input);
+    codecFuzzHttp2WrappedNghttp2(input);
     // Prevent oghttp2 from aborting the program.
     // If when disabling the FATAL log abort the fuzzer will create a test that reaches an
     // inconsistent state (and crashes/accesses inconsistent memory), then it will be a bug we'll
     // need to further evaluate. However, in fuzzing we allow oghttp2 reaching FATAL states that may
     // happen in production environments.
     quiche::setDFatalExitDisabled(true);
-    codecFuzz(input, HttpVersion::Http2Oghttp2);
+    codecFuzzHttp2Oghttp2(input);
+#endif
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }
