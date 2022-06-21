@@ -726,7 +726,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "685052b498b6ddfe562ca7a97736741d87916fe536623afb7da2824c0211c369",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
         use_category = ["build", "api"],
-        release_date = "2022-05-11",
+        release_date = "2022-06-06",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
