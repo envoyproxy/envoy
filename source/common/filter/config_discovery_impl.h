@@ -164,8 +164,13 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 };
 
-// Pair of canonical filter name and HTTP stream filter factory callback.
-using NamedHttpFilterFactoryCb = std::pair<std::string, Http::FilterFactoryCb>;
+// Struct of canonical filter name and HTTP stream filter factory callback.
+struct NamedHttpFilterFactoryCb {
+  // Canonical filter name.
+  std::string name;
+  // Factory function used to create filter instances.
+  Http::FilterFactoryCb factory_cb;
+};
 
 // Implementation of a HTTP dynamic filter config provider.
 class HttpDynamicFilterConfigProviderImpl

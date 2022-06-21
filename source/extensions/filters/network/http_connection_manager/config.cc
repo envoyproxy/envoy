@@ -657,8 +657,7 @@ void HttpConnectionManagerConfig::processFilter(
   Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
-      std::pair<std::string, Http::FilterFactoryCb>{factory->name(), callback},
-      proto_config.name());
+      {factory->name(), callback}, proto_config.name());
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessageOrError(
@@ -736,8 +735,8 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
     auto config = filter_config_provider->config();
     if (config.has_value()) {
       Filter::NamedHttpFilterFactoryCb& factory_cb = config.value().get();
-      manager.applyFilterFactoryCb({filter_config_provider->name(), factory_cb.first},
-                                   factory_cb.second);
+      manager.applyFilterFactoryCb({filter_config_provider->name(), factory_cb.name},
+                                   factory_cb.factory_cb);
       continue;
     }
 
