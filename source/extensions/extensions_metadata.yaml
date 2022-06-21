@@ -43,7 +43,7 @@ envoy.bootstrap.wasm:
   - envoy.bootstrap
   security_posture: unknown
   status: alpha
-envoy.cache.cache_policy:
+envoy.filters.http.cache.cache_policy:
   categories:
   - envoy.filters.http.cache
   security_posture: robust_to_untrusted_downstream_and_upstream
