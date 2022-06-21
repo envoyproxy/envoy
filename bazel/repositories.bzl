@@ -2,7 +2,7 @@ load(":dev_binding.bzl", "envoy_dev_binding")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
@@ -743,6 +743,16 @@ def _com_google_protobuf():
     external_http_archive(
         name = "rules_python",
     )
+
+    for platform in PROTOC_VERSIONS:
+        # Ideally we dont use a private build artefact as done here.
+        # If `rules_proto` implements protoc toolchains in the future (currently it
+        # is there, but is empty) we should remove these and use that rule
+        # instead.
+        external_http_archive(
+            "com_google_protobuf_protoc_%s" % platform,
+            build_file = "@rules_proto//proto/private:BUILD.protoc",
+        )
 
     external_http_archive(
         "com_google_protobuf",
