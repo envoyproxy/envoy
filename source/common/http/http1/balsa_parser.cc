@@ -9,12 +9,12 @@
 
 #include "absl/strings/match.h"
 
-using ::quiche::BalsaFrameEnums;
-using ::quiche::BalsaHeaders;
-
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+
+using ::quiche::BalsaFrameEnums;
+using ::quiche::BalsaHeaders;
 
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length)
     : connection_(connection) {
@@ -92,11 +92,11 @@ void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
     return;
   }
   headers.ForEachHeader([this](const absl::string_view key, const absl::string_view value) {
-    checkResult(connection_->onHeaderField(key.data(), key.length()));
+    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
     if (status_ == ParserStatus::Error) {
       return false;
     }
-    checkResult(connection_->onHeaderValue(value.data(), value.length()));
+    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
     if (status_ == ParserStatus::Error) {
       return false;
     }
@@ -109,11 +109,11 @@ void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
     return;
   }
   trailer.ForEachHeader([this](const absl::string_view key, const absl::string_view value) {
-    checkResult(connection_->onHeaderField(key.data(), key.length()));
+    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
     if (status_ == ParserStatus::Error) {
       return false;
     }
-    checkResult(connection_->onHeaderValue(value.data(), value.length()));
+    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
     if (status_ == ParserStatus::Error) {
       return false;
     }
@@ -128,11 +128,11 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
-  checkResult(connection_->onMessageBegin());
+  status_ = convertResult(connection_->onMessageBegin());
   if (status_ == ParserStatus::Error) {
     return;
   }
-  checkResult(connection_->onUrl(request_uri.data(), request_uri.size()));
+  status_ = convertResult(connection_->onUrl(request_uri.data(), request_uri.size()));
 }
 
 void BalsaParser::OnResponseFirstLineInput(absl::string_view /*line_input*/,
@@ -142,11 +142,11 @@ void BalsaParser::OnResponseFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
-  checkResult(connection_->onMessageBegin());
+  status_ = convertResult(connection_->onMessageBegin());
   if (status_ == ParserStatus::Error) {
     return;
   }
-  checkResult(connection_->onStatus(status_input.data(), status_input.size()));
+  status_ = convertResult(connection_->onStatus(status_input.data(), status_input.size()));
 }
 
 void BalsaParser::OnChunkLength(size_t chunk_length) {
@@ -163,7 +163,7 @@ void BalsaParser::HeaderDone() {
   if (status_ == ParserStatus::Error) {
     return;
   }
-  checkResult(connection_->onHeadersComplete());
+  status_ = convertResult(connection_->onHeadersComplete());
 }
 
 void BalsaParser::ContinueHeaderDone() {}
@@ -172,30 +172,32 @@ void BalsaParser::MessageDone() {
   if (status_ == ParserStatus::Error) {
     return;
   }
-  checkResult(connection_->onMessageComplete());
+  status_ = convertResult(connection_->onMessageComplete());
   framer_.Reset();
 }
 
 void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
   status_ = ParserStatus::Error;
-  error_message_ = BalsaFrameEnums::ErrorCodeToString(error_code);
-  if (error_code == BalsaFrameEnums::UNKNOWN_TRANSFER_ENCODING) {
+  // Specific error messages to match http-parser behavior.
+  switch (error_code) {
+  case BalsaFrameEnums::UNKNOWN_TRANSFER_ENCODING:
     error_message_ = "unsupported transfer encoding";
-  }
-  if (error_code == BalsaFrameEnums::INVALID_CHUNK_LENGTH) {
+    break;
+  case BalsaFrameEnums::INVALID_CHUNK_LENGTH:
     error_message_ = "HPE_INVALID_CHUNK_SIZE";
-  }
-  if (error_code == BalsaFrameEnums::HEADERS_TOO_LONG) {
+    break;
+  case BalsaFrameEnums::HEADERS_TOO_LONG:
     error_message_ = "size exceeds limit";
+    break;
+  default:
+    error_message_ = BalsaFrameEnums::ErrorCodeToString(error_code);
   }
 }
 
 void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode /*error_code*/) {}
 
-void BalsaParser::checkResult(CallbackResult result) {
-  if (result == CallbackResult::Error) {
-    status_ = ParserStatus::Error;
-  }
+ParserStatus BalsaParser::convertResult(CallbackResult result) const {
+  return result == CallbackResult::Error ? ParserStatus::Error : status_;
 }
 
 } // namespace Http1
