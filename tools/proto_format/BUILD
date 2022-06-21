@@ -3,6 +3,8 @@ load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data")
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
 licenses(["notice"])  # Apache 2
 
@@ -54,9 +56,20 @@ envoy_py_data(
     src = ":data_srcs",
 )
 
+pkg_files(
+    name = "xformed_files",
+    srcs = ["//tools/protoxform:api_protoxform"],
+    strip_prefix = strip_prefix.from_pkg(),
+)
+
+pkg_tar(
+    name = "xformed",
+    srcs = [":xformed_files"],
+)
+
 py_binary(
-    name = "proto_sync",
-    srcs = ["proto_sync.py"],
+    name = "format_api",
+    srcs = ["format_api.py"],
     args = [
         "--api_root=%s/api" % PATH,
         "--protoprint=$(location //tools/protoxform:protoprint)",
@@ -68,4 +81,33 @@ py_binary(
         "//tools/api_proto_plugin:utils",
         "//tools/protoxform:protoprint",
     ],
+)
+
+genrule(
+    name = "formatted_api",
+    outs = ["formatted_api.tar"],
+    cmd = """
+    $(location :format_api) \
+        --api_root=%s/api \
+        --protoprint=$(location //tools/protoxform:protoprint) \
+        --descriptor=$(location //tools/type_whisperer:api_type_db.pb_text) \
+        --outfile=$@ \
+        --xformed=$(location :xformed) \
+    """ % PATH,
+    tools = [
+        ":format_api",
+        ":xformed",
+        "//tools/protoxform:protoprint",
+        "//tools/type_whisperer:api_type_db.pb_text",
+    ],
+)
+
+py_binary(
+    name = "proto_sync",
+    srcs = ["proto_sync.py"],
+    args = [
+        "--api_root=%s/api" % PATH,
+        "--formatted=$(location :formatted_api)",
+    ],
+    data = [":formatted_api"],
 )
