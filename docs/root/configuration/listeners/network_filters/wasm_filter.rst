@@ -23,15 +23,14 @@ Example filter configuration:
   name: envoy.filters.network.wasm
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.network.wasm.v3.Wasm
-    config:
-      config:
-        name: "my_plugin"
-        vm_config:
-          runtime: "envoy.wasm.runtime.v8"
-          code:
-            local:
-              filename: "/etc/envoy_filter_http_wasm_example.wasm"
-          allow_precompiled: true
+     config:
+       name: "my_plugin"
+       vm_config:
+         runtime: "envoy.wasm.runtime.v8"
+         code:
+           local:
+             filename: "/etc/envoy_filter_http_wasm_example.wasm"
+         allow_precompiled: true
 
 
 The preceding snippet configures a filter from a Wasm binary on local disk.
