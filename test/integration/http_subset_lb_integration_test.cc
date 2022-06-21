@@ -52,7 +52,9 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::httpProxyConfig()),
         is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
-                    GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
+                    GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV),
+        is_random_hash_lb_(GetParam() ==
+                           envoy::config::cluster::v3::Cluster::DETERMINISTIC_APERTURE) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
 
@@ -64,6 +66,7 @@ public:
 
       // Create subsets based on type value of the "type" metadata.
       cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
+      cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys("test");
 
       cluster->clear_load_assignment();
 
@@ -86,6 +89,8 @@ public:
         auto* metadata = lb_endpoint->mutable_metadata();
         Envoy::Config::Metadata::mutableMetadataValue(*metadata, "envoy.lb", type_key_)
             .set_string_value((i % 2 == 0) ? "a" : "b");
+        Envoy::Config::Metadata::mutableMetadataValue(*metadata, "envoy.lb", fmt::format("test", i))
+            .set_string_value((i % 2 == 0) ? "test-a, test-1" : "test-b, test-2");
       }
     });
 
@@ -130,7 +135,7 @@ public:
         .set_string_value(host_type);
 
     // Set a hash policy for hashing load balancers.
-    if (is_hash_lb_) {
+    if (is_hash_lb_ || is_random_hash_lb_) {
       action->add_hash_policy()->mutable_header()->set_header_name(hash_header_);
     }
   };
@@ -145,7 +150,7 @@ public:
   // iterations (e.g. for maglev/hash-ring policies). Otherwise, expected more than one host to be
   // selected over at least n iterations and at most m.
   void runTest(Http::TestRequestHeaderMapImpl& request_headers,
-               const std::string expected_host_type, const int n = 100, const int m = 1000) {
+               const std::string expected_host_type, const int n = 1, const int m = 2) {
     ASSERT_LT(n, m);
 
     std::set<std::string> hosts;
@@ -169,7 +174,7 @@ public:
                         ->value()
                         .getStringView());
 
-      if (i >= n && (is_hash_lb_ || hosts.size() > 1)) {
+      if (i >= n && (is_hash_lb_ || is_random_hash_lb_ || hosts.size() > 1)) {
         // Once we've completed n iterations, quit for hash lb policies. For others, keep going
         // until we've seen multiple hosts (as expected) or reached m iterations.
         break;
@@ -179,6 +184,10 @@ public:
     if (is_hash_lb_) {
       EXPECT_EQ(hosts.size(), 1) << "Expected a single unique host to be selected for "
                                  << envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
+    } else if (is_random_hash_lb_) {
+      EXPECT_GE(hosts.size(), 1) << "Expected atleast a host to be selected for "
+                                 << envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
+
     } else {
       EXPECT_GT(hosts.size(), 1) << "Expected multiple hosts to be selected for "
                                  << envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
@@ -187,6 +196,7 @@ public:
 
   const uint32_t num_hosts_{4};
   const bool is_hash_lb_;
+  const bool is_random_hash_lb_;
 
   const std::string hash_header_{"x-hash"};
   const std::string host_type_header_{"x-host-type"};

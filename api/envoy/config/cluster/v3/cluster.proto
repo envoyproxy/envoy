@@ -44,7 +44,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 57]
+// [#next-free-field: 61]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -117,6 +117,8 @@ message Cluster {
     // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field without
     // setting any value in :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
     LOAD_BALANCING_POLICY_CONFIG = 7;
+
+    DETERMINISTIC_APERTURE = 9;
   }
 
   // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
@@ -520,6 +522,27 @@ message Cluster {
     // upstream as it was before. Increasing the table size reduces the amount of disruption.
     // The table size must be prime number limited to 5000011. If it is not specified, the default is 65537.
     google.protobuf.UInt64Value table_size = 1 [(validate.rules).uint64 = {lte: 5000011}];
+  }
+
+  // Deterministic Aperture load balancing is designed to conserve connections between Envoy and
+  // backend instances. This is achieved by dividing the backends uniformly among participating peers.
+  // This way, we avoid a complete mesh of connections between Envoy and backends. The participating
+  // Envoy peers are placed on a ring that is conceptually laid on top of the Ring Hash of backends
+  // to determine their overlaps. By using the ring overlaps as a mechanism to divide the backends,
+  // the backends get divided as a fraction of their overlaps with each peer. The algorithm uses a
+  // uniform random distribution to select a backend from the range of overlapping backends. This
+  // along with P2C ensures uniform load distribution.
+
+  // [#next-free-field: 6]
+  message DeterministicApertureLbConfig {
+    // Hash ring configuration for the internal ring for endpoints.
+    RingHashLbConfig ring_config = 1;
+
+    // Index of this peer (0 indexed).
+    uint32 peer_index = 3;
+
+    // Total number of peers participating in the algorithm (that share the outer ring).
+    uint32 total_peers = 5;
   }
 
   // Specific configuration for the
@@ -1061,6 +1084,9 @@ message Cluster {
 
     // Optional configuration for the RoundRobin load balancing policy.
     RoundRobinLbConfig round_robin_lb_config = 56;
+
+    // Optional configuration for the Deterministic Aperture load balancing policy.
+    DeterministicApertureLbConfig deterministic_aperture_lb_config = 60;
   }
 
   // Common configuration for all load balancer implementations.

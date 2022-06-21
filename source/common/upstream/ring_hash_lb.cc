@@ -121,8 +121,8 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
                static_cast<double>(max_ring_size));
 
   // Reserve memory for the entire ring up front.
-  const uint64_t ring_size = std::ceil(scale);
-  ring_.reserve(ring_size);
+  ring_size_ = std::ceil(scale);
+  ring_.reserve(ring_size_);
 
   // Populate the hash ring by walking through the (host, weight) pairs in
   // normalized_host_weights, and generating (scale * weight) hashes for each host. Since these
@@ -145,7 +145,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
   absl::InlinedVector<char, 196> hash_key_buffer;
   double current_hashes = 0.0;
   double target_hashes = 0.0;
-  uint64_t min_hashes_per_host = ring_size;
+  uint64_t min_hashes_per_host = ring_size_;
   uint64_t max_hashes_per_host = 0;
   for (const auto& entry : normalized_host_weights) {
     const auto& host = entry.first;
@@ -192,7 +192,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
     }
   }
 
-  stats_.size_.set(ring_size);
+  stats_.size_.set(ring_size_);
   stats_.min_hashes_per_host_.set(min_hashes_per_host);
   stats_.max_hashes_per_host_.set(max_hashes_per_host);
 }

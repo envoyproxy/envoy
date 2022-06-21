@@ -891,6 +891,15 @@ public:
   lbOriginalDstConfig() const PURE;
 
   /**
+   * @return const
+   * absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>& the
+   * configuration for the Deterministic Aperture load balancing policy, only used if type is set to
+   *         DETERMINISTIC_APERTURE_LB.
+   */
+  virtual const absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>&
+  lbDeterministicApertureConfig() const PURE;
+
+  /**
    * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
    *         for the upstream, if a custom upstream is configured.
    */

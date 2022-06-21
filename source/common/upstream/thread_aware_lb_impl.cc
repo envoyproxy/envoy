@@ -95,7 +95,10 @@ void ThreadAwareLoadBalancerBase::initialize() {
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector&) -> void { refresh(); });
+      [this](uint32_t p, const HostVector&, const HostVector&) -> void {
+        ENVOY_LOG_MISC(trace, "Update host set for priority {}", p);
+        refresh();
+      });
 
   refresh();
 }
@@ -110,6 +113,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
 
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     const uint32_t priority = host_set->priority();
+    ENVOY_LOG_MISC(debug, "Refreshing load balancer for host set in priority {}", priority);
     (*per_priority_state_vector)[priority] = std::make_unique<PerPriorityState>();
     const auto& per_priority_state = (*per_priority_state_vector)[priority];
     // Copy panic flag from LoadBalancerBase. It is calculated when there is a change

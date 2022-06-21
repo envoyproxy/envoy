@@ -450,6 +450,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "deterministic_aperture_lb_lib",
+    srcs = ["deterministic_aperture_lb.cc"],
+    hdrs = ["deterministic_aperture_lb.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
+    deps = [
+        ":ring_hash_lb_lib",
+        ":upstream_lib",
+        "//source/common/common:minimal_logger_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "eds_lib",
     srcs = ["eds.cc"],
     hdrs = ["eds.h"],
@@ -509,6 +524,7 @@ envoy_cc_library(
     srcs = ["subset_lb.cc"],
     hdrs = ["subset_lb.h"],
     deps = [
+        ":deterministic_aperture_lb_lib",
         ":load_balancer_lib",
         ":maglev_lb_lib",
         ":ring_hash_lb_lib",

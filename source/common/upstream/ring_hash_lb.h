@@ -38,7 +38,7 @@ struct RingHashLoadBalancerStats {
  * 3) Max request fallback to support hot shards (not all applications will want this).
  */
 class RingHashLoadBalancer : public ThreadAwareLoadBalancerBase,
-                             Logger::Loggable<Logger::Id::upstream> {
+                             protected Logger::Loggable<Logger::Id::upstream> {
 public:
   RingHashLoadBalancer(
       const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
@@ -48,7 +48,7 @@ public:
 
   const RingHashLoadBalancerStats& stats() const { return stats_; }
 
-private:
+protected:
   using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
 
   struct RingEntry {
@@ -65,6 +65,8 @@ private:
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
     std::vector<RingEntry> ring_;
+
+    uint64_t ring_size_{0};
 
     RingHashLoadBalancerStats& stats_;
   };

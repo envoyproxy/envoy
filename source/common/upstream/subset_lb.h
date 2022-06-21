@@ -39,6 +39,8 @@ public:
           round_robin_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
           least_request_config,
+      const absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>&
+          daperture_lb_config,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       TimeSource& time_source);
   ~SubsetLoadBalancer() override;
@@ -364,6 +366,8 @@ private:
   const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config_;
   const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       least_request_config_;
+  const absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>
+      lb_daperture_config_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   ClusterStats& stats_;
   Stats::Scope& scope_;

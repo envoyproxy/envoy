@@ -586,6 +586,28 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "deterministic_aperture_lb_test",
+    srcs = ["deterministic_aperture_lb_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//envoy/router:router_interface",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:deterministic_aperture_lb_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:priority_set_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
     deps = [
