@@ -516,7 +516,7 @@ key:
                             "type URL: 'google.protobuf.Struct'");
 }
 
-// Test that scopes with same config as existing scopes will be skiped in a config push.
+// Test that scopes with same config as existing scopes will be skipped in a config push.
 TEST_F(ScopedRdsTest, UnchangedScopesAreSkipped) {
   setup();
   init_watcher_.expectReady();
@@ -550,7 +550,7 @@ key:
       static_cast<Envoy::Router::ScopedRdsConfigSubscription*>(srds_subscription_);
   ASSERT_NE(srds_delta_subscription, nullptr);
   ASSERT_EQ("v1", srds_delta_subscription->configInfo()->last_config_version_);
-  // Repush the same set of config with different version number, the config will be skipped.
+  // Push again the same set of config with different version number, the config will be skipped.
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "123"));
   ASSERT_EQ("v1", srds_delta_subscription->configInfo()->last_config_version_);
   EXPECT_EQ(2UL,
