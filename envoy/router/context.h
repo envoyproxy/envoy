@@ -45,7 +45,7 @@ public:
   /**
    * @return stat name for route specific stats.
    */
-  virtual const Stats::StatName statName() const PURE;
+  virtual Stats::StatName statName() const PURE;
 
   /**
    * @return a struct containing stats for route stats.

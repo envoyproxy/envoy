@@ -60,7 +60,7 @@ public:
 
   ~RouteStatsContextImpl() override = default;
 
-  const Stats::StatName statName() const override { return route_stat_name_; }
+  Stats::StatName statName() const override { return route_stat_name_; }
   const RouteStats& stats() const override { return route_stats_; }
 
 private:
