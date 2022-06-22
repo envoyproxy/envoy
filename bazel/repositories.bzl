@@ -206,6 +206,7 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_colm_open_source_ragel()
     _net_zlib()
+    _intel_dlb()
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
     _org_brotli()
@@ -1119,6 +1120,22 @@ def _com_github_wasm_c_api():
     native.bind(
         name = "prefixed_wasmtime",
         actual = "@com_github_wasm_c_api//:wasmtime_lib",
+    )
+
+def _intel_dlb():
+    external_http_archive(
+        name = "intel_dlb",
+        build_file_content = """
+filegroup(
+    name = "libdlb",
+    srcs = glob([
+        "dlb/libdlb/**",
+    ]),
+    visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
+)
+""",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
     )
 
 def _rules_fuzzing():
