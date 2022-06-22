@@ -31,17 +31,17 @@ public:
   /**
    * @return the span's version as a hex string.
    */
-  std::string version() const { return version_; }
+  const std::string& version() const { return version_; }
 
   /**
    * @return the span's parent id as a hex string.
    */
-  std::string parentId() const { return parent_id_; }
+  const std::string& parentId() const { return parent_id_; }
 
   /**
    * @return the trace id as an integer.
    */
-  std::string traceId() const { return trace_id_; }
+  const std::string& traceId() const { return trace_id_; }
 
   /**
    * @return the sampled flag.
