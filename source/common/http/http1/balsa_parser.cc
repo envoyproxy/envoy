@@ -72,7 +72,9 @@ absl::string_view BalsaParser::methodName() const { return headers_.request_meth
 
 absl::string_view BalsaParser::errorMessage() const { return error_message_; }
 
-int BalsaParser::hasTransferEncoding() const { return headers_.HasHeader("transfer-encoding"); }
+int BalsaParser::hasTransferEncoding() const {
+  return headers_.HasHeader(Http::Headers::get().TransferEncoding);
+}
 
 void BalsaParser::OnRawBodyInput(absl::string_view /*input*/) {}
 
