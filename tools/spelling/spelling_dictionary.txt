@@ -271,7 +271,6 @@ OSI
 OSS
 OSX
 OT
-OTLP
 OU
 OVFL
 PAYLOADLEN
@@ -1262,7 +1261,6 @@ tokenizing
 toolchain
 traceid
 traceparent
-tracestate
 transcode
 transcoded
 transcoder

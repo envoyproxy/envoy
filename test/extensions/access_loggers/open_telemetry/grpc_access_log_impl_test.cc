@@ -117,7 +117,7 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
           value:
             string_value: "node_name"
     instrumentation_library_logs:
-      - log_records:
+      - logs:
           - severity_text: "test-severity-text"
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;
@@ -180,7 +180,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
           value:
             string_value: "node_name"
     instrumentation_library_logs:
-      - log_records:
+      - logs:
           - severity_text: "test-severity-text"
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;

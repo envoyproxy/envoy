@@ -53,8 +53,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/tracers/xray @abaptiste @suniltheta @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @lizan @Shikugawa
-# tracers.opentelemetry extension
-/*/extensions/tracers/opentelemetry @alexanderellis @htuch
 # quic extension
 /*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # UDP packet writer

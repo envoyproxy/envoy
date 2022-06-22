@@ -62,15 +62,15 @@ void GrpcAccessLoggerImpl::initMessageRoot(
 }
 
 void GrpcAccessLoggerImpl::addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) {
-  root_->mutable_log_records()->Add(std::move(entry));
+  root_->mutable_logs()->Add(std::move(entry));
 }
 
-bool GrpcAccessLoggerImpl::isEmpty() { return root_->log_records().empty(); }
+bool GrpcAccessLoggerImpl::isEmpty() { return root_->logs().empty(); }
 
 // The message is already initialized in the c'tor, and only the logs are cleared.
 void GrpcAccessLoggerImpl::initMessage() {}
 
-void GrpcAccessLoggerImpl::clearMessage() { root_->clear_log_records(); }
+void GrpcAccessLoggerImpl::clearMessage() { root_->clear_logs(); }
 
 GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
                                                      Stats::Scope& scope,
