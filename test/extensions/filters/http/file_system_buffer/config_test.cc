@@ -94,9 +94,8 @@ TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionWithConfigured0BytesMemo
     response:
       memory_buffer_bytes_limit: 0
   )");
-  auto base_config = captureConfigFromProto(proto_config);
-  EXPECT_THROW_WITH_REGEX(FileSystemBufferFilterMergedConfig({*base_config}), EnvoyException,
-                          "must not be zero");
+  EXPECT_THROW_WITH_REGEX(captureConfigFromProto(proto_config), ProtoValidationException,
+                          "value must be greater than 0");
 }
 
 TEST_F(FileSystemBufferFilterConfigTest, FallsBackToZeroStorageIfManagerNotConfigured) {

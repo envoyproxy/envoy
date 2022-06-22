@@ -116,12 +116,6 @@ void cleanFileSystemBufferConfig(Protobuf::Message* message) {
         "received input exceeding the allowed number of threads ({} > {}) for "
         "FileSystemBufferFilter.AsyncFileManager",
         config.manager_config().thread_pool().thread_count(), kMaxAsyncFileManagerThreadCount));
-  } else if (config.request().has_memory_buffer_bytes_limit() &&
-             config.request().memory_buffer_bytes_limit().value() == 0) {
-    throw EnvoyException("request's memory_buffer_bytes_limit must be greater than 0");
-  } else if (config.response().has_memory_buffer_bytes_limit() &&
-             config.response().memory_buffer_bytes_limit().value() == 0) {
-    throw EnvoyException("response's memory_buffer_bytes_limit must be greater than 0");
   }
 }
 
