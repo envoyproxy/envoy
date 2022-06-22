@@ -483,14 +483,10 @@ public:
         // The client codec will ensure we always have a valid :status.
         // Similarly, local replies should always contain this.
         const auto status = Utility::getResponseStatusOrNullopt(*headers);
-        if (!status.has_value()) {
-          headers->setReferenceKey(Headers::get().Status, "200");
-        }
         // The only 1xx header that may be provided to encodeHeaders() is a 101 upgrade,
         // guaranteed by the codec parsers. See include/envoy/http/filter.h.
-        if (CodeUtility::is1xx(status.value_or(enumToInt(Http::Code::OK))) &&
-            status.value_or(enumToInt(Http::Code::OK)) !=
-                enumToInt(Http::Code::SwitchingProtocols)) {
+        if (!status.has_value() || (CodeUtility::is1xx(status.value()) &&
+                                    status.value() != enumToInt(Http::Code::SwitchingProtocols))) {
           headers->setReferenceKey(Headers::get().Status, "200");
         }
         decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream, "details");
