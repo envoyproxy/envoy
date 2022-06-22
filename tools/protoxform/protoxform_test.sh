@@ -20,5 +20,5 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
     --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
     //tools/protoxform:test_protoxform
 
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoprint
 ./tools/protoxform/protoxform_test_helper.py fix "${PROTO_TARGETS[@]}"

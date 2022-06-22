@@ -315,13 +315,9 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
           shared_from_this()};
 }
 
-Network::ClientConnectionPtr HostImpl::createConnection(
-    Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-    const Network::Address::InstanceConstSharedPtr& address,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
-    Network::UpstreamTransportSocketFactory& socket_factory,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
+Network::ConnectionSocket::OptionsSharedPtr
+combineConnectionSocketOptions(const ClusterInfo& cluster,
+                               const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (cluster.clusterSocketOptions() != nullptr) {
     if (options) {
@@ -335,6 +331,18 @@ Network::ClientConnectionPtr HostImpl::createConnection(
   } else {
     connection_options = options;
   }
+  return connection_options;
+}
+
+Network::ClientConnectionPtr HostImpl::createConnection(
+    Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+    const Network::Address::InstanceConstSharedPtr& address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+    Network::UpstreamTransportSocketFactory& socket_factory,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
+  Network::ConnectionSocket::OptionsSharedPtr connection_options =
+      combineConnectionSocketOptions(cluster, options);
 
   ASSERT(!address->envoyInternalAddress() ||
          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
