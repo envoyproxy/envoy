@@ -16,7 +16,9 @@ std::vector<std::string> stringsFromListValue(const ProtobufWkt::Value& value) {
   return strings;
 }
 
-TEST(ValidateExtensionManifestTest, CorrectMetadata) {
+// Ensure that the type URLs in the static extension schema match the type URLs
+// in the internal extension registry.
+TEST(CheckExtensionsAgainstRegistry, CorrectMetadata) {
   // Manifest schema example:
   // <extension_name>:
   //   categories:

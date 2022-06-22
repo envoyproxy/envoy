@@ -99,8 +99,8 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "validate_extension_manifest_test",
-    srcs = ["validate_extension_manifest_test.cc"],
+    name = "check_extensions_against_registry_test",
+    srcs = ["check_extensions_against_registry_test.cc"],
     data = [
         "//source/extensions:extensions_metadata.yaml",
     ],
