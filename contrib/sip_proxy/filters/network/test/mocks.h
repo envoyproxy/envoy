@@ -125,6 +125,7 @@ public:
   MOCK_METHOD(void, continueHandling, (const std::string&, bool));
   MOCK_METHOD(MessageMetadataSharedPtr, metadata, ());
   MOCK_METHOD(SipFilterStats&, stats, ());
+  MOCK_METHOD(IngressID, ingressID, ());
 
   uint64_t stream_id_{1};
   std::string transaction_id_{"test"};
@@ -133,6 +134,7 @@ public:
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   Stats::TestUtil::TestStore store_;
   SipFilterStats stats_;
+  IngressID ingress_id_ = IngressID("123", "xyz");
 };
 
 class MockFilterConfigFactory : public NamedSipFilterConfigFactory {

@@ -120,7 +120,7 @@ void Router::onDestroy() {
     for (auto& kv : *transaction_infos_) {
       auto transaction_info = kv.second;
       transaction_info->deleteTransaction(callbacks_->transactionId());
-    }
+    } 
   }
 
   if (upstream_request_) {
@@ -194,7 +194,7 @@ FilterStatus Router::handleAffinity() {
     ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
     callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, absl::nullopt);
   }
-
+  
   const std::shared_ptr<const ProtocolOptionsConfig> options =
       cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
           SipFilters::SipFilterNames::get().SipProxy);
@@ -282,6 +282,16 @@ FilterStatus Router::handleAffinity() {
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
 
+  
+  //metadata_->addXEnvoyOriginIngressHeader()
+   // fixme 
+  // - move this somewhere more appropriate??
+  // - only add the header if does not already exist
+  // - only add the header if the outbound-transactions feature is enabled for the cluster (may need to move this to the router where we have the route config)
+  // todo - add cache of conn-id to -> downstream, and cache of upstream_transaction for mapping responses from downstream to upstream
+  metadata->addXEnvoyOriginIngressHeader(callbacks_->ingressID());
+
+  
   if (upstream_request_ != nullptr) {
     return FilterStatus::Continue;
   }

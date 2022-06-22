@@ -117,15 +117,13 @@ public:
     // also going to need a unique value for the connection - e.g base64(remoteIPport@host@uuid)
     Random::RandomGeneratorImpl random;
     std::string remote_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
-    std::string local_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
+    std::string local_address = read_callbacks_->connection().connectionInfoProvider().localAddress()->asString();
     std::string uuid = random.uuid();
     downstream_conn_id_ = remote_address + "@" + local_address + "@" + uuid;
-
-    ENVOY_LOG(debug, "thread_id={}, downstream_connection_id={}", thread_id, downstream_conn_id_);
-
-    std::cerr << "ThreadIDx: " << thread_id << " Ds Connid: " << read_callbacks_->connection().connectionInfoProvider().ja3Hash() << std::endl;
-    
+    ENVOY_LOG(trace, "thread_id={}, downstream_connection_id={}", thread_id, downstream_conn_id_);
     local_origin_ingress_id_ = downstream_conn_id_ + ";downstream_conn_id=" + thread_id;
+
+    local_ingress_id_ = IngressID(thread_id, downstream_conn_id_);
 
     return Network::FilterStatus::Continue; 
   }
@@ -208,6 +206,7 @@ private:
     uint64_t streamId() const override { return parent_.streamId(); }
     std::string transactionId() const override { return parent_.transactionId(); }
     const Network::Connection* connection() const override { return parent_.connection(); }
+    IngressID ingressID() override { return parent_.ingressID(); }
     Router::RouteConstSharedPtr route() override { return parent_.route(); }
     SipFilterStats& stats() override { return parent_.stats(); }
     void sendLocalReply(const DirectResponse& response, bool end_stream) override {
@@ -309,6 +308,7 @@ private:
     // SipFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     std::string transactionId() const override { return transaction_id_; }
+    IngressID ingressID() override { return parent_.local_ingress_id_.value(); } // fixme - careful need to ensure theres a value
     const Network::Connection* connection() const override;
     Router::RouteConstSharedPtr route() override;
     SipFilterStats& stats() override { return parent_.stats_; }
@@ -392,6 +392,7 @@ private:
 
   std::string downstream_conn_id_;
   std::string local_origin_ingress_id_;
+  std::optional<IngressID> local_ingress_id_;
 
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;

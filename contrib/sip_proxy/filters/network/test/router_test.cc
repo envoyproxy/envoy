@@ -154,7 +154,19 @@ public:
   void initializeMetadata(MsgType msg_type, MethodType method = MethodType::Invite,
                           bool set_destination = true) {
 
-    metadata_ = std::make_shared<MessageMetadata>();
+    const std::string SIP_INVITE = // addNewMsgHeader needs a raw_msg with a Content header
+      "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
+      "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+      "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
+      "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
+      "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+      "Content-Type: application/sdp\x0d\x0a"
+      "Content-Length:  0\x0d\x0a"
+      "\x0d\x0a";
+    Buffer::OwnedImpl buffer_;
+    buffer_.add(SIP_INVITE);
+
+    metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
     metadata_->setMethodType(method);
     metadata_->setMsgType(msg_type);
     metadata_->setTransactionId("<branch=cluster>");

@@ -93,6 +93,20 @@ private:
   bool subscribe_;
 };
 
+class IngressID {
+public: 
+  IngressID(const std::string& thread_id, const std::string& connection_id)
+    : thread_id_(thread_id), connection_id_(connection_id) {}
+  
+  std::string toHeaderValue() {
+    return thread_id_ + ";downstream_connection=" + connection_id_;
+  }
+
+private:
+  std::string thread_id_;
+  std::string connection_id_;
+};
+
 /**
  * MessageMetadata encapsulates metadata about Sip messages. The various fields are considered
  * optional. Unless otherwise noted, accessor methods throw absl::bad_optional_access if the
@@ -156,6 +170,7 @@ public:
     }
   };
 
+  void addXEnvoyOriginIngressHeader(IngressID ingress_id);
   void addXEnvoyOriginIngressHeader(absl::string_view value);
   void addNewMsgHeader(HeaderType type,  absl::string_view value);
 

@@ -57,7 +57,6 @@ public:
 
   void initializeFilter(const std::string& yaml) {
 
-    std::cerr << "JONAH ERROR" << std::endl;
     // Destroy any existing filter first.
     filter_ = nullptr;
 
@@ -906,8 +905,8 @@ TEST_F(SipConnectionManagerTest, EncodeAddXEnvoyOriginIngressHeader) {
 
   metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
 
-  std::string origin_ingress_id = "thread_id_123;downstream_connection=xyz";
-  metadata_->addXEnvoyOriginIngressHeader(origin_ingress_id);
+  std::unique_ptr<IngressID> origin_ingress_id = std::make_unique<IngressID>("thread_id_123", "xyz");
+  metadata_->addXEnvoyOriginIngressHeader(*origin_ingress_id);
   
   Buffer::OwnedImpl request_buffer;
 
@@ -915,7 +914,7 @@ TEST_F(SipConnectionManagerTest, EncodeAddXEnvoyOriginIngressHeader) {
   encoder->encode(metadata_, request_buffer);
 
   std::cout << request_buffer.toString() << std::endl;
-  EXPECT_EQ(request_buffer.length(), buffer_.length() + (std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress)) + ": " + origin_ingress_id + "\r\n").length() );
+  EXPECT_EQ(request_buffer.length(), buffer_.length() + (std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress)) + ": " + origin_ingress_id->toHeaderValue() + "\r\n").length() );
 }
 
 } // namespace SipProxy

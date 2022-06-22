@@ -45,6 +45,14 @@ public:
    */
   virtual std::string transactionId() const PURE;
 
+
+  /**
+   * @return  ID for this Ingress worker thread + downstream connection.
+
+     fixme - should return a const ref
+   */
+  virtual IngressID ingressID() PURE;
+
   /**
    * @return const Network::Connection* the originating connection, or nullptr if there is none.
    */
