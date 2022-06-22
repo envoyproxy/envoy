@@ -81,23 +81,34 @@ envoy_proto_library(
     deps = ["//test/fuzz:common_proto"],
 )
 
-envoy_cc_fuzz_test(
-    name = "codec_impl_fuzz_test",
-    srcs = ["codec_impl_fuzz_test.cc"],
-    corpus = "codec_impl_corpus",
-    deps = [
-        ":codec_impl_fuzz_proto_cc_proto",
-        "//source/common/http:conn_manager_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http/http1:codec_lib",
-        "//source/common/http/http2:codec_lib",
-        "//test/common/http/http2:codec_impl_test_util",
-        "//test/fuzz:utility_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/test_common:test_runtime_lib",
-    ],
-)
+# TODO(kbaichoo): We split the fuzzer by protocol to allow the fuzzer to
+# better explore the individual protocols and catagorize failures for the
+# particular protocol that fails. In the future we might want to further
+# split out the codec fuzzer to better model the individual protocols.
+[
+    envoy_cc_fuzz_test(
+        name = "%s_codec_impl_fuzz_test" % http_protocol,
+        srcs = ["codec_impl_fuzz_test.cc"],
+        corpus = "codec_impl_corpus",
+        defines = ["FUZZ_PROTOCOL_%s" % http_protocol],
+        deps = [
+            ":codec_impl_fuzz_proto_cc_proto",
+            "//source/common/http:conn_manager_lib",
+            "//source/common/http:header_map_lib",
+            "//source/common/http/http1:codec_lib",
+            "//source/common/http/http2:codec_lib",
+            "//test/common/http/http2:codec_impl_test_util",
+            "//test/fuzz:utility_lib",
+            "//test/mocks/http:http_mocks",
+            "//test/mocks/network:network_mocks",
+            "//test/test_common:test_runtime_lib",
+        ],
+    )
+    for http_protocol in [
+        "http1",
+        "http2",
+    ]
+]
 
 envoy_cc_test(
     name = "filter_manager_test",
