@@ -6,7 +6,7 @@ set -e
 
 
 build_setup_args=""
-if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "docs" ||  \
+if [[ "$1" == "format" || "$1" == "fix_proto_format" || "$1" == "check_proto_format" || "$1" == "docs" ||  \
           "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" \
           || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "verify_build_examples" \
           || "$1" == "verify_distro" ]]; then
@@ -473,23 +473,14 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=asan-fuzzer "${FUZZ_TEST_TARGETS[@]}" --test_arg="-runs=10"
   exit 0
-elif [[ "$CI_TARGET" == "format_pre" ]]; then
+elif [[ "$CI_TARGET" == "format" ]]; then
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/ci/format_pre.sh
-elif [[ "$CI_TARGET" == "fix_format" ]]; then
-  echo "Run protoxform test"
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
-
-  # TODO(phlax): move this to a bazel rule
-  echo "check_format_test..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
-
-  echo "fix_format..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
+elif [[ "$CI_TARGET" == "fix_proto_format" ]]; then
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix
   exit 0
-elif [[ "$CI_TARGET" == "check_format" ]]; then
-  echo "check_format..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
+elif [[ "$CI_TARGET" == "check_proto_format" ]]; then
+  echo "Run protoxform test"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then

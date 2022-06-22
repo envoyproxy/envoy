@@ -198,6 +198,7 @@ FilterStatus Router::handleAffinity() {
 
     if (!options->customizedAffinity().entries().empty()) {
       for (const auto& aff : options->customizedAffinity().entries()) {
+        // default header is Route, TOP-URI also used as Route
         HeaderType header = HeaderType::Route;
         if (!aff.header().empty()) {
           header = HeaderTypes::get().str2Header(aff.header());
@@ -215,6 +216,11 @@ FilterStatus Router::handleAffinity() {
         } else if (type == "ep") {
           key = "ep";
         } else {
+          // If the header is Route, and the value is empty, then use the top-uri
+          if ((header == HeaderType::Route) && (metadata->header(HeaderType::Route).empty())) {
+            header = HeaderType::TopLine;
+          }
+
           metadata->parseHeader(header);
           if (metadata->header(header).hasParam(type)) {
             key = metadata->header(header).param(type);

@@ -250,6 +250,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/http/cors @wbpcode @daixiang0
 # Header Validators
 /*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
+# Thrift
+/*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
@@ -258,7 +260,6 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 
 # secondary owner needed or moving to contrib next release.
 /*/extensions/filters/http/ip_tagging @alyssawilk @UNOWNED
-/*/extensions/filters/network/thrift_proxy @zuercher @UNOWNED
 /*/extensions/filters/http/header_to_metadata @zuercher @UNOWNED
 /*/extensions/filters/network/zookeeper_proxy @snowp @UNOWNED
 
