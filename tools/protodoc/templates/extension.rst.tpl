@@ -15,7 +15,7 @@ This extension has the qualified name ``{{extension}}``
 {% endfor %}
 
 {% if type_urls|length > 0 %}
-  This extension must be configured with the following type URLs:
+  This extension must be configured with one of the following type URLs:
 
 {% for type_url in type_urls %}
 {% if type_url.startswith('envoy.') %}
