@@ -41,7 +41,7 @@ public:
     EXPECT_CALL(*created_connections_.back(), addConnectionCallbacks(_))
         .WillOnce(
             Invoke([&](ConnectionCallbacks& cb) -> void { connection_callbacks_.push_back(&cb); }));
-    return std::move(conn);
+    return conn;
   }
 
   size_t nextConnection() override { return created_connections_.size(); }
