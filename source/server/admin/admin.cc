@@ -44,13 +44,6 @@
 namespace Envoy {
 namespace Server {
 
-namespace {
-
-#ifdef ENVOY_ADMIN_HTML
-#endif // ENVOY_ADMIN_HTML
-
-} // namespace
-
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
@@ -328,15 +321,6 @@ void AdminImpl::getHelp(Buffer::Instance& response) {
     response.add(fmt::format("  {}: {}\n", handler->prefix_, handler->help_text_));
   }
 }
-
-#ifndef ENVOY_ADMIN_HTML
-Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
-                                       Buffer::Instance& response, AdminStream&) {
-  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
-  response.add("HTML output is disabled in BUILD");
-  return Http::Code::OK;
-}
-#endif
 
 const Network::Address::Instance& AdminImpl::localAddress() {
   return *server_.localInfo().address();

@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_admin_html",
+    "envoy_select_admin_no_html",
 )
 
 licenses(["notice"])  # Apache 2
@@ -11,7 +12,11 @@ envoy_package()
 
 envoy_cc_library(
     name = "admin_lib",
-    srcs = ["admin.cc"] + envoy_select_admin_html(["admin_html.cc"]),
+    srcs = ["admin.cc"] + envoy_select_admin_html([
+        "admin_html.cc",
+    ]) + envoy_select_admin_no_html([
+        "admin_no_html.cc",
+    ]),
     hdrs = ["admin.h"],
     deps = [
         ":admin_filter_lib",
