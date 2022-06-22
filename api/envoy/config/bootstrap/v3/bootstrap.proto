@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 34]
+// [#next-free-field: 35]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -330,6 +330,10 @@ message Bootstrap {
   // Optional path to a file with performance tracing data created by "Perfetto" SDK in binary
   // ProtoBuf format. The default value is "envoy.pftrace".
   string perf_tracing_file_path = 33;
+
+  // Optional overriding of default regex engine.
+  // If the value is not specified, Google RE2 will be used by default.
+  core.v3.TypedExtensionConfig default_regex_engine = 34;
 }
 
 // Administration interface :ref:`operations documentation

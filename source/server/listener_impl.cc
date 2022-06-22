@@ -349,7 +349,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               parent_.server_.singletonManager(), parent_.server_.threadLocal(),
               validation_visitor_, parent_.server_.api(), parent_.server_.options(),
               parent_.server_.accessLogManager())),
-      quic_stat_names_(parent_.quicStatNames()) {
+      quic_stat_names_(parent_.quicStatNames()),
+      missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
+          POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
 
   if ((address_->type() == Network::Address::Type::Ip &&
        config.address().socket_address().ipv4_compat()) &&
@@ -440,7 +442,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                             parent_.inPlaceFilterChainUpdate(*this);
                           }),
       transport_factory_context_(origin.transport_factory_context_),
-      quic_stat_names_(parent_.quicStatNames()) {
+      quic_stat_names_(parent_.quicStatNames()),
+      missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
+          POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   validateConfig(socket_type);
@@ -688,9 +692,29 @@ void ListenerImpl::buildSocketOptions() {
 #else
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
-      // Currently exact balance is the only supported type and there are no options.
-      ASSERT(config_.connection_balance_config().has_exact_balance());
-      connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+      switch (config_.connection_balance_config().balance_type_case()) {
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kExactBalance: {
+        connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+        break;
+      }
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kExtendBalance: {
+        const std::string connection_balance_library_type{TypeUtil::typeUrlToDescriptorFullName(
+            config_.connection_balance_config().extend_balance().typed_config().type_url())};
+        auto factory =
+            Envoy::Registry::FactoryRegistry<Network::ConnectionBalanceFactory>::getFactoryByType(
+                connection_balance_library_type);
+        if (factory == nullptr) {
+          throw EnvoyException(fmt::format("Didn't find a registered implementation for type: '{}'",
+                                           connection_balance_library_type));
+        }
+        connection_balancer_ = factory->createConnectionBalancerFromProto(
+            config_.connection_balance_config().extend_balance(), *listener_factory_context_);
+        break;
+      }
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::BALANCE_TYPE_NOT_SET: {
+        throw EnvoyException("No valid balance type for connection balance");
+      }
+      }
     } else {
       connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
     }
@@ -710,9 +734,12 @@ void ListenerImpl::buildOriginalDstListenerFilter() {
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             "envoy.filters.listener.original_dst");
 
-    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(),
-        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
+    Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(), nullptr, *listener_factory_context_);
+    auto* cfg_provider_manager = parent_.factory_.getTcpListenerConfigProviderManager();
+    auto filter_config_provider = cfg_provider_manager->createStaticFilterConfigProvider(
+        callback, "envoy.filters.listener.original_dst");
+    listener_filter_factories_.push_back(std::move(filter_config_provider));
   }
 }
 
@@ -725,9 +752,14 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             "envoy.filters.listener.proxy_protocol");
-    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
-        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol(),
-        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
+
+    Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol(), nullptr,
+        *listener_factory_context_);
+    auto* cfg_provider_manager = parent_.factory_.getTcpListenerConfigProviderManager();
+    auto filter_config_provider = cfg_provider_manager->createStaticFilterConfigProvider(
+        callback, "envoy.filters.listener.proxy_protocol");
+    listener_filter_factories_.push_back(std::move(filter_config_provider));
   }
 }
 
@@ -824,7 +856,14 @@ bool ListenerImpl::createNetworkFilterChain(
 }
 
 bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {
-  return Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_);
+  if (Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_)) {
+    return true;
+  } else {
+    ENVOY_LOG(debug, "New connection accepted while missing configuration. "
+                     "Close socket and stop the iteration onAccept.");
+    missing_listener_config_stats_.extension_config_missing_.inc();
+    return false;
+  }
 }
 
 void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManager& manager,
@@ -863,8 +902,8 @@ ListenerImpl::~ListenerImpl() {
 Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 void ListenerImpl::setSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
-  ASSERT(!socket_factory_);
-  socket_factory_ = std::move(socket_factory);
+  ASSERT(socket_factories_.empty());
+  socket_factories_.emplace_back(std::move(socket_factory));
 }
 
 bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,

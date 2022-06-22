@@ -704,6 +704,51 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateTest) {
       expected);
 }
 
+TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  const StreamInfo::FilterStateSharedPtr upstream_filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
+  upstream_filter_state->setData("test_key",
+                                 std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                 StreamInfo::FilterState::StateType::ReadOnly);
+  upstream_filter_state->setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
+                                 StreamInfo::FilterState::StateType::ReadOnly);
+
+  EXPECT_CALL(stream_info, upstreamInfo()).Times(testing::AtLeast(1));
+  // Get pointer to MockUpstreamInfo.
+  std::shared_ptr<StreamInfo::MockUpstreamInfo> mock_upstream_info =
+      std::dynamic_pointer_cast<StreamInfo::MockUpstreamInfo>(stream_info.upstreamInfo());
+  EXPECT_CALL(Const(stream_info), upstreamInfo()).Times(testing::AtLeast(1));
+  EXPECT_CALL(Const(*mock_upstream_info), upstreamFilterState())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(upstream_filter_state));
+
+  OpenTelemetryFormatMap expected = {{"test_key", "\"test_value\""},
+                                     {"test_obj", "{\"inner_key\":\"inner_value\"}"}};
+
+  KeyValueList key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+  values:
+    - key: "test_key"
+      value:
+        string_value: "%UPSTREAM_FILTER_STATE(test_key)%"
+    - key: "test_obj"
+      value:
+        string_value: "%UPSTREAM_FILTER_STATE(test_obj)%"
+  )EOF",
+                            key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping);
+
+  verifyOpenTelemetryOutput(
+      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
+      expected);
+}
+
 // Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
 // the FilterState can call the serializeAsProto or serializeAsString methods correctly.
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateSpeciferTest) {
@@ -740,6 +785,48 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateSpeciferTest) {
       expected);
 }
 
+// Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
+// the FilterState can call the serializeAsProto or serializeAsString methods correctly.
+TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateSpeciferTest) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  stream_info.upstream_info_ = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+  stream_info.upstream_info_->setUpstreamFilterState(
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
+
+  stream_info.upstream_info_->upstreamFilterState()->setData(
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  EXPECT_CALL(Const(stream_info), upstreamInfo()).Times(testing::AtLeast(1));
+
+  OpenTelemetryFormatMap expected = {
+      {"test_key_plain", "test_value By PLAIN"},
+      {"test_key_typed", "\"test_value By TYPED\""},
+  };
+
+  KeyValueList key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    values:
+      - key: "test_key_plain"
+        value:
+          string_value: "%UPSTREAM_FILTER_STATE(test_key:PLAIN)%"
+      - key: "test_key_typed"
+        value:
+          string_value: "%UPSTREAM_FILTER_STATE(test_key:TYPED)%"
+  )EOF",
+                            key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping);
+
+  verifyOpenTelemetryOutput(
+      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
+      expected);
+}
+
 // Error specifier will cause an exception to be thrown.
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateErrorSpeciferTest) {
   Http::TestRequestHeaderMapImpl request_headers;
@@ -761,6 +848,37 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateErrorSpeciferTe
       - key: "test_key_typed"
         value:
           string_value: "%FILTER_STATE(test_key:TYPED)%"
+  )EOF",
+                            key_mapping);
+  EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping), EnvoyException,
+                            "Invalid filter state serialize type, only support PLAIN/TYPED.");
+}
+
+TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateErrorSpeciferTest) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  stream_info.upstream_info_ = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+  stream_info.upstream_info_->setUpstreamFilterState(
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
+
+  stream_info.upstream_info_->upstreamFilterState()->setData(
+      "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  // 'ABCDE' is error specifier.
+  KeyValueList key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    values:
+      - key: "test_key_plain"
+        value:
+          string_value: "%UPSTREAM_FILTER_STATE(test_key:ABCDE)%"
+      - key: "test_key_typed"
+        value:
+          string_value: "%UPSTREAM_FILTER_STATE(test_key:TYPED)%"
   )EOF",
                             key_mapping);
   EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping), EnvoyException,

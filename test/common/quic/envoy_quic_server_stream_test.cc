@@ -219,6 +219,72 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
   quic_stream_->encodeTrailers(response_trailers_);
 }
 
+TEST_F(EnvoyQuicServerStreamTest, EncodeHeaderOnClosedStream) {
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+
+  // Reset stream should clear the connection level buffered bytes accounting.
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  EXPECT_CALL(stream_callbacks_,
+              onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
+
+  EXPECT_ENVOY_BUG(quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false),
+                   "encodeHeaders is called on write-closed stream.");
+}
+
+TEST_F(EnvoyQuicServerStreamTest, EncodeDataOnClosedStream) {
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+
+  // Encode 18kB response body. first 16KB should be written out right away. The
+  // rest should be buffered.
+  std::string response(18 * 1024, 'a');
+  Buffer::OwnedImpl buffer(response);
+  quic_stream_->encodeData(buffer, false);
+  EXPECT_LT(0u, quic_session_.bytesToSend());
+
+  // Reset stream should clear the connection level buffered bytes accounting.
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  EXPECT_CALL(stream_callbacks_,
+              onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
+
+  // Try to send more data on the closed stream. And the watermark shouldn't be
+  // messed up.
+  std::string response2(1024, 'a');
+  Buffer::OwnedImpl buffer2(response2);
+  EXPECT_ENVOY_BUG(quic_stream_->encodeData(buffer2, true),
+                   "encodeData is called on write-closed stream");
+  EXPECT_EQ(0u, quic_session_.bytesToSend());
+}
+
+TEST_F(EnvoyQuicServerStreamTest, EncodeTrailersOnClosedStream) {
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+
+  // Encode 18kB response body. first 16KB should be written out right away. The
+  // rest should be buffered.
+  std::string response(18 * 1024, 'a');
+  Buffer::OwnedImpl buffer(response);
+  quic_stream_->encodeData(buffer, false);
+  EXPECT_LT(0u, quic_session_.bytesToSend());
+
+  // Reset stream should clear the connection level buffered bytes accounting.
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  EXPECT_CALL(stream_callbacks_,
+              onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
+
+  // Try to send trailers on the closed stream. And the watermark shouldn't be
+  // messed up.
+  EXPECT_ENVOY_BUG(quic_stream_->encodeTrailers(response_trailers_),
+                   "encodeTrailers is called on write-closed stream");
+  EXPECT_EQ(0u, quic_session_.bytesToSend());
+}
+
 TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesReceived());

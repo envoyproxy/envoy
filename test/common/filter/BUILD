@@ -15,6 +15,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/filter:config_discovery_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:filter_matcher_lib",
         "//source/extensions/filters/http/router:config",
         "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:test_listener_filter_lib",

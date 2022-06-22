@@ -150,7 +150,6 @@ configure_make(
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
     },
     lib_source = "@com_github_unicode_org_icu//:all",
-    linkopts = ["-lstdc++"],
     out_static_libs = [
         "libicuuc.a",
         "libicudata.a",

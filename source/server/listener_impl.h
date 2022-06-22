@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
@@ -26,6 +27,18 @@
 
 namespace Envoy {
 namespace Server {
+
+/**
+ * All missing listener config stats. @see stats_macros.h
+ */
+#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(extension_config_missing)
+
+/**
+ * Struct definition for all missing listener config stats. @see stats_macros.h
+ */
+struct MissingListenerConfigStats {
+  ALL_MISSING_LISTENER_CONFIG_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 class ListenerMessageUtil {
 public:
@@ -284,7 +297,7 @@ public:
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const envoy::config::listener::v3::Listener& config() const { return config_; }
-  const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factory_; }
+  const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factories_[0]; }
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const {
@@ -304,7 +317,10 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factory_; }
+  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
+  std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
+    return socket_factories_;
+  }
   bool bindToPort() override { return bind_to_port_; }
   bool mptcpEnabled() { return mptcp_enabled_; }
   bool handOffRestoredDestinationConnections() const override {
@@ -418,7 +434,7 @@ private:
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
 
-  Network::ListenSocketFactoryPtr socket_factory_;
+  std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   const bool bind_to_port_;
   const bool mptcp_enabled_;
   const bool hand_off_restored_destination_connections_;
@@ -438,7 +454,7 @@ private:
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   std::unique_ptr<Init::Manager> dynamic_init_manager_;
 
-  std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
+  Filter::ListenerFilterFactoriesList listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const envoy::config::listener::v3::Listener config_;
@@ -468,6 +484,7 @@ private:
       transport_factory_context_;
 
   Quic::QuicStatNames& quic_stat_names_;
+  MissingListenerConfigStats missing_listener_config_stats_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

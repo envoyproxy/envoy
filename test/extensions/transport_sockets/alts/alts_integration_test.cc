@@ -240,7 +240,7 @@ public:
   std::unique_ptr<grpc::Server> fake_handshaker_server_;
   ConditionalInitializer fake_handshaker_server_ci_;
   int fake_handshaker_server_port_{};
-  Network::TransportSocketFactoryPtr client_alts_;
+  Network::UpstreamTransportSocketFactoryPtr client_alts_;
   TsiSocket* client_tsi_socket_{nullptr};
   bool capturing_handshaker_;
   CapturingHandshakerService* capturing_handshaker_service_;

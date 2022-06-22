@@ -8,6 +8,13 @@ namespace {
 class LocalRateLimitFilterIntegrationTest : public Event::TestUsingSimulatedTime,
                                             public HttpProtocolIntegrationTest {
 protected:
+  LocalRateLimitFilterIntegrationTest() {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat
+    // 'http_local_rate_limiter.http_local_rate_limit.enabled' and stat_prefix
+    // 'http_local_rate_limiter'.
+    skip_tag_extraction_rule_check_ = true;
+  }
   void initializeFilter(const std::string& filter_config) {
     config_helper_.prependFilter(filter_config);
     initialize();

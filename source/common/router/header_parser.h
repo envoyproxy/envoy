@@ -70,6 +70,7 @@ private:
   struct HeadersToAddEntry {
     HeaderFormatterPtr formatter_;
     const std::string original_value_;
+    const bool add_if_empty_ = false;
   };
 
   std::vector<std::pair<Http::LowerCaseString, HeadersToAddEntry>> headers_to_add_;

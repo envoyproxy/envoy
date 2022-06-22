@@ -30,6 +30,9 @@ void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& call
   Server::ResourceUsage usage;
   usage.resource_pressure_ = used / static_cast<double>(max_heap_);
 
+  ENVOY_LOG_MISC(trace, "FixedHeapMonitor: used={}, max_heap={}, pressure={}", used, max_heap_,
+                 usage.resource_pressure_);
+
   callbacks.onSuccess(usage);
 }
 

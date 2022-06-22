@@ -243,7 +243,7 @@ void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
-                               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
+                               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
@@ -278,11 +278,14 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
       {Http::Headers::get().Host, config_.hostname()},
-      {Http::Headers::get().Path, "/"},
-      {Http::Headers::get().Scheme, scheme},
   });
 
-  if (!config_.usePost()) {
+  if (config_.usePost()) {
+    headers->addReference(Http::Headers::get().Path, "/");
+    headers->addReference(Http::Headers::get().Scheme, scheme);
+  } else if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
+    headers->addReference(Http::Headers::get().Path, "/");
+    headers->addReference(Http::Headers::get().Scheme, scheme);
     headers->addReference(Http::Headers::get().Protocol,
                           Http::Headers::get().ProtocolValues.Bytestream);
   }

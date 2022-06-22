@@ -100,6 +100,8 @@ void UberFilterFuzzer::reset() {
   encoder_filter_.reset();
 
   access_logger_.reset();
+  custom_stat_namespaces_ = Stats::CustomStatNamespacesImpl();
+  decoding_buffer_ = nullptr;
   HttpFilterFuzzer::reset();
 }
 

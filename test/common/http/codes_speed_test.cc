@@ -29,11 +29,20 @@ public:
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    Stats::StatName request_vhost_name = Stats::StatName(),
                    Stats::StatName request_vcluster_name = Stats::StatName(),
+                   Stats::StatName request_route_name = Stats::StatName(),
                    Stats::StatName from_az = Stats::StatName(),
                    Stats::StatName to_az = Stats::StatName()) {
-    Http::CodeStats::ResponseStatInfo info{
-        global_store_,      cluster_scope_,        prefix_, code,  internal_request,
-        request_vhost_name, request_vcluster_name, from_az, to_az, canary};
+    Http::CodeStats::ResponseStatInfo info{global_store_,
+                                           cluster_scope_,
+                                           prefix_,
+                                           code,
+                                           internal_request,
+                                           request_vhost_name,
+                                           request_route_name,
+                                           request_vcluster_name,
+                                           from_az,
+                                           to_az,
+                                           canary};
 
     code_stats_.chargeResponseStat(info, false);
   }
@@ -52,10 +61,11 @@ public:
   }
 
   void responseTiming() {
+    Stats::StatName empty_stat_name;
     Http::CodeStats::ResponseTimingInfo info{
-        global_store_, cluster_scope_, prefix_,     std::chrono::milliseconds(5),
-        true,          true,           vhost_name_, req_vcluster_name_,
-        from_az_,      to_az_};
+        global_store_, cluster_scope_, prefix_,         std::chrono::milliseconds(5), true,
+        true,          vhost_name_,    empty_stat_name, req_vcluster_name_,           from_az_,
+        to_az_};
     code_stats_.chargeResponseTiming(info);
   }
 

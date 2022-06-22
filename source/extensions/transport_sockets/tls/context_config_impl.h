@@ -75,6 +75,7 @@ protected:
                     Server::Configuration::TransportSocketFactoryContext& factory_context);
   Api::Api& api_;
   const Server::Options& options_;
+  Singleton::Manager& singleton_manager_;
 
 private:
   static unsigned tlsVersionFromProto(

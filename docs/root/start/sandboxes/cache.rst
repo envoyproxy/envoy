@@ -238,5 +238,8 @@ You can also add new responses to the yaml file with different ``cache-control``
 
 .. seealso::
 
+   :ref:`Envoy Cache filter configuration <config_http_filters_cache>`
+      Learn more about configuring the Envoy Cache filter.
+
    `MDN Web Docs <https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching>`_.
       Learn more about caching and ``cache-control`` on the web.

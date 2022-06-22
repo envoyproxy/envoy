@@ -26,6 +26,8 @@ BBR
 BIDIRECTIONAL
 BSON
 BPF
+Bdecoded
+Bencoded
 Repick
 TRA
 btree
@@ -1370,4 +1372,5 @@ ElastiCache
 pinterest
 NSS
 SSLKEYLOGFILE
-
+DLB
+PCIE

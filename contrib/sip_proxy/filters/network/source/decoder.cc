@@ -75,7 +75,6 @@ State DecoderStateMachine::run() {
 Decoder::Decoder(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
 
 void Decoder::complete() {
-  ENVOY_LOG(trace, "sip message COMPLETE");
   request_.reset();
   metadata_.reset();
   state_machine_ = nullptr;
@@ -85,6 +84,8 @@ void Decoder::complete() {
 
   first_via_ = true;
   first_route_ = true;
+  first_record_route_ = true;
+  first_service_route_ = true;
 }
 
 FilterStatus Decoder::onData(Buffer::Instance& data, bool continue_handling) {
@@ -277,8 +278,8 @@ int Decoder::HeaderHandler::processAuth(absl::string_view& header) {
   if (end == absl::string_view::npos) {
     return 0;
   }
-  metadata()->affinity().emplace_back("Route", "ep", header.substr(start, end - start).data(),
-                                      false, false);
+
+  metadata()->setOpaque(header.substr(start, end - start));
   return 0;
 }
 
@@ -294,22 +295,6 @@ int Decoder::HeaderHandler::processPCookieIPMap(absl::string_view& header) {
   metadata()->setPCookieIpMap(std::make_pair(std::string(lskpmc), std::string(ip)));
   metadata()->setOperation(Operation(OperationType::Delete, rawOffset(),
                                      DeleteOperationValue(header.length() + strlen("\r\n"))));
-  return 0;
-}
-//
-// 200 OK Header Handler
-//
-int Decoder::OK200HeaderHandler::processCseq(absl::string_view& header) {
-  if (header.find("INVITE") != absl::string_view::npos) {
-    metadata()->setRespMethodType(MethodType::Invite);
-  } else {
-    /**
-     * need to set a value, else when processRecordRoute,
-     * (metadata()->respMethodType() != MethodType::Invite) always false
-     * TODO: need to handle non-invite 200OK
-     */
-    metadata()->setRespMethodType(MethodType::NullMethod);
-  }
   return 0;
 }
 
