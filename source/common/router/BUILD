@@ -199,9 +199,9 @@ envoy_cc_library(
     deps = [
         ":config_lib",
         "//envoy/router:rds_interface",
-         "//source/common/protobuf:utility_lib",
         "//envoy/router:scopes_interface",
         "//envoy/thread_local:thread_local_interface",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],

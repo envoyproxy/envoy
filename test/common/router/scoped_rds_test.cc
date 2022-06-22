@@ -12,8 +12,8 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/config/config_provider_impl.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/config_provider_impl.h"
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/scoped_rds.h"

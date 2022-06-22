@@ -9,6 +9,7 @@
 #include "envoy/router/router.h"
 #include "envoy/router/scopes.h"
 #include "envoy/thread_local/thread_local.h"
+
 #include "source/common/common/hash.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
