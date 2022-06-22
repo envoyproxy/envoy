@@ -6717,6 +6717,18 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
 #endif
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
+// Envoy always use ExactBalance at WIN32, so ignore it.
+#ifndef WIN32
+  auto listener = createIPv4Listener("TCPListener");
+  listener.mutable_connection_balance_config();
+
+  EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0), 1),
+                            EnvoyException, "No valid balance type for connection balance");
+#endif
+}
+
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithRealFiltersTest,
                          ::testing::Values(false, true));
