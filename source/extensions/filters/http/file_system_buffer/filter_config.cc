@@ -80,11 +80,7 @@ namespace {
 size_t getMemoryBufferBytesLimit(const StreamConfigVector& configs) {
   for (const ProtoStreamConfig& cfg : configs) {
     if (cfg.has_memory_buffer_bytes_limit()) {
-      if (cfg.memory_buffer_bytes_limit().value() > 0) {
-        return cfg.memory_buffer_bytes_limit().value();
-      } else {
-        throw EnvoyException("memory_buffer_bytes_limit must not be zero");
-      }
+      return cfg.memory_buffer_bytes_limit().value();
     }
   }
   return FileSystemBufferFilterMergedConfig::default_memory_buffer_bytes_limit;
