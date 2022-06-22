@@ -170,7 +170,6 @@ public:
   };
 
   void addXEnvoyOriginIngressHeader(IngressID ingress_id);
-  void addXEnvoyOriginIngressHeader(absl::string_view value);
   void addNewMsgHeader(HeaderType type,  absl::string_view value);
 
   void addEPOperation(
@@ -211,7 +210,6 @@ private:
   MsgType msg_type_;
   MethodType method_type_;
   std::vector<std::vector<SipHeader>> headers_{HeaderType::HeaderMaxNum};
-  std::vector<std::vector<SipHeader>> new_headers_{HeaderType::HeaderMaxNum};
   absl::string_view::size_type new_headers_pos_ = 0;
 
   std::vector<Operation> operation_list_;

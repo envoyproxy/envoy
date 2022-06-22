@@ -120,15 +120,10 @@ void MessageMetadata::setTransactionId(absl::string_view data) {
 }
 
 void MessageMetadata::addXEnvoyOriginIngressHeader(IngressID ingress_id) {
-  addXEnvoyOriginIngressHeader(ingress_id.toHeaderValue());
-}
-
-void MessageMetadata::addXEnvoyOriginIngressHeader(absl::string_view value) {
-  addNewMsgHeader(HeaderType::XEnvoyOriginIngress, value);
+  addNewMsgHeader(HeaderType::XEnvoyOriginIngress, ingress_id.toHeaderValue());
 }
 
 void MessageMetadata::addNewMsgHeader(HeaderType type,  absl::string_view value) {
-  //new_headers_[type].emplace_back(SipHeader(type, value));
   if (new_headers_pos_ == 0) {
     // place new headers before the content headers
     new_headers_pos_ = raw_msg_.find("Content");

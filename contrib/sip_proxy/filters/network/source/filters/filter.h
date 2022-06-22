@@ -48,7 +48,8 @@ public:
 
   /**
    * @return  ID for this Ingress worker thread + downstream connection.
-
+      // alternative option for passing the ingressID is to set it on the metadata 
+      // in somewhere such as  ConnectionManager::ActiveTrans::transportBegin(
      fixme - should return a const ref
    */
   virtual IngressID ingressID() PURE;
