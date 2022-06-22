@@ -73,3 +73,8 @@ envoy.filters.http.language:
   - envoy.filters.http
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.network.connection_balance.dlb:
+  categories:
+  - envoy.network.connection_balance
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha

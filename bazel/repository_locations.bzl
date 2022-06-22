@@ -1188,6 +1188,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-03-02",
         cpe = "N/A",
     ),
+    intel_dlb = dict(
+        project_name = "Intel Dlb",
+        project_desc = "Dlb",
+        project_url = "https://networkbuilders.intel.com/solutionslibrary/queue-management-and-load-balancing-on-intel-architecture",
+        version = "7.6.0",
+        sha256 = "b74c1bb2863fb6374bf80b9268b5978ab7b9d4eabb2d47ea427a5460aa3ae5fe",
+        urls = ["https://downloadmirror.intel.com/727424/dlb_linux_src_release7.6.0_2022_03_30.txz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.network.connection_balance.dlb"],
+        release_date = "2022-03-30",
+        cpe = "N/A",
+    ),
 )
 
 def _compiled_protoc_deps(locations, versions):

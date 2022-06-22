@@ -255,6 +255,9 @@ new_features:
 - area: dubbo_proxy
   change: |
     added :ref:`metadata_match <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.metadata_match>` support to the dubbo proxy.
+- area: network
+  change: |
+    extended conection balancer with :ref:`extend balance <envoy_v3_api_field_config.listener.v3.Listener.ConnectionBalanceConfig.extend_balance>`, and added :ref:`Dlb connection balancer <envoy_v3_api_msg_extensions.network.connection_balance.dlb.v3alpha.Dlb>` to use `DLB <https://www.intel.com/content/www/us/en/download/686372/intel-dynamic-load-balancer.html>`_ hardware to balance.
 - area: router
   change: |
     added :ref:`stat_prefix <envoy_v3_api_field_config.route.v3.Route.stat_prefix>` support to generate route level statistics.
