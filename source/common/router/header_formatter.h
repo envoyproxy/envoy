@@ -189,5 +189,25 @@ private:
   const bool append_;
 };
 
+// TODO(cpakulski). 
+// This class is used only when runtime guard envoy_reloadable_features_unified_header_formatter
+// is false and should be removed when the guard is removed. See issue 20389..
+// This is basically a bridge between "new" header formatters which take request_headers and response_headers
+// as parameters and "old" header formatters which take only stream_info as parameter.
+class HeaderFormatterBridge : public HeaderFormatterNew {
+public:
+    HeaderFormatterBridge() = delete;
+    HeaderFormatterBridge(HeaderFormatterPtr&& header_formatter, bool append) : header_formatter_(std::move(header_formatter)), append_(append) {}
+
+  const std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Envoy::StreamInfo::StreamInfo& stream_info) const override {
+    return header_formatter_->format(stream_info);
+    }
+  bool append() const override { return append_; }
+private:
+     const HeaderFormatterPtr header_formatter_;
+  const bool append_;
+
+};
+
 } // namespace Router
 } // namespace Envoy

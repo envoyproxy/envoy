@@ -28,6 +28,7 @@ public:
   Http::TestRequestHeaderMapImpl downstream_request_header_map_{};
   NiceMock<MockRouterFilterInterface> router_filter_interface_;
   UpstreamRequest upstream_request_{router_filter_interface_,
+                                    downstream_request_header_map_,
                                     std::make_unique<NiceMock<Router::MockGenericConnPool>>(),
                                     false, true};
 };

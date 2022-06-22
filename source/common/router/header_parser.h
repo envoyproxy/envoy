@@ -53,6 +53,8 @@ public:
                        const Http::ResponseHeaderMap& response_headers,
                        const StreamInfo::StreamInfo& stream_info) const override;
   void evaluateHeaders( Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers, const StreamInfo::StreamInfo* stream_info) const;
+  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
+  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const;
 
   /*
    * Same as evaluateHeaders, but returns the modifications that would have been made rather than
@@ -64,6 +66,8 @@ public:
   Http::HeaderTransforms getHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                              bool do_formatting = true) const;
 
+  static std::string translateMetadataFormat(const std::string& header_value);
+ static std::string translatePerRequestState(const std::string& header_value);
 protected:
   HeaderParser() = default;
 
