@@ -2,12 +2,10 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/runtime/runtime.h"
 
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
-#include "source/extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -18,6 +16,8 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "contrib/client_ssl_auth/filters/network/source/client_ssl_auth.h"
+#include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -177,7 +177,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   Http::ResponseMessagePtr message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   message->body().add(api_->fileSystem().fileReadToEnd(TestEnvironment::runfilesPath(
-      "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json")));
+      "contrib/client_ssl_auth/filters/network/test/test_data/vpn_response_1.json")));
   callbacks_->onSuccess(request_, std::move(message));
   EXPECT_EQ(1U,
             stats_store_

@@ -31,15 +31,14 @@ if [[ "$1" == "freeze" ]]; then
     PROTO_SYNC_CMD="fix"
 fi
 
-# Invoke protoxform aspect.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-    --//tools/api_proto_plugin:default_type_db_target=@envoy_api//:all_protos \
-    ${FREEZE_ARG} \
-    //tools/protoxform:api_protoxform
-
 # Copy back the FileDescriptorProtos that protoxform emitted to the source tree. This involves
 # pretty-printing to format with protoprint.
-bazel run //tools/proto_format:proto_sync -- "--mode=${PROTO_SYNC_CMD}" --ci
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+    --//tools/api_proto_plugin:default_type_db_target=@envoy_api//:all_protos \
+    ${FREEZE_ARG} \
+    //tools/proto_format:proto_sync \
+    -- "--mode=${PROTO_SYNC_CMD}" \
+       --ci
 
 # Need to regenerate //versioning:active_protos before building type DB below if freezing.
 if [[ "$1" == "freeze" ]]; then

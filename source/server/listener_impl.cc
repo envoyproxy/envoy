@@ -691,10 +691,30 @@ void ListenerImpl::buildConnectionBalancer(const Network::Address::Instance& add
 #else
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
-      // Currently exact balance is the only supported type and there are no options.
-      ASSERT(config_.connection_balance_config().has_exact_balance());
-      connection_balancers_.emplace(address.asString(),
-                                    std::make_shared<Network::ExactConnectionBalancerImpl>());
+      switch (config_.connection_balance_config().balance_type_case()) {
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kExactBalance: {
+        connection_balancers_.emplace(address.asString(),
+          std::make_shared<Network::ExactConnectionBalancerImpl>());
+        break;
+      }
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kExtendBalance: {
+        const std::string connection_balance_library_type{TypeUtil::typeUrlToDescriptorFullName(
+            config_.connection_balance_config().extend_balance().typed_config().type_url())};
+        auto factory =
+            Envoy::Registry::FactoryRegistry<Network::ConnectionBalanceFactory>::getFactoryByType(
+                connection_balance_library_type);
+        if (factory == nullptr) {
+          throw EnvoyException(fmt::format("Didn't find a registered implementation for type: '{}'",
+                                           connection_balance_library_type));
+        }
+        connection_balancers_.emplace(address.asString(), factory->createConnectionBalancerFromProto(
+            config_.connection_balance_config().extend_balance(), *listener_factory_context_));
+        break;
+      }
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::BALANCE_TYPE_NOT_SET: {
+        throw EnvoyException("No valid balance type for connection balance");
+      }
+      }
     } else {
       connection_balancers_.emplace(address.asString(),
                                     std::make_shared<Network::NopConnectionBalancerImpl>());
