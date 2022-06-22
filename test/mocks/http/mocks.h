@@ -189,7 +189,7 @@ public:
   ~MockFilterChainManager() override;
 
   // Http::FilterChainManager
-  MOCK_METHOD(void, applyFilterFactoryCb, (FilterFacotryContext context, FilterFactoryCb& factory));
+  MOCK_METHOD(void, applyFilterFactoryCb, (FilterContext context, FilterFactoryCb& factory));
 
   NiceMock<MockFilterChainFactoryCallbacks> callbacks_;
 };

@@ -50,7 +50,7 @@ MockClientConnection::~MockClientConnection() = default;
 MockFilterChainManager::MockFilterChainManager() {
   ON_CALL(*this, applyFilterFactoryCb(_, _))
       .WillByDefault(
-          Invoke([this](FilterFacotryContext, FilterFactoryCb& factory) { factory(callbacks_); }));
+          Invoke([this](FilterContext, FilterFactoryCb& factory) { factory(callbacks_); }));
 }
 
 MockFilterChainManager::~MockFilterChainManager() = default;

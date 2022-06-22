@@ -1079,14 +1079,16 @@ public:
 using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
 /**
- * Simple struct of additional contextual information of filter factory, e.g. custom filter name
+ * Simple struct of additional contextual information of HTTP filter, e.g. filter config name
  * from configuration, canonical filter name, etc.
  */
-struct FilterFacotryContext {
-  // Custom filter name from configuration.
-  absl::string_view custom_name;
-  // Canonical filter name.
-  absl::string_view filter_name;
+struct FilterContext {
+  // The name of the filter configuration that used to create related filter factory function.
+  // This could be any legitimate non-empty string.
+  std::string config_name;
+  // Canonical filter name. This is used to indicate type of filter. For example,
+  // "envoy.filters.http.buffer" for the HTTP buffer filter.
+  std::string filter_name;
 };
 
 /**
@@ -1104,7 +1106,7 @@ public:
    * @param context supplies additional contextual information of filter factory.
    * @param factory factory function used to create filter instances.
    */
-  virtual void applyFilterFactoryCb(FilterFacotryContext context, FilterFactoryCb& factory) PURE;
+  virtual void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) PURE;
 };
 
 /**
