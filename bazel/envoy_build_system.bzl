@@ -201,10 +201,6 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
 def envoy_google_grpc_external_deps():
     return envoy_select_google_grpc([envoy_external_dep_path("grpc")])
 
-# Dependencies on admim HTML should be wrapped with this function.
-def envoy_admin_html_deps():
-    return envoy_select_admin_html([envoy_external_dep_path("admin_html")])
-
 # Here we create wrappers for each of the public targets within the separate bazel
 # files loaded above. This maintains envoy_build_system.bzl as the preferred import
 # for BUILD files that need these build macros. Do not use the imports directly
