@@ -1,5 +1,5 @@
 diff --git a/BUILD b/BUILD
-index 1690d4219..d87b98519 100644
+index 1690d4219..eb3cfbc67 100644
 --- a/BUILD
 +++ b/BUILD
 @@ -19,7 +19,7 @@ exports_files(["LICENSE"])
@@ -11,7 +11,7 @@ index 1690d4219..d87b98519 100644
  
  ################################################################################
  # Protobuf Runtime Library
-@@ -510,14 +510,105 @@ cc_library(
+@@ -510,14 +510,69 @@ cc_library(
      deps = [":protobuf"],
  )
  
@@ -36,30 +36,6 @@ index 1690d4219..d87b98519 100644
 +)
 +
 +config_setting(
-+    name = "linux-ppcle_64",
-+    constraint_values = [
-+        "@platforms//os:linux",
-+        "@platforms//cpu:ppc",
-+    ],
-+)
-+
-+config_setting(
-+    name = "linux-s390x",
-+    constraint_values = [
-+        "@platforms//os:linux",
-+        "@platforms//cpu:s390x",
-+    ],
-+)
-+
-+config_setting(
-+    name = "linux-x86_32",
-+    constraint_values = [
-+        "@platforms//os:linux",
-+        "@platforms//cpu:x86_32",
-+    ],
-+)
-+
-+config_setting(
 +    name = "linux-x86_64",
 +    constraint_values = [
 +        "@platforms//os:linux",
@@ -72,14 +48,6 @@ index 1690d4219..d87b98519 100644
 +    constraint_values = [
 +        "@platforms//os:osx",
 +        "@platforms//cpu:x86_64",
-+    ],
-+)
-+
-+config_setting(
-+    name = "win32",
-+    constraint_values = [
-+        "@platforms//os:windows",
-+        "@platforms//cpu:x86_32",
 +    ],
 +)
 +
@@ -103,12 +71,8 @@ index 1690d4219..d87b98519 100644
 +    name = "protoc",
 +    actual = select({
 +        ":linux-aarch64": "@com_google_protobuf_protoc_linux_aarch_64//:protoc",
-+        ":linux-ppcle_64": "@com_google_protobuf_protoc_linux_ppcle_64//:protoc",
-+        ":linux-s390x": "@com_google_protobuf_protoc_linux_s390_64//:protoc",
-+        ":linux-x86_32": "@com_google_protobuf_protoc_linux_x86_32//:protoc",
 +        ":linux-x86_64": "@com_google_protobuf_protoc_linux_x86_64//:protoc",
 +        ":osx-x86_64": "@com_google_protobuf_protoc_osx_x86_64//:protoc",
-+        ":win32": "@com_google_protobuf_protoc_win32//:protoc",
 +        ":win64": "@com_google_protobuf_protoc_win64//:protoc",
 +        "//conditions:default": ":compiled_protoc",
 +    }),

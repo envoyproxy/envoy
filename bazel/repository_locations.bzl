@@ -1,5 +1,7 @@
 # This should match the schema defined in external_deps.bzl.
 
+PROTOBUF_VERSION = "3.19.4"
+
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
 # https://github.com/protocolbuffers/protobuf/releases).
@@ -7,12 +9,8 @@
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
     linux_aarch_64 = "95584939e733bdd6ffb8245616b2071f565cd4c28163b6c21c8f936a9ee20861",
-    linux_ppcle_64 = "5c22cc91c87e4396bf4c68fb66ba655e2eda251935c7893f08016313933f6944",
-    linux_s390_64 = "5d84154efa12082d9774935c164c34a57878267e7371a08c11f66526f7014c4b",
-    linux_x86_32 = "06aff080f7c275f6cae3dabd54f7f819cbcc495d79f9d3c2d6c268991551342b",
     linux_x86_64 = "058d29255a08f8661c8096c92961f3676218704cbd516d3916ec468e139cbd87",
     osx_x86_64 = "d8b55cf1e887917dd43c447d77bd5bd213faff1e18ac3a176b35558d86f7ffff",
-    win32 = "c1a863e1601a923a116b1fdf880eb616530ca6175f1418a55f3f5f2d6e2f4c16",
     win64 = "828d2bdfe410e988cfc46462bcabd34ffdda8cc172867989ec647eadc55b03b5",
 )
 
@@ -710,7 +708,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Protocol Buffers",
         project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
         project_url = "https://developers.google.com/protocol-buffers",
-        version = "3.19.4",
+        version = PROTOBUF_VERSION,
         # When upgrading the protobuf library, please re-run
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
@@ -1198,7 +1196,7 @@ def _compiled_protoc_deps(locations, versions):
             project_name = "Protocol Buffers (protoc) %s" % platform,
             project_desc = "Protoc compiler for protobuf (%s)" % platform,
             project_url = "https://developers.google.com/protocol-buffers",
-            version = "3.19.4",
+            version = PROTOBUF_VERSION,
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
