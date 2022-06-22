@@ -52,11 +52,11 @@ message CacheConfig {
 
   // Config specific to the cache storage implementation.
   // [#extension-category: envoy.filters.http.cache]
-  google.protobuf.Any typed_config = 1 [(validate.rules).any = {required: true}];
+  google.protobuf.Any typed_config = 1 [(validate.rules).TypedExtensionConfig = {required: true}];
 
   // CachePolicy extension that takes care of cache key, cacheability, cache
   // freshness computations.
-  google.protobuf.Any typed_cache_policy_config = 5 [(validate.rules).any = {required: true}];
+  google.protobuf.Any typed_cache_policy_config = 5 [(validate.rules).TypedExtensionConfig = {required: true}];
 
   // List of matching rules that defines allowed *Vary* headers.
   //
