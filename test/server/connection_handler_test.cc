@@ -72,10 +72,10 @@ public:
         bool continue_on_listener_filters_timeout,
         std::shared_ptr<AccessLog::MockInstance> access_log,
         std::shared_ptr<NiceMock<Network::MockFilterChainManager>> filter_chain_manager = nullptr,
-        uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE,
-        bool ignore_global_conn_limit = false, int num_of_socket_factories = 1)
-        : parent_(parent),
-          tag_(tag), bind_to_port_(bind_to_port), tcp_backlog_size_(tcp_backlog_size),
+        uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE, bool ignore_global_conn_limit = false,
+        int num_of_socket_factories = 1)
+        : parent_(parent), tag_(tag), bind_to_port_(bind_to_port),
+          tcp_backlog_size_(tcp_backlog_size),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           name_(name), listener_filters_timeout_(listener_filters_timeout),
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout),
@@ -179,7 +179,7 @@ public:
   };
 
   class TestListener : public TestListenerBase {
-    public:
+  public:
     TestListener(
         ConnectionHandlerTest& parent, uint64_t tag, bool bind_to_port,
         bool hand_off_restored_destination_connections, const std::string& name,
@@ -190,13 +190,13 @@ public:
         uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE,
         Network::ConnectionBalancerSharedPtr connection_balancer = nullptr,
         bool ignore_global_conn_limit = false, int num_of_socket_factories = 1)
-        : TestListenerBase(parent, tag, bind_to_port, hand_off_restored_destination_connections, name,
-                           socket_type, listener_filters_timeout, continue_on_listener_filters_timeout, access_log,
-                           filter_chain_manager, tcp_backlog_size, ignore_global_conn_limit, num_of_socket_factories),
-           connection_balancer_(connection_balancer == nullptr
+        : TestListenerBase(parent, tag, bind_to_port, hand_off_restored_destination_connections,
+                           name, socket_type, listener_filters_timeout,
+                           continue_on_listener_filters_timeout, access_log, filter_chain_manager,
+                           tcp_backlog_size, ignore_global_conn_limit, num_of_socket_factories),
+          connection_balancer_(connection_balancer == nullptr
                                    ? std::make_shared<Network::NopConnectionBalancerImpl>()
-                                   : connection_balancer) {
-    }
+                                   : connection_balancer) {}
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return *connection_balancer_;
     }
@@ -205,24 +205,26 @@ public:
   };
 
   class TestMultiAddressesListener : public TestListenerBase {
-    public:
+  public:
     TestMultiAddressesListener(
         ConnectionHandlerTest& parent, uint64_t tag, bool bind_to_port,
         bool hand_off_restored_destination_connections, const std::string& name,
         Network::Socket::Type socket_type, std::chrono::milliseconds listener_filters_timeout,
         bool continue_on_listener_filters_timeout,
         std::shared_ptr<AccessLog::MockInstance> access_log,
-        absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr>& connection_balancers,
+        absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr>&
+            connection_balancers,
         std::shared_ptr<NiceMock<Network::MockFilterChainManager>> filter_chain_manager = nullptr,
-        uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE,
-        bool ignore_global_conn_limit = false, int num_of_socket_factories = 1)
-        : TestListenerBase(parent, tag, bind_to_port, hand_off_restored_destination_connections, name,
-                           socket_type, listener_filters_timeout, continue_on_listener_filters_timeout, access_log,
-                           filter_chain_manager, tcp_backlog_size, ignore_global_conn_limit, num_of_socket_factories),
-          connection_balancers_(connection_balancers) {
-    }
+        uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE, bool ignore_global_conn_limit = false,
+        int num_of_socket_factories = 1)
+        : TestListenerBase(parent, tag, bind_to_port, hand_off_restored_destination_connections,
+                           name, socket_type, listener_filters_timeout,
+                           continue_on_listener_filters_timeout, access_log, filter_chain_manager,
+                           tcp_backlog_size, ignore_global_conn_limit, num_of_socket_factories),
+          connection_balancers_(connection_balancers) {}
 
-    Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance& address) override {
+    Network::ConnectionBalancer&
+    connectionBalancer(const Network::Address::Instance& address) override {
       auto iter = connection_balancers_.find(address.asString());
       EXPECT_NE(iter, connection_balancers_.end());
       return *iter->second;
@@ -341,11 +343,13 @@ public:
       const std::string& name, std::vector<Network::Listener*>& mock_listeners,
       std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
       absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr>& connection_balancers,
-      absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**>& listener_callbacks_map, bool disable_listener = false) {
+      absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**>& listener_callbacks_map,
+      bool disable_listener = false) {
     if (connection_balancers.empty()) {
-        for (auto& address : addresses) {
-            connection_balancers.emplace(address->asString(), std::make_shared<Network::NopConnectionBalancerImpl>());
-        }
+      for (auto& address : addresses) {
+        connection_balancers.emplace(address->asString(),
+                                     std::make_shared<Network::NopConnectionBalancerImpl>());
+      }
     }
     auto test_listener = std::make_unique<TestMultiAddressesListener>(
         *this, tag, bind_to_port, hand_off_restored_destination_connections, name,
@@ -367,7 +371,8 @@ public:
           .WillOnce(Invoke([i, &mock_listeners, &listener_callbacks_map](
                                Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
                                Runtime::Loader&, bool, bool) -> Network::Listener* {
-            auto listener_callbacks_iter = listener_callbacks_map.find(socket->connectionInfoProvider().localAddress()->asString());
+            auto listener_callbacks_iter = listener_callbacks_map.find(
+                socket->connectionInfoProvider().localAddress()->asString());
             EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
             *listener_callbacks_iter->second = &cb;
             return mock_listeners[i];
@@ -620,8 +625,9 @@ TEST_F(ConnectionHandlerTest, RemoveListenerWithMultiAddrs) {
   listener_callbacks_map.emplace(address1->asString(), &listener_callbacks1);
   listener_callbacks_map.emplace(address2->asString(), &listener_callbacks2);
   absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
-  TestMultiAddressesListener* test_listener = addMultiAddrsListener(
-      1, true, false, "test_listener", mock_listeners, addresses, connection_balancers, listener_callbacks_map);
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
@@ -679,8 +685,9 @@ TEST_F(ConnectionHandlerTest, DisableListenerWithMultiAddrs) {
   listener_callbacks_map.emplace(address1->asString(), &listener_callbacks1);
   listener_callbacks_map.emplace(address2->asString(), &listener_callbacks2);
   absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
-  TestMultiAddressesListener* test_listener = addMultiAddrsListener(
-      1, false, false, "test_listener", mock_listeners, addresses, connection_balancers, listener_callbacks_map);
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, false, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
 
   EXPECT_CALL(*listener1, disable());
@@ -720,16 +727,20 @@ TEST_F(ConnectionHandlerTest, RebalanceWithMultiAddressListener) {
   Network::BalancedConnectionHandler* current_handler1;
   Network::BalancedConnectionHandler* current_handler2;
 
-  EXPECT_CALL(*mock_connection_balancer1, registerHandler(_)).WillOnce(SaveArgAddress(&current_handler1));
-  EXPECT_CALL(*mock_connection_balancer2, registerHandler(_)).WillOnce(SaveArgAddress(&current_handler2));
+  EXPECT_CALL(*mock_connection_balancer1, registerHandler(_))
+      .WillOnce(SaveArgAddress(&current_handler1));
+  EXPECT_CALL(*mock_connection_balancer2, registerHandler(_))
+      .WillOnce(SaveArgAddress(&current_handler2));
 
-  TestMultiAddressesListener* test_listener = addMultiAddrsListener(
-      1, false, false, "test_listener", mock_listeners, addresses, connection_balancers, listener_callbacks_map);
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, false, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
 
   // Send connection to the first listener, expect mock_connection_balancer1 will be called.
   // then mock_connection_balancer1 will rebalance the connection to the same listener.
-  EXPECT_CALL(*mock_connection_balancer1, pickTargetHandler(_)).WillOnce(ReturnRef(*current_handler1));
+  EXPECT_CALL(*mock_connection_balancer1, pickTargetHandler(_))
+      .WillOnce(ReturnRef(*current_handler1));
   EXPECT_CALL(*access_log_, log(_, _, _, _));
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
 
@@ -738,7 +749,8 @@ TEST_F(ConnectionHandlerTest, RebalanceWithMultiAddressListener) {
 
   // Send connection to the second listener, expect mock_connection_balancer2 will be called.
   // then mock_connection_balancer2 will rebalance the connection to the same listener.
-  EXPECT_CALL(*mock_connection_balancer2, pickTargetHandler(_)).WillOnce(ReturnRef(*current_handler2));
+  EXPECT_CALL(*mock_connection_balancer2, pickTargetHandler(_))
+      .WillOnce(ReturnRef(*current_handler2));
   EXPECT_CALL(*access_log_, log(_, _, _, _));
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
 
@@ -804,8 +816,9 @@ TEST_F(ConnectionHandlerTest, AddDisabledListenerWithMultiAddrs) {
   listener_callbacks_map.emplace(address1->asString(), &listener_callbacks1);
   listener_callbacks_map.emplace(address2->asString(), &listener_callbacks2);
   absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
-  TestMultiAddressesListener* test_listener = addMultiAddrsListener(
-      1, false, false, "test_listener", mock_listeners, addresses, connection_balancers, listener_callbacks_map, true);
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, false, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map, true);
   EXPECT_CALL(*listener1, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
 
@@ -1014,8 +1027,9 @@ TEST_F(ConnectionHandlerTest, NormalRedirectWithMultiAddrs) {
   listener_callbacks_map.emplace(normal_address->asString(), &listener_callbacks1);
   listener_callbacks_map.emplace(alt_address->asString(), &listener_callbacks2);
   absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
-  TestMultiAddressesListener* test_listener1 = addMultiAddrsListener(
-      1, true, true, "test_listener1", mock_listeners, addresses, connection_balancers, listener_callbacks_map);
+  TestMultiAddressesListener* test_listener1 =
+      addMultiAddrsListener(1, true, true, "test_listener1", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
   handler_->addListener(absl::nullopt, *test_listener1, runtime_);
 
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
