@@ -478,13 +478,6 @@ envoy.filters.listener.tls_inspector:
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
-envoy.filters.network.client_ssl_auth:
-  categories:
-  - envoy.filters.network
-  security_posture: robust_to_untrusted_downstream
-  status: stable
-  type_urls:
-  - envoy.extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth
 envoy.filters.network.connection_limit:
   categories:
   - envoy.filters.network

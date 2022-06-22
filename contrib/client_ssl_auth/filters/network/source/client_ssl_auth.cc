@@ -1,10 +1,9 @@
-#include "source/extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
+#include "contrib/client_ssl_auth/filters/network/source/client_ssl_auth.h"
 
 #include <chrono>
 #include <cstdint>
 #include <string>
 
-#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
@@ -16,6 +15,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/network/utility.h"
+
+#include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 
 namespace Envoy {
 namespace Extensions {

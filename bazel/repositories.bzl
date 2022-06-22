@@ -2,7 +2,7 @@ load(":dev_binding.bzl", "envoy_dev_binding")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
@@ -206,6 +206,7 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_colm_open_source_ragel()
     _net_zlib()
+    _intel_dlb()
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
     _org_brotli()
@@ -744,6 +745,16 @@ def _com_google_protobuf():
         name = "rules_python",
     )
 
+    for platform in PROTOC_VERSIONS:
+        # Ideally we dont use a private build artefact as done here.
+        # If `rules_proto` implements protoc toolchains in the future (currently it
+        # is there, but is empty) we should remove these and use that rule
+        # instead.
+        external_http_archive(
+            "com_google_protobuf_protoc_%s" % platform,
+            build_file = "@rules_proto//proto/private:BUILD.protoc",
+        )
+
     external_http_archive(
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
@@ -1109,6 +1120,22 @@ def _com_github_wasm_c_api():
     native.bind(
         name = "prefixed_wasmtime",
         actual = "@com_github_wasm_c_api//:wasmtime_lib",
+    )
+
+def _intel_dlb():
+    external_http_archive(
+        name = "intel_dlb",
+        build_file_content = """
+filegroup(
+    name = "libdlb",
+    srcs = glob([
+        "dlb/libdlb/**",
+    ]),
+    visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
+)
+""",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
     )
 
 def _rules_fuzzing():
