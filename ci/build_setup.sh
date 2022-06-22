@@ -86,7 +86,9 @@ trap cleanup EXIT
 
 "$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
 
-[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")
+[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=(
+        "--experimental_split_coverage_postprocessing"
+        "--experimental_fetch_all_coverage_outputs")
 
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
