@@ -278,8 +278,8 @@ int Decoder::HeaderHandler::processAuth(absl::string_view& header) {
   if (end == absl::string_view::npos) {
     return 0;
   }
-  metadata()->affinity().emplace_back("Route", "ep", header.substr(start, end - start).data(),
-                                      false, false);
+
+  metadata()->setOpaque(header.substr(start, end - start));
   return 0;
 }
 
