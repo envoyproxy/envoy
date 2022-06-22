@@ -12,6 +12,7 @@
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
+#include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
@@ -19,8 +20,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/interval_value.h"
-
-#include "address.h"
 
 namespace Envoy {
 namespace Network {
