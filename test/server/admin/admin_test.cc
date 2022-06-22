@@ -225,6 +225,7 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
                                                      callback, true, false)));
 }
 
+#ifdef ENVOY_ADMIN_HTML
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
@@ -253,6 +254,7 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0, 0));
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0, 0));
 }
+#endif
 
 class AdminTestingPeer {
 public:

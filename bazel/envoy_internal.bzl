@@ -1,6 +1,6 @@
 # DO NOT LOAD THIS FILE. Targets from this file should be considered private
 # and not used outside of the @envoy//bazel package.
-load(":envoy_select.bzl", "envoy_select_enable_http3", "envoy_select_google_grpc", "envoy_select_hot_restart")
+load(":envoy_select.bzl", "envoy_select_admin_html", "envoy_select_enable_http3", "envoy_select_google_grpc", "envoy_select_hot_restart")
 
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
@@ -126,6 +126,7 @@ def envoy_copts(repository, test = False):
            _envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
            _envoy_select_perfetto(["-DENVOY_PERFETTO"]) + \
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
+           envoy_select_admin_html(["-DENVOY_ADMIN_HTML"], repository) + \
            _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
 # References to Envoy external dependencies should be wrapped with this function.
