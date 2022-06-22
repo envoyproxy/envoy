@@ -154,6 +154,13 @@ def envoy_stdlib_deps():
         "//conditions:default": ["@envoy//bazel:static_stdlib"],
     })
 
+def envoy_dbg_linkopts():
+    return select({
+        # TODO: Remove once we have https://github.com/bazelbuild/bazel/pull/15635
+        "@envoy//bazel:apple_non_opt": ["-Wl,-no_deduplicate"],
+        "//conditions:default": [],
+    })
+
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.
 def tcmalloc_external_dep(repository):
     return select({

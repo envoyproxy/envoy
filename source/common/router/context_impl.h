@@ -40,6 +40,7 @@ public:
   const VirtualClusterStatNames& virtualClusterStatNames() const override {
     return virtual_cluster_stat_names_;
   }
+  const RouteStatNames& routeStatNames() const override { return route_stat_names_; }
   GenericConnPoolFactory& genericConnPoolFactory() override {
     ASSERT(generic_conn_pool_factory_ != nullptr);
     return *generic_conn_pool_factory_;
@@ -47,6 +48,7 @@ public:
 
 private:
   const StatNames stat_names_;
+  const RouteStatNames route_stat_names_;
   const VirtualClusterStatNames virtual_cluster_stat_names_;
   GenericConnPoolFactory* generic_conn_pool_factory_;
 };

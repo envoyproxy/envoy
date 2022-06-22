@@ -1073,5 +1073,12 @@ void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host
 void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSharedPtr& host,
                                           Network::ConnectionEvent event);
 
+/**
+ * Utility function to combine the given socket options with the socket options in cluster.
+ */
+Network::ConnectionSocket::OptionsSharedPtr
+combineConnectionSocketOptions(const ClusterInfo& cluster,
+                               const Network::ConnectionSocket::OptionsSharedPtr& options);
+
 } // namespace Upstream
 } // namespace Envoy
