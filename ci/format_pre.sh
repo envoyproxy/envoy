@@ -57,6 +57,7 @@ CURRENT=check_format_test
 
 
 fix_format () {
+    echo "Fixing format..."
     "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
     return 1
 }
