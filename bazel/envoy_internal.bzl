@@ -126,7 +126,6 @@ def envoy_copts(repository, test = False):
            _envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
            _envoy_select_perfetto(["-DENVOY_PERFETTO"]) + \
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
-           envoy_select_admin_html(["-DENVOY_ADMIN_HTML"], repository) + \
            _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
 # References to Envoy external dependencies should be wrapped with this function.
