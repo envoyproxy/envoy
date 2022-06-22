@@ -15,25 +15,27 @@ namespace Server {
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerConfig& config, Runtime::Loader& runtime,
                                      Network::SocketSharedPtr&& socket,
-                                     Network::Address::InstanceConstSharedPtr& address,
+                                     Network::Address::InstanceConstSharedPtr& listen_address,
                                      Network::ConnectionBalancer& connection_balancer)
     : OwnedActiveStreamListenerBase(
           parent, parent.dispatcher(),
           parent.dispatcher().createListener(std::move(socket), *this, runtime, config.bindToPort(),
                                              config.ignoreGlobalConnLimit()),
           config),
-      tcp_conn_handler_(parent), connection_balancer_(connection_balancer), address_(address) {
+      tcp_conn_handler_(parent), connection_balancer_(connection_balancer),
+      listen_address_(listen_address) {
   connection_balancer_.registerHandler(*this);
 }
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,
-                                     Network::Address::InstanceConstSharedPtr& address,
+                                     Network::Address::InstanceConstSharedPtr& listen_address,
                                      Network::ListenerConfig& config,
                                      Network::ConnectionBalancer& connection_balancer,
                                      Runtime::Loader&)
     : OwnedActiveStreamListenerBase(parent, parent.dispatcher(), std::move(listener), config),
-      tcp_conn_handler_(parent), connection_balancer_(connection_balancer), address_(address) {
+      tcp_conn_handler_(parent), connection_balancer_(connection_balancer),
+      listen_address_(listen_address) {
   connection_balancer_.registerHandler(*this);
 }
 
@@ -156,7 +158,7 @@ void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {
   RebalancedSocketSharedPtr socket_to_rebalance = std::make_shared<RebalancedSocket>();
   socket_to_rebalance->socket = std::move(socket);
 
-  dispatcher().post([socket_to_rebalance, address = address_, tag = config_->listenerTag(),
+  dispatcher().post([socket_to_rebalance, address = listen_address_, tag = config_->listenerTag(),
                      &tcp_conn_handler = tcp_conn_handler_,
                      handoff = config_->handOffRestoredDestinationConnections()]() {
     auto balanced_handler = tcp_conn_handler.getBalancedHandlerByTag(tag, *address);
