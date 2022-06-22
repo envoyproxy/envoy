@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/cache/v3/cache_policy.pb.h"
-#include "envoy/extensions/filters/http/cache/v3/cache_policy.pb.validate.h"
+#include "envoy/extensions/cache/cache_policy/v3/config.pb.h"
+#include "envoy/extensions/cache/cache_policy/v3/config.pb.validate.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -174,17 +174,17 @@ private:
 
 class CachePolicyImplFactory
     : public CachePolicyFactoryBase<
-          envoy::extensions::filters::http::cache::cache_policy::v3::CachePolicyConfig> {
+          envoy::extensions::cache::cache_policy::v3::CachePolicyConfig> {
 public:
   std::string name() const override { return "envoy.extensions.http.cache_policy_impl"; }
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::filters::http::cache::cache_policy::v3::CachePolicyConfig>();
+        envoy::extensions::cache::cache_policy::v3::CachePolicyConfig>();
   }
 
 private:
   CachePolicyPtr
-  createCachePolicyFromProtoTyped([[maybe_unused]] const envoy::extensions::filters::http::cache::
+  createCachePolicyFromProtoTyped([[maybe_unused]] const envoy::extensions::cache::
                                       cache_policy::v3::CachePolicyConfig& config) override {
     return std::make_unique<CachePolicyImpl>();
   }

@@ -1,5 +1,5 @@
 #include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
-#include "envoy/extensions/filters/http/cache/v3/cache_policy.pb.h"
+#include "envoy/extensions/cache/cache_policy/v3/config.pb.h"
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 
 #include "source/extensions/filters/http/cache/cache_filter.h"
@@ -28,7 +28,7 @@ TEST_F(CacheFilterFactoryTest, Basic) {
   config_.mutable_typed_config()->PackFrom(
       envoy::extensions::cache::simple_http_cache::v3::SimpleHttpCacheConfig());
   config_.mutable_typed_cache_policy_config()->PackFrom(
-      envoy::extensions::filters::http::cache::cache_policy::v3::CachePolicyConfig());
+      envoy::extensions::cache::cache_policy::v3::CachePolicyConfig());
   Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
   Http::StreamFilterSharedPtr filter;
   EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));

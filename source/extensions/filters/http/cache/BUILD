@@ -68,6 +68,7 @@ envoy_cc_library(
         "//envoy/registry",
         "//source/common/http:header_map_lib",
         "//source/common/stream_info:filter_state_lib",
+        "@envoy_api//envoy/extensions/cache/cache_policy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
