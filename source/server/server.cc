@@ -592,6 +592,21 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     }
   }
 
+  // Initialize the regex engine and inject to singleton.
+  if (bootstrap_.has_default_regex_engine()) {
+    const auto& default_regex_engine = bootstrap_.default_regex_engine();
+    Regex::EngineFactory& factory =
+        Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    regex_engine_ = factory.createEngine(*config, serverFactoryContext());
+  } else {
+    regex_engine_ = std::make_shared<Regex::GoogleReEngine>();
+  }
+  Regex::EngineSingleton::clear();
+  Regex::EngineSingleton::initialize(regex_engine_.get());
+
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
       std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_,

@@ -900,6 +900,13 @@ envoy.tracers.opencensus:
   status: stable
   type_urls:
   - envoy.config.trace.v3.OpenCensusConfig
+envoy.tracers.opentelemetry:
+  categories:
+  - envoy.tracers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.config.trace.v3.OpenTelemetryConfig
 envoy.tracers.skywalking:
   categories:
   - envoy.tracers
