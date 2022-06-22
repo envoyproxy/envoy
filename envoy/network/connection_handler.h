@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/filter.h"
@@ -12,8 +13,6 @@
 #include "envoy/ssl/context.h"
 
 #include "source/common/common/interval_value.h"
-
-#include "address.h"
 
 namespace Envoy {
 namespace Network {

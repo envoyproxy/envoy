@@ -471,6 +471,8 @@ private:
   const bool continue_on_listener_filters_timeout_;
   std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;
   std::unique_ptr<Network::InternalListenerConfig> internal_listener_config_;
+  // The key is the address string, the value is the address specific connection balancer.
+  // TODO (soulxu): Add hash support for address, then needn't a string address as key anymore.
   absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;

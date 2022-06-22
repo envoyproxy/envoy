@@ -87,6 +87,9 @@ public:
   std::atomic<uint64_t> num_listener_connections_{};
 
   Network::ConnectionBalancer& connection_balancer_;
+  // This is the address of this listener is listening on. And used for get the correct listener
+  // when rebalancing. The accepted socket can't be used to get the listening address, since
+  // the accepted socket's remote address can be another address than the listening address.
   Network::Address::InstanceConstSharedPtr address_;
 };
 
