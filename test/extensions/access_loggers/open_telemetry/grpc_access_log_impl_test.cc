@@ -240,7 +240,7 @@ values:
           value:
             int_value: 1655429509
     instrumentation_library_logs:
-      - logs:
+      - log_records:
           - severity_text: "test-severity-text"
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;
