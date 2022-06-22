@@ -62,7 +62,7 @@ fix_format () {
 }
 
 CURRENT=check_format
-"${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
+"${ENVOY_SRCDIR}"/tools/code_format/check_format.py check || fix_format
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2
