@@ -113,6 +113,10 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
 }
 
 void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
+  read_filters_.clear();
+  // Create the filter chain on data.
+  config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
+
   for (auto& read_filter : read_filters_) {
     Network::FilterStatus status = read_filter->onData(data);
     if (status == Network::FilterStatus::StopIteration) {

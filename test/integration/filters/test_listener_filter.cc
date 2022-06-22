@@ -73,11 +73,8 @@ public:
     const auto& message = MessageUtil::downcastAndValidate<
         const test::integration::filters::TestUdpListenerFilterConfig&>(
         proto_config, context.messageValidationVisitor());
-    std::cout << "\n Yanjun Udp Listener factory from proto  here 2 drain_bytes " << message.drain_bytes() << std::endl;
     return [message](Network::UdpListenerFilterManager& filter_manager,
                      Network::UdpReadFilterCallbacks& callbacks) -> void {
-
-      std::cout << "\n Yanjun Udp Listener  proto  here 3 callback  drain_bytes " << message.drain_bytes() << std::endl;
       filter_manager.addReadFilter(std::make_unique<TestUdpListenerFilter>(callbacks, message.drain_bytes()));
     };
   }

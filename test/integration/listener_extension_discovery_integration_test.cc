@@ -268,45 +268,14 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessUdp) {
   test_server_->waitForCounterGe(
       "extension_config_discovery.udp_listener_filter." + filter_name_ + ".config_reload", 1);
 
-  sendUdpDataVerifyResults(2);
+  sendUdpDataVerifyResults(5);
    // Send 2nd config update to have listener filter drain 7 bytes of data.
   sendXdsResponse(filter_name_, "1", 7);
   test_server_->waitForCounterGe(
       "extension_config_discovery.udp_listener_filter." + filter_name_ + ".config_reload", 2);
 
-  sendUdpDataVerifyResults(2);
+  sendUdpDataVerifyResults(7);
 }
-
-
-TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessUdpNoDefault) {
-  is_udp_ = true;
-  on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicFilter(filter_name_, false, false);
-  initialize();
-
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-
-  // Send 1st config update to have listener filter drain 5 bytes of data.
-  sendXdsResponse(filter_name_, "1", 5);
-  test_server_->waitForCounterGe(
-      "extension_config_discovery.udp_listener_filter." + filter_name_ + ".config_reload", 1);
-
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
-  const uint32_t port = lookupPort(port_name_);
-  const auto listener_address = Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
-
-  Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
-  std::string request = data_;
-  client.write(request, *listener_address);
-
-   // The extension_listener_config_missing stats counter increases by 1.
-  test_server_->waitForCounterGe("listener.listener_stat.extension_udp_listener_config_missing", 1);
-
-}
-
-
-
 
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() { waitXdsStream(); };

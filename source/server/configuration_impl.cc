@@ -129,7 +129,6 @@ void FilterChainUtility::buildUdpFilterChain(
     const Filter::UdpListenerFilterFactoriesList& factories,
     Stats::Scope& stats_scope) {
   bool added_missing_config_filter = false;
-  std::cout << "\n Yanjun here 10 buildUdpFilterChain \n" << std::endl;
   for (const auto& filter_config_provider : factories) {
     auto config = filter_config_provider->config();
     if (config.has_value()) {
