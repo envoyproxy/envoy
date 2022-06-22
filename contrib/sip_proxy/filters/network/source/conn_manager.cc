@@ -340,13 +340,6 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSh
   }
   // }
 
-  // fixme 
-  // - move this somewhere more appropriate??
-  // - only add the header if does not already exist
-  // - only add the header if the outbound-transactions feature is enabled for the cluster (may need to move this to the router where we have the route config)
-  // todo - add cache of conn-id to -> downstream, and cache of upstream_transaction for mapping responses from downstream to upstream
-  //metadata->addXEnvoyOriginIngressHeader(local_origin_ingress_id_);
-
   ActiveTransPtr new_trans = std::make_unique<ActiveTrans>(*this, metadata);
   new_trans->createFilterChain();
   transactions_.emplace(k, std::move(new_trans));

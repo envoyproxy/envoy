@@ -119,11 +119,9 @@ public:
     std::string remote_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
     std::string local_address = read_callbacks_->connection().connectionInfoProvider().localAddress()->asString();
     std::string uuid = random.uuid();
-    downstream_conn_id_ = remote_address + "@" + local_address + "@" + uuid;
-    ENVOY_LOG(trace, "thread_id={}, downstream_connection_id={}", thread_id, downstream_conn_id_);
-    local_origin_ingress_id_ = downstream_conn_id_ + ";downstream_conn_id=" + thread_id;
-
-    local_ingress_id_ = IngressID(thread_id, downstream_conn_id_);
+    std::string downstream_conn_id = remote_address + "@" + local_address + "@" + uuid;
+    ENVOY_LOG(trace, "thread_id={}, downstream_connection_id={}", thread_id, downstream_conn_id);
+    local_ingress_id_ = IngressID(thread_id, downstream_conn_id);
 
     return Network::FilterStatus::Continue; 
   }
@@ -390,8 +388,6 @@ private:
 
   std::shared_ptr<TrafficRoutingAssistantHandler> tra_handler_;
 
-  std::string downstream_conn_id_;
-  std::string local_origin_ingress_id_;
   std::optional<IngressID> local_ingress_id_;
 
   // This is used in Router, put here to pass to Router

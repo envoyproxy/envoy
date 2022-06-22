@@ -30,6 +30,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::HasSubstr;
 
 namespace Envoy {
 namespace Extensions {
@@ -369,6 +370,25 @@ public:
   Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks_{};
   NiceMock<Network::MockClientConnection> upstream_connection_;
 };
+
+// fixme - need to update once the feature is configurable
+TEST_F(SipRouterTest, AddXEnvoyOriginIngressHeader) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  startRequest();
+  connectUpstream();
+ 
+  EXPECT_CALL(upstream_connection_, write(_, _)).WillOnce(Invoke([this](Buffer::Instance& buffer, bool) -> void {
+    auto header_name = std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress));
+    EXPECT_THAT(buffer.toString(), HasSubstr(header_name + ": " + callbacks_.ingress_id_.toHeaderValue()));
+    buffer.drain(buffer.length());
+  }));
+
+  completeRequest();
+  destroyRouter();
+}
 
 TEST_F(SipRouterTest, CustomizedAffinity) {
   initializeTrans();

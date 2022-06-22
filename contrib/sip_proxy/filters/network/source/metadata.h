@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <vector>
 
 #include "source/common/common/assert.h"

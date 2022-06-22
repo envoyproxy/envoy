@@ -98,9 +98,8 @@ public:
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
-    EXPECT_NE("", filter_->local_origin_ingress_id_);
-    EXPECT_NE("", filter_->downstream_conn_id_);
-    //filter_->downstream_connection_id = 
+    EXPECT_NE("", filter_->local_ingress_id_->toHeaderValue());
+
     // NOP currently.
     filter_->onAboveWriteBufferHighWatermark();
     filter_->onBelowWriteBufferLowWatermark();
@@ -692,7 +691,7 @@ TEST_F(SipConnectionManagerTest, SendLocalReply_Exception) {
       Envoy::Extensions::NetworkFilters::SipProxy::DirectResponse::ResponseType::Exception);
 }
 
-//TEST_F(SipConnectionManagerTest, UpstreamData) { upstreamDataTest(); }
+TEST_F(SipConnectionManagerTest, UpstreamData) { upstreamDataTest(); }
 
 TEST_F(SipConnectionManagerTest, ResetLocalTrans) {
   resetAllTransTest(true);
@@ -703,7 +702,7 @@ TEST_F(SipConnectionManagerTest, ResetRemoteTrans) {
   resetAllTransTest(false);
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
-//TEST_F(SipConnectionManagerTest, ResumeResponse) { resumeResponseTest(); }
+TEST_F(SipConnectionManagerTest, ResumeResponse) { resumeResponseTest(); }
 
 TEST_F(SipConnectionManagerTest, EncodeInsertOpaque) {
   const std::string SIP_OK200_FULL =
