@@ -26,7 +26,6 @@ envoy_py_data(
 )
 
 py_binary(
-    name = "manifest_to_json",
     srcs = ["manifest_to_json.py"],
     args = ["$(location @envoy_api//:v3_proto_set)"],
     data = ["@envoy_api//:v3_proto_set"],
@@ -38,6 +37,7 @@ py_binary(
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
     ],
+    name = "manifest_to_json",
 )
 
 genrule(
