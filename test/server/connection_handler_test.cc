@@ -738,7 +738,7 @@ TEST_F(ConnectionHandlerTest, RebalanceWithMultiAddressListener) {
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
 
   // Send connection to the first listener, expect mock_connection_balancer1 will be called.
-  // then mock_connection_balancer1 will rebalance the connection to the same listener.
+  // then mock_connection_balancer1 will balance the connection to the same listener.
   EXPECT_CALL(*mock_connection_balancer1, pickTargetHandler(_))
       .WillOnce(ReturnRef(*current_handler1));
   EXPECT_CALL(*access_log_, log(_, _, _, _));
@@ -748,7 +748,7 @@ TEST_F(ConnectionHandlerTest, RebalanceWithMultiAddressListener) {
   listener_callbacks1->onAccept(std::make_unique<NiceMock<Network::MockConnectionSocket>>());
 
   // Send connection to the second listener, expect mock_connection_balancer2 will be called.
-  // then mock_connection_balancer2 will rebalance the connection to the same listener.
+  // then mock_connection_balancer2 will balance the connection to the same listener.
   EXPECT_CALL(*mock_connection_balancer2, pickTargetHandler(_))
       .WillOnce(ReturnRef(*current_handler2));
   EXPECT_CALL(*access_log_, log(_, _, _, _));
