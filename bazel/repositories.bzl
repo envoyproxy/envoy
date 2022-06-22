@@ -57,26 +57,26 @@ _default_envoy_build_config = repository_rule(
 def _envoy_repo_impl(repository_ctx):
     """This provides information about the Envoy repository
 
-    You can access the current version and path to the repository in .bzl/BUILD
-    files as follows:
+    You can access the current project and api versions and the path to the repository in
+    .bzl/BUILD files as follows:
 
     ```starlark
-    load("@envoy_repo//:version.bzl", "VERSION")
+    load("@envoy_repo//:version.bzl", "VERSION", "API_VERSION")
     ```
 
-    `VERSION` can be used to derive version-specific rules and can be passed
+    `*VERSION` can be used to derive version-specific rules and can be passed
     to the rules.
 
-    The `VERSION` and also the local `PATH` to the repo can be accessed in
+    The `VERSION`s and also the local `PATH` to the repo can be accessed in
     python libraries/binaries. By adding `@envoy_repo` to `deps` they become
     importable through the `envoy_repo` namespace.
 
     As the `PATH` is local to the machine, it is generally only useful for
     jobs that will run locally.
 
-    This can be useful for example, for tooling that needs to check the
-    repository, or to run bazel queries that cannot be run within the
-    constraints of a `genquery`.
+    This can be useful, for example, for bazel run jobs to run bazel queries that cannot be run
+    within the constraints of a `genquery`, or that otherwise need access to the repository
+    files.
 
     """
     repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)
