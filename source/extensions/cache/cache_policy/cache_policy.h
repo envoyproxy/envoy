@@ -12,7 +12,6 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Cache {
 
 /**
@@ -22,7 +21,8 @@ struct CacheEntryUsability {
   /**
    * Whether the cache entry is usable, additional checks are required to be usable, or unusable.
    */
-  CacheEntryStatus status = CacheEntryStatus::Unusable;
+
+  HttpFilters::Cache::CacheEntryStatus status = HttpFilters::Cache::CacheEntryStatus::Unusable;
   /**
    * Value to be put in the Age header for cache responses.
    */
@@ -56,7 +56,7 @@ public:
    * Calculates the lookup key for storing the entry in the cache.
    * @param request_headers - headers from the request the CacheFilter is currently processing.
    */
-  virtual Key createCacheKey(const Http::RequestHeaderMap& request_headers) PURE;
+  virtual HttpFilters::Cache::Key createCacheKey(const Http::RequestHeaderMap& request_headers) PURE;
 
   /**
    * Determines the cacheability of the response during decoding.
@@ -66,7 +66,7 @@ public:
    * @return true if the response may be cached, based on the contents of the request.
    */
   virtual bool requestCacheable(const Http::RequestHeaderMap& request_headers,
-                                const RequestCacheControl& request_cache_control) PURE;
+                                const HttpFilters::Cache::RequestCacheControl& request_cache_control) PURE;
 
   /**
    * Determines the cacheability of the response during encoding.
@@ -81,8 +81,8 @@ public:
    */
   virtual bool responseCacheable(const Http::RequestHeaderMap& request_headers,
                                  const Http::ResponseHeaderMap& response_headers,
-                                 const ResponseCacheControl& response_cache_control,
-                                 const VaryAllowList& vary_allow_list) PURE;
+                                 const HttpFilters::Cache::ResponseCacheControl& response_cache_control,
+                                 const HttpFilters::Cache::VaryAllowList& vary_allow_list) PURE;
 
   /**
    * Determines whether the cached entry may be used directly or must be validated with upstream.
@@ -100,9 +100,9 @@ public:
   virtual CacheEntryUsability
   computeCacheEntryUsability(const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& cached_response_headers,
-                             const RequestCacheControl& request_cache_control,
-                             const ResponseCacheControl& cached_response_cache_control,
-                             const uint64_t content_length, const ResponseMetadata& cached_metadata,
+                             const HttpFilters::Cache::RequestCacheControl& request_cache_control,
+                             const HttpFilters::Cache::ResponseCacheControl& cached_response_cache_control,
+                             const uint64_t content_length, const HttpFilters::Cache::ResponseMetadata& cached_metadata,
                              SystemTime now) PURE;
 
   /**
@@ -117,28 +117,28 @@ using CachePolicyPtr = std::unique_ptr<CachePolicy>;
 
 class CachePolicyImpl : public CachePolicy {
 public:
-  Key createCacheKey(const Http::RequestHeaderMap& request_headers) override;
+  HttpFilters::Cache::Key createCacheKey(const Http::RequestHeaderMap& request_headers) override;
   bool requestCacheable(const Http::RequestHeaderMap& request_headers,
-                        const RequestCacheControl& request_cache_control) override;
+                        const HttpFilters::Cache::RequestCacheControl& request_cache_control) override;
 
   bool responseCacheable(const Http::RequestHeaderMap& request_headers,
                          const Http::ResponseHeaderMap& response_headers,
-                         const ResponseCacheControl& response_cache_control,
-                         const VaryAllowList& vary_allow_list) override;
+                         const HttpFilters::Cache::ResponseCacheControl& response_cache_control,
+                         const HttpFilters::Cache::VaryAllowList& vary_allow_list) override;
 
   CacheEntryUsability
   computeCacheEntryUsability(const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& cached_response_headers,
-                             const RequestCacheControl& request_cache_control,
-                             const ResponseCacheControl& cached_response_cache_control,
-                             const uint64_t content_length, const ResponseMetadata& cached_metadata,
+                             const HttpFilters::Cache::RequestCacheControl& request_cache_control,
+                             const HttpFilters::Cache::ResponseCacheControl& cached_response_cache_control,
+                             const uint64_t content_length, const HttpFilters::Cache::ResponseMetadata& cached_metadata,
                              SystemTime now) override;
 
   void setCallbacks([[maybe_unused]] CachePolicyCallbacks& callbacks) override {}
 
 private:
-  bool requiresValidation(const RequestCacheControl& request_cache_control,
-                          const ResponseCacheControl& cached_response_cache_control,
+  bool requiresValidation(const HttpFilters::Cache::RequestCacheControl& request_cache_control,
+                          const HttpFilters::Cache::ResponseCacheControl& cached_response_cache_control,
                           const Http::ResponseHeaderMap& response_headers,
                           Seconds response_age) const;
 
@@ -146,51 +146,6 @@ private:
   const std::vector<const Http::LowerCaseString*>& conditionalHeaders() const;
 };
 
-class CachePolicyFactory : public Config::TypedFactory {
-public:
-  // From UntypedFactory
-  std::string category() const override { return "envoy.http.cache_policy"; }
-
-  virtual std::unique_ptr<CachePolicy>
-  createCachePolicyFromProto(const Protobuf::Message& config) PURE;
-};
-
-// A base class to handle the proto downcasting and validation to save some
-// boilerplate for factory implementations.
-template <class ConfigProto> class CachePolicyFactoryBase : public CachePolicyFactory {
-public:
-  CachePolicyPtr createCachePolicyFromProto(const Protobuf::Message& config) override {
-    return createCachePolicyFromProtoTyped(
-        Envoy::MessageUtil::downcastAndValidate<const ConfigProto&>(
-            config, Envoy::ProtobufMessage::getStrictValidationVisitor()));
-  }
-
-protected:
-  CachePolicyFactoryBase() {}
-
-private:
-  virtual CachePolicyPtr createCachePolicyFromProtoTyped(const ConfigProto& config) PURE;
-};
-
-class CachePolicyImplFactory
-    : public CachePolicyFactoryBase<
-          envoy::extensions::cache::cache_policy::v3::CachePolicyConfig> {
-public:
-  std::string name() const override { return "envoy.extensions.http.cache_policy_impl"; }
-  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::cache::cache_policy::v3::CachePolicyConfig>();
-  }
-
-private:
-  CachePolicyPtr
-  createCachePolicyFromProtoTyped([[maybe_unused]] const envoy::extensions::cache::
-                                      cache_policy::v3::CachePolicyConfig& config) override {
-    return std::make_unique<CachePolicyImpl>();
-  }
-};
-
 } // namespace Cache
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

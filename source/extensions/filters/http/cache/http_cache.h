@@ -15,7 +15,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
-#include "source/extensions/filters/http/cache/cache_policy.h"
+#include "source/extensions/cache/cache_policy/cache_policy.h"
 #include "source/extensions/filters/http/cache/key.pb.h"
 #include "source/extensions/filters/http/cache/range_utils.h"
 
@@ -25,6 +25,11 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
+
+using ::Envoy::Extensions::Cache::CachePolicy;
+using ::Envoy::Extensions::Cache::CachePolicyPtr;
+using ::Envoy::Extensions::Cache::CachePolicyImpl;
+using ::Envoy::Extensions::Cache::CacheEntryUsability;
 
 // Result of a lookup operation, including cached headers and information needed
 // to serve a response based on it, or to attempt to validate.

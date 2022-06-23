@@ -10,7 +10,7 @@
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
-#include "source/extensions/filters/http/cache/cache_policy.h"
+#include "source/extensions/cache/cache_policy/cache_policy.h"
 
 #include "test/test_common/utility.h"
 
@@ -18,10 +18,18 @@
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
+
+// TODO: move to /test/envoy/extensions/cache/cache_policy/cache_policy_test.cc
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Cache {
+
+using ::Envoy::Extensions::HttpFilters::Cache::RequestCacheControl;
+using ::Envoy::Extensions::HttpFilters::Cache::ResponseCacheControl;
+using ::Envoy::Extensions::HttpFilters::Cache::CacheCustomHeaders;
+using ::Envoy::Extensions::HttpFilters::Cache::VaryAllowList;
+using ::Envoy::Extensions::HttpFilters::Cache::CacheEntryStatus;
+
 namespace {
 
 class CachePolicyImplTest : public testing::TestWithParam<std::string> {
@@ -238,6 +246,5 @@ TEST(CacheEntryUsabilityTest, IsEqualFalseAge) {
 
 } // namespace
 } // namespace Cache
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

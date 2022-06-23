@@ -13,7 +13,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
-#include "source/extensions/filters/http/cache/cache_policy.h"
+#include "source/extensions/cache/cache_policy/cache_policy.h"
 
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"

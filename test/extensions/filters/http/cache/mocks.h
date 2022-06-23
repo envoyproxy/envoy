@@ -10,7 +10,7 @@
 
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
-#include "source/extensions/filters/http/cache/cache_policy.h"
+#include "source/extensions/cache/cache_policy/cache_policy.h"
 #include "source/extensions/filters/http/cache/key.pb.h"
 
 #include "gmock/gmock.h"
@@ -19,6 +19,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
+
+using ::Envoy::Extensions::Cache::CachePolicyCallbacks;
 
 class MockCachePolicy : public CachePolicy {
 public:

@@ -19,6 +19,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+using ::Envoy::Extensions::Cache::CachePolicyCallbacks;
+
 namespace {
 inline bool isResponseNotModified(const Http::ResponseHeaderMap& response_headers) {
   return Http::Utility::getResponseStatus(response_headers) == enumToInt(Http::Code::NotModified);

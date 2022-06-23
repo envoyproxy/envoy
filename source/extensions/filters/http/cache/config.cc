@@ -1,12 +1,14 @@
 #include "source/extensions/filters/http/cache/config.h"
 
 #include "source/extensions/filters/http/cache/cache_filter.h"
-#include "source/extensions/filters/http/cache/cache_policy.h"
+#include "source/extensions/cache/cache_policy/config.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
+
+using ::Envoy::Extensions::Cache::CachePolicyFactory;
 
 Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,

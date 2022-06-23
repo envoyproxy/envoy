@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/cache/cache_policy.h"
+#include "source/extensions/cache/cache_policy/cache_policy.h"
 
 #include <stdint.h>
 
@@ -18,8 +18,15 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Cache {
+
+using ::Envoy::Extensions::HttpFilters::Cache::RequestCacheControl;
+using ::Envoy::Extensions::HttpFilters::Cache::ResponseCacheControl;
+using ::Envoy::Extensions::HttpFilters::Cache::CacheCustomHeaders;
+using ::Envoy::Extensions::HttpFilters::Cache::VaryAllowList;
+using ::Envoy::Extensions::HttpFilters::Cache::CacheEntryStatus;
+using ::Envoy::Extensions::HttpFilters::Cache::ResponseMetadata;
+using ::Envoy::Extensions::HttpFilters::Cache::Key;
 
 Key CachePolicyImpl::createCacheKey(const Http::RequestHeaderMap& request_headers) {
   ASSERT(request_headers.ForwardedProto(),
@@ -106,7 +113,7 @@ CacheEntryUsability CachePolicyImpl::computeCacheEntryUsability(
   CacheEntryUsability result;
 
   result.age =
-      CacheHeadersUtils::calculateAge(cached_response_headers, cached_metadata.response_time_, now);
+      HttpFilters::Cache::CacheHeadersUtils::calculateAge(cached_response_headers, cached_metadata.response_time_, now);
 
   result.status = CacheEntryStatus::Ok;
   if (requiresValidation(request_cache_control, cached_response_cache_control,
@@ -141,8 +148,8 @@ bool CachePolicyImpl::requiresValidation(const RequestCacheControl& request_cach
     freshness_lifetime = cached_response_cache_control.max_age_.value();
   } else {
     const SystemTime expires_value =
-        CacheHeadersUtils::httpTime(response_headers.getInline(CacheCustomHeaders::expires()));
-    const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
+        HttpFilters::Cache::CacheHeadersUtils::httpTime(response_headers.getInline(CacheCustomHeaders::expires()));
+    const SystemTime date_value = HttpFilters::Cache::CacheHeadersUtils::httpTime(response_headers.Date());
     freshness_lifetime = expires_value - date_value;
   }
 
@@ -182,9 +189,6 @@ const std::vector<const Http::LowerCaseString*>& CachePolicyImpl::conditionalHea
       &Http::CustomHeaders::get().IfUnmodifiedSince, &Http::CustomHeaders::get().IfRange);
 }
 
-static Registry::RegisterFactory<CachePolicyImplFactory, CachePolicyFactory> register_;
-
 } // namespace Cache
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
