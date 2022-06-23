@@ -324,6 +324,13 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
 
   ConnectionManager& cm = parent_.parent_;
 
+  ENVOY_STREAM_LOG(
+      trace, "Response message_type: {}, seq_id: {}, method: {}, frame size: {}, headers:\n{}",
+      parent_,
+      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-",
+      metadata_->sequenceId(), metadata->hasMethodName() ? metadata->methodName() : "-",
+      metadata->hasFrameSize() ? metadata->frameSize() : -1, metadata->responseHeaders());
+
   // Check if the upstream host is draining.
   //
   // Note: the drain header needs to be checked here in messageBegin, and not transportBegin, so
@@ -341,6 +348,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
     // call so that the header is added after all upstream headers passed, due to messageBegin
     // possibly not getting headers in transportBegin.
     if (cm.drain_decision_.drainClose()) {
+      ENVOY_STREAM_LOG(debug, "propogate Drain header for drain close decision", parent_);
       // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
       // over)?
       metadata->responseHeaders().addReferenceKey(Headers::get().Drain, "true");
@@ -520,6 +528,8 @@ ConnectionManager::ActiveRpc::applyFilters(FilterType* filter,
       !filter ? filter_list.begin() : std::next(filter->entry());
   for (; entry != filter_list.end(); entry++) {
     const FilterStatus status = filter_action_((*entry)->decodeEventHandler());
+    ENVOY_STREAM_LOG(trace, "apply filter called: filter={} status={}", *this,
+                     static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (local_response_sent_) {
       // The filter called sendLocalReply but _did not_ close the connection.
       // We return FilterStatus::Continue irrespective of the current result,
@@ -848,6 +858,10 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
       metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
 
   streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
+  ENVOY_STREAM_LOG(
+      trace, "Request seq_id: {}, method: {}, frame size: {}, headers:\n{}", *this,
+      metadata_->sequenceId(), metadata->hasMethodName() ? metadata->methodName() : "-",
+      metadata->hasFrameSize() ? metadata->frameSize() : -1, metadata->requestHeaders());
 
   return applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
 }
@@ -977,6 +991,8 @@ void ConnectionManager::ActiveRpc::onLocalReply(const MessageMetadata& metadata,
 
 void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response, bool end_stream) {
   ASSERT(!under_on_local_reply_);
+  ENVOY_STREAM_LOG(debug, "Sending local reply, end_stream: {}, seq_id: {}", *this, end_stream,
+                   original_sequence_id_);
   localReplyMetadata_ = metadata_->createResponseMetadata();
   localReplyMetadata_->setSequenceId(original_sequence_id_);
 
@@ -1034,6 +1050,7 @@ ThriftFilters::ResponseStatus ConnectionManager::ActiveRpc::upstreamData(Buffer:
 }
 
 void ConnectionManager::ActiveRpc::resetDownstreamConnection() {
+  ENVOY_CONN_LOG(debug, "resetting downstream connection", parent_.read_callbacks_->connection());
   parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 

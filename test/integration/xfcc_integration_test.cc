@@ -130,9 +130,9 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("http")));
-  return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                             client_mtls_ssl_ctx_->createTransportSocket(nullptr),
-                                             nullptr);
+  return dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      client_mtls_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr);
 }
 
 void XfccIntegrationTest::createUpstreams() {

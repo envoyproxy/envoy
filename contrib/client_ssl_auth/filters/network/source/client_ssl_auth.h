@@ -6,7 +6,6 @@
 
 #include "envoy/common/random_generator.h"
 #include "envoy/config/subscription.h"
-#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -19,6 +18,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
+#include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 
 namespace Envoy {
 namespace Extensions {
