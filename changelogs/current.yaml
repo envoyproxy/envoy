@@ -21,7 +21,7 @@ behavior_changes:
 - area: server
   change: |
     Fixed metric tag extraction so that worker_id is properly extracted fromt the server stats. This changes the Prometheus name from
-    server_worker_1_watchdog_miss{} to server_watchdog_miss{envoy_worker_id="worker_01}.
+    envoy_server_worker_1_watchdog_miss{} to envoy_server_watchdog_miss{envoy_worker_id="worker_01}.
 - area: thrift_proxy
   change: |
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.stat_prefix>`

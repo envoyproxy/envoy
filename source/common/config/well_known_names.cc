@@ -156,7 +156,7 @@ TagNameValues::TagNameValues() {
   addRe2(WORKER_ID, R"(^listener\.<ADDRESS>\.((worker_\d+)\.))", "");
   addRe2(WORKER_ID, R"(^listener\.<TAG_VALUE>\.((worker_\d+)\.))", "");
 
-  // sever.(worker_<id>.)*
+  // server.(worker_<id>.)*
   addRe2(WORKER_ID, R"(^server\.((worker_\d+)\.))", "");
 
   // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
