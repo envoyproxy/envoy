@@ -559,6 +559,7 @@ message RouteMatch {
     // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
     string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
 
+    // [#not-implemented-hide:]
     // If specified, the route is a template match rule meaning that the
     // ``:path`` header (without the query string) must match the given
     // ``path_template_match`` pattern.
@@ -1087,6 +1088,7 @@ message RouteAction {
   //   ``/aaa/yyy/bbb``.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
 
+  // [#not-implemented-hide:]
   // Indicates that during forwarding, portions of the path that match the
   // pattern should be rewritten, even allowing the substitution of variables
   // from the match pattern into the new path as specified by the rewrite template.
