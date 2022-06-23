@@ -433,11 +433,11 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
   auto cert = bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl));
-  const Network::TransportSocketOptions* transport_socket_options = nullptr;
   auto transport_socket_options_shared_ptr_ptr =
       static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(SSL_get_app_data(ssl));
   ASSERT(transport_socket_options_shared_ptr_ptr);
-  transport_socket_options = (*transport_socket_options_shared_ptr_ptr).get();
+  const Network::TransportSocketOptions* transport_socket_options =
+      (*transport_socket_options_shared_ptr_ptr).get();
   return impl->cert_validator_->doSynchronousVerifyCertChain(
       store_ctx,
       reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
