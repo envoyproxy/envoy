@@ -172,6 +172,19 @@ TEST_F(FileSystemBufferFilterTest, PassesResponseHeadersThroughOnNoBody) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
 }
 
+TEST_F(FileSystemBufferFilterTest, FullyBypassingAllowsUnspecifiedManager) {
+  createFilterFromYaml(R"(
+    request:
+      behavior:
+        bypass: {}
+    response:
+      behavior:
+        bypass: {}
+  )");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+}
+
 TEST_F(FileSystemBufferFilterTest, BypassesRequestFilter) {
   createFilterFromYaml(R"(
     manager_config:
