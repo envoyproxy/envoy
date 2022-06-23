@@ -11,5 +11,6 @@ envoy_cc_test(
     deps = [
         "//library/cc:engine_builder_lib",
         "//library/cc:envoy_engine_cc_lib_no_stamp",
+        "@envoy//source/extensions/network/dns_resolver/apple:config",
     ],
 )
