@@ -139,7 +139,9 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
 
   if (!header_value.result().has_value()) {
     if (header_data.invert_match_) {
-      return header_data.header_match_type_ == HeaderMatchType::Present && header_data.present_;
+      // For invert match with any match type but present, it should be considered as a match when 
+      // the header is not present
+      return header_data.header_match_type_ == HeaderMatchType::Present ? header_data.present_ : true;
     } else {
       return header_data.header_match_type_ == HeaderMatchType::Present && !header_data.present_;
     }
