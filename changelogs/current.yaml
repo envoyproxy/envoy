@@ -4,6 +4,10 @@ behavior_changes:
 - area: tls-inspector
   change: |
     the listener filter tls inspector's stats ``connection_closed`` and ``read_error`` are removed. The new stats are introduced for listener, ``downstream_peek_remote_close`` and ``read_error`` :ref:`listener stats <config_listener_stats>`.
+- area: config
+  change: |
+    Multiple SDS resources of multiple clusters or listeners are sent in a single SDS requests, instead of multiple SDS requests.
+    This behavioral change can be reverted by setting ``envoy.reloadable_features.combine_sds_requests`` to false.
 - area: listener
   change: |
     Fixed metric tag extraction so that :ref:stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>
@@ -173,6 +177,8 @@ new_features:
 - area: access_log
   change: |
     added new access_log command operators to retrieve upstream connection information change: ``%UPSTREAM_PROTOCOL%``, ``%UPSTREAM_PEER_SUBJECT%``, ``%UPSTREAM_PEER_ISSUER%``, ``%UPSTREAM_TLS_SESSION_ID%``, ``%UPSTREAM_TLS_CIPHER%``, ``%UPSTREAM_TLS_VERSION%``, ``%UPSTREAM_PEER_CERT_V_START%``, ``%UPSTREAM_PEER_CERT_V_END%``, ``%UPSTREAM_PEER_CERT%` and ``%UPSTREAM_FILTER_STATE%``.
+  change: |
+    added configuration for OpenTelemetry :ref:`resource_attributes <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.resource_attributes>`.
 - area: dns_resolver
   change: |
     added :ref:`include_unroutable_families<envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families>` to the Apple DNS resolver.
@@ -252,12 +258,18 @@ new_features:
 - area: cors
   change: |
     added support for cors PNA. This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_cors_private_network_access`` to false. More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
+- area: network
+  change: |
+    extended conection balancer with :ref:`extend balance <envoy_v3_api_field_config.listener.v3.Listener.ConnectionBalanceConfig.extend_balance>`, and added :ref:`Dlb connection balancer <envoy_v3_api_msg_extensions.network.connection_balance.dlb.v3alpha.Dlb>` to use `DLB <https://www.intel.com/content/www/us/en/download/686372/intel-dynamic-load-balancer.html>`_ hardware to balance.
 - area: router
   change: |
     added :ref:`stat_prefix <envoy_v3_api_field_config.route.v3.Route.stat_prefix>` support to generate route level statistics.
 - area: matching
   change : |
     added support for matching authenticated inputs in network and HTTP matching data.
+- area: network
+  change: |
+    the :ref:`client ssl auth filter <config_network_filters_client_ssl_auth>` has been moved to :ref:`contrib images <install_contrib>`.
 - area: rbac
   change: |
     added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.

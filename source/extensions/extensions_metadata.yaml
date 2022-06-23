@@ -333,11 +333,6 @@ envoy.filters.listener.tls_inspector:
   - envoy.filters.listener
   security_posture: robust_to_untrusted_downstream
   status: stable
-envoy.filters.network.client_ssl_auth:
-  categories:
-  - envoy.filters.network
-  security_posture: robust_to_untrusted_downstream
-  status: stable
 envoy.filters.network.connection_limit:
   categories:
   - envoy.filters.network
@@ -654,6 +649,11 @@ envoy.tracers.opencensus:
   - envoy.tracers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.tracers.opentelemetry:
+  categories:
+  - envoy.tracers
+  security_posture: unknown
+  status: wip
 envoy.tracers.skywalking:
   categories:
   - envoy.tracers

@@ -20,6 +20,9 @@ namespace Router {
 namespace {
 
 class ThriftRouteMatcherTest : public testing::Test {
+public:
+  ThriftRouteMatcherTest() : engine_(std::make_unique<Regex::GoogleReEngine>()) {}
+
 protected:
   RouteMatcher createMatcher(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& route) {
@@ -32,6 +35,8 @@ protected:
   }
 
 private:
+  ScopedInjectableLoader<Regex::Engine> engine_;
+
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration
   parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
     envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration route_config;
@@ -330,7 +335,6 @@ routes:
       - name: "x-version"
         string_match:
           safe_regex:
-            google_re2: {}
             regex: "0.[5-9]"
     route:
       cluster: "cluster1"
