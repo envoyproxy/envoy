@@ -4,6 +4,7 @@ CONTRIB_EXTENSIONS = {
     # HTTP filters
     #
 
+    "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
     "envoy.filters.http.squash":                                "//contrib/squash/filters/http/source:config",
     "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
@@ -12,6 +13,7 @@ CONTRIB_EXTENSIONS = {
     # Network filters
     #
 
+    "envoy.filters.network.client_ssl_auth":                    "//contrib/client_ssl_auth/filters/network/source:config",
     "envoy.filters.network.kafka_broker":                       "//contrib/kafka/filters/network/source:kafka_broker_config_lib",
     "envoy.filters.network.kafka_mesh":                         "//contrib/kafka/filters/network/source/mesh:config_lib",
     "envoy.filters.network.mysql_proxy":                        "//contrib/mysql_proxy/filters/network/source:config",
@@ -42,4 +44,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.matching.input_matchers.hyperscan":                  "//contrib/hyperscan/matching/input_matchers/source:config",
+
+    #
+    # Connection Balance extensions
+    #
+
+    "envoy.network.connection_balance.dlb":                     "//contrib/network/connection_balance/dlb/source:connection_balancer",
 }

@@ -114,6 +114,9 @@ public:
   absl::optional<absl::string_view> ep() { return ep_; }
   void setEP(absl::string_view data) { ep_ = data; }
 
+  absl::optional<absl::string_view> opaque() { return opaque_; }
+  void setOpaque(absl::string_view data) { opaque_ = data; }
+
   std::vector<Operation>& operationList() { return operation_list_; }
   void setOperation(Operation op) { operation_list_.emplace_back(op); }
 
@@ -182,6 +185,7 @@ private:
 
   std::vector<Operation> operation_list_;
   absl::optional<absl::string_view> ep_{};
+  absl::optional<absl::string_view> opaque_{};
 
   absl::optional<std::pair<std::string, std::string>> p_cookie_ip_map_{};
 

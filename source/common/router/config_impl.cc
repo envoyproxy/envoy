@@ -40,6 +40,7 @@
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/context_impl.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -653,6 +654,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
               path_redirect_);
+  }
+  if (!route.stat_prefix().empty()) {
+    route_stats_context_ = std::make_unique<RouteStatsContextImpl>(
+        factory_context.scope(), factory_context.routerContext().routeStatNames(), vhost.statName(),
+        route.stat_prefix());
   }
 
   if (route.route().has_early_data_policy()) {

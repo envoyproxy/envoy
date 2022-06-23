@@ -27,6 +27,7 @@ filegroup(
             # TODO(phlax/windows-dev): figure out how to get this working on windows
             #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
+            "root/configuration/other_features/_include/dlb.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
         ],
     ) + select({
@@ -214,16 +215,14 @@ genrule(
          --build_sha="$${BUILD_SHA:-}" \
          --docs_tag="$${DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
-         --validator_path=$(location //tools/config_validation:validate_fragment) \
-         --descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text) \
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \\
          $(location rst) \
          $@
     """,
     exec_tools = [
         "//tools/docs:sphinx_runner",
         ":rst",
-        "//tools/config_validation:validate_fragment",
-        "//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text",
         "//:VERSION.txt",
+        "@envoy_api//:v3_proto_set",
     ],
 )
