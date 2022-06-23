@@ -71,10 +71,18 @@ public:
     }
     decoder_filter_ = new NiceMock<MockStreamDecoderFilter>();
     encoder_filter_ = new NiceMock<MockStreamEncoderFilter>();
+
     EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
-          callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
+        .WillOnce(Invoke([this](FilterChainManager& manager) -> void {
+          FilterFactoryCb decoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
+            callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
+          };
+          FilterFactoryCb encoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
+            callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
+          };
+
+          manager.applyFilterFactoryCb({}, decoder_filter_factory);
+          manager.applyFilterFactoryCb({}, encoder_filter_factory);
         }));
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
         .WillOnce(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
@@ -84,8 +92,8 @@ public:
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
     EXPECT_CALL(filter_factory_, createUpgradeFilterChain("WebSocket", _, _))
         .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                   FilterChainFactoryCallbacks& callbacks) -> bool {
-          filter_factory_.createFilterChain(callbacks);
+                                   FilterChainManager& manager) -> bool {
+          filter_factory_.createFilterChain(manager);
           return true;
         }));
   }
