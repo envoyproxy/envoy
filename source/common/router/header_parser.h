@@ -49,10 +49,12 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add,
       const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
-  void evaluateHeaders( Http::HeaderMap& headers,const Http::RequestHeaderMap& request_headers,
+  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
                        const Http::ResponseHeaderMap& response_headers,
                        const StreamInfo::StreamInfo& stream_info) const override;
-  void evaluateHeaders( Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers, const StreamInfo::StreamInfo* stream_info) const;
+  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
+                       const Http::ResponseHeaderMap& response_headers,
+                       const StreamInfo::StreamInfo* stream_info) const;
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const;
 
@@ -67,7 +69,8 @@ public:
                                              bool do_formatting = true) const;
 
   static std::string translateMetadataFormat(const std::string& header_value);
- static std::string translatePerRequestState(const std::string& header_value);
+  static std::string translatePerRequestState(const std::string& header_value);
+
 protected:
   HeaderParser() = default;
 

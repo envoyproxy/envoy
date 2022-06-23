@@ -56,7 +56,8 @@ public:
    * @param request_headers request headers to be used in manipulation of the response headers.
    * @param stream_info holds additional information about the request.
    */
-  virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers, const Http::RequestHeaderMap& request_headers,
+  virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                                       const Http::RequestHeaderMap& request_headers,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**

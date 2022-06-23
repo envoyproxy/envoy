@@ -147,9 +147,8 @@ public:
    */
   virtual void check(RequestCallbacks& callback,
                      const envoy::service::auth::v3::CheckRequest& request,
-                     Tracing::Span& parent_span, 
-                              const Http::RequestHeaderMap& orig_request_headers,  
-const StreamInfo::StreamInfo& stream_info) PURE;
+                     Tracing::Span& parent_span, const Http::RequestHeaderMap& orig_request_headers,
+                     const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;

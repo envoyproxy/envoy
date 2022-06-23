@@ -433,7 +433,8 @@ SubstitutionFormatParser::getKnownFormatters() {
            std::vector<std::string> path;
 
            SubstitutionFormatParser::parseSubcommand(format, ':', filter_namespace, path);
-           return std::make_unique<UpstreamHostMetadataFormatter>(filter_namespace, path, max_length);
+           return std::make_unique<UpstreamHostMetadataFormatter>(filter_namespace, path,
+                                                                  max_length);
          }}},
        {"FILTER_STATE",
         {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
@@ -1828,20 +1829,21 @@ ClusterMetadataFormatter::ClusterMetadataFormatter(const std::string& filter_nam
                           return &cluster_info.value()->metadata();
                         }) {}
 UpstreamHostMetadataFormatter::UpstreamHostMetadataFormatter(const std::string& filter_namespace,
-                                                   const std::vector<std::string>& path,
-                                                   absl::optional<size_t> max_length)
+                                                             const std::vector<std::string>& path,
+                                                             absl::optional<size_t> max_length)
     : MetadataFormatter(filter_namespace, path, max_length,
                         [](const StreamInfo::StreamInfo& stream_info)
                             -> const envoy::config::core::v3::Metadata* {
-    if (!stream_info.upstreamInfo().has_value()) {
-        return nullptr;
-    }
-      Upstream::HostDescriptionConstSharedPtr host = stream_info.upstreamInfo()->upstreamHost();
-      if (!host) {
-        return nullptr;
-      }
-      return host->metadata().get();
-}){}
+                          if (!stream_info.upstreamInfo().has_value()) {
+                            return nullptr;
+                          }
+                          Upstream::HostDescriptionConstSharedPtr host =
+                              stream_info.upstreamInfo()->upstreamHost();
+                          if (!host) {
+                            return nullptr;
+                          }
+                          return host->metadata().get();
+                        }) {}
 
 FilterStateFormatter::FilterStateFormatter(const std::string& key,
                                            absl::optional<size_t> max_length,

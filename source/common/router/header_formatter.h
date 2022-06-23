@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/formatter/substitution_formatter.h"
+
 #include "source/common/http/header_map_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -103,7 +104,9 @@ class HeaderFormatterNew {
 public:
   virtual ~HeaderFormatterNew() = default;
 
-  virtual const std::string format(const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& headers, const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual const std::string format(const Http::RequestHeaderMap& request_headers,
+                                   const Http::ResponseHeaderMap& headers,
+                                   const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * @return bool indicating whether the formatted header should be appended to the existing
@@ -170,14 +173,17 @@ public:
       : formatter_(std::move(formatter)), append_(append) {}
 
   // HeaderFormatter::format
-  const std::string format(const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers, const Envoy::StreamInfo::StreamInfo& stream_info) const override {
+  const std::string format(const Http::RequestHeaderMap& request_headers,
+                           const Http::ResponseHeaderMap& response_headers,
+                           const Envoy::StreamInfo::StreamInfo& stream_info) const override {
     std::string buf;
-   //auto empty_req_map = Http::RequestHeaderMapImpl::create();
-//   auto empty_response_map = Http::ResponseHeaderMapImpl::create();
-   auto empty_trailers_map = Http::ResponseTrailerMapImpl::create();
+    // auto empty_req_map = Http::RequestHeaderMapImpl::create();
+    //   auto empty_response_map = Http::ResponseHeaderMapImpl::create();
+    auto empty_trailers_map = Http::ResponseTrailerMapImpl::create();
 
-    //for (const auto& formatter : formatters_) {
-      buf = formatter_->format(request_headers, response_headers, *empty_trailers_map, stream_info, "");
+    // for (const auto& formatter : formatters_) {
+    buf =
+        formatter_->format(request_headers, response_headers, *empty_trailers_map, stream_info, "");
     //}
 
     return buf;
@@ -189,24 +195,27 @@ private:
   const bool append_;
 };
 
-// TODO(cpakulski). 
+// TODO(cpakulski).
 // This class is used only when runtime guard envoy_reloadable_features_unified_header_formatter
 // is false and should be removed when the guard is removed. See issue 20389..
-// This is basically a bridge between "new" header formatters which take request_headers and response_headers
-// as parameters and "old" header formatters which take only stream_info as parameter.
+// This is basically a bridge between "new" header formatters which take request_headers and
+// response_headers as parameters and "old" header formatters which take only stream_info as
+// parameter.
 class HeaderFormatterBridge : public HeaderFormatterNew {
 public:
-    HeaderFormatterBridge() = delete;
-    HeaderFormatterBridge(HeaderFormatterPtr&& header_formatter, bool append) : header_formatter_(std::move(header_formatter)), append_(append) {}
+  HeaderFormatterBridge() = delete;
+  HeaderFormatterBridge(HeaderFormatterPtr&& header_formatter, bool append)
+      : header_formatter_(std::move(header_formatter)), append_(append) {}
 
-  const std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Envoy::StreamInfo::StreamInfo& stream_info) const override {
+  const std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                           const Envoy::StreamInfo::StreamInfo& stream_info) const override {
     return header_formatter_->format(stream_info);
-    }
+  }
   bool append() const override { return append_; }
-private:
-     const HeaderFormatterPtr header_formatter_;
-  const bool append_;
 
+private:
+  const HeaderFormatterPtr header_formatter_;
+  const bool append_;
 };
 
 } // namespace Router

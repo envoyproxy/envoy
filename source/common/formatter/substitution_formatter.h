@@ -158,7 +158,7 @@ private:
 
 // Helper classes for StructFormatter::StructFormatMapVisitor.
 template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
-template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
+template <class... Ts> StructFormatMapVisitorHelper(Ts...)->StructFormatMapVisitorHelper<Ts...>;
 
 /**
  * An formatter for structured log formats, which returns a Struct proto that
@@ -512,7 +512,8 @@ public:
 class UpstreamHostMetadataFormatter : public MetadataFormatter {
 public:
   UpstreamHostMetadataFormatter(const std::string& filter_namespace,
-                           const std::vector<std::string>& path, absl::optional<size_t> max_length);
+                                const std::vector<std::string>& path,
+                                absl::optional<size_t> max_length);
 };
 
 /**

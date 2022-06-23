@@ -8,11 +8,11 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/formatter/substitution_formatter.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
@@ -20,67 +20,68 @@
 namespace Envoy {
 namespace Router {
 
-  // Related to issue 20389. Header formatters are parsed and processed by formatters defined in 
-  // source/common/formatter/substitution_formatter.cc. For backwards compatibility UPSTREAM_METADATA
-  // and UPSTREAM_METADATA format must be chnaged. Those formatters used to take a JSON format like
-  // UPSTREAM_METADATA(["a", "b"]) and substitution formatters use UPSTREAM_METADATA(a:b) format.
-  // This translator translates UPSTREAM_METADATA and DYNAMIC_METADATA from JSON format to colon format.
-  // TODO(cpakulski): Eventually JSON format should be deprecated in favor of colon format.
+// Related to issue 20389. Header formatters are parsed and processed by formatters defined in
+// source/common/formatter/substitution_formatter.cc. For backwards compatibility UPSTREAM_METADATA
+// and UPSTREAM_METADATA format must be changed. Those formatters used to take a JSON format like
+// UPSTREAM_METADATA(["a", "b"]) and substitution formatters use UPSTREAM_METADATA(a:b) format.
+// This translator translates UPSTREAM_METADATA and DYNAMIC_METADATA from JSON format to colon
+// format.
+// TODO(cpakulski): Eventually JSON format should be deprecated in favor of colon format.
 std::string HeaderParser::translateMetadataFormat(const std::string& header_value) {
-  const std::regex command_w_args_regex(R"EOF(%(UPSTREAM|DYNAMIC)_METADATA\(\s*(\[(?:.|\r?\n)+?\]\s*)\)%)EOF");
-    std::smatch m;
+  const std::regex command_w_args_regex(
+      R"EOF(%(UPSTREAM|DYNAMIC)_METADATA\(\s*(\[(?:.|\r?\n)+?\]\s*)\)%)EOF");
+  std::smatch m;
   std::string new_header_value = header_value;
   while (std::regex_search(new_header_value, m, command_w_args_regex)) {
-  ASSERT(m.size() == 3);
-  std::vector<std::string> params;
+    ASSERT(m.size() == 3);
+    std::vector<std::string> params;
     std::string new_format;
-  TRY_ASSERT_MAIN_THREAD {
-    Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(m.str(2));
+    TRY_ASSERT_MAIN_THREAD {
+      Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(m.str(2));
 
-    // The given json string may be an invalid object.
-    if (!parsed_params) {
-      // return original value
+      // The given json string may be an invalid object.
+      if (!parsed_params) {
+        // return original value
+        return new_header_value;
+      }
+      new_format = parsed_params->asObjectArray()[0]->asString();
+      for (size_t i = 1; i < parsed_params->asObjectArray().size(); i++) {
+        new_format += ":" + parsed_params->asObjectArray()[i]->asString();
+      }
+
+      new_format = "%" + m.str(1) + "_METADATA(" + new_format + ")%";
+
+      auto index = new_header_value.find(m.str(0));
+      new_header_value.replace(index, m.str(0).length(), new_format);
+    }
+    END_TRY
+    catch (Json::Exception& e) {
       return new_header_value;
     }
-    new_format = parsed_params->asObjectArray()[0]->asString();
-    for (size_t i = 1; i < parsed_params->asObjectArray().size(); i++) {
-      new_format += ":" + parsed_params->asObjectArray()[i]->asString();
-    }
-
-    new_format = "%" + m.str(1) + "_METADATA(" + new_format + ")%";
-    
-    auto index = new_header_value.find(m.str(0));
-    new_header_value.replace(index, m.str(0).length(), new_format);
   }
-  END_TRY
-  catch (Json::Exception& e) {
-    return new_header_value;
-  }
-    }
 
   return new_header_value;
 }
 
-  // Related to issue 20389. 
-  // Header's formatter PER_REQUEST_STATE(key) is equivalent to substitution
-  // formatter FILTER_STATE(key:PLAIN). translatePerRequestState method
-  // translates between these 2 formats.
-  // TODO(cpakulski): eventually PER_REQUEST_STATE formatter should be deprecated in
-  // favor of FILTER_STATE.
+// Related to issue 20389.
+// Header's formatter PER_REQUEST_STATE(key) is equivalent to substitution
+// formatter FILTER_STATE(key:PLAIN). translatePerRequestState method
+// translates between these 2 formats.
+// TODO(cpakulski): eventually PER_REQUEST_STATE formatter should be deprecated in
+// favor of FILTER_STATE.
 std::string HeaderParser::translatePerRequestState(const std::string& header_value) {
   const std::regex command_w_args_regex(R"EOF(%PER_REQUEST_STATE\((.+?)\)%)EOF");
-    std::smatch m;
+  std::smatch m;
   std::string new_header_value = header_value;
   while (std::regex_search(new_header_value, m, command_w_args_regex)) {
     ASSERT(m.size() == 2);
     std::string new_format = "%FILTER_STATE(" + m.str(1) + ":PLAIN)%";
-    
+
     auto index = new_header_value.find(m.str(0));
     new_header_value.replace(index, m.str(0).length(), new_format);
-    }
-    return new_header_value;
+  }
+  return new_header_value;
 }
-
 
 namespace {
 
@@ -97,9 +98,8 @@ enum class ParserState {
 
 std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%%", "%"}}); }
 
-
-HeaderFormatterNewPtr  parseInternalNew(const envoy::config::core::v3::HeaderValue& header_value,
-                                 bool append) {
+HeaderFormatterNewPtr parseInternalNew(const envoy::config::core::v3::HeaderValue& header_value,
+                                       bool append) {
   const std::string& key = header_value.key();
   // PGV constraints provide this guarantee.
   ASSERT(!key.empty());
@@ -114,13 +114,15 @@ HeaderFormatterNewPtr  parseInternalNew(const envoy::config::core::v3::HeaderVal
     throw EnvoyException(":-prefixed or host headers may not be modified");
   }
 
-  // UPSTREAM_METADATA and DYNAMIC_METADATA must be translated from JSON ["a", "b"] format to colon format (a:b) 
-  std::string  final_header_value = HeaderParser::translateMetadataFormat(header_value.value());
+  // UPSTREAM_METADATA and DYNAMIC_METADATA must be translated from JSON ["a", "b"] format to colon
+  // format (a:b)
+  std::string final_header_value = HeaderParser::translateMetadataFormat(header_value.value());
   // Change PER_REQUEST_STATE to FILTER_STATE.
   final_header_value = HeaderParser::translatePerRequestState(final_header_value);
 
   // Let the substitution formatter Parse the final_header_value.
-  return std::make_unique<CompoundHeaderFormatterNew>(std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true), append);
+  return std::make_unique<CompoundHeaderFormatterNew>(
+      std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true), append);
 }
 
 // Implements a state machine to parse custom headers. Each character of the custom header format
@@ -128,8 +130,9 @@ HeaderFormatterNewPtr  parseInternalNew(const envoy::config::core::v3::HeaderVal
 // The statement machine does minimal validation of the arguments (if any) and does not know the
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
 // StreamInfoHeaderFormatter.
-// TODO(cpakulski): parseInternal function is executed only when envoy_reloadable_features_unified_header_formatter
-// runtime guard is false. The the guard is deprecated, parseInternal function is not needed.
+// TODO(cpakulski): parseInternal function is executed only when
+// envoy_reloadable_features_unified_header_formatter runtime guard is false. The the guard is
+// deprecated, parseInternal function is not needed.
 HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
                                  bool append) {
   const std::string& key = header_value.key();
@@ -319,11 +322,14 @@ HeaderParserPtr HeaderParser::configure(
   for (const auto& header_value_option : headers_to_add) {
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
     HeaderFormatterNewPtr header_formatter;
-if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-    //header_formatter = std::make_unique<CompoundHeaderFormatterNew>(parseInternalNew(header_value, append), append);
-    header_formatter = parseInternalNew(header_value_option.header(), append);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+      // header_formatter =
+      // std::make_unique<CompoundHeaderFormatterNew>(parseInternalNew(header_value, append),
+      // append);
+      header_formatter = parseInternalNew(header_value_option.header(), append);
     } else {
-    header_formatter = std::make_unique<HeaderFormatterBridge>(parseInternal(header_value_option.header(), append), append);
+      header_formatter = std::make_unique<HeaderFormatterBridge>(
+          parseInternal(header_value_option.header(), append), append);
     }
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),
@@ -334,7 +340,6 @@ if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_for
   return header_parser;
 }
 
-
 HeaderParserPtr HeaderParser::configure(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_add,
     bool append) {
@@ -342,11 +347,14 @@ HeaderParserPtr HeaderParser::configure(
 
   for (const auto& header_value : headers_to_add) {
     HeaderFormatterNewPtr header_formatter;
-if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-    //header_formatter = std::make_unique<CompoundHeaderFormatterNew>(parseInternalNew(header_value, append), append);
-    header_formatter = parseInternalNew(header_value, append);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+      // header_formatter =
+      // std::make_unique<CompoundHeaderFormatterNew>(parseInternalNew(header_value, append),
+      // append);
+      header_formatter = parseInternalNew(header_value, append);
     } else {
-    header_formatter = std::make_unique<HeaderFormatterBridge>(parseInternal(header_value, append), append);
+      header_formatter =
+          std::make_unique<HeaderFormatterBridge>(parseInternal(header_value, append), append);
     }
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value.key()),
@@ -374,23 +382,28 @@ HeaderParserPtr HeaderParser::configure(
   return header_parser;
 }
 
-void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
-    evaluateHeaders(headers, *Http::StaticEmptyHeaders::get().request_headers, *Http::StaticEmptyHeaders::get().response_headers, &stream_info);
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info) const {
+  evaluateHeaders(headers, *Http::StaticEmptyHeaders::get().request_headers,
+                  *Http::StaticEmptyHeaders::get().response_headers, &stream_info);
 }
 
-void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const {
-    evaluateHeaders(headers, *Http::StaticEmptyHeaders::get().request_headers, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
+                                   const StreamInfo::StreamInfo* stream_info) const {
+  evaluateHeaders(headers, *Http::StaticEmptyHeaders::get().request_headers,
+                  *Http::StaticEmptyHeaders::get().response_headers, stream_info);
 }
 
-void HeaderParser::evaluateHeaders( Http::HeaderMap& headers,
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
                                    const Http::RequestHeaderMap& request_headers,
                                    const Http::ResponseHeaderMap& response_headers,
                                    const StreamInfo::StreamInfo& stream_info) const {
-  evaluateHeaders(headers, request_headers, response_headers,  &stream_info);
+  evaluateHeaders(headers, request_headers, response_headers, &stream_info);
 }
 
-void HeaderParser::evaluateHeaders( Http::HeaderMap& headers,const Http::RequestHeaderMap& request_headers,
-                                    const Http::ResponseHeaderMap& response_headers,
+void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
+                                   const Http::RequestHeaderMap& request_headers,
+                                   const Http::ResponseHeaderMap& response_headers,
                                    const StreamInfo::StreamInfo* stream_info) const {
   // Removing headers in the headers_to_remove_ list first makes
   // remove-before-add the default behavior as expected by users.
@@ -400,7 +413,9 @@ void HeaderParser::evaluateHeaders( Http::HeaderMap& headers,const Http::Request
 
   for (const auto& [key, entry] : headers_to_add_) {
     const std::string value =
-        stream_info != nullptr ? entry.formatter_->format(request_headers, response_headers, *stream_info) : entry.original_value_;
+        stream_info != nullptr
+            ? entry.formatter_->format(request_headers, response_headers, *stream_info)
+            : entry.original_value_;
     if (!value.empty() || entry.add_if_empty_) {
       if (entry.formatter_->append()) {
         headers.addReferenceKey(key, value);
@@ -419,7 +434,8 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
 
   for (const auto& [key, entry] : headers_to_add_) {
     if (do_formatting) {
-      const std::string value = entry.formatter_->format(*empty_req_map, *empty_response_map, stream_info);
+      const std::string value =
+          entry.formatter_->format(*empty_req_map, *empty_response_map, stream_info);
       if (!value.empty() || entry.add_if_empty_) {
         if (entry.formatter_->append()) {
           transforms.headers_to_append.push_back({key, value});

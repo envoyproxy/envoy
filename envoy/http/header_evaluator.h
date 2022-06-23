@@ -17,7 +17,7 @@ public:
    *
    * @param headers the target header map to be mutated.
    * @param request_headers request headers to be used in the header manipulation.
-   * @param response_headers response headers to be used in the header manipulation. 
+   * @param response_headers response headers to be used in the header manipulation.
    * @param stream_info the source of values that can be used in the evaluation.
    */
   virtual void evaluateHeaders(Http::HeaderMap& headers,

@@ -177,12 +177,12 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
                                                                    true);
       sendLocalReply(tool_config, *tool_config.route_->directResponseEntry());
       tool_config.route_->directResponseEntry()->finalizeResponseHeaders(
-          *tool_config.response_headers_, *tool_config.request_headers_,stream_info);
+          *tool_config.response_headers_, *tool_config.request_headers_, stream_info);
     } else if (tool_config.route_->routeEntry() != nullptr) {
       tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.request_headers_,
                                                                stream_info, true);
-      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.response_headers_,*tool_config.request_headers_,
-                                                                stream_info);
+      tool_config.route_->routeEntry()->finalizeResponseHeaders(
+          *tool_config.response_headers_, *tool_config.request_headers_, stream_info);
     }
   }
 

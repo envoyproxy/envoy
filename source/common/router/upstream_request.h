@@ -37,8 +37,9 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public GenericConnectionPoolCallbacks,
                         public Event::DeferredDeletable {
 public:
-  UpstreamRequest(RouterFilterInterface& parent, const Http::RequestHeaderMap& request_headers, std::unique_ptr<GenericConnPool>&& conn_pool,
-                  bool can_send_early_data, bool can_use_http3);
+  UpstreamRequest(RouterFilterInterface& parent, const Http::RequestHeaderMap& request_headers,
+                  std::unique_ptr<GenericConnPool>&& conn_pool, bool can_send_early_data,
+                  bool can_use_http3);
   ~UpstreamRequest() override;
 
   // To be called from the destructor, or prior to deferred delete.
@@ -131,7 +132,7 @@ public:
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
   bool hadUpstream() const { return had_upstream_; }
 
-  const Http::RequestHeaderMap& getRequestHeaders() const {return request_headers_;}
+  const Http::RequestHeaderMap& getRequestHeaders() const { return request_headers_; }
 
 private:
   StreamInfo::UpstreamTiming& upstreamTiming() {

@@ -181,7 +181,9 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   ctxt_.set_deadline(abs_deadline);
   // Fill service-wide initial metadata.
   auto initial_metadata = Http::RequestHeaderMapImpl::create();
-  parent_.metadata_parser_->evaluateHeaders(*initial_metadata, *Http::StaticEmptyHeaders::get().request_headers, *Http::StaticEmptyHeaders::get().response_headers, options_.parent_context.stream_info);
+  parent_.metadata_parser_->evaluateHeaders(
+      *initial_metadata, *Http::StaticEmptyHeaders::get().request_headers,
+      *Http::StaticEmptyHeaders::get().response_headers, options_.parent_context.stream_info);
   callbacks_.onCreateInitialMetadata(*initial_metadata);
   initial_metadata->iterate([this](const Http::HeaderEntry& header) {
     ctxt_.AddMetadata(std::string(header.key().getStringView()),

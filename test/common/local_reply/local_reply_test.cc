@@ -378,7 +378,8 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
   response_headers_.addCopy("foo-2", "bar2");
   response_headers_.addCopy("foo-3", "bar3");
   Http::TestRequestHeaderMapImpl request_headers_with_req_id{{"req-id", "123"}};
-  local->rewrite(&request_headers_with_req_id, response_headers_, stream_info_, code_, body_, content_type_);
+  local->rewrite(&request_headers_with_req_id, response_headers_, stream_info_, code_, body_,
+                 content_type_);
   EXPECT_EQ(code_, TestInitCode);
   EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
   EXPECT_EQ(content_type_, "text/plain");
