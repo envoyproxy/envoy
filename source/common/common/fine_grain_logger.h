@@ -17,6 +17,7 @@ using FineGrainLogLevelMap = absl::flat_hash_map<std::string, spdlog::level::lev
 
 constexpr int kLogLevelMax = 6; // spdlog level is in [0, 6].
 constexpr int kLogLevelMin = 0;
+inline const char* kDefaultFineGrainLogFormat = "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v";
 
 /**
  * Data struct that stores the necessary verbosity log update info.
@@ -45,6 +46,12 @@ public:
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
+   * Gets the default verbosity log level.
+   */
+  spdlog::level::level_enum getVerbosityDefaultLevel() const
+      ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
+
+  /**
    * Initializes Fine-Grain Logger, gets log level from setting vector, and registers it in global
    * map if not done.
    */
@@ -58,9 +65,9 @@ public:
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
-   * Sets the default logger level and format when updating context. It should only be used in
-   * Context, otherwise the fine_grain_default_level will possibly be inconsistent with the actual
-   * logger level.
+   * Sets the default verbosity log level and format when updating context. It will update all the
+   * loggers based on new level and verbosity info vector. It is used in Context during
+   * initialization or the enable process.
    */
   void setDefaultFineGrainLogLevelFormat(spdlog::level::level_enum level, const std::string& format)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
@@ -83,7 +90,7 @@ public:
   FineGrainLogLevelMap getAllFineGrainLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
-   * Updates the all the loggers based on the verbosity updates <(file, level) ...>.
+   * Updates all loggers based on the verbosity updates <(file, level) ...>.
    * It supports file basename and glob "*" and "?" pattern, eg. ("foo", 2), ("foo/b*", 3)
    * Patterns including a slash character are matched against full path names, while those
    * without are matched against base names (by removing one suffix) only.
@@ -94,9 +101,21 @@ public:
    * Files are matched against globs in updates in order, and the first match determines
    * the verbosity level.
    *
-   * Files which do not match any pattern use the value of default log level from Context.
+   * Files which do not match any pattern use the default verbosity log level.
    */
   void updateVerbositySetting(const std::vector<std::pair<absl::string_view, int>>& updates)
+      ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
+
+  /**
+   * Updates all loggers based on the new default verbosity log level.
+   * The default verbosity log level is overridable if the verbosity update vector is not empty.
+   * All the loggers which are not matched with verbosity_update_info_ are set to new default
+   * log level.
+   *
+   * verbosity_default_level_ could be different from fine_grain_default_level_ in Context after
+   * calling this method.
+   */
+  void updateVerbosityDefaultLevel(spdlog::level::level_enum level)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
@@ -127,15 +146,16 @@ private:
 
   /**
    * Returns the current log level of `file`. Default log level is used if there is no
-   * match in log_update_info_.
+   * match in verbosity_update_info_.
    */
   spdlog::level::level_enum getLogLevel(absl::string_view file) const
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(fine_grain_log_lock_);
+      ABSL_SHARED_LOCKS_REQUIRED(fine_grain_log_lock_);
 
   /**
-   * Lock for the following global map and update vector (not for the corresponding loggers).
+   * Lock for the following global map, update vector, and default log level
+   * (not for the corresponding loggers).
    */
-  absl::Mutex fine_grain_log_lock_;
+  mutable absl::Mutex fine_grain_log_lock_;
 
   /**
    * Map that stores <key, logger> pairs, key can be the file name.
@@ -145,8 +165,16 @@ private:
 
   /**
    * Vector that stores <update, level> pairs, key can be the file basename or glob expressions.
+   * It will override the default verbosity log level.
    */
-  std::vector<VerbosityLogUpdateInfo> log_update_info_ ABSL_GUARDED_BY(fine_grain_log_lock_);
+  std::vector<VerbosityLogUpdateInfo> verbosity_update_info_ ABSL_GUARDED_BY(fine_grain_log_lock_);
+
+  /**
+   * Default verbosity log level. It could be different from fine_grain_default_level_ in Context.
+   * It is overridable if verbosity_update_info_ is not empty.
+   */
+  spdlog::level::level_enum
+      verbosity_default_level_ ABSL_GUARDED_BY(fine_grain_log_lock_) = spdlog::level::info;
 };
 
 FineGrainLogContext& getFineGrainLogContext();
