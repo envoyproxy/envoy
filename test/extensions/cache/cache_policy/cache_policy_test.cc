@@ -18,8 +18,6 @@
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
-
-// TODO: move to /test/envoy/extensions/cache/cache_policy/cache_policy_test.cc
 namespace Envoy {
 namespace Extensions {
 namespace Cache {

@@ -12,6 +12,7 @@ envoy_cc_library(
     hdrs = ["cache_policy.h"],
     visibility = [
         "//source/extensions/filters/http/cache:__subpackages__",
+        "//test/extensions/cache/cache_policy:__subpackages__",
         "//test/extensions/filters/http/cache:__subpackages__",
     ],
     deps = [
