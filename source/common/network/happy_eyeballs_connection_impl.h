@@ -40,6 +40,7 @@ public:
                               Address::InstanceConstSharedPtr source_address,
                               UpstreamTransportSocketFactory& socket_factory,
                               TransportSocketOptionsConstSharedPtr transport_socket_options,
+                              const Upstream::HostDescriptionConstSharedPtr& host,
                               const ConnectionSocket::OptionsSharedPtr options);
 
   ~HappyEyeballsConnectionImpl() override;
@@ -199,6 +200,7 @@ private:
     Address::InstanceConstSharedPtr source_address_;
     UpstreamTransportSocketFactory& socket_factory_;
     TransportSocketOptionsConstSharedPtr transport_socket_options_;
+    const Upstream::HostDescriptionConstSharedPtr host_;
     const ConnectionSocket::OptionsSharedPtr options_;
   };
 
