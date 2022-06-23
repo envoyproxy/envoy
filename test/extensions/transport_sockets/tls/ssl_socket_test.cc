@@ -955,14 +955,12 @@ TEST_P(SslSocketTest, ServerTransportSocketOptions) {
   ContextManagerImpl manager(time_system_);
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
-  Network::TransportSocketOptionsConstSharedPtr transport_socket_options(
-      new Network::TransportSocketOptionsImpl());
-  auto ssl_socket = server_ssl_socket_factory.createTransportSocket(transport_socket_options);
+  auto ssl_socket = server_ssl_socket_factory.createDownstreamTransportSocket();
   auto ssl_handshaker = dynamic_cast<const SslHandshakerImpl*>(ssl_socket->ssl().get());
   auto shared_ptr_ptr = static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(
       SSL_get_app_data(ssl_handshaker->ssl()));
   ASSERT_NE(nullptr, shared_ptr_ptr);
-  EXPECT_EQ(transport_socket_options.get(), (*shared_ptr_ptr).get());
+  EXPECT_EQ(nullptr, (*shared_ptr_ptr).get());
 }
 
 TEST_P(SslSocketTest, GetCertDigest) {
