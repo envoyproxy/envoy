@@ -413,7 +413,9 @@ private:
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
-    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+    Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
+      return connection_balancer_;
+    }
     ResourceLimit& openConnections() override { return open_connections_; }
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;

@@ -6710,10 +6710,15 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
   extend_balance_config->mutable_typed_config()->set_type_url(
       "type.googleapis.com/google.protobuf.test");
 
+  auto listener_impl = ListenerImpl(listener, "version", *manager_, "foo", true, false,
+                                    /*hash=*/static_cast<uint64_t>(0), 1);
+  auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+  EXPECT_CALL(*socket_factory, localAddress()).WillOnce(ReturnRef(address));
   EXPECT_THROW_WITH_MESSAGE(
-      new ListenerImpl(listener, "version", *manager_, "foo", true, false,
-                       /*hash=*/static_cast<uint64_t>(0), 1),
-      EnvoyException, "Didn't find a registered implementation for type: 'google.protobuf.test'");
+      listener_impl.addSocketFactory(std::move(socket_factory)), EnvoyException,
+      "Didn't find a registered implementation for type: 'google.protobuf.test'");
 #endif
 }
 
@@ -6723,8 +6728,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
   auto listener = createIPv4Listener("TCPListener");
   listener.mutable_connection_balance_config();
 
-  EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0), 1),
+  auto listener_impl = ListenerImpl(listener, "version", *manager_, "foo", true, false,
+                                    /*hash=*/static_cast<uint64_t>(0), 1);
+  auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+  EXPECT_CALL(*socket_factory, localAddress()).WillOnce(ReturnRef(address));
+  EXPECT_THROW_WITH_MESSAGE(listener_impl.addSocketFactory(std::move(socket_factory)),
                             EnvoyException, "No valid balance type for connection balance");
 #endif
 }
