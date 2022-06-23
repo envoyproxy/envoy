@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/tcp/conn_pool.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/singleton/const_singleton.h"
 
@@ -229,6 +231,32 @@ enum class AppExceptionType {
   ChecksumMismatch = 14,
   Interruption = 15,
 };
+
+/**
+ * Names of available reply types.
+ */
+class PoolFailureReasonNameValues {
+public:
+  const std::string OVERFLOW = "overflow";
+  const std::string LOCAL_CONNECTION_FAILURE = "local connection failure";
+  const std::string REMOTE_CONNECTION_FAILURE = "remote connection failure";
+  const std::string TIMEOUT = "timeout";
+
+  const std::string& fromReason(ConnectionPool::PoolFailureReason reason) const {
+    switch (reason) {
+    case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+      return LOCAL_CONNECTION_FAILURE;
+    case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+      return REMOTE_CONNECTION_FAILURE;
+    case ConnectionPool::PoolFailureReason::Timeout:
+      return TIMEOUT;
+    case ConnectionPool::PoolFailureReason::Overflow:
+      return OVERFLOW;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+};
+using PoolFailureReasonNames = ConstSingleton<PoolFailureReasonNameValues>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters
