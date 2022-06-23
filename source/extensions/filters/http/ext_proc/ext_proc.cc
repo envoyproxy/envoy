@@ -647,8 +647,8 @@ void Filter::onMessageTimeout() {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
     closeStream();
-    decoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
-    encoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
+    decoding_state_.onFinishCall();
+    encoding_state_.onFinishCall();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
@@ -666,8 +666,8 @@ void Filter::clearAsyncState() {
 // Regardless of the current state, ensure that the timers won't fire
 // again.
 void Filter::cleanUpTimers() {
-  decoding_state_.cleanUpTimer();
-  encoding_state_.cleanUpTimer();
+  decoding_state_.onFinishCall();
+  encoding_state_.onFinishCall();
 }
 
 static const ImmediateMutationChecker& immediateResponseChecker() {

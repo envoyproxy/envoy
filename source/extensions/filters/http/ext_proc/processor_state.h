@@ -87,7 +87,6 @@ public:
   ProcessorState& operator=(const ProcessorState&) = delete;
 
   CallbackState callbackState() const { return callback_state_; }
-  void setCallbackState(CallbackState state) { callback_state_ = state; }
   void setPaused(bool paused) { paused_ = paused; }
 
   bool completeBodyAvailable() const { return complete_body_available_; }
@@ -111,7 +110,6 @@ public:
   void onStartCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                    CallbackState callback_state);
   void onFinishCall(CallbackState next_state = CallbackState::Idle);
-  void cleanUpTimer() const;
 
   // Idempotent methods for watermarking the body
   virtual void requestWatermark() PURE;

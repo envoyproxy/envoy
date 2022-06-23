@@ -301,7 +301,7 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 }
 
 void ProcessorState::clearAsyncState() {
-  cleanUpTimer();
+  onFinishCall();
   while (auto queued_chunk = dequeueStreamingChunk(false)) {
     auto chunk = std::move(*queued_chunk);
     ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk->data.length());
@@ -309,13 +309,6 @@ void ProcessorState::clearAsyncState() {
   }
   clearWatermark();
   continueIfNecessary();
-  callback_state_ = CallbackState::Idle;
-}
-
-void ProcessorState::cleanUpTimer() const {
-  if (message_timer_ && message_timer_->enabled()) {
-    message_timer_->disableTimer();
-  }
 }
 
 void ProcessorState::setBodyMode(ProcessingMode_BodySendMode body_mode) {
