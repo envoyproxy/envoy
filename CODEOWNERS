@@ -43,6 +43,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/transport_sockets/common @alyssawilk @wez470
 # starttls transport socket
 /*/extensions/transport_sockets/starttls @cpakulski @lizan
+# internal upstream transport socket
+/*/extensions/transport_sockets/internal_upstream @kyessenov @lambdai
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # sni_dynamic_forward_proxy extension
@@ -53,6 +55,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/tracers/xray @abaptiste @suniltheta @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @lizan @Shikugawa
+# tracers.opentelemetry extension
+/*/extensions/tracers/opentelemetry @alexanderellis @htuch
 # quic extension
 /*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # UDP packet writer

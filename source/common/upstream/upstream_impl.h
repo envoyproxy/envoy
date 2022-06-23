@@ -289,13 +289,14 @@ public:
   void used(bool new_used) override { used_ = new_used; }
 
 protected:
-  static Network::ClientConnectionPtr
+  static CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    const Network::Address::InstanceConstSharedPtr& address,
                    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
                    Network::UpstreamTransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   Network::TransportSocketOptionsConstSharedPtr transport_socket_options);
+                   Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+                   HostDescriptionConstSharedPtr host);
 
 private:
   void setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status);

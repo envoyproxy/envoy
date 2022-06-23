@@ -56,10 +56,12 @@ TapSocketFactory::TapSocketFactory(
                           singleton_manager, tls, main_thread_dispatcher),
       PassthroughFactory(std::move(transport_socket_factory)) {}
 
-Network::TransportSocketPtr TapSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr options) const {
-  return std::make_unique<TapSocket>(currentConfigHelper<SocketTapConfig>(),
-                                     transport_socket_factory_->createTransportSocket(options));
+Network::TransportSocketPtr
+TapSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                                        Upstream::HostDescriptionConstSharedPtr host) const {
+  return std::make_unique<TapSocket>(
+      currentConfigHelper<SocketTapConfig>(),
+      transport_socket_factory_->createTransportSocket(options, host));
 }
 
 DownstreamTapSocketFactory::DownstreamTapSocketFactory(
