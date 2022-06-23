@@ -431,6 +431,12 @@ void UpstreamRequest::onPoolReady(
     // here.
     parent_.requestVcluster()->stats().upstream_rq_total_.inc();
   }
+  if (parent_.routeStatsContext().has_value()) {
+    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
+    // callback. Hence, the upstream request increases the route level upstream_rq_total_ stat
+    // here.
+    parent_.routeStatsContext()->stats().upstream_rq_total_.inc();
+  }
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 

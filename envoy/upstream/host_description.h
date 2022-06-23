@@ -148,7 +148,7 @@ public:
   /**
    * @return the transport socket factory responsible for this host.
    */
-  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual Network::UpstreamTransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
    * @return the address used to connect to the host.
@@ -220,10 +220,10 @@ struct TransportSocketMatchStats {
 class TransportSocketMatcher {
 public:
   struct MatchData {
-    MatchData(Network::TransportSocketFactory& factory, TransportSocketMatchStats& stats,
+    MatchData(Network::UpstreamTransportSocketFactory& factory, TransportSocketMatchStats& stats,
               std::string name)
         : factory_(factory), stats_(stats), name_(std::move(name)) {}
-    Network::TransportSocketFactory& factory_;
+    Network::UpstreamTransportSocketFactory& factory_;
     TransportSocketMatchStats& stats_;
     std::string name_;
   };

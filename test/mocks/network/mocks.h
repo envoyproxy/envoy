@@ -229,7 +229,7 @@ public:
   ~MockFilterChain() override;
 
   // Network::DrainableFilterChain
-  MOCK_METHOD(const TransportSocketFactory&, transportSocketFactory, (), (const));
+  MOCK_METHOD(const DownstreamTransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, transportSocketConnectTimeout, (), (const));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());
@@ -427,6 +427,7 @@ public:
   MOCK_METHOD(FilterChainManager&, filterChainManager, ());
   MOCK_METHOD(FilterChainFactory&, filterChainFactory, ());
   MOCK_METHOD(ListenSocketFactory&, listenSocketFactory, ());
+  MOCK_METHOD(std::vector<ListenSocketFactoryPtr>&, listenSocketFactories, ());
   MOCK_METHOD(bool, bindToPort, ());
   MOCK_METHOD(bool, handOffRestoredDestinationConnections, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
@@ -437,7 +438,7 @@ public:
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(Network::UdpListenerConfigOptRef, udpListenerConfig, ());
   MOCK_METHOD(InternalListenerConfigOptRef, internalListenerConfig, ());
-  MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
+  MOCK_METHOD(ConnectionBalancer&, connectionBalancer, (const Network::Address::Instance&));
   MOCK_METHOD(ResourceLimit&, openConnections, ());
   MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
   MOCK_METHOD(Init::Manager&, initManager, ());

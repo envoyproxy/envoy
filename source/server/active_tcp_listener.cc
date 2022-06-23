@@ -14,28 +14,34 @@ namespace Server {
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerConfig& config, Runtime::Loader& runtime,
-                                     uint32_t worker_index)
-    : OwnedActiveStreamListenerBase(parent, parent.dispatcher(),
-                                    parent.dispatcher().createListener(
-                                        config.listenSocketFactory().getListenSocket(worker_index),
-                                        *this, runtime, config.bindToPort(),
-                                        config.ignoreGlobalConnLimit()),
-                                    config),
-      tcp_conn_handler_(parent) {
-  config.connectionBalancer().registerHandler(*this);
+                                     Network::SocketSharedPtr&& socket,
+                                     Network::Address::InstanceConstSharedPtr& listen_address,
+                                     Network::ConnectionBalancer& connection_balancer)
+    : OwnedActiveStreamListenerBase(
+          parent, parent.dispatcher(),
+          parent.dispatcher().createListener(std::move(socket), *this, runtime, config.bindToPort(),
+                                             config.ignoreGlobalConnLimit()),
+          config),
+      tcp_conn_handler_(parent), connection_balancer_(connection_balancer),
+      listen_address_(listen_address) {
+  connection_balancer_.registerHandler(*this);
 }
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,
-                                     Network::ListenerConfig& config, Runtime::Loader&)
+                                     Network::Address::InstanceConstSharedPtr& listen_address,
+                                     Network::ListenerConfig& config,
+                                     Network::ConnectionBalancer& connection_balancer,
+                                     Runtime::Loader&)
     : OwnedActiveStreamListenerBase(parent, parent.dispatcher(), std::move(listener), config),
-      tcp_conn_handler_(parent) {
-  config.connectionBalancer().registerHandler(*this);
+      tcp_conn_handler_(parent), connection_balancer_(connection_balancer),
+      listen_address_(listen_address) {
+  connection_balancer_.registerHandler(*this);
 }
 
 ActiveTcpListener::~ActiveTcpListener() {
   is_deleting_ = true;
-  config_->connectionBalancer().unregisterHandler(*this);
+  connection_balancer_.unregisterHandler(*this);
 
   // Purge sockets that have not progressed to connections. This should only happen when
   // a listener filter stops iteration and never resumes.
@@ -65,7 +71,6 @@ ActiveTcpListener::~ActiveTcpListener() {
 
 void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
   ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
-  ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
   config_ = &config;
 }
 
@@ -98,7 +103,7 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                                        bool rebalanced) {
   if (!rebalanced) {
     Network::BalancedConnectionHandler& target_handler =
-        config_->connectionBalancer().pickTargetHandler(*this);
+        connection_balancer_.pickTargetHandler(*this);
     if (&target_handler != this) {
       target_handler.post(std::move(socket));
       return;
@@ -153,10 +158,10 @@ void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {
   RebalancedSocketSharedPtr socket_to_rebalance = std::make_shared<RebalancedSocket>();
   socket_to_rebalance->socket = std::move(socket);
 
-  dispatcher().post([socket_to_rebalance, tag = config_->listenerTag(),
+  dispatcher().post([socket_to_rebalance, address = listen_address_, tag = config_->listenerTag(),
                      &tcp_conn_handler = tcp_conn_handler_,
                      handoff = config_->handOffRestoredDestinationConnections()]() {
-    auto balanced_handler = tcp_conn_handler.getBalancedHandlerByTag(tag);
+    auto balanced_handler = tcp_conn_handler.getBalancedHandlerByTag(tag, *address);
     if (balanced_handler.has_value()) {
       balanced_handler->get().onAcceptWorker(std::move(socket_to_rebalance->socket), handoff, true);
       return;

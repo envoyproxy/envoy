@@ -151,7 +151,10 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
 
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
-
+  mockHost().cluster_.cluster_socket_options_ = std::make_shared<Network::Socket::Options>();
+  std::shared_ptr<Network::MockSocketOption> cluster_socket_option{new Network::MockSocketOption()};
+  mockHost().cluster_.cluster_socket_options_->push_back(cluster_socket_option);
+  EXPECT_CALL(*cluster_socket_option, setOption(_, _)).Times(3u);
   EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
