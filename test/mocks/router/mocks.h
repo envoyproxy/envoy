@@ -49,7 +49,7 @@ public:
 
   // DirectResponseEntry
   MOCK_METHOD(void, finalizeResponseHeaders,
-              (const Http::RequestHeaderMap&, Http::ResponseHeaderMap&, const StreamInfo::StreamInfo& stream_info),
+              (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&, const StreamInfo::StreamInfo& stream_info),
               (const));
   MOCK_METHOD(Http::HeaderTransforms, responseHeaderTransforms,
               (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
@@ -364,7 +364,7 @@ public:
   MOCK_METHOD(Http::HeaderTransforms, requestHeaderTransforms,
               (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
   MOCK_METHOD(void, finalizeResponseHeaders,
-              (const Http::RequestHeaderMap&, Http::ResponseHeaderMap & headers, const StreamInfo::StreamInfo& stream_info),
+              (Http::ResponseHeaderMap & headers, const Http::RequestHeaderMap&, const StreamInfo::StreamInfo& stream_info),
               (const));
   MOCK_METHOD(Http::HeaderTransforms, responseHeaderTransforms,
               (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));

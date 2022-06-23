@@ -795,7 +795,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 }
 
-void RouteEntryImplBase::finalizeResponseHeaders(const Http::RequestHeaderMap& request_headers, Http::ResponseHeaderMap& headers,
+void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,const Http::RequestHeaderMap& request_headers, 
                                                  const StreamInfo::StreamInfo& stream_info) const {
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
