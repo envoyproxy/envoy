@@ -942,7 +942,7 @@ envoy.transport_sockets.internal_upstream:
   security_posture: unknown
   status: wip
   type_urls:
-  - envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstream
+  - envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
 envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream
