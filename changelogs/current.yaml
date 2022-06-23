@@ -4,12 +4,11 @@ behavior_changes:
 - area: tls-inspector
   change: |
     the listener filter tls inspector's stats ``connection_closed`` and ``read_error`` are removed. The new stats are introduced for listener, ``downstream_peek_remote_close`` and ``read_error`` :ref:`listener stats <config_listener_stats>`.
-- area: stats listener
 - area: config
   change: |
     Multiple SDS resources of multiple clusters or listeners are sent in a single SDS requests, instead of multiple SDS requests.
     This behavioral change can be reverted by setting ``envoy.reloadable_features.combine_sds_requests`` to false.
-- area: listener
+- area: stats listener
   change: |
     Fixed metric tag extraction so that :ref:stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>
     is properly extracted. This changes the Prometheus name from
