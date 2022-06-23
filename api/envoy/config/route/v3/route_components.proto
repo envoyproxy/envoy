@@ -559,7 +559,6 @@ message RouteMatch {
     // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
     string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
 
-    // [#not-implemented-hide:]
     // If specified, the route is a template match rule meaning that the
     // ``:path`` header (without the query string) must match the given
     // ``path_template_match`` pattern.
@@ -585,6 +584,7 @@ message RouteMatch {
     // * ``/videos/{file}`` would match ``/videos/1080p5000_00001.m4s``
     //
     // * ``/**.mpd`` would match ``/content/123/india/dash/55/manifest.mpd``
+    // [#not-implemented-hide:]
     string path_template_match = 15
         [(validate.rules).string = {min_len: 1 max_len: 256 ignore_empty: true}];
   }
@@ -1088,7 +1088,6 @@ message RouteAction {
   //   ``/aaa/yyy/bbb``.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
 
-  // [#not-implemented-hide:]
   // Indicates that during forwarding, portions of the path that match the
   // pattern should be rewritten, even allowing the substitution of variables
   // from the match pattern into the new path as specified by the rewrite template.
@@ -1129,6 +1128,7 @@ message RouteAction {
   // * The path pattern ``/content/{format}/{lang}/{id}/{file}.vtt`` paired with a substitution
   //   string of ``/{lang}/{format}/{file}.vtt`` would transform ``/content/hls/en-us/12345/en_193913.vtt``
   //   into ``/en-us/hls/en_193913.vtt``.
+  // [#not-implemented-hide:]
   string path_template_rewrite = 41
       [(validate.rules).string = {min_len: 1 max_len: 256 ignore_empty: true}];
 
