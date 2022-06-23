@@ -105,24 +105,43 @@ private:
   bool using_tls_{false};
 };
 
-class StartTlsSocketFactory : public Network::CommonTransportSocketFactory,
+class StartTlsSocketFactory : public Network::CommonUpstreamTransportSocketFactory,
                               Logger::Loggable<Logger::Id::config> {
 public:
   ~StartTlsSocketFactory() override = default;
 
-  StartTlsSocketFactory(Network::TransportSocketFactoryPtr raw_socket_factory,
-                        Network::TransportSocketFactoryPtr tls_socket_factory)
+  StartTlsSocketFactory(Network::UpstreamTransportSocketFactoryPtr raw_socket_factory,
+                        Network::UpstreamTransportSocketFactoryPtr tls_socket_factory)
       : raw_socket_factory_(std::move(raw_socket_factory)),
         tls_socket_factory_(std::move(tls_socket_factory)) {}
 
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr host) const override;
   bool implementsSecureTransport() const override { return false; }
   absl::string_view defaultServerNameIndication() const override { return ""; }
 
 private:
-  Network::TransportSocketFactoryPtr raw_socket_factory_;
-  Network::TransportSocketFactoryPtr tls_socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr raw_socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr tls_socket_factory_;
+};
+
+class StartTlsDownstreamSocketFactory : public Network::DownstreamTransportSocketFactory,
+                                        Logger::Loggable<Logger::Id::config> {
+public:
+  ~StartTlsDownstreamSocketFactory() override = default;
+
+  StartTlsDownstreamSocketFactory(Network::DownstreamTransportSocketFactoryPtr raw_socket_factory,
+                                  Network::DownstreamTransportSocketFactoryPtr tls_socket_factory)
+      : raw_socket_factory_(std::move(raw_socket_factory)),
+        tls_socket_factory_(std::move(tls_socket_factory)) {}
+
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override;
+  bool implementsSecureTransport() const override { return false; }
+
+private:
+  Network::DownstreamTransportSocketFactoryPtr raw_socket_factory_;
+  Network::DownstreamTransportSocketFactoryPtr tls_socket_factory_;
 };
 
 } // namespace StartTls

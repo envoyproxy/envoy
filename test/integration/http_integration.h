@@ -231,6 +231,7 @@ protected:
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
   void testRouterVirtualClusters();
+  void testRouteStats();
   void testRouterUpstreamProtocolError(const std::string&, const std::string&);
 
   void testRouterRequestAndResponseWithBody(
@@ -300,7 +301,7 @@ protected:
   // Prefix listener stat with IP:port, including IP version dependent loopback address.
   std::string listenerStatPrefix(const std::string& stat_name);
 
-  Network::TransportSocketFactoryPtr quic_transport_socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr quic_transport_socket_factory_;
   // Must outlive |codec_client_| because it may not close connection till the end of its life
   // scope.
   std::unique_ptr<Http::PersistentQuicInfo> quic_connection_persistent_info_;

@@ -528,6 +528,12 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  const RouteStatsContextOptRef routeStatsContext() const override {
+    if (route_stats_context_ != nullptr) {
+      return *route_stats_context_;
+    }
+    return RouteStatsContextOptRef();
+  }
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
   }
@@ -735,6 +741,9 @@ public:
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return parent_->connectConfig();
     }
+    const RouteStatsContextOptRef routeStatsContext() const override {
+      return parent_->routeStatsContext();
+    }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
     const EarlyDataPolicy& earlyDataPolicy() const override { return parent_->earlyDataPolicy(); }
 
@@ -932,6 +941,7 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const bool append_xfh_;
   const std::string cluster_name_;
+  RouteStatsContextPtr route_stats_context_;
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;

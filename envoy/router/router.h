@@ -531,10 +531,37 @@ using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
   STATNAME(vhost)
 
 /**
+ * All route level stats. @see stats_macro.h
+ */
+#define ALL_ROUTE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                         \
+  COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
+  COUNTER(upstream_rq_retry_overflow)                                                              \
+  COUNTER(upstream_rq_retry_success)                                                               \
+  COUNTER(upstream_rq_timeout)                                                                     \
+  COUNTER(upstream_rq_total)                                                                       \
+  STATNAME(route)                                                                                  \
+  STATNAME(vhost)
+
+/**
  * Struct definition for all virtual cluster stats. @see stats_macro.h
  */
 MAKE_STAT_NAMES_STRUCT(VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
+
+/**
+ * Struct definition for all route level stats. @see stats_macro.h
+ */
+MAKE_STAT_NAMES_STRUCT(RouteStatNames, ALL_ROUTE_STATS);
+MAKE_STATS_STRUCT(RouteStats, RouteStatNames, ALL_ROUTE_STATS);
+
+/**
+ * RouteStatsContext defines config needed to generate all route level stats.
+ */
+class RouteStatsContext;
+
+using RouteStatsContextPtr = std::unique_ptr<RouteStatsContext>;
+using RouteStatsContextOptRef = OptRef<RouteStatsContext>;
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -1028,6 +1055,11 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+
+  /**
+   * @return RouteStatsContextOptRef the config needed to generate route level stats.
+   */
+  virtual const RouteStatsContextOptRef routeStatsContext() const PURE;
 
   /**
    * @return EarlyDataPolicy& the configured early data option.

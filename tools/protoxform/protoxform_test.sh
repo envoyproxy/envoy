@@ -15,7 +15,10 @@ PROTO_TARGETS=()
 protos=$(bazel query "labels(srcs, labels(deps, //tools/testdata/protoxform:fix_protos))")
 while read -r line; do PROTO_TARGETS+=("$line"); done \
     <<< "$protos"
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
-  //tools/testdata/protoxform:fix_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint
+
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+    --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+    //tools/protoxform:test_protoxform
+
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoprint
 ./tools/protoxform/protoxform_test_helper.py fix "${PROTO_TARGETS[@]}"

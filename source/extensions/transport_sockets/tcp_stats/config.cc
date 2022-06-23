@@ -14,9 +14,7 @@ namespace TcpStats {
 
 TcpStatsSocketFactory::TcpStatsSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& context,
-    const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
-    Network::TransportSocketFactoryPtr&& inner_factory)
-    : PassthroughFactory(std::move(inner_factory)) {
+    const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config) {
 #if defined(__linux__)
   config_ = std::make_shared<Config>(config, context.scope());
 #else
@@ -26,16 +24,44 @@ TcpStatsSocketFactory::TcpStatsSocketFactory(
 #endif
 }
 
-Network::TransportSocketPtr TcpStatsSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr options) const {
+UpstreamTcpStatsSocketFactory::UpstreamTcpStatsSocketFactory(
+    Server::Configuration::TransportSocketFactoryContext& context,
+    const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
+    Network::UpstreamTransportSocketFactoryPtr&& inner_factory)
+    : TcpStatsSocketFactory(context, config), PassthroughFactory(std::move(inner_factory)) {}
+
+Network::TransportSocketPtr UpstreamTcpStatsSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsConstSharedPtr options,
+    Upstream::HostDescriptionConstSharedPtr host) const {
 #if defined(__linux__)
-  auto inner_socket = transport_socket_factory_->createTransportSocket(options);
+  auto inner_socket = transport_socket_factory_->createTransportSocket(options, host);
   if (inner_socket == nullptr) {
     return nullptr;
   }
   return std::make_unique<TcpStatsSocket>(config_, std::move(inner_socket));
 #else
   UNREFERENCED_PARAMETER(options);
+  UNREFERENCED_PARAMETER(host);
+  return nullptr;
+#endif
+}
+
+DownstreamTcpStatsSocketFactory::DownstreamTcpStatsSocketFactory(
+    Server::Configuration::TransportSocketFactoryContext& context,
+    const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
+    Network::DownstreamTransportSocketFactoryPtr&& inner_factory)
+    : TcpStatsSocketFactory(context, config),
+      DownstreamPassthroughFactory(std::move(inner_factory)) {}
+
+Network::TransportSocketPtr
+DownstreamTcpStatsSocketFactory::createDownstreamTransportSocket() const {
+#if defined(__linux__)
+  auto inner_socket = transport_socket_factory_->createDownstreamTransportSocket();
+  if (inner_socket == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<TcpStatsSocket>(config_, std::move(inner_socket));
+#else
   return nullptr;
 #endif
 }
@@ -52,7 +78,7 @@ class UpstreamTcpStatsConfigFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
       public TcpStatsConfigFactory {
 public:
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override {
     const auto& outer_config = MessageUtil::downcastAndValidate<
@@ -67,8 +93,8 @@ public:
                                                          inner_config_factory);
     auto inner_transport_factory =
         inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
-    return std::make_unique<TcpStatsSocketFactory>(context, outer_config,
-                                                   std::move(inner_transport_factory));
+    return std::make_unique<UpstreamTcpStatsSocketFactory>(context, outer_config,
+                                                           std::move(inner_transport_factory));
   }
 };
 
@@ -76,7 +102,7 @@ class DownstreamTcpStatsConfigFactory
     : public Server::Configuration::DownstreamTransportSocketConfigFactory,
       public TcpStatsConfigFactory {
 public:
-  Network::TransportSocketFactoryPtr
+  Network::DownstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) override {
@@ -92,8 +118,8 @@ public:
                                                          inner_config_factory);
     auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
         *inner_factory_config, context, server_names);
-    return std::make_unique<TcpStatsSocketFactory>(context, outer_config,
-                                                   std::move(inner_transport_factory));
+    return std::make_unique<DownstreamTcpStatsSocketFactory>(context, outer_config,
+                                                             std::move(inner_transport_factory));
   }
 };
 

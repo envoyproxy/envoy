@@ -92,7 +92,7 @@ public:
   fromFilterState(const StreamInfo::FilterStateSharedPtr& stream_info);
 };
 
-class CommonTransportSocketFactory : public TransportSocketFactory {
+class CommonUpstreamTransportSocketFactory : public UpstreamTransportSocketFactory {
 public:
   /**
    * Compute the generic hash key from the transport socket options.

@@ -7,13 +7,14 @@ namespace Network {
 
 HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
     Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
-    Address::InstanceConstSharedPtr source_address, TransportSocketFactory& socket_factory,
+    Address::InstanceConstSharedPtr source_address, UpstreamTransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
+    const Upstream::HostDescriptionConstSharedPtr& host,
     const ConnectionSocket::OptionsSharedPtr options)
     : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher),
       address_list_(sortAddresses(address_list)),
       connection_construction_state_(
-          {source_address, socket_factory, transport_socket_options, options}),
+          {source_address, socket_factory, transport_socket_options, host, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_new_cx", "[C{}] addresses={}", id_, address_list_.size());
   connections_.push_back(createNextConnection());
@@ -432,7 +433,8 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
   auto connection = dispatcher_.createClientConnection(
       address_list_[next_address_++], connection_construction_state_.source_address_,
       connection_construction_state_.socket_factory_.createTransportSocket(
-          connection_construction_state_.transport_socket_options_),
+          connection_construction_state_.transport_socket_options_,
+          connection_construction_state_.host_),
       connection_construction_state_.options_);
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id_, next_address_);
   callbacks_wrappers_.push_back(std::make_unique<ConnectionCallbacksWrapper>(*this, *connection));
