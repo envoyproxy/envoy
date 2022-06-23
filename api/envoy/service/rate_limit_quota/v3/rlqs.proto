@@ -35,12 +35,17 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // The first report sent by the data plane is interpreted by the RLQS server as a "watch" request,
 // indicating that the data plane instance is interested in receiving further updates for the
 // ``BucketId``. From then on, RLQS server may push assignments to this instance at will, even if
-// the instance is not sending usage reports. It's on the RLQS server to decide when the instance
-// didn't send reports for too long, and issue an assignment with ``AbandonAction``, telling the
-// client it will no longer send updates for the ``BucketId``.
+// the instance is not sending usage reports. It's the responsibility of the RLQS server
+// to determine when the data plane instance didn't send ``BucketId`` reports for too long,
+// and to respond with the :ref:`AbandonAction
+// <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction>`,
+// indicating that the server has now stopped sending quota assignments for the ``BucketId`` bucket,
+// and the data plane instance should :ref:`abandon
+// <envoy_v3_api_field_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.abandon_action>`
+// it.
 //
 // Refer to Rate Limit Quota :ref:`configuration overview <config_http_filters_rate_limit_quota>`
-// for the details.
+// for further details.
 
 // Defines the Rate Limit Quota Service (RLQS).
 service RateLimitQuotaService {
