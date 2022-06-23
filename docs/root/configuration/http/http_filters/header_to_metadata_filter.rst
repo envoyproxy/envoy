@@ -105,7 +105,6 @@ dynamic metadata, this filter supports regex matching and substitution:
               key: cluster
               regex_value_rewrite:
                 pattern:
-                  google_re2: {}
                   regex: "^/(cluster[\\d\\w-]+)/?.*$"
                 substitution: "\\1"
 
