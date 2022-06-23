@@ -6863,9 +6863,11 @@ request_headers_to_add:
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-    EXPECT_THROW_WITH_MESSAGE(EnvoyException,
-                              "Invalid header configuration. Un-terminated variable expression "
-                              "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+        EnvoyException,
+        "Invalid header configuration. Un-terminated variable expression "
+        "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
   } else {
     EXPECT_THROW(
         TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),

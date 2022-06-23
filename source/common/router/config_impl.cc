@@ -752,7 +752,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
     header_parser->evaluateHeaders(headers, headers,
-                                   *Http::StaticEmptyHeaders::get().request_headers, stream_info);
+                                   *Http::StaticEmptyHeaders::get().response_headers, stream_info);
   }
 
   // Restore the port if this was a CONNECT request.
