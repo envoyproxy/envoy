@@ -20,18 +20,19 @@ struct SupportedCommands {
    */
   static const absl::flat_hash_set<std::string>& simpleCommands() {
     CONSTRUCT_ON_FIRST_USE(
-        absl::flat_hash_set<std::string>, "append", "bitcount", "bitfield", "bitpos", "decr",
-        "decrby", "dump", "expire", "expireat", "geoadd", "geodist", "geohash", "geopos",
-        "georadius_ro", "georadiusbymember_ro", "get", "getbit", "getrange", "getset", "hdel",
-        "hexists", "hget", "hgetall", "hincrby", "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset",
-        "hscan", "hset", "hsetnx", "hstrlen", "hvals", "incr", "incrby", "incrbyfloat", "lindex",
-        "linsert", "llen", "lpop", "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist",
-        "pexpire", "pexpireat", "pfadd", "pfcount", "psetex", "pttl", "restore", "rpop", "rpush",
-        "rpushx", "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember",
-        "smembers", "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "zadd",
-        "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
-        "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
-        "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore");
+        absl::flat_hash_set<std::string>, "append", "bitcount", "bitfield", "bitpos", "blpop",
+        "brpop", "decr", "decrby", "dump", "expire", "expireat", "geoadd", "geodist", "geohash",
+        "geopos", "georadius_ro", "georadiusbymember_ro", "get", "getbit", "getrange", "getset",
+        "hdel", "hexists", "hget", "hgetall", "hincrby", "hincrbyfloat", "hkeys", "hlen", "hmget",
+        "hmset", "hscan", "hset", "hsetnx", "hstrlen", "hvals", "incr", "incrby", "incrbyfloat",
+        "lindex", "linsert", "llen", "lpop", "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim",
+        "persist", "pexpire", "pexpireat", "pfadd", "pfcount", "psetex", "pttl", "restore", "rpop",
+        "rpush", "rpushx", "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange",
+        "sismember", "smembers", "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type",
+        "zadd", "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange",
+        "zrangebylex", "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank",
+        "zremrangebyscore", "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan",
+        "zscore");
   }
 
   /**
@@ -73,13 +74,13 @@ struct SupportedCommands {
    */
   static const absl::flat_hash_set<std::string>& writeCommands() {
     CONSTRUCT_ON_FIRST_USE(
-        absl::flat_hash_set<std::string>, "append", "bitfield", "decr", "decrby", "del", "expire",
-        "expireat", "eval", "evalsha", "geoadd", "hdel", "hincrby", "hincrbyfloat", "hmset", "hset",
-        "hsetnx", "incr", "incrby", "incrbyfloat", "linsert", "lpop", "lpush", "lpushx", "lrem",
-        "lset", "ltrim", "mset", "persist", "pexpire", "pexpireat", "pfadd", "psetex", "restore",
-        "rpop", "rpush", "rpushx", "sadd", "set", "setbit", "setex", "setnx", "setrange", "spop",
-        "srem", "zadd", "zincrby", "touch", "zpopmin", "zpopmax", "zrem", "zremrangebylex",
-        "zremrangebyrank", "zremrangebyscore", "unlink");
+        absl::flat_hash_set<std::string>, "append", "bitfield", "blpop", "brpop", "decr", "decrby",
+        "del", "expire", "expireat", "eval", "evalsha", "geoadd", "hdel", "hincrby", "hincrbyfloat",
+        "hmset", "hset", "hsetnx", "incr", "incrby", "incrbyfloat", "linsert", "lpop", "lpush",
+        "lpushx", "lrem", "lset", "ltrim", "mset", "persist", "pexpire", "pexpireat", "pfadd",
+        "psetex", "restore", "rpop", "rpush", "rpushx", "sadd", "set", "setbit", "setex", "setnx",
+        "setrange", "spop", "srem", "zadd", "zincrby", "touch", "zpopmin", "zpopmax", "zrem",
+        "zremrangebylex", "zremrangebyrank", "zremrangebyscore", "unlink");
   }
 
   static bool isReadCommand(const std::string& command) {
