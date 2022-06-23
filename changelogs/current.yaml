@@ -14,15 +14,14 @@ behavior_changes:
     is properly extracted. This changes the Prometheus name from
     envoy_listener_myprefix_downstream_cx_overflow{} to envoy_listener_downstream_cx_overflow{envoy_listener_address="myprefix"}.
     This does not affect the Prometheus name if stat_prefix is not set.
-- area: listener
+- area: stats listener
   change: |
     Fixed metric tag extraction so that worker_id is properly extracted from the listener stats. This changes the Prometheus name from
     envoy_listener_worker_1_downstream_cx_active{envoy_listener_address="0.0.0.0_10000"} to envoy_listener_downstream_cx_active{envoy_listener_address="0.0.0.0_10000", envoy_worker_id="worker_1"} .
-- area: server
+- area: stats server
   change: |
     Fixed metric tag extraction so that worker_id is properly extracted fromt the server stats. This changes the Prometheus name from
     envoy_server_worker_1_watchdog_miss{} to envoy_server_watchdog_miss{envoy_worker_id="worker_01}.
-- area: thrift_proxy
 - area: stats thrift_proxy
   change: |
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.stat_prefix>`
