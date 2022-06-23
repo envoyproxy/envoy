@@ -147,6 +147,19 @@ for how to update or override dependencies.
     version of `ar` on the PATH, so if you run into issues building third party code like luajit
     consider uninstalling binutils.
 
+    If you see an error like so:
+    ```console
+    ERROR: An error occured during the fetch of repository 'python3_10':
+        Traceback (most recent call last):
+            File "/Users/user/Library/Caches/Bazel/..."
+                fail("No platform declared for host OS {} on arch {}".format(os_name, arch))
+    Error in fail: No platform declared for host OS mac os on arch 5.4.0
+    ```
+    Please check the output of uname `uname-a`, `which uname`.  The result should look something like this:
+    ```console
+    Darwin machine-name.local 21.4.0 Darwin Kernel Version 21.4.0: Fri Mar 18 00:00:00 PDT 2022; root:xnu-8020.101.4~15/RELEASE_X86_64 x86_64
+    ```
+
     ### Windows
 
     > Note: These instructions apply to **Windows 10 SDK, version 1803 (10.0.17134.12)**. Earlier versions will not compile because the `afunix.h` header is not available. **The recommended Windows version is equal or later than Windows 10 SDK, version 1903 (10.0.18362.1)**
