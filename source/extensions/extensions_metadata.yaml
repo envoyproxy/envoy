@@ -173,11 +173,6 @@ envoy.filters.http.dynamic_forward_proxy:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
   status: stable
-envoy.filters.http.dynamo:
-  categories:
-  - envoy.filters.http
-  security_posture: requires_trusted_downstream_and_upstream
-  status: stable
 envoy.filters.http.ext_authz:
   categories:
   - envoy.filters.http
@@ -336,11 +331,6 @@ envoy.filters.listener.proxy_protocol:
 envoy.filters.listener.tls_inspector:
   categories:
   - envoy.filters.listener
-  security_posture: robust_to_untrusted_downstream
-  status: stable
-envoy.filters.network.client_ssl_auth:
-  categories:
-  - envoy.filters.network
   security_posture: robust_to_untrusted_downstream
   status: stable
 envoy.filters.network.connection_limit:
@@ -659,6 +649,11 @@ envoy.tracers.opencensus:
   - envoy.tracers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.tracers.opentelemetry:
+  categories:
+  - envoy.tracers
+  security_posture: unknown
+  status: wip
 envoy.tracers.skywalking:
   categories:
   - envoy.tracers
@@ -680,6 +675,11 @@ envoy.transport_sockets.alts:
   - envoy.transport_sockets.upstream
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.transport_sockets.internal_upstream:
+  categories:
+  - envoy.transport_sockets.upstream
+  security_posture: unknown
+  status: wip
 envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream

@@ -4,6 +4,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/http/header_map_impl.h"
+#include "source/common/router/context_impl.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
@@ -171,8 +172,8 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Stats::StatNameManagedStorage stat_name_{"fake_route", stats_store_.symbolTable()};
   RouteStatNames stat_names_{stats_store_.symbolTable()};
-  RouteStatsContext route_stats_context_{stats_store_, stat_names_, stat_name_.statName(),
-                                         "fake_route"};
+  RouteStatsContextImpl route_stats_context_{stats_store_, stat_names_, stat_name_.statName(),
+                                             "fake_route"};
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   Event::MockDispatcher dispatcher_;
@@ -742,7 +743,8 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersSetViaRequestHeader) {
 
     expectTimerCreateAndEnable();
 
-    Http::TestResponseHeaderMapImpl response_headers{{"x-upstream-pushback", "yes"}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                     {"x-upstream-pushback", "yes"}};
     EXPECT_EQ(RetryStatus::Yes,
               state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
   }
@@ -755,7 +757,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersSetViaRequestHeader) {
 
     expectTimerCreateAndEnable();
 
-    Http::TestResponseHeaderMapImpl response_headers{{"foobar", "false"}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foobar", "false"}};
     EXPECT_EQ(RetryStatus::Yes,
               state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
   }

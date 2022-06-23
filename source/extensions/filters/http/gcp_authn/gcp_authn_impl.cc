@@ -69,7 +69,7 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
 
 void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
                                Http::ResponseMessagePtr&& response) {
-  auto status = Envoy::Http::Utility::getResponseStatusNoThrow(response->headers());
+  auto status = Envoy::Http::Utility::getResponseStatusOrNullopt(response->headers());
   active_request_ = nullptr;
   if (status.has_value()) {
     uint64_t status_code = status.value();

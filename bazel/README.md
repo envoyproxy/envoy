@@ -311,7 +311,7 @@ Change the value of `--remote_cache`, `--remote_executor` and `--remote_instance
 be run in remote execution too.
 
 Note: Currently the test run configuration in `.bazelrc` doesn't download test binaries and test logs,
-to override the behavior set [`--experimental_remote_download_outputs`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_remote_download_outputs)
+to override the behavior set [`--remote_download_outputs`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--remote_download_outputs)
 accordingly.
 
 ## Building Envoy with Docker sandbox

@@ -1,3 +1,8 @@
+envoy.filters.http.dynamo:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
 envoy.filters.http.squash:
   categories:
   - envoy.filters.http
@@ -8,6 +13,11 @@ envoy.filters.http.sxg:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
   status: alpha
+envoy.filters.network.client_ssl_auth:
+  categories:
+  - envoy.filters.network
+  security_posture: robust_to_untrusted_downstream
+  status: stable
 envoy.filters.network.kafka_broker:
   categories:
   - envoy.filters.network
@@ -61,5 +71,10 @@ envoy.matching.input_matchers.hyperscan:
 envoy.filters.http.language:
   categories:
   - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.network.connection_balance.dlb:
+  categories:
+  - envoy.network.connection_balance
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha

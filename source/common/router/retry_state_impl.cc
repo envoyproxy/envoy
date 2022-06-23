@@ -394,20 +394,22 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
                                                                   : RetryDecision::NoRetry;
   }
 
+  uint64_t response_status = Http::Utility::getResponseStatus(response_headers);
+
   if (retry_on_ & RetryPolicy::RETRY_ON_5XX) {
-    if (Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(response_headers))) {
+    if (Http::CodeUtility::is5xx(response_status)) {
       return RetryDecision::RetryWithBackoff;
     }
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_GATEWAY_ERROR) {
-    if (Http::CodeUtility::isGatewayError(Http::Utility::getResponseStatus(response_headers))) {
+    if (Http::CodeUtility::isGatewayError(response_status)) {
       return RetryDecision::RetryWithBackoff;
     }
   }
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_4XX)) {
-    Http::Code code = static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers));
+    Http::Code code = static_cast<Http::Code>(response_status);
     if (code == Http::Code::Conflict) {
       return RetryDecision::RetryWithBackoff;
     }
@@ -415,8 +417,7 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES)) {
     for (auto code : retriable_status_codes_) {
-      uint32_t status_code = Http::Utility::getResponseStatus(response_headers);
-      if (status_code == code) {
+      if (response_status == code) {
         if (!conn_pool_new_stream_with_early_data_and_http3_ ||
             static_cast<Http::Code>(code) != Http::Code::TooEarly) {
           return RetryDecision::RetryWithBackoff;
