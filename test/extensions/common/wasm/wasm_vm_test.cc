@@ -52,7 +52,7 @@ protected:
 TEST_F(BaseVmTest, UnSpecifiedRuntime) {
   auto wasm_vm = createWasmVm("");
   EXPECT_TRUE(wasm_vm.get() != nullptr);
-  EXPECT_TRUE(wasm_vm->getEngineName() == "v8");
+  EXPECT_TRUE(std::string(getWasmEngine()).find(wasm_vm->getEngineName()));
 }
 
 TEST_F(BaseVmTest, BadRuntime) { EXPECT_EQ(createWasmVm("envoy.wasm.runtime.invalid"), nullptr); }

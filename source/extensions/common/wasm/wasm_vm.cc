@@ -72,11 +72,31 @@ bool EnvoyWasmVmIntegration::getNullVmFunction(std::string_view function_name, b
   return false;
 }
 
+absl::string_view getWasmEngine() {
+  absl::string_view wasm_ext_runtime;
+  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    if (ext.first == "envoy.wasm.runtime") {
+      for (auto engine_name : ext.second->registeredNames()) {
+        if (engine_name != "envoy.wasm.runtime.null") {
+          wasm_ext_runtime = engine_name;
+        }
+      }
+    }
+  }
+  if (wasm_ext_runtime.empty()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
+                        "Failed to get Wasm engine. Envoy was compiled without support for it");
+  }
+  return wasm_ext_runtime;
+}
+
 WasmVmPtr createWasmVm(absl::string_view runtime) {
-  if (runtime.empty()) {
+  // Set wasm runtime to build-in wasm engine if it is not specified
+  if (runtime.empty() && !getWasmEngine().empty()) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), info,
-                        "Wasm VM runtime is unspecified, set to envoy.wasm.runtime.v8");
-    runtime = "envoy.wasm.runtime.v8";
+                        "Wasm VM runtime is unspecified, set to envoy built-in wasm runtime: {}",
+                        getWasmEngine());
+    runtime = getWasmEngine();
   }
 
   auto runtime_factory = Registry::FactoryRegistry<WasmRuntimeFactory>::getFactory(runtime);

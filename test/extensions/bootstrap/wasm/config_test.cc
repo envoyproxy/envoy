@@ -24,13 +24,8 @@ using Extensions::Bootstrap::Wasm::WasmServicePtr;
 class WasmFactoryTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmFactoryTest() {
-    if (std::get<0>(GetParam()).empty()) {
-      config_.mutable_config()->mutable_vm_config()->set_runtime(
-          absl::StrCat("envoy.wasm.runtime.", "v8"));
-    } else {
-      config_.mutable_config()->mutable_vm_config()->set_runtime(
-          absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
-    }
+    config_.mutable_config()->mutable_vm_config()->set_runtime(
+        absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
     if (std::get<0>(GetParam()) != "null") {
       config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
           TestEnvironment::substitute(
@@ -109,13 +104,12 @@ TEST_P(WasmFactoryTest, MissingImport) {
                             "Unable to create Wasm service test");
 }
 
-TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
+TEST_P(WasmFactoryTest, UnSpecifiedRuntime) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
   config_.mutable_config()->mutable_vm_config()->set_runtime("");
 
-  // Expect no exceptions when runtime is unspecified
   EXPECT_NO_THROW(initializeWithConfig(config_));
 }
 
