@@ -83,7 +83,6 @@ absl::string_view getWasmEngine() {
       }
     }
   }
-
   return wasm_ext_runtime;
 }
 
