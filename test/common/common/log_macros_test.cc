@@ -321,7 +321,7 @@ TEST(FineGrainLog, SetLevel) {
   FINE_GRAIN_LOG(error, "FineGrainLog Error! Here's a test for level.");
   FINE_GRAIN_LOG(warn, "Warning: you shouldn't see this message!");
   p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
-  EXPECT_NE(p, nullptr);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::err);
 
   getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::info);

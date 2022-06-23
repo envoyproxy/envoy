@@ -303,7 +303,7 @@ public:
   DrainManager& localDrainManager() const {
     return listener_factory_context_->listener_factory_context_base_->drainManager();
   }
-  void setSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
+  void addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
   const std::string& versionInfo() const { return version_info_; }
@@ -346,7 +346,12 @@ public:
     return internal_listener_config_ != nullptr ? *internal_listener_config_
                                                 : Network::InternalListenerConfigOptRef();
   }
-  Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
+  Network::ConnectionBalancer&
+  connectionBalancer(const Network::Address::Instance& address) override {
+    auto balancer = connection_balancers_.find(address.asString());
+    ASSERT(balancer != connection_balancers_.end());
+    return *balancer->second;
+  }
   ResourceLimit& openConnections() override { return *open_connections_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
@@ -416,12 +421,13 @@ private:
   // Helpers for constructor.
   void buildAccessLog();
   void buildInternalListener();
-  void validateConfig(Network::Socket::Type socket_type);
-  void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
-  void buildListenSocketOptions(Network::Socket::Type socket_type);
-  void createListenerFilterFactories(Network::Socket::Type socket_type);
-  void validateFilterChains(Network::Socket::Type socket_type);
+  void validateConfig();
+  void buildUdpListenerFactory(uint32_t concurrency);
+  void buildListenSocketOptions();
+  void createListenerFilterFactories();
+  void validateFilterChains();
   void buildFilterChains();
+  void buildConnectionBalancer(const Network::Address::Instance& address);
   void buildSocketOptions();
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
@@ -433,6 +439,7 @@ private:
 
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
+  const Network::Socket::Type socket_type_;
 
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   const bool bind_to_port_;
@@ -464,7 +471,9 @@ private:
   const bool continue_on_listener_filters_timeout_;
   std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;
   std::unique_ptr<Network::InternalListenerConfig> internal_listener_config_;
-  Network::ConnectionBalancerSharedPtr connection_balancer_;
+  // The key is the address string, the value is the address specific connection balancer.
+  // TODO (soulxu): Add hash support for address, then needn't a string address as key anymore.
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
   const bool reuse_port_;
