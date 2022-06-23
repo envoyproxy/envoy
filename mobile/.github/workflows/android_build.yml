@@ -33,6 +33,7 @@ jobs:
             //:android_dist
   javahelloworld:
     name: java_helloworld
+    needs: androidbuild
     runs-on: macos-12
     timeout-minutes: 25
     steps:
@@ -66,6 +67,7 @@ jobs:
         run: adb logcat -e "received headers with status 200" -m 1
   kotlinhelloworld:
     name: kotlin_helloworld
+    needs: androidbuild
     runs-on: macos-12
     timeout-minutes: 25
     steps:
@@ -99,6 +101,7 @@ jobs:
         run: adb logcat -e "received headers with status 200" -m 1
   kotlinbaselineapp:
     name: kotlin_baseline_app
+    needs: androidbuild
     runs-on: macos-12
     timeout-minutes: 25
     steps:
@@ -132,6 +135,7 @@ jobs:
         run: adb logcat -e "received headers with status 200" -m 1
   kotlinexperimentalapp:
     name: kotlin_experimental_app
+    needs: androidbuild
     runs-on: macos-12
     timeout-minutes: 25
     steps:
