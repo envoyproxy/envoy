@@ -40,3 +40,9 @@ protoxform_rule(
         "@envoy_api//versioning:frozen_protos",
     ],
 )
+
+protoxform_rule(
+    name = "test_protoxform",
+    visibility = ["//visibility:public"],
+    deps = ["//tools/testdata/protoxform:fix_protos"],
+)
