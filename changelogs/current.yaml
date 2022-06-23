@@ -277,3 +277,6 @@ deprecated:
     deprecated :ref:`old dubbo route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.route_config>`. Please use
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config>` or
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.
+- area: matching
+  change: |
+    The ``google_re2`` field in :ref:`RegexMatcher <envoy_v3_api_field_type.matcher.v3.RegexMatcher>` has been deprecated.
