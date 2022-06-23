@@ -117,8 +117,9 @@ public:
   // is needed. In this case the QuicClientTransportSocketFactory falls over to
   // using the fallback factory.
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override {
-    return fallback_factory_->createTransportSocket(options);
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr host) const override {
+    return fallback_factory_->createTransportSocket(options, host);
   }
 
   virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
