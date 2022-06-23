@@ -43,6 +43,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/transport_sockets/common @alyssawilk @wez470
 # starttls transport socket
 /*/extensions/transport_sockets/starttls @cpakulski @lizan
+# internal upstream transport socket
+/*/extensions/transport_sockets/internal_upstream @kyessenov @lambdai
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # sni_dynamic_forward_proxy extension

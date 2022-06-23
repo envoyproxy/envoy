@@ -44,7 +44,9 @@ public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, supportsAlpn, (), (const));
   MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
-  MOCK_METHOD(TransportSocketPtr, createTransportSocket, (TransportSocketOptionsConstSharedPtr),
+  MOCK_METHOD(TransportSocketPtr, createTransportSocket,
+              (TransportSocketOptionsConstSharedPtr,
+               std::shared_ptr<const Upstream::HostDescription>),
               (const));
   MOCK_METHOD(void, hashKey,
               (std::vector<uint8_t> & key, TransportSocketOptionsConstSharedPtr options), (const));

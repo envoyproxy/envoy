@@ -30,7 +30,8 @@ public:
       Network::UpstreamTransportSocketFactoryPtr&& inner_factory);
 
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr host) const override;
 };
 
 class DownstreamTcpStatsSocketFactory : public TcpStatsSocketFactory,
