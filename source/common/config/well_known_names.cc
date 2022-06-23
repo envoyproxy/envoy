@@ -135,6 +135,9 @@ TagNameValues::TagNameValues() {
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
+  // listener.<address|stat_prefix>.(worker_<id>.)*
+  addRe2(WORKER_ID, R"(^listener\.(?:<ADDRESS>|<TAG_VALUE>)\.(worker_(\d+)\.))", "");
+
   // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
   addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>|<TAG_VALUE>)\.))", "", "admin");
 
@@ -150,14 +153,10 @@ TagNameValues::TagNameValues() {
   addRe2(RDS_ROUTE_CONFIG, R"(^http\.<TAG_VALUE>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
 
   // listener_manager.(worker_<id>.)*
-  addRe2(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
-
-  // listener.<address|stat_prefix>.(worker_<id>.)*
-  addRe2(WORKER_ID, R"(^listener\.<ADDRESS>\.((worker_\d+)\.))", "");
-  addRe2(WORKER_ID, R"(^listener\.<TAG_VALUE>\.((worker_\d+)\.))", "");
+  addRe2(WORKER_ID, R"(^listener_manager\.(worker_(\d+)\.))", "listener_manager.worker_");
 
   // server.(worker_<id>.)*
-  addRe2(WORKER_ID, R"(^server\.((worker_\d+)\.))", "");
+  addRe2(WORKER_ID, R"(^server\.(worker_(\d+)\.))", "");
 
   // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
   addTokenized(ROUTE, "vhost.*.route.$.**");
