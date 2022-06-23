@@ -364,7 +364,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
   // Exactly one of config_path and config_yaml should be specified.
-  if (config_path.empty() && config_yaml.empty() && config_proto.ByteSize() == 0) {
+  if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
     throw EnvoyException("At least one of --config-path or --config-yaml or Options::configProto() "
                          "should be non-empty");
   }
@@ -378,7 +378,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
-  if (config_proto.ByteSize() != 0) {
+  if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
@@ -591,6 +591,21 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       Network::SocketInterfaceSingleton::initialize(sock);
     }
   }
+
+  // Initialize the regex engine and inject to singleton.
+  if (bootstrap_.has_default_regex_engine()) {
+    const auto& default_regex_engine = bootstrap_.default_regex_engine();
+    Regex::EngineFactory& factory =
+        Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    regex_engine_ = factory.createEngine(*config, serverFactoryContext());
+  } else {
+    regex_engine_ = std::make_shared<Regex::GoogleReEngine>();
+  }
+  Regex::EngineSingleton::clear();
+  Regex::EngineSingleton::initialize(regex_engine_.get());
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ =

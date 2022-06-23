@@ -96,7 +96,7 @@ public:
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
-  MOCK_METHOD(Network::TransportSocketFactory&, transportSocketFactory, (), (const));
+  MOCK_METHOD(Network::UpstreamTransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(HostStats&, stats, (), (const));
   MOCK_METHOD(LoadMetricStats&, loadMetricStats, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
@@ -114,7 +114,7 @@ public:
   Network::Address::InstanceConstSharedPtr address_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
-  Network::TransportSocketFactoryPtr socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
@@ -188,7 +188,7 @@ public:
   MOCK_METHOD(Host::Health, health, (), (const));
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
-  MOCK_METHOD(Network::TransportSocketFactory&, transportSocketFactory, (), (const));
+  MOCK_METHOD(Network::UpstreamTransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));
   MOCK_METHOD(void, setHealthChecker_, (HealthCheckHostMonitorPtr & health_checker));
   MOCK_METHOD(void, setOutlierDetector_, (Outlier::DetectorHostMonitorPtr & outlier_detector));
@@ -205,7 +205,7 @@ public:
   MOCK_METHOD(MonotonicTime, creationTime, (), (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
-  Network::TransportSocketFactoryPtr socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;

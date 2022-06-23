@@ -88,7 +88,6 @@ EXTENSIONS = {
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     "envoy.filters.http.decompressor":                  "//source/extensions/filters/http/decompressor:config",
     "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
-    "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.ext_proc":                      "//source/extensions/filters/http/ext_proc:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
@@ -136,7 +135,6 @@ EXTENSIONS = {
     # Network filters
     #
 
-    "envoy.filters.network.client_ssl_auth":                      "//source/extensions/filters/network/client_ssl_auth:config",
     "envoy.filters.network.connection_limit":                     "//source/extensions/filters/network/connection_limit:config",
     "envoy.filters.network.direct_response":                      "//source/extensions/filters/network/direct_response:config",
     "envoy.filters.network.dubbo_proxy":                          "//source/extensions/filters/network/dubbo_proxy:config",
@@ -199,6 +197,7 @@ EXTENSIONS = {
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
+    "envoy.tracers.opentelemetry":                      "//source/extensions/tracers/opentelemetry:config",
 
     #
     # Transport sockets
@@ -210,6 +209,7 @@ EXTENSIONS = {
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
     "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
     "envoy.transport_sockets.tcp_stats":                "//source/extensions/transport_sockets/tcp_stats:config",
+    "envoy.transport_sockets.internal_upstream":        "//source/extensions/transport_sockets/internal_upstream:config",
 
     #
     # Retry host predicates
