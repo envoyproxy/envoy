@@ -1,11 +1,11 @@
 version: v1beta1
 deps:
     - buf.build/googleapis/googleapis:d1a849b8f8304950832335723096e954
-    - buf.build/beta/opencensus
-    - buf.build/beta/prometheus
-    - buf.build/beta/opentelemetry
+    - buf.build/opencensus/opencensus
+    - buf.build/prometheus/prometheus
+    - buf.build/opentelemetry/opentelemetry
     - buf.build/gogo/protobuf
-    - buf.build/beta/xds
+    - buf.build/cncf/xds
 breaking:
   ignore_unstable_packages: true
   use:
