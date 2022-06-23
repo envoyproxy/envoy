@@ -72,6 +72,8 @@ private:
   std::string virtual_clusters_ = "[]";
   std::string config_override_for_tests_ = "";
   std::string admin_address_path_for_tests_ = "";
+  std::string dns_resolver_name_ = "";
+  std::string dns_resolver_config_ = "";
   int stream_idle_timeout_seconds_ = 15;
   int per_try_idle_timeout_seconds_ = 15;
   bool gzip_filter_ = true;

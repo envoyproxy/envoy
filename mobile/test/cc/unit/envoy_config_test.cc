@@ -10,6 +10,10 @@
 #include "library/cc/log_level.h"
 #include "library/common/config/internal.h"
 
+#if defined(__APPLE__)
+#include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
+#endif
+
 using testing::HasSubstr;
 using testing::Not;
 extern const char* alternate_protocols_cache_filter_insert;
@@ -61,6 +65,15 @@ TEST(TestConfig, ConfigIsValid) {
   auto config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  // Test per-platform DNS fixes.
+#if defined(__APPLE__)
+  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.network.dns_resolver.cares")));
+  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.network.dns_resolver.apple"));
+#else
+  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.network.dns_resolver.cares"));
+  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.network.dns_resolver.apple")));
+#endif
 }
 
 TEST(TestConfig, SetGzip) {
