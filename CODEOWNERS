@@ -43,6 +43,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/transport_sockets/common @alyssawilk @wez470
 # starttls transport socket
 /*/extensions/transport_sockets/starttls @cpakulski @lizan
+# internal upstream transport socket
+/*/extensions/transport_sockets/internal_upstream @kyessenov @lambdai
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # sni_dynamic_forward_proxy extension
@@ -53,6 +55,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/tracers/xray @abaptiste @suniltheta @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @lizan @Shikugawa
+# tracers.opentelemetry extension
+/*/extensions/tracers/opentelemetry @alexanderellis @htuch
 # quic extension
 /*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # UDP packet writer
@@ -250,6 +254,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/http/cors @wbpcode @daixiang0
 # Header Validators
 /*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
+# Thrift
+/*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
@@ -258,16 +264,13 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 
 # secondary owner needed or moving to contrib next release.
 /*/extensions/filters/http/ip_tagging @alyssawilk @UNOWNED
-/*/extensions/filters/network/thrift_proxy @zuercher @UNOWNED
 /*/extensions/filters/http/header_to_metadata @zuercher @UNOWNED
 /*/extensions/filters/network/zookeeper_proxy @snowp @UNOWNED
-
-# To be moved to Contrib
 /*/extensions/tracers/lightstep @UNOWNED @UNOWNED
-/*/extensions/filters/network/client_ssl_auth @UNOWNED @UNOWNED
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
+/contrib/client_ssl_auth/ @UNOWNED @UNOWNED
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/squash/ @yuval-k @alyssawilk
@@ -281,3 +284,4 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/vcl/ @florincoras @KfreeZ
 /contrib/hyperscan/ @zhxie @soulxu
 /contrib/language/ @diceride @diceride
+/contrib/dlb/ @mattklein123 @daixiang0

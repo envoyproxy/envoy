@@ -87,7 +87,8 @@ absl::string_view RawBufferSocket::failureReason() const { return EMPTY_STRING; 
 void RawBufferSocket::onConnected() { callbacks_->raiseEvent(ConnectionEvent::Connected); }
 
 TransportSocketPtr
-RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsConstSharedPtr) const {
+RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsConstSharedPtr,
+                                              Upstream::HostDescriptionConstSharedPtr) const {
   return std::make_unique<RawBufferSocket>();
 }
 

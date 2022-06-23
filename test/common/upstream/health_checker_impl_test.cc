@@ -147,6 +147,8 @@ public:
       absl::node_hash_map<std::string,
                           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
+  HttpHealthCheckerImplTest() : engine_(std::make_unique<Regex::GoogleReEngine>()) {}
+
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
         *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
@@ -425,7 +427,6 @@ public:
     http_health_check:
       service_name_matcher:
         safe_regex:
-          google_re2: {}
           regex: 'locations-.*-.*$'
       path: /healthcheck
     )EOF";
@@ -722,6 +723,7 @@ public:
   std::list<uint32_t> connection_index_{};
   std::list<uint32_t> codec_index_{};
   const HostWithHealthCheckMap health_checker_map_{};
+  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 TEST_F(HttpHealthCheckerImplTest, Success) {
@@ -1103,7 +1105,7 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
       Network::UpstreamTransportSocketFactoryPtr(socket_factory));
   cluster_->info_->transport_socket_matcher_.reset(transport_socket_match);
 
-  EXPECT_CALL(*socket_factory, createTransportSocket(ApplicationProtocolListEq("http1")));
+  EXPECT_CALL(*socket_factory, createTransportSocket(ApplicationProtocolListEq("http1"), _));
 
   allocHealthChecker(yaml);
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -2563,7 +2565,7 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
   auto default_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
   // We expect that this default_socket_factory will NOT be used to create a transport socket for
   // the health check connection.
-  EXPECT_CALL(*default_socket_factory, createTransportSocket(_)).Times(0);
+  EXPECT_CALL(*default_socket_factory, createTransportSocket(_, _)).Times(0);
   EXPECT_CALL(*default_socket_factory, implementsSecureTransport()).WillRepeatedly(Return(true));
   auto transport_socket_match =
       std::make_unique<Upstream::MockTransportSocketMatcher>(std::move(default_socket_factory));
@@ -2589,7 +2591,7 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
           *health_check_only_socket_factory, health_transport_socket_stats, "health_check_only")));
   // The health_check_only_socket_factory should be used to create a transport socket for the health
   // check connection.
-  EXPECT_CALL(*health_check_only_socket_factory, createTransportSocket(_));
+  EXPECT_CALL(*health_check_only_socket_factory, createTransportSocket(_, _));
 
   cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
 
@@ -2624,7 +2626,7 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
   auto default_socket_factory = std::make_unique<Network::MockTransportSocketFactory>();
   // The default_socket_factory should be used to create a transport socket for the health check
   // connection.
-  EXPECT_CALL(*default_socket_factory, createTransportSocket(_));
+  EXPECT_CALL(*default_socket_factory, createTransportSocket(_, _));
   EXPECT_CALL(*default_socket_factory, implementsSecureTransport()).WillRepeatedly(Return(true));
   auto transport_socket_match =
       std::make_unique<Upstream::MockTransportSocketMatcher>(std::move(default_socket_factory));

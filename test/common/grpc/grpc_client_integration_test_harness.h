@@ -529,7 +529,7 @@ public:
         std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
             std::move(cfg), context_manager_, *stats_store_);
     async_client_transport_socket_ =
-        mock_host_description_->socket_factory_->createTransportSocket(nullptr);
+        mock_host_description_->socket_factory_->createTransportSocket(nullptr, nullptr);
     FakeUpstreamConfig config(test_time_.timeSystem());
     config.upstream_protocol_ = Http::CodecType::HTTP2;
     fake_upstream_ =

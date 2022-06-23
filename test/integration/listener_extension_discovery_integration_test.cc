@@ -15,6 +15,9 @@ namespace {
 
 enum class ListenerMatcherType { NULLMATCHER, ANYMATCHER, NOTANYMATCHER };
 
+constexpr absl::string_view EcdsClusterName = "ecds_cluster";
+constexpr absl::string_view Ecds2ClusterName = "ecds2_cluster";
+
 class ListenerExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                                   public BaseIntegrationTest {
 public:
@@ -30,9 +33,10 @@ public:
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
                         bool set_default_config = true, bool rate_limit = false,
-                        ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER) {
+                        ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER,
+                        bool second_connection = false) {
     config_helper_.addConfigModifier([name, apply_without_warming, set_default_config, rate_limit,
-                                      matcher,
+                                      matcher, second_connection,
                                       this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       listener->set_stat_prefix("listener_stat");
@@ -60,7 +64,13 @@ public:
       }
       addListenerFilterMatcher(listener_filter, matcher);
       auto* grpc_service = api_config_source->add_grpc_services();
-      setGrpcService(*grpc_service, "ecds_cluster", getEcdsFakeUpstream().localAddress());
+      if (!second_connection) {
+        setGrpcService(*grpc_service, std::string(EcdsClusterName),
+                       getEcdsFakeUpstream().localAddress());
+      } else {
+        setGrpcService(*grpc_service, std::string(Ecds2ClusterName),
+                       getEcds2FakeUpstream().localAddress());
+      }
     });
   }
 
@@ -88,6 +98,17 @@ public:
     }
   }
 
+  void addEcdsCluster(const std::string& cluster_name) {
+    // Add an xDS cluster for extension config discovery.
+    config_helper_.addConfigModifier(
+        [cluster_name](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* ecds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+          ecds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+          ecds_cluster->set_name(cluster_name);
+          ConfigHelper::setHttp2(*ecds_cluster);
+        });
+  }
+
   void initialize() override {
     defer_listener_finalization_ = true;
     setUpstreamCount(1);
@@ -104,45 +125,59 @@ public:
       filter->mutable_typed_config()->PackFrom(config);
     });
 
-    // Add an xDS cluster for extension config discovery.
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* ecds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      ecds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ecds_cluster->set_name("ecds_cluster");
-      ConfigHelper::setHttp2(*ecds_cluster);
-    });
+    addEcdsCluster(std::string(EcdsClusterName));
+    // Add 2nd cluster in case of two connections.
+    if (two_connections_) {
+      addEcdsCluster(std::string(Ecds2ClusterName));
+    }
     BaseIntegrationTest::initialize();
     registerTestServerPorts({port_name_});
   }
 
-  ~ListenerExtensionDiscoveryIntegrationTest() override {
-    if (ecds_connection_ != nullptr) {
-      AssertionResult result = ecds_connection_->close();
+  void resetEcdsConnection(FakeHttpConnectionPtr& connection) {
+    if (connection != nullptr) {
+      AssertionResult result = connection->close();
       RELEASE_ASSERT(result, result.message());
-      result = ecds_connection_->waitForDisconnect();
+      result = connection->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
-      ecds_connection_.reset();
+      connection.reset();
     }
+  }
+
+  ~ListenerExtensionDiscoveryIntegrationTest() override {
+    resetEcdsConnection(ecds_connection_);
+    resetEcdsConnection(ecds2_connection_);
   }
 
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
-    // Create the extension config discovery upstream (fake_upstreams_[1]).
+    // Create two extension config discovery upstreams (fake_upstreams_[1] and fake_upstreams_[2]).
     addFakeUpstream(Http::CodecType::HTTP2);
+    if (two_connections_) {
+      addFakeUpstream(Http::CodecType::HTTP2);
+    }
+  }
+
+  void waitForEcdsStream(FakeUpstream& upstream, FakeHttpConnectionPtr& connection,
+                         FakeStreamPtr& stream) {
+    AssertionResult result = upstream.waitForHttpConnection(*dispatcher_, connection);
+    ASSERT_TRUE(result);
+    result = connection->waitForNewStream(*dispatcher_, stream);
+    ASSERT_TRUE(result);
+    stream->startGrpcStream();
   }
 
   void waitXdsStream() {
-    // Wait for ECDS stream.
-    auto& ecds_upstream = getEcdsFakeUpstream();
-    AssertionResult result = ecds_upstream.waitForHttpConnection(*dispatcher_, ecds_connection_);
-    ASSERT_TRUE(result);
-    result = ecds_connection_->waitForNewStream(*dispatcher_, ecds_stream_);
-    ASSERT_TRUE(result);
-    ecds_stream_->startGrpcStream();
+    waitForEcdsStream(getEcdsFakeUpstream(), ecds_connection_, ecds_stream_);
+    if (two_connections_) {
+      // Wait for 2nd ECDS stream.
+      waitForEcdsStream(getEcds2FakeUpstream(), ecds2_connection_, ecds2_stream_);
+    }
   }
 
   void sendXdsResponse(const std::string& name, const std::string& version,
-                       const uint32_t drain_bytes, bool ttl = false) {
+                       const uint32_t drain_bytes, bool ttl = false,
+                       bool second_connection = false) {
     // The to-be-drained bytes has to be smaller than data size.
     ASSERT(drain_bytes <= data_.size());
 
@@ -162,7 +197,11 @@ public:
       resource.mutable_ttl()->set_seconds(1);
     }
     response.add_resources()->PackFrom(resource);
-    ecds_stream_->sendGrpcMessage(response);
+    if (!second_connection) {
+      ecds_stream_->sendGrpcMessage(response);
+    } else {
+      ecds2_stream_->sendGrpcMessage(response);
+    }
   }
 
   // Client sends data_, which is drained by Envoy listener filter based on config, then received by
@@ -187,12 +226,16 @@ public:
   const std::string filter_name_;
   const std::string data_;
   const std::string port_name_;
+  bool two_connections_{false};
 
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
+  FakeUpstream& getEcds2FakeUpstream() const { return *fake_upstreams_[2]; }
 
-  // gRPC ECDS set-up
+  // gRPC two ECDS connections set-up.
   FakeHttpConnectionPtr ecds_connection_{nullptr};
   FakeStreamPtr ecds_stream_{nullptr};
+  FakeHttpConnectionPtr ecds2_connection_{nullptr};
+  FakeStreamPtr ecds2_stream_{nullptr};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ListenerExtensionDiscoveryIntegrationTest,
@@ -379,6 +422,35 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameName) {
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
   // Each filter drain 3 bytes.
   sendDataVerifyResults(6);
+}
+
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentName) {
+  two_connections_ = true;
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", true);
+  addDynamicFilter("bar", false, true, false, ListenerMatcherType::NULLMATCHER, true);
+  initialize();
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  // Send 1st config update.
+  sendXdsResponse("foo", "1", 3);
+  sendXdsResponse("bar", "1", 4, false, true);
+  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.foo.config_reload",
+                                 1);
+  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.bar.config_reload",
+                                 1);
+  // The two filters drain 3 + 4  bytes.
+  sendDataVerifyResults(7);
+
+  // Send 2nd config update.
+  sendXdsResponse("foo", "2", 4);
+  sendXdsResponse("bar", "2", 5, false, true);
+  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.foo.config_reload",
+                                 2);
+  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.bar.config_reload",
+                                 2);
+  // The two filters drain 4 + 5  bytes.
+  sendDataVerifyResults(9);
 }
 
 // Testing it works with two static listener filter configuration.

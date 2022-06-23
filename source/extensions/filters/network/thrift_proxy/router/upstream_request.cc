@@ -44,6 +44,7 @@ FilterStatus UpstreamRequest::start() {
 }
 
 void UpstreamRequest::releaseConnection(const bool close) {
+  ENVOY_LOG(debug, "releasing connection, close: {}", close);
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
     conn_pool_handle_ = nullptr;
@@ -59,10 +60,14 @@ void UpstreamRequest::releaseConnection(const bool close) {
   }
 }
 
-void UpstreamRequest::resetStream() { releaseConnection(true); }
+void UpstreamRequest::resetStream() {
+  ENVOY_LOG(debug, "reset stream");
+  releaseConnection(true);
+}
 
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                     Upstream::HostDescriptionConstSharedPtr host) {
+  ENVOY_LOG(debug, "on pool failure");
   conn_pool_handle_ = nullptr;
 
   // Mimic an upstream reset.
@@ -159,6 +164,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     }
 
     if (callbacks.responseMetadata()->isDraining()) {
+      ENVOY_LOG(debug, "got draining signal");
       stats_.incCloseDrain(cluster);
       resetStream();
     }
@@ -300,6 +306,7 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
 
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (response_started_) {
+      ENVOY_LOG(debug, "reset downstream connection for a partial response");
       // Error occurred after a partial response, propagate the reset to the downstream.
       parent_.resetDownstreamConnection();
     } else {
@@ -317,6 +324,9 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     }
     break;
   }
+
+  ENVOY_LOG(debug, "upstream reset complete reason {} (close_downstream={})",
+            static_cast<int>(reason), close_downstream);
   return close_downstream;
 }
 
