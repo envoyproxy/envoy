@@ -8,17 +8,22 @@ behavior_changes:
   change: |
     Multiple SDS resources of multiple clusters or listeners are sent in a single SDS requests, instead of multiple SDS requests.
     This behavioral change can be reverted by setting ``envoy.reloadable_features.combine_sds_requests`` to false.
-- area: listener
+- area: stats listener
   change: |
     Fixed metric tag extraction so that :ref:stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>
     is properly extracted. This changes the Prometheus name from
     envoy_listener_myprefix_downstream_cx_overflow{} to envoy_listener_downstream_cx_overflow{envoy_listener_address="myprefix"}.
     This does not affect the Prometheus name if stat_prefix is not set.
-- area: thrift_proxy
+- area: stats thrift_proxy
   change: |
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.stat_prefix>`
     is properly extracted. This changes the Prometheus name from
     envoy_thrift_myprefix_request{} to envoy_thrift_request{envoy_thrift_prefix="myprefix"}.
+- area: stats redis_proxy
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.stat_prefix>`
+    is properly extracted. This changes the Prometheus name from
+    envoy_redis_myprefix_command_pttl_latency_sum{} to envoy_redis_command_pttl_latency_sum{envoy_redis_prefix="myprefix"}.
 
 minor_behavior_changes:
 - area: thrift
