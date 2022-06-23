@@ -164,6 +164,9 @@ TagNameValues::TagNameValues() {
 
   // thrift.(<stat_prefix>.)*
   addTokenized(THRIFT_PREFIX, "thrift.$.**");
+
+  // redis.(<stat_prefix>.)*
+  addTokenized(REDIS_PREFIX, "redis.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

@@ -67,8 +67,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         local_registry->createActiveInternalListener(*this, config, dispatcher());
     // TODO(soulxu): support multiple internal addresses in listener in the future.
     ASSERT(config.listenSocketFactories().size() == 1);
-    details->addActiveListener(config, config.listenSocketFactories()[0], listener_reject_fraction_,
-                               disable_listeners_, std::move(internal_listener));
+    details->addActiveListener(config, config.listenSocketFactories()[0]->localAddress(),
+                               listener_reject_fraction_, disable_listeners_,
+                               std::move(internal_listener));
   } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
     if (!support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
       if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
@@ -82,20 +83,22 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       IS_ENVOY_BUG("unexpected");
     }
     for (auto& socket_factory : config.listenSocketFactories()) {
+      auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
       details->addActiveListener(
-          config, socket_factory, listener_reject_fraction_, disable_listeners_,
+          config, address, listener_reject_fraction_, disable_listeners_,
           std::make_unique<ActiveTcpListener>(
               *this, config, runtime,
-              socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0)));
+              socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
+              address, config.connectionBalancer(*address)));
     }
-
   } else {
     ASSERT(config.udpListenerConfig().has_value(), "UDP listener factory is not initialized.");
     ASSERT(worker_index_.has_value());
     for (auto& socket_factory : config.listenSocketFactories()) {
+      auto address = socket_factory->localAddress();
       details->addActiveListener(
-          config, socket_factory, listener_reject_fraction_, disable_listeners_,
+          config, address, listener_reject_fraction_, disable_listeners_,
           config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
               runtime, *worker_index_, *this,
               config.listenSocketFactories()[0]->getListenSocket(*worker_index_), dispatcher_,
@@ -319,15 +322,18 @@ ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
 }
 
 Network::BalancedConnectionHandlerOptRef
-ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
+ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
+                                               const Network::Address::Instance& address) {
   auto active_listener = findActiveListenerByTag(listener_tag);
   if (active_listener.has_value()) {
-    // TODO(soulxu): return first listener here, this will be changed
-    // when ConnectionBalancer supports the multiple addresses.
-    ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-               active_listener->get().per_address_details_list_[0]->typed_listener_) &&
-           active_listener->get().per_address_details_list_[0]->listener_->listener() != nullptr);
-    return active_listener->get().per_address_details_list_[0]->tcpListener().value().get();
+    for (auto& details : active_listener->get().per_address_details_list_) {
+      if (*details->address_ == address) {
+        ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
+                   details->typed_listener_) &&
+               details->listener_->listener() != nullptr);
+        return {details->tcpListener().value().get()};
+      }
+    }
   }
   return absl::nullopt;
 }

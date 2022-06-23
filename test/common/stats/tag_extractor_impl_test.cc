@@ -411,6 +411,12 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   thrift_prefix.name_ = tag_names.THRIFT_PREFIX;
   thrift_prefix.value_ = "thrift_prefix";
   regex_tester.testRegex("thrift.thrift_prefix.response", "thrift.response", {thrift_prefix});
+
+  // Redis Proxy Prefix
+  Tag redis_prefix;
+  redis_prefix.name_ = tag_names.REDIS_PREFIX;
+  redis_prefix.value_ = "my_redis_prefix";
+  regex_tester.testRegex("redis.my_redis_prefix.response", "redis.response", {redis_prefix});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {
