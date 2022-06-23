@@ -136,8 +136,8 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   auto* headers_req = state.mutableHeaders(req);
   MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
-  state.setCallbackState(ProcessorState::CallbackState::HeadersCallback);
-  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
+  state.onStartCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                    ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -487,8 +487,8 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
 void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                            ProcessorState::CallbackState new_state, bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
-  state.setCallbackState(new_state);
-  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
+  state.onStartCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                    new_state);
   ProcessingRequest req;
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
@@ -501,8 +501,8 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   ProcessingRequest req;
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, *trailers_req->mutable_trailers());
-  state.setCallbackState(ProcessorState::CallbackState::TrailersCallback);
-  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
+  state.onStartCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                    ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
