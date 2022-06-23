@@ -9,7 +9,8 @@ EXTENSIONS = {
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
     "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
     "envoy.access_loggers.open_telemetry":              "//source/extensions/access_loggers/open_telemetry:config",
-    "envoy.access_loggers.stream":                      "//source/extensions/access_loggers/stream:config",
+    "envoy.access_loggers.stdout":                      "//source/extensions/access_loggers/stream:config",
+    "envoy.access_loggers.stderr":                      "//source/extensions/access_loggers/stream:config",
     "envoy.access_loggers.wasm":                        "//source/extensions/access_loggers/wasm:config",
 
     #
@@ -228,7 +229,7 @@ EXTENSIONS = {
     #
     # CacheFilter plugins
     #
-    "envoy.cache.simple_http_cache":                    "//source/extensions/filters/http/cache/simple_http_cache:config",
+    "envoy.extensions.http.cache.simple":               "//source/extensions/filters/http/cache/simple_http_cache:config",
 
     #
     # Internal redirect predicates
