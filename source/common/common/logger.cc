@@ -186,11 +186,11 @@ void Context::activate() {
   fine_grain_default_level_ = log_level_;
   fine_grain_log_format_ = log_format_;
   if (enable_fine_grain_logging_) {
-    // loggers with default level before are set to log_level_ as new default
-    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(log_level_, log_format_);
     if (log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
-      fine_grain_log_format_ = absl::StrReplaceAll(log_format_, {{"[%n]", ""}});
+      fine_grain_log_format_ = kDefaultFineGrainLogFormat;
     }
+    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(fine_grain_default_level_,
+                                                               fine_grain_log_format_);
   }
 }
 
@@ -204,14 +204,13 @@ bool Context::useFineGrainLogger() {
 void Context::enableFineGrainLogger() {
   if (current_context) {
     current_context->enable_fine_grain_logging_ = true;
-    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(current_context->log_level_,
-                                                               current_context->log_format_);
     current_context->fine_grain_default_level_ = current_context->log_level_;
     current_context->fine_grain_log_format_ = current_context->log_format_;
     if (current_context->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
-      current_context->fine_grain_log_format_ =
-          absl::StrReplaceAll(current_context->log_format_, {{"[%n]", ""}});
+      current_context->fine_grain_log_format_ = kDefaultFineGrainLogFormat;
     }
+    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(
+        current_context->fine_grain_default_level_, current_context->fine_grain_log_format_);
   }
 }
 
@@ -223,7 +222,7 @@ void Context::disableFineGrainLogger() {
 
 std::string Context::getFineGrainLogFormat() {
   if (!current_context) { // Context is not instantiated in benchmark test
-    return "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v";
+    return kDefaultFineGrainLogFormat;
   }
   return current_context->fine_grain_log_format_;
 }

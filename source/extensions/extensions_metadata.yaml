@@ -936,6 +936,13 @@ envoy.transport_sockets.alts:
   status: stable
   type_urls:
   - envoy.extensions.transport_sockets.alts.v3.Alts
+envoy.transport_sockets.internal_upstream:
+  categories:
+  - envoy.transport_sockets.upstream
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstream
 envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream

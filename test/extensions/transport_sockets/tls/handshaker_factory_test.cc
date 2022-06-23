@@ -137,7 +137,8 @@ TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
           tls_context_, "", mock_factory_ctx),
       *context_manager_, stats_store_);
 
-  std::unique_ptr<Network::TransportSocket> socket = socket_factory.createTransportSocket(nullptr);
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory.createTransportSocket(nullptr, nullptr);
 
   SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
 
@@ -162,7 +163,8 @@ TEST_F(HandshakerFactoryTest, SetSpecificSslCtxOption) {
           tls_context_, "", mock_factory_ctx),
       *context_manager_, stats_store_);
 
-  std::unique_ptr<Network::TransportSocket> socket = socket_factory.createTransportSocket(nullptr);
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory.createTransportSocket(nullptr, nullptr);
 
   SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
 
@@ -198,7 +200,8 @@ TEST_F(HandshakerFactoryTest, HandshakerContextProvidesObjectsFromParentContext)
           tls_context_, "", mock_factory_ctx),
       *context_manager_, stats_store_);
 
-  std::unique_ptr<Network::TransportSocket> socket = socket_factory.createTransportSocket(nullptr);
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory.createTransportSocket(nullptr, nullptr);
 }
 
 } // namespace

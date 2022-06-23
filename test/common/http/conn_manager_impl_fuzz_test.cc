@@ -413,7 +413,8 @@ public:
                   if (trailers_action.has_decoder_filter_callback_action()) {
                     decoderFilterCallbackAction(trailers_action.decoder_filter_callback_action());
                   }
-                  return fromTrailerStatus(trailers_action.status());
+                  trailers_status_ = fromTrailerStatus(trailers_action.status());
+                  return *trailers_status_;
                 }));
         EXPECT_CALL(*config_.codec_, dispatch(_))
             .WillOnce(InvokeWithoutArgs([this, &trailers_action] {
@@ -429,12 +430,15 @@ public:
       break;
     }
     case test::common::http::RequestAction::kContinueDecoding: {
-      if (!decoding_done_ && (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
-                              header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
-                              (header_status_ == FilterHeadersStatus::StopIteration &&
-                               (data_status_ == FilterDataStatus::StopIterationAndBuffer ||
-                                data_status_ == FilterDataStatus::StopIterationAndWatermark ||
-                                data_status_ == FilterDataStatus::StopIterationNoBuffer)))) {
+      if (!decoding_done_ &&
+          (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
+           header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
+           header_status_ == FilterHeadersStatus::StopIteration) &&
+          (!data_status_.has_value() || data_status_ == FilterDataStatus::StopIterationAndBuffer ||
+           data_status_ == FilterDataStatus::StopIterationAndWatermark ||
+           data_status_ == FilterDataStatus::StopIterationNoBuffer) &&
+          (!trailers_status_.has_value() ||
+           trailers_status_ == FilterTrailersStatus::StopIteration)) {
         decoder_filter_->callbacks_->continueDecoding();
         decoding_done_ = true;
       }
@@ -482,15 +486,11 @@ public:
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.headers()));
         // The client codec will ensure we always have a valid :status.
         // Similarly, local replies should always contain this.
-        uint64_t status;
-        try {
-          status = Utility::getResponseStatus(*headers);
-        } catch (const CodecClientException&) {
-          headers->setReferenceKey(Headers::get().Status, "200");
-        }
+        const auto status = Utility::getResponseStatusOrNullopt(*headers);
         // The only 1xx header that may be provided to encodeHeaders() is a 101 upgrade,
         // guaranteed by the codec parsers. See include/envoy/http/filter.h.
-        if (CodeUtility::is1xx(status) && status != enumToInt(Http::Code::SwitchingProtocols)) {
+        if (!status.has_value() || (CodeUtility::is1xx(status.value()) &&
+                                    status.value() != enumToInt(Http::Code::SwitchingProtocols))) {
           headers->setReferenceKey(Headers::get().Status, "200");
         }
         decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream, "details");
@@ -546,6 +546,7 @@ public:
   StreamState response_state_;
   absl::optional<Http::FilterHeadersStatus> header_status_;
   absl::optional<Http::FilterDataStatus> data_status_;
+  absl::optional<Http::FilterTrailersStatus> trailers_status_;
   bool decoding_done_{};
 };
 
