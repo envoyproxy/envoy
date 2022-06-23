@@ -83,16 +83,13 @@ absl::string_view getWasmEngine() {
       }
     }
   }
-  if (wasm_ext_runtime.empty()) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
-                        "Failed to get Wasm engine. Envoy was compiled without support for it");
-  }
+
   return wasm_ext_runtime;
 }
 
 WasmVmPtr createWasmVm(absl::string_view runtime) {
   // Set wasm runtime to build-in wasm engine if it is not specified
-  if (runtime.empty() && !getWasmEngine().empty()) {
+  if (runtime.empty()) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), info,
                         "Wasm VM runtime is unspecified, set to envoy built-in wasm runtime: {}",
                         getWasmEngine());
