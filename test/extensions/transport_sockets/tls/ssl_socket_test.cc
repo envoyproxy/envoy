@@ -936,7 +936,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SslSocketTest,
 
 TEST_P(SslSocketTest, ServerTransportSocketOptions) {
   Stats::TestUtil::TestStore server_stats_store;
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_async_cert_validation", true);
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:

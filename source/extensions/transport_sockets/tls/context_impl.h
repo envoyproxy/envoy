@@ -15,7 +15,6 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/matchers.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
@@ -138,8 +137,6 @@ protected:
   const Network::Address::IpList tls_keylog_local_;
   const Network::Address::IpList tls_keylog_remote_;
   AccessLog::AccessLogFileSharedPtr tls_keylog_file_;
-  const bool tls_async_cert_validation_ =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation");
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
