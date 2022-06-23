@@ -413,7 +413,8 @@ public:
                   if (trailers_action.has_decoder_filter_callback_action()) {
                     decoderFilterCallbackAction(trailers_action.decoder_filter_callback_action());
                   }
-                  return fromTrailerStatus(trailers_action.status());
+                  trailers_status_ = fromTrailerStatus(trailers_action.status());
+                  return *trailers_status_;
                 }));
         EXPECT_CALL(*config_.codec_, dispatch(_))
             .WillOnce(InvokeWithoutArgs([this, &trailers_action] {
@@ -429,12 +430,15 @@ public:
       break;
     }
     case test::common::http::RequestAction::kContinueDecoding: {
-      if (!decoding_done_ && (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
-                              header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
-                              (header_status_ == FilterHeadersStatus::StopIteration &&
-                               (data_status_ == FilterDataStatus::StopIterationAndBuffer ||
-                                data_status_ == FilterDataStatus::StopIterationAndWatermark ||
-                                data_status_ == FilterDataStatus::StopIterationNoBuffer)))) {
+      if (!decoding_done_ &&
+          (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
+           header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
+           header_status_ == FilterHeadersStatus::StopIteration) &&
+          (!data_status_.has_value() || data_status_ == FilterDataStatus::StopIterationAndBuffer ||
+           data_status_ == FilterDataStatus::StopIterationAndWatermark ||
+           data_status_ == FilterDataStatus::StopIterationNoBuffer) &&
+          (!trailers_status_.has_value() ||
+           trailers_status_ == FilterTrailersStatus::StopIteration)) {
         decoder_filter_->callbacks_->continueDecoding();
         decoding_done_ = true;
       }
@@ -546,6 +550,7 @@ public:
   StreamState response_state_;
   absl::optional<Http::FilterHeadersStatus> header_status_;
   absl::optional<Http::FilterDataStatus> data_status_;
+  absl::optional<Http::FilterTrailersStatus> trailers_status_;
   bool decoding_done_{};
 };
 
