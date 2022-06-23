@@ -259,8 +259,6 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     }
   }
 
-  auto empty_req_map = Http::RequestHeaderMapImpl::create();
-  auto empty_response_map = Http::ResponseHeaderMapImpl::create();
   config_->requestHeaderParser().evaluateHeaders(*headers, orig_request_headers, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
 
   Http::RequestMessagePtr message =

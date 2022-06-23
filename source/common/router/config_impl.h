@@ -782,9 +782,7 @@ public:
     void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
-  //auto empty_req_map = Http::RequestHeaderMapImpl::create();
-  auto empty_response_map = Http::ResponseHeaderMapImpl::create();
-      request_headers_parser_->evaluateHeaders(headers, headers, *empty_response_map, stream_info);
+      request_headers_parser_->evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().response_headers, empty_response_map, stream_info);
       if (!host_rewrite_.empty()) {
         headers.setHost(host_rewrite_);
       }

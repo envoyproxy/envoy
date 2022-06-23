@@ -751,9 +751,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-  auto empty_req_map = Http::RequestHeaderMapImpl::create();
-  auto empty_response_map = Http::ResponseHeaderMapImpl::create();
-    header_parser->evaluateHeaders(headers, *empty_req_map, *empty_response_map, stream_info);
+    header_parser->evaluateHeaders(headers, headers, *Http::StaticEmptyHeaders::get().request_headers, stream_info);
   }
 
   // Restore the port if this was a CONNECT request.

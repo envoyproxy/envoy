@@ -403,9 +403,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")),
                           expected_header.second);
 
-  //StreamInfo::MockStreamInfo stream_info;
-  //EXPECT_CALL(stream_info, getRequestHeaders()).WillOnce(Return(&request_headers));
-
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, request_headers, stream_info_);
 
