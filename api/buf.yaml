@@ -2,7 +2,7 @@ version: v1beta1
 deps:
     - buf.build/googleapis/googleapis:d1a849b8f8304950832335723096e954
     - buf.build/opencensus/opencensus
-    - buf.build/prometheus/prometheus
+    - buf.build/beta/prometheus
     - buf.build/opentelemetry/opentelemetry
     - buf.build/gogo/protobuf
     - buf.build/cncf/xds

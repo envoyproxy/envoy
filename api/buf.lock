@@ -2,6 +2,10 @@
 version: v1
 deps:
   - remote: buf.build
+    owner: beta
+    repository: prometheus
+    commit: a91b42d18a994cd4b07b37f365f87cf9
+  - remote: buf.build
     owner: cncf
     repository: xds
     commit: 0492166643854ea08814f4349286f9cb
@@ -25,7 +29,3 @@ deps:
     owner: opentelemetry
     repository: opentelemetry
     commit: 187ea5573ff044faa892a5d244cb2b48
-  - remote: buf.build
-    owner: prometheus
-    repository: prometheus
-    commit: 7e56b71ad9994f2d816a5bd4b9ee737f
