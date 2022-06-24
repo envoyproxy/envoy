@@ -192,7 +192,7 @@ void testMerge() {
 }
 
 uint32_t run(const std::string& directory) {
-  // In the deafult startup process, we will inject regex engine before initializing config.
+  // In the default startup process, we will inject regex engine before initializing config.
   // While in the ConfigTest, these kind of bootstrap injections will not take place, so we must
   // register regex engine in advance.
   ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
