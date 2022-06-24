@@ -143,6 +143,7 @@ envoy_cc_library(
     hdrs = ["process_wide.h"],
     external_deps = ["ares"],
     deps = [
+        "//envoy/network:dns_resolver_interface",
         "//source/common/common:assert_lib",
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:nghttp2_lib",

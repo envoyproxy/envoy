@@ -26,6 +26,8 @@ public:
       const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) const PURE;
 
   std::string category() const override { return std::string(DnsResolverCategory); }
+  virtual void init() {}
+  virtual void cleanup() {}
 };
 
 } // namespace Network

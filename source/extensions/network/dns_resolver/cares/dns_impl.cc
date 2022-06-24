@@ -521,6 +521,9 @@ public:
     }
     return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, resolvers);
   }
+
+  void init() override { ares_library_init(ARES_LIB_INIT_ALL); }
+  void cleanup() override { ares_library_cleanup(); }
 };
 
 // Register the CaresDnsResolverFactory
