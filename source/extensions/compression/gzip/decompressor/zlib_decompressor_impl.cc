@@ -17,16 +17,6 @@ namespace Compression {
 namespace Gzip {
 namespace Decompressor {
 
-// namespace {
-
-// // How many times the output buffer is allowed to be bigger than the size of
-// // accumulated input. This value is used to detect compression bombs.
-// // TODO(rojkov): Re-design the Decompressor interface to handle compression
-// // bombs gracefully instead of this quick solution.
-// constexpr uint64_t MaxInflateRatio = 100;
-
-// } // namespace
-
 ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix)
     : ZlibDecompressorImpl(scope, stats_prefix, 4096, 100) {}
 
