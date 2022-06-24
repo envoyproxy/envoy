@@ -14,6 +14,11 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Upstream {
+class HostDescription;
+}
+
 namespace Network {
 
 class Connection;
@@ -259,10 +264,12 @@ public:
 
   /**
    * @param options for creating the transport socket
+   * @param host description for the destination upstream host
    * @return Network::TransportSocketPtr a transport socket to be passed to client connection.
    */
   virtual TransportSocketPtr
-  createTransportSocket(TransportSocketOptionsConstSharedPtr options) const PURE;
+  createTransportSocket(TransportSocketOptionsConstSharedPtr options,
+                        std::shared_ptr<const Upstream::HostDescription> host) const PURE;
 
   /**
    * Returns true if the transport socket created by this factory supports some form of ALPN

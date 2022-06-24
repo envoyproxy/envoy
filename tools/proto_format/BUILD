@@ -72,14 +72,14 @@ py_binary(
     srcs = ["format_api.py"],
     args = [
         "--api_root=%s/api" % PATH,
-        "--protoprint=$(location //tools/protoxform:protoprint)",
+        "--protoprint=$(location //tools/protoprint)",
         "--descriptor=$(location //tools/type_whisperer:api_type_db.pb_text)",
     ],
     data = ["//tools/type_whisperer:api_type_db.pb_text"],
     deps = [
         ":data",
         "//tools/api_proto_plugin:utils",
-        "//tools/protoxform:protoprint",
+        "//tools/protoprint",
     ],
 )
 
@@ -89,7 +89,7 @@ genrule(
     cmd = """
     $(location :format_api) \
         --api_root=%s/api \
-        --protoprint=$(location //tools/protoxform:protoprint) \
+        --protoprint=$(location //tools/protoprint) \
         --descriptor=$(location //tools/type_whisperer:api_type_db.pb_text) \
         --outfile=$@ \
         --xformed=$(location :xformed) \
@@ -97,7 +97,7 @@ genrule(
     tools = [
         ":format_api",
         ":xformed",
-        "//tools/protoxform:protoprint",
+        "//tools/protoprint",
         "//tools/type_whisperer:api_type_db.pb_text",
     ],
 )

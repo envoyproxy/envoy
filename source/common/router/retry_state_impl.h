@@ -7,6 +7,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/router/context.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"

@@ -57,33 +57,35 @@ _default_envoy_build_config = repository_rule(
 def _envoy_repo_impl(repository_ctx):
     """This provides information about the Envoy repository
 
-    You can access the current version and path to the repository in .bzl/BUILD
-    files as follows:
+    You can access the current project and api versions and the path to the repository in
+    .bzl/BUILD files as follows:
 
     ```starlark
-    load("@envoy_repo//:version.bzl", "VERSION")
+    load("@envoy_repo//:version.bzl", "VERSION", "API_VERSION")
     ```
 
-    `VERSION` can be used to derive version-specific rules and can be passed
+    `*VERSION` can be used to derive version-specific rules and can be passed
     to the rules.
 
-    The `VERSION` and also the local `PATH` to the repo can be accessed in
+    The `VERSION`s and also the local `PATH` to the repo can be accessed in
     python libraries/binaries. By adding `@envoy_repo` to `deps` they become
     importable through the `envoy_repo` namespace.
 
     As the `PATH` is local to the machine, it is generally only useful for
     jobs that will run locally.
 
-    This can be useful for example, for tooling that needs to check the
-    repository, or to run bazel queries that cannot be run within the
-    constraints of a `genquery`.
+    This can be useful, for example, for bazel run jobs to run bazel queries that cannot be run
+    within the constraints of a `genquery`, or that otherwise need access to the repository
+    files.
 
     """
-    repo_path = repository_ctx.path(repository_ctx.attr.envoy_version)
-    version = repository_ctx.read(repo_path.dirname.get_child(repo_path.basename)).strip()
-    repository_ctx.file("version.bzl", "VERSION = '%s'" % version)
-    repository_ctx.file("path.bzl", "PATH = '%s'" % repo_path.dirname)
-    repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path.dirname, version))
+    repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)
+    api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
+    version = repository_ctx.read(repo_version_path).strip()
+    api_version = repository_ctx.read(api_version_path).strip()
+    repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
+    repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
+    repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", """
 load("@rules_python//python:defs.bzl", "py_library")
@@ -96,6 +98,7 @@ _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
     attrs = {
         "envoy_version": attr.label(default = "@envoy//:VERSION.txt"),
+        "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
     },
 )
 
@@ -206,6 +209,7 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_colm_open_source_ragel()
     _net_zlib()
+    _intel_dlb()
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
     _org_brotli()
@@ -1119,6 +1123,22 @@ def _com_github_wasm_c_api():
     native.bind(
         name = "prefixed_wasmtime",
         actual = "@com_github_wasm_c_api//:wasmtime_lib",
+    )
+
+def _intel_dlb():
+    external_http_archive(
+        name = "intel_dlb",
+        build_file_content = """
+filegroup(
+    name = "libdlb",
+    srcs = glob([
+        "dlb/libdlb/**",
+    ]),
+    visibility = ["@envoy//contrib/network/connection_balance/dlb/source:__pkg__"],
+)
+""",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
     )
 
 def _rules_fuzzing():

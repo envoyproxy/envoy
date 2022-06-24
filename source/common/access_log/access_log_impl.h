@@ -269,7 +269,7 @@ public:
   virtual FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
                                  Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
 
-  std::string category() const override { return "envoy.access_logger.extension_filters"; }
+  std::string category() const override { return "envoy.access_loggers.extension_filters"; }
 };
 
 /**

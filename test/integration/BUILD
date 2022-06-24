@@ -1027,6 +1027,7 @@ envoy_cc_test(
     shard_count = 2,
     deps = [
         ":http_integration_lib",
+        "//envoy/registry",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//test/integration/filters:clear_route_cache_filter_lib",
@@ -1038,8 +1039,10 @@ envoy_cc_test(
         "//test/integration/filters:set_route_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
@@ -1057,6 +1060,17 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "regex_engine_integration_test",
+    srcs = ["regex_engine_integration_test.cc"],
+    deps = [
+        ":integration_lib",
+        "//source/common/common:regex_lib",
+        "@envoy_api//envoy/extensions/regex_engines/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 

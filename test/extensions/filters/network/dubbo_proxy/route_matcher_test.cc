@@ -163,6 +163,7 @@ routes:
 }
 
 TEST(DubboRouteMatcherTest, RouteByServiceNameWithAnyMethod) {
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   {
     const std::string yaml = R"EOF(
 name: local_route
@@ -172,7 +173,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -221,7 +221,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -261,7 +260,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -302,7 +300,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -431,6 +428,7 @@ routes:
 }
 
 TEST(DubboRouteMatcherTest, RouteByMethodWithRegexMatch) {
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
@@ -439,7 +437,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "\\d{3}test"
     route:
         cluster: user_service_dubbo_server

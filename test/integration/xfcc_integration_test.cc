@@ -130,9 +130,9 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("http")));
-  return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                             client_mtls_ssl_ctx_->createTransportSocket(nullptr),
-                                             nullptr);
+  return dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      client_mtls_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr);
 }
 
 void XfccIntegrationTest::createUpstreams() {
@@ -484,7 +484,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {listenerStatPrefix("ssl.ocsp_staple_failed"), "listener.ssl.ocsp_staple_failed"},
       {listenerStatPrefix("http.config_test.downstream_rq_2xx"), "listener.http.downstream_rq_xx"},
       {listenerStatPrefix("http.config_test.downstream_rq_5xx"), "listener.http.downstream_rq_xx"},
-      {listenerStatPrefix("worker_0.downstream_cx_total"), "listener.worker_0.downstream_cx_total"},
+      {listenerStatPrefix("worker_0.downstream_cx_total"), "listener.downstream_cx_total"},
       {listenerStatPrefix("ssl.fail_verify_san"), "listener.ssl.fail_verify_san"},
       {listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"),
        "listener.downstream_cx_transport_socket_connect_timeout"},
@@ -675,7 +675,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.config_test.downstream_rq_failed_path_normalization",
        "http.downstream_rq_failed_path_normalization"},
       {"cluster.cluster_0.original_dst_host_invalid", "cluster.original_dst_host_invalid"},
-      {"server.worker_0.watchdog_miss", "server.worker_0.watchdog_miss"},
+      {"server.worker_0.watchdog_miss", "server.watchdog_miss"},
       {"http.config_test.downstream_rq_rx_reset", "http.downstream_rq_rx_reset"},
       {"cluster.cluster_0.upstream_cx_destroy_local_with_active_rq",
        "cluster.upstream_cx_destroy_local_with_active_rq"},
@@ -758,7 +758,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
        "listener.admin.downstream_cx_overload_reject"},
       {"http.config_test.tracing.random_sampling", "http.tracing.random_sampling"},
       {"cluster.cluster_0.upstream_cx_pool_overflow", "cluster.upstream_cx_pool_overflow"},
-      {"server.worker_0.watchdog_mega_miss", "server.worker_0.watchdog_mega_miss"},
+      {"server.worker_0.watchdog_mega_miss", "server.watchdog_mega_miss"},
       {"cluster.cluster_0.upstream_cx_tx_bytes_total", "cluster.upstream_cx_tx_bytes_total"},
       {"http.admin.rs_too_large", "http.rs_too_large"},
       {"listener.admin.downstream_cx_transport_socket_connect_timeout",
@@ -828,8 +828,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"listener.admin.downstream_cx_destroy", "listener.admin.downstream_cx_destroy"}};
 
   tag_extracted_gauge_map = {
-      {listenerStatPrefix("worker_0.downstream_cx_active"),
-       "listener.worker_0.downstream_cx_active"},
+      {listenerStatPrefix("worker_0.downstream_cx_active"), "listener.downstream_cx_active"},
       {listenerStatPrefix("downstream_cx_active"), "listener.downstream_cx_active"},
       {listenerStatPrefix("downstream_pre_cx_active"), "listener.downstream_pre_cx_active"},
       {"listener.admin.downstream_cx_active", "listener.admin.downstream_cx_active"},
