@@ -74,8 +74,11 @@ minor_behavior_changes:
     that loads shared object libraries, such as those installed via luarocks.
 - area: admin
   change: |
-    changed default regex engine for /stats?filter= from std::regex to RE2, improving filtering speed
-    20x.
+    changed default regex engine for ``/stats?filter=`` from std::regex to RE2, improving
+    filtering speed 20x.
+- area: admin
+  change: |
+    added compile-time option ``--define=admin_html=disabled`` to disable HTML home page.
 - area: skywalking
   change: |
     use request path as operation name of ENTRY/EXIT spans.
