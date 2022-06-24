@@ -9,6 +9,7 @@ HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
     Address::InstanceConstSharedPtr source_address, UpstreamTransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
+    const Upstream::HostDescriptionConstSharedPtr& host,
     const ConnectionSocket::OptionsSharedPtr options)
     : dispatcher_(dispatcher), address_list_(sortAddresses(address_list)),
       source_address_(source_address), socket_factory_(socket_factory),

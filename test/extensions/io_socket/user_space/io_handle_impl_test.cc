@@ -3,6 +3,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -1116,6 +1117,51 @@ TEST_F(IoHandleImplTest, CreatePlatformDefaultTriggerTypeFailOnWindows) {
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   io_handle_->close();
   io_handle_peer_->close();
+}
+
+class TestObject : public StreamInfo::FilterState::Object {
+public:
+  TestObject(int value) : value_(value) {}
+  int value_;
+};
+
+TEST_F(IoHandleImplTest, PassthroughState) {
+  auto source_metadata = std::make_unique<envoy::config::core::v3::Metadata>();
+  ProtobufWkt::Struct& map = (*source_metadata->mutable_filter_metadata())["envoy.test"];
+  ProtobufWkt::Value val;
+  val.set_string_value("val");
+  (*map.mutable_fields())["key"] = val;
+  auto source_filter_state = std::make_unique<FilterStateObjects>();
+  auto object = std::make_shared<TestObject>(1000);
+  source_filter_state->emplace_back("object_key", object);
+  ASSERT_NE(nullptr, io_handle_->passthroughState());
+  io_handle_->passthroughState()->initialize(std::move(source_metadata),
+                                             std::move(source_filter_state));
+
+  StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  envoy::config::core::v3::Metadata dest_metadata;
+  ASSERT_NE(nullptr, io_handle_peer_->passthroughState());
+  io_handle_peer_->passthroughState()->mergeInto(dest_metadata, dest_filter_state);
+  ASSERT_EQ("val",
+            dest_metadata.filter_metadata().at("envoy.test").fields().at("key").string_value());
+  auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
+  ASSERT_NE(nullptr, dest_object);
+  ASSERT_EQ(object->value_, dest_object->value_);
+}
+
+TEST_F(IoHandleImplTest, PassthroughStateReadOnlyObject) {
+  auto source_filter_state = std::make_unique<FilterStateObjects>();
+  auto object = std::make_shared<TestObject>(1000);
+  source_filter_state->emplace_back("object_key", object);
+  io_handle_->passthroughState()->initialize(nullptr, std::move(source_filter_state));
+  StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  auto read_only = std::make_shared<TestObject>(1);
+  dest_filter_state.setData("object_key", read_only, StreamInfo::FilterState::StateType::ReadOnly,
+                            StreamInfo::FilterState::LifeSpan::Connection);
+  envoy::config::core::v3::Metadata dest_metadata;
+  io_handle_peer_->passthroughState()->mergeInto(dest_metadata, dest_filter_state);
+  auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
+  ASSERT_EQ(read_only->value_, dest_object->value_);
 }
 
 class IoHandleImplNotImplementedTest : public testing::Test {

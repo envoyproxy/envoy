@@ -310,6 +310,10 @@ bazel build envoy --config=remote-clang \
 Change the value of `--remote_cache`, `--remote_executor` and `--remote_instance_name` for your remote build services. Tests can
 be run in remote execution too.
 
+Note: Currently the test run configuration in `.bazelrc` doesn't download test binaries and test logs,
+to override the behavior set [`--remote_download_outputs`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--remote_download_outputs)
+accordingly.
+
 ## Building Envoy with Docker sandbox
 
 Building Envoy with Docker sandbox uses the same Docker image used in CI with fixed C++ toolchain configuration. It produces more consistent
@@ -661,6 +665,7 @@ The following optional features can be disabled on the Bazel build command-line:
   tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
 * http3/quic with --//bazel:http3=False
+* admin HTML home page with `--define=admin_html=disabled`
 
 ## Enabling optional features
 

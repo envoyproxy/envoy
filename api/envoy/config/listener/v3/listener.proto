@@ -5,6 +5,7 @@ package envoy.config.listener.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
@@ -94,6 +95,11 @@ message Listener {
 
       // If specified, the listener will use the exact connection balancer.
       ExactBalance exact_balance = 1;
+
+      // The listener will use the connection balancer according to ``type_url``. If ``type_url`` is invalid,
+      // Envoy will not attempt to balance active connections between worker threads.
+      // [#extension-category: envoy.network.connection_balance]
+      core.v3.TypedExtensionConfig extend_balance = 2;
     }
   }
 

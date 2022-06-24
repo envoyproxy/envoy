@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.config.trace.v3;
+
+import "envoy/config/core/v3/grpc_service.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.trace.v3";
+option java_outer_classname = "OpentelemetryProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/trace/v3;tracev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: OpenTelemetry tracer]
+
+// Configuration for the OpenTelemetry tracer.
+//  [#extension: envoy.tracers.opentelemetry]
+message OpenTelemetryConfig {
+  // The upstream gRPC cluster that will receive OTLP traces.
+  // Note that the tracer drops traces if the server does not read data fast enough.
+  core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+}
