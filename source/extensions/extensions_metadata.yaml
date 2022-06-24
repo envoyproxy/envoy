@@ -554,6 +554,11 @@ envoy.rate_limit_descriptors.expr:
   - envoy.rate_limit_descriptors
   security_posture: unknown
   status: stable
+envoy.regex_engines.google_re2:
+  categories:
+  - envoy.regex_engines
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.request_id.uuid:
   categories:
   - envoy.request_id
