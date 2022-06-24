@@ -50,7 +50,8 @@ public:
    * 256K bytes. @see http://zlib.net/zlib_how.html
    * @param chunk_size amount of memory reserved for the decompressor output.
    */
-  ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix, uint64_t chunk_size, uint64_t max_inflate_ratio);
+  ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix, uint64_t chunk_size,
+                       uint64_t max_inflate_ratio);
 
   /**
    * Init must be called in order to initialize the decompressor. Once decompressor is initialized,

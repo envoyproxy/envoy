@@ -251,7 +251,7 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   ASSERT_EQ(0, buffer.length());
 
   Stats::IsolatedStoreImpl stats_store{};
-  ZlibDecompressorImpl decompressor{stats_store, "test.", 16};
+  ZlibDecompressorImpl decompressor{stats_store, "test.", 16, 100};
   decompressor.init(gzip_window_bits);
 
   decompressor.decompress(accumulation_buffer, buffer);

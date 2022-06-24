@@ -21,11 +21,13 @@ GzipDecompressorFactory::GzipDecompressorFactory(
       window_bits_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, window_bits, DefaultWindowBits) |
                    GzipHeaderValue),
       chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, chunk_size, DefaultChunkSize)),
-      max_inflate_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, max_inflate_ratio, DefaultMaxInflateRatio)) {}
+      max_inflate_ratio_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, max_inflate_ratio, DefaultMaxInflateRatio)) {}
 
 Envoy::Compression::Decompressor::DecompressorPtr
 GzipDecompressorFactory::createDecompressor(const std::string& stats_prefix) {
-  auto decompressor = std::make_unique<ZlibDecompressorImpl>(scope_, stats_prefix, chunk_size_, max_inflate_ratio_);
+  auto decompressor =
+      std::make_unique<ZlibDecompressorImpl>(scope_, stats_prefix, chunk_size_, max_inflate_ratio_);
   decompressor->init(window_bits_);
   return decompressor;
 }
