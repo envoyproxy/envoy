@@ -11,8 +11,6 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -264,7 +262,7 @@ message FilterChain {
   // Note: :ref:`filter_chain_matcher
   // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
   // requires that filter chains are uniquely named within a listener.
-  string name = 7 [(xds.annotations.v3.field_status).work_in_progress = true];
+  string name = 7;
 
   // [#not-implemented-hide:] The configuration to specify whether the filter chain will be built on-demand.
   // If this field is not empty, the filter chain will be built on-demand.

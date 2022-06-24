@@ -1,5 +1,7 @@
 # This should match the schema defined in external_deps.bzl.
 
+PROTOBUF_VERSION = "3.19.4"
+
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
 # https://github.com/protocolbuffers/protobuf/releases).
@@ -7,12 +9,8 @@
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
     linux_aarch_64 = "95584939e733bdd6ffb8245616b2071f565cd4c28163b6c21c8f936a9ee20861",
-    linux_ppcle_64 = "5c22cc91c87e4396bf4c68fb66ba655e2eda251935c7893f08016313933f6944",
-    linux_s390_64 = "5d84154efa12082d9774935c164c34a57878267e7371a08c11f66526f7014c4b",
-    linux_x86_32 = "06aff080f7c275f6cae3dabd54f7f819cbcc495d79f9d3c2d6c268991551342b",
     linux_x86_64 = "058d29255a08f8661c8096c92961f3676218704cbd516d3916ec468e139cbd87",
     osx_x86_64 = "d8b55cf1e887917dd43c447d77bd5bd213faff1e18ac3a176b35558d86f7ffff",
-    win32 = "c1a863e1601a923a116b1fdf880eb616530ca6175f1418a55f3f5f2d6e2f4c16",
     win64 = "828d2bdfe410e988cfc46462bcabd34ffdda8cc172867989ec647eadc55b03b5",
 )
 
@@ -121,12 +119,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Aspect Bazel helpers",
         project_desc = "Base Starlark libraries and basic Bazel rules which are useful for constructing rulesets and BUILD files",
         project_url = "https://github.com/aspect-build/bazel-lib",
-        version = "0.12.0",
-        sha256 = "d1d712d115b908eaaa22aa899fa0e9016d70347debdafe295059e79adda93b02",
+        version = "1.0.0",
+        sha256 = "b381ac4dca544ecc5515916f38066e9793628477e2577edb7b2ab04e8c210738",
         strip_prefix = "bazel-lib-{version}",
         urls = ["https://github.com/aspect-build/bazel-lib/archive/v{version}.tar.gz"],
         use_category = ["build"],
-        release_date = "2022-05-26",
+        release_date = "2022-06-06",
         cpe = "N/A",
     ),
     com_google_absl = dict(
@@ -145,11 +143,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Shellcheck rules for bazel",
         project_desc = "Now you do not need to depend on the system shellcheck version in your bazel-managed (mono)repos.",
         project_url = "https://github.com/aignas/rules_shellcheck",
-        version = "0.1.0",
-        sha256 = "180325028cddda58df209765947839e78e75a0cf90b2dc6303bdf7a90c735e0c",
+        version = "0.1.1",
+        sha256 = "4e7cc56d344d0adfd20283f7ad8cb4fba822c0b15ce122665b00dd87a27a74b6",
         strip_prefix = "rules_shellcheck-{version}",
         urls = ["https://github.com/aignas/rules_shellcheck/archive/v{version}.tar.gz"],
-        release_date = "2022-05-29",
+        release_date = "2022-05-30",
         use_category = ["build"],
         cpe = "N/A",
     ),
@@ -710,7 +708,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Protocol Buffers",
         project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
         project_url = "https://developers.google.com/protocol-buffers",
-        version = "3.19.4",
+        version = PROTOBUF_VERSION,
         # When upgrading the protobuf library, please re-run
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
@@ -739,11 +737,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Go rules for Bazel",
         project_desc = "Bazel rules for the Go language",
         project_url = "https://github.com/bazelbuild/rules_go",
-        version = "0.32.0",
-        sha256 = "ab21448cef298740765f33a7f5acee0607203e4ea321219f2a4c85a6e0fb0a27",
+        version = "0.33.0",
+        sha256 = "685052b498b6ddfe562ca7a97736741d87916fe536623afb7da2824c0211c369",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
         use_category = ["build", "api"],
-        release_date = "2022-05-11",
+        release_date = "2022-06-06",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
@@ -936,12 +934,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "74aa2867de8e650809d85cd6454aca4200ec6e36",
-        sha256 = "7a35126b6d6937ff5dbac09dbfec247449fb83effdf41c9a18db8a0efbc641b9",
+        version = "9e822e9494e1dcba1740a0fa4cc9f6605c97a7f9",
+        sha256 = "9d3ca5e9667a42cc49f53aa6986f188ad5a17a2b4d667b38959d1d3ef91d1ecf",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2022-06-07",
+        release_date = "2022-06-18",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -1190,6 +1188,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-03-02",
         cpe = "N/A",
     ),
+    intel_dlb = dict(
+        project_name = "Intel Dlb",
+        project_desc = "Dlb",
+        project_url = "https://networkbuilders.intel.com/solutionslibrary/queue-management-and-load-balancing-on-intel-architecture",
+        version = "7.6.0",
+        sha256 = "b74c1bb2863fb6374bf80b9268b5978ab7b9d4eabb2d47ea427a5460aa3ae5fe",
+        urls = ["https://downloadmirror.intel.com/727424/dlb_linux_src_release7.6.0_2022_03_30.txz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.network.connection_balance.dlb"],
+        release_date = "2022-03-30",
+        cpe = "N/A",
+    ),
 )
 
 def _compiled_protoc_deps(locations, versions):
@@ -1198,7 +1208,7 @@ def _compiled_protoc_deps(locations, versions):
             project_name = "Protocol Buffers (protoc) %s" % platform,
             project_desc = "Protoc compiler for protobuf (%s)" % platform,
             project_url = "https://developers.google.com/protocol-buffers",
-            version = "3.19.4",
+            version = PROTOBUF_VERSION,
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],

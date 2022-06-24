@@ -25,7 +25,7 @@ public:
                            std::make_shared<Address::Ipv4Instance>("127.0.0.2"),
                            std::make_shared<Address::Ipv6Instance>("ff02::1", 0)}),
         address_list_({raw_address_list_[0], raw_address_list_[2], raw_address_list_[1]}) {
-    EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
+    EXPECT_CALL(transport_socket_factory_, createTransportSocket(_, _));
     EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[0], _, _, _))
         .WillOnce(testing::InvokeWithoutArgs(
             this, &HappyEyeballsConnectionImplTest::createNextConnection));
@@ -33,7 +33,7 @@ public:
     next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
     impl_ = std::make_unique<HappyEyeballsConnectionImpl>(
         dispatcher_, raw_address_list_, Address::InstanceConstSharedPtr(),
-        transport_socket_factory_, transport_socket_options_, options_);
+        transport_socket_factory_, transport_socket_options_, nullptr, options_);
   }
 
   // Called by the dispatcher to return a MockClientConnection. In order to allow expectations to
@@ -69,7 +69,7 @@ public:
 
   // Fires the failover timer and creates the next connection.
   void timeOutAndStartNextAttempt() {
-    EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
+    EXPECT_CALL(transport_socket_factory_, createTransportSocket(_, _));
     EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[1], _, _, _))
         .WillOnce(testing::InvokeWithoutArgs(
             this, &HappyEyeballsConnectionImplTest::createNextConnection));
@@ -113,7 +113,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeout) {
 
   // Let the second attempt timeout to start the third and final attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
+  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_, _));
   EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[2], _, _, _))
       .WillOnce(
           testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
@@ -129,7 +129,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectFailed) {
   // When the first connection attempt fails, the next attempt will be immediately
   // started and the timer will be armed for the third attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
+  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_, _));
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(
           testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
@@ -203,7 +203,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondFailsAndFirstSuc
 
   // When the second attempt fails, the third and final attempt will be started.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
+  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_, _));
   EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[2], _, _, _))
       .WillOnce(
           testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
@@ -230,7 +230,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectThenAllTimeoutAndFail) {
 
   // After the second timeout the third and final attempt will be started.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
+  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_, _));
   EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[2], _, _, _))
       .WillOnce(
           testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
