@@ -18,8 +18,8 @@ using envoy::service::ext_proc::v3::CommonResponse;
 using envoy::service::ext_proc::v3::HeadersResponse;
 using envoy::service::ext_proc::v3::TrailersResponse;
 
-void ProcessorState::onStartCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
-                                 CallbackState callback_state) {
+void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
+                                          CallbackState callback_state) {
   callback_state_ = callback_state;
   if (!message_timer_) {
     message_timer_ = filter_callbacks_->dispatcher().createTimer(cb);
@@ -27,7 +27,7 @@ void ProcessorState::onStartCall(Event::TimerCb cb, std::chrono::milliseconds ti
   message_timer_->enableTimer(timeout);
 }
 
-void ProcessorState::onFinishCall(CallbackState next_state) {
+void ProcessorState::onFinishProcessorCall(CallbackState next_state) {
   callback_state_ = next_state;
   if (message_timer_) {
     message_timer_->disableTimer();
@@ -51,7 +51,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     if (common_response.clear_route_cache()) {
       filter_callbacks_->clearRouteCache();
     }
-    onFinishCall();
+    onFinishProcessorCall();
 
     if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
       ENVOY_LOG(debug, "Replacing complete message");
@@ -188,7 +188,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         });
       }
       clearWatermark();
-      onFinishCall();
+      onFinishProcessorCall();
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback ||
                callback_state_ == CallbackState::StreamedBodyCallbackFinishing) {
@@ -217,9 +217,9 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         clearWatermark();
       }
       if (chunk_queue_.empty()) {
-        onFinishCall();
+        onFinishProcessorCall();
       } else {
-        onFinishCall(callback_state_);
+        onFinishProcessorCall(callback_state_);
       }
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
       // Apply changes to the buffer that we sent to the server
@@ -236,7 +236,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       }
       should_continue = true;
       clearWatermark();
-      onFinishCall();
+      onFinishProcessorCall();
       partial_body_processed_ = true;
 
       // If anything else is left on the queue, inject it too
@@ -249,7 +249,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         }
       }
     } else {
-      onFinishCall();
+      onFinishProcessorCall();
     }
 
     if (response.response().clear_route_cache()) {
@@ -285,7 +285,7 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
       }
     }
     trailers_ = nullptr;
-    onFinishCall();
+    onFinishProcessorCall();
     continueIfNecessary();
     return absl::OkStatus();
   }
@@ -301,7 +301,7 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 }
 
 void ProcessorState::clearAsyncState() {
-  onFinishCall();
+  onFinishProcessorCall();
   while (auto queued_chunk = dequeueStreamingChunk(false)) {
     auto chunk = std::move(*queued_chunk);
     ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk->data.length());

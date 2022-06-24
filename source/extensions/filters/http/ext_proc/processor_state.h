@@ -107,9 +107,9 @@ public:
   void setHeaders(Http::RequestOrResponseHeaderMap* headers) { headers_ = headers; }
   void setTrailers(Http::HeaderMap* trailers) { trailers_ = trailers; }
 
-  void onStartCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
-                   CallbackState callback_state);
-  void onFinishCall(CallbackState next_state = CallbackState::Idle);
+  void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
+                            CallbackState callback_state);
+  void onFinishProcessorCall(CallbackState next_state = CallbackState::Idle);
 
   // Idempotent methods for watermarking the body
   virtual void requestWatermark() PURE;

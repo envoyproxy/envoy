@@ -136,8 +136,8 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   auto* headers_req = state.mutableHeaders(req);
   MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
-  state.onStartCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                    ProcessorState::CallbackState::HeadersCallback);
+  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                             ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -487,8 +487,8 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
 void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                            ProcessorState::CallbackState new_state, bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
-  state.onStartCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                    new_state);
+  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                             new_state);
   ProcessingRequest req;
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
@@ -501,8 +501,8 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   ProcessingRequest req;
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, *trailers_req->mutable_trailers());
-  state.onStartCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                    ProcessorState::CallbackState::TrailersCallback);
+  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                             ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -647,8 +647,8 @@ void Filter::onMessageTimeout() {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
     closeStream();
-    decoding_state_.onFinishCall();
-    encoding_state_.onFinishCall();
+    decoding_state_.onFinishProcessorCall();
+    encoding_state_.onFinishProcessorCall();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
@@ -666,8 +666,8 @@ void Filter::clearAsyncState() {
 // Regardless of the current state, ensure that the timers won't fire
 // again.
 void Filter::cleanUpTimers() {
-  decoding_state_.onFinishCall();
-  encoding_state_.onFinishCall();
+  decoding_state_.onFinishProcessorCall();
+  encoding_state_.onFinishProcessorCall();
 }
 
 static const ImmediateMutationChecker& immediateResponseChecker() {

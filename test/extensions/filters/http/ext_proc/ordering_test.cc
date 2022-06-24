@@ -782,6 +782,7 @@ TEST_F(OrderingTest, GrpcErrorAfterTimeout) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(*request_timer, disableTimer());
   request_timer->invokeCallback();
   // Nothing should happen now despite the gRPC error
   sendGrpcError();
@@ -811,7 +812,7 @@ TEST_F(OrderingTest, TimeoutOnResponseBody) {
   EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
-  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(*request_timer, disableTimer()).Times(2);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   sendRequestBodyReply();
 
@@ -826,7 +827,7 @@ TEST_F(OrderingTest, TimeoutOnResponseBody) {
   EXPECT_CALL(*response_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
-  EXPECT_CALL(*response_timer, disableTimer());
+  EXPECT_CALL(*response_timer, disableTimer()).Times(2);
   sendResponseHeadersReply();
   EXPECT_CALL(*response_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
@@ -850,7 +851,7 @@ TEST_F(OrderingTest, TimeoutOnRequestBody) {
   EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersPost(true);
-  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(*request_timer, disableTimer()).Times(2);
   sendRequestHeadersReply();
 
   Buffer::OwnedImpl req_body;
