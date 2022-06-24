@@ -150,7 +150,6 @@ TEST(OpenCensusTracerTest, Span) {
 
     ASSERT_EQ(3, sd.annotations().events().size());
     EXPECT_EQ("my annotation", sd.annotations().events()[0].event().description());
-    EXPECT_EQ("spawnChild", sd.annotations().events()[1].event().description());
     EXPECT_EQ("setSampled", sd.annotations().events()[2].event().description());
     EXPECT_TRUE(sd.has_ended());
   }
