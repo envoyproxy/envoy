@@ -1,11 +1,11 @@
-version: v1beta1
+version: v1
 deps:
     - buf.build/googleapis/googleapis:d1a849b8f8304950832335723096e954
-    - buf.build/beta/opencensus
+    - buf.build/opencensus/opencensus
     - buf.build/beta/prometheus
-    - buf.build/beta/opentelemetry
+    - buf.build/opentelemetry/opentelemetry
     - buf.build/gogo/protobuf
-    - buf.build/beta/xds
+    - buf.build/cncf/xds
 breaking:
   ignore_unstable_packages: true
   use:
@@ -17,3 +17,6 @@ breaking:
     - FILE_SAME_PACKAGE
     - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED
     - FIELD_NO_DELETE_UNLESS_NAME_RESERVED
+lint:
+  use:
+  - IMPORT_USED

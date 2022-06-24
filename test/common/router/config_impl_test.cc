@@ -167,7 +167,8 @@ parseRouteConfigurationFromYaml(const std::string& yaml) {
 
 class ConfigImplTestBase {
 protected:
-  ConfigImplTestBase() : api_(Api::createApiForTest()) {
+  ConfigImplTestBase()
+      : api_(Api::createApiForTest()), engine_(std::make_unique<Regex::GoogleReEngine>()) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
@@ -332,6 +333,7 @@ most_specific_header_mutations_wins: {0}
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Event::SimulatedTimeSystem test_time_;
+  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
@@ -345,7 +347,6 @@ virtual_hosts:
   routes:
   - match:
       safe_regex:
-        google_re2: {}
         regex: "foobar"
     route:
       cluster: connect_break
@@ -357,7 +358,6 @@ virtual_hosts:
       prefix_rewrite: "/rewrote"
   - match:
       safe_regex:
-        google_re2: {}
         regex: ".*"
     route:
       cluster: connect_fallthrough
@@ -396,7 +396,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/users/\\d+/location$"
     - name: ":method"
       string_match:
@@ -489,7 +488,6 @@ virtual_hosts:
     route:
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "^/new(.*?)_endpoint(.*)$"
         substitution: /\1_rewritten_endpoint\2
       cluster: www2
@@ -498,7 +496,6 @@ virtual_hosts:
     route:
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "e"
         substitution: "X"
       cluster: www2
@@ -509,7 +506,6 @@ virtual_hosts:
       cluster: www2
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "[aeioe]"
         substitution: "V"
   - match:
@@ -552,37 +548,31 @@ virtual_hosts:
   routes:
   - match:
       safe_regex:
-        google_re2: {}
         regex: "/t[io]c"
     route:
       cluster: clock
   - match:
       safe_regex:
-        google_re2: {}
         regex: "/baa+"
     route:
       cluster: sheep
   - match:
       safe_regex:
-        google_re2: {}
         regex: ".*/\\d{3}$"
     route:
       cluster: three_numbers
       prefix_rewrite: "/rewrote"
   - match:
       safe_regex:
-        google_re2: {}
         regex: ".*/\\d{4}$"
     route:
       cluster: four_numbers
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "(^.*)/(\\d{4})$"
         substitution: /four/\2/endpoint\1
   - match:
       safe_regex:
-        google_re2: {}
         regex: ".*"
     route:
       cluster: regex_default
@@ -592,7 +582,6 @@ virtual_hosts:
   routes:
   - match:
       safe_regex:
-        google_re2: {}
         regex: ".*"
     route:
       cluster: regex_default
@@ -676,7 +665,6 @@ virtual_hosts:
       cluster: ats
       host_rewrite_path_regex:
         pattern:
-          google_re2: {}
           regex: "^/.+/(.+)$"
         substitution: \1
       append_x_forwarded_host: true
@@ -690,7 +678,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/rides$"
     - name: ":method"
       string_match:
@@ -700,7 +687,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/rides/\\d+$"
     - name: ":method"
       string_match:
@@ -710,7 +696,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/users/\\d+/chargeaccounts$"
     - name: ":method"
       string_match:
@@ -720,7 +705,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/users$"
     - name: ":method"
       string_match:
@@ -730,7 +714,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/users/\\d+$"
     - name: ":method"
       string_match:
@@ -740,7 +723,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/users/\\d+/location$"
     - name: ":method"
       string_match:
@@ -1187,7 +1169,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/(+invalid)"
         route: { cluster: "regex" }
   )EOF";
@@ -1205,7 +1186,6 @@ virtual_hosts:
         name: "invalid"
         string_match:
           safe_regex:
-            google_re2: {}
             regex: "^/(+invalid)"
   )EOF";
 
@@ -2277,7 +2257,6 @@ virtual_hosts:
       - name: test_header_pattern
         string_match:
           safe_regex:
-            google_re2: {}
             regex: "^user=test-\\d+$"
     route:
       cluster: local_service_with_header_pattern_set_regex
@@ -2401,7 +2380,6 @@ virtual_hosts:
             - name: test_header
               string_match:
                 safe_regex:
-                  google_re2: {}
                   regex: "(+invalid regex)"
         route: { cluster: "local_service" }
   )EOF";
@@ -2428,7 +2406,6 @@ virtual_hosts:
       - name: id
         string_match:
           safe_regex:
-            google_re2: {}
             regex: "\\d+[02468]"
       - name: debug
     route:
@@ -5094,7 +5071,6 @@ virtual_hosts:
       prefix_rewrite: /
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: foo
         substitution: bar
       cluster: www2
@@ -6455,7 +6431,6 @@ virtual_hosts:
   - match:
       prefix: "/"
       safe_regex:
-        google_re2: {}
         regex: "/[bc]at"
     route:
       cluster: www2
@@ -6505,7 +6480,6 @@ virtual_hosts:
   - match:
       path: "/foo"
       safe_regex:
-        google_re2: {}
         regex: "/[bc]at"
     route:
       cluster: www2
@@ -6540,7 +6514,6 @@ virtual_hosts:
       prefix: "/"
       path: "/foo"
       safe_regex:
-        google_re2: {}
         regex: "/[bc]at"
     route:
       cluster: www2
@@ -6651,7 +6624,6 @@ virtual_hosts:
     cors:
       allow_origin_string_match:
       - safe_regex:
-          google_re2: {}
           regex: .*\.envoyproxy\.io
       allow_methods: "test-methods"
       allow_headers: "test-headers"
@@ -7390,7 +7362,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/rege[xy]"
         route: { cluster: ww2 }
       - match: { path: "/exact-path" }
@@ -7437,7 +7408,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/first"
         tracing:
           client_sampling:
@@ -7445,7 +7415,6 @@ virtual_hosts:
         route: { cluster: ww2 }
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/second"
         tracing:
           overall_sampling:
@@ -7526,7 +7495,6 @@ virtual_hosts:
         redirect: { host_redirect: new.lyft.com, prefix_rewrite: "/new/prefix"}
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/[r][e][g][e][x].*"
         redirect: { prefix_rewrite: "/new/regex-prefix/" }
       - match: { prefix: "/http/prefix"}
@@ -7649,23 +7617,19 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: /foo/([0-9]{4})/(.*)
         redirect:
           regex_rewrite:
             pattern:
-              google_re2: {}
               regex: /foo/([0-9]{4})/(.*)
             substitution: /\2/\1/baz
       - match:
           safe_regex:
-            google_re2: {}
             regex: /strip-query/([0-9]{4})/(.*)
         redirect:
           strip_query: true
           regex_rewrite:
             pattern:
-              google_re2: {}
               regex: /strip-query/([0-9]{4})/(.*)
             substitution: /\2/\1/baz
   )EOF";
@@ -7841,7 +7805,6 @@ virtual_hosts:
             - name: test_header_pattern
               string_match:
                 safe_regex:
-                  google_re2: {}
                   regex: "^user=test-\\d+$"
         route:
           cluster: local_service_with_header_pattern_set_regex
@@ -8543,7 +8506,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route: { cluster: some-cluster }
   )EOF";
@@ -8575,7 +8537,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8597,7 +8558,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8620,7 +8580,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8643,7 +8602,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8668,7 +8626,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8706,7 +8663,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8734,7 +8690,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8757,7 +8712,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8780,7 +8734,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8808,7 +8761,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8848,7 +8800,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8871,7 +8822,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8901,7 +8851,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8937,7 +8886,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster

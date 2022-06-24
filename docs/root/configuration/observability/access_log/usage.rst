@@ -943,7 +943,7 @@ The following command operators are supported:
   The body text for the requests rejected by the Envoy.
 
 %FILTER_CHAIN_NAME%
-  The network filter chain name of the downstream connection.
+  The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
