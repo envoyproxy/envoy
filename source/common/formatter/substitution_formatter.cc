@@ -1827,7 +1827,7 @@ UpstreamHostMetadataFormatter::UpstreamHostMetadataFormatter(const std::string& 
                           }
                           Upstream::HostDescriptionConstSharedPtr host =
                               stream_info.upstreamInfo()->upstreamHost();
-                          if (!host) {
+                          if (host == nullptr) {
                             return nullptr;
                           }
                           return host->metadata().get();
