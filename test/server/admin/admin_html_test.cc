@@ -35,11 +35,8 @@ TEST_P(AdminInstanceTest, HelpUsesPostForMutations) {
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
-  const std::string logging_post = "<form action='logging' method='post'";
-  const std::string stats_get = "<a href='stats'";
-  EXPECT_NE(-1, response.search(logging_post.data(), logging_post.size(), 0, 0))
-      << response.toString();
-  EXPECT_NE(-1, response.search(stats_get.data(), stats_get.size(), 0, 0)) << response.toString();
+  EXPECT_THAT(response.toString(), HasSubstr("<form action='logging' method='post'"));
+  EXPECT_THAT(response.toString(), HasSubstr("<form action='stats' method='get'"));
 }
 
 } // namespace Server

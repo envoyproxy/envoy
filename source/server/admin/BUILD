@@ -160,7 +160,6 @@ envoy_cc_library(
     srcs = ["stats_render.cc"],
     hdrs = ["stats_render.h"],
     deps = [
-        ":admin_html_generator_lib",
         ":stats_params_lib",
         ":utils_lib",
         "//envoy/server:admin_interface",
@@ -168,7 +167,9 @@ envoy_cc_library(
         "//source/common/html:utility_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/stats:histogram_lib",
-    ],
+    ] + envoy_select_admin_html([
+        ":admin_html_generator_lib",
+    ]),
 )
 
 envoy_cc_library(
