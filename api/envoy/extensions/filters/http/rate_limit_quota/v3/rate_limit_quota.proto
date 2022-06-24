@@ -36,8 +36,9 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#next-free-field: 7]
 message RateLimitQuotaFilterConfig {
   // Configures the gRPC Rate Limit Quota Service (RLQS) RateLimitQuotaService.
-  // If not specified, all requests are allowed.
-  config.core.v3.GrpcService rlqs_server = 1;
+  //
+  // If (for any reason) this field is not set, the default behavior is to allow all requests.
+  config.core.v3.GrpcService rlqs_server = 1 [(validate.rules).message = {required: true}];
 
   // The application domain to use when calling the service. This enables sharing the quota
   // server between different applications without fear of overlap.
@@ -128,7 +129,7 @@ message RateLimitQuotaFilterConfig {
   //
   // Note: this only applies to the fraction of enabled requests.
   //
-  // Defaults to 0% of requests for safety.
+  // Defaults to 100% of requests.
   config.core.v3.RuntimeFractionalPercent filter_enforced = 5;
 
   // Specifies a list of HTTP headers that should be added to each request that
@@ -170,47 +171,19 @@ message RateLimitQuotaBucketSettings {
   // Configures the behavior after the first request has been matched to the bucket, and before the
   // the RLQS server returns the first quota assignment.
   message NoAssignmentBehavior {
-    // Blocking behavior: wait for the RLQS server to return the first assignment before
-    // processing any requests.
-    // [#not-implemented-hide:]
-    message BlockingBehavior {
-      // Limit the time the requests are blocked until the RLQS server to returns
-      // the first assignment. If the server doesn't respond within the configured time,
-      // all pending requests will be processed according to the :ref:`on_timeout
-      // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.NoAssignmentBehavior.BlockingBehavior.on_timeout>`
-      // field.
-      google.protobuf.Duration timeout = 1 [(validate.rules).duration = {
-        required: true
-        gt {}
-      }];
-
-      // Allow or Deny the requests after the duration specified in the :ref:`timeout
-      // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.NoAssignmentBehavior.BlockingBehavior.timeout>`
-      // field reached.
-      //
-      // If unset, the default behavior is to allow all requests (:ref:`BlanketRule.ALLOW_ALL
-      // <envoy_v3_api_enum_value_type.v3.RateLimitStrategy.BlanketRule.ALLOW_ALL>`).
-      type.v3.RateLimitStrategy.BlanketRule on_timeout = 2;
-    }
-
     oneof no_assignment_behavior {
       option (validate.required) = true;
 
       // Apply the rate limiting strategy to the requests matched into the bucket
       // until the RLQS server returns the first assignment.
       type.v3.RateLimitStrategy fallback_rate_limit = 1;
-
-      // Block all requests matched into the bucket until the RLQS server returns
-      // the first quota assignment.
-      // [#not-implemented-hide:]
-      BlockingBehavior block_requests = 2;
     }
   }
 
-  // Specifies the behavior when the bucket's assignment has expired, and can't be refreshed
-  // due to the RLQS server's unavailability.
+  // Specifies the behavior when the bucket's assignment has expired, and cannot be refreshed for
+  // any reason.
   message ExpiredAssignmentBehavior {
-    // Reuse the last known quota assignment, effectively extending it for  the duration
+    // Reuse the last known quota assignment, effectively extending it for the duration
     // specified in the :ref:`expired_assignment_behavior_timeout
     // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.expired_assignment_behavior_timeout>`
     // field.
@@ -403,13 +376,17 @@ message RateLimitQuotaBucketSettings {
   // configuration.
   BucketIdBuilder bucket_id_builder = 1;
 
-  // The interval at which the data plane is to report quota usage for
-  // this bucket.
-  // When the first request is matched to a bucket without an active
-  // assignment, the data plane immediately sends RateLimitQuotaUsageReports
-  // to the server, signaling it's subscribed for the quota assignments
-  // in that bucket. After that, the data plane is to submit the report
-  // with the given reporting internal.
+  // The interval at which the data plane (RLQS client) is to report quota usage for this bucket.
+  //
+  // When the first request is matched to a bucket with no assignment, the data plane is to report
+  // the request immediately in the :ref:`RateLimitQuotaUsageReports
+  // <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaUsageReports>` message.
+  // For the RLQS server, this signals that the data plane is now subscribed to
+  // the quota assignments in this bucket, and will start sending the assignment as described in
+  // the :ref:`RLQS documentation <envoy_v3_api_file_envoy/service/rate_limit_quota/v3/rlqs.proto>`.
+  //
+  // After sending the initial report, the data plane is to continue reporting the bucket usage with
+  // the internal specified in this field.
   // [#comment:nanos to seconds = 0.001 seconds]
   google.protobuf.Duration reporting_interval = 2 [(validate.rules).duration = {
     required: true
@@ -428,8 +405,8 @@ message RateLimitQuotaBucketSettings {
   // If not set, the default behavior is to allow all requests.
   NoAssignmentBehavior no_assignment_behavior = 4;
 
-  // Configures the behavior when the bucket's assignment has expired, and can't be refreshed
-  // due to the RLQS server's unavailability.
+  // Configures the behavior in the "expired assignment" state: the bucket's assignment has expired,
+  // and can't be refreshed due to the RLQS server's unavailability.
   //
   // If not set, the assignment is discarded immediately, and the bucket state returned to
   // "no assignment" (prior to receiving the first assignment). Thus :ref:`no_assignment_behavior

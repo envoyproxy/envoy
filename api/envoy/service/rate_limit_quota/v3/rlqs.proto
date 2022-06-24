@@ -93,9 +93,8 @@ message RateLimitQuotaUsageReports {
   // changes, close the stream, and reopen a new one with the different domain.
   string domain = 1 [(validate.rules).string = {min_len: 1}];
 
-  // A list of quota usage reports. In most cases the order doesn't matter, except the case when
-  // the list contains multiple reports of the same ``BucketId``. Then the earlier report must come
-  // first.
+  // A list of quota usage reports. The list is processed by the RLQS server in the same order
+  // it's provided by the client.
   repeated BucketQuotaUsage bucket_quota_usages = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
@@ -105,16 +104,16 @@ message RateLimitQuotaResponse {
     message QuotaAssignmentAction {
       // A duration after which the assignment is be considered expired.
       //
-      // If unset, the assignment has no expiration date.
-      //
-      // .. attention::
-      //   Zero-second ``Duration`` expires **immediately**, while unset ``Duration``
-      //   **has no expiration date**.
+      // * If unset, the assignment has no expiration date.
+      // * If set to ``0``, the assignment expires immediately, forcing the client into the
+      //   :ref:`"expired assignment"
+      //   <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.expired_assignment_behavior_timeout>`
+      //   state.
       google.protobuf.Duration assignment_time_to_live = 2 [(validate.rules).duration = {gte {}}];
 
       // Configures the local rate limiter for the request matched to the bucket.
       //
-      // If not set, no allow all requests.
+      // If not set, allow all requests.
       type.v3.RateLimitStrategy rate_limit_strategy = 3;
     }
 
@@ -138,13 +137,17 @@ message RateLimitQuotaResponse {
       // Abandon the bucket.
       //
       // If no requests are reported for a bucket, after some time the server considers the bucket
-      // inactive. The server stops tracking the bucket, and instructs the client to abandon the
-      // bucket via this message.
+      // inactive. The server stops tracking the bucket, and instructs the RLQS client to abandon
+      // the bucket via this message.
       //
-      // The client is to purge the bucket from the memory, and to stop tracking the bucket until
-      // there's a new request matched into the bucket. Functionally this identical to the
-      // state before client has matched the first request to the bucket, and
-      // sent bucket's first usage report ("no assignment behavior").
+      // The client is to purge the bucket from the memory, and to stop tracking the bucket.
+      // This effectively resets the client to the state prior to matching the first request into
+      // the bucket.
+      //
+      // If a new request is matched into a bucket previously abandoned via an ``AbandonAction``,
+      // the :ref:`subscription and reporting
+      // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.reporting_interval>`
+      // process simply starts over from the beginning.
       AbandonAction abandon_action = 3;
     }
   }
