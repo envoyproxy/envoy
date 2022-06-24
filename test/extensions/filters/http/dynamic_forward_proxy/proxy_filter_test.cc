@@ -41,7 +41,7 @@ public:
   void setupSocketMatcher() {
     cm_.initializeThreadLocalClusters({"fake_cluster"});
     transport_socket_match_ = new NiceMock<Upstream::MockTransportSocketMatcher>(
-        Network::TransportSocketFactoryPtr(transport_socket_factory_));
+        Network::UpstreamTransportSocketFactoryPtr(transport_socket_factory_));
     cm_.thread_local_cluster_.cluster_.info_->transport_socket_matcher_.reset(
         transport_socket_match_);
   }

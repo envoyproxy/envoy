@@ -171,7 +171,9 @@ http_filters:
       RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
                                       server_factory_context_, validation_visitor_,
                                       outer_init_manager_, "foo.", *route_config_provider_manager_),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 TEST_F(RdsImplTest, RdsAndStaticWithOptionalUnknownFilterPerVirtualHostConfig) {
@@ -346,7 +348,9 @@ TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 // validate the optional unknown factory will be ignored for per virtualhost typed config.
@@ -461,7 +465,9 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 // validate the optional unknown factory will be ignored for per route typed config.

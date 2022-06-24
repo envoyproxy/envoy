@@ -63,7 +63,7 @@ std::string sha256(absl::string_view data) {
   rc = EVP_DigestFinal(ctx, digest.data(), nullptr);
   RELEASE_ASSERT(rc == 1, "Failed to finalize digest");
   EVP_MD_CTX_free(ctx);
-  return std::string(reinterpret_cast<const char*>(&digest[0]), digest.size());
+  return {reinterpret_cast<const char*>(&digest[0]), digest.size()};
 }
 
 class TestContext : public ::Envoy::Extensions::Common::Wasm::Context {
@@ -150,7 +150,8 @@ TEST_P(WasmCommonTest, WasmFailState) {
       StreamInfo::FilterState::LifeSpan::FilterChain);
   auto wasm_state = std::make_unique<Filters::Common::Expr::CelState>(wasm_state_prototype);
   Protobuf::Arena arena;
-  EXPECT_EQ(wasm_state->exprValue(&arena, true).MessageOrDie(), nullptr);
+  EXPECT_EQ(wasm_state->exprValue(&arena, true).type(),
+            Filters::Common::Expr::CelValue::Type::kNullType);
   wasm_state->setValue("foo");
   auto any = wasm_state->serializeAsProto();
   EXPECT_TRUE(static_cast<ProtobufWkt::Any*>(any.get())->Is<ProtobufWkt::BytesValue>());

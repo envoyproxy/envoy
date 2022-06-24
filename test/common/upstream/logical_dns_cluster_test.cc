@@ -32,6 +32,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -75,6 +76,7 @@ protected:
 
   void testBasicSetup(const std::string& config, const std::string& expected_address,
                       uint32_t expected_port, uint32_t expected_hc_port) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     setupFromV3Yaml(config);
 

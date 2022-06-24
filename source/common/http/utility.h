@@ -321,7 +321,7 @@ std::string makeSetCookieValue(const std::string& key, const std::string& value,
 /**
  * Get the response status from the response headers.
  * @param headers supplies the headers to get the status from.
- * @return uint64_t the response code or throws an exception if the headers are invalid.
+ * @return uint64_t the response code or returns 0 if headers are invalid.
  */
 uint64_t getResponseStatus(const ResponseHeaderMap& headers);
 
@@ -330,7 +330,7 @@ uint64_t getResponseStatus(const ResponseHeaderMap& headers);
  * @param headers supplies the headers to get the status from.
  * @return absl::optional<uint64_t> the response code or absl::nullopt if the headers are invalid.
  */
-absl::optional<uint64_t> getResponseStatusNoThrow(const ResponseHeaderMap& headers);
+absl::optional<uint64_t> getResponseStatusOrNullopt(const ResponseHeaderMap& headers);
 
 /**
  * Determine whether these headers are a valid Upgrade request or response.
@@ -619,7 +619,7 @@ convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_
  * @return true if the request method is safe as defined in
  * https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1
  */
-bool isSafeRequest(Http::RequestHeaderMap& request_headers);
+bool isSafeRequest(const Http::RequestHeaderMap& request_headers);
 
 /**
  * Return the GatewayTimeout HTTP code to indicate the request is full received.

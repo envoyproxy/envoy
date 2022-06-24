@@ -21,6 +21,7 @@ public:
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
+          hcm.mutable_delayed_close_timeout()->set_seconds(delay_close_seconds_);
           ConfigHelper::setConnectConfig(hcm, !terminate_via_cluster_config_, allow_post_,
                                          downstream_protocol_ == Http::CodecType::HTTP3);
 
@@ -32,7 +33,7 @@ public:
             auto* route_config = hcm.mutable_route_config();
             ASSERT_EQ(1, route_config->virtual_hosts_size());
             route_config->mutable_virtual_hosts(0)->clear_domains();
-            route_config->mutable_virtual_hosts(0)->add_domains("host:80");
+            route_config->mutable_virtual_hosts(0)->add_domains("foo.lyft.com:80");
           }
         });
     HttpIntegrationTest::initialize();
@@ -66,7 +67,7 @@ public:
                                                   {":path", "/"},
                                                   {":protocol", "bytestream"},
                                                   {":scheme", "https"},
-                                                  {":authority", "host:80"}};
+                                                  {":authority", "foo.lyft.com:80"}};
   void clearExtendedConnectHeaders() {
     connect_headers_.removeProtocol();
     connect_headers_.removePath();
@@ -93,6 +94,7 @@ public:
 
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
+  uint32_t delay_close_seconds_ = 200;
   bool terminate_via_cluster_config_{};
   bool enable_timeout_{};
   bool exact_match_{};
@@ -131,6 +133,8 @@ TEST_P(ConnectTerminationIntegrationTest, BasicWithClusterconfig) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
+  // This case does not handle delay close well.
+  delay_close_seconds_ = 1;
   allow_post_ = true;
   initialize();
 
@@ -191,8 +195,10 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
     // In HTTP/3 end stream will be sent when the upstream connection is closed, and
     // STOP_SENDING frame sent instead of reset.
     ASSERT_TRUE(response_->waitForEndStream());
-  } else {
+  } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
     ASSERT_TRUE(response_->waitForReset());
+  } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
 }
 
@@ -221,7 +227,7 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
                                      {":path", "/"},
                                      {":protocol", "bytestream"},
                                      {":scheme", "https"},
-                                     {":authority", "host:80"}});
+                                     {":authority", "foo.lyft.com:80"}});
   // If the connection is established (created, set to half close, and then the
   // FIN arrives), make sure the FIN arrives, and send a FIN from upstream.
   if (fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_) &&
@@ -294,19 +300,64 @@ public:
   }
 
   Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
-                                                  {":path", "/"},
-                                                  {":protocol", "bytestream"},
-                                                  {":scheme", "https"},
-                                                  {":authority", "host:80"}};
+                                                  {":authority", "foo.lyft.com:80"}};
   IntegrationStreamDecoderPtr response_;
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, ProxyingConnectIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                              Http::CodecType::HTTP3},
-                             {Http::CodecType::HTTP1})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, ProxyingConnectIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
+        {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(ProxyingConnectIntegrationTest, ProxyConnectLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_rfc_connect", "false");
+
+  initialize();
+
+  Http::TestRequestHeaderMapImpl legacy_connect_headers{{":method", "CONNECT"},
+                                                        {":path", "/"},
+                                                        {":protocol", "bytestream"},
+                                                        {":scheme", "https"},
+                                                        {":authority", "foo.lyft.com:80"}};
+  // Send request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(legacy_connect_headers);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Wait for them to arrive upstream.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
+  } else {
+    EXPECT_EQ(upstream_request_->headers().getProtocolValue(), "bytestream");
+  }
+
+  // Send response headers
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Wait for them to arrive downstream.
+  response_->waitForHeaders();
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Make sure that even once the response has started, that data can continue to go upstream.
+  codec_client_->sendData(*request_encoder_, "hello", false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  // Also test upstream to downstream data.
+  upstream_request_->encodeData(12, false);
+  response_->waitForBodyData(12);
+
+  cleanupUpstreamAndDownstream();
+}
 
 TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   initialize();
@@ -328,8 +379,9 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
   } else {
-    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
-              "bytestream");
+    EXPECT_EQ("", upstream_request_->headers().getSchemeValue());
+    EXPECT_EQ("", upstream_request_->headers().getProtocolValue());
+    EXPECT_EQ("", upstream_request_->headers().getSchemeValue());
   }
 
   // Send response headers
@@ -378,15 +430,10 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithPortStripping) {
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "host:80");
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_TRUE(upstream_request_->headers().getProtocolValue().empty());
-  } else {
-    EXPECT_EQ(upstream_request_->headers().getProtocolValue(), "bytestream");
-  }
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "foo.lyft.com:80");
   auto stripped_host = upstream_request_->headers().get(Http::LowerCaseString("host-in-envoy"));
   ASSERT_EQ(stripped_host.size(), 1);
-  EXPECT_EQ(stripped_host[0]->value(), "host");
+  EXPECT_EQ(stripped_host[0]->value(), "foo.lyft.com");
 
   // Send response headers
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -424,12 +471,6 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
-  } else {
-    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
-              "bytestream");
-  }
 
   // Send response headers
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -461,7 +502,7 @@ public:
           envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
           proxy_config.set_stat_prefix("tcp_stats");
           proxy_config.set_cluster("cluster_0");
-          proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+          proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
 
           auto* listener = bootstrap.mutable_static_resources()->add_listeners();
           listener->set_name("tcp_proxy");
@@ -562,7 +603,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
     proxy_config.set_stat_prefix("tcp_stats");
     proxy_config.set_cluster("cluster_0");
-    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
     proxy_config.mutable_tunneling_config()->set_use_post(true);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
@@ -599,7 +640,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
     proxy_config.set_stat_prefix("tcp_stats");
     proxy_config.set_cluster("cluster_0");
-    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
     auto new_header = proxy_config.mutable_tunneling_config()->mutable_headers_to_add()->Add();
     new_header->mutable_header()->set_key("downstream-local-ip");
     new_header->mutable_header()->set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
@@ -651,7 +692,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     proxy_config.set_stat_prefix("tcp_stats");
     proxy_config.set_cluster("cluster_0");
-    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
     auto address_header = proxy_config.mutable_tunneling_config()->mutable_headers_to_add()->Add();
     address_header->mutable_header()->set_key("config-version");
     address_header->mutable_header()->set_value("1");
@@ -852,7 +893,7 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
     proxy_config.set_stat_prefix("tcp_stats");
     proxy_config.set_cluster("cluster_0");
-    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
 
     // Enable retries. The crash is due to retrying after the downstream connection is closed, which
     // can't occur if retries are not enabled.
@@ -1200,7 +1241,7 @@ TEST_P(TcpTunnelingIntegrationTest, TransferEncodingHeaderIgnoredHttp1) {
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
-  ASSERT_THAT(data, testing::HasSubstr("CONNECT host.com:80 HTTP/1.1"));
+  ASSERT_THAT(data, testing::HasSubstr("CONNECT foo.lyft.com:80 HTTP/1.1"));
 
   // Send upgrade headers downstream, fully establishing the connection.
   ASSERT_TRUE(
@@ -1289,11 +1330,11 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
   tcp_client_->close();
 }
 
-INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, TcpTunnelingIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP1},
-                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                              Http::CodecType::HTTP3})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpAndHttpVersions, TcpTunnelingIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
+        {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 } // namespace
 } // namespace Envoy

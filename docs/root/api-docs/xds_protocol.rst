@@ -37,6 +37,34 @@ appears below, and takes the form ``type.googleapis.com/<resource type>`` -- e.g
 ``type.googleapis.com/envoy.config.cluster.v3.Cluster`` for a ``Cluster`` resource. In various requests from
 Envoy and responses by the management server, the resource type URL is stated.
 
+Protoc-Gen-Validate Annotations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The protobuf messages for the individual xDS resource types have annotations
+using `protoc-gen-validate<https://github.com/envoyproxy/protoc-gen-validate>`
+(PGV), which indicate semantic constraints to be used to validate the contents
+of a resource when it is received by a client.
+
+Clients are not required to use these PGV annotations to validate the
+resources (e.g., Envoy does this validation, but gRPC does not). Also, the
+PGV annotations are not intended to be an exhaustive list of validation checks
+to be performed by the client; clients may reject a resource for reasons
+unrelated to the PGV annotations.
+
+In general, the PGV annotations are not intended to be used by control
+planes or xDS proxies directly. There may be some cases where a control
+plane may wish to do validation using the PGV annotations as a means of
+catching problems earlier in the config pipeline (e.g., rejecting invalid
+input when the resource is added to the control plane, before it is ever
+sent to any client). However, the PGV annotations evolve over time as the
+xDS API evolves, and it is not considered a breaking change in the API
+to make a PGV annotation less strict. Therefore, in the general case,
+a control plane cannot assume that all of its clients were compiled
+with the same version of the xDS proto files as the control plane was,
+which means that it cannot know that the client will actually use the
+same validations that the server does. This can lead to problems where
+the server rejects a resource that the client would have accepted.
+
 
 Filesystem subscriptions
 ------------------------

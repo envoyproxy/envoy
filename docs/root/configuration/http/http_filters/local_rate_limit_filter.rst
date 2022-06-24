@@ -75,7 +75,14 @@ the filter config descriptor list. The local descriptor's token bucket
 settings are then used to decide if the request should be rate limited or not
 depending on whether the local descriptor's entries match the route's rate
 limit actions descriptor entries. If there is no matching descriptor entries,
-the default token bucket is used.
+the default token bucket is used. All the matched local descriptors will be
+sorterd by tokens per second and try to consume tokens in order, in most cases
+if one of them is limited, the remaining descriptors will not consume their tokens.
+However, in some cases, it may not work, for example, we have two descriptors
+A and B, A is limited 3 requests per second, and B is limited 20 requests per 10 seconds.
+Obviously B is stricter than A (token per second), as a result, if we send requests
+above 3 in a second, the limited requests from A will also consume tokens of B.
+Note that global tokens are not sorted, so we suggest they should be larger than other descriptors.
 
 Example filter configuration using descriptors:
 

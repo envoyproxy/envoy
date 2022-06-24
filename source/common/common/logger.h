@@ -10,7 +10,7 @@
 #include "envoy/thread/thread.h"
 
 #include "source/common/common/base_logger.h"
-#include "source/common/common/fancy_logger.h"
+#include "source/common/common/fine_grain_logger.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger_impl.h"
 #include "source/common/common/macros.h"
@@ -262,7 +262,7 @@ private:
   bool should_escape_{false};
 };
 
-enum class LoggerMode { Envoy, Fancy };
+enum class LoggerMode { Envoy, FineGrainLog };
 
 /**
  * Defines a scope for the logging system with the specified lock and log level.
@@ -275,8 +275,8 @@ enum class LoggerMode { Envoy, Fancy };
  * and logging will remain unlocked, the same state it is in prior to
  * instantiating a Context.
  *
- * Settings for Fancy Logger, a file level logger without explicit implementation of
- * Envoy::Logger:Loggable, are integrated here, as they should be updated when
+ * Settings for Fine-Grain Logger, a file level logger without explicit implementation
+ * of Envoy::Logger:Loggable, are integrated here, as they should be updated when
  * context switch occurs.
  */
 class Context {
@@ -288,13 +288,13 @@ public:
   /**
    * Same as before, with boolean returned to use in log macros.
    */
-  static bool useFancyLogger();
+  static bool useFineGrainLogger();
 
-  static void enableFancyLogger();
-  static void disableFancyLogger();
+  static void enableFineGrainLogger();
+  static void disableFineGrainLogger();
 
-  static std::string getFancyLogFormat();
-  static spdlog::level::level_enum getFancyDefaultLevel();
+  static std::string getFineGrainLogFormat();
+  static spdlog::level::level_enum getFineGrainDefaultLevel();
 
 private:
   void activate();
@@ -306,8 +306,8 @@ private:
   bool enable_fine_grain_logging_;
   Context* const save_context_;
 
-  std::string fancy_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
-  spdlog::level::level_enum fancy_default_level_ = spdlog::level::info;
+  std::string fine_grain_log_format_;
+  spdlog::level::level_enum fine_grain_default_level_ = spdlog::level::info;
 };
 
 /**
@@ -445,13 +445,13 @@ public:
 #define ENVOY_LOG_CHECK_LEVEL(LEVEL) ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)
 
 /**
- * Convenience macro to log to a user-specified logger. When fancy logging is used, the specific
- * logger is ignored and instead the file-specific logger is used.
+ * Convenience macro to log to a user-specified logger. When fine-grain logging is used, the
+ * specific logger is ignored and instead the file-specific logger is used.
  */
 #define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...)                                                    \
   do {                                                                                             \
-    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
-      FANCY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    if (Envoy::Logger::Context::useFineGrainLogger()) {                                            \
+      FINE_GRAIN_LOG(LEVEL, ##__VA_ARGS__);                                                        \
     } else {                                                                                       \
       ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ##__VA_ARGS__);                                        \
     }                                                                                              \
@@ -486,7 +486,7 @@ public:
 // TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
 
 /**
- * Command line options for log macros: use Fancy Logger or not.
+ * Command line options for log macros: use Fine-Grain Logger or not.
  */
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
 
@@ -597,8 +597,8 @@ using t_logclock = std::chrono::steady_clock; // NOLINT
 
 #define ENVOY_FLUSH_LOG()                                                                          \
   do {                                                                                             \
-    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
-      FANCY_FLUSH_LOG();                                                                           \
+    if (Envoy::Logger::Context::useFineGrainLogger()) {                                            \
+      FINE_GRAIN_FLUSH_LOG();                                                                      \
     } else {                                                                                       \
       ENVOY_LOGGER().flush();                                                                      \
     }                                                                                              \
@@ -606,8 +606,8 @@ using t_logclock = std::chrono::steady_clock; // NOLINT
 
 #define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
   do {                                                                                             \
-    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
-      FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);                                    \
+    if (Envoy::Logger::Context::useFineGrainLogger()) {                                            \
+      FINE_GRAIN_CONN_LOG(LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);                               \
     } else {                                                                                       \
       ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);          \
     }                                                                                              \
@@ -615,8 +615,8 @@ using t_logclock = std::chrono::steady_clock; // NOLINT
 
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
   do {                                                                                             \
-    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
-      FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__);                                      \
+    if (Envoy::Logger::Context::useFineGrainLogger()) {                                            \
+      FINE_GRAIN_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__);                                 \
     } else {                                                                                       \
       ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);            \
     }                                                                                              \

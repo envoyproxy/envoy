@@ -1443,7 +1443,7 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
   // Inject Unsafe Factory
   NiceMock<Configuration::MockFatalActionFactory> mock_unsafe_factory;
   EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
-    return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
+    return std::make_unique<ProtobufWkt::Struct>();
   }));
   EXPECT_CALL(mock_unsafe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.unsafe"));
 

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.listener.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/udp_socket_config.proto";
 import "envoy/config/listener/v3/quic_config.proto";
 
@@ -17,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: UDP listener config]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message UdpListenerConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.UdpListenerConfig";
@@ -35,6 +36,14 @@ message UdpListenerConfig {
   // Configuration for QUIC protocol. If empty, QUIC will not be enabled on this listener. Set
   // to the default object to enable QUIC without modifying any additional options.
   QuicProtocolOptions quic_options = 7;
+
+  // Configuration for the UDP packet writer. If empty, HTTP/3 will use GSO if available
+  // (:ref:`UdpDefaultWriterFactory <envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory>`)
+  // or the default kernel sendmsg if not,
+  // (:ref:`UdpDefaultWriterFactory <envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpDefaultWriterFactory>`)
+  // and raw UDP will use kernel sendmsg.
+  // [#extension-category: envoy.udp_packet_writer]
+  core.v3.TypedExtensionConfig udp_packet_packet_writer_config = 8;
 }
 
 message ActiveRawUdpListenerConfig {

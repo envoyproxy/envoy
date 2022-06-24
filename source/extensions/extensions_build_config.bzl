@@ -9,7 +9,8 @@ EXTENSIONS = {
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
     "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
     "envoy.access_loggers.open_telemetry":              "//source/extensions/access_loggers/open_telemetry:config",
-    "envoy.access_loggers.stream":                      "//source/extensions/access_loggers/stream:config",
+    "envoy.access_loggers.stdout":                      "//source/extensions/access_loggers/stream:config",
+    "envoy.access_loggers.stderr":                      "//source/extensions/access_loggers/stream:config",
     "envoy.access_loggers.wasm":                        "//source/extensions/access_loggers/wasm:config",
 
     #
@@ -88,7 +89,6 @@ EXTENSIONS = {
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     "envoy.filters.http.decompressor":                  "//source/extensions/filters/http/decompressor:config",
     "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
-    "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.ext_proc":                      "//source/extensions/filters/http/ext_proc:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
@@ -136,7 +136,6 @@ EXTENSIONS = {
     # Network filters
     #
 
-    "envoy.filters.network.client_ssl_auth":                      "//source/extensions/filters/network/client_ssl_auth:config",
     "envoy.filters.network.connection_limit":                     "//source/extensions/filters/network/connection_limit:config",
     "envoy.filters.network.direct_response":                      "//source/extensions/filters/network/direct_response:config",
     "envoy.filters.network.dubbo_proxy":                          "//source/extensions/filters/network/dubbo_proxy:config",
@@ -199,6 +198,7 @@ EXTENSIONS = {
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
+    "envoy.tracers.opentelemetry":                      "//source/extensions/tracers/opentelemetry:config",
 
     #
     # Transport sockets
@@ -210,6 +210,7 @@ EXTENSIONS = {
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
     "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
     "envoy.transport_sockets.tcp_stats":                "//source/extensions/transport_sockets/tcp_stats:config",
+    "envoy.transport_sockets.internal_upstream":        "//source/extensions/transport_sockets/internal_upstream:config",
 
     #
     # Retry host predicates
@@ -228,7 +229,7 @@ EXTENSIONS = {
     #
     # CacheFilter plugins
     #
-    "envoy.cache.simple_http_cache":                    "//source/extensions/filters/http/cache/simple_http_cache:config",
+    "envoy.extensions.http.cache.simple":               "//source/extensions/filters/http/cache/simple_http_cache:config",
 
     #
     # Internal redirect predicates
@@ -300,11 +301,17 @@ EXTENSIONS = {
     "envoy.http.stateful_session.cookie":                "//source/extensions/http/stateful_session/cookie:config",
 
     #
-    # Quic extensions
+    # QUIC extensions
     #
 
     "envoy.quic.crypto_stream.server.quiche":           "//source/extensions/quic/crypto_stream:envoy_quic_default_crypto_server_stream",
     "envoy.quic.proof_source.filter_chain":             "//source/extensions/quic/proof_source:envoy_quic_default_proof_source",
+
+    #
+    # UDP packet writers
+    #
+    "envoy.udp_packet_writer.default":                  "//source/extensions/udp_packet_writer/default:config",
+    "envoy.udp_packet_writer.gso":                      "//source/extensions/udp_packet_writer/gso:config",
 
     #
     # Formatter
@@ -340,6 +347,18 @@ EXTENSIONS = {
     #
 
     "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
+
+    #
+    # Header Validators
+    #
+
+    "envoy.http.header_validators.envoy_default":        "//source/extensions/http/header_validators/envoy_default:config",
+
+    #
+    # Early Data option
+    #
+
+    "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
@@ -26,6 +27,18 @@
 
 namespace Envoy {
 namespace Server {
+
+/**
+ * All missing listener config stats. @see stats_macros.h
+ */
+#define ALL_MISSING_LISTENER_CONFIG_STATS(COUNTER) COUNTER(extension_config_missing)
+
+/**
+ * Struct definition for all missing listener config stats. @see stats_macros.h
+ */
+struct MissingListenerConfigStats {
+  ALL_MISSING_LISTENER_CONFIG_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 class ListenerMessageUtil {
 public:
@@ -284,13 +297,13 @@ public:
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const envoy::config::listener::v3::Listener& config() const { return config_; }
-  const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factory_; }
+  const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factories_[0]; }
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const {
     return listener_factory_context_->listener_factory_context_base_->drainManager();
   }
-  void setSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
+  void addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
   const std::string& versionInfo() const { return version_info_; }
@@ -304,7 +317,10 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factory_; }
+  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
+  std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
+    return socket_factories_;
+  }
   bool bindToPort() override { return bind_to_port_; }
   bool mptcpEnabled() { return mptcp_enabled_; }
   bool handOffRestoredDestinationConnections() const override {
@@ -330,7 +346,12 @@ public:
     return internal_listener_config_ != nullptr ? *internal_listener_config_
                                                 : Network::InternalListenerConfigOptRef();
   }
-  Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
+  Network::ConnectionBalancer&
+  connectionBalancer(const Network::Address::Instance& address) override {
+    auto balancer = connection_balancers_.find(address.asString());
+    ASSERT(balancer != connection_balancers_.end());
+    return *balancer->second;
+  }
   ResourceLimit& openConnections() override { return *open_connections_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
@@ -400,12 +421,13 @@ private:
   // Helpers for constructor.
   void buildAccessLog();
   void buildInternalListener();
-  void validateConfig(Network::Socket::Type socket_type);
-  void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
-  void buildListenSocketOptions(Network::Socket::Type socket_type);
-  void createListenerFilterFactories(Network::Socket::Type socket_type);
-  void validateFilterChains(Network::Socket::Type socket_type);
+  void validateConfig();
+  void buildUdpListenerFactory(uint32_t concurrency);
+  void buildListenSocketOptions();
+  void createListenerFilterFactories();
+  void validateFilterChains();
   void buildFilterChains();
+  void buildConnectionBalancer(const Network::Address::Instance& address);
   void buildSocketOptions();
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
@@ -417,8 +439,9 @@ private:
 
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
+  const Network::Socket::Type socket_type_;
 
-  Network::ListenSocketFactoryPtr socket_factory_;
+  std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   const bool bind_to_port_;
   const bool mptcp_enabled_;
   const bool hand_off_restored_destination_connections_;
@@ -438,7 +461,7 @@ private:
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   std::unique_ptr<Init::Manager> dynamic_init_manager_;
 
-  std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
+  Filter::ListenerFilterFactoriesList listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const envoy::config::listener::v3::Listener config_;
@@ -448,7 +471,9 @@ private:
   const bool continue_on_listener_filters_timeout_;
   std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;
   std::unique_ptr<Network::InternalListenerConfig> internal_listener_config_;
-  Network::ConnectionBalancerSharedPtr connection_balancer_;
+  // The key is the address string, the value is the address specific connection balancer.
+  // TODO (soulxu): Add hash support for address, then needn't a string address as key anymore.
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
   const bool reuse_port_;
@@ -468,6 +493,7 @@ private:
       transport_factory_context_;
 
   Quic::QuicStatNames& quic_stat_names_;
+  MissingListenerConfigStats missing_listener_config_stats_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

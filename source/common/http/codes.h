@@ -22,6 +22,7 @@ struct CodeStats::ResponseStatInfo {
   bool internal_request_;
   Stats::StatName request_vhost_name_;
   Stats::StatName request_vcluster_name_;
+  Stats::StatName request_route_name_;
   Stats::StatName from_zone_;
   Stats::StatName to_zone_;
   bool upstream_canary_;
@@ -36,6 +37,7 @@ struct CodeStats::ResponseTimingInfo {
   bool internal_request_;
   Stats::StatName request_vhost_name_;
   Stats::StatName request_vcluster_name_;
+  Stats::StatName request_route_name_;
   Stats::StatName from_zone_;
   Stats::StatName to_zone_;
 };
@@ -82,6 +84,7 @@ private:
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName vcluster_;
   const Stats::StatName vhost_;
+  const Stats::StatName route_;
   const Stats::StatName zone_;
 
   // Use an array of atomic pointers to hold StatNameStorage objects for

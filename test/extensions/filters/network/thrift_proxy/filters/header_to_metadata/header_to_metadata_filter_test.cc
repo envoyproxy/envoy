@@ -78,7 +78,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-VERSION"), "0xdeadbeef");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-VERSION"), "0xdeadbeef");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -97,7 +97,7 @@ request_rules:
               setDynamicMetadata("envoy.filters.thrift.header_to_metadata", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-VERSION"), "0xdeadbeef");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-VERSION"), "0xdeadbeef");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -117,7 +117,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-replace"), "hello");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-replace"), "hello");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -141,7 +141,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-sub"), "hello world!!!!!");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-sub"), "hello world!!!!!");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -165,7 +165,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-sub"), "does not match");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-sub"), "does not match");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -191,7 +191,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-sub"), "hello !!!!!");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-sub"), "hello !!!!!");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -214,7 +214,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-Number"), "1");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-Number"), "1");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -236,7 +236,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-Number"), "invalid");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-Number"), "invalid");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -262,7 +262,7 @@ request_rules:
 
   const auto encoded = Base64::encode(data.c_str(), data.size());
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-Base64"), encoded);
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-Base64"), encoded);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -301,7 +301,7 @@ request_rules:
   ASSERT_TRUE(value.SerializeToString(&data));
   const auto encoded = Base64::encode(data.c_str(), data.size());
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-Proto-Base64"), encoded);
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-Proto-Base64"), encoded);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -323,7 +323,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-Bad-Base64"), "invalid");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-Bad-Base64"), "invalid");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -347,7 +347,7 @@ request_rules:
   std::string data = "invalid";
   const auto encoded = Base64::encode(data.c_str(), data.size());
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-Bad-Proto"), encoded);
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-Bad-Proto"), encoded);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -391,7 +391,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-Exist"), "hello");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-Exist"), "hello");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -417,12 +417,12 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-REMOVE"),
-                              "replaced in metadata then removed from headers");
-  metadata->headers().setCopy(Http::LowerCaseString("X-KEEP"), "remains");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-REMOVE"),
+                                     "replaced in metadata then removed from headers");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-KEEP"), "remains");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
-  Http::TestRequestHeaderMapImpl headers{metadata->headers()};
+  Http::TestRequestHeaderMapImpl headers{metadata->requestHeaders()};
   EXPECT_EQ("", headers.get_(Http::LowerCaseString("X-REMOVE")));
   EXPECT_EQ("remains", headers.get_(Http::LowerCaseString("X-KEEP")));
   filter_->onDestroy();
@@ -443,7 +443,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-VERSION"), "");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-VERSION"), "");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -465,7 +465,7 @@ request_rules:
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
   auto length = MAX_HEADER_VALUE_LEN + 1;
-  metadata->headers().setCopy(Http::LowerCaseString("X-VERSION"), std::string(length, 'x'));
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-VERSION"), std::string(length, 'x'));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -490,7 +490,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-REPLACE"), "should be replaced");
+  metadata->requestHeaders().setCopy(Http::LowerCaseString("X-REPLACE"), "should be replaced");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();

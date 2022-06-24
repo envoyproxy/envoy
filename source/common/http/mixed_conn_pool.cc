@@ -13,23 +13,8 @@ namespace Http {
 Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveClient() {
   uint32_t initial_streams = 1;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
-    // For now, use the hard-coded setting. Eventually use the cached setting if available.
-    initial_streams = host()->cluster().http2Options().max_concurrent_streams().value();
-    if (http_server_properties_cache_ && origin_.has_value()) {
-      uint32_t cached_concurrency =
-          http_server_properties_cache_->getConcurrentStreams(origin_.value());
-      if (cached_concurrency != 0 && cached_concurrency < initial_streams) {
-        // Only use the cached concurrency if lowers the streams below the
-        // configured max_concurrent_streams as Envoy should never send more
-        // than max_concurrent_streams at once.
-        initial_streams = cached_concurrency;
-      }
-    }
-    auto max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
-        host()->cluster().maxRequestsPerConnection());
-    if (max_requests < initial_streams) {
-      initial_streams = max_requests;
-    }
+    initial_streams = Http2::ActiveClient::calculateInitialStreamsLimit(
+        http_server_properties_cache_, origin_, host());
   }
   return std::make_unique<Tcp::ActiveTcpClient>(
       *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams);

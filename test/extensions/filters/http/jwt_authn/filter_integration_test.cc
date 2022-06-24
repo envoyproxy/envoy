@@ -3,10 +3,9 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/router/string_accessor_impl.h"
-#include "source/extensions/filters/http/common/pass_through_filter.h"
 
-#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/integration/filters/header_to_filter_state.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
 
@@ -19,44 +18,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
-
-const char HeaderToFilterStateFilterName[] = "envoy.filters.http.header_to_filter_state_for_test";
-// This filter extracts a string header from "header" and
-// save it into FilterState as name "state" as read-only Router::StringAccessor.
-class HeaderToFilterStateFilter : public Http::PassThroughDecoderFilter {
-public:
-  HeaderToFilterStateFilter(const std::string& header, const std::string& state)
-      : header_(header), state_(state) {}
-
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    const auto entry = headers.get(header_);
-    if (!entry.empty()) {
-      decoder_callbacks_->streamInfo().filterState()->setData(
-          state_, std::make_unique<Router::StringAccessorImpl>(entry[0]->value().getStringView()),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::FilterChain);
-    }
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-private:
-  Http::LowerCaseString header_;
-  std::string state_;
-};
-
-class HeaderToFilterStateFilterConfig : public Common::EmptyHttpFilterConfig {
-public:
-  HeaderToFilterStateFilterConfig()
-      : Common::EmptyHttpFilterConfig(HeaderToFilterStateFilterName) {}
-
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
-    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(
-          std::make_shared<HeaderToFilterStateFilter>("jwt_selector", "jwt_selector"));
-    };
-  }
-};
 
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
@@ -93,13 +54,7 @@ std::string getFilterConfig(bool use_local_jwks) {
   return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
-class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {
-public:
-  LocalJwksIntegrationTest() : registration_(factory_) {}
-
-  HeaderToFilterStateFilterConfig factory_;
-  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
-};
+class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {};
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
@@ -265,7 +220,14 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
 )";
 
   config_helper_.prependFilter(getAuthFilterConfig(auth_filter_conf, true));
-  config_helper_.prependFilter(absl::StrCat("name: ", HeaderToFilterStateFilterName));
+  config_helper_.prependFilter(R"(
+  name: header-to-filter-state
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
+    header_name: jwt_selector
+    state_name: jwt_selector
+    read_only: true
+)");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -341,16 +303,11 @@ TEST_P(LocalJwksIntegrationTest, ConnectRequestWithRegExMatch) {
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  if (downstreamProtocol() == Http::CodecType::HTTP1) {
-    // Because CONNECT requests for HTTP/1 do not include a path, they will fail
-    // to find a route match and return a 404.
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("404", response->headers().getStatusValue());
-  } else {
-    ASSERT_TRUE(response->waitForReset());
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  }
+  // Because CONNECT requests do not include a path, they will fail
+  // to find a route match and return a 404.
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
 }
 
 // The test case with a fake upstream for remote Jwks server.

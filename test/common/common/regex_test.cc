@@ -30,6 +30,7 @@ TEST(Utility, ParseStdRegex) {
 }
 
 TEST(Utility, ParseRegex) {
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.mutable_google_re2();
@@ -66,6 +67,14 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
+    EXPECT_NO_THROW(Utility::parseRegex(matcher));
+  }
+
+  // Positive case to ensure matcher can be created by config without google_re2 field.
+  {
+    TestScopedRuntime scoped_runtime;
+    envoy::type::matcher::v3::RegexMatcher matcher;
+    matcher.set_regex("/asdf/.*");
     EXPECT_NO_THROW(Utility::parseRegex(matcher));
   }
 

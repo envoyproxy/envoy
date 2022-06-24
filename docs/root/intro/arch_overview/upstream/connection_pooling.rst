@@ -71,8 +71,8 @@ stream, but if both TCP and QUIC connections are established, QUIC will eventual
 If an alternate protocol cache is configured via
 :ref:`alternate_protocols_cache_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig.alternate_protocols_cache_options>`
 then HTTP/3 connections will only be attempted to servers which
-advertise HTTP/3 support either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`, (eventually
-the `HTTPS DNS resource record<https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>` or "QUIC hints"
+advertise HTTP/3 support either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_, (eventually
+the `HTTPS DNS resource record <https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>`_ or "QUIC hints"
 which will be manually configured).
 If no such advertisement exists, then HTTP/2 or HTTP/1 will be used instead.
 

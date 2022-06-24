@@ -56,6 +56,7 @@ envoy_cc_test(
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
+        ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
@@ -97,8 +98,10 @@ envoy_cc_test(
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
+        ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
     ],
@@ -330,6 +333,8 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         "//source/common/quic:envoy_quic_client_connection_lib",
+        "//source/common/quic:envoy_quic_client_session_lib",
+        "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//test/test_common:environment_lib",

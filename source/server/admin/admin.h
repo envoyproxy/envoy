@@ -112,9 +112,9 @@ public:
                                     Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
+  void createFilterChain(Http::FilterChainManager& manager) override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainFactoryCallbacks&) override {
+                                Http::FilterChainManager&) override {
     return false;
   }
 
@@ -381,7 +381,11 @@ private:
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::ListenSocketFactory& listenSocketFactory() override {
-      return *parent_.socket_factory_;
+      ASSERT(parent_.socket_factories_.size() == 1);
+      return *parent_.socket_factories_[0];
+    }
+    std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
+      return parent_.socket_factories_;
     }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
@@ -400,7 +404,9 @@ private:
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
-    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+    Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
+      return connection_balancer_;
+    }
     ResourceLimit& openConnections() override { return open_connections_; }
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
@@ -430,7 +436,7 @@ private:
     AdminFilterChain() {} // NOLINT(modernize-use-equals-default)
 
     // Network::FilterChain
-    const Network::TransportSocketFactory& transportSocketFactory() const override {
+    const Network::DownstreamTransportSocketFactory& transportSocketFactory() const override {
       return transport_socket_factory_;
     }
 
@@ -486,7 +492,7 @@ private:
   ConfigTrackerImpl config_tracker_;
   const Network::FilterChainSharedPtr admin_filter_chain_;
   Network::SocketSharedPtr socket_;
-  Network::ListenSocketFactoryPtr socket_factory_;
+  std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;

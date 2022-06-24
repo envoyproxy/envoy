@@ -232,7 +232,7 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
 
 void FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
     const bool null_default_factory, const std::string& filter_config_name,
-    const std::string& type_url) const {
+    absl::string_view type_url) const {
   if (null_default_factory) {
     throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
                                      "configuration with type URL {}.",

@@ -600,7 +600,6 @@ class TestFactory : public Config::TypedFactory {
 public:
   ~TestFactory() override = default;
   std::string category() const override { return "test"; }
-  std::string configType() override { return "google.protobuf.StringValue"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::StringValue>();
   }
@@ -615,7 +614,6 @@ class TestingFactory : public Config::TypedFactory {
 public:
   ~TestingFactory() override = default;
   std::string category() const override { return "testing"; }
-  std::string configType() override { return "google.protobuf.StringValue"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::StringValue>();
   }

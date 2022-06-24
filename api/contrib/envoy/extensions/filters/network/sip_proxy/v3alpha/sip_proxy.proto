@@ -125,18 +125,22 @@ message CustomizedAffinity {
   bool stop_load_balance = 2;
 }
 
+// [#next-free-field: 6]
 message CustomizedAffinityEntry {
-  // Affinity key for TRA query/subscribe
-  string key_name = 1;
+  // The header name to match, e.g. "From", if not specified, default is "Route"
+  string header = 1;
+
+  // Affinity key for TRA query/subscribe, e.g. "lskpmc", if key_name is "text" means use the header content as key.
+  string key_name = 2;
 
   // Whether subscribe to TRA is required
-  bool subscribe = 2;
+  bool subscribe = 3;
 
   // Whether query to TRA is required
-  bool query = 3;
+  bool query = 4;
 
   // Local cache
-  Cache cache = 4;
+  Cache cache = 5;
 }
 
 message Cache {

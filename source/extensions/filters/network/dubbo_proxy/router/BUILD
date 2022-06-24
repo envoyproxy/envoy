@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:metadatamatchcriteria_lib",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy:serializer_interface",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

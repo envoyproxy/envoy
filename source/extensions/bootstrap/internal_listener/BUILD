@@ -56,13 +56,48 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "thread_local_registry",
+    srcs = [
+        "thread_local_registry.cc",
+    ],
     hdrs = [
         "client_connection_factory.h",
         "thread_local_registry.h",
     ],
     deps = [
+        ":active_internal_listener",
         "//envoy/network:client_connection_factory",
-        "//envoy/network:listener_interface",
+        "//envoy/network:connection_handler_interface",
         "//envoy/thread_local:thread_local_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_internal_listener",
+    srcs = ["active_internal_listener.cc"],
+    hdrs = [
+        "active_internal_listener.h",
+    ],
+    deps = [
+        "//envoy/common:time_interface",
+        "//envoy/event:deferred_deletable",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/network:connection_handler_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:exception_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:listen_socket_interface",
+        "//envoy/network:listener_interface",
+        "//envoy/stats:timespan_interface",
+        "//source/common/common:linked_object",
+        "//source/common/common:non_copyable",
+        "//source/common/event:deferred_task",
+        "//source/common/network:connection_lib",
+        "//source/common/network:listener_filter_buffer_lib",
+        "//source/common/stats:timespan_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/io_socket/user_space:config",
+        "//source/server:active_stream_listener_base",
+        "//source/server:active_tcp_listener",
     ],
 )

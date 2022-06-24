@@ -219,7 +219,7 @@ message FilterAction {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
@@ -317,6 +317,21 @@ message Route {
   // If set, the bytes actually buffered will be the minimum value of this and the
   // listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
+
+  // The human readable prefix to use when emitting statistics for this endpoint.
+  // The statistics are rooted at vhost.<virtual host name>.route.<stat_prefix>.
+  // This should be set for highly critical
+  // endpoints that one wishes to get “per-route” statistics on.
+  // If not set, endpoint statistics are not generated.
+  //
+  // The emitted statistics are the same as those documented for :ref:`virtual clusters <config_http_filters_router_vcluster_stats>`.
+  //
+  // .. warning::
+  //
+  //    We do not recommend setting up a stat prefix for
+  //    every application endpoint. This is both not easily maintainable and
+  //    statistics use a non-trivial amount of memory(approximately 1KiB per route).
+  string stat_prefix = 19;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a
@@ -449,7 +464,8 @@ message WeightedCluster {
     // If header is not present or invalid, Envoy will fall back to use the internally generated random value.
     // This header is expected to be single-valued header as we only want to have one selected value throughout
     // the process for the consistency. And the value is a unsigned number between 0 and UINT64_MAX.
-    string header_name = 4;
+    string header_name = 4
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
   }
 }
 
@@ -656,7 +672,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 40]
+// [#next-free-field: 41]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -688,6 +704,7 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing will not be triggered if the primary cluster does not exist.
+  // [#next-free-field: 6]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
@@ -696,9 +713,30 @@ message RouteAction {
 
     reserved "runtime_key";
 
+    // Only one of *cluster* and *cluster_header* can be specified.
+    // [#next-major-version: Need to add back the validation rule: (validate.rules).string = {min_len: 1}]
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration.
-    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+    string cluster = 1 [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
+
+    // Only one of *cluster* and *cluster_header* can be specified.
+    // Envoy will determine the cluster to route to by reading the value of the
+    // HTTP header named by cluster_header from the request headers. Only the first value in header is used,
+    // and no shadow request will happen if the value is not found in headers. Envoy will not wait for
+    // the shadow cluster to respond before returning the response from the primary cluster.
+    //
+    // .. attention::
+    //
+    //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
+    //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
+    string cluster_header = 5 [
+      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+    ];
 
     // If not specified, all requests to the target cluster will be mirrored.
     //
@@ -1124,6 +1162,11 @@ message RouteAction {
   // is configured, this timeout is scaled according to the value for
   // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
   google.protobuf.Duration idle_timeout = 24;
+
+  // Specifies how to send request over TLS early data.
+  // If absent, allows `safe HTTP requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ to be sent on early data.
+  // [#extension-category: envoy.route.early_data_policy]
+  core.v3.TypedExtensionConfig early_data_policy = 40;
 
   // Indicates that the route has a retry policy. Note that if this is set,
   // it'll take precedence over the virtual host level retry policy entirely
@@ -1954,6 +1997,12 @@ message RateLimit {
       MetaData metadata = 8;
 
       // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
+      //
+      // :ref:`HTTP matching input functions <arch_overview_matching_api>` are
+      // permitted as descriptor extensions. The input functions are only
+      // looked up if there is no rate limit descriptor extension matching
+      // the type URL.
+      //
       // [#extension-category: envoy.rate_limit_descriptors]
       core.v3.TypedExtensionConfig extension = 9;
 

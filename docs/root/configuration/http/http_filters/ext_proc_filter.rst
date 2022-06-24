@@ -48,3 +48,5 @@ The following statistics are supported:
   streams_closed, Counter, The number of streams successfully closed on either end
   streams_failed, Counter, The number of times a stream produced a gRPC error
   failure_mode_allowed, Counter, The number of times an error was ignored due to configuration
+  message_timeouts, Counter, The number of times a message failed to receive a response within the configured timeout
+  rejected_header_mutations, Counter, The number of rejected header mutations

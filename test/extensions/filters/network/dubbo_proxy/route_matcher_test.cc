@@ -163,6 +163,7 @@ routes:
 }
 
 TEST(DubboRouteMatcherTest, RouteByServiceNameWithAnyMethod) {
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   {
     const std::string yaml = R"EOF(
 name: local_route
@@ -172,7 +173,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -221,7 +221,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -261,7 +260,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -302,7 +300,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -431,6 +428,7 @@ routes:
 }
 
 TEST(DubboRouteMatcherTest, RouteByMethodWithRegexMatch) {
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
@@ -439,7 +437,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "\\d{3}test"
     route:
         cluster: user_service_dubbo_server
@@ -912,6 +909,299 @@ routes:
       parseRouteConfigurationFromV2Yaml(yaml);
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW(SingleRouteMatcherImpl m(config, context), EnvoyException);
+}
+
+TEST(DubboRouteMatcherTest, RouteActionMetadataMatch) {
+  const std::string yaml = R"EOF(
+name: config
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "method1"
+    route:
+      cluster: cluster1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+            k2: v2
+  - match:
+      method:
+        name:
+          exact: "method2"
+    route:
+      cluster: cluster2
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+
+  // Match with metadata.
+  {
+    MessageMetadata metadata;
+    metadata.setInvocationInfo(invo);
+    invo->setServiceName("org.apache.dubbo.demo.DemoService");
+    invo->setMethodName("method1");
+
+    setDefaultInvocationCallback(*invo);
+
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    SingleRouteMatcherImpl matcher(config, context);
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, mmc.size());
+
+    ProtobufWkt::Value v1, v2;
+    v1.set_string_value("v1");
+    v2.set_string_value("v2");
+    HashedValue hv1(v1), hv2(v2);
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv2, mmc[1]->value());
+  }
+
+  // Match with no metadata.
+  {
+    MessageMetadata metadata;
+    metadata.setInvocationInfo(invo);
+    invo->setServiceName("org.apache.dubbo.demo.DemoService");
+    invo->setMethodName("method2");
+
+    setDefaultInvocationCallback(*invo);
+
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    SingleRouteMatcherImpl matcher(config, context);
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    EXPECT_EQ(nullptr, route->routeEntry()->metadataMatchCriteria());
+  }
+}
+
+TEST(DubboRouteMatcherTest, WeightedClusterMetadataMatch) {
+  const std::string yaml = R"EOF(
+name: config
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "method1"
+    route:
+      weighted_clusters:
+        clusters:
+          - name: cluster1
+            weight: 2000
+            metadata_match:
+              filter_metadata:
+                envoy.lb:
+                  k1: v1
+                  k2: v2
+          - name: cluster2
+            weight: 3000
+            metadata_match:
+              filter_metadata:
+                not.envoy.lb:
+                  k1: v1
+                  k2: v2
+          - name: cluster3
+            weight: 5000
+            metadata_match:
+              filter_metadata:
+                envoy.lb:
+                  k3: v3
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+  MessageMetadata metadata;
+  metadata.setInvocationInfo(invo);
+  invo->setServiceName("org.apache.dubbo.demo.DemoService");
+  invo->setMethodName("method1");
+
+  setDefaultInvocationCallback(*invo);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  SingleRouteMatcherImpl matcher(config, context);
+
+  ProtobufWkt::Value v1, v2, v3;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  v3.set_string_value("v3");
+  HashedValue hv1(v1), hv2(v2), hv3(v3);
+
+  // Metadata match with multiple metadata entries.
+  {
+
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, mmc.size());
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv2, mmc[1]->value());
+  }
+
+  // The case where none 'envoy.lb' metadata key is used in the 'metadata_match'.
+  {
+    RouteConstSharedPtr route = matcher.route(metadata, 2001);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    EXPECT_EQ(nullptr, route->routeEntry()->metadataMatchCriteria());
+  }
+
+  // Metadata match with single metadata entry.
+  {
+    RouteConstSharedPtr route = matcher.route(metadata, 5001);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(1, mmc.size());
+
+    EXPECT_EQ("k3", mmc[0]->name());
+    EXPECT_EQ(hv3, mmc[0]->value());
+  }
+}
+
+TEST(DubboRouteMatcherTest, WeightedClusterRouteActionMetadataMatchMerged) {
+  const std::string yaml = R"EOF(
+name: config
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "method1"
+    route:
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+            k2: v2
+      weighted_clusters:
+        clusters:
+          - name: cluster1
+            weight: 2000
+            metadata_match:
+              filter_metadata:
+                envoy.lb:
+                  k3: v3
+          - name: cluster2
+            weight: 3000
+          - name: cluster3
+            weight: 5000
+            metadata_match:
+              filter_metadata:
+                envoy.lb:
+                  k2: v3
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+  MessageMetadata metadata;
+  metadata.setInvocationInfo(invo);
+  invo->setServiceName("org.apache.dubbo.demo.DemoService");
+  invo->setMethodName("method1");
+
+  setDefaultInvocationCallback(*invo);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  SingleRouteMatcherImpl matcher(config, context);
+
+  ProtobufWkt::Value v1, v2, v3;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  v3.set_string_value("v3");
+  HashedValue hv1(v1), hv2(v2), hv3(v3);
+
+  // 'metadata_match' of both weighted cluster and route action are configured.
+  {
+
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(3, mmc.size());
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv2, mmc[1]->value());
+
+    EXPECT_EQ("k3", mmc[2]->name());
+    EXPECT_EQ(hv3, mmc[2]->value());
+  }
+
+  // Only 'metadata_match' of route action is configured.
+  {
+    RouteConstSharedPtr route = matcher.route(metadata, 2001);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, mmc.size());
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv2, mmc[1]->value());
+  }
+
+  // 'metadata_match' of both weighted cluster and route action are configured and with same
+  // metadata entry key.
+  {
+    RouteConstSharedPtr route = matcher.route(metadata, 5001);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, mmc.size());
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv3, mmc[1]->value());
+  }
 }
 
 } // namespace Router

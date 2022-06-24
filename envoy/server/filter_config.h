@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <string>
 
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
@@ -230,6 +231,16 @@ public:
   virtual MatchingRequirementsPtr matchingRequirements() {
     return std::make_unique<
         envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
+  }
+
+  std::set<std::string> configTypes() override {
+    auto config_types = TypedFactory::configTypes();
+
+    if (auto message = createEmptyRouteConfigProto(); message != nullptr) {
+      config_types.insert(message->GetDescriptor()->full_name());
+    }
+
+    return config_types;
   }
 };
 

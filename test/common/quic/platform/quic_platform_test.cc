@@ -38,7 +38,6 @@
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
@@ -76,6 +75,7 @@ protected:
     GetLogger().set_level(log_level_);
   }
 
+  quiche::test::QuicheFlagSaver saver_;
   const quiche::QuicheLogLevel log_level_;
   const int verbosity_log_threshold_;
 };
@@ -149,35 +149,6 @@ TEST_F(QuicPlatformTest, QuicHostnameUtils) {
   EXPECT_EQ("lyft.com", QuicHostnameUtils::NormalizeHostname("lyft.com"));
   EXPECT_EQ("google.com", QuicHostnameUtils::NormalizeHostname("google.com..."));
   EXPECT_EQ("quicwg.org", QuicHostnameUtils::NormalizeHostname("QUICWG.ORG"));
-}
-
-TEST_F(QuicPlatformTest, QuicMockLog) {
-  ASSERT_EQ(spdlog::level::err, GetLogger().level());
-
-  {
-    // Test a mock log that is not capturing logs.
-    CREATE_QUIC_MOCK_LOG(log);
-    EXPECT_QUIC_LOG_CALL(log).Times(0);
-    QUIC_LOG(ERROR) << "This should be logged but not captured by the mock.";
-  }
-
-  // Test nested mock logs.
-  CREATE_QUIC_MOCK_LOG(outer_log);
-  outer_log.StartCapturingLogs();
-
-  {
-    // Test a mock log that captures logs.
-    CREATE_QUIC_MOCK_LOG(inner_log);
-    inner_log.StartCapturingLogs();
-
-    EXPECT_QUIC_LOG_CALL_CONTAINS(inner_log, ERROR, "Inner log message");
-    QUIC_LOG(ERROR) << "Inner log message should be captured.";
-
-    // Destruction of inner_log should restore the QUIC log sink to outer_log.
-  }
-
-  EXPECT_QUIC_LOG_CALL_CONTAINS(outer_log, ERROR, "Outer log message");
-  QUIC_LOG(ERROR) << "Outer log message should be captured.";
 }
 
 TEST_F(QuicPlatformTest, QuicServerStats) {
@@ -390,21 +361,11 @@ TEST_F(QuicPlatformTest, QuicFatalLog) {
 #endif
 }
 
-TEST_F(QuicPlatformTest, QuicBranchPrediction) {
-  GetLogger().set_level(spdlog::level::info);
-
-  if (QUIC_PREDICT_FALSE(rand() % RAND_MAX == 123456789)) {
-    QUIC_LOG(INFO) << "Go buy some lottery tickets.";
-  } else {
-    QUIC_LOG(INFO) << "As predicted.";
-  }
-}
-
 TEST_F(QuicPlatformTest, QuicNotReached) {
 #ifdef NDEBUG
-  QUIC_NOTREACHED(); // Expect no-op.
+  QUICHE_NOTREACHED(); // Expect no-op.
 #else
-  EXPECT_DEATH(QUIC_NOTREACHED(), "reached unexpected code");
+  EXPECT_DEATH(QUICHE_NOTREACHED(), "reached unexpected code");
 #endif
 }
 
@@ -514,36 +475,56 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 }
 
 TEST_F(QuicPlatformTest, QuicFlags) {
-  auto& flag_registry = quiche::FlagRegistry::getInstance();
+  quiche::FlagRegistry::getInstance();
   EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr));
-  flag_registry.resetFlags();
+
+  {
+    quiche::test::QuicheFlagSaver saver;
+    EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+    EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
+    SetQuicReloadableFlag(quic_testonly_default_false, true);
+    EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+
+    EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
+    EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
+    SetQuicRestartFlag(quic_testonly_default_false, true);
+    EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
+
+    EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+    SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
+    EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+  }
+
+  // Verify that the saver reset all the flags to their previous values.
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
+  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+}
+
+TEST_F(QuicPlatformTest, UpdateReloadableFlags) {
+  auto& flag_registry = quiche::FlagRegistry::getInstance();
 
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
-  SetQuicReloadableFlag(quic_testonly_default_false, true);
+
+  // Flip both flags to a non-default value.
+  flag_registry.updateReloadableFlags(
+      {{"FLAGS_quic_reloadable_flag_quic_testonly_default_false", true},
+       {"FLAGS_quic_reloadable_flag_quic_testonly_default_true", false}});
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
 
-  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
-  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
-  SetQuicRestartFlag(quic_testonly_default_false, true);
-  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
-
-  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
-  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-
-  flag_registry.resetFlags();
+  // Flip one flag back to a default value.
+  flag_registry.updateReloadableFlags(
+      {{"FLAGS_quic_reloadable_flag_quic_testonly_default_false", false}});
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
-  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  flag_registry.findFlag("FLAGS_quic_reloadable_flag_quic_testonly_default_false")
-      ->setValueFromString("true");
-  flag_registry.findFlag("FLAGS_quic_restart_flag_quic_testonly_default_true")
-      ->setValueFromString("0");
-  flag_registry.findFlag("FLAGS_quic_time_wait_list_seconds")->setValueFromString("100");
-  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
-  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
+
+  // Flip the other back to a default value.
+  flag_registry.updateReloadableFlags(
+      {{"FLAGS_quic_reloadable_flag_quic_testonly_default_true", true}});
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
 }
 
 class FileUtilsTest : public testing::Test {
@@ -615,14 +596,15 @@ TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
         fragment_releaser_called = true;
       });
   Envoy::Buffer::OwnedImpl buffer;
-  EXPECT_DEBUG_DEATH(quiche::QuicheMemSlice slice0{quiche::QuicheMemSliceImpl(buffer, 0)}, "");
+  EXPECT_DEBUG_DEATH(quiche::QuicheMemSlice slice0(quiche::QuicheMemSlice::InPlace(), buffer, 0u),
+                     "");
   std::string str2(1024, 'a');
   // str2 is copied.
   buffer.add(str2);
   EXPECT_EQ(1u, buffer.getRawSlices().size());
   buffer.addBufferFragment(fragment);
 
-  quiche::QuicheMemSlice slice1{quiche::QuicheMemSliceImpl(buffer, str2.length())};
+  quiche::QuicheMemSlice slice1(quiche::QuicheMemSlice::InPlace(), buffer, str2.length());
   EXPECT_EQ(str.length(), buffer.length());
   EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
   std::string str2_old = str2; // NOLINT(performance-unnecessary-copy-initialization)
@@ -632,7 +614,7 @@ TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_EQ(nullptr, slice1.data());
   EXPECT_EQ(str2_old, str2);
 
-  quiche::QuicheMemSlice slice2{quiche::QuicheMemSliceImpl(buffer, str.length())};
+  quiche::QuicheMemSlice slice2(quiche::QuicheMemSlice::InPlace(), buffer, str.length());
   EXPECT_EQ(0, buffer.length());
   EXPECT_EQ(str.data(), slice2.data());
   EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));

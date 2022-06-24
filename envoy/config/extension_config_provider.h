@@ -2,6 +2,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/filter.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -62,6 +63,10 @@ public:
    * Applies the default configuration if one is set, otherwise does nothing.
    */
   virtual void applyDefaultConfiguration() PURE;
+  /**
+   * Return Network::ListenerFilterMatcherSharedPtr& the listener filter matcher.
+   */
+  virtual const Network::ListenerFilterMatcherSharedPtr& getListenerFilterMatcher() PURE;
 };
 
 template <class FactoryCallback>

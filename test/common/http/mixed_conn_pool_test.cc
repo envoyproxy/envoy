@@ -106,8 +106,16 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
   conn_pool_.reset();
 }
 
-TEST_F(MixedConnPoolImplTest, BasicNoAlpnHandshake) {
+TEST_F(MixedConnPoolImplTest, BasicNoAlpnHandshakeOld) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "false"}});
   expected_capacity_ = 1; // The old code assumes HTTP/1.1
+  testAlpnHandshake({});
+}
+
+TEST_F(MixedConnPoolImplTest, BasicNoAlpnHandshakeNew) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
   testAlpnHandshake({});
 }
 
