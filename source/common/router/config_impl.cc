@@ -99,7 +99,7 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
   }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathTemplateMatch: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathTemplate: {
     route = std::make_shared<PathTemplateRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                          factory_context, validator);
     break;
@@ -1380,17 +1380,17 @@ PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      path_template_match_(route.match().path_template_match()),
-      path_matcher_(Matchers::PathMatcher::createPattern(path_template_match_, !case_sensitive_)) {}
+      path_template_(route.match().path_template()),
+      path_matcher_(Matchers::PathMatcher::createPattern(path_template_, !case_sensitive_)) {}
 
 void PathTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                    bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, path_template_match_, insert_envoy_original_path);
+  finalizePathHeader(headers, path_template_, insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathTemplateRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_template_match_);
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_template_);
 }
 
 RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
