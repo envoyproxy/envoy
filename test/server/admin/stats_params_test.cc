@@ -39,8 +39,12 @@ TEST(StatsParamsTest, ParseParamsFormat) {
 
   ASSERT_EQ(Http::Code::OK, params.parse("?format=text", response));
   EXPECT_EQ(StatsFormat::Text, params.format_);
+#ifdef ENVOY_ADMIN_HTML
   ASSERT_EQ(Http::Code::OK, params.parse("?format=html", response));
   EXPECT_EQ(StatsFormat::Html, params.format_);
+#else
+  EXPECT_EQ(Http::Code::BadRequest, params.parse("?format=html", response));
+#endif
   ASSERT_EQ(Http::Code::OK, params.parse("?format=json", response));
   EXPECT_EQ(StatsFormat::Json, params.format_);
   ASSERT_EQ(Http::Code::OK, params.parse("?format=prometheus", response));

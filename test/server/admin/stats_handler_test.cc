@@ -183,6 +183,7 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
   EXPECT_EQ(expected, code_response.second);
 }
 
+#ifdef ENVOY_ADMIN_HTML
 TEST_F(AdminStatsTest, HandlerStatsHtml) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -217,6 +218,7 @@ TEST_F(AdminStatsTest, HandlerStatsHtml) {
   test("&usedonly", {"foo.c0: 0", "foo.c1: 1"},      // expected
        {"scope1.scope2.unset"});                     // not expected
 }
+#endif
 
 TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
   const std::string url = "/stats?histogram_buckets=cumulative";

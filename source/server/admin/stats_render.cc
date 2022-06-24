@@ -263,6 +263,7 @@ void StatsJsonRender::collectBuckets(const std::string& name,
   *histogram_array_->add_values() = ValueUtil::structValue(histogram_obj);
 }
 
+#ifdef ENVOY_ADMIN_HTML
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const Admin::UrlHandler& url_handler,
                                  const StatsParams& params)
@@ -283,6 +284,7 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) { response.add("</pre
 void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
   response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
 }
+#endif
 
 } // namespace Server
 } // namespace Envoy

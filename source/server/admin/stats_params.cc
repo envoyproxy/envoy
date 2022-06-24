@@ -68,7 +68,12 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     } else if (format_value.value() == "text") {
       format_ = StatsFormat::Text;
     } else if (format_value.value() == "html") {
+#ifdef ENVOY_ADMIN_HTML
       format_ = StatsFormat::Html;
+#else
+      response.add("HTML output was disabled by building with --define=admin_html=disabled");
+      return Http::Code::BadRequest;
+#endif
     } else {
       response.add("usage: /stats?format=(html|json|prometheus|text)\n\n");
       return Http::Code::BadRequest;

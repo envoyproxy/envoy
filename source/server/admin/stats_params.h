@@ -23,7 +23,9 @@ constexpr absl::string_view TextReadouts = "TextReadouts";
 } // namespace Labels
 
 enum class StatsFormat {
+#ifdef ENVOY_ADMIN_HTML
   Html,
+#endif
   Json,
   Prometheus,
   Text,

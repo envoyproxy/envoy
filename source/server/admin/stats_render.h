@@ -4,7 +4,10 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/buffer/buffer_impl.h"
+
+#ifdef ENVOY_ADMIN_HTML
 #include "source/server/admin/admin_html_generator.h"
+#endif
 #include "source/server/admin/stats_params.h"
 #include "source/server/admin/utils.h"
 
@@ -96,6 +99,7 @@ private:
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
 };
 
+#ifdef ENVOY_ADMIN_HTML
 class StatsHtmlRender : public StatsTextRender {
 public:
   StatsHtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
@@ -107,6 +111,7 @@ public:
 private:
   AdminHtmlGenerator html_;
 };
+#endif
 
 } // namespace Server
 } // namespace Envoy
