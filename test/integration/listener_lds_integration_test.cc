@@ -950,6 +950,7 @@ TEST_P(ListenerFilterIntegrationTest, MixNoInspectDataFilterAndInspectDataFilter
 TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersClientCloseConnectionWithFewData) {
 // This is required `EV_FEATURE_EARLY_CLOSE` feature for libevent, and this feature is
 // only supported with `epoll`. But `MacOS` uses the `kqueue`.
+// https://libevent.org/doc/event_8h.html#a98f643f9c9063a4cbf410f519eb61e55
 #if !defined(__APPLE__)
   config_helper_.addListenerFilter(R"EOF(
       name: inspect_data1
