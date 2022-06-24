@@ -5069,7 +5069,7 @@ virtual_hosts:
   - match: { prefix: "/foo" }
     route:
       prefix_rewrite: /
-      regex_rewrite:
+      regex_rewrite:f
         pattern:
           regex: foo
         substitution: bar
@@ -5088,7 +5088,7 @@ virtual_hosts:
   domains: ["*"]
   routes:
   - match:
-      path_template_match: "/bar/{country}/{lang}"
+      path_template: "/bar/{country}/{lang}"
     route:
       path_template_rewrite: "/bar/{lang}/{country}"
       cluster: www2
