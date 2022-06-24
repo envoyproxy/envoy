@@ -90,10 +90,7 @@ public:
   uint64_t retryCount() const { return retry_count_; }
   Random::RandomGenerator& random() const { return random_; }
   uint64_t maxPendingLookups() const { return max_pending_lookups_; }
-  const envoy::config::core::v3::TypedExtensionConfig& typedDnsResolverConfig() const {
-    return typed_dns_resolver_config_;
-  }
-  const Network::DnsResolverFactory& dnsResolverFactory() const { return *dns_resolver_factory_; }
+  const Network::DnsResolverSharedPtr& resolver() const { return resolver_; }
   Api::Api& api() const { return api_; }
   const TrieLookupTable<DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const {
     return dns_lookup_trie_;
@@ -128,8 +125,6 @@ private:
   std::chrono::milliseconds resolver_timeout_;
   Random::RandomGenerator& random_;
   uint64_t max_pending_lookups_;
-  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config_;
-  Network::DnsResolverFactory* dns_resolver_factory_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;
