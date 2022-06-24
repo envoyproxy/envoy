@@ -16,8 +16,8 @@ ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle,
   // If the buffer_size not greater than 0, it means that doesn't expect any data.
   ASSERT(buffer_size > 0);
 
-// `FileReadyType::Closed` is required `EV_FEATURE_EARLY_CLOSE` feature for libevent, and this feature is
-// only supported with `epoll`. But `MacOS` uses the `kqueue`.
+// `FileReadyType::Closed` is required `EV_FEATURE_EARLY_CLOSE` feature for libevent, and this
+// feature is only supported with `epoll`. But `MacOS` uses the `kqueue`.
 // https://libevent.org/doc/event_8h.html#a98f643f9c9063a4cbf410f519eb61e55
 #if defined(__APPLE__)
   io_handle_.initializeFileEvent(
