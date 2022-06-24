@@ -173,7 +173,7 @@ message RateLimitQuotaBucketSettings {
     oneof no_assignment_behavior {
       option (validate.required) = true;
 
-      // Apply preconfigured rate limiting strategy until the server sends the first assignment.
+      // Apply pre-configured rate limiting strategy until the server sends the first assignment.
       type.v3.RateLimitStrategy fallback_rate_limit = 1;
     }
   }

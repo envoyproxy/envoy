@@ -140,7 +140,7 @@ message RateLimitQuotaResponse {
       //   :ref:`"expired assignment"
       //   <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.expired_assignment_behavior_timeout>`
       //   state. This may be used by the RLQS server in cases when it needs clients to proactively
-      //   fall back to the preconfigured :ref:`ExpiredAssignmentBehavior
+      //   fall back to the pre-configured :ref:`ExpiredAssignmentBehavior
       //   <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior>`,
       //   f.e. before the server going into restart.
       //
