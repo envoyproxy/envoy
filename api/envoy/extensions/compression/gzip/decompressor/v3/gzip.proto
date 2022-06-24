@@ -33,5 +33,4 @@ message Gzip {
   // TODO(rojkov): Re-design the Decompressor interface to handle compression
   // bombs gracefully instead of this quick solution.
   google.protobuf.UInt32Value max_inflate_ratio = 3 [(validate.rules).uint32 = {lte: 10000 gte: 0}];
-
 }
