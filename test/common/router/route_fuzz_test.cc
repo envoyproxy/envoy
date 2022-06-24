@@ -48,9 +48,11 @@ cleanRouteConfig(envoy::config::route::v3::RouteConfiguration route_config) {
 bool validateMatcherConfig(const xds::type::matcher::v3::Matcher& matcher);
 
 bool validateOnMatchConfig(const xds::type::matcher::v3::Matcher::OnMatch& on_match) {
-  if (on_match.has_matcher()) {
+  switch (on_match.on_match_case()) {
+  case xds::type::matcher::v3::Matcher_OnMatch::kMatcher: {
     return validateMatcherConfig(on_match.matcher());
-  } else {
+  }
+  case xds::type::matcher::v3::Matcher_OnMatch::kAction: {
     // Only envoy...Route is allowed as typed_config here.
     if (on_match.action().typed_config().type_url().find("envoy.config.route.v3.Route") ==
         std::string::npos) {
@@ -61,6 +63,13 @@ bool validateOnMatchConfig(const xds::type::matcher::v3::Matcher::OnMatch& on_ma
     ENVOY_LOG_MISC(trace, "typed_config of on_match.action is: {}",
                    on_match_route_action_config.DebugString());
     return !isUnsupportedRouteConfig(on_match_route_action_config);
+  }
+  case xds::type::matcher::v3::Matcher_OnMatch::ON_MATCH_NOT_SET: {
+    // This alternative shall never occur. It is here to case on all values of Matcher_OnMatch and
+    // this way ensures that the compiler will report new entries to that enum as warning, which
+    // will finally result in an compiler error, when error on all warnings is set.
+    ASSERT(false);
+  }
   }
 }
 
