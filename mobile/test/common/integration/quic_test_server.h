@@ -25,7 +25,7 @@ private:
   ProcessWide process_wide;
   Thread::MutexBasicLockable lock;
 
-  Network::TransportSocketFactoryPtr createUpstreamTlsContext(
+  Network::DownstreamTransportSocketFactoryPtr createUpstreamTlsContext(
       testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
 
 public:

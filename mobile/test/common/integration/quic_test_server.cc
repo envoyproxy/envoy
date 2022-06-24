@@ -4,7 +4,7 @@
 
 namespace Envoy {
 
-Network::TransportSocketFactoryPtr QuicTestServer::createUpstreamTlsContext(
+Network::DownstreamTransportSocketFactoryPtr QuicTestServer::createUpstreamTlsContext(
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{time_system_};
@@ -47,7 +47,7 @@ void QuicTestServer::startQuicTestServer() {
 
   upstream_config_.upstream_protocol_ = Http::CodecType::HTTP3;
 
-  Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(factory_context_);
+  Network::DownstreamTransportSocketFactoryPtr factory = createUpstreamTlsContext(factory_context_);
 
   upstream_ =
       std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_, upstream_config_);
