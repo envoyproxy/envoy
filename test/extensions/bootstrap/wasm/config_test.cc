@@ -104,7 +104,7 @@ TEST_P(WasmFactoryTest, MissingImport) {
                             "Unable to create Wasm service test");
 }
 
-TEST_P(WasmFactoryTest, UnSpecifiedRuntime) {
+TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }

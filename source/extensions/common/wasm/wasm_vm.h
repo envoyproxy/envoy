@@ -41,7 +41,9 @@ using WasmVmPtr = std::unique_ptr<proxy_wasm::WasmVm>;
 // Create a new low-level Wasm VM using runtime of the given type (e.g. "envoy.wasm.runtime.wavm").
 WasmVmPtr createWasmVm(absl::string_view runtime);
 
-absl::string_view getWasmEngine();
+// Get the name of the built-in Wasm Engine compiled with Envoy
+absl::string_view getDefaultWasmEngineName();
+
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions
