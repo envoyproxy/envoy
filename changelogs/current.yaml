@@ -116,6 +116,9 @@ minor_behavior_changes:
 - area: logging
   change: |
     changed category name for access log filter extensions to ``envoy.access_loggers.extension_filters``.
+- area: http
+  change: |
+    deprecate the short name ``preserve_case`` header formatter extension in favor of the fully-qualified name ``envoy.http.stateful_header_formatters.preserve_case``.
 
 bug_fixes:
 - area: http
