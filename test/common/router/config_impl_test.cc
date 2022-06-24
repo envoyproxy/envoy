@@ -5069,7 +5069,7 @@ virtual_hosts:
   - match: { prefix: "/foo" }
     route:
       prefix_rewrite: /
-      regex_rewrite:f
+      regex_rewrite:
         pattern:
           regex: foo
         substitution: bar
