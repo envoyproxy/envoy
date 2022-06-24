@@ -8,6 +8,7 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/upstream.h"
 
+#include "router/router.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
@@ -24,11 +25,96 @@
 #include "contrib/sip_proxy/filters/network/source/tra/tra_impl.h"
 #include "contrib/sip_proxy/filters/network/source/utility.h"
 #include "metadata.h"
+#include <cstddef>
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
+
+class DownstreamConnectionInfo;
+
+class DownstreamConnectionInfoItem: public Logger::Loggable<Logger::Id::filter> {
+public:
+  DownstreamConnectionInfoItem(Network::Connection* connection)
+      : connection_(connection)  {}
+
+  ~DownstreamConnectionInfoItem() = default;
+  Network::Connection* connection() const { return connection_; }
+
+private:
+  Network::Connection* connection_;
+};
+
+struct ThreadLocalDownstreamConnectionInfo : public ThreadLocal::ThreadLocalObject,
+                                    public Logger::Loggable<Logger::Id::filter> {
+  ThreadLocalDownstreamConnectionInfo(std::shared_ptr<DownstreamConnectionInfo> parent)
+      : parent_(parent) {
+  }
+  absl::flat_hash_map<std::string, std::shared_ptr<DownstreamConnectionInfoItem>> downstream_connection_info_map_{};
+
+  std::shared_ptr<DownstreamConnectionInfo> parent_;
+};
+
+
+class DownstreamConnectionInfo : public std::enable_shared_from_this<DownstreamConnectionInfo>,
+                        Logger::Loggable<Logger::Id::connection> {
+public:
+   DownstreamConnectionInfo(ThreadLocal::SlotAllocator& tls)
+      : tls_(tls.allocateSlot()) {}
+
+  // init one map per worker thread
+  void init() {
+    // Note: `this` and `cluster_name` have a a lifetime of the filter.
+    // That may be shorter than the tls callback if the listener is torn down shortly after it is
+    // created. We use a weak pointer to make sure this object outlives the tls callbacks.
+    std::weak_ptr<DownstreamConnectionInfo> this_weak_ptr = this->shared_from_this();
+    tls_->set(
+        [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+          UNREFERENCED_PARAMETER(dispatcher); // todo
+          if (auto this_shared_ptr = this_weak_ptr.lock()) {
+            return std::make_shared<ThreadLocalDownstreamConnectionInfo>(this_shared_ptr);
+          }
+          return nullptr;
+        });
+  }
+  ~DownstreamConnectionInfo() = default;
+
+  void insertDownstreamConnection(std::string conn_id,
+                         Network::Connection* conn) {
+    if (hasDownstreamConnection(conn_id)) {
+      return;
+    }
+
+    ENVOY_LOG(info, "Inserting {} " + conn_id);
+
+    tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(std::make_pair(
+        conn_id, std::make_shared<DownstreamConnectionInfoItem>(conn)));
+  }
+
+  size_t size() {
+    return tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.size();
+  }
+
+  void deleteDownstreamConnection(std::string&& conn_id) {
+    if (hasDownstreamConnection(conn_id)) {
+      // fixme - probably need to have this run on the main thread?
+      tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.erase(conn_id);
+    }
+  }
+
+  bool hasDownstreamConnection(std::string& conn_id) {
+    return tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.find(conn_id) !=
+           tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.end();
+  }
+
+  DownstreamConnectionInfoItem& getDownstreamConnection(std::string&& conn_id) {
+    return *(tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.at(conn_id));
+  }
+
+private:
+  ThreadLocal::SlotPtr tls_;
+};
 
 /**
  * Config is a configuration interface for ConnectionManager.
@@ -102,7 +188,7 @@ class ConnectionManager : public Network::ReadFilter,
 public:
   ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                     TimeSource& time_system, Server::Configuration::FactoryContext& context,
-                    std::shared_ptr<Router::TransactionInfos> transaction_infos);
+                    std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipProxy::DownstreamConnectionInfo> downstream_connections_info);
   ~ConnectionManager() override;
 
   // Network::ReadFilter
@@ -120,9 +206,11 @@ public:
     std::string local_address = read_callbacks_->connection().connectionInfoProvider().localAddress()->asString();
     std::string uuid = random.uuid();
     std::string downstream_conn_id = remote_address + "@" + local_address + "@" + uuid;
-    ENVOY_LOG(trace, "thread_id={}, downstream_connection_id={}", thread_id, downstream_conn_id);
     local_ingress_id_ = IngressID(thread_id, downstream_conn_id);
 
+    downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, &(read_callbacks_->connection()));
+
+    ENVOY_LOG(info, "XXXXXXXXXXXXXXXXXX thread_id={}, downstream_connection_id={}, n-connections={}", thread_id, downstream_conn_id, downstream_connection_infos_->size());
     return Network::FilterStatus::Continue; 
   }
 
@@ -392,6 +480,7 @@ private:
 
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
+  std::shared_ptr<SipProxy::DownstreamConnectionInfo> downstream_connection_infos_;
   PendingList pending_list_;
 };
 

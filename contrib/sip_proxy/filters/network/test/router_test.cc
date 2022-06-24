@@ -115,7 +115,7 @@ public:
     EXPECT_CALL(config_, stats()).WillRepeatedly(ReturnRef(stat));
 
     filter_ =
-        new NiceMock<MockConnectionManager>(config_, random_, time_source_, context_, nullptr);
+        new NiceMock<MockConnectionManager>(config_, random_, time_source_, context_, nullptr, nullptr);
     sip_settings_ = std::make_shared<SipSettings>(sip_proxy_config_.settings());
 
     EXPECT_CALL(*filter_, settings()).WillRepeatedly(Return(sip_settings_));

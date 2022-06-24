@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 
+#include "router/router.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
@@ -158,10 +159,10 @@ void TrafficRoutingAssistantHandler::doSubscribe(
 ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                                      TimeSource& time_source,
                                      Server::Configuration::FactoryContext& context,
-                                     std::shared_ptr<Router::TransactionInfos> transaction_infos)
+                                     std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipProxy::DownstreamConnectionInfo> downstream_connection_infos)
     : config_(config), stats_(config_.stats()), decoder_(std::make_unique<Decoder>(*this)),
       random_generator_(random_generator), time_source_(time_source), context_(context),
-      transaction_infos_(transaction_infos) {}
+      transaction_infos_(transaction_infos), downstream_connection_infos_(downstream_connection_infos) {}
 
 ConnectionManager::~ConnectionManager() = default;
 
@@ -327,6 +328,10 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   ENVOY_CONN_LOG(info, "received event {}", read_callbacks_->connection(), static_cast<int>(event));
   resetAllTrans(event == Network::ConnectionEvent::LocalClose);
+
+  if (local_ingress_id_.has_value()) {
+      downstream_connection_infos_->deleteDownstreamConnection(local_ingress_id_->getDownstreamConnectionID());
+  }
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {

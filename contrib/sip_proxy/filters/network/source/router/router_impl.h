@@ -100,6 +100,7 @@ struct RouterStats {
   ALL_SIP_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
+
 class UpstreamRequest;
 class TransactionInfoItem : public Logger::Loggable<Logger::Id::filter> {
 public:

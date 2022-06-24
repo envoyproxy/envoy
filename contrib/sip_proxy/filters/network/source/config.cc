@@ -5,6 +5,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
+#include "router/router.h"
 #include "source/common/config/utility.h"
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.h"
@@ -53,7 +54,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   }
 
   /**
-   * ConnPool::InstanceImpl contains ThreadLocalObject ThreadLocalPool which only can be
+   *  ThreadLocalPool which only can be
    * instantiated on main thread. so construct ConnPool::InstanceImpl here.
    */
   auto transaction_infos = std::make_shared<Router::TransactionInfos>();
@@ -68,11 +69,23 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
     transaction_infos->emplace(cluster, transaction_info_ptr);
   }
 
+  // We need a map of downstream connections per worker thread,
+  // to enable demultiplexing of new upstream transactions to the correct downstream 
+  // Shouldn't really need to use a TLS I don't think, but we need a common place in a worker thread
+  // to share out the map from
+  auto downstream_connection_info = std::make_shared<SipProxy::DownstreamConnectionInfo>(context.threadLocal());
+  downstream_connection_info->init();
+
+  std::cerr << "config.cc - Thread: " << context.api().threadFactory().currentThreadId().debugString() << std::endl;
+
   return
-      [filter_config, &context, transaction_infos](Network::FilterManager& filter_manager) -> void {
+      [filter_config, &context, transaction_infos, downstream_connection_info](Network::FilterManager& filter_manager) -> void {
+
+        std::cerr << "2 config.cc - Thread: " << context.api().threadFactory().currentThreadId().debugString() << std::endl;
+
         filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
             *filter_config, context.api().randomGenerator(),
-            context.mainThreadDispatcher().timeSource(), context, transaction_infos));
+            context.mainThreadDispatcher().timeSource(), context, transaction_infos, downstream_connection_info));
       };
 }
 

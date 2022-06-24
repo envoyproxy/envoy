@@ -403,6 +403,10 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
+  
+  // callbacks_->connection();
+  // callbacks_->ingressID().getDownstreamConnectionID();
+
   if (!metadata->affinity().empty() &&
       metadata->affinityIteration() != metadata->affinity().end()) {
     std::string host;
@@ -711,8 +715,23 @@ bool ResponseDecoder::onData(Buffer::Instance& data) {
   return true;
 }
 
+// todo - perhaps rename ResponseDecoder to UpstreamMessageDecoder ?
 FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) {
   ENVOY_LOG(trace, "ResponseDecoder\n{}", metadata->rawMsg());
+
+  if (metadata->msgType() == MsgType::Request) {
+    // todo - create and save an UpstreamTransaction if this is a new Transaction
+    // lookup the downstream connection based off the IngressID connection id value
+    // route to the downstream connection
+
+    // auto ingress_id = metadata.ingressId().downstreamConnectionId(); // string view
+    // parent._getDownstreamConnection()
+    // if it doesn't exist, then
+
+    // active_trans->startUpstreamResponse();
+    // active_trans->upstreamData(metadata);
+  }
+
   if (metadata->transactionId().has_value()) {
     auto transaction_id = metadata->transactionId().value();
 
