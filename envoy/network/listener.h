@@ -12,6 +12,7 @@
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
+#include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
@@ -221,10 +222,11 @@ public:
   virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
+   * @param address is used for query the address specific connection balancer.
    * @return the connection balancer for this listener. All listeners have a connection balancer,
    *         though the implementation may be a NOP balancer.
    */
-  virtual ConnectionBalancer& connectionBalancer() PURE;
+  virtual ConnectionBalancer& connectionBalancer(const Network::Address::Instance& address) PURE;
 
   /**
    * Open connection resources for this listener.
