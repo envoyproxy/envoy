@@ -66,7 +66,7 @@ message RateLimitStrategy {
 
     // Allow or Deny the requests.
     // If unset, allow all.
-    BlanketRule blanket_rule = 1;
+    BlanketRule blanket_rule = 1 [(validate.rules).enum = {defined_only: true}];
 
     // Best-effort limit of the number of requests per time unit, f.e. requests per second.
     // Does not prescribe any specific rate limiting algorithm, see :ref:`RequestsPerTimeUnit
