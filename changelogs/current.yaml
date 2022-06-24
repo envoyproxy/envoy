@@ -7,7 +7,6 @@ behavior_changes:
 - area: tls
   change: |
     Change TLS transport socket and QUIC transport socket to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
-- area: listener
 - area: config
   change: |
     Multiple SDS resources of multiple clusters or listeners are sent in a single SDS requests, instead of multiple SDS requests.
