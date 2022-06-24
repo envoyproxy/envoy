@@ -948,6 +948,9 @@ TEST_P(ListenerFilterIntegrationTest, MixNoInspectDataFilterAndInspectDataFilter
 }
 
 TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersClientCloseConnectionWithFewData) {
+// This is required `EV_FEATURE_EARLY_CLOSE` feature for libevent, and this feature is
+// only supported with `epoll`. But `MacOS` uses the `kqueue`.
+#if !defined(__APPLE__)
   config_helper_.addListenerFilter(R"EOF(
       name: inspect_data1
       typed_config:
@@ -977,6 +980,7 @@ TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersClientCloseConnectionWit
     tcp_client->waitForDisconnect();
   }
   test_server_->waitForCounterEq("listener.listener_0.downstream_listener_filter_remote_close", 1);
+#endif
 }
 
 // Only update the order of listener filters, ensure the listener filters

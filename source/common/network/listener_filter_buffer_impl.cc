@@ -16,9 +16,17 @@ ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle,
   // If the buffer_size not greater than 0, it means that doesn't expect any data.
   ASSERT(buffer_size > 0);
 
+// This is required `EV_FEATURE_EARLY_CLOSE` feature for libevent, and this feature is
+// only supported with `epoll`. But `MacOS` uses the `kqueue`.
+#if defined(__APPLE__)
+  io_handle_.initializeFileEvent(
+      dispatcher_, [this](uint32_t events) { onFileEvent(events); },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+#else
   io_handle_.initializeFileEvent(
       dispatcher_, [this](uint32_t events) { onFileEvent(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Closed);
+#endif
 }
 
 const Buffer::ConstRawSlice ListenerFilterBufferImpl::rawSlice() const {
