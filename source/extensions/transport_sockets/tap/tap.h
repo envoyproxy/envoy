@@ -38,7 +38,8 @@ public:
 
   // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr host) const override;
 };
 
 class DownstreamTapSocketFactory : public Common::Tap::ExtensionConfigBase,

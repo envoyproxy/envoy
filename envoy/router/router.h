@@ -558,26 +558,7 @@ MAKE_STATS_STRUCT(RouteStats, RouteStatNames, ALL_ROUTE_STATS);
 /**
  * RouteStatsContext defines config needed to generate all route level stats.
  */
-class RouteStatsContext {
-public:
-  RouteStatsContext(Stats::Scope& scope, const RouteStatNames& route_stat_names,
-                    const Stats::StatName& vhost_stat_name, const std::string& stat_prefix)
-      : route_stat_name_storage_(stat_prefix, scope.symbolTable()),
-        route_stats_scope_(Stats::Utility::scopeFromStatNames(
-            scope, {route_stat_names.vhost_, vhost_stat_name, route_stat_names.route_,
-                    route_stat_name_storage_.statName()})),
-        route_stat_name_(route_stat_name_storage_.statName()),
-        route_stats_(route_stat_names, *route_stats_scope_) {}
-
-  const Stats::StatName statName() const { return route_stat_name_; }
-  const RouteStats& stats() const { return route_stats_; }
-
-private:
-  const Stats::StatNameManagedStorage route_stat_name_storage_;
-  Stats::ScopeSharedPtr route_stats_scope_;
-  Stats::StatName route_stat_name_;
-  RouteStats route_stats_;
-};
+class RouteStatsContext;
 
 using RouteStatsContextPtr = std::unique_ptr<RouteStatsContext>;
 using RouteStatsContextOptRef = OptRef<RouteStatsContext>;

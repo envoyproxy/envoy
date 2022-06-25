@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["omit_host_metadata.h"],
     deps = [
         "//envoy/upstream:retry_interface",
+        "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
     ],
 )

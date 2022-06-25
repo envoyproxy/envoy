@@ -34,6 +34,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":config_utility_lib",
+        ":context_lib",
         ":header_formatter_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
@@ -420,5 +421,6 @@ envoy_cc_library(
     hdrs = ["delegating_route_impl.h"],
     deps = [
         "//envoy/router:router_interface",
+        "//source/common/config:metadata_lib",
     ],
 )
