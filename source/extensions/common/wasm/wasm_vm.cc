@@ -73,18 +73,16 @@ bool EnvoyWasmVmIntegration::getNullVmFunction(std::string_view function_name, b
 }
 
 absl::string_view getDefaultWasmEngineName() {
-  absl::string_view default_wasm_engine_name;
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
     if (ext.first == "envoy.wasm.runtime") {
       for (auto engine_name : ext.second->registeredNames()) {
         if (engine_name != "envoy.wasm.runtime.null") {
-          default_wasm_engine_name = engine_name;
-          break;
+          return engine_name;
         }
       }
     }
   }
-  return default_wasm_engine_name;
+  return "";
 }
 
 WasmVmPtr createWasmVm(absl::string_view runtime) {
