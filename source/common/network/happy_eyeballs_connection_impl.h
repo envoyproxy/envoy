@@ -8,7 +8,7 @@ namespace Network {
  * connections to multiple addresses in an specific order complying to
  * HappyEyeballs.
  */
-class HappyEyeballsConnectionProvider : public virtual ConnectionProvider,
+class HappyEyeballsConnectionProvider : public ConnectionProvider,
                                         Logger::Loggable<Logger::Id::happy_eyeballs> {
 public:
   HappyEyeballsConnectionProvider(Event::Dispatcher& dispatcher,
@@ -16,6 +16,7 @@ public:
                                   Address::InstanceConstSharedPtr source_address,
                                   UpstreamTransportSocketFactory& socket_factory,
                                   TransportSocketOptionsConstSharedPtr transport_socket_options,
+                                  const Upstream::HostDescriptionConstSharedPtr& host,
                                   const ConnectionSocket::OptionsSharedPtr options);
   bool hasNextConnection() override;
   ClientConnectionPtr createNextConnection(const uint64_t id) override;
@@ -36,6 +37,7 @@ private:
   Address::InstanceConstSharedPtr source_address_;
   UpstreamTransportSocketFactory& socket_factory_;
   TransportSocketOptionsConstSharedPtr transport_socket_options_;
+  const Upstream::HostDescriptionConstSharedPtr host_;
   const ConnectionSocket::OptionsSharedPtr options_;
   // Index of the next address to use.
   size_t next_address_ = 0;
@@ -64,11 +66,12 @@ public:
                               Address::InstanceConstSharedPtr source_address,
                               UpstreamTransportSocketFactory& socket_factory,
                               TransportSocketOptionsConstSharedPtr transport_socket_options,
+                              const Upstream::HostDescriptionConstSharedPtr& host,
                               const ConnectionSocket::OptionsSharedPtr options)
       : MultiConnectionBaseImpl(dispatcher,
                                 std::make_unique<Network::HappyEyeballsConnectionProvider>(
                                     dispatcher, address_list, source_address, socket_factory,
-                                    transport_socket_options, options)) {}
+                                    transport_socket_options, host, options)) {}
 };
 
 } // namespace Network

@@ -13,7 +13,7 @@ HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     const ConnectionSocket::OptionsSharedPtr options)
     : dispatcher_(dispatcher), address_list_(sortAddresses(address_list)),
       source_address_(source_address), socket_factory_(socket_factory),
-      transport_socket_options_(transport_socket_options), options_(options) {}
+      transport_socket_options_(transport_socket_options), host_(host), options_(options) {}
 
 bool HappyEyeballsConnectionProvider::hasNextConnection() {
   return next_address_ < address_list_.size();
@@ -25,7 +25,7 @@ ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const 
                   address_list_[next_address_]);
   return dispatcher_.createClientConnection(
       address_list_[next_address_++], source_address_,
-      socket_factory_.createTransportSocket(transport_socket_options_), options_);
+      socket_factory_.createTransportSocket(transport_socket_options_, host_), options_);
 }
 
 size_t HappyEyeballsConnectionProvider::nextConnection() { return next_address_; }
