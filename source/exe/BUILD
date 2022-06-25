@@ -141,7 +141,6 @@ envoy_cc_library(
     name = "process_wide_lib",
     srcs = ["process_wide.cc"],
     hdrs = ["process_wide.h"],
-    external_deps = ["ares"],
     deps = [
         "//envoy/network:dns_resolver_interface",
         "//source/common/common:assert_lib",

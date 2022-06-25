@@ -6,8 +6,6 @@
 #include "source/common/http/http2/nghttp2.h"
 #include "source/server/proto_descriptors.h"
 
-#include "ares.h"
-
 namespace Envoy {
 namespace {
 
