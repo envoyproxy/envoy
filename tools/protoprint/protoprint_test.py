@@ -50,8 +50,7 @@ def golden_proto_file(tmp, path, filename, version):
         actual golden proto absolute path
     """
 
-    return tmp.joinpath("golden").joinpath(
-        f"{filename}.{version}.gold").absolute()
+    return tmp.joinpath("golden").joinpath(f"{filename}.{version}.gold").absolute()
 
 
 def proto_print(protoprint, descriptor, src, dst):
@@ -97,8 +96,7 @@ def diff(result_file, golden_file):
     Returns:
         output and status code
     """
-    return run_command(
-        f"diff -u {result_file} {golden_file}")
+    return run_command(f"diff -u {result_file} {golden_file}")
 
 
 def run(tmp, protoprint, descriptor, target, version):
