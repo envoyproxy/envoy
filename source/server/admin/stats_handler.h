@@ -97,20 +97,9 @@ public:
   //                                     StatsRequest::UrlHandlerFn url_handler_fn);
 
 private:
-  class Context;
-  class HtmlRender;
-  class JsonRender;
-  class Render;
-  class TextRender;
-
-  friend class StatsHandlerTest;
-
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
                                     Stats::Store& stats,
                                     Stats::CustomStatNamespaces& custom_namespaces);
-
-private:
-  friend class StatsHandlerTest;
 };
 
 } // namespace Server

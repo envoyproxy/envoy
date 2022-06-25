@@ -164,11 +164,11 @@ envoy_cc_library(
         ":utils_lib",
         "//envoy/server:admin_interface",
         "//source/common/buffer:buffer_lib",
-        "//source/common/html:utility_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/stats:histogram_lib",
     ] + envoy_select_admin_html([
         ":admin_html_generator_lib",
+        "//source/common/html:utility_lib",
     ]),
 )
 
