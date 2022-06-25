@@ -33,6 +33,8 @@ def path_and_filename(label):
         return label
     label = label.replace(":", "/")
     splitted_label = label.split('/')
+    # transforms a proto label
+    # - eg `@envoy_api//foo/bar:baz.proto` -> `foo/bar`, `baz.proto`
     return '/'.join(splitted_label[:len(splitted_label) - 1])[1:], splitted_label[-1]
 
 
@@ -48,9 +50,8 @@ def golden_proto_file(tmp, path, filename, version):
         actual golden proto absolute path
     """
 
-    gold_dir = tmp.joinpath("golden")
-    filename = f"{filename}.{version}.gold"
-    return gold_dir.joinpath(filename).absolute()
+    return tmp.joinpath("golden").joinpath(
+        f"{filename}.{version}.gold").absolute()
 
 
 def proto_print(protoprint, descriptor, src, dst):
@@ -96,17 +97,15 @@ def diff(result_file, golden_file):
     Returns:
         output and status code
     """
-    command = 'diff -u '
-    command += str(result_file) + ' '
-    command += str(golden_file)
-    status, stdout, stderr = run_command(command)
-    return [status, stdout, stderr]
+    return run_command(
+        f"diff -u {result_file} {golden_file}")
 
 
 def run(tmp, protoprint, descriptor, target, version):
     """Run main execution for protoxform test
 
     Args:
+        tmp: path to temporary directory
         cmd: fix or freeze?
         path: target proto path
         filename: target proto filename
