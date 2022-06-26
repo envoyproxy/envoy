@@ -335,3 +335,13 @@ proto_descriptor_set(
         ":xds_protos",
     ],
 )
+
+proto_descriptor_set(
+    name = "all_proto_set",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":v2_protos",
+        ":v3_protos",
+        ":xds_protos",
+    ],
+)

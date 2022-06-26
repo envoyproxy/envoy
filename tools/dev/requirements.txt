@@ -17,3 +17,9 @@ remote-pdb
 #
 # `cachebust` can be used to signify change to bazel.
 #
+
+# -e file:///src/workspace/pytooling/envoy.base.utils#egg=envoy.base.utils&cachebust=043
+
+-e git+https://github.com/envoyproxy/pytooling@c6dd7c7dcc044db37c44331df5a75c59ede934fc#egg=envoy.base.utils&subdirectory=envoy.base.utils
+
+# -e file:///src/workspace/pytooling/envoy.base.utils#egg=envoy.base.utils&cachebust=087

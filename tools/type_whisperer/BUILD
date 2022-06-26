@@ -1,9 +1,12 @@
 load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_proto//proto:defs.bzl", "proto_descriptor_set")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_proto_library")
 load("//tools/type_whisperer:api_build_file.bzl", "api_build_file")
 load("//tools/type_whisperer:file_descriptor_set_text.bzl", "file_descriptor_set_text")
 load("//tools/type_whisperer:type_database.bzl", "type_database")
 load("//tools/type_whisperer:proto_cc_source.bzl", "proto_cc_source")
+load("//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("@dev_pip3//:requirements.bzl", dev_entry_point = "entry_point", dev_requirement = "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -31,6 +34,7 @@ py_binary(
     srcs = ["typedb_gen.py"],
     visibility = ["//visibility:public"],
     deps = [
+        dev_requirement("remote_pdb"),
         ":api_type_db_proto_py_proto",
         ":types_py_proto",
         "//tools/api_proto_plugin:utils",
@@ -43,6 +47,7 @@ py_binary(
     srcs = ["file_descriptor_set_text_gen.py"],
     visibility = ["//visibility:public"],
     deps = [
+        dev_requirement("remote_pdb"),
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
     ],
@@ -124,4 +129,23 @@ py_binary(
 api_build_file(
     name = "api_build_file",
     typedb = "//tools/type_whisperer:api_type_db",
+)
+
+envoy_entry_point(
+    name = "worker",
+    entry_point = dev_entry_point,
+    pkg = "aio.api.bazel",
+    script = "aio.bazel.worker",
+    deps = [
+        "//tools/type_whisperer",
+        dev_requirement("envoy.base.utils"),
+    ],
+)
+
+proto_descriptor_set(
+    name = "types_proto_set",
+    deps = [
+        "//tools/api_proto_plugin:default_type_db_target",
+        "@envoy_api//:all_protos",
+    ],
 )

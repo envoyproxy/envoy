@@ -22,6 +22,8 @@ build --platform_mappings=bazel/platform_mappings
 # silence absl logspam.
 build --copt=-DABSL_MIN_LOG_LEVEL=4
 
+build --strategy=TypeWhisperer=worker,local
+
 # Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
 build --action_env=CC --host_action_env=CC
 build --action_env=CXX --host_action_env=CXX

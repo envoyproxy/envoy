@@ -94,7 +94,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-09-15",
         strip_prefix = "rules_proto-{version}",
         urls = ["https://github.com/bazelbuild/rules_proto/archive/refs/tags/{version}.tar.gz"],
-        use_category = ["api"],
+        use_category = ["api", "test_only"],
     ),
     opentelemetry_proto = dict(
         project_name = "OpenTelemetry Proto",

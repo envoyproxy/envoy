@@ -58,10 +58,11 @@ class TypeWhispererVisitor(visitor.Visitor):
         return str(self._types)
 
 
-def main():
-    plugin.plugin([
+def main(request=None):
+    return plugin.plugin([
         plugin.direct_output_descriptor('.types.pb_text', TypeWhispererVisitor),
-    ])
+    ],
+                         incoming=request)
 
 
 if __name__ == '__main__':
