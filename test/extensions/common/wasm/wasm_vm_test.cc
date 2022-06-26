@@ -49,7 +49,7 @@ protected:
   Stats::ScopeSharedPtr scope_;
 };
 
-TEST_F(BaseVmTest, UnSpecifiedRuntime) {
+TEST_F(BaseVmTest, UnspecifiedRuntime) {
   auto wasm_vm = createWasmVm("");
   // Envoy is built with "--define wasm=disabled", so no Wasm engine is available
   if (getDefaultWasmEngineName().empty()) {
