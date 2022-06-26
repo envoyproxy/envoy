@@ -79,8 +79,11 @@ void handleLegacyDnsResolverData(
 Network::DnsResolverFactory& createDnsResolverFactoryFromTypedConfig(
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   ENVOY_LOG_MISC(debug, "create DNS resolver type: {}", typed_dns_resolver_config.name());
-  return Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
-      typed_dns_resolver_config);
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
+  // Perform factory initialization.
+  factory.init();
+  return factory;
 }
 
 // Create the default DNS resolver factory. apple for MacOS or c-ares for all others.
