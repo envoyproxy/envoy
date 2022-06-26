@@ -30,12 +30,6 @@ ProcessWide::ProcessWide() {
   if (init_data.count_++ == 0) {
     // TODO(mattklein123): Audit the following as not all of these have to be re-initialized in the
     // edge case where something does init/destroy/init/destroy.
-
-    // Initialize c-ares library if it is linked in.
-    if (auto* dns_factory = Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(
-            std::string(Network::CaresDnsResolver), true)) {
-      dns_factory->init();
-    }
     Event::Libevent::Global::initialize();
     Envoy::Server::validateProtoDescriptors();
     Http::Http2::initializeNghttp2Logging();

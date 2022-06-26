@@ -495,6 +495,7 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 // c-ares DNS resolver factory
 class CaresDnsResolverFactory : public DnsResolverFactory {
 public:
+  CaresDnsResolverFactory() : ares_library_initialized_(false) {}
   std::string name() const override { return std::string(CaresDnsResolver); }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -507,6 +508,11 @@ public:
                                              typed_dns_resolver_config) const override {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+    // Initialize c-ares library in case first time.
+    if (!ares_library_initialized_) {
+      ares_library_init(ARES_LIB_INIT_ALL);
+      ares_library_initialized_ = true;
+    }
 
     ASSERT(dispatcher.isThreadSafe());
     // Only c-ares DNS factory will call into this function.
@@ -522,8 +528,15 @@ public:
     return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, resolvers);
   }
 
-  void init() override { ares_library_init(ARES_LIB_INIT_ALL); }
-  void cleanup() override { ares_library_cleanup(); }
+  void cleanup() override {
+    // Cleanup c-ares library if initialized.
+    if (ares_library_initialized_) {
+      ares_library_cleanup();
+    }
+  }
+
+private:
+  mutable bool ares_library_initialized_;
 };
 
 // Register the CaresDnsResolverFactory
