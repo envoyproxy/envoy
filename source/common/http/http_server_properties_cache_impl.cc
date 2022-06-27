@@ -40,44 +40,50 @@ HttpServerPropertiesCacheImpl::stringToOrigin(const std::string& str) {
 }
 
 std::string HttpServerPropertiesCacheImpl::originDataToStringForCache(const OriginData& data) {
-  if (!data.protocols.has_value() || data.protocols->empty()) {
-    return absl::StrCat("clear|", data.srtt.count());
-  }
   std::string value;
-  for (auto& protocol : *data.protocols) {
-    if (!value.empty()) {
-      value.push_back(',');
+  if (!data.protocols.has_value() || data.protocols->empty()) {
+    value = "clear";
+  } else {
+    for (auto& protocol : *data.protocols) {
+      if (!value.empty()) {
+        value.push_back(',');
+      }
+      absl::StrAppend(&value, protocol.alpn_, "=\"", protocol.hostname_, ":", protocol.port_, "\"");
+      // Note this is _not_ actually the max age, but the absolute time at which
+      // this entry will expire. protocolsFromString will convert back to ma.
+      absl::StrAppend(
+          &value, "; ma=",
+          std::chrono::duration_cast<std::chrono::seconds>(protocol.expiration_.time_since_epoch())
+              .count());
     }
-    absl::StrAppend(&value, protocol.alpn_, "=\"", protocol.hostname_, ":", protocol.port_, "\"");
-    // Note this is _not_ actually the max age, but the absolute time at which
-    // this entry will expire. protocolsFromString will convert back to ma.
-    absl::StrAppend(
-        &value, "; ma=",
-        std::chrono::duration_cast<std::chrono::seconds>(protocol.expiration_.time_since_epoch())
-            .count());
   }
-  absl::StrAppend(&value, "|", data.srtt.count());
+  absl::StrAppend(&value, "|", data.srtt.count(), "|", data.concurrent_streams);
   return value;
 }
 
 absl::optional<HttpServerPropertiesCacheImpl::OriginData>
 HttpServerPropertiesCacheImpl::originDataFromString(absl::string_view origin_data_string,
                                                     TimeSource& time_source, bool from_cache) {
-  OriginData data;
   const std::vector<absl::string_view> parts = absl::StrSplit(origin_data_string, '|');
-  if (parts.size() == 2) {
-    int64_t srtt;
-    if (!absl::SimpleAtoi(parts[1], &srtt)) {
-      return {};
-    }
-    data.srtt = std::chrono::microseconds(srtt);
-  } else if (parts.size() != 1) {
+  if (parts.size() != 3) {
     return {};
-  } else {
-    // Handling raw alt-svc with no endpoint info
-    data.srtt = std::chrono::microseconds(0);
   }
+
+  OriginData data;
   data.protocols = alternateProtocolsFromString(parts[0], time_source, from_cache);
+
+  int64_t srtt;
+  if (!absl::SimpleAtoi(parts[1], &srtt)) {
+    return {};
+  }
+  data.srtt = std::chrono::microseconds(srtt);
+
+  int32_t concurrency;
+  if (!absl::SimpleAtoi(parts[2], &concurrency)) {
+    return {};
+  }
+  data.concurrent_streams = concurrency;
+
   return data;
 }
 
@@ -127,7 +133,8 @@ HttpServerPropertiesCacheImpl::HttpServerPropertiesCacheImpl(
         if (origin_data->protocols.has_value()) {
           protocols = *origin_data->protocols;
         }
-        OriginDataWithOptRef data{protocols, origin_data->srtt, nullptr};
+        OriginDataWithOptRef data(protocols, origin_data->srtt, nullptr,
+                                  origin_data->concurrent_streams);
         setPropertiesImpl(*origin, data);
       } else {
         ENVOY_LOG(warn,
@@ -169,6 +176,24 @@ std::chrono::microseconds HttpServerPropertiesCacheImpl::getSrtt(const Origin& o
   return entry_it->second.srtt;
 }
 
+void HttpServerPropertiesCacheImpl::setConcurrentStreams(const Origin& origin,
+                                                         uint32_t concurrent_streams) {
+  OriginDataWithOptRef data;
+  data.concurrent_streams = concurrent_streams;
+  auto it = setPropertiesImpl(origin, data);
+  if (key_value_store_) {
+    key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second));
+  }
+}
+
+uint32_t HttpServerPropertiesCacheImpl::getConcurrentStreams(const Origin& origin) const {
+  auto entry_it = protocols_.find(origin);
+  if (entry_it == protocols_.end()) {
+    return 0;
+  }
+  return entry_it->second.concurrent_streams;
+}
+
 HttpServerPropertiesCacheImpl::ProtocolsMap::iterator
 HttpServerPropertiesCacheImpl::setPropertiesImpl(const Origin& origin,
                                                  OriginDataWithOptRef& origin_data) {
@@ -194,8 +219,9 @@ HttpServerPropertiesCacheImpl::setPropertiesImpl(const Origin& origin,
 
     return entry_it;
   }
-  return addOriginData(
-      origin, {origin_data.protocols, origin_data.srtt, std::move(origin_data.h3_status_tracker)});
+  return addOriginData(origin,
+                       {origin_data.protocols, origin_data.srtt,
+                        std::move(origin_data.h3_status_tracker), origin_data.concurrent_streams});
 }
 
 HttpServerPropertiesCacheImpl::ProtocolsMap::iterator

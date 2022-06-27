@@ -60,7 +60,7 @@ HeaderToMetadataFilter::HeaderToMetadataFilter(const ConfigSharedPtr config) : c
 
 ThriftProxy::FilterStatus
 HeaderToMetadataFilter::transportBegin(ThriftProxy::MessageMetadataSharedPtr metadata) {
-  auto& headers = metadata->headers();
+  auto& headers = metadata->requestHeaders();
 
   writeHeaderToMetadata(headers, config_->requestRules(), *decoder_callbacks_);
 

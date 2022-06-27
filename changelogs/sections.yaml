@@ -1,0 +1,24 @@
+# NB: you cannot remove sections from here without breaking old changelogs
+#     also, adding a section here requires an update to `envoy.base.utils.typing`
+changes:
+  title: Changes
+behavior_changes:
+  title: Incompatible behavior changes
+  description: |
+    *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+minor_behavior_changes:
+  title: Minor behavior changes
+  description: |
+    *Changes that may cause incompatibilities for some users, but should not for most*
+bug_fixes:
+  title: Bug fixes
+  description: |
+    *Changes expected to improve the state of the world and are unlikely to have negative effects*
+removed_config_or_runtime:
+  title: Removed config or runtime
+  description: |
+    *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+new_features:
+  title: New features
+deprecated:
+  title: Deprecated

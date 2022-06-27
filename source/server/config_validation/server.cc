@@ -102,7 +102,7 @@ void ValidationInstance::initialize(const Options& options,
   thread_local_.registerThread(*dispatcher_, true);
 
   Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);
-  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.no_runtime_singleton", false)) {
+  if (runtime_ptr->snapshot().getBoolean("envoy.restart_features.remove_runtime_singleton", true)) {
     runtime_ = std::move(runtime_ptr);
   } else {
     runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));

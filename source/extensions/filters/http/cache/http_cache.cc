@@ -33,7 +33,7 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
                                  "with null Path.");
   ASSERT(request_headers.Host(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
                                  "with null Host.");
-  absl::string_view scheme = Http::Utility::getScheme(request_headers);
+  absl::string_view scheme = request_headers.getSchemeValue();
   const auto& scheme_values = Http::Headers::get().SchemeValues;
   ASSERT(scheme == scheme_values.Http || scheme == scheme_values.Https);
 

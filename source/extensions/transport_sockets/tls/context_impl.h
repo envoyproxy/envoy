@@ -81,7 +81,7 @@ public:
 
   static int sslSocketIndex();
   // Ssl::Context
-  size_t daysUntilFirstCertExpires() const override;
+  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;

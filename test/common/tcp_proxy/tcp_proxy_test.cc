@@ -1312,6 +1312,22 @@ TEST_F(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
 }
 
+// Test that upstream transport failure message is reflected in access logs.
+TEST_F(TcpProxyTest, UpstreamConnectFailureStreamInfoAccessLog) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+
+  setup(1, accessLogConfig("%UPSTREAM_TRANSPORT_FAILURE_REASON%"));
+
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                  "test_transport_failure");
+
+  EXPECT_EQ(filter_->getStreamInfo().upstreamInfo()->upstreamTransportFailureReason(),
+            "test_transport_failure");
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "test_transport_failure");
+}
+
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy

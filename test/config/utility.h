@@ -150,6 +150,9 @@ public:
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
   using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
 
+  // A basic configuration (admin port, cluster_0, no listeners) with no network filters.
+  static std::string baseConfigNoListeners();
+
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
   static std::string baseConfig();
 

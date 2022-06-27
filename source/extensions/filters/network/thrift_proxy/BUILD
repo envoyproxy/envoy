@@ -50,13 +50,16 @@ envoy_cc_extension(
         ":protocol_options_config_lib",
         ":twitter_protocol_lib",
         ":unframed_transport_lib",
+        "//envoy/access_log:access_log_interface",
         "//envoy/registry",
+        "//source/common/access_log:access_log_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
         "//source/extensions/filters/network/thrift_proxy/router:rds_lib",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
+        "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
@@ -70,6 +73,7 @@ envoy_cc_library(
     deps = [
         ":app_exception_lib",
         ":decoder_lib",
+        ":filter_utils_lib",
         ":protocol_converter_lib",
         ":protocol_interface",
         ":stats_lib",
@@ -111,6 +115,15 @@ envoy_cc_library(
         ":stats_lib",
         ":transport_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_utils_lib",
+    srcs = ["filter_utils.cc"],
+    hdrs = ["filter_utils.h"],
+    deps = [
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
     ],
 )

@@ -172,6 +172,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            empty_stat_name,
                                            empty_stat_name,
+                                           empty_stat_name,
                                            false};
     httpContext().codeStats().chargeResponseStat(info, false);
     if (config_->enableXEnvoyRateLimitedHeader()) {

@@ -15,6 +15,7 @@ read -ra ENVOY_DOCKER_OPTIONS <<< "${ENVOY_DOCKER_OPTIONS:-}"
 export HTTP_PROXY="${http_proxy:-}"
 export HTTPS_PROXY="${https_proxy:-}"
 export NO_PROXY="${no_proxy:-}"
+export GOPROXY="${go_proxy:-}"
 
 if is_windows; then
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
@@ -72,6 +73,7 @@ docker run --rm \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
+       -e GOPROXY \
        -e BAZEL_STARTUP_OPTIONS \
        -e BAZEL_BUILD_EXTRA_OPTIONS \
        -e BAZEL_EXTRA_TEST_OPTIONS \
@@ -79,6 +81,7 @@ docker run --rm \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
        -e BAZEL_REMOTE_INSTANCE \
+       -e GOOGLE_BES_PROJECT_ID \
        -e GCP_SERVICE_ACCOUNT_KEY \
        -e NUM_CPUS \
        -e ENVOY_RBE \

@@ -50,7 +50,7 @@ getProtocolTypes() {
 }
 
 envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy
-parseThriftProxyFromV2Yaml(const std::string& yaml) {
+parseThriftProxyFromV3Yaml(const std::string& yaml) {
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy thrift_proxy;
   TestUtility::loadFromYaml(yaml, thrift_proxy);
   return thrift_proxy;
@@ -147,7 +147,7 @@ thrift_filters:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   std::string header = "A";
   header.push_back('\000'); // Add an invalid character for http header.
   config.mutable_route_config()->mutable_routes()->at(0).mutable_route()->set_cluster_header(
@@ -168,7 +168,7 @@ thrift_filters:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   testConfig(config);
 }
 
@@ -186,7 +186,7 @@ thrift_filters:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
 
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
                           "no_such_filter");
@@ -213,7 +213,7 @@ thrift_filters:
   Registry::InjectFactory<ThriftFilters::NamedThriftFilterConfigFactory> registry(factory);
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   testConfig(config);
 
   EXPECT_EQ(1, factory.config_struct_.fields_size());
@@ -235,7 +235,7 @@ thrift_filters:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   testConfig(config);
 
   EXPECT_EQ(true, config.payload_passthrough());
@@ -258,7 +258,7 @@ resources:
 )EOF");
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(config_yaml);
+      parseThriftProxyFromV3Yaml(config_yaml);
   Matchers::UniversalStringMatcher universal_name_matcher;
   Network::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config, context_);
   auto response =
@@ -286,7 +286,7 @@ trds:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
                           "both trds and route_config is present in ThriftProxy");
 }
@@ -302,7 +302,7 @@ trds:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
                           "trds supports only aggregated api_type in api_config_source");
 }

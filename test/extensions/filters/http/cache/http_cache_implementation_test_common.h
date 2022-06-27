@@ -30,7 +30,7 @@ public:
 
   virtual void setUp(Event::MockDispatcher& dispatcher) { dispatcher_ = &dispatcher; }
   virtual void tearDown() {}
-  virtual HttpCache& cache() = 0;
+  virtual std::shared_ptr<HttpCache> cache() = 0;
 
   // Specifies whether or not the cache supports validating stale cache entries
   // and updating their headers. If false, tests will expect the cache to return
@@ -53,7 +53,7 @@ protected:
   HttpCacheImplementationTest();
   ~HttpCacheImplementationTest() override;
 
-  HttpCache& cache() const { return delegate_->cache(); }
+  std::shared_ptr<HttpCache> cache() const { return delegate_->cache(); }
   bool validationEnabled() const { return delegate_->validationEnabled(); }
   LookupContextPtr lookup(absl::string_view request_path);
 

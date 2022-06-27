@@ -30,7 +30,7 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                          Logger::Loggable<Logger::Id::thrift> {
   UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
                   MessageMetadataSharedPtr& metadata, TransportType transport_type,
-                  ProtocolType protocol_type);
+                  ProtocolType protocol_type, bool close_downstream_on_error);
   ~UpstreamRequest() override;
 
   FilterStatus start();
@@ -55,7 +55,7 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   void onRequestComplete();
   void onResponseComplete();
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
-  void onResetStream(ConnectionPool::PoolFailureReason reason);
+  bool onResetStream(ConnectionPool::PoolFailureReason reason);
   void chargeResponseTiming();
 
   RequestOwner& parent_;
@@ -78,6 +78,8 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   bool charged_response_timing_{false};
   MonotonicTime downstream_request_complete_time_;
   uint64_t response_size_{};
+
+  bool close_downstream_on_error_;
 };
 
 } // namespace Router

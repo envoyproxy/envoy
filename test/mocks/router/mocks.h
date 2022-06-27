@@ -18,6 +18,7 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/router.h"
@@ -329,6 +330,12 @@ public:
   MOCK_METHOD(const absl::optional<bool>&, validated, (), (const));
 };
 
+class MockEarlyDataPolicy : public EarlyDataPolicy {
+public:
+  MOCK_METHOD(bool, allowsEarlyDataForRequest, (const Http::RequestHeaderMap& request_headers),
+              (const));
+};
+
 class MockPathMatchCriterion : public PathMatchCriterion {
 public:
   MockPathMatchCriterion();
@@ -338,7 +345,7 @@ public:
   MOCK_METHOD(PathMatchType, matchType, (), (const));
   MOCK_METHOD(const std::string&, matcher, (), (const));
 
-  PathMatchType type_;
+  PathMatchType type_{};
   std::string matcher_;
 };
 
@@ -394,6 +401,11 @@ public:
   MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
+  MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
+
+  const RouteStatsContextOptRef routeStatsContext() const override {
+    return RouteStatsContextOptRef();
+  }
 
   std::string cluster_name_{"fake_cluster"};
   std::string route_name_{"fake_route_name"};
@@ -412,6 +424,7 @@ public:
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   UpgradeMap upgrade_map_;
   absl::optional<ConnectConfig> connect_config_;
+  testing::NiceMock<MockEarlyDataPolicy> early_data_policy_;
 };
 
 class MockDecorator : public Decorator {
@@ -561,7 +574,7 @@ class MockGenericConnPool : public GenericConnPool {
 
 class MockUpstreamToDownstream : public UpstreamToDownstream {
 public:
-  MOCK_METHOD(const RouteEntry&, routeEntry, (), (const));
+  MOCK_METHOD(const Route&, route, (), (const));
   MOCK_METHOD(const Network::Connection&, connection, (), (const));
 
   MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));
@@ -590,10 +603,32 @@ public:
               (std::unique_ptr<GenericUpstream> && upstream,
                Upstream::HostDescriptionConstSharedPtr host,
                const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
+               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
   MOCK_METHOD(UpstreamToDownstream&, upstreamToDownstream, ());
 
   NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;
+};
+
+class MockClusterSpecifierPlugin : public ClusterSpecifierPlugin {
+public:
+  MockClusterSpecifierPlugin();
+
+  MOCK_METHOD(RouteConstSharedPtr, route,
+              (const RouteEntry& parent, const Http::RequestHeaderMap& header), (const));
+};
+
+class MockClusterSpecifierPluginFactoryConfig : public ClusterSpecifierPluginFactoryConfig {
+public:
+  MockClusterSpecifierPluginFactoryConfig();
+  MOCK_METHOD(ClusterSpecifierPluginSharedPtr, createClusterSpecifierPlugin,
+              (const Protobuf::Message& config,
+               Server::Configuration::CommonFactoryContext& context));
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
+
+  std::string name() const override { return "envoy.router.cluster_specifier_plugin.mock"; }
 };
 
 } // namespace Router

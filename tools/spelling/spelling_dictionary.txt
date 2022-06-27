@@ -23,8 +23,11 @@ AWS
 BACKTRACE
 BEL
 BBR
+BIDIRECTIONAL
 BSON
 BPF
+Bdecoded
+Bencoded
 Repick
 TRA
 btree
@@ -170,6 +173,7 @@ HC
 HCM
 HDS
 HMAC
+HOL
 HPACK
 HTAB
 HTML
@@ -267,6 +271,7 @@ OSI
 OSS
 OSX
 OT
+OTLP
 OU
 OVFL
 PAYLOADLEN
@@ -387,6 +392,7 @@ UA
 UBSAN
 UDP
 UDS
+UHV
 UNC
 URI
 URL
@@ -1256,6 +1262,7 @@ tokenizing
 toolchain
 traceid
 traceparent
+tracestate
 transcode
 transcoded
 transcoder
@@ -1367,4 +1374,5 @@ ElastiCache
 pinterest
 NSS
 SSLKEYLOGFILE
-
+DLB
+PCIE

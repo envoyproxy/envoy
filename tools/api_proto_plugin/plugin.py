@@ -1,11 +1,11 @@
 """Python protoc plugin for Envoy APIs."""
 
 import cProfile
-from collections import namedtuple
 import io
 import os
 import pstats
 import sys
+from collections import namedtuple
 
 from tools.api_proto_plugin import traverse
 
@@ -64,12 +64,7 @@ def plugin(output_descriptors):
             pr.enable()
         for od in output_descriptors:
             f = response.file.add()
-            f.name = file_proto.name + od.output_suffix
-            # Don't run API proto plugins on things like WKT types etc.
-            envoy_proto = file_proto.package.startswith('envoy.') or file_proto.package.startswith(
-                'xds.')
-            if not envoy_proto:
-                continue
+            f.name = f"{file_proto.name}{od.output_suffix}"
             if request.HasField("parameter") and od.want_params:
                 params = dict(param.split('=') for param in request.parameter.split(','))
                 xformed_proto = od.xform(file_proto, params)
@@ -77,8 +72,7 @@ def plugin(output_descriptors):
             else:
                 xformed_proto = od.xform(file_proto)
                 visitor_factory = od.visitor_factory()
-            f.content = traverse.traverse_file(
-                xformed_proto, visitor_factory) if xformed_proto else ''
+            f.content = traverse.traverse_file(xformed_proto, visitor_factory)
         if cprofile_enabled:
             pr.disable()
             stats_stream = io.StringIO()

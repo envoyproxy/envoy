@@ -134,7 +134,7 @@ TEST(StatusUtilityTest, IsOkAndHoldsFailureByCode) {
   ::testing::StringMatchResultListener listener;
   ::testing::ExplainMatchResult(
       IsOkAndHolds(5), absl::StatusOr<int>{absl::FailedPreconditionError("oh no")}, &listener);
-  EXPECT_EQ("which has unexpected status: FAILED_PRECONDITION: oh no", listener.str());
+  EXPECT_THAT(listener.str(), HasSubstr("which has unexpected status: FAILED_PRECONDITION: oh no"));
 }
 
 } // namespace StatusHelpers

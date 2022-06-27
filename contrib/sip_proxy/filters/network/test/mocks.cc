@@ -47,11 +47,13 @@ MockDecoderFilter::MockDecoderFilter() {
 }
 MockDecoderFilter::~MockDecoderFilter() = default;
 
-MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
+MockDecoderFilterCallbacks::MockDecoderFilterCallbacks()
+    : stats_(SipFilterStats::generateStats("test", store_)) {
 
   ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
   ON_CALL(*this, transactionInfos()).WillByDefault(Return(transaction_infos_));
   ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(connection_.stream_info_));
+  ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 

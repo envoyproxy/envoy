@@ -28,6 +28,22 @@
 #include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
+#if defined(ENVOY_CONFIG_COVERAGE)
+#define DISABLE_UNDER_COVERAGE return
+#else
+#define DISABLE_UNDER_COVERAGE                                                                     \
+  do {                                                                                             \
+  } while (0)
+#endif
+
+#ifdef WIN32
+#define DISABLE_UNDER_WINDOWS return
+#else
+#define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
+#endif
+
 namespace Envoy {
 
 struct ApiFilesystemConfig {
@@ -61,6 +77,9 @@ public:
   // Set up the fake upstream connections. This is called by initialize() and
   // is virtual to allow subclass overrides.
   virtual void createUpstreams();
+  // Create a single upstream, based on the supplied config.
+  void createUpstream(Network::Address::InstanceConstSharedPtr endpoint,
+                      FakeUpstreamConfig& config);
   // Finalize the config and spin up an Envoy instance.
   virtual void createEnvoy();
   // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
@@ -338,8 +357,9 @@ public:
     return *fake_upstreams_.back();
   }
 
-  FakeUpstream& addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                                Http::CodecType type) {
+  FakeUpstream&
+  addFakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
+                  Http::CodecType type) {
     auto config = configWithType(type);
     fake_upstreams_.emplace_back(
         std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
@@ -385,6 +405,8 @@ protected:
     upstream_config_.quic_options_.MergeFrom(options);
   }
 
+  void checkForMissingTagExtractionRules();
+
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.
@@ -425,7 +447,7 @@ protected:
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   bool upstream_tls_{false};
 
-  Network::TransportSocketFactoryPtr
+  Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
@@ -465,6 +487,9 @@ protected:
   // By default the test server will use custom stats to notify on increment.
   // This override exists for tests measuring stats memory.
   bool use_real_stats_{};
+
+  // If true, skip checking stats for missing tag-extraction rules.
+  bool skip_tag_extraction_rule_check_{};
 
 private:
   // Configuration for the fake upstream.

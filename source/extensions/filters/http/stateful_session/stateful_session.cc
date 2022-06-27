@@ -12,8 +12,24 @@ namespace Extensions {
 namespace HttpFilters {
 namespace StatefulSession {
 
+namespace {
+
+class EmptySessionStateFactory : public Envoy::Http::SessionStateFactory {
+public:
+  Envoy::Http::SessionStatePtr create(const Envoy::Http::RequestHeaderMap&) const override {
+    return nullptr;
+  }
+};
+
+} // namespace
+
 StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
                                              Server::Configuration::CommonFactoryContext& context) {
+  if (!config.has_session_state()) {
+    factory_ = std::make_shared<EmptySessionStateFactory>();
+    return;
+  }
+
   auto& factory =
       Envoy::Config::Utility::getAndCheckFactoryByName<Envoy::Http::SessionStateFactoryConfig>(
           config.session_state().name());
@@ -34,7 +50,7 @@ PerRouteStatefulSession::PerRouteStatefulSession(
 }
 
 Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const StatefulSessionConfig* config = config_;
+  const StatefulSessionConfig* config = config_.get();
   auto route_config = Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteStatefulSession>(
       "envoy.filters.http.stateful_session", decoder_callbacks_->route());
 

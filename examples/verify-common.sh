@@ -86,43 +86,59 @@ _curl () {
 }
 
 responds_with () {
-    local expected
+    local expected response
     expected="$1"
     shift
-    _curl "${@}" | grep "$expected" || {
-        echo "ERROR: curl expected (${*}): $expected" >&2
+    response=$(_curl "${@}")
+    grep -s "$expected" <<< "$response" || {
+        echo "ERROR: curl (${*})" >&2
+        echo "EXPECTED: $expected" >&2
+        echo "RECEIVED:" >&2
+        echo "$response" >&2
         return 1
     }
 }
 
 responds_without () {
-    local expected
+    local expected response
     expected="$1"
     shift
+    response=$(_curl "${@}")
     # shellcheck disable=2266
-    _curl "${@}" | grep "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
-        echo "ERROR: curl without (${*}): $expected" >&2
+    grep -s "$expected" <<< "$response" | [[ "$(wc -l)" -eq 0 ]] || {
+        echo "ERROR: curl (${*})" >&2
+        echo "DID NOT EXPECT: $expected" >&2
+        echo "RECEIVED:" >&2
+        echo "$response" >&2
         return 1
     }
 }
 
 responds_with_header () {
-    local expected
+    local expected response
     expected="$1"
     shift
-    _curl --head "${@}" | grep "$expected"  || {
-        echo "ERROR: curl header (${*}): $expected" >&2
+    response=$(_curl --head "${@}")
+    grep -s "$expected" <<< "$response"  || {
+        echo "ERROR: curl (${*})" >&2
+        echo "EXPECTED HEADER: $expected" >&2
+        echo "RECEIVED:" >&2
+        echo "$response" >&2
         return 1
     }
 }
 
 responds_without_header () {
-    local expected
+    local expected response
     expected="$1"
     shift
+    response=$(_curl --head "${@}")
     # shellcheck disable=2266
-    _curl --head "${@}" | grep "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
-        echo "ERROR: curl without header (${*}): $expected" >&2
+    grep -s "$expected" <<< "$response" | [[ "$(wc -l)" -eq 0 ]] || {
+        echo "ERROR: curl (${*})" >&2
+        echo "DID NOT EXPECT HEADER: $expected" >&2
+        echo "RECEIVED:" >&2
+        echo "$response" >&2
         return 1
     }
 }

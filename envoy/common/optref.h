@@ -16,6 +16,7 @@ namespace Envoy {
 template <class T> struct OptRef : public absl::optional<std::reference_wrapper<T>> {
   OptRef(T& t) : absl::optional<std::reference_wrapper<T>>(t) {}
   OptRef() = default;
+  OptRef(absl::nullopt_t) : OptRef() {}
 
   /**
    * Copy constructor that allows conversion.

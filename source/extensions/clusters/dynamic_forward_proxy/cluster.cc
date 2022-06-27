@@ -170,6 +170,9 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     if (host_it == cluster_.host_map_.end()) {
       return nullptr;
     } else {
+      if (host_it->second.logical_host_->health() == Upstream::Host::Health::Unhealthy) {
+        return nullptr;
+      }
       host_it->second.shared_host_info_->touch();
       return host_it->second.logical_host_;
     }

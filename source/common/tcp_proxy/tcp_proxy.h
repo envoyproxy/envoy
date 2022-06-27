@@ -343,6 +343,7 @@ public:
                           const Network::Address::InstanceConstSharedPtr& local_address,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info) override;
   void onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
+                            absl::string_view failure_reason,
                             Upstream::HostDescriptionConstSharedPtr host) override;
 
   // Upstream::LoadBalancerContext

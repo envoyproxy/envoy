@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/utility.h"
 
+#include <cstdint>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/safe_memcpy.h"
@@ -45,8 +47,8 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
       std::make_unique<envoy::admin::v3::CertificateDetails>();
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
-  certificate_details->set_days_until_expiration(
-      Utility::getDaysUntilExpiration(cert, time_source));
+  const auto days_until_expiry = Utility::getDaysUntilExpiration(cert, time_source).value_or(0);
+  certificate_details->set_days_until_expiration(days_until_expiry);
 
   ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
   TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
@@ -253,16 +255,19 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
   return getRFC2253NameFromCertificate(cert, CertName::Subject);
 }
 
-int32_t Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
+absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
+                                                         TimeSource& time_source) {
   if (cert == nullptr) {
-    return std::numeric_limits<int>::max();
+    return absl::make_optional(std::numeric_limits<uint32_t>::max());
   }
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),
                      X509_get0_notAfter(cert))) {
-    return days;
+    if (days >= 0 && seconds >= 0) {
+      return absl::make_optional(days);
+    }
   }
-  return 0;
+  return absl::nullopt;
 }
 
 absl::string_view Utility::getCertificateExtensionValue(X509& cert,

@@ -430,6 +430,9 @@ public:
    */
   virtual void setUpstreamNumStreams(uint64_t num_streams) PURE;
   virtual uint64_t upstreamNumStreams() const PURE;
+
+  virtual void setUpstreamProtocol(Http::Protocol protocol) PURE;
+  virtual absl::optional<Http::Protocol> upstreamProtocol() const PURE;
 };
 
 /**

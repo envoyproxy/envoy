@@ -28,6 +28,7 @@ struct HttpProtocolTestParams {
 // TEST_P(MyTest, TestInstance) {
 // ....
 // }
+// TODO(#20996) consider switching to SimulatedTimeSystem instead of using real time.
 class HttpProtocolIntegrationTest : public testing::TestWithParam<HttpProtocolTestParams>,
                                     public HttpIntegrationTest {
 public:

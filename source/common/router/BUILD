@@ -34,6 +34,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":config_utility_lib",
+        ":context_lib",
         ":header_formatter_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
@@ -43,6 +44,7 @@ envoy_cc_library(
         ":tls_context_match_criteria_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/router:router_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:filter_config_interface",  # TODO(rodaine): break dependency on server
@@ -67,6 +69,7 @@ envoy_cc_library(
         "//source/common/tracing:custom_tag_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:retry_factory_lib",
+        "//source/extensions/early_data:default_early_data_policy_lib",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -336,6 +339,9 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:header_utility_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/matcher:matcher_lib",
+        "//source/common/network:cidr_range_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -415,5 +421,6 @@ envoy_cc_library(
     hdrs = ["delegating_route_impl.h"],
     deps = [
         "//envoy/router:router_interface",
+        "//source/common/config:metadata_lib",
     ],
 )

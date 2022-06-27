@@ -4,7 +4,6 @@ runtime {
   override_subdirectory: "out"
 }
 admin {
-  access_log_path: "/"
   address {
     pipe {
       path: "WW"

@@ -22,15 +22,13 @@ config_env() {
 
 build_platforms() {
   TYPE=$1
-  FILE_SUFFIX="${TYPE/-debug/}"
-  FILE_SUFFIX="${FILE_SUFFIX/-contrib/}"
 
   if is_windows; then
     echo "windows/amd64"
-  elif [[ -z "${FILE_SUFFIX}" ]]; then
-      echo "linux/arm64,linux/amd64"
+  elif [[ "${TYPE}" == *-google-vrp ]]; then
+    echo "linux/amd64"
   else
-      echo "linux/amd64"
+    echo "linux/arm64,linux/amd64"
   fi
 }
 
@@ -46,11 +44,11 @@ build_args() {
   fi
 
   if [[ "${TYPE}" == *-contrib* ]]; then
-      printf ' --build-arg ENVOY_BINARY=envoy-contrib'
+    printf ' --build-arg ENVOY_BINARY=envoy-contrib'
   fi
 
   if [[ "${TYPE}" == *-debug ]]; then
-      printf ' --build-arg ENVOY_BINARY_SUFFIX='
+    printf ' --build-arg ENVOY_BINARY_SUFFIX='
   fi
 }
 
@@ -68,7 +66,7 @@ build_images() {
 
   use_builder "${TYPE}"
   _args=$(build_args "${TYPE}")
-  read -ra args <<< "$_args"
+  read -ra args <<<"$_args"
   PLATFORM="$(build_platforms "${TYPE}")"
 
   if ! is_windows && ! [[ "${TYPE}" =~ debug ]]; then
@@ -85,11 +83,11 @@ push_images() {
 
   use_builder "${TYPE}"
   _args=$(build_args "${TYPE}")
-  read -ra args <<< "$_args"
+  read -ra args <<<"$_args"
   PLATFORM="$(build_platforms "${TYPE}")"
   # docker buildx doesn't do push with default builder
-  docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" . --push || \
-  docker push "${BUILD_TAG}"
+  docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" . --push ||
+    docker push "${BUILD_TAG}"
 }
 
 MAIN_BRANCH="refs/heads/main"
@@ -126,8 +124,8 @@ fi
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
 # cases where we do push.
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
-    image_tag="${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
-    build_images "${BUILD_TYPE}" "$image_tag"
+  image_tag="${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
+  build_images "${BUILD_TYPE}" "$image_tag"
 done
 
 # Only push images for main builds, release branch builds, and tag builds.

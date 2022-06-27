@@ -481,10 +481,18 @@ public:
   virtual ~ShadowPolicy() = default;
 
   /**
-   * @return the name of the cluster that a matching request should be shadowed to. Returns empty
+   * @return the name of the cluster that a matching request should be shadowed to.
+   *         Only one of *cluster* and *cluster_header* can be specified. Returns empty
    *         string if no shadowing should take place.
    */
   virtual const std::string& cluster() const PURE;
+
+  /**
+   * @return the cluster header name that router can get the cluster name from request headers.
+   *         Only one of *cluster* and *cluster_header* can be specified. Returns empty
+   *         string if no shadowing should take place.
+   */
+  virtual const Http::LowerCaseString& clusterHeader() const PURE;
 
   /**
    * @return the runtime key that will be used to determine whether an individual request should
@@ -523,10 +531,37 @@ using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
   STATNAME(vhost)
 
 /**
+ * All route level stats. @see stats_macro.h
+ */
+#define ALL_ROUTE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                         \
+  COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
+  COUNTER(upstream_rq_retry_overflow)                                                              \
+  COUNTER(upstream_rq_retry_success)                                                               \
+  COUNTER(upstream_rq_timeout)                                                                     \
+  COUNTER(upstream_rq_total)                                                                       \
+  STATNAME(route)                                                                                  \
+  STATNAME(vhost)
+
+/**
  * Struct definition for all virtual cluster stats. @see stats_macro.h
  */
 MAKE_STAT_NAMES_STRUCT(VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
+
+/**
+ * Struct definition for all route level stats. @see stats_macro.h
+ */
+MAKE_STAT_NAMES_STRUCT(RouteStatNames, ALL_ROUTE_STATS);
+MAKE_STATS_STRUCT(RouteStats, RouteStatNames, ALL_ROUTE_STATS);
+
+/**
+ * RouteStatsContext defines config needed to generate all route level stats.
+ */
+class RouteStatsContext;
+
+using RouteStatsContextPtr = std::unique_ptr<RouteStatsContext>;
+using RouteStatsContextOptRef = OptRef<RouteStatsContext>;
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -754,6 +789,38 @@ public:
  * Base class for all route typed metadata factories.
  */
 class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
+
+/**
+ * Base class for all early data option extensions.
+ */
+class EarlyDataPolicy {
+public:
+  virtual ~EarlyDataPolicy() = default;
+
+  /**
+   * @return bool whether the given request may be sent over early data.
+   */
+  virtual bool allowsEarlyDataForRequest(const Http::RequestHeaderMap& request_headers) const PURE;
+};
+
+using EarlyDataPolicyPtr = std::unique_ptr<EarlyDataPolicy>;
+
+/**
+ * Base class for all early data option factories.
+ */
+class EarlyDataPolicyFactory : public Envoy::Config::TypedFactory {
+public:
+  ~EarlyDataPolicyFactory() override = default;
+
+  /**
+   * @param config the typed config for early data option.
+   * @return EarlyDataIOptionPtr an instance of EarlyDataPolicy.
+   */
+  virtual EarlyDataPolicyPtr createEarlyDataPolicy(const Protobuf::Message& config) PURE;
+
+  // Config::UntypedFactory
+  std::string category() const override { return "envoy.route.early_data_policy"; }
+};
 
 /**
  * An individual resolved route entry.
@@ -988,6 +1055,16 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+
+  /**
+   * @return RouteStatsContextOptRef the config needed to generate route level stats.
+   */
+  virtual const RouteStatsContextOptRef routeStatsContext() const PURE;
+
+  /**
+   * @return EarlyDataPolicy& the configured early data option.
+   */
+  virtual const EarlyDataPolicy& earlyDataPolicy() const PURE;
 };
 
 /**
@@ -1264,9 +1341,9 @@ public:
 class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
 public:
   /**
-   * @return return the routeEntry for the downstream stream.
+   * @return return the route for the downstream stream.
    */
-  virtual const RouteEntry& routeEntry() const PURE;
+  virtual const Route& route() const PURE;
   /**
    * @return return the connection for the downstream stream.
    */
@@ -1312,7 +1389,7 @@ public:
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                           const StreamInfo::StreamInfo& info,
+                           StreamInfo::StreamInfo& info,
                            absl::optional<Http::Protocol> protocol) PURE;
 
   // @return the UpstreamToDownstream interface for this stream.

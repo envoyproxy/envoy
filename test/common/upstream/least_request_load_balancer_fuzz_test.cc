@@ -8,6 +8,8 @@
 namespace Envoy {
 namespace Upstream {
 
+static const uint32_t MaxChoiceCountForTest = 150;
+
 // Least Request takes into account both weights (handled in ZoneAwareLoadBalancerFuzzBase), and
 // requests active as well
 void setRequestsActiveForStaticHosts(NiceMock<MockPrioritySet>& priority_set,
@@ -45,7 +47,12 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
   }
-
+  if (input.least_request_lb_config().has_choice_count() &&
+      input.least_request_lb_config().choice_count().value() > MaxChoiceCountForTest) {
+    ENVOY_LOG_MISC(debug, "a choice count greater than {} has no added value",
+                   MaxChoiceCountForTest);
+    return;
+  }
   const test::common::upstream::ZoneAwareLoadBalancerTestCase& zone_aware_load_balancer_test_case =
       input.zone_aware_load_balancer_test_case();
 

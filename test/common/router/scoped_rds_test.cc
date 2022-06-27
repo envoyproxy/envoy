@@ -511,7 +511,8 @@ key:
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(pushRdsConfig({"foo_routes"}, "111", route_config_tmpl), EnvoyException,
-                            "Didn't find a registered implementation for name: 'filter.unknown'");
+                            "Didn't find a registered implementation for 'filter.unknown' with "
+                            "type URL: 'google.protobuf.Struct'");
 }
 
 // Test ignoring the optional unknown factory in the per-virtualhost typed config.

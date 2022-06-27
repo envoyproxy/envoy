@@ -8,7 +8,13 @@ class ConnectionLimitIntegrationTest : public Event::TestUsingSimulatedTime,
                                        public BaseIntegrationTest {
 public:
   ConnectionLimitIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat
+    // 'connection_limit.connection_limit_stats.limited_connections' and stat_prefix
+    // 'connection_limit_stats'.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
   void setup(const std::string& filter_yaml) {
     config_helper_.addNetworkFilter(filter_yaml);

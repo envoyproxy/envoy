@@ -1,7 +1,7 @@
-diff --git a/icu4c/source/common/BUILD b/icu4c/source/common/BUILD
+diff --git a/icu4c/source/common/BUILD.bazel b/icu4c/source/common/BUILD.bazel
 deleted file mode 100644
 index e385d3b..0000000
---- a/icu4c/source/common/BUILD
+--- a/icu4c/source/common/BUILD.bazel
 +++ /dev/null
 @@ -1,1213 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
@@ -1217,10 +1217,10 @@ index e385d3b..0000000
 -        "U_COMMON_IMPLEMENTATION",  
 -    ],
 -)
-diff --git a/icu4c/source/data/unidata/norm2/BUILD b/icu4c/source/data/unidata/norm2/BUILD
+diff --git a/icu4c/source/data/unidata/norm2/BUILD.bazel b/icu4c/source/data/unidata/norm2/BUILD.bazel
 deleted file mode 100644
 index 049e19b..0000000
---- a/icu4c/source/data/unidata/norm2/BUILD
+--- a/icu4c/source/data/unidata/norm2/BUILD.bazel
 +++ /dev/null
 @@ -1,13 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
@@ -1236,10 +1236,10 @@ index 049e19b..0000000
 -exports_files([
 -    "nfc.txt", "nfkc.txt", "nfkc_cf.txt", "uts46.txt",
 -])
-diff --git a/icu4c/source/i18n/BUILD b/icu4c/source/i18n/BUILD
+diff --git a/icu4c/source/i18n/BUILD.bazel b/icu4c/source/i18n/BUILD.bazel
 deleted file mode 100644
 index 2d85cdb..0000000
---- a/icu4c/source/i18n/BUILD
+--- a/icu4c/source/i18n/BUILD.bazel
 +++ /dev/null
 @@ -1,130 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
@@ -1385,10 +1385,10 @@ index 2c35816..4ad6f52 100644
  RANLIB = @RANLIB@
  COMPILE_LINK_ENVVAR = @COMPILE_LINK_ENVVAR@
  UCLN_NO_AUTO_CLEANUP = @UCLN_NO_AUTO_CLEANUP@
-diff --git a/icu4c/source/stubdata/BUILD b/icu4c/source/stubdata/BUILD
+diff --git a/icu4c/source/stubdata/BUILD.bazel b/icu4c/source/stubdata/BUILD.bazel
 deleted file mode 100644
 index abb7351..0000000
---- a/icu4c/source/stubdata/BUILD
+--- a/icu4c/source/stubdata/BUILD.bazel
 +++ /dev/null
 @@ -1,23 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
@@ -1414,10 +1414,10 @@ index abb7351..0000000
 -        "U_COMMON_IMPLEMENTATION",
 -    ],
 -)
-diff --git a/icu4c/source/tools/gennorm2/BUILD b/icu4c/source/tools/gennorm2/BUILD
+diff --git a/icu4c/source/tools/gennorm2/BUILD.bazel b/icu4c/source/tools/gennorm2/BUILD.bazel
 deleted file mode 100644
 index c602897..0000000
---- a/icu4c/source/tools/gennorm2/BUILD
+--- a/icu4c/source/tools/gennorm2/BUILD.bazel
 +++ /dev/null
 @@ -1,39 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
@@ -1459,10 +1459,10 @@ index c602897..0000000
 -    ],
 -    linkopts = ["-pthread"],
 -)
-diff --git a/icu4c/source/tools/toolutil/BUILD b/icu4c/source/tools/toolutil/BUILD
+diff --git a/icu4c/source/tools/toolutil/BUILD.bazel b/icu4c/source/tools/toolutil/BUILD.bazel
 deleted file mode 100644
 index 276c857..0000000
---- a/icu4c/source/tools/toolutil/BUILD
+--- a/icu4c/source/tools/toolutil/BUILD.bazel
 +++ /dev/null
 @@ -1,126 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.

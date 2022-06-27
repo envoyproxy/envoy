@@ -98,7 +98,9 @@ TEST_F(SchemaValidatorTest, BootstrapPgvFail) {
 TEST_F(SchemaValidatorTest, LdsRecursivePgvFail) {
   EXPECT_THROW_WITH_REGEX(
       run("schema_validator_tool -c {} -t discovery_response", "lds_pgv_fail.yaml"), EnvoyException,
-      "Proto constraint validation failed \\(ListenerValidationError.Address: value is required");
+      "Proto constraint validation failed \\(HttpConnectionManagerValidationError.RouteConfig:"
+      ".* caused by RouteConfigurationValidationError.VirtualHosts.*"
+      "VirtualHostValidationError.Domains: value must contain at least 1 item\\(s\\)");
 }
 
 } // namespace Envoy

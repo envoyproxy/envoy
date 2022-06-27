@@ -75,6 +75,8 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
   bool passthroughEnabled() const override { return true; }
+  bool isRequest() const override { return false; }
+  bool headerKeysPreserveCase() const override { return false; }
 
   DecoderPtr decoder_;
   Buffer::OwnedImpl response_buffer_;

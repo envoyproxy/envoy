@@ -1,7 +1,10 @@
 #include "source/common/common/regex.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/extensions/regex_engines/v3/google_re2.pb.h"
+#include "envoy/extensions/regex_engines/v3/google_re2.pb.validate.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
+#include "envoy/type/matcher/v3/regex.pb.validate.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
@@ -17,7 +20,7 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
     throw EnvoyException(regex_.error());
   }
 
-  if (do_program_size_check) {
+  if (do_program_size_check && Runtime::isRuntimeInitialized()) {
     const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
     const uint32_t max_program_size_error_level =
         Runtime::getInteger("re2.max_program_size.error_level", 100);
@@ -55,6 +58,21 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(
     }
   }
 }
+
+CompiledMatcherPtr GoogleReEngine::matcher(const std::string& regex) const {
+  return std::make_unique<CompiledGoogleReMatcher>(regex, true);
+}
+
+EnginePtr GoogleReEngineFactory::createEngine(const Protobuf::Message&,
+                                              Server::Configuration::ServerFactoryContext&) {
+  return std::make_shared<GoogleReEngine>();
+}
+
+ProtobufTypes::MessagePtr GoogleReEngineFactory::createEmptyConfigProto() {
+  return std::make_unique<envoy::extensions::regex_engines::v3::GoogleRE2>();
+}
+
+REGISTER_FACTORY(GoogleReEngineFactory, EngineFactory);
 
 std::regex Utility::parseStdRegex(const std::string& regex, std::regex::flag_type flags) {
   // TODO(zuercher): In the future, PGV (https://github.com/envoyproxy/protoc-gen-validate)

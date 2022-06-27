@@ -50,7 +50,7 @@ typed_config:
     HttpIntegrationTest::initialize();
   }
 
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
+  Network::DownstreamTransportSocketFactoryPtr createUpstreamSslContext() {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     const std::string yaml = absl::StrFormat(
         R"EOF(

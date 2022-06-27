@@ -12,11 +12,9 @@ envoy_cc_library(
     name = "conn_pool_lib",
     srcs = [
         "conn_pool.cc",
-        "original_conn_pool.cc",
     ],
     hdrs = [
         "conn_pool.h",
-        "original_conn_pool.h",
     ],
     external_deps = ["abseil_optional"],
     deps = [

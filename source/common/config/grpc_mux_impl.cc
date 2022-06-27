@@ -213,7 +213,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // We have to walk all watches (and need an efficient map as a result) to
     // ensure we deliver empty config updates when a resource is dropped. We make the map ordered
     // for test determinism.
-    std::vector<DecodedResourceImplPtr> resources;
+    std::vector<DecodedResourcePtr> resources;
     absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
     std::vector<DecodedResourceRef> all_resource_refs;
     OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
@@ -247,8 +247,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     // Execute external config validators if there are any watches.
     if (!api_state.watches_.empty()) {
-      config_validators_->executeValidators(
-          type_url, reinterpret_cast<std::vector<DecodedResourcePtr>&>(resources));
+      config_validators_->executeValidators(type_url, resources);
     }
 
     for (auto watch : api_state.watches_) {

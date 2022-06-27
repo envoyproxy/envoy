@@ -247,7 +247,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -319,6 +319,9 @@ message Http1ProtocolOptions {
   // .. attention::
   //   Enabling this option might lead to request smuggling vulnerability, especially if traffic
   //   is proxied via multiple layers of proxies.
+  // [#comment:TODO: This field is ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present.]
   bool allow_chunked_length = 6;
 
   // Allows invalid HTTP messaging. When this option is false, then Envoy will terminate
@@ -328,6 +331,13 @@ message Http1ProtocolOptions {
   // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 7;
+
+  // Allows sending fully qualified URLs when proxying the first line of the
+  // response. By default, Envoy will only send the path components in the first line.
+  // If this is true, Envoy will create a fully qualified URI composing scheme
+  // (inferred if not present), host (from the host/:authority header) and path
+  // (from first line or :path header).
+  bool send_fully_qualified_url = 8;
 }
 
 message KeepaliveSettings {
@@ -336,7 +346,9 @@ message KeepaliveSettings {
   google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // How long to wait for a response to a keepalive PING. If a response is not received within this
-  // time period, the connection will be aborted.
+  // time period, the connection will be aborted. Note that in order to prevent the influence of
+  // Head-of-line (HOL) blocking the timeout period is extended when *any* frame is received on
+  // the connection, under the assumption that if a frame is received the connection is healthy.
   google.protobuf.Duration timeout = 2 [(validate.rules).duration = {
     required: true
     gte {nanos: 1000000}

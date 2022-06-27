@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <list>
 
@@ -34,7 +35,7 @@ public:
   Ssl::ServerContextSharedPtr
   createSslServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                          const std::vector<std::string>& server_names) override;
-  size_t daysUntilFirstCertExpires() const override;
+  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> callback) override;
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override {

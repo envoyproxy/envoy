@@ -10,11 +10,12 @@ namespace Router {
 
 UpstreamRequest::UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
                                  MessageMetadataSharedPtr& metadata, TransportType transport_type,
-                                 ProtocolType protocol_type)
+                                 ProtocolType protocol_type, bool close_downstream_on_error)
     : parent_(parent), stats_(parent.stats()), conn_pool_data_(pool_data), metadata_(metadata),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
-      request_complete_(false), response_started_(false), response_complete_(false) {}
+      request_complete_(false), response_started_(false), response_complete_(false),
+      close_downstream_on_error_(close_downstream_on_error) {}
 
 UpstreamRequest::~UpstreamRequest() {
   if (conn_pool_handle_) {
@@ -43,6 +44,7 @@ FilterStatus UpstreamRequest::start() {
 }
 
 void UpstreamRequest::releaseConnection(const bool close) {
+  ENVOY_LOG(debug, "releasing connection, close: {}", close);
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
     conn_pool_handle_ = nullptr;
@@ -58,15 +60,21 @@ void UpstreamRequest::releaseConnection(const bool close) {
   }
 }
 
-void UpstreamRequest::resetStream() { releaseConnection(true); }
+void UpstreamRequest::resetStream() {
+  ENVOY_LOG(debug, "reset stream");
+  releaseConnection(true);
+}
 
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                     Upstream::HostDescriptionConstSharedPtr host) {
+  ENVOY_LOG(debug, "on pool failure");
   conn_pool_handle_ = nullptr;
 
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
-  onResetStream(reason);
+  if (!onResetStream(reason)) {
+    parent_.continueDecoding();
+  }
 }
 
 void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
@@ -156,6 +164,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     }
 
     if (callbacks.responseMetadata()->isDraining()) {
+      ENVOY_LOG(debug, "got draining signal");
       stats_.incCloseDrain(cluster);
       resetStream();
     }
@@ -200,15 +209,16 @@ bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream
 
 void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
   ASSERT(!response_complete_);
+  bool end_downstream = true;
 
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
     ENVOY_LOG(debug, "upstream remote close");
-    onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    end_downstream = onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     break;
   case Network::ConnectionEvent::LocalClose:
     ENVOY_LOG(debug, "upstream local close");
-    onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+    end_downstream = onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
   case Network::ConnectionEvent::Connected:
   case Network::ConnectionEvent::ConnectedZeroRtt:
@@ -217,6 +227,9 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
   }
 
   releaseConnection(false);
+  if (!end_downstream && request_complete_) {
+    parent_.onReset();
+  }
 }
 
 uint64_t UpstreamRequest::encodeAndWrite(Buffer::OwnedImpl& request_buffer) {
@@ -228,7 +241,6 @@ uint64_t UpstreamRequest::encodeAndWrite(Buffer::OwnedImpl& request_buffer) {
   uint64_t size = transport_buffer.length();
 
   conn_data_->connection().write(transport_buffer, false);
-  onRequestComplete();
 
   return size;
 }
@@ -262,13 +274,8 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
   upstream_host_ = host;
 }
 
-void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
-  if (metadata_->messageType() == MessageType::Oneway) {
-    // For oneway requests, we should not attempt a response. Reset the downstream to signal
-    // an error.
-    parent_.resetDownstreamConnection();
-    return;
-  }
+bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
+  bool close_downstream = true;
 
   chargeResponseTiming();
 
@@ -278,6 +285,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
                            false /* Don't close the downstream connection. */);
+    close_downstream = false;
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_host_->outlierDetector().putResult(
@@ -297,20 +305,29 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     stats_.incResponseLocalException(parent_.cluster());
 
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
-    if (!response_started_) {
-      parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
-                                          fmt::format("connection failure '{}'",
-                                                      (upstream_host_ != nullptr)
-                                                          ? upstream_host_->address()->asString()
-                                                          : "to upstream")),
-                             true);
-      return;
+    if (response_started_) {
+      ENVOY_LOG(debug, "reset downstream connection for a partial response");
+      // Error occurred after a partial response, propagate the reset to the downstream.
+      parent_.resetDownstreamConnection();
+    } else {
+      close_downstream = close_downstream_on_error_;
+      parent_.sendLocalReply(
+          AppException(
+              AppExceptionType::InternalError,
+              fmt::format("connection failure: {} '{}'",
+                          reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure
+                              ? "remote connection failure"
+                              : "timeout",
+                          (upstream_host_ != nullptr) ? upstream_host_->address()->asString()
+                                                      : "to upstream")),
+          close_downstream);
     }
-
-    // Error occurred after a partial response, propagate the reset to the downstream.
-    parent_.resetDownstreamConnection();
     break;
   }
+
+  ENVOY_LOG(debug, "upstream reset complete reason {} (close_downstream={})",
+            static_cast<int>(reason), close_downstream);
+  return close_downstream;
 }
 
 void UpstreamRequest::chargeResponseTiming() {

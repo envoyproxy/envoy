@@ -128,8 +128,9 @@ public:
       : ActionWithFileResult(manager, on_complete), path_(path) {}
 
   absl::StatusOr<AsyncFileHandle> executeImpl() override {
-    bool was_successful_first_call = false;
     Api::SysCallIntResult open_result;
+#ifdef O_TMPFILE
+    bool was_successful_first_call = false;
     std::call_once(manager_.once_flag_, [this, &was_successful_first_call, &open_result]() {
       open_result = posix().open(path_.c_str(), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
       was_successful_first_call = manager_.supports_o_tmpfile_ = (open_result.return_value_ != -1);
@@ -147,6 +148,7 @@ public:
       }
       return std::make_shared<AsyncFileContextThreadPool>(manager_, open_result.return_value_);
     }
+#endif // O_TMPFILE
     // If O_TMPFILE didn't work, fall back to creating a named file and unlinking it.
     // Use a fixed-size buffer because we're going to be using C file functions anyway, and it saves
     // a heap allocation.

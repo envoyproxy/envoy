@@ -47,7 +47,8 @@ message FilterConfig {
   //
   // Envoy will treat the upstream response as an error if this option is specified and the header
   // is missing or if the value does not match the actual response body size.
-  string response_size_header = 3;
+  string response_size_header = 3
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }
 
 // gRPC reverse bridge filter configuration per virtualhost/route/weighted-cluster level.

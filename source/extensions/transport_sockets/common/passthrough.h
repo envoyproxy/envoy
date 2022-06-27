@@ -10,9 +10,9 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 
-class PassthroughFactory : public Network::CommonTransportSocketFactory {
+class PassthroughFactory : public Network::CommonUpstreamTransportSocketFactory {
 public:
-  PassthroughFactory(Network::TransportSocketFactoryPtr&& transport_socket_factory)
+  PassthroughFactory(Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)) {
     ASSERT(transport_socket_factory_ != nullptr);
   }
@@ -21,10 +21,30 @@ public:
     return transport_socket_factory_->implementsSecureTransport();
   }
   bool supportsAlpn() const override { return transport_socket_factory_->supportsAlpn(); }
+  absl::string_view defaultServerNameIndication() const override {
+    return transport_socket_factory_->defaultServerNameIndication();
+  }
 
 protected:
   // The wrapped factory.
-  Network::TransportSocketFactoryPtr transport_socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr transport_socket_factory_;
+};
+
+class DownstreamPassthroughFactory : public Network::DownstreamTransportSocketFactory {
+public:
+  DownstreamPassthroughFactory(
+      Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory)
+      : transport_socket_factory_(std::move(transport_socket_factory)) {
+    ASSERT(transport_socket_factory_ != nullptr);
+  }
+
+  bool implementsSecureTransport() const override {
+    return transport_socket_factory_->implementsSecureTransport();
+  }
+
+protected:
+  // The wrapped factory.
+  Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_;
 };
 
 class PassthroughSocket : public Network::TransportSocket {
@@ -35,6 +55,7 @@ public:
   std::string protocol() const override;
   absl::string_view failureReason() const override;
   bool canFlushClose() override;
+  Api::SysCallIntResult connect(Network::ConnectionSocket& socket) override;
   void closeSocket(Network::ConnectionEvent event) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
