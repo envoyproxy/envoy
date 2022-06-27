@@ -2172,6 +2172,7 @@ message HeaderMatcher {
   // Examples:
   //
   // * The regex ``\d{3}`` does not match the value *1234*, so it will match when inverted.
+  // * The prefix *abc* does not match when the header is not present, so it will match when inverted.
   // * The range [-10,0) will match the value -1, so it will not match when inverted.
   bool invert_match = 8;
 }
