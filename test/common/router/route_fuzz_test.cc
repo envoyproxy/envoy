@@ -65,13 +65,15 @@ bool validateOnMatchConfig(const xds::type::matcher::v3::Matcher::OnMatch& on_ma
     return !isUnsupportedRouteConfig(on_match_route_action_config);
   }
   case xds::type::matcher::v3::Matcher_OnMatch::ON_MATCH_NOT_SET: {
-    // This alternative shall never occur. It is here to case on all values of Matcher_OnMatch and
-    // this way ensures that the compiler will report new entries to that enum as warning, which
-    // will finally result in an compiler error, when error on all warnings is set.
-    ASSERT(false);
+    // This alternative should never occur. But of course it does. By returning false the
+    // fuzzer will not follow this path any further.
     return false;
   }
+    // By not providing a default: the compiler will indicate new constants in the
+    // Matcher_OnMatch enum as compile warnings.
   }
+  // This is present only to silence compilers that do not analyze the switch above correctly.
+  return false;
 }
 
 bool validateMatcherConfig(const xds::type::matcher::v3::Matcher& matcher) {
