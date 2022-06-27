@@ -78,16 +78,16 @@ TEST(InternalParsing, IsValidRewriteLiteralWorks) {
 }
 
 TEST(InternalParsing, IsValidIdentWorks) {
-  EXPECT_TRUE(IsValidIdent("abc"));
-  EXPECT_TRUE(IsValidIdent("ABC_def_123"));
-  EXPECT_TRUE(IsValidIdent("a1"));
-  EXPECT_TRUE(IsValidIdent("T"));
-  EXPECT_FALSE(IsValidIdent("123"));
-  EXPECT_FALSE(IsValidIdent("__undefined__"));
-  EXPECT_FALSE(IsValidIdent("abc-def"));
-  EXPECT_FALSE(IsValidIdent("abc=def"));
-  EXPECT_FALSE(IsValidIdent("abc def"));
-  EXPECT_FALSE(IsValidIdent("a!!!"));
+  EXPECT_TRUE(IsValidIndent("abc"));
+  EXPECT_TRUE(IsValidIndent("ABC_def_123"));
+  EXPECT_TRUE(IsValidIndent("a1"));
+  EXPECT_TRUE(IsValidIndent("T"));
+  EXPECT_FALSE(IsValidIndent("123"));
+  EXPECT_FALSE(IsValidIndent("__undefined__"));
+  EXPECT_FALSE(IsValidIndent("abc-def"));
+  EXPECT_FALSE(IsValidIndent("abc=def"));
+  EXPECT_FALSE(IsValidIndent("abc def"));
+  EXPECT_FALSE(IsValidIndent("a!!!"));
 }
 
 TEST(InternalParsing, ConsumeLiteralWorks) {
