@@ -13,6 +13,7 @@
 #include "absl/types/variant.h"
 #include "re2/re2.h"
 
+namespace Envoy {
 namespace matching {
 
 namespace url_template_matching_internal {
@@ -22,19 +23,19 @@ enum class Operator { kPathGlob, kTextGlob };
 
 struct Variable {
   absl::string_view var_name;
-  std::vector<std::variant<Operator, Literal>> var_match;
+  std::vector<absl::variant<Operator, Literal>> var_match;
 
-  Variable(absl::string_view name, std::vector<std::variant<Operator, Literal>> match)
+  Variable(absl::string_view name, std::vector<absl::variant<Operator, Literal>> match)
       : var_name(name), var_match(match) {}
 
   std::string DebugString() const;
 };
 
-using ParsedSegment = std::variant<Operator, Variable, Literal>;
+using ParsedSegment = absl::variant<Operator, Variable, Literal>;
 
 struct ParsedUrlPattern {
   std::vector<ParsedSegment> parsed_segments;
-  std::optional<absl::string_view> suffix;
+  absl::optional<absl::string_view> suffix;
   absl::flat_hash_set<absl::string_view> captured_variables;
 
   std::string DebugString() const;
@@ -44,7 +45,7 @@ bool IsValidLiteral(absl::string_view pattern);
 
 bool IsValidRewriteLiteral(absl::string_view pattern);
 
-bool IsValidIdent(absl::string_view pattern);
+bool IsValidIndent(absl::string_view pattern);
 
 // Used by the following Consume{Literal.Operator,Variable} functions
 // in the return value. The functions would take the given pattern,
@@ -78,5 +79,6 @@ inline re2::StringPiece ToStringPiece(absl::string_view text) { return {text.dat
 } // namespace url_template_matching_internal
 
 } // namespace matching
+} // namespace Envoy
 
 #endif // SOURCE_COMMON_COMMON_MATCHING_URL_TEMPLATE_MATCHING_INTERNAL_H

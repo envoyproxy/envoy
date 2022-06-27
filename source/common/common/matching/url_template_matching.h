@@ -10,6 +10,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
+namespace Envoy {
 namespace matching {
 
 enum class RewriteStringKind { kVariable, kLiteral };
@@ -58,5 +59,6 @@ bool IsValidSharedVariableSet(const std::string& path_template_rewrite,
                               absl::string_view capture_regex);
 
 } // namespace matching
+} // namespace Envoy
 
 #endif // SOURCE_COMMON_COMMON_MATCHING_URL_TEMPLATE_MATCHING_H

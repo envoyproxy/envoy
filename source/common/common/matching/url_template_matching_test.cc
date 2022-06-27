@@ -13,6 +13,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace matching {
 
 namespace {
@@ -331,3 +332,4 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
 } // namespace
 
 } // namespace matching
+} // namespace Envoy

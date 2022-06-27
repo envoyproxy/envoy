@@ -14,6 +14,7 @@
 #include "absl/strings/string_view.h"
 #include "re2/re2.h"
 
+namespace Envoy {
 namespace matching {
 
 using ::matching::url_template_matching_internal::ParsedUrlPattern;
@@ -77,7 +78,7 @@ ParseRewritePatternHelper(absl::string_view pattern) {
     }
     pattern = segments2[1];
 
-    if (!url_template_matching_internal::IsValidIdent(segments2[0])) {
+    if (!url_template_matching_internal::IsValidIndent(segments2[0])) {
       return absl::InvalidArgumentError("Invalid variable name");
     }
     result.emplace_back(segments2[0], RewriteStringKind::kVariable);
@@ -165,3 +166,4 @@ bool IsValidSharedVariableSet(const std::string& path_template_rewrite,
 }
 
 } // namespace matching
+} // namespace Envoy

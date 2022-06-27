@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 #include "re2/re2.h"
 
+namespace Envoy {
 namespace matching {
 
 namespace url_template_matching_internal {
@@ -464,3 +465,4 @@ TEST_P(GenPatternRegexWithoutMatch, WithCapture) {
 } // namespace
 } // namespace url_template_matching_internal
 } // namespace matching
+} // namespace Envoy

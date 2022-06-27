@@ -20,6 +20,7 @@
 #include "absl/types/variant.h"
 #include "re2/re2.h"
 
+namespace Envoy {
 namespace matching {
 
 namespace url_template_matching_internal {
@@ -52,7 +53,7 @@ struct ToStringVisitor {
 // Formatter used to allow joining variants together with StrJoin.
 struct ToStringFormatter {
   template <typename T> void operator()(std::string* out, const T& t) const {
-    absl::StrAppend(out, std::visit(ToStringVisitor(), t));
+    absl::StrAppend(out, absl::visit(ToStringVisitor(), t));
   }
 };
 
@@ -64,7 +65,7 @@ struct ToRegexPatternVisitor {
 // Formatter used to allow joining variants together with StrJoin.
 struct ToRegexPatternFormatter {
   template <typename T> void operator()(std::string* out, const T& t) const {
-    absl::StrAppend(out, std::visit(ToRegexPatternVisitor(), t));
+    absl::StrAppend(out, absl::visit(ToRegexPatternVisitor(), t));
   }
 };
 
@@ -130,7 +131,7 @@ bool IsValidRewriteLiteral(absl::string_view pattern) {
   return RE2::FullMatch(ToStringPiece(pattern), *literal_regex);
 }
 
-bool IsValidIdent(absl::string_view pattern) {
+bool IsValidIndent(absl::string_view pattern) {
   static const LazyRE2 ident_regex = {"^[a-zA-Z][a-zA-Z0-9_]*$"};
   return RE2::FullMatch(ToStringPiece(pattern), *ident_regex);
 }
@@ -168,7 +169,7 @@ absl::StatusOr<ParsedResult<Variable>> ConsumeVariable(absl::string_view pattern
 
   // Parse the actual variable pattern, starting with the variable name.
   std::vector<absl::string_view> var_parts = absl::StrSplit(parts[0], absl::MaxSplits('=', 1));
-  if (!IsValidIdent(var_parts[0])) {
+  if (!IsValidIndent(var_parts[0])) {
     return absl::InvalidArgumentError("Invalid variable name");
   }
   Variable var = Variable(var_parts[0], {});
@@ -182,7 +183,7 @@ absl::StatusOr<ParsedResult<Variable>> ConsumeVariable(absl::string_view pattern
     return absl::InvalidArgumentError("Empty variable match");
   }
   while (!var_patt.empty()) {
-    std::variant<Operator, Literal> var_match;
+    absl::variant<Operator, Literal> var_match;
     if (var_patt[0] == '*') {
 
       absl::StatusOr<Operator> status = AlsoUpdatePattern<Operator>(ConsumeOperator, &var_patt);
@@ -216,7 +217,7 @@ GatherCaptureNames(struct ParsedUrlPattern pattern) {
   absl::flat_hash_set<absl::string_view> captured_variables;
 
   for (const ParsedSegment& segment : pattern.parsed_segments) {
-    if (!std::holds_alternative<Variable>(segment)) {
+    if (!absl::holds_alternative<Variable>(segment)) {
       continue;
     }
     if (captured_variables.size() >= pattern_matching_max_variables_per_url) {
@@ -240,12 +241,12 @@ GatherCaptureNames(struct ParsedUrlPattern pattern) {
 absl::Status ValidateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
   bool seen_text_glob = false;
   for (const ParsedSegment& segment : pattern.parsed_segments) {
-    if (std::holds_alternative<Operator>(segment)) {
+    if (absl::holds_alternative<Operator>(segment)) {
       if (seen_text_glob) {
         return absl::InvalidArgumentError("Glob after text glob.");
       }
       seen_text_glob = (std::get<Operator>(segment) == Operator::kTextGlob);
-    } else if (std::holds_alternative<Variable>(segment)) {
+    } else if (absl::holds_alternative<Variable>(segment)) {
       const Variable& var = std::get<Variable>(segment);
       if (var.var_match.empty()) {
         if (seen_text_glob) {
@@ -253,8 +254,8 @@ absl::Status ValidateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
           return absl::InvalidArgumentError("Implicit variable path glob after text glob.");
         }
       } else {
-        for (const std::variant<Operator, absl::string_view>& var_seg : var.var_match) {
-          if (!std::holds_alternative<Operator>(var_seg)) {
+        for (const absl::variant<Operator, absl::string_view>& var_seg : var.var_match) {
+          if (!absl::holds_alternative<Operator>(var_seg)) {
             continue;
           }
           if (seen_text_glob) {
@@ -379,3 +380,4 @@ std::string ToRegexPattern(const struct ParsedUrlPattern& pattern) {
 } // namespace url_template_matching_internal
 
 } // namespace matching
+} // namespace Envoy
