@@ -1133,7 +1133,9 @@ if __name__ == "__main__":
             "':(exclude)source/extensions/filters/network/common/BUILD' "
             "':(exclude)source/extensions/transport_sockets/common/BUILD' "
             "':(exclude)source/extensions/udp_packet_writer/default/BUILD' "
-            "':(exclude)source/extensions/udp_packet_writer/gso/BUILD' ")
+            "':(exclude)source/extensions/udp_packet_writer/gso/BUILD' "
+            # TODO (capoferro): Get senior maintainer approval before merge
+            "':(exclude)source/extensions/cache/cache_policy/BUILD'")
         command = (
             "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
             % exclude_list)
