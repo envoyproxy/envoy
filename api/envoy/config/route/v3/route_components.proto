@@ -1362,7 +1362,8 @@ message RouteAction {
   MaxStreamDuration max_stream_duration = 36;
 }
 
-// Holds the segments for rewrite
+// Holds the segments for rewriting urls base on pattern templates
+// [#next-free-field: 4]
 message RouteUrlRewritePattern {
   message RewriteSegment {
     oneof segment_type {

@@ -1,9 +1,5 @@
 #include "source/common/common/matching/url_template_matching_internal.h"
 
-// hack for now
-// Silence warnings about missing initializers for members of LazyRE2.
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-
 #include <optional>
 #include <string>
 #include <type_traits>
@@ -29,6 +25,11 @@ namespace matching {
 namespace url_template_matching_internal {
 
 namespace {
+
+#ifndef SWIG
+// Silence warnings about missing initializers for members of LazyRE2.
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
 
 unsigned long pattern_matching_max_variables_per_url = 5;
 unsigned long pattern_matching_max_variable_name_len = 16;
@@ -323,7 +324,6 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
           return status.status();
         }
         parsed_pattern.suffix = *std::move(status);
-
         if (!url_pattern.empty()) {
           // Suffix didn't consume whole remaining pattern ('/' in url_pattern).
           return absl::InvalidArgumentError("Prefix match not supported.");

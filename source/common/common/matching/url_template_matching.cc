@@ -1,9 +1,5 @@
 #include "source/common/common/matching/url_template_matching.h"
 
-// hack for now
-// Silence warnings about missing initializers for members of LazyRE2.
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-
 #include <map>
 #include <string>
 #include <utility>
@@ -20,6 +16,11 @@
 namespace matching {
 
 using ::matching::url_template_matching_internal::ParsedUrlPattern;
+
+#ifndef SWIG
+// Silence warnings about missing initializers for members of LazyRE2.
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
 
 inline re2::StringPiece ToStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
 

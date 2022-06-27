@@ -1,4 +1,4 @@
-# BDN Wildcard & Pattern Matching as per go/wildcard-matching-ug
+# Wildcard & Pattern Matching
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -68,22 +68,5 @@ envoy_cc_test(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
-    ],
-)
-
-envoy_cc_test(
-    name = "url_template_benchmark_test",
-    srcs = ["url_template_benchmark_test.cc"],
-    deps = [
-        ":url_template_matching",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@envoy_api//envoy/src/api/envoy/config/route/v3:pkg_cc",
-        "@envoy_api//envoy/src/api/envoy/config/route/v3:pkg_cc_proto_library",
-        "@envoy_api//envoy/src/source/common/common:assert_lib",
-        "@envoy_api//envoy/src/source/common/router:config_lib",
-        "@envoy_api//envoy/src/test/mocks/server:instance_mocks",
-        "@envoy_api//envoy/src/test/mocks/stream_info:stream_info_mocks",
-        "@envoy_api//envoy/src/test/test_common:utility_lib",
     ],
 )
