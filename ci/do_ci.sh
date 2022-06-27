@@ -366,6 +366,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
   COMPILE_TIME_OPTIONS=(
+    "--define" "admin_html=disabled"
     "--define" "signal_trace=disabled"
     "--define" "hot_restart=disabled"
     "--define" "google_grpc=disabled"
@@ -484,7 +485,9 @@ elif [[ "$CI_TARGET" == "check_proto_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
   echo "Run protoxform test"
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+        //tools/protoprint:protoprint_test
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then

@@ -319,6 +319,11 @@ selects.config_setting_group(
 )
 
 config_setting(
+    name = "disable_admin_html",
+    values = {"define": "admin_html=disabled"},
+)
+
+config_setting(
     name = "disable_hot_restart_setting",
     values = {"define": "hot_restart=disabled"},
     visibility = ["//visibility:private"],
