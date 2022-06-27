@@ -495,7 +495,6 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 // c-ares DNS resolver factory
 class CaresDnsResolverFactory : public DnsResolverFactory {
 public:
-  CaresDnsResolverFactory() : ares_library_initialized_(false) {}
   std::string name() const override { return std::string(CaresDnsResolver); }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -538,7 +537,7 @@ public:
   }
 
 private:
-  mutable bool ares_library_initialized_;
+  mutable bool ares_library_initialized_{false};
 };
 
 // Register the CaresDnsResolverFactory
