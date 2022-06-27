@@ -29,7 +29,12 @@ BPF
 Bdecoded
 Bencoded
 Repick
+SION
 TRA
+abc
+abcd
+abd
+ar
 btree
 CAS
 CB
@@ -149,9 +154,13 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+delims
 dereferencing
 differentially
 dnsresolvers
+endpos
+fo
+ghi
 guarddog
 GC
 GCC
@@ -218,6 +227,10 @@ LEDS
 LEV
 LF
 LHS
+hls
+jkl
+js
+lang
 libsxg
 LLVM
 LPT
@@ -261,6 +274,7 @@ Oauth
 OCSP
 OD
 ODCDS
+mpd
 oghttp
 OID
 OK
@@ -963,10 +977,12 @@ parsers
 passphrase
 passthrough
 pathname
+patt
 pausable
 pausedness
 pcall
 pcap
+pchar
 pclose
 performant
 pfctl
@@ -1172,6 +1188,7 @@ srtt
 ssize
 stackdriver
 stacktrace
+startpos
 starttls
 startup
 stateful
@@ -1218,6 +1235,7 @@ subtrees
 subtype
 subtypes
 subzone
+suf
 superclass
 superset
 svc
@@ -1309,6 +1327,7 @@ username
 usr
 util
 utils
+va
 valgrind
 validator
 validators
@@ -1318,6 +1337,7 @@ variadic
 varint
 vec
 vectorize
+ver
 verifier
 verifiers
 versa
@@ -1328,6 +1348,7 @@ vip
 virtualhost
 virtualize
 vptr
+vtt
 wakeup
 wakeups
 wamr
