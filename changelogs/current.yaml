@@ -116,9 +116,6 @@ minor_behavior_changes:
 - area: logging
   change: |
     changed category name for access log filter extensions to ``envoy.access_loggers.extension_filters``.
-- area: http
-  change: |
-    deprecate the short name ``preserve_case`` header formatter extension in favor of the fully-qualified name ``envoy.http.stateful_header_formatters.preserve_case``.
 
 bug_fixes:
 - area: http
@@ -302,3 +299,7 @@ deprecated:
     deprecated :ref:`old dubbo route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.route_config>`. Please use
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config>` or
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.
+- area: http
+  change: |
+    deprecate the short name ``preserve_case`` for the header formatter extension in favor of the fully-qualified name
+    ``envoy.http.stateful_header_formatters.preserve_case``.
