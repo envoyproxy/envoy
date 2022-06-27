@@ -39,6 +39,31 @@ struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+inline constexpr absl::string_view ExtProcGrpcStatsName = "ext-proc-filter-state";
+
+class ExtProcGrpcStats : public Envoy::StreamInfo::FilterState::Object {
+public:
+  void record(std::chrono::microseconds latency, ProcessorState::CallbackState callback_state) {
+    switch (callback_state) {
+    case ProcessorState::CallbackState::Idle:
+      header_call_latencies.push_back(latency);
+      break;
+    case ProcessorState::CallbackState::HeadersCallback:
+      header_call_latencies.push_back(latency);
+      break;
+    case ProcessorState::CallbackState::TrailersCallback:
+      trailer_call_latencies.push_back(latency);
+      break;
+    default:
+      body_call_latencies.push_back(latency);
+    }
+  }
+
+  std::vector<std::chrono::microseconds> header_call_latencies;
+  std::vector<std::chrono::microseconds> body_call_latencies;
+  std::vector<std::chrono::microseconds> trailer_call_latencies;
+};
+
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
@@ -126,6 +151,7 @@ public:
   const FilterConfig& config() const { return *config_; }
 
   ExtProcFilterStats& stats() { return stats_; }
+  ExtProcGrpcStats& grpcStats() { return *grpc_stats_; }
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -181,6 +207,7 @@ private:
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
+  ExtProcGrpcStats* grpc_stats_;
   envoy::config::core::v3::GrpcService grpc_service_;
 
   // The state of the filter on both the encoding and decoding side.

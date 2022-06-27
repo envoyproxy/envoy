@@ -2,6 +2,7 @@
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 
+#include "ext_proc.h"
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
@@ -77,6 +78,14 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
   decoding_state_.setDecoderFilterCallbacks(callbacks);
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      callbacks.streamInfo().filterState();
+  if (!filter_state->hasData<ExtProcGrpcStats>(ExtProcGrpcStatsName)) {
+    filter_state->setData(ExtProcGrpcStatsName, std::make_shared<ExtProcGrpcStats>(),
+                          Envoy::StreamInfo::FilterState::StateType::Mutable,
+                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  }
+  grpc_stats_ = filter_state->getDataMutable<ExtProcGrpcStats>(ExtProcGrpcStatsName);
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {

@@ -25,13 +25,20 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
     message_timer_ = filter_callbacks_->dispatcher().createTimer(cb);
   }
   message_timer_->enableTimer(timeout);
+  call_start_time_ = filter_callbacks_->dispatcher().timeSource().monotonicTime();
 }
 
 void ProcessorState::onFinishProcessorCall(CallbackState next_state) {
-  callback_state_ = next_state;
   if (message_timer_) {
     message_timer_->disableTimer();
   }
+  if (call_start_time_.has_value()) {
+    std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
+        filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
+    filter_.grpcStats().record(duration, callback_state_);
+    call_start_time_ = absl::nullopt;
+  }
+  callback_state_ = next_state;
 }
 
 absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {

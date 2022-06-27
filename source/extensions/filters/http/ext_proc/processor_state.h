@@ -191,6 +191,7 @@ protected:
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
   ChunkQueue chunk_queue_;
+  absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
 };
 
 class DecodingProcessorState : public ProcessorState {
