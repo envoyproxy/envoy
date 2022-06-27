@@ -2,15 +2,15 @@
 #include <string>
 
 #include "envoy/common/time.h"
-#include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
 #include "envoy/extensions/cache/cache_policy/v3/config.pb.h"
+#include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/http/headers.h"
+#include "source/extensions/cache/cache_policy/cache_policy.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
-#include "source/extensions/cache/cache_policy/cache_policy.h"
 
 #include "test/test_common/utility.h"
 
@@ -22,11 +22,11 @@ namespace Envoy {
 namespace Extensions {
 namespace Cache {
 
+using ::Envoy::Extensions::HttpFilters::Cache::CacheCustomHeaders;
+using ::Envoy::Extensions::HttpFilters::Cache::CacheEntryStatus;
 using ::Envoy::Extensions::HttpFilters::Cache::RequestCacheControl;
 using ::Envoy::Extensions::HttpFilters::Cache::ResponseCacheControl;
-using ::Envoy::Extensions::HttpFilters::Cache::CacheCustomHeaders;
 using ::Envoy::Extensions::HttpFilters::Cache::VaryAllowList;
-using ::Envoy::Extensions::HttpFilters::Cache::CacheEntryStatus;
 
 namespace {
 

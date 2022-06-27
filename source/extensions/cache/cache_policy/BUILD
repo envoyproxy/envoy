@@ -2,9 +2,12 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "cache_policy_lib",
@@ -23,7 +26,6 @@ envoy_cc_library(
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//source/extensions/filters/http/cache:key_cc_proto",
         "@envoy_api//envoy/extensions/cache/cache_policy/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
 
@@ -34,6 +36,5 @@ envoy_cc_extension(
     deps = [
         ":cache_policy_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/cache/cache_policy/v3:pkg_cc_proto",
     ],
 )

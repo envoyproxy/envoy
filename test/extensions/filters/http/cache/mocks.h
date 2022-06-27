@@ -8,9 +8,9 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/extensions/cache/cache_policy/cache_policy.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
-#include "source/extensions/cache/cache_policy/cache_policy.h"
 #include "source/extensions/filters/http/cache/key.pb.h"
 
 #include "gmock/gmock.h"

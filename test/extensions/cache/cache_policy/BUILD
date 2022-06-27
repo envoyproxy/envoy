@@ -1,7 +1,12 @@
+load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
 
 envoy_extension_cc_test(
     name = "cache_policy_test",
@@ -16,7 +21,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/cache:cache_custom_headers",
         "//source/extensions/filters/http/cache:cache_entry_utils_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/cache/cache_policy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/cache/simple_http_cache/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )

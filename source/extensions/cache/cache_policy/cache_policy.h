@@ -56,7 +56,8 @@ public:
    * Calculates the lookup key for storing the entry in the cache.
    * @param request_headers - headers from the request the CacheFilter is currently processing.
    */
-  virtual HttpFilters::Cache::Key createCacheKey(const Http::RequestHeaderMap& request_headers) PURE;
+  virtual HttpFilters::Cache::Key
+  createCacheKey(const Http::RequestHeaderMap& request_headers) PURE;
 
   /**
    * Determines the cacheability of the response during decoding.
@@ -65,8 +66,9 @@ public:
    * by the caller.
    * @return true if the response may be cached, based on the contents of the request.
    */
-  virtual bool requestCacheable(const Http::RequestHeaderMap& request_headers,
-                                const HttpFilters::Cache::RequestCacheControl& request_cache_control) PURE;
+  virtual bool
+  requestCacheable(const Http::RequestHeaderMap& request_headers,
+                   const HttpFilters::Cache::RequestCacheControl& request_cache_control) PURE;
 
   /**
    * Determines the cacheability of the response during encoding.
@@ -79,10 +81,11 @@ public:
    * Vary-differentiated responses.
    * @return true if the response may be cached.
    */
-  virtual bool responseCacheable(const Http::RequestHeaderMap& request_headers,
-                                 const Http::ResponseHeaderMap& response_headers,
-                                 const HttpFilters::Cache::ResponseCacheControl& response_cache_control,
-                                 const HttpFilters::Cache::VaryAllowList& vary_allow_list) PURE;
+  virtual bool
+  responseCacheable(const Http::RequestHeaderMap& request_headers,
+                    const Http::ResponseHeaderMap& response_headers,
+                    const HttpFilters::Cache::ResponseCacheControl& response_cache_control,
+                    const HttpFilters::Cache::VaryAllowList& vary_allow_list) PURE;
 
   /**
    * Determines whether the cached entry may be used directly or must be validated with upstream.
@@ -97,13 +100,13 @@ public:
    * @param now - the timestamp for this request.
    * @return details about whether or not the cached entry can be used.
    */
-  virtual CacheEntryUsability
-  computeCacheEntryUsability(const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap& cached_response_headers,
-                             const HttpFilters::Cache::RequestCacheControl& request_cache_control,
-                             const HttpFilters::Cache::ResponseCacheControl& cached_response_cache_control,
-                             const uint64_t content_length, const HttpFilters::Cache::ResponseMetadata& cached_metadata,
-                             SystemTime now) PURE;
+  virtual CacheEntryUsability computeCacheEntryUsability(
+      const Http::RequestHeaderMap& request_headers,
+      const Http::ResponseHeaderMap& cached_response_headers,
+      const HttpFilters::Cache::RequestCacheControl& request_cache_control,
+      const HttpFilters::Cache::ResponseCacheControl& cached_response_cache_control,
+      const uint64_t content_length, const HttpFilters::Cache::ResponseMetadata& cached_metadata,
+      SystemTime now) PURE;
 
   /**
    * Performs actions when StreamInfo and FilterState become available, for
@@ -118,29 +121,30 @@ using CachePolicyPtr = std::unique_ptr<CachePolicy>;
 class CachePolicyImpl : public CachePolicy {
 public:
   HttpFilters::Cache::Key createCacheKey(const Http::RequestHeaderMap& request_headers) override;
-  bool requestCacheable(const Http::RequestHeaderMap& request_headers,
-                        const HttpFilters::Cache::RequestCacheControl& request_cache_control) override;
+  bool
+  requestCacheable(const Http::RequestHeaderMap& request_headers,
+                   const HttpFilters::Cache::RequestCacheControl& request_cache_control) override;
 
   bool responseCacheable(const Http::RequestHeaderMap& request_headers,
                          const Http::ResponseHeaderMap& response_headers,
                          const HttpFilters::Cache::ResponseCacheControl& response_cache_control,
                          const HttpFilters::Cache::VaryAllowList& vary_allow_list) override;
 
-  CacheEntryUsability
-  computeCacheEntryUsability(const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap& cached_response_headers,
-                             const HttpFilters::Cache::RequestCacheControl& request_cache_control,
-                             const HttpFilters::Cache::ResponseCacheControl& cached_response_cache_control,
-                             const uint64_t content_length, const HttpFilters::Cache::ResponseMetadata& cached_metadata,
-                             SystemTime now) override;
+  CacheEntryUsability computeCacheEntryUsability(
+      const Http::RequestHeaderMap& request_headers,
+      const Http::ResponseHeaderMap& cached_response_headers,
+      const HttpFilters::Cache::RequestCacheControl& request_cache_control,
+      const HttpFilters::Cache::ResponseCacheControl& cached_response_cache_control,
+      const uint64_t content_length, const HttpFilters::Cache::ResponseMetadata& cached_metadata,
+      SystemTime now) override;
 
   void setCallbacks([[maybe_unused]] CachePolicyCallbacks& callbacks) override {}
 
 private:
-  bool requiresValidation(const HttpFilters::Cache::RequestCacheControl& request_cache_control,
-                          const HttpFilters::Cache::ResponseCacheControl& cached_response_cache_control,
-                          const Http::ResponseHeaderMap& response_headers,
-                          Seconds response_age) const;
+  bool
+  requiresValidation(const HttpFilters::Cache::RequestCacheControl& request_cache_control,
+                     const HttpFilters::Cache::ResponseCacheControl& cached_response_cache_control,
+                     const Http::ResponseHeaderMap& response_headers, Seconds response_age) const;
 
   const absl::flat_hash_set<absl::string_view>& cacheableStatusCodes() const;
   const std::vector<const Http::LowerCaseString*>& conditionalHeaders() const;

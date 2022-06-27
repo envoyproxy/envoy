@@ -5,10 +5,8 @@
 #include "source/extensions/cache/cache_policy/cache_policy.h"
 
 namespace Envoy {
-  namespace Extensions {
-    namespace Cache {
-
-      
+namespace Extensions {
+namespace Cache {
 
 class CachePolicyFactory : public Config::TypedFactory {
 public:
@@ -37,23 +35,21 @@ private:
 };
 
 class CachePolicyImplFactory
-    : public CachePolicyFactoryBase<
-          envoy::extensions::cache::cache_policy::v3::CachePolicyConfig> {
+    : public CachePolicyFactoryBase<envoy::extensions::cache::cache_policy::v3::CachePolicyConfig> {
 public:
   std::string name() const override { return "envoy.extensions.http.cache_policy_impl"; }
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::cache::cache_policy::v3::CachePolicyConfig>();
+    return std::make_unique<envoy::extensions::cache::cache_policy::v3::CachePolicyConfig>();
   }
 
 private:
-  CachePolicyPtr
-  createCachePolicyFromProtoTyped([[maybe_unused]] const envoy::extensions::cache::
-                                      cache_policy::v3::CachePolicyConfig& config) override {
+  CachePolicyPtr createCachePolicyFromProtoTyped(
+      [[maybe_unused]] const envoy::extensions::cache::cache_policy::v3::CachePolicyConfig& config)
+      override {
     return std::make_unique<CachePolicyImpl>();
   }
 };
 
-    } // namespace Cache
-  } // namespace Extensions
+} // namespace Cache
+} // namespace Extensions
 } // namespace Envoy

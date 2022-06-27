@@ -22,8 +22,8 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::Extensions::Cache::CachePolicyCallbacks;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 
 constexpr Seconds kArbitraryAge(10);
 
