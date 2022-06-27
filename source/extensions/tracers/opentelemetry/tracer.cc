@@ -61,6 +61,30 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   trace_context.setByReferenceKey(kTraceParent, traceparent_header_value);
 }
 
+void Span::setTag(absl::string_view name, absl::string_view value) {
+  // The attribute key MUST be a non-null and non-empty string.
+  if (name.empty()) {
+    return;
+  }
+  // Attribute keys MUST be unique.
+  // If a value already exists for this key, overwrite it.
+  for (auto& key_value : *span_.mutable_attributes()) {
+    if (key_value.key() == name) {
+      key_value.mutable_value()->set_string_value(std::string{value});
+      return;
+    }
+  }
+  // If we haven't found an existing match already, we can add a new key/value.
+  opentelemetry::proto::common::v1::KeyValue key_value =
+      opentelemetry::proto::common::v1::KeyValue();
+  opentelemetry::proto::common::v1::AnyValue value_proto =
+      opentelemetry::proto::common::v1::AnyValue();
+  value_proto.set_string_value(std::string{value});
+  key_value.set_key(std::string{name});
+  *key_value.mutable_value() = value_proto;
+  *span_.add_attributes() = key_value;
+}
+
 Tracer::Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats)

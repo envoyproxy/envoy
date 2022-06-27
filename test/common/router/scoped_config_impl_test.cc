@@ -382,6 +382,24 @@ TEST_F(ScopedRouteInfoTest, Creation) {
   EXPECT_EQ(info_->scopeKey(), makeKey({"foo", "bar"}));
 }
 
+// Tests that config hash changes if ScopedRouteConfiguration of the ScopedRouteInfo changes.
+TEST_F(ScopedRouteInfoTest, Hash) {
+  const envoy::config::route::v3::ScopedRouteConfiguration config_copy = scoped_route_config_;
+  info_ = std::make_unique<ScopedRouteInfo>(scoped_route_config_, route_config_);
+  EXPECT_EQ(info_->routeConfig().get(), route_config_.get());
+  EXPECT_TRUE(TestUtility::protoEqual(info_->configProto(), config_copy));
+  EXPECT_EQ(info_->scopeName(), "foo_scope");
+  EXPECT_EQ(info_->scopeKey(), makeKey({"foo", "bar"}));
+
+  const auto info2 = std::make_unique<ScopedRouteInfo>(scoped_route_config_, route_config_);
+  ASSERT_EQ(info2->configHash(), info_->configHash());
+
+  // Mutate the config and hash should be different now.
+  scoped_route_config_.set_on_demand(true);
+  const auto info3 = std::make_unique<ScopedRouteInfo>(scoped_route_config_, route_config_);
+  ASSERT_NE(info3->configHash(), info_->configHash());
+}
+
 class ScopedConfigImplTest : public testing::Test {
 public:
   void SetUp() override {
