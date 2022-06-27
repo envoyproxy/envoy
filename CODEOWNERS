@@ -8,8 +8,6 @@
 /*/extensions/access_loggers/common @auni53 @zuercher
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
-# certificate providers extensions
-/*/extensions/certificate_providers/default_cert_provider @LuyaoZhong @lizan
 # alternate protocols cache extensions
 /*/extensions/filters/http/alternate_protocols_cache @RyanTheOptimist @alyssawilk
 # csrf extension

@@ -4,6 +4,8 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/ssl/connection.h"
 
 #include "absl/strings/string_view.h"
 #include "openssl/ssl.h"
@@ -11,10 +13,15 @@
 
 namespace Envoy {
 namespace CertificateProvider {
-struct Certpair {
-  const std::string& certificate_;
-  const std::string& private_key_;
+
+class OnDemandUpdateMetadata {
+public:
+  virtual ~OnDemandUpdateMetadata() = default;
+
+  virtual Envoy::Ssl::ConnectionInfoConstSharedPtr connectionInfo() const PURE;
 };
+
+using OnDemandUpdateMetadataPtr = std::unique_ptr<OnDemandUpdateMetadata>;
 
 class CertificateProvider {
 public:
@@ -22,16 +29,11 @@ public:
     /* whether or not a provider provides a trusted ca cert for validation */
     bool provide_trusted_ca = false;
 
-    /* whether or not a provider providers ca certpairs for issuer */
-    bool provide_ca_certpairs = false;
+    /* Whether or not a provider provides identity certpairs */
+    bool provide_identity_certs = false;
 
-    /* Whether or not a provider provides identity certpairs directly */
-    bool provide_identity_certpairs = false;
-
-    /* whether or not a provider supports generating identity certpairs during handshake,
-     * which requires the capability provide_ca_certpairs to sign the certificates
-     */
-    bool generate_identity_certpairs = false;
+    /* whether or not a provider supports generating identity certificates on demand */
+    bool provide_on_demand_identity_certs = false;
   };
 
   virtual ~CertificateProvider() = default;
@@ -39,14 +41,26 @@ public:
   virtual Capabilites capabilities() const PURE;
 
   /**
-   * @return CA certificate from provider used for validation
+   * @return CA certificate used for validation
    */
-  virtual const std::string& caCert(absl::string_view cert_name) const PURE;
+  virtual const std::string trustedCA(const std::string& cert_name) const PURE;
 
   /**
-   * @return CertPairs, identity certpairs or ca certpairs
+   * @return Identity certificates used for handshake
    */
-  virtual std::list<Certpair> certPairs(absl::string_view cert_name, bool generate) PURE;
+  virtual std::vector<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate*>
+  tlsCertificates(const std::string& cert_name) const PURE;
+
+  /**
+   * Add on-demand callback into certificate provider, this function might be invoked from worker
+   * thread during runtime
+   *
+   * @param metadata is passed to provider for certs fetching/refreshing
+   * @return CallbackHandle the handle which can remove that update callback.
+   */
+  virtual Common::CallbackHandlePtr
+  addOnDemandUpdateCallback(const std::string& cert_name, OnDemandUpdateMetadataPtr metadata,
+                            std::function<void()> thread_local_callback) PURE;
 
   /**
    * Add certificate update callback into certificate provider for asychronous usage.
@@ -54,7 +68,7 @@ public:
    * @param callback callback that is executed by certificate provider.
    * @return CallbackHandle the handle which can remove that update callback.
    */
-  virtual Common::CallbackHandlePtr addUpdateCallback(absl::string_view cert_name,
+  virtual Common::CallbackHandlePtr addUpdateCallback(const std::string& cert_name,
                                                       std::function<void()> callback) PURE;
 };
 

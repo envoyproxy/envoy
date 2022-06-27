@@ -87,7 +87,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
       ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()),
-      tls_keylog_local_(config.tlsKeyLogLocal()), tls_keylog_remote_(config.tlsKeyLogRemote()) {
+      cert_provider_caps_(config.certProviderCaps()), tls_keylog_local_(config.tlsKeyLogLocal()),
+      tls_keylog_remote_(config.tlsKeyLogRemote()) {
 
   auto cert_validator_name = getCertValidatorName(config.certificateValidationContext());
   auto cert_validator_factory =
@@ -695,7 +696,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
-  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
+  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates &&
+      !config.certProviderCaps().provide_on_demand_identity_certs) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
 
@@ -796,7 +798,8 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
   // case that different Envoy instances each have their own certs. All certificates in a
   // ServerContextImpl context are hashed together, since they all constitute a match on a filter
   // chain for resumption purposes.
-  if (!capabilities_.provides_certificates) {
+  if (!capabilities_.provides_certificates &&
+      !cert_provider_caps_.provide_on_demand_identity_certs) {
     for (const auto& ctx : tls_contexts_) {
       X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
       RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");

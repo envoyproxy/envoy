@@ -7,6 +7,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/certificate_provider/certificate_provider_manager.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -520,6 +521,11 @@ public:
    * Returns the singleton manager.
    */
   virtual Singleton::Manager& singletonManager() PURE;
+
+  /**
+   * Returns the certificate provider manager
+   */
+  virtual CertificateProvider::CertificateProviderManager& certificateProviderManager() PURE;
 };
 
 /**

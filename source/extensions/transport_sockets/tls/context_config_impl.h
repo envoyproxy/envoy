@@ -61,6 +61,9 @@ public:
   void setSecretUpdateCallback(std::function<void()> callback) override;
   Ssl::HandshakerFactoryCb createHandshaker() const override;
   Ssl::HandshakerCapabilities capabilities() const override { return capabilities_; }
+  CertificateProvider::CertificateProvider::Capabilites certProviderCaps() const override {
+    return cert_provider_caps_;
+  }
   Ssl::SslCtxCb sslctxCb() const override { return sslctx_cb_; }
 
   Ssl::CertificateValidationContextConfigPtr getCombinedValidationContextConfig(
@@ -94,6 +97,8 @@ private:
   std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
       default_cvc_;
   std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
+  CertificateProvider::CertificateProviderSharedPtr tls_certificates_hybrid_provider_;
+  std::string tls_certificate_name_;
   // Handle for TLS certificate dynamic secret callback.
   std::vector<Envoy::Common::CallbackHandlePtr> tc_update_callback_handles_;
   Secret::CertificateValidationContextConfigProviderSharedPtr
@@ -106,6 +111,7 @@ private:
 
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
   Ssl::HandshakerCapabilities capabilities_;
+  CertificateProvider::CertificateProvider::Capabilites cert_provider_caps_;
   Ssl::SslCtxCb sslctx_cb_;
   Server::Configuration::TransportSocketFactoryContext& factory_context_;
   const std::string tls_keylog_path_;

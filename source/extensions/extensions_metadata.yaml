@@ -1207,9 +1207,6 @@ envoy.matching.inputs.subject:
 envoy.matching.custom_matchers.trie_matcher:
   categories:
   - envoy.matching.network.custom_matchers
-envoy.cert_providers.default_cert_provider:
-  categories:
-  - envoy.cert_providers
   security_posture: unknown
   status: alpha
   type_urls:

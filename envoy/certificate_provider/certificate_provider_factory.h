@@ -8,18 +8,22 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace CertificateProviders {
+namespace Server {
+namespace Configuration {
+class TransportSocketFactoryContext;
+} // namespace Configuration
+} // namespace Server
+namespace CertificateProvider {
 
 class CertificateProviderFactory : public Config::TypedFactory {
 public:
   virtual Envoy::CertificateProvider::CertificateProviderSharedPtr
-  createCertificateProviderInstance(const envoy::config::core::v3::TypedExtensionConfig& config,
-                                    Api::Api& api) PURE;
+  createCertificateProviderInstance(
+      const envoy::config::core::v3::TypedExtensionConfig& config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api) PURE;
 
   std::string category() const override { return "envoy.certificate_providers"; }
 };
 
-} // namespace CertificateProviders
-} // namespace Extensions
+} // namespace CertificateProvider
 } // namespace Envoy

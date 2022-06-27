@@ -9,6 +9,19 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "certificate_provider_interface",
+    hdrs = ["certificate_provider.h"],
+    external_deps = [
+        "ssl",
+    ],
+    deps = [
+        "//envoy/common:callback",
+        "@com_google_absl//absl/strings",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "certificate_provider_manager_interface",
     hdrs = [
         "certificate_provider_manager.h",
@@ -20,13 +33,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "certificate_provider_interface",
-    hdrs = ["certificate_provider.h"],
-    external_deps = [
-        "ssl",
+    name = "certificate_provider_factory_lib",
+    hdrs = [
+        "certificate_provider_factory.h",
     ],
     deps = [
-        "//envoy/common:callback",
+        ":certificate_provider_interface",
+        "//envoy/registry",
         "@com_google_absl//absl/strings",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

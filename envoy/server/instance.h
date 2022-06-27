@@ -144,7 +144,7 @@ public:
   virtual Secret::SecretManager& secretManager() PURE;
 
   /**
-   * @return the certificate provider manager
+   * @return the server's certificate provider manager
    */
   virtual CertificateProvider::CertificateProviderManager& certificateProviderManager() PURE;
 

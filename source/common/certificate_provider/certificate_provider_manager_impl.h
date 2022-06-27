@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/certificate_provider/certificate_provider_factory.h"
 #include "envoy/certificate_provider/certificate_provider_manager.h"
 #include "envoy/config/core/v3/extension.pb.h"
 
@@ -18,8 +19,9 @@ class CertificateProviderManagerImpl : public CertificateProviderManager {
 public:
   CertificateProviderManagerImpl(Api::Api& api);
 
-  void addCertificateProvider(absl::string_view name,
-                              const envoy::config::core::v3::TypedExtensionConfig& config) override;
+  void addCertificateProvider(
+      absl::string_view name, const envoy::config::core::v3::TypedExtensionConfig& config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context) override;
 
   CertificateProviderSharedPtr getCertificateProvider(absl::string_view name) override;
 

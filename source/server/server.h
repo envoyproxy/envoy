@@ -201,7 +201,7 @@ public:
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
-  CertificateProvider::CertificateProviderManager& certificateProviderManager() {
+  CertificateProvider::CertificateProviderManager& certificateProviderManager() override {
     return server_.certificateProviderManager();
   }
   Stats::Store& stats() override { return server_.stats(); }

@@ -239,7 +239,6 @@ message TlsSessionTicketKeys {
 // The plugin instances are defined in the client's bootstrap file.
 // The plugin allows certificates to be fetched/refreshed over the network asynchronously with
 // respect to the TLS handshake.
-// [#not-implemented-hide:]
 message CertificateProviderPluginInstance {
   // Provider instance name. If not present, defaults to "default".
   //
@@ -335,7 +334,6 @@ message CertificateValidationContext {
   // Certificate provider instance for fetching TLS certificates.
   //
   // Only one of *trusted_ca* and *ca_certificate_provider_instance* may be specified.
-  // [#not-implemented-hide:]
   CertificateProviderPluginInstance ca_certificate_provider_instance = 13
       [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];
 

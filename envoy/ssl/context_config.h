@@ -111,6 +111,11 @@ public:
    * @return the access log manager object reference
    */
   virtual AccessLog::AccessLogManager& accessLogManager() const PURE;
+
+  /**
+   * @return the set of capabilities for Certificate Provider instance specified in this context
+   */
+  virtual CertificateProvider::CertificateProvider::Capabilites certProviderCaps() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
