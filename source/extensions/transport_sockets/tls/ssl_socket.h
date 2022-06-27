@@ -108,7 +108,8 @@ public:
   ~ClientSslSocketFactory() override;
 
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr) const override;
   bool implementsSecureTransport() const override;
   absl::string_view defaultServerNameIndication() const override {
     return config().serverNameIndication();
