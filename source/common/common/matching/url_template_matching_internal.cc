@@ -223,7 +223,7 @@ GatherCaptureNames(struct ParsedUrlPattern pattern) {
     if (captured_variables.size() >= pattern_matching_max_variables_per_url) {
       return absl::InvalidArgumentError("Exceeded variable count limit");
     }
-    absl::string_view var_name = std::get<Variable>(segment).var_name;
+    absl::string_view var_name = absl::get<Variable>(segment).var_name;
 
     if (var_name.size() < pattern_matching_min_variable_name_len ||
         var_name.size() > pattern_matching_max_variable_name_len) {
@@ -245,9 +245,9 @@ absl::Status ValidateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
       if (seen_text_glob) {
         return absl::InvalidArgumentError("Glob after text glob.");
       }
-      seen_text_glob = (std::get<Operator>(segment) == Operator::kTextGlob);
+      seen_text_glob = (absl::get<Operator>(segment) == Operator::kTextGlob);
     } else if (absl::holds_alternative<Variable>(segment)) {
-      const Variable& var = std::get<Variable>(segment);
+      const Variable& var = absl::get<Variable>(segment);
       if (var.var_match.empty()) {
         if (seen_text_glob) {
           // A variable with no explicit matcher is treated as a path glob.
@@ -261,7 +261,7 @@ absl::Status ValidateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
           if (seen_text_glob) {
             return absl::InvalidArgumentError("Glob after text glob.");
           }
-          seen_text_glob = (std::get<Operator>(var_seg) == Operator::kTextGlob);
+          seen_text_glob = (absl::get<Operator>(var_seg) == Operator::kTextGlob);
         }
       }
     }

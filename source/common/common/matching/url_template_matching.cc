@@ -17,7 +17,7 @@
 namespace Envoy {
 namespace matching {
 
-using ::matching::url_template_matching_internal::ParsedUrlPattern;
+using matching::url_template_matching_internal::ParsedUrlPattern;
 
 #ifndef SWIG
 // Silence warnings about missing initializers for members of LazyRE2.
