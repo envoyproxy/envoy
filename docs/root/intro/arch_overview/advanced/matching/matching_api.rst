@@ -30,6 +30,7 @@ HTTP Input Functions
 
 These input functions are available for matching HTTP requests:
 
+* :ref:`Cookie value <extension_envoy.matching.inputs.cookies>`.
 * :ref:`Request header value <extension_envoy.matching.inputs.request_headers>`.
 * :ref:`Request trailer value <extension_envoy.matching.inputs.request_trailers>`.
 * :ref:`Response header value <extension_envoy.matching.inputs.response_headers>`.
