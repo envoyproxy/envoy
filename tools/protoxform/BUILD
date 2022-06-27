@@ -1,4 +1,7 @@
+load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("//tools/protoxform:protoxform.bzl", "protoxform_rule")
 
 licenses(["notice"])  # Apache 2
@@ -41,8 +44,36 @@ protoxform_rule(
     ],
 )
 
+genquery(
+    name = "test_proto_targets_txt.json",
+    expression = "labels(srcs, labels(deps, //tools/testdata/protoxform:fix_protos))",
+    scope = ["//tools/testdata/protoxform:fix_protos"],
+)
+
+jq(
+    name = "test_proto_targets",
+    srcs = [":test_proto_targets_txt.json"],
+    out = "test_proto_targets.json",
+    args = ["-sR"],
+    filter = """
+    split("\n") |  map(select(length>0))
+    """,
+    visibility = ["//visibility:public"],
+)
+
 protoxform_rule(
     name = "test_protoxform",
-    visibility = ["//visibility:public"],
     deps = ["//tools/testdata/protoxform:fix_protos"],
+)
+
+pkg_files(
+    name = "xformed_test_files",
+    srcs = [":test_protoxform"],
+    strip_prefix = strip_prefix.from_pkg(),
+)
+
+pkg_tar(
+    name = "xformed_test_protos",
+    srcs = [":xformed_test_files"],
+    visibility = ["//visibility:public"],
 )
