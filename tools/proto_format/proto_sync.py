@@ -12,7 +12,8 @@ import tempfile
 
 
 def git_status(path):
-    return subprocess.check_output(['git', 'status', '--porcelain', str(path)]).decode()
+    return subprocess.check_output(
+        ['git', 'status', '--porcelain', str(path)], cwd=str(path)).decode()
 
 
 def generate_current_api_dir(api_dir, dst_dir):
