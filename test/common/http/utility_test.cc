@@ -155,7 +155,8 @@ TEST(HttpUtility, replaceQueryString) {
 }
 
 TEST(HttpUtility, getResponseStatus) {
-  EXPECT_THROW(Utility::getResponseStatus(TestResponseHeaderMapImpl{}), CodecClientException);
+  EXPECT_ENVOY_BUG(Utility::getResponseStatus(TestResponseHeaderMapImpl{}),
+                   "Details: No status in headers");
   EXPECT_EQ(200U, Utility::getResponseStatus(TestResponseHeaderMapImpl{{":status", "200"}}));
 }
 

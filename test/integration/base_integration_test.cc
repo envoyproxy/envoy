@@ -109,7 +109,7 @@ void BaseIntegrationTest::initialize() {
   }
 }
 
-Network::TransportSocketFactoryPtr
+Network::DownstreamTransportSocketFactoryPtr
 BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string yaml = absl::StrFormat(
@@ -156,9 +156,9 @@ void BaseIntegrationTest::createUpstreams() {
 }
 void BaseIntegrationTest::createUpstream(Network::Address::InstanceConstSharedPtr endpoint,
                                          FakeUpstreamConfig& config) {
-  Network::TransportSocketFactoryPtr factory = upstream_tls_
-                                                   ? createUpstreamTlsContext(config)
-                                                   : Network::Test::createRawBufferSocketFactory();
+  Network::DownstreamTransportSocketFactoryPtr factory =
+      upstream_tls_ ? createUpstreamTlsContext(config)
+                    : Network::Test::createRawBufferDownstreamSocketFactory();
   if (autonomous_upstream_) {
     fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint, config,
                                                         autonomous_allow_incomplete_streams_));

@@ -852,14 +852,13 @@ public:
   }
   std::string name() const override { return "envoy.quic.crypto_stream.server.fail_handshake"; }
 
-  std::unique_ptr<quic::QuicCryptoServerStreamBase>
-  createEnvoyQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
-                                    quic::QuicCompressedCertsCache* /*compressed_certs_cache*/,
-                                    quic::QuicSession* session,
-                                    quic::QuicCryptoServerStreamBase::Helper* /*helper*/,
-                                    Envoy::OptRef<const Envoy::Network::TransportSocketFactory>
-                                    /*transport_socket_factory*/,
-                                    Envoy::Event::Dispatcher& /*dispatcher*/) override {
+  std::unique_ptr<quic::QuicCryptoServerStreamBase> createEnvoyQuicCryptoServerStream(
+      const quic::QuicCryptoServerConfig* crypto_config,
+      quic::QuicCompressedCertsCache* /*compressed_certs_cache*/, quic::QuicSession* session,
+      quic::QuicCryptoServerStreamBase::Helper* /*helper*/,
+      Envoy::OptRef<const Envoy::Network::DownstreamTransportSocketFactory>
+      /*transport_socket_factory*/,
+      Envoy::Event::Dispatcher& /*dispatcher*/) override {
     ASSERT(session->connection()->version().handshake_protocol == quic::PROTOCOL_TLS1_3);
     return std::make_unique<QuicCustomTlsServerHandshaker>(session, crypto_config, fail_handshake_);
   }

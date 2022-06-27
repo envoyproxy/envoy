@@ -121,9 +121,6 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
-    ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrError(
-                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
     // dynamic listener filter configuration
     if (proto_config.config_type_case() ==
         envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
@@ -150,6 +147,9 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
           createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
+      ENVOY_LOG(debug, "  config: {}",
+                MessageUtil::getJsonStringFromMessageOrError(
+                    static_cast<const Protobuf::Message&>(proto_config.typed_config())));
       // For static configuration, now see if there is a factory that will accept the config.
       auto& factory =
           Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
@@ -178,7 +178,13 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
-
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      throw EnvoyException(fmt::format("UDP listener filter: {} is configured with "
+                                       "unsupported dynamic configuration",
+                                       proto_config.name()));
+      return ret;
+    }
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
@@ -481,7 +487,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
-      new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
+      new_listener->addSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
     }
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
@@ -490,7 +496,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
-      new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory().clone());
+      new_listener->addSocketFactory((*existing_active_listener)->getSocketFactory().clone());
     }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
@@ -1048,7 +1054,7 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     }
   }
 
-  listener.setSocketFactory(draining_listen_socket_factory != nullptr
+  listener.addSocketFactory(draining_listen_socket_factory != nullptr
                                 ? draining_listen_socket_factory->clone()
                                 : createListenSocketFactory(proto_address, listener));
 }

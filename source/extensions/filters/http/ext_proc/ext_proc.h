@@ -166,7 +166,7 @@ private:
   StreamOpenState openStream();
   void closeStream();
 
-  void cleanUpTimers();
+  void onFinishProcessorCalls();
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 

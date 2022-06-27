@@ -9,6 +9,7 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_impl.h"
+#include "source/extensions/filters/http/gcp_authn/token_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,12 +46,13 @@ public:
 
   GcpAuthnFilter(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
-      Server::Configuration::FactoryContext& context, const std::string& stats_prefix)
+      Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
+      TokenCacheImpl<JwtToken>* token_cache)
       : filter_config_(
             std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
                 config)),
         context_(context), client_(std::make_unique<GcpAuthnClient>(*filter_config_, context_)),
-        stats_(generateStats(stats_prefix, context_.scope())) {}
+        stats_(generateStats(stats_prefix, context_.scope())), jwt_token_cache_(token_cache) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -75,10 +77,14 @@ private:
   // The pointer to request headers for header manipulation later.
   Envoy::Http::RequestHeaderMap* request_header_map_ = nullptr;
 
+  GcpAuthnFilterStats stats_;
+
   bool initiating_call_{};
   State state_{State::NotStarted};
-
-  GcpAuthnFilterStats stats_;
+  std::string audience_str_;
+  // This cache is optional (it will be nullptr if no cache configuration) and not owned by the
+  // filter (thread local storage).
+  TokenCacheImpl<JwtToken>* jwt_token_cache_;
 };
 
 } // namespace GcpAuthn

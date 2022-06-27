@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.http.header_validators.envoy_default.v3;
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.header_validators.envoy_default.v3";

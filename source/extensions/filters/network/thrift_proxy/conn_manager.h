@@ -88,7 +88,6 @@ private:
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
           protocol_converter_(std::make_shared<ProtocolConverter>()), complete_{false},
           passthrough_{false}, pending_transport_end_{false} {
-      ;
       protocol_converter_->initProtocolConverter(*parent_.parent_.protocol_,
                                                  parent_.response_buffer_);
     }
@@ -282,7 +281,10 @@ private:
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
-    MessageMetadataSharedPtr responseMetadata() override { return response_decoder_->metadata_; }
+    MessageMetadataSharedPtr responseMetadata() override {
+      ASSERT(localReplyMetadata_ || response_decoder_);
+      return localReplyMetadata_ ? localReplyMetadata_ : response_decoder_->metadata_;
+    }
     bool responseSuccess() override { return response_decoder_->success_.value_or(false); }
     void onReset() override;
 
@@ -347,6 +349,7 @@ private:
     uint64_t stream_id_;
     StreamInfo::StreamInfoImpl stream_info_;
     MessageMetadataSharedPtr metadata_;
+    MessageMetadataSharedPtr localReplyMetadata_;
     std::list<ActiveRpcDecoderFilterPtr> decoder_filters_;
     std::list<ActiveRpcEncoderFilterPtr> encoder_filters_;
     std::list<ThriftFilters::FilterBaseSharedPtr> base_filters_;
