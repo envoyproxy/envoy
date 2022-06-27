@@ -40,8 +40,6 @@ class ZlibDecompressorImpl : public Common::Base,
                              public Envoy::Compression::Decompressor::Decompressor,
                              public Logger::Loggable<Logger::Id::decompression> {
 public:
-  ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix);
-
   /**
    * Constructor that allows setting the size of decompressor's output buffer. It
    * should be called whenever a buffer size different than the 4096 bytes, normally set by the

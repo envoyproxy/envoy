@@ -30,7 +30,6 @@ message Gzip {
 
   // How many times the output buffer is allowed to be bigger than the size of
   // accumulated input. This value is used to detect compression bombs.
-  // TODO(rojkov): Re-design the Decompressor interface to handle compression
-  // bombs gracefully instead of this quick solution.
+  // [#comment:TODO(rojkov): Re-design the Decompressor interface to handle compression bombs gracefully instead of this quick solution.]
   google.protobuf.UInt32Value max_inflate_ratio = 3 [(validate.rules).uint32 = {lte: 10000 gte: 0}];
 }

@@ -17,9 +17,6 @@ namespace Compression {
 namespace Gzip {
 namespace Decompressor {
 
-ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix)
-    : ZlibDecompressorImpl(scope, stats_prefix, 4096, 100) {}
-
 ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
                                            uint64_t chunk_size)
     : Common::Base(chunk_size,
