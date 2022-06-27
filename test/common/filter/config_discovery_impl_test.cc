@@ -171,7 +171,7 @@ public:
 
 // HTTP filter test
 class HttpFilterConfigDiscoveryImplTest
-    : public FilterConfigDiscoveryImplTest<Http::FilterFactoryCb,
+    : public FilterConfigDiscoveryImplTest<NamedHttpFilterFactoryCb,
                                            Server::Configuration::FactoryContext,
                                            HttpFilterConfigProviderManagerImpl,
                                            envoy::extensions::filters::http::router::v3::Router> {

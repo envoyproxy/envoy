@@ -196,6 +196,7 @@ public:
 
   static PathMatcherConstSharedPtr createExact(const std::string& exact, bool ignore_case);
   static PathMatcherConstSharedPtr createPrefix(const std::string& prefix, bool ignore_case);
+  static PathMatcherConstSharedPtr createPattern(const std::string& pattern, bool ignore_case);
   static PathMatcherConstSharedPtr
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher);
 
