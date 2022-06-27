@@ -524,6 +524,8 @@ public:
 
   void init() override {
     // Initialize c-ares library in case first time.
+    absl::Mutex mutex;
+    absl::MutexLock lock(&mutex);
     if (!ares_library_initialized_) {
       ares_library_initialized_ = true;
       ares_library_init(ARES_LIB_INIT_ALL);
