@@ -41,12 +41,14 @@ private:
 
 class UpstreamProxyProtocolSocketFactory : public PassthroughFactory {
 public:
-  UpstreamProxyProtocolSocketFactory(Network::TransportSocketFactoryPtr transport_socket_factory,
-                                     ProxyProtocolConfig config);
+  UpstreamProxyProtocolSocketFactory(
+      Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
+      ProxyProtocolConfig config);
 
-  // Network::TransportSocketFactory
+  // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr host) const override;
   void hashKey(std::vector<uint8_t>& key,
                Network::TransportSocketOptionsConstSharedPtr options) const override;
 

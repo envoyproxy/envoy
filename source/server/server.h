@@ -395,6 +395,7 @@ private:
   Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
   bool enable_reuse_port_default_;
+  Regex::EnginePtr regex_engine_;
 
   bool stats_flush_in_progress_ : 1;
 

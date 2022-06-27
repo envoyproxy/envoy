@@ -276,7 +276,7 @@ void InstanceImpl::updateServerStats() {
   server_stats_->total_connections_.set(listener_manager_->numConnections() +
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
-      sslContextManager().daysUntilFirstCertExpires().value());
+      sslContextManager().daysUntilFirstCertExpires().value_or(0));
 
   auto secs_until_ocsp_response_expires =
       sslContextManager().secondsUntilFirstOcspResponseExpires();
@@ -364,7 +364,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
   // Exactly one of config_path and config_yaml should be specified.
-  if (config_path.empty() && config_yaml.empty() && config_proto.ByteSize() == 0) {
+  if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
     throw EnvoyException("At least one of --config-path or --config-yaml or Options::configProto() "
                          "should be non-empty");
   }
@@ -378,7 +378,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
-  if (config_proto.ByteSize() != 0) {
+  if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
@@ -502,6 +502,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   }
 
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    auto registered_types = ext.second->registeredTypes();
     for (const auto& name : ext.second->allRegisteredNames()) {
       auto* extension = bootstrap_.mutable_node()->add_extensions();
       extension->set_name(std::string(name));
@@ -511,6 +512,13 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
         *extension->mutable_version() = version.value();
       }
       extension->set_disabled(ext.second->isFactoryDisabled(name));
+      auto it = registered_types.find(name);
+      if (it != registered_types.end()) {
+        std::sort(it->second.begin(), it->second.end());
+        for (const auto& type_url : it->second) {
+          extension->add_type_urls(type_url);
+        }
+      }
     }
   }
 
@@ -583,6 +591,21 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       Network::SocketInterfaceSingleton::initialize(sock);
     }
   }
+
+  // Initialize the regex engine and inject to singleton.
+  if (bootstrap_.has_default_regex_engine()) {
+    const auto& default_regex_engine = bootstrap_.default_regex_engine();
+    Regex::EngineFactory& factory =
+        Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    regex_engine_ = factory.createEngine(*config, serverFactoryContext());
+  } else {
+    regex_engine_ = std::make_shared<Regex::GoogleReEngine>();
+  }
+  Regex::EngineSingleton::clear();
+  Regex::EngineSingleton::initialize(regex_engine_.get());
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ =

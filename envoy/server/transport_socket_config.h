@@ -124,13 +124,13 @@ public:
    * @param config const Protobuf::Message& supplies the config message for the transport socket
    *        implementation.
    * @param context TransportSocketFactoryContext& supplies the transport socket's context.
-   * @return Network::TransportSocketFactoryPtr the transport socket factory instance. The returned
-   *         TransportSocketFactoryPtr should not be nullptr.
+   * @return Network::UpstreamTransportSocketFactoryPtr the transport socket factory instance. The
+   * returned TransportSocketFactoryPtr should not be nullptr.
    *
    * @throw EnvoyException if the implementation is unable to produce a factory with the provided
    *        parameters.
    */
-  virtual Network::TransportSocketFactoryPtr
+  virtual Network::UpstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context) PURE;
 
@@ -150,13 +150,13 @@ public:
    * @param config const Protobuf::Message& supplies the config message for the transport socket
    *        implementation.
    * @param context TransportSocketFactoryContext& supplies the transport socket's context.
-   * @return Network::TransportSocketFactoryPtr the transport socket factory instance. The returned
-   *         TransportSocketFactoryPtr should not be nullptr.
+   * @return Network::DownstreamTransportSocketFactoryPtr the transport socket factory instance. The
+   * returned TransportSocketFactoryPtr should not be nullptr.
    *
    * @throw EnvoyException if the implementation is unable to produce a factory with the provided
    *        parameters.
    */
-  virtual Network::TransportSocketFactoryPtr
+  virtual Network::DownstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;

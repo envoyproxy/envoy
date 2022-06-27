@@ -312,9 +312,23 @@ struct StreamInfoImpl : public StreamInfo {
     ASSERT(downstream_bytes_meter_.get() == downstream_bytes_meter.get());
   }
 
+  // This function is used to persist relevant information from the original
+  // stream into to the new one, when recreating the stream. Generally this
+  // includes information about the downstream stream, but not the upstream
+  // stream.
+  void setFromForRecreateStream(StreamInfo& info) {
+    downstream_timing_ = info.downstreamTiming();
+    protocol_ = info.protocol();
+    bytes_received_ = info.bytesReceived();
+    downstream_bytes_meter_ = info.getDownstreamBytesMeter();
+    // These two are set in the constructor, but to T(recreate), and should be T(create)
+    start_time_ = info.startTime();
+    start_time_monotonic_ = info.startTimeMonotonic();
+  }
+
   TimeSource& time_source_;
-  const SystemTime start_time_;
-  const MonotonicTime start_time_monotonic_;
+  SystemTime start_time_;
+  MonotonicTime start_time_monotonic_;
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;

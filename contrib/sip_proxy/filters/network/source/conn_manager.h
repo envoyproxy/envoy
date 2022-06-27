@@ -247,7 +247,7 @@ private:
           transaction_id_(metadata->transactionId().value()),
           stream_info_(parent_.time_source_,
                        parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
-          metadata_(metadata), local_response_sent_(false) {}
+          metadata_(metadata) {}
     ~ActiveTrans() override {
       request_timer_->complete();
       parent_.stats_.request_active_.dec();
@@ -336,7 +336,7 @@ private:
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
 
     absl::any filter_context_;
-    bool local_response_sent_ : 1;
+    bool local_response_sent_{false};
 
     /* Used by Router */
     std::shared_ptr<Router::TransactionInfos> transaction_infos_;

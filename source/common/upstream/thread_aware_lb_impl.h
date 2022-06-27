@@ -38,7 +38,7 @@ public:
           host->metadata().get(), Config::MetadataFilters::get().ENVOY_LB,
           Config::MetadataEnvoyLbKeys::get().HASH_KEY);
       if (val.kind_case() != val.kStringValue && val.kind_case() != val.KIND_NOT_SET) {
-        FANCY_LOG(debug, "hash_key must be string type, got: {}", val.kind_case());
+        FINE_GRAIN_LOG(debug, "hash_key must be string type, got: {}", val.kind_case());
       }
       absl::string_view hash_key = val.string_value();
       if (hash_key.empty()) {

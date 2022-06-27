@@ -71,8 +71,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
                                                : Envoy::Compression::Compressor::State::Flush);
     decompressor.decompress(buffer, full_output);
   }
-  RELEASE_ASSERT(full_input.toString() == full_output.toString(), "");
-  RELEASE_ASSERT(compressor.checksum() == decompressor.checksum(), "");
+  if (stats_store.counterFromString("test.zlib_data_error").value() == 0) {
+    RELEASE_ASSERT(full_input.toString() == full_output.toString(), "");
+    RELEASE_ASSERT(compressor.checksum() == decompressor.checksum(), "");
+  }
 }
 
 } // namespace Fuzz

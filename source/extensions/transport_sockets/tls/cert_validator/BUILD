@@ -30,6 +30,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//envoy/config:typed_config_interface",
         "//envoy/ssl:context_config_interface",
         "//envoy/ssl:ssl_socket_extended_info_interface",
         "//source/common/common:assert_lib",

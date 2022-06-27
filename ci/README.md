@@ -141,9 +141,9 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.compile_time_options <test>` &mdash; build Envoy and run a specified test or test dir with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
-* `check_format`&mdash; run `clang-format` and `buildifier` on entire source tree.
-* `fix_format`&mdash; run and enforce `clang-format` and `buildifier` on entire source tree.
-* `format_pre`&mdash; run validation and linting tools.
+* `check_proto_format`&mdash; check configuration, formatting and build issues in API proto files.
+* `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
+* `format`&mdash; run validation, linting and formatting tools.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 ## On Windows

@@ -185,7 +185,7 @@ public:
   }
 
   Network::TransportSocketPtr makeAltsTransportSocket() {
-    auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
+    auto client_transport_socket = client_alts_->createTransportSocket(nullptr, nullptr);
     client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
     client_tsi_socket_->setActualFrameSizeToUse(16384);
     client_tsi_socket_->setFrameOverheadSize(4);
@@ -240,7 +240,7 @@ public:
   std::unique_ptr<grpc::Server> fake_handshaker_server_;
   ConditionalInitializer fake_handshaker_server_ci_;
   int fake_handshaker_server_port_{};
-  Network::TransportSocketFactoryPtr client_alts_;
+  Network::UpstreamTransportSocketFactoryPtr client_alts_;
   TsiSocket* client_tsi_socket_{nullptr};
   bool capturing_handshaker_;
   CapturingHandshakerService* capturing_handshaker_service_;

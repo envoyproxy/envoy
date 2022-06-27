@@ -103,7 +103,6 @@ RouteConstSharedPtr RouteMatcher::route(MessageMetadata& metadata) const {
   for (const auto& route : routes_) {
     RouteConstSharedPtr route_entry = route->matches(metadata);
     if (nullptr != route_entry) {
-      ENVOY_LOG(debug, "route matched!");
       return route_entry;
     }
   }
@@ -137,11 +136,18 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
   QueryStatus ret = QueryStatus::Stop;
 
   if (type == "ep") {
-    if ((metadata->header(HeaderType::Route).empty() &&
-         metadata->header(HeaderType::TopLine).hasParam("ep"))) {
-      host = std::string(metadata->header(HeaderType::TopLine).param("ep"));
-    } else if (metadata->header(HeaderType::Route).hasParam("ep")) {
-      host = std::string(metadata->header(HeaderType::Route).param("ep"));
+    // For REGISTER, ep comes from Authorization header with opaque, and opaque is set when parse
+    // Authorization
+    if (metadata->methodType() == MethodType::Register && metadata->opaque().has_value()) {
+      host = std::string(metadata->opaque().value());
+    } else {
+      // Handler other Requests except REGISTER
+      if ((metadata->header(HeaderType::Route).empty() &&
+           metadata->header(HeaderType::TopLine).hasParam("ep"))) {
+        host = std::string(metadata->header(HeaderType::TopLine).param("ep"));
+      } else if (metadata->header(HeaderType::Route).hasParam("ep")) {
+        host = std::string(metadata->header(HeaderType::Route).param("ep"));
+      }
     }
 
     if (!host.empty()) {
@@ -169,19 +175,12 @@ FilterStatus Router::handleAffinity() {
   auto& metadata = metadata_;
   std::string host;
 
-#if 1
-  // TODO To be deleted
+  // ONLY used for NOKIA P-Cookie-IP-Mapping
   if (metadata->pCookieIpMap().has_value()) {
-    ENVOY_LOG(trace, "Updata pCookieIpMap in tra");
     auto [key, val] = metadata->pCookieIpMap().value();
-    callbacks_->traHandler()->retrieveTrafficRoutingAssistant("lskpmc", key, *callbacks_, host);
-    if (host != val) {
-      callbacks_->traHandler()->updateTrafficRoutingAssistant(
-          "lskpmc", metadata->pCookieIpMap().value().first,
-          metadata->pCookieIpMap().value().second);
-    }
+    ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
+    callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val);
   }
-#endif
 
   const std::shared_ptr<const ProtocolOptionsConfig> options =
       cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
@@ -199,6 +198,7 @@ FilterStatus Router::handleAffinity() {
 
     if (!options->customizedAffinity().entries().empty()) {
       for (const auto& aff : options->customizedAffinity().entries()) {
+        // default header is Route, TOP-URI also used as Route
         HeaderType header = HeaderType::Route;
         if (!aff.header().empty()) {
           header = HeaderTypes::get().str2Header(aff.header());
@@ -216,6 +216,11 @@ FilterStatus Router::handleAffinity() {
         } else if (type == "ep") {
           key = "ep";
         } else {
+          // If the header is Route, and the value is empty, then use the top-uri
+          if ((header == HeaderType::Route) && (metadata->header(HeaderType::Route).empty())) {
+            header = HeaderType::TopLine;
+          }
+
           metadata->parseHeader(header);
           if (metadata->header(header).hasParam(type)) {
             key = metadata->header(header).param(type);
@@ -227,14 +232,19 @@ FilterStatus Router::handleAffinity() {
                                             aff.subscribe());
         }
       }
-    } else if ((metadata->methodType() != MethodType::Register && options->sessionAffinity()) ||
-               (metadata->methodType() == MethodType::Register &&
-                options->registrationAffinity())) {
+    } else if (metadata->methodType() != MethodType::Register && options->sessionAffinity()) {
       metadata->setStopLoadBalance(false);
 
       if ((metadata->header(HeaderType::Route).empty() &&
            metadata->header(HeaderType::TopLine).hasParam("ep")) ||
           (metadata->header(HeaderType::Route).hasParam("ep"))) {
+        metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
+      }
+    } else if (metadata->methodType() == MethodType::Register && options->registrationAffinity()) {
+      metadata->setStopLoadBalance(false);
+
+      // For REGISTER, opaque is set when parse Authorization, opaque works as same as ep
+      if (metadata->opaque().has_value()) {
         metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
       }
     }
@@ -439,6 +449,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                                             upstream_request_started);
     } else {
       ENVOY_STREAM_LOG(debug, "no destination without load balance", *callbacks_);
+      throw AppException(AppExceptionType::UnknownMethod, "envoy no endpoint found");
       return FilterStatus::StopIteration;
     }
   }
@@ -678,16 +689,11 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
     auto active_trans = parent_.getTransaction(std::string(transaction_id));
     if (active_trans) {
+      // ONLY used for NOKIA P-Cookie-IP-Mapping
       if (metadata->pCookieIpMap().has_value()) {
-        ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", metadata->pCookieIpMap().value().first,
-                  metadata->pCookieIpMap().value().second);
         auto [key, val] = metadata->pCookieIpMap().value();
-        std::string host;
-        active_trans->traHandler()->retrieveTrafficRoutingAssistant("lskpmc", key, *active_trans,
-                                                                    host);
-        if (host != val) {
-          active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val);
-        }
+        ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
+        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val);
       }
 
       active_trans->startUpstreamResponse();

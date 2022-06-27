@@ -73,14 +73,14 @@ void initializeUpstreamTlsContextConfig(
     const ClientSslTransportOptions& options,
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context);
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
                                       ContextManager& context_manager, Api::Api& api);
 
-Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
-                                                            Api::Api& api, bool use_http3 = false);
+Network::DownstreamTransportSocketFactoryPtr
+createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool use_http3 = false);
 
-Network::TransportSocketFactoryPtr
+Network::DownstreamTransportSocketFactoryPtr
 createFakeUpstreamSslContext(const std::string& upstream_cert_name, ContextManager& context_manager,
                              Server::Configuration::TransportSocketFactoryContext& factory_context);
 

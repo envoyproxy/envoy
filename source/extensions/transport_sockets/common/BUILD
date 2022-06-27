@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "passthrough_lib",
     srcs = ["passthrough.cc"],
     hdrs = ["passthrough.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",

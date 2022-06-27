@@ -109,27 +109,59 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
   return ret;
 }
 
-std::vector<Network::ListenerFilterFactoryCb>
+Filter::ListenerFilterFactoriesList
 ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
-    Configuration::ListenerFactoryContext& context) {
-  std::vector<Network::ListenerFilterFactoryCb> ret;
+    Configuration::ListenerFactoryContext& context,
+    Filter::TcpListenerFilterConfigProviderManagerImpl& config_provider_manager) {
+  Filter::ListenerFilterFactoriesList ret;
+
+  ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
-    ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrError(
-                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
-
-    // Now see if there is a factory that will accept the config.
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
-            proto_config);
-    auto message = Config::Utility::translateToFactoryConfig(
-        proto_config, context.messageValidationVisitor(), factory);
-    ret.push_back(factory.createListenerFilterFactoryFromProto(
-        *message, createListenerFilterMatcher(proto_config), context));
+    // dynamic listener filter configuration
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      const auto& config_discovery = proto_config.config_discovery();
+      const auto& name = proto_config.name();
+      if (config_discovery.apply_default_config_without_warming() &&
+          !config_discovery.has_default_config()) {
+        throw EnvoyException(fmt::format(
+            "Error: listener filter config {} applied without warming but has no default config.",
+            name));
+      }
+      for (const auto& type_url : config_discovery.type_urls()) {
+        const auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+        const auto* factory =
+            Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
+                getFactoryByType(factory_type_url);
+        if (factory == nullptr) {
+          throw EnvoyException(fmt::format(
+              "Error: no listener factory found for a required type URL {}.", factory_type_url));
+        }
+      }
+      auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
+          config_discovery, name, context, "tcp_listener.", false, "listener",
+          createListenerFilterMatcher(proto_config));
+      ret.push_back(std::move(filter_config_provider));
+    } else {
+      ENVOY_LOG(debug, "  config: {}",
+                MessageUtil::getJsonStringFromMessageOrError(
+                    static_cast<const Protobuf::Message&>(proto_config.typed_config())));
+      // For static configuration, now see if there is a factory that will accept the config.
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+              proto_config);
+      const auto message = Config::Utility::translateToFactoryConfig(
+          proto_config, context.messageValidationVisitor(), factory);
+      const auto callback = factory.createListenerFilterFactoryFromProto(
+          *message, createListenerFilterMatcher(proto_config), context);
+      auto filter_config_provider =
+          config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name());
+      ret.push_back(std::move(filter_config_provider));
+    }
   }
   return ret;
 }
@@ -146,7 +178,13 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
-
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      throw EnvoyException(fmt::format("UDP listener filter: {} is configured with "
+                                       "unsupported dynamic configuration",
+                                       proto_config.name()));
+      return ret;
+    }
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
@@ -449,7 +487,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
-      new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
+      new_listener->addSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
     }
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
@@ -458,7 +496,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
-      new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory().clone());
+      new_listener->addSocketFactory((*existing_active_listener)->getSocketFactory().clone());
     }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
@@ -1016,7 +1054,7 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     }
   }
 
-  listener.setSocketFactory(draining_listen_socket_factory != nullptr
+  listener.addSocketFactory(draining_listen_socket_factory != nullptr
                                 ? draining_listen_socket_factory->clone()
                                 : createListenSocketFactory(proto_address, listener));
 }

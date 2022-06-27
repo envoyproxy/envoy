@@ -19,3 +19,9 @@ proto_library(
         "@envoy_api//envoy/api/v2:pkg",
     ],
 )
+
+filegroup(
+    name = "golden_proto_files",
+    srcs = glob(["*.gold"]),
+    visibility = ["//visibility:public"],
+)
