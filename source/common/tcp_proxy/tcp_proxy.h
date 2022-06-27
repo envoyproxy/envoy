@@ -114,10 +114,15 @@ class TunnelingConfigHelperImpl : public TunnelingConfigHelper {
 public:
   TunnelingConfigHelperImpl(
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
-          config_message)
+          config_message,
+      Formatter::FormatterPtr hostname_fmt)
       : hostname_(config_message.hostname()), use_post_(config_message.use_post()),
-        header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())) {}
-  const std::string& hostname() const override { return hostname_; }
+        header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
+        hostname_fmt_(std::move(hostname_fmt)) {}
+  const std::string host(const StreamInfo::StreamInfo& stream_info) const override {
+    return hostname_fmt_->format(*empty_request_headers_.get(), *empty_response_headers_.get(),
+                                 *empty_response_trailers_.get(), stream_info, absl::string_view());
+  }
   bool usePost() const override { return use_post_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
 
@@ -125,6 +130,10 @@ private:
   const std::string hostname_;
   const bool use_post_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+  Formatter::FormatterPtr hostname_fmt_;
+  const Http::RequestHeaderMapPtr empty_request_headers_;
+  const Http::ResponseHeaderMapPtr empty_response_headers_;
+  const Http::ResponseTrailerMapPtr empty_response_trailers_;
 };
 
 /**

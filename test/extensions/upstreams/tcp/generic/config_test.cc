@@ -36,7 +36,8 @@ public:
 TEST_F(TcpConnPoolTest, TestNoConnPool) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   config_proto.set_hostname("host");
-  const TcpProxy::TunnelingConfigHelperImpl config(config_proto);
+  Formatter::FormatterPtr formatter;
+  const TcpProxy::TunnelingConfigHelperImpl config(config_proto, std::move(formatter));
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
                          thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
@@ -49,7 +50,8 @@ TEST_F(TcpConnPoolTest, Http2Config) {
   EXPECT_CALL(thread_local_cluster_, info).WillOnce(Return(info));
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   config_proto.set_hostname("host");
-  const TcpProxy::TunnelingConfigHelperImpl config(config_proto);
+  Formatter::FormatterPtr formatter;
+  const TcpProxy::TunnelingConfigHelperImpl config(config_proto, std::move(formatter));
 
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
@@ -65,7 +67,8 @@ TEST_F(TcpConnPoolTest, Http3Config) {
   EXPECT_CALL(thread_local_cluster_, info).Times(AnyNumber()).WillRepeatedly(Return(info));
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   config_proto.set_hostname("host");
-  const TcpProxy::TunnelingConfigHelperImpl config(config_proto);
+  Formatter::FormatterPtr formatter;
+  const TcpProxy::TunnelingConfigHelperImpl config(config_proto, std::move(formatter));
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
                          thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
