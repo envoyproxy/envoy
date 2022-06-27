@@ -146,13 +146,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
     auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
     latchTime(decoder_callbacks_, DNS_END);
-    if (host.has_value()) {
-      if (!host.value()->address()) {
-        onDnsResolutionFail();
-        return Http::FilterHeadersStatus::StopIteration;
-      }
-      addHostAddressToFilterState(host.value()->address());
+    if (!host.has_value() || !host.value()->address()) {
+      onDnsResolutionFail();
+      return Http::FilterHeadersStatus::StopIteration;
     }
+    addHostAddressToFilterState(host.value()->address());
 
     return Http::FilterHeadersStatus::Continue;
   }

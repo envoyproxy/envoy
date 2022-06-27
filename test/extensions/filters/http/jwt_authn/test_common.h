@@ -105,7 +105,6 @@ providers:
 rules:
 - match:
     safe_regex:
-      google_re2: {}
       regex: "/somethig/.*"
   requires:
     provider_name: "example_provider"

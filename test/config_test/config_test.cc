@@ -111,14 +111,16 @@ public:
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
                   filters, context);
             }));
+    ON_CALL(component_factory_, getTcpListenerConfigProviderManager())
+        .WillByDefault(Return(&tcp_listener_config_provider_manager_));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                     filters,
                 Server::Configuration::ListenerFactoryContext& context)
-                -> std::vector<Network::ListenerFilterFactoryCb> {
+                -> Filter::ListenerFilterFactoriesList {
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
-                  filters, context);
+                  filters, context, *component_factory_.getTcpListenerConfigProviderManager());
             }));
     ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -158,6 +160,7 @@ public:
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
+  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 
 void testMerge() {

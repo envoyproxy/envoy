@@ -138,10 +138,15 @@ TransportSocketPtr createRawBufferSocket();
 
 /**
  * Create a transport socket factory for testing purposes.
- * @return TransportSocketFactoryPtr the transport socket factory to use with a cluster or a
- * listener.
+ * @return TransportSocketFactoryPtr the transport socket factory to use with a cluster
  */
-TransportSocketFactoryPtr createRawBufferSocketFactory();
+UpstreamTransportSocketFactoryPtr createRawBufferSocketFactory();
+
+/**
+ * Create a transport socket factory for testing purposes.
+ * @return TransportSocketFactoryPtr the transport socket factory to use with a listener.
+ */
+DownstreamTransportSocketFactoryPtr createRawBufferDownstreamSocketFactory();
 
 /**
  * Implementation of Network::FilterChain with empty filter chain, but pluggable transport socket
@@ -149,11 +154,11 @@ TransportSocketFactoryPtr createRawBufferSocketFactory();
  */
 class EmptyFilterChain : public FilterChain {
 public:
-  EmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory)
+  EmptyFilterChain(DownstreamTransportSocketFactoryPtr&& transport_socket_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)) {}
 
   // Network::FilterChain
-  const TransportSocketFactory& transportSocketFactory() const override {
+  const DownstreamTransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
   }
 
@@ -168,7 +173,7 @@ public:
   absl::string_view name() const override { return "EmptyFilterChain"; }
 
 private:
-  const TransportSocketFactoryPtr transport_socket_factory_;
+  const DownstreamTransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<FilterFactoryCb> empty_network_filter_factory_{};
 };
 
@@ -178,7 +183,7 @@ private:
  * @return const FilterChainSharedPtr filter chain.
  */
 const FilterChainSharedPtr
-createEmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory);
+createEmptyFilterChain(DownstreamTransportSocketFactoryPtr&& transport_socket_factory);
 
 /**
  * Create an empty filter chain creating raw buffer sockets for testing purposes.

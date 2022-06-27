@@ -529,7 +529,7 @@ public:
         std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
             std::move(cfg), context_manager_, *stats_store_);
     async_client_transport_socket_ =
-        mock_host_description_->socket_factory_->createTransportSocket(nullptr);
+        mock_host_description_->socket_factory_->createTransportSocket(nullptr, nullptr);
     FakeUpstreamConfig config(test_time_.timeSystem());
     config.upstream_protocol_ = Http::CodecType::HTTP2;
     fake_upstream_ =
@@ -538,7 +538,7 @@ public:
     GrpcClientIntegrationTest::initialize();
   }
 
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
+  Network::DownstreamTransportSocketFactoryPtr createUpstreamSslContext() {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);

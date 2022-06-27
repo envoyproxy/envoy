@@ -18,11 +18,20 @@ using envoy::service::ext_proc::v3::CommonResponse;
 using envoy::service::ext_proc::v3::HeadersResponse;
 using envoy::service::ext_proc::v3::TrailersResponse;
 
-void ProcessorState::startMessageTimer(Event::TimerCb cb, std::chrono::milliseconds timeout) {
+void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
+                                          CallbackState callback_state) {
+  callback_state_ = callback_state;
   if (!message_timer_) {
     message_timer_ = filter_callbacks_->dispatcher().createTimer(cb);
   }
   message_timer_->enableTimer(timeout);
+}
+
+void ProcessorState::onFinishProcessorCall(CallbackState next_state) {
+  callback_state_ = next_state;
+  if (message_timer_) {
+    message_timer_->disableTimer();
+  }
 }
 
 absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
@@ -42,8 +51,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     if (common_response.clear_route_cache()) {
       filter_callbacks_->clearRouteCache();
     }
-    callback_state_ = CallbackState::Idle;
-    message_timer_->disableTimer();
+    onFinishProcessorCall();
 
     if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
       ENVOY_LOG(debug, "Replacing complete message");
@@ -180,7 +188,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         });
       }
       clearWatermark();
-      callback_state_ = CallbackState::Idle;
+      onFinishProcessorCall();
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback ||
                callback_state_ == CallbackState::StreamedBodyCallbackFinishing) {
@@ -209,7 +217,9 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         clearWatermark();
       }
       if (chunk_queue_.empty()) {
-        callback_state_ = CallbackState::Idle;
+        onFinishProcessorCall();
+      } else {
+        onFinishProcessorCall(callback_state_);
       }
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
       // Apply changes to the buffer that we sent to the server
@@ -226,7 +236,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       }
       should_continue = true;
       clearWatermark();
-      callback_state_ = CallbackState::Idle;
+      onFinishProcessorCall();
       partial_body_processed_ = true;
 
       // If anything else is left on the queue, inject it too
@@ -238,12 +248,13 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
           injectDataToFilterChain(chunk->data, false);
         }
       }
+    } else {
+      onFinishProcessorCall();
     }
 
     if (response.response().clear_route_cache()) {
       filter_callbacks_->clearRouteCache();
     }
-    message_timer_->disableTimer();
     headers_ = nullptr;
 
     if (send_trailers_ && trailers_available_) {
@@ -274,8 +285,7 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
       }
     }
     trailers_ = nullptr;
-    callback_state_ = CallbackState::Idle;
-    message_timer_->disableTimer();
+    onFinishProcessorCall();
     continueIfNecessary();
     return absl::OkStatus();
   }
@@ -291,7 +301,7 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 }
 
 void ProcessorState::clearAsyncState() {
-  cleanUpTimer();
+  onFinishProcessorCall();
   while (auto queued_chunk = dequeueStreamingChunk(false)) {
     auto chunk = std::move(*queued_chunk);
     ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk->data.length());
@@ -299,13 +309,6 @@ void ProcessorState::clearAsyncState() {
   }
   clearWatermark();
   continueIfNecessary();
-  callback_state_ = CallbackState::Idle;
-}
-
-void ProcessorState::cleanUpTimer() const {
-  if (message_timer_ && message_timer_->enabled()) {
-    message_timer_->disableTimer();
-  }
 }
 
 void ProcessorState::setBodyMode(ProcessingMode_BodySendMode body_mode) {

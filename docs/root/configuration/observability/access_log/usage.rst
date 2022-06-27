@@ -759,6 +759,25 @@ The following command operators are supported:
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
+%UPSTREAM_FILTER_STATE(KEY:F):Z%
+  HTTP
+    Extracts filter state from upstream components like cluster or transport socket extensions.
+
+    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
+    look up the filter state object. The serialized proto will be logged as JSON string if possible.
+    If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
+    Z is an optional parameter denoting string truncation up to Z characters long.
+    F is an optional parameter used to indicate which method FilterState uses for serialization.
+    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
+    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+
+  TCP/UDP
+    Not implemented.
+
+  .. note::
+
+    This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`
+
 %REQUESTED_SERVER_NAME%
   HTTP/TCP/THRIFT
     String value set on ssl connection socket for Server Name Indication (SNI)
@@ -924,7 +943,7 @@ The following command operators are supported:
   The body text for the requests rejected by the Envoy.
 
 %FILTER_CHAIN_NAME%
-  The network filter chain name of the downstream connection.
+  The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

@@ -304,7 +304,8 @@ public:
   virtual bool downstreamEndStream() const PURE;
   virtual uint32_t attemptCount() const PURE;
   virtual const VirtualCluster* requestVcluster() const PURE;
-  virtual const RouteEntry* routeEntry() const PURE;
+  virtual const RouteStatsContextOptRef routeStatsContext() const PURE;
+  virtual const Route* route() const PURE;
   virtual const std::list<UpstreamRequestPtr>& upstreamRequests() const PURE;
   virtual const UpstreamRequest* finalUpstreamRequest() const PURE;
   virtual TimeSource& timeSource() PURE;
@@ -488,7 +489,8 @@ public:
   bool downstreamEndStream() const override { return downstream_end_stream_; }
   uint32_t attemptCount() const override { return attempt_count_; }
   const VirtualCluster* requestVcluster() const override { return request_vcluster_; }
-  const RouteEntry* routeEntry() const override { return route_entry_; }
+  const RouteStatsContextOptRef routeStatsContext() const override { return route_stats_context_; }
+  const Route* route() const override { return route_.get(); }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const override {
     return upstream_requests_;
   }
@@ -514,13 +516,12 @@ private:
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
-  virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
-                                         Http::RequestHeaderMap& request_headers,
-                                         const Upstream::ClusterInfo& cluster,
-                                         const VirtualCluster* vcluster, Runtime::Loader& runtime,
-                                         Random::RandomGenerator& random,
-                                         Event::Dispatcher& dispatcher, TimeSource& time_source,
-                                         Upstream::ResourcePriority priority) PURE;
+  virtual RetryStatePtr
+  createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
+                   const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                   RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
+                   Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                   TimeSource& time_source, Upstream::ResourcePriority priority) PURE;
 
   std::unique_ptr<GenericConnPool>
   createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster);
@@ -574,6 +575,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
+  RouteStatsContextOptRef route_stats_context_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
   FilterUtility::HedgingParams hedging_params_;
@@ -618,9 +620,10 @@ private:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                                  const Upstream::ClusterInfo& cluster,
-                                 const VirtualCluster* vcluster, Runtime::Loader& runtime,
-                                 Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                                 TimeSource& time_source,
+                                 const VirtualCluster* vcluster,
+                                 RouteStatsContextOptRef route_stats_context,
+                                 Runtime::Loader& runtime, Random::RandomGenerator& random,
+                                 Event::Dispatcher& dispatcher, TimeSource& time_source,
                                  Upstream::ResourcePriority priority) override;
 };
 

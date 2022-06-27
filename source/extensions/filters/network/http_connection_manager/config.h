@@ -19,6 +19,7 @@
 #include "envoy/tracing/http_tracer_manager.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/date_provider_impl.h"
@@ -41,7 +42,7 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 
 using FilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Http::FilterFactoryCb,
+    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
                                         Server::Configuration::FactoryContext>;
 
 /**
@@ -132,15 +133,16 @@ public:
       FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  using FilterFactoriesList = std::list<Filter::FilterConfigProviderPtr<Http::FilterFactoryCb>>;
+  void createFilterChain(Http::FilterChainManager& manager) override;
+  using FilterFactoriesList =
+      std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
   };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-                                Http::FilterChainFactoryCallbacks& callbacks) override;
+                                Http::FilterChainManager& manager) override;
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
@@ -246,7 +248,7 @@ private:
                              FilterFactoriesList& filter_factories,
                              const std::string& filter_chain_type,
                              bool last_filter_in_current_config);
-  void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,
+  void createFilterChainForFactories(Http::FilterChainManager& manager,
                                      const FilterFactoriesList& filter_factories);
 
   /**

@@ -1,5 +1,5 @@
 diff --git a/BUILD b/BUILD
-index 1690d4219..8a7f1bf14 100644
+index 1690d4219..eb3cfbc67 100644
 --- a/BUILD
 +++ b/BUILD
 @@ -19,7 +19,7 @@ exports_files(["LICENSE"])
@@ -11,6 +11,77 @@ index 1690d4219..8a7f1bf14 100644
  
  ################################################################################
  # Protobuf Runtime Library
+@@ -510,14 +510,69 @@ cc_library(
+     deps = [":protobuf"],
+ )
+ 
++
+ cc_binary(
+-    name = "protoc",
++    name = "compiled_protoc",
+     srcs = ["src/google/protobuf/compiler/main.cc"],
+     linkopts = LINK_OPTS,
+     visibility = ["//visibility:public"],
+     deps = [":protoc_lib"],
+ )
+ 
++
++# Lifted from `rules_proto`
++config_setting(
++    name = "linux-aarch64",
++    constraint_values = [
++        "@platforms//os:linux",
++        "@platforms//cpu:aarch64",
++    ],
++)
++
++config_setting(
++    name = "linux-x86_64",
++    constraint_values = [
++        "@platforms//os:linux",
++        "@platforms//cpu:x86_64",
++    ],
++)
++
++config_setting(
++    name = "osx-x86_64",
++    constraint_values = [
++        "@platforms//os:osx",
++        "@platforms//cpu:x86_64",
++    ],
++)
++
++config_setting(
++    name = "win64",
++    constraint_values = [
++        "@platforms//os:windows",
++        "@platforms//cpu:x86_64",
++    ],
++)
++
++config_setting(
++    name = "windows",
++    constraint_values = [
++        "@platforms//os:windows",
++    ],
++)
++
++# Use precompiled binaries where possible.
++alias(
++    name = "protoc",
++    actual = select({
++        ":linux-aarch64": "@com_google_protobuf_protoc_linux_aarch_64//:protoc",
++        ":linux-x86_64": "@com_google_protobuf_protoc_linux_x86_64//:protoc",
++        ":osx-x86_64": "@com_google_protobuf_protoc_osx_x86_64//:protoc",
++        ":win64": "@com_google_protobuf_protoc_win64//:protoc",
++        "//conditions:default": ":compiled_protoc",
++    }),
++    visibility = ["//visibility:public"],
++)
++
+ ################################################################################
+ # Tests
+ ################################################################################
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
 index 9319c67f1..d85d53d4a 100644
 --- a/python/google/protobuf/__init__.py

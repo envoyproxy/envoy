@@ -13,54 +13,34 @@ pr: none
 stages:
 - stage: precheck
   jobs:
-  - job: format_pre
+  - job: format
     dependsOn: []
     pool:
       vmImage: "ubuntu-18.04"
     steps:
     - task: Cache@2
       inputs:
-        key: "format_pre | ./WORKSPACE | **/*.bzl"
+        key: "format | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format_pre'
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
       workingDirectory: $(Build.SourcesDirectory)
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      displayName: "Run format pre-checks"
+      displayName: "Run format checks"
     - task: PublishBuildArtifacts@1
       inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/fix_format_pre.diff"
+        pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
         artifactName: format
       # not all have fixes so improve condition/handling
       condition: failed()
 
-  - job: tooling
+  - job: proto_format
     dependsOn: []
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-    - task: Cache@2
-      inputs:
-        key: "tooling | ./WORKSPACE | **/*.bzl"
-        path: $(Build.StagingDirectory)/repository_cache
-      continueOnError: true
-
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh tooling'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      displayName: "Run tooling checks"
-
-  - job: format
-    dependsOn: ["format_pre"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -81,7 +61,7 @@ stages:
 
     - task: PublishBuildArtifacts@1
       inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
+        pathtoPublish: "$(Build.StagingDirectory)/fix_proto_format.diff"
         artifactName: format
       condition: failed()
 
@@ -204,8 +184,6 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
     - template: bazel.yml
       parameters:
         ciTarget: bazel.release
@@ -367,8 +345,6 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
     - bash: |
         echo "disk space at beginning of build:"
         df -h

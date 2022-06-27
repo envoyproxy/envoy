@@ -407,8 +407,32 @@ TEST_F(DubboRouterTest, PoolRemoteConnectionFailure) {
       }));
   startRequest(MessageType::Request);
 
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+}
+
+TEST_F(DubboRouterTest, PoolLocalConnectionFailure) {
+  initializeRouter();
+
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_FALSE(end_stream);
+      }));
+  startRequest(MessageType::Request);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
+      ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
 
 TEST_F(DubboRouterTest, PoolTimeout) {

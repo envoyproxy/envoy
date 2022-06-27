@@ -122,6 +122,31 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
   ASSERT_EQ(0, decompressor.decompression_error_);
 }
 
+// Detect excessive compression ratio by compressing a long whitespace string
+// into a very small chunk of data and decompressing it again.
+TEST_F(ZlibDecompressorImplTest, DetectExcessiveCompressionRatio) {
+  const absl::string_view ten_whitespaces = "          ";
+  Buffer::OwnedImpl buffer;
+  Extensions::Compression::Gzip::Compressor::ZlibCompressorImpl compressor;
+  compressor.init(
+      Extensions::Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+      Extensions::Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
+      gzip_window_bits, memory_level);
+
+  for (int i = 0; i < 1000; i++) {
+    buffer.add(ten_whitespaces);
+  }
+
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
+
+  Buffer::OwnedImpl output_buffer;
+  Stats::IsolatedStoreImpl stats_store{};
+  ZlibDecompressorImpl decompressor{stats_store, "test."};
+  decompressor.init(gzip_window_bits);
+  decompressor.decompress(buffer, output_buffer);
+  ASSERT_EQ(stats_store.counterFromString("test.zlib_data_error").value(), 1);
+}
+
 // Exercises compression and decompression by compressing some data, decompressing it and then
 // comparing compressor's input/checksum with decompressor's output/checksum.
 TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {

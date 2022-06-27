@@ -35,7 +35,12 @@ protected:
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
+  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat
+    // 'listener_manager.lds.grpc.lds_cluster.streams_closed_1' and stat_prefix 'lds_cluster'.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
   ~ListenerIntegrationTest() override { resetConnections(); }
 
@@ -737,7 +742,12 @@ public:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
-)EOF") {}
+)EOF") {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat
+    // 'listener_manager.lds.grpc.lds_cluster.streams_closed_1' and stat_prefix 'lds_cluster'.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
   void createLdsStream() {
     AssertionResult result =

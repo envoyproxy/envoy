@@ -4,6 +4,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_select_admin_html",
 )
 
 licenses(["notice"])  # Apache 2
@@ -54,6 +55,15 @@ envoy_cc_test(
         "//source/server/admin:admin_lib",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "admin_html_test",
+    srcs = envoy_select_admin_html(["admin_html_test.cc"]),
+    deps = [
+        ":admin_instance_lib",
+        "//source/server/admin:admin_lib",
     ],
 )
 

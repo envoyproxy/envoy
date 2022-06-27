@@ -48,7 +48,10 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return socket_factory_; }
+  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
+  std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
+    return socket_factories_;
+  }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
@@ -67,7 +70,9 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
-  Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+  Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
+    return connection_balancer_;
+  }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
@@ -98,7 +103,7 @@ private:
   BasicResourceLimitImpl open_connections_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
-  Network::MockListenSocketFactory socket_factory_;
+  std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
@@ -108,6 +113,7 @@ private:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
+  bool connection_established_{};
 };
 
 } // namespace ListenerFilters

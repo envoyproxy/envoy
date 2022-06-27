@@ -15,6 +15,14 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
     std::unique_ptr<quic::ProofVerifierCallback> callback) {
   ASSERT(details != nullptr);
+  ASSERT(!certs.empty());
+  auto* verify_context = dynamic_cast<const EnvoyQuicProofVerifyContext*>(context);
+  if (verify_context == nullptr) {
+    IS_ENVOY_BUG("QUIC proof verify context was not setup correctly.");
+    return quic::QUIC_FAILURE;
+  }
+  ENVOY_BUG(!verify_context->isServer(), "Client certificates are not supported in QUIC yet.");
+
   if (doVerifyCertChain(hostname, port, certs, ocsp_response, cert_sct, context, error_details,
                         out_alert, std::move(callback))) {
     *details = std::make_unique<CertVerifyResult>(true);
@@ -29,7 +37,6 @@ bool EnvoyQuicProofVerifier::doVerifyCertChain(
     const std::string& /*ocsp_response*/, const std::string& /*cert_sct*/,
     const quic::ProofVerifyContext* /*context*/, std::string* error_details, uint8_t* /*out_alert*/,
     std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
-  ASSERT(!certs.empty());
   bssl::UniquePtr<STACK_OF(X509)> intermediates(sk_X509_new_null());
   bssl::UniquePtr<X509> leaf;
   for (size_t i = 0; i < certs.size(); i++) {
