@@ -143,7 +143,8 @@ public:
   }
 
   void createUpstreams() override {
-    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_), Http::CodecType::HTTP1);
+    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_), Http::CodecType::HTTP1,
+                    /*autonomous_upstream=*/false);
   }
 
 private:
