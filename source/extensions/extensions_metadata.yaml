@@ -75,7 +75,7 @@ envoy.extensions.http.cache.simple:
   status: wip
   type_urls:
   - envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig
-envoy.cache.cache_policy:
+envoy.extensions.cache.cache_policy:
   categories:
   - envoy.http.cache
   security_posture: robust_to_untrusted_downstream_and_upstream

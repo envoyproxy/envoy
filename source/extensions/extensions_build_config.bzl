@@ -229,7 +229,7 @@ EXTENSIONS = {
     #
     # CacheFilter plugins
     #
-    "envoy.cache.cache_policy":                         "//source/extensions/cache/cache_policy:config",
+    "envoy.extensions.cache.cache_policy":                         "//source/extensions/cache/cache_policy:config",
     "envoy.extensions.http.cache.simple":               "//source/extensions/filters/http/cache/simple_http_cache:config",
 
     #
