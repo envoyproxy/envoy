@@ -28,6 +28,7 @@ absence of a version header could be:
 .. literalinclude:: _include/header-to-metadata-filter.yaml
     :language: yaml
     :lines: 20-35
+    :lineno-start: 20
     :linenos:
     :caption: :download:`header-to-metadata-filter.yaml <_include/header-to-metadata-filter.yaml>`
 
@@ -36,6 +37,7 @@ A corresponding upstream cluster configuration could be:
 .. literalinclude:: _include/header-to-metadata-filter.yaml
     :language: yaml
     :lines: 37-47
+    :lineno-start: 37
     :linenos:
     :caption: :download:`header-to-metadata-filter.yaml <_include/header-to-metadata-filter.yaml>`
 
@@ -49,6 +51,7 @@ dynamic metadata, this filter supports regex matching and substitution:
 .. literalinclude:: _include/header-to-metadata-filter-regex-substitution.yaml
     :language: yaml
     :lines: 20-32
+    :lineno-start: 20
     :linenos:
     :caption: :download:`header-to-metadata-filter-regex-substitution.yaml <_include/header-to-metadata-filter-regex-substitution.yaml>`
 

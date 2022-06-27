@@ -29,6 +29,7 @@ absence of a version header could be:
 .. literalinclude:: _include/header-to-metadata-filter.yaml
     :language: yaml
     :lines: 25-40
+    :lineno-start: 25
     :linenos:
     :caption: :download:`header-to-metadata-filter.yaml <_include/header-to-metadata-filter.yaml>`
 
@@ -39,6 +40,7 @@ Removing a cookie when a rule matches is unsupported.
 .. literalinclude:: _include/header-to-metadata-filter-cookies.yaml
     :language: yaml
     :lines: 25-40
+    :lineno-start: 25
     :linenos:
     :caption: :download:`header-to-metadata-filter-cookies.yaml <_include/header-to-metadata-filter-cookies.yaml>`
 
@@ -47,6 +49,7 @@ A corresponding upstream cluster configuration could be:
 .. literalinclude:: _include/header-to-metadata-filter.yaml
     :language: yaml
     :lines: 45-55
+    :lineno-start: 45
     :linenos:
     :caption: :download:`header-to-metadata-filter.yaml <_include/header-to-metadata-filter.yaml>`
 
@@ -60,6 +63,7 @@ dynamic metadata, this filter supports regex matching and substitution:
 .. literalinclude:: _include/header-to-metadata-filter-regex-substitution.yaml
     :language: yaml
     :lines: 25-37
+    :lineno-start: 25
     :linenos:
     :caption: :download:`header-to-metadata-filter-regex-substitution.yaml <_include/header-to-metadata-filter-regex-substitution.yaml>`
 
@@ -68,6 +72,7 @@ Note that this filter also supports per route configuration:
 .. literalinclude:: _include/header-to-metadata-filter-route-config.yaml
     :language: yaml
     :lines: 14-38
+    :lineno-start: 14
     :linenos:
     :caption: :download:`header-to-metadata-filter-route-config.yaml <_include/header-to-metadata-filter-route-config.yaml>`
 
