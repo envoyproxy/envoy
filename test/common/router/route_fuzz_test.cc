@@ -69,6 +69,7 @@ bool validateOnMatchConfig(const xds::type::matcher::v3::Matcher::OnMatch& on_ma
     // this way ensures that the compiler will report new entries to that enum as warning, which
     // will finally result in an compiler error, when error on all warnings is set.
     ASSERT(false);
+    return false;
   }
   }
 }
