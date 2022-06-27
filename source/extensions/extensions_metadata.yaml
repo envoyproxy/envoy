@@ -77,7 +77,7 @@ envoy.extensions.http.cache.simple:
   - envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig
 envoy.cache.cache_policy:
   categories:
-  - envoy.filters.http.cache
+  - envoy.http.cache
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: wip
 envoy.clusters.aggregate:
