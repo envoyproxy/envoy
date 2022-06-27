@@ -103,6 +103,8 @@ public:
   const std::string MONGO_CALLSITE = "envoy.mongo_callsite";
   // Stats prefix for the Ratelimit network filter
   const std::string RATELIMIT_PREFIX = "envoy.ratelimit_prefix";
+  // Stats prefix for the Local Ratelimit network filter
+  const std::string LOCAL_RATELIMIT_PREFIX = "envoy.local_ratelimit_prefix";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
   // Stats prefix for the UDP Proxy network filter

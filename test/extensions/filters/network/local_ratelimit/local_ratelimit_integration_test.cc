@@ -8,13 +8,7 @@ class LocalRateLimitIntegrationTest : public Event::TestUsingSimulatedTime,
                                       public BaseIntegrationTest {
 public:
   LocalRateLimitIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'http_local_rate_limiter.http_local_rate_limit.rate_limited' and stat_prefix
-    // 'http_local_rate_limiter'.
-    skip_tag_extraction_rule_check_ = true;
-  }
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
 
   void setup(const std::string& filter_yaml = {}) {
     if (!filter_yaml.empty()) {
