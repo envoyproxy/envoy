@@ -8,10 +8,11 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 
 #include "source/common/common/matching/url_template_matching_internal.h"
-#include "re2/re2.h"
+
 #include "absl/status/statusor.h"
-#include "absl/strings/string_view.h"
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
+#include "re2/re2.h"
 
 namespace matching {
 

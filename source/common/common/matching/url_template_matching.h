@@ -3,10 +3,12 @@
 
 #include <string>
 
+#include "envoy/config/route/v3/route_components.pb.h"
+
+#include "source/common/common/matching/url_template_matching_internal.h"
+
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "source/common/common/matching/url_template_matching_internal.h"
-#include "envoy/config/route/v3/route_components.pb.h"
 
 namespace matching {
 

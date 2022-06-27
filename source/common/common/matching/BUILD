@@ -1,14 +1,16 @@
-# Wildcard & Pattern Matching
-
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_cc_test",
     "envoy_extension_package",
+    "envoy_package",
 )
 
 licenses(["notice"])  # Apache 2
+
+# Wildcard & Pattern Matching
+
+envoy_package()
 
 envoy_extension_package()
 
@@ -26,6 +28,7 @@ envoy_cc_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 

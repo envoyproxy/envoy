@@ -1,5 +1,3 @@
-#include "source/common/common/matching/url_template_matching_internal.h"
-
 #include <map>
 #include <string>
 #include <tuple>
@@ -8,15 +6,17 @@
 #include <vector>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/matching/url_template_matching_internal.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/test_common/logging.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/status_utility.h"
-#include "source/common/protobuf/protobuf.h"
+#include "test/test_common/utility.h"
+
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "re2/re2.h"
 #include "gtest/gtest.h"
+#include "re2/re2.h"
 
 namespace matching {
 
