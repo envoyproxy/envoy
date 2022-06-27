@@ -188,6 +188,7 @@ private:
     virtual int processWwwAuth(absl::string_view& header);
     virtual int processAuth(absl::string_view& header);
     virtual int processPCookieIPMap(absl::string_view& header);
+    virtual int processXEnvoyOriginIngress(absl::string_view& header);
 
     MessageMetadataSharedPtr metadata() { return parent_.metadata(); }
 

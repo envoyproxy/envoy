@@ -119,6 +119,11 @@ void MessageMetadata::setTransactionId(absl::string_view data) {
   transaction_id_ = data.substr(start_index, end_index - start_index);
 }
 
+void MessageMetadata::setIngressId(std::unique_ptr<IngressID> ingress_id) {
+  ingress_id_ = std::move(ingress_id);
+}
+
+
 void MessageMetadata::addXEnvoyOriginIngressHeader(IngressID ingress_id) {
   addNewMsgHeader(HeaderType::XEnvoyOriginIngress, ingress_id.toHeaderValue());
 }

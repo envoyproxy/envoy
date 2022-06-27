@@ -209,7 +209,7 @@ public:
     tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.emplace(std::make_pair(
         transaction_id, std::make_shared<TransactionInfoItem>(active_trans, upstream_request)));
   }
-
+ 
   void deleteTransaction(std::string&& transaction_id) {
     if (hasTransaction(transaction_id)) {
       tls_->getTyped<ThreadLocalTransactionInfo>()
@@ -364,6 +364,9 @@ public:
   void releaseConnection(bool close);
 
   SipFilters::DecoderFilterCallbacks* getTransaction(std::string&& transaction_id);
+  SipFilters::DecoderFilterCallbacks* getDownstreamConnection(std::string& downstream_connection_id) {
+    return &callbacks_->downstreamConnectionInfos()->getDownstreamConnection(downstream_connection_id);
+  }
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -406,6 +409,7 @@ private:
   ConnectionState conn_state_{ConnectionState::NotConnected};
 
   std::shared_ptr<TransactionInfo> transaction_info_;
+  std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstream_connection_info_;
   SipFilters::DecoderFilterCallbacks* callbacks_{};
   MessageMetadataSharedPtr metadata_;
   Buffer::OwnedImpl upstream_buffer_;

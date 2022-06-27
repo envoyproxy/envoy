@@ -80,10 +80,16 @@ public:
       config_->custom_filter_ = custom_filter_;
     }
 
+    // JONAH fixme: Probably should initialize these just once..
+    NiceMock<Api::MockApi> api_;
+    Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
+    EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
+    EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
+
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
         *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), context_,
-        transaction_infos_);
+        transaction_infos_, downstream_connection_infos_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
@@ -117,6 +123,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   std::unique_ptr<ConnectionManager> filter_;
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
+  std::shared_ptr<SipProxy::DownstreamConnectionInfo> downstream_connection_infos_;
   SipFilters::DecoderFilterSharedPtr custom_filter_;
 };
 
@@ -166,6 +173,7 @@ TEST_F(SipDecoderTest, DecodeINVITE) {
       "CSeq: 1 INVITE\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
+      "X-Envoy-Origin-Ingress: abc123;downstream-connection=1234xyz\x0d\x0a"
       "P-Charging-Vector: orig-ioi=ims.com;term-ioi= ims.com\x0d\x0a"
       "P-Charging-Vector: orig-ioi=ims1.com;term-ioi= ims1.com\x0d\x0a"
       "P-Charging-Function-Addresses: ccf=0.0.0.0\x0d\x0a"

@@ -19,6 +19,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
+
 class TrafficRoutingAssistantHandler;
 namespace SipFilters {
 
@@ -26,6 +27,17 @@ enum class ResponseStatus {
   MoreData = 0, // The upstream response requires more data.
   Complete = 1, // The upstream response is complete.
   Reset = 2,    // The upstream response is invalid and its connection must be reset.
+};
+
+class DownstreamConnectionInfos: public std::enable_shared_from_this<DownstreamConnectionInfos> {
+public: 
+  virtual ~DownstreamConnectionInfos() = default;
+  virtual void insertDownstreamConnection(std::string conn_id, Network::Connection* conn) PURE;
+  virtual size_t size() PURE;
+  virtual void deleteDownstreamConnection(std::string&& conn_id) PURE;
+  virtual bool hasDownstreamConnection(std::string& conn_id) PURE;
+  virtual DecoderFilterCallbacks& getDownstreamConnection(std::string& conn_id) PURE;
+  virtual void init() PURE;
 };
 
 /**
@@ -99,6 +111,7 @@ public:
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   virtual std::shared_ptr<Router::TransactionInfos> transactionInfos() PURE;
+  virtual std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstreamConnectionInfos() PURE;
   virtual std::shared_ptr<SipProxy::SipSettings> settings() const PURE;
   virtual std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler> traHandler() PURE;
   virtual void onReset() PURE;

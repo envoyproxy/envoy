@@ -235,6 +235,7 @@ Decoder::HeaderHandler::HeaderHandler(MessageHandler& parent)
                            {HeaderType::WAuth, &HeaderHandler::processWwwAuth},
                            {HeaderType::Auth, &HeaderHandler::processAuth},
                            {HeaderType::PCookieIPMap, &HeaderHandler::processPCookieIPMap},
+                           {HeaderType::XEnvoyOriginIngress, &HeaderHandler::processXEnvoyOriginIngress},
                        } {}
 
 int Decoder::HeaderHandler::processPath(absl::string_view& header) {
@@ -301,6 +302,32 @@ int Decoder::HeaderHandler::processPCookieIPMap(absl::string_view& header) {
   return 0;
 }
 
+int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header) {
+  // X-Envoy-Origin-Ingress: worker-thread;downstream_connection=xxxxxx
+  auto downstream_conn_location = header.find('=');
+  if (downstream_conn_location == absl::string_view::npos) {
+    return 0;
+  }
+
+  // todo error checks
+  auto worker_thread_id = header.substr(header.find(": ")+2, header.find(";")-header.find(": ")-2);
+  auto downstream_conn_id = header.substr(header.find("=")+1, header.length()-header.find("="-1));
+  auto ingress_id = std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
+
+  ENVOY_LOG(info, "Parsed IngressID worker_thread_id={}, downstream_connection={}", worker_thread_id, downstream_conn_id);
+
+  metadata()->setIngressId(std::move(ingress_id));
+
+  //metadata()->setIngressID(IngressID());
+  // if (metadata()->msgType() == MsgType::Request && woker_thread_id == localThreadID) { // we don't have a ref localThreadID here yet
+  // can we assume this is a requesat recvd form upstream, or can we check.. 
+  //   // delete the header 
+  //   //  metadata()->setOperation(Operation(OperationType::Delete, rawOffset(),
+  //   //                                  DeleteOperationValue(header.length() + strlen("\r\n"))));
+  // }
+  return 0;
+}
+
 int Decoder::HeaderHandler::processContact(absl::string_view& header) {
   metadata()->deleteInstipOperation(rawOffset(), header);
   metadata()->addEPOperation(rawOffset(), header, HeaderType::Contact,
@@ -345,6 +372,9 @@ void Decoder::REGISTERHandler::parseHeader(HeaderType& type, absl::string_view& 
   case HeaderType::PCookieIPMap:
     handler_->processPCookieIPMap(header);
     break;
+  case HeaderType::XEnvoyOriginIngress:
+    handler_->processXEnvoyOriginIngress(header);
+    break;
   default:
     break;
   }
@@ -372,6 +402,9 @@ void Decoder::INVITEHandler::parseHeader(HeaderType& type, absl::string_view& he
     break;
   case HeaderType::PCookieIPMap:
     handler_->processPCookieIPMap(header);
+    break;
+  case HeaderType::XEnvoyOriginIngress:
+    handler_->processXEnvoyOriginIngress(header);
     break;
   default:
     break;
@@ -423,6 +456,9 @@ void Decoder::GeneralHandler::parseHeader(HeaderType& type, absl::string_view& h
   case HeaderType::PCookieIPMap:
     handler_->processPCookieIPMap(header);
     break;
+  case HeaderType::XEnvoyOriginIngress:
+    handler_->processXEnvoyOriginIngress(header);
+    break;
   default:
     break;
   }
@@ -444,6 +480,9 @@ void Decoder::SUBSCRIBEHandler::parseHeader(HeaderType& type, absl::string_view&
     break;
   case HeaderType::PCookieIPMap:
     handler_->processPCookieIPMap(header);
+    break;
+  case HeaderType::XEnvoyOriginIngress:
+    handler_->processXEnvoyOriginIngress(header);
     break;
   default:
     break;
@@ -485,6 +524,9 @@ void Decoder::OthersHandler::parseHeader(HeaderType& type, absl::string_view& he
     break;
   case HeaderType::PCookieIPMap:
     handler_->processPCookieIPMap(header);
+    break;
+  case HeaderType::XEnvoyOriginIngress:
+    handler_->processXEnvoyOriginIngress(header);
     break;
   default:
     break;

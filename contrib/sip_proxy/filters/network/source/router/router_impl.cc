@@ -403,7 +403,6 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
-  
   // callbacks_->connection();
   // callbacks_->ingressID().getDownstreamConnectionID();
 
@@ -724,7 +723,9 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
     // lookup the downstream connection based off the IngressID connection id value
     // route to the downstream connection
 
-    // auto ingress_id = metadata.ingressId().downstreamConnectionId(); // string view
+    auto downstream_conn_id = metadata->ingressId()->getDownstreamConnectionID();
+    parent_.getDownstreamConnection(downstream_conn_id);
+  
     // parent._getDownstreamConnection()
     // if it doesn't exist, then
 

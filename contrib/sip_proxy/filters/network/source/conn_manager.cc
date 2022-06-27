@@ -159,7 +159,7 @@ void TrafficRoutingAssistantHandler::doSubscribe(
 ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                                      TimeSource& time_source,
                                      Server::Configuration::FactoryContext& context,
-                                     std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipProxy::DownstreamConnectionInfo> downstream_connection_infos)
+                                     std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstream_connection_infos)
     : config_(config), stats_(config_.stats()), decoder_(std::make_unique<Decoder>(*this)),
       random_generator_(random_generator), time_source_(time_source), context_(context),
       transaction_infos_(transaction_infos), downstream_connection_infos_(downstream_connection_infos) {}

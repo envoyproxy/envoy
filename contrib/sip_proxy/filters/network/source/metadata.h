@@ -92,6 +92,8 @@ private:
   bool subscribe_;
 };
 
+// rename to IngressId for consistency
+// think about using string-view here if possible, and adding a move ctr
 class IngressID {
 public: 
   IngressID(const std::string& thread_id, const std::string& connection_id)
@@ -152,6 +154,9 @@ public:
    */
   void setTransactionId(absl::string_view data);
 
+  IngressID* ingressId() { return ingress_id_.get(); };
+  void setIngressId(std::unique_ptr<IngressID> ingress_id);
+  
   std::string destination() { return destination_; }
   void setDestination(std::string destination) { destination_ = destination; }
   void resetDestination() { destination_.clear(); }
@@ -223,6 +228,7 @@ private:
   absl::optional<std::pair<std::string, std::string>> p_cookie_ip_map_{};
 
   absl::optional<absl::string_view> transaction_id_{};
+  std::unique_ptr<IngressID> ingress_id_;
 
   std::string destination_{};
 
