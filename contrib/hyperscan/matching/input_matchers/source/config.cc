@@ -63,7 +63,7 @@ Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
       ids.push_back(regex.id());
     }
 
-    return std::make_unique<Matcher>(expressions, flags, ids, factory_context.threadLocal());
+    return std::make_unique<Matcher>(expressions, flags, ids, factory_context.threadLocal(), false);
   };
 #endif
 }

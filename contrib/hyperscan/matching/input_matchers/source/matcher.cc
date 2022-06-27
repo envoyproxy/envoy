@@ -23,7 +23,7 @@ ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database,
 
 Matcher::Matcher(const std::vector<const char*>& expressions,
                  const std::vector<unsigned int>& flags, const std::vector<unsigned int>& ids,
-                 ThreadLocal::SlotAllocator& tls)
+                 ThreadLocal::SlotAllocator& tls, bool som)
     : tls_(ThreadLocal::TypedSlot<ScratchThreadLocal>::makeUnique(tls)) {
   ASSERT(expressions.size() == flags.size());
   ASSERT(expressions.size() == ids.size());
@@ -48,21 +48,25 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
   }
 
   // Compile SOM database. The SOM database will report start of matching, works for replaceAll.
-  std::vector<unsigned int> som_flags = flags;
-  for (unsigned int& som_flag : som_flags) {
-    som_flag = som_flag | HS_FLAG_SOM_LEFTMOST;
-  }
-  err = hs_compile_multi(expressions.data(), som_flags.data(), ids.data(), expressions.size(),
-                         HS_MODE_BLOCK, nullptr, &som_database_, &compile_err);
-  if (err != HS_SUCCESS) {
-    std::string compile_err_message(compile_err->message);
-    int compile_err_expression = compile_err->expression;
+  if (som) {
+    std::vector<unsigned int> som_flags = flags;
+    for (unsigned int& som_flag : som_flags) {
+      som_flag = som_flag | HS_FLAG_SOM_LEFTMOST;
+    }
+    err = hs_compile_multi(expressions.data(), som_flags.data(), ids.data(), expressions.size(),
+                           HS_MODE_BLOCK, nullptr, &som_database_, &compile_err);
+    if (err != HS_SUCCESS) {
+      std::string compile_err_message(compile_err->message);
+      int compile_err_expression = compile_err->expression;
 
-    if (compile_err_expression < 0) {
-      ENVOY_LOG_MISC(warn, "unable to compile SOM database: {}", compile_err_message);
-    } else {
-      ENVOY_LOG_MISC(warn, "unable to compile SOM pattern '{}': {}",
-                     expressions.at(compile_err_expression), compile_err_message);
+      if (compile_err_expression < 0) {
+        throw EnvoyException(
+            fmt::format("unable to compile SOM database: {}", compile_err_message));
+      } else {
+        throw EnvoyException(fmt::format("unable to compile SOM pattern '{}': {}",
+                                         expressions.at(compile_err_expression),
+                                         compile_err_message));
+      }
     }
   }
 

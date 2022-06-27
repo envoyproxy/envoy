@@ -14,7 +14,7 @@ Envoy::Regex::CompiledMatcherPtr HyperscanEngine::matcher(const std::string& reg
   std::vector<unsigned int> ids{0};
 
   return std::make_unique<Matching::InputMatchers::Hyperscan::Matcher>(expressions, flags, ids,
-                                                                       tls_);
+                                                                       tls_, true);
 }
 
 } // namespace Hyperscan

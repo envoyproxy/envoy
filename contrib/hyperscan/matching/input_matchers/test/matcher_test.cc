@@ -50,11 +50,11 @@ TEST(ThreadLocalTest, RaceScratchCreation) {
 
 class MatcherTest : public ::testing::Test {
 protected:
-  void setup(const char* expression, unsigned int flag) {
+  void setup(const char* expression, unsigned int flag, bool som) {
     std::vector<const char*> expressions{expression};
     std::vector<unsigned int> flags{flag};
     std::vector<unsigned int> ids{0};
-    matcher_ = std::make_unique<Matcher>(expressions, flags, ids, instance_);
+    matcher_ = std::make_unique<Matcher>(expressions, flags, ids, instance_, som);
   }
 
   void TearDown() override {
@@ -68,7 +68,7 @@ protected:
 
 // Verify that matching will be performed successfully.
 TEST_F(MatcherTest, Regex) {
-  setup("^/asdf/.+", 0);
+  setup("^/asdf/.+", 0, false);
 
   EXPECT_TRUE(matcher_->match("/asdf/1"));
   EXPECT_FALSE(matcher_->match("/ASDF/1"));
@@ -78,14 +78,14 @@ TEST_F(MatcherTest, Regex) {
 
 // Verify that matching will be performed successfully on empty optional value.
 TEST_F(MatcherTest, Nullopt) {
-  setup("^/asdf/.+", 0);
+  setup("^/asdf/.+", 0, false);
 
   EXPECT_FALSE(matcher_->match(absl::nullopt));
 }
 
 // Verify that matching will be performed case-insensitively.
 TEST_F(MatcherTest, RegexWithCaseless) {
-  setup("^/asdf/.+", HS_FLAG_CASELESS);
+  setup("^/asdf/.+", HS_FLAG_CASELESS, false);
 
   EXPECT_TRUE(matcher_->match("/asdf/1"));
   EXPECT_TRUE(matcher_->match("/ASDF/1"));
@@ -95,7 +95,7 @@ TEST_F(MatcherTest, RegexWithCaseless) {
 
 // Verify that matching a `.` will not exclude newlines.
 TEST_F(MatcherTest, RegexWithDotAll) {
-  setup("^/asdf/.+", HS_FLAG_DOTALL);
+  setup("^/asdf/.+", HS_FLAG_DOTALL, false);
 
   EXPECT_TRUE(matcher_->match("/asdf/1"));
   EXPECT_FALSE(matcher_->match("/ASDF/1"));
@@ -105,7 +105,7 @@ TEST_F(MatcherTest, RegexWithDotAll) {
 
 // Verify that `^` and `$` anchors match any newlines in data.
 TEST_F(MatcherTest, RegexWithMultiline) {
-  setup("^/asdf/.+", HS_FLAG_MULTILINE);
+  setup("^/asdf/.+", HS_FLAG_MULTILINE, false);
 
   EXPECT_TRUE(matcher_->match("/asdf/1"));
   EXPECT_FALSE(matcher_->match("/ASDF/1"));
@@ -115,21 +115,21 @@ TEST_F(MatcherTest, RegexWithMultiline) {
 
 // Verify that expressions which can match against an empty string.
 TEST_F(MatcherTest, RegexWithAllowEmpty) {
-  setup(".*", HS_FLAG_ALLOWEMPTY);
+  setup(".*", HS_FLAG_ALLOWEMPTY, false);
 
   EXPECT_TRUE(matcher_->match(""));
 }
 
 // Verify that treating the pattern as a sequence of UTF-8 characters.
 TEST_F(MatcherTest, RegexWithUTF8) {
-  setup("^.$", HS_FLAG_UTF8);
+  setup("^.$", HS_FLAG_UTF8, false);
 
   EXPECT_TRUE(matcher_->match("😀"));
 }
 
 // Verify that using Unicode properties for character classes.
 TEST_F(MatcherTest, RegexWithUCP) {
-  setup("^\\w$", HS_FLAG_UTF8 | HS_FLAG_UCP);
+  setup("^\\w$", HS_FLAG_UTF8 | HS_FLAG_UCP, false);
 
   EXPECT_TRUE(matcher_->match("Á"));
 }
@@ -140,7 +140,7 @@ TEST_F(MatcherTest, RegexWithCombination) {
   std::vector<unsigned int> flags{HS_FLAG_QUIET, HS_FLAG_QUIET, HS_FLAG_COMBINATION};
   std::vector<unsigned int> ids{1, 2, 0};
 
-  matcher_ = std::make_unique<Matcher>(expressions, flags, ids, instance_);
+  matcher_ = std::make_unique<Matcher>(expressions, flags, ids, instance_, false);
 
   EXPECT_TRUE(matcher_->match("a"));
 }
@@ -148,13 +148,13 @@ TEST_F(MatcherTest, RegexWithCombination) {
 // Verify that invalid expression will cause a throw.
 TEST_F(MatcherTest, InvalidRegex) {
   EXPECT_THROW_WITH_MESSAGE(
-      setup("(", 0), EnvoyException,
+      setup("(", 0, false), EnvoyException,
       "unable to compile pattern '(': Missing close parenthesis for group started at index 0.");
 }
 
 // Verify that replace all works correctly.
 TEST_F(MatcherTest, ReplaceAll) {
-  setup("b+", 0);
+  setup("b+", 0, true);
 
   EXPECT_EQ(matcher_->replaceAll("yabba dabba doo", "d"), "yada dada doo");
 }

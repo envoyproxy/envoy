@@ -45,7 +45,7 @@ BENCHMARK(BM_CompiledGoogleReMatcher);
 static void BM_HyperscanMatcher(benchmark::State& state) {
   auto instance = ThreadLocal::InstanceImpl();
   auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(
-      {cluster_re_pattern.data()}, {0}, {0}, instance);
+      {cluster_re_pattern.data()}, {0}, {0}, instance, false);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : clusterInputs()) {
