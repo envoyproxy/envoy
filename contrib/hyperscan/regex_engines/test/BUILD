@@ -14,6 +14,5 @@ envoy_cc_test(
     deps = [
         "//contrib/hyperscan/regex_engines/source:config",
         "//test/integration:integration_lib",
-        "@envoy_api//contrib/envoy/extensions/regex_engines/hyperscan/v3alpha:pkg_cc_proto",
     ],
 )

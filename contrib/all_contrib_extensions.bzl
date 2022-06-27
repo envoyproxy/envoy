@@ -11,13 +11,13 @@ ARM64_SKIP_CONTRIB_TARGETS = [
     "envoy.tls.key_providers.cryptomb",
     "envoy.matching.input_matchers.hyperscan",
     "envoy.regex_engines.hyperscan",
-    "envoy.network.connection_balance.dlb"
+    "envoy.network.connection_balance.dlb",
 ]
 PPC_SKIP_CONTRIB_TARGETS = [
     "envoy.tls.key_providers.cryptomb",
     "envoy.matching.input_matchers.hyperscan",
     "envoy.regex_engines.hyperscan",
-    "envoy.network.connection_balance.dlb"
+    "envoy.network.connection_balance.dlb",
 ]
 
 def envoy_all_contrib_extensions(denylist = []):
