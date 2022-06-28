@@ -197,6 +197,9 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    const Router::RouteStatsContextOptRef routeStatsContext() const override {
+      return Router::RouteStatsContextOptRef();
+    }
     Http::Code clusterNotFoundResponseCode() const override {
       return Http::Code::InternalServerError;
     }
@@ -412,6 +415,11 @@ private:
   }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
+  const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
+    return nullptr;
+  }
+  void traversePerFilterConfig(
+      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
   void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {}
   void resetIdleTimer() override {}
   void setUpstreamOverrideHost(absl::string_view) override {}

@@ -16,20 +16,15 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/common/fmt.h"
-#include "source/common/config/api_version.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
-#include "absl/container/fixed_array.h"
-#include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -109,7 +104,7 @@ void BaseIntegrationTest::initialize() {
   }
 }
 
-Network::TransportSocketFactoryPtr
+Network::DownstreamTransportSocketFactoryPtr
 BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string yaml = absl::StrFormat(
@@ -156,9 +151,9 @@ void BaseIntegrationTest::createUpstreams() {
 }
 void BaseIntegrationTest::createUpstream(Network::Address::InstanceConstSharedPtr endpoint,
                                          FakeUpstreamConfig& config) {
-  Network::TransportSocketFactoryPtr factory = upstream_tls_
-                                                   ? createUpstreamTlsContext(config)
-                                                   : Network::Test::createRawBufferSocketFactory();
+  Network::DownstreamTransportSocketFactoryPtr factory =
+      upstream_tls_ ? createUpstreamTlsContext(config)
+                    : Network::Test::createRawBufferDownstreamSocketFactory();
   if (autonomous_upstream_) {
     fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint, config,
                                                         autonomous_allow_incomplete_streams_));
@@ -518,7 +513,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
-    addFakeUpstream(std::move(context), Http::CodecType::HTTP2);
+    addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
   }
   xds_upstream_ = fake_upstreams_.back().get();
 }

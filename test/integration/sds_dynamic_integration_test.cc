@@ -309,13 +309,13 @@ resources:
       Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, port);
       return dispatcher_->createClientConnection(
           address, Network::Address::InstanceConstSharedPtr(),
-          client_ssl_ctx_->createTransportSocket(nullptr), nullptr);
+          client_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr);
     }
     return makeClientConnectionWithOptions(port, nullptr);
   }
 
 protected:
-  Network::TransportSocketFactoryPtr client_ssl_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
   bool dual_cert_{false};
 };
 
@@ -587,11 +587,11 @@ public:
 
   void createUpstreams() override {
     // Fake upstream with SSL/TLS for the first cluster.
-    addFakeUpstream(createUpstreamSslContext(), upstreamProtocol());
+    addFakeUpstream(createUpstreamSslContext(), upstreamProtocol(), /*autonomous_upstream=*/false);
     create_xds_upstream_ = true;
   }
 
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
+  Network::DownstreamTransportSocketFactoryPtr createUpstreamSslContext() {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     auto* tls_certificate = common_tls_context->add_tls_certificates();
@@ -778,7 +778,7 @@ public:
   void createUpstreams() override {
     // This is for backend with ssl
     addFakeUpstream(createUpstreamSslContext(context_manager_, *api_, test_quic_),
-                    upstreamProtocol());
+                    upstreamProtocol(), /*autonomous_upstream=*/false);
     create_xds_upstream_ = true;
   }
 };

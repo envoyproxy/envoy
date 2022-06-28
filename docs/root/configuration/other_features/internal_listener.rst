@@ -21,6 +21,26 @@ network.connection.client.envoy_internal
 It is a client connection factory. The factory is implicitly instantiated by the dispatcher to establish a client connection to an
 internal listener address.  This client connection factory is installed automatically when ``envoy.bootstrap.internal_listener`` is specified.
 
+Internal upstream transport
+---------------------------
+
+:ref:`Internal upstream transport
+<envoy_v3_api_msg_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport>`
+extension enables exchange of the filter state from the downstream listener to
+the internal listener through a user space socket. This additional state can be
+in the form of the resource metadata obtained from the upstream host or
+:ref:`the filter state objects <arch_overview_data_sharing_between_filters>`.
+
+This extension emits the following statistics:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   no_metadata, Counter, Metadata key is absent from the import location.
+   no_filter_state, Counter, Filter state object key is absent from the downstream filter state.
+   filter_state_error, Counter, Unable to copy the filter state object (e.g. it is read only).
+
 Example config
 --------------
 Below is a smallest static config that redirect TCP proxy on port 19000 to the TCP proxy binding to the internal address.

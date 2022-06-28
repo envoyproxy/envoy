@@ -28,9 +28,9 @@ bool clusterSupportsHttp3AndTcpFallback(const Upstream::ClusterInfo& cluster) {
 std::unique_ptr<RetryStateImpl>
 RetryStateImpl::create(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                        const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                       Runtime::Loader& runtime, Random::RandomGenerator& random,
-                       Event::Dispatcher& dispatcher, TimeSource& time_source,
-                       Upstream::ResourcePriority priority) {
+                       RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
+                       Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                       TimeSource& time_source, Upstream::ResourcePriority priority) {
   std::unique_ptr<RetryStateImpl> ret;
 
   const bool conn_pool_new_stream_with_early_data_and_http3 =
@@ -41,15 +41,15 @@ RetryStateImpl::create(const RetryPolicy& route_policy, Http::RequestHeaderMap& 
   // policy doesn't specify it. So always allocate retry state object.
   if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
       route_policy.retryOn()) {
-    ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster, runtime, random,
-                                 dispatcher, time_source, priority, false,
-                                 conn_pool_new_stream_with_early_data_and_http3));
+    ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster,
+                                 route_stats_context, runtime, random, dispatcher, time_source,
+                                 priority, false, conn_pool_new_stream_with_early_data_and_http3));
   } else if (conn_pool_new_stream_with_early_data_and_http3 &&
              (cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
              Http::Utility::isSafeRequest(request_headers)) {
-    ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster, runtime, random,
-                                 dispatcher, time_source, priority, true,
-                                 conn_pool_new_stream_with_early_data_and_http3));
+    ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster,
+                                 route_stats_context, runtime, random, dispatcher, time_source,
+                                 priority, true, conn_pool_new_stream_with_early_data_and_http3));
   }
 
   // Consume all retry related headers to avoid them being propagated to the upstream
@@ -67,14 +67,15 @@ RetryStateImpl::create(const RetryPolicy& route_policy, Http::RequestHeaderMap& 
 RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
                                Http::RequestHeaderMap& request_headers,
                                const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                               RouteStatsContextOptRef route_stats_context,
                                Runtime::Loader& runtime, Random::RandomGenerator& random,
                                Event::Dispatcher& dispatcher, TimeSource& time_source,
                                Upstream::ResourcePriority priority, bool auto_configured_for_http3,
                                bool conn_pool_new_stream_with_early_data_and_http3)
-    : cluster_(cluster), vcluster_(vcluster), runtime_(runtime), random_(random),
-      dispatcher_(dispatcher), time_source_(time_source), retry_on_(route_policy.retryOn()),
-      retries_remaining_(route_policy.numRetries()), priority_(priority),
-      retry_host_predicates_(route_policy.retryHostPredicates()),
+    : cluster_(cluster), vcluster_(vcluster), route_stats_context_(route_stats_context),
+      runtime_(runtime), random_(random), dispatcher_(dispatcher), time_source_(time_source),
+      retry_on_(route_policy.retryOn()), retries_remaining_(route_policy.numRetries()),
+      priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
       retriable_headers_(route_policy.retriableHeaders()),
@@ -280,6 +281,9 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
     if (vcluster_) {
       vcluster_->stats().upstream_rq_retry_success_.inc();
     }
+    if (route_stats_context_.has_value()) {
+      route_stats_context_->stats().upstream_rq_retry_success_.inc();
+    }
   }
 
   resetRetry();
@@ -295,6 +299,9 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
     if (vcluster_) {
       vcluster_->stats().upstream_rq_retry_limit_exceeded_.inc();
     }
+    if (route_stats_context_.has_value()) {
+      route_stats_context_->stats().upstream_rq_retry_limit_exceeded_.inc();
+    }
     return RetryStatus::NoRetryLimitExceeded;
   }
 
@@ -304,6 +311,9 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
     cluster_.stats().upstream_rq_retry_overflow_.inc();
     if (vcluster_) {
       vcluster_->stats().upstream_rq_retry_overflow_.inc();
+    }
+    if (route_stats_context_.has_value()) {
+      route_stats_context_->stats().upstream_rq_retry_overflow_.inc();
     }
     return RetryStatus::NoOverflow;
   }
@@ -317,6 +327,9 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
   cluster_.stats().upstream_rq_retry_.inc();
   if (vcluster_) {
     vcluster_->stats().upstream_rq_retry_.inc();
+  }
+  if (route_stats_context_.has_value()) {
+    route_stats_context_->stats().upstream_rq_retry_.inc();
   }
   if (would_retry == RetryDecision::RetryWithBackoff) {
     backoff_callback_ = callback;
@@ -381,20 +394,22 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
                                                                   : RetryDecision::NoRetry;
   }
 
+  uint64_t response_status = Http::Utility::getResponseStatus(response_headers);
+
   if (retry_on_ & RetryPolicy::RETRY_ON_5XX) {
-    if (Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(response_headers))) {
+    if (Http::CodeUtility::is5xx(response_status)) {
       return RetryDecision::RetryWithBackoff;
     }
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_GATEWAY_ERROR) {
-    if (Http::CodeUtility::isGatewayError(Http::Utility::getResponseStatus(response_headers))) {
+    if (Http::CodeUtility::isGatewayError(response_status)) {
       return RetryDecision::RetryWithBackoff;
     }
   }
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_4XX)) {
-    Http::Code code = static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers));
+    Http::Code code = static_cast<Http::Code>(response_status);
     if (code == Http::Code::Conflict) {
       return RetryDecision::RetryWithBackoff;
     }
@@ -402,8 +417,7 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES)) {
     for (auto code : retriable_status_codes_) {
-      uint32_t status_code = Http::Utility::getResponseStatus(response_headers);
-      if (status_code == code) {
+      if (response_status == code) {
         if (!conn_pool_new_stream_with_early_data_and_http3_ ||
             static_cast<Http::Code>(code) != Http::Code::TooEarly) {
           return RetryDecision::RetryWithBackoff;

@@ -28,23 +28,26 @@ envoy_py_data(
 py_binary(
     name = "manifest_to_json",
     srcs = ["manifest_to_json.py"],
+    args = ["$(location @envoy_api//:v3_proto_set)"],
+    data = ["@envoy_api//:v3_proto_set"],
     deps = [
+        requirement("envoy.base.utils"),
         ":manifest_proto_py_proto",
         ":protodoc_manifest_untyped",
-        "//tools/config_validation:validate_fragment",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
-        "@com_google_protobuf//:protobuf_python",
-        requirement("envoy.base.utils"),
     ],
 )
 
 genrule(
     name = "manifest",
     outs = ["manifest.json"],
-    cmd = """$(location :manifest_to_json) $@""",
-    tools = [":manifest_to_json"],
+    cmd = """$(location :manifest_to_json) $(location @envoy_api//:v3_proto_set) $@""",
+    tools = [
+        ":manifest_to_json",
+        "@envoy_api//:v3_proto_set",
+    ],
 )
 
 envoy_genjson(
@@ -113,12 +116,10 @@ py_binary(
 
 protodoc_rule(
     name = "api_v3_protodoc",
-    deps = ["@envoy_api//:v3_protos"],
-)
-
-protodoc_rule(
-    name = "xds_protodoc",
-    deps = ["@envoy_api//:xds_protos"],
+    deps = [
+        "@envoy_api//:v3_protos",
+        "@envoy_api//:xds_protos",
+    ],
 )
 
 py_library(

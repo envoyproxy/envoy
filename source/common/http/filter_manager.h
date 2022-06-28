@@ -42,10 +42,11 @@ struct ActiveStreamFilterBase;
  */
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
-  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter)
-      : parent_(parent), iterate_from_current_filter_(false), headers_continued_(false),
-        continued_1xx_headers_(false), end_stream_(false), dual_filter_(dual_filter),
-        decode_headers_called_(false), encode_headers_called_(false) {}
+  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter, FilterContext filter_context)
+      : parent_(parent), iteration_state_(IterationState::Continue),
+        filter_context_(std::move(filter_context)), iterate_from_current_filter_(false),
+        headers_continued_(false), continued_1xx_headers_(false), end_stream_(false),
+        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -96,6 +97,9 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
+  const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override;
+  void traversePerFilterConfig(
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -138,6 +142,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   FilterManager& parent_;
   IterationState iteration_state_{};
 
+  const FilterContext filter_context_;
+
   // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
   // hasn't parsed data and trailers. As a result, the filter iteration should start with the
   // current filter instead of the next one. If true, filter iteration starts with the current
@@ -159,8 +165,11 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    public StreamDecoderFilterCallbacks,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
-                            bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+                            bool dual_filter, FilterContext filter_context)
+      : ActiveStreamFilterBase(parent, dual_filter, std::move(filter_context)),
+        handle_(std::move(filter)) {
+    handle_->setDecoderFilterCallbacks(*this);
+  }
 
   // ActiveStreamFilterBase
   bool canContinue() override;
@@ -254,8 +263,11 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                    public StreamEncoderFilterCallbacks,
                                    LinkedObject<ActiveStreamEncoderFilter> {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
-                            bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+                            bool dual_filter, FilterContext filter_context)
+      : ActiveStreamFilterBase(parent, dual_filter, std::move(filter_context)),
+        handle_(std::move(filter)) {
+    handle_->setEncoderFilterCallbacks(*this);
+  }
 
   // ActiveStreamFilterBase
   bool canContinue() override;
@@ -594,7 +606,7 @@ private:
  * of the resulting response.
  */
 class FilterManager : public ScopeTrackedObject,
-                      FilterChainFactoryCallbacks,
+                      public FilterChainManager,
                       Logger::Loggable<Logger::Id::http> {
 public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
@@ -627,23 +639,35 @@ public:
     DUMP_DETAILS(&stream_info_);
   }
 
-  // Http::FilterChainFactoryCallbacks
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, false);
-    filters_.push_back(filter.get());
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+    access_log_handlers_.push_back(std::move(handler));
   }
-  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
-    addStreamEncoderFilterWorker(filter, false);
-    filters_.push_back(filter.get());
+  void addStreamDecoderFilter(ActiveStreamDecoderFilterPtr filter) {
+    // Note: configured decoder filters are appended to decoder_filters_.
+    // This means that if filters are configured in the following order (assume all three filters
+    // are both decoder/encoder filters):
+    //   http_filters:
+    //     - A
+    //     - B
+    //     - C
+    // The decoder filter chain will iterate through filters A, B, C.
+    LinkedList::moveIntoListBack(std::move(filter), decoder_filters_);
   }
-  void addStreamFilter(StreamFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, true);
-    addStreamEncoderFilterWorker(filter, true);
-    StreamDecoderFilter* decoder_filter = filter.get();
-    filters_.push_back(decoder_filter);
+  void addStreamEncoderFilter(ActiveStreamEncoderFilterPtr filter) {
+    // Note: configured encoder filters are prepended to encoder_filters_.
+    // This means that if filters are configured in the following order (assume all three filters
+    // are both decoder/encoder filters):
+    //   http_filters:
+    //     - A
+    //     - B
+    //     - C
+    // The encoder filter chain will iterate through filters C, B, A.
+    LinkedList::moveIntoList(std::move(filter), encoder_filters_);
   }
-  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
+  void addStreamFilterBase(StreamFilterBase* filter) { filters_.push_back(filter); }
+
+  // FilterChainManager
+  void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
   void log() {
     RequestHeaderMap* request_headers = nullptr;
@@ -721,10 +745,6 @@ public:
    * @param metadata_map the metadata to decode.
    */
   void decodeMetadata(MetadataMap& metadata_map) { decodeMetadata(nullptr, metadata_map); }
-
-  // TODO(snowp): Make private as filter chain construction is moved into FM.
-  void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
-  void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
 
   void disarmRequestTimeout();
 
@@ -840,6 +860,44 @@ public:
   void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
 
 private:
+  class FilterChainFactoryCallbacksImpl : public Http::FilterChainFactoryCallbacks {
+  public:
+    FilterChainFactoryCallbacksImpl(FilterManager& manager, const Http::FilterContext& context)
+        : manager_(manager), context_(context) {}
+
+    void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
+      manager_.addStreamFilterBase(filter.get());
+      manager_.addStreamDecoderFilter(std::make_unique<ActiveStreamDecoderFilter>(
+          manager_, std::move(filter), false, context_));
+    }
+
+    void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
+      manager_.addStreamFilterBase(filter.get());
+      manager_.addStreamEncoderFilter(std::make_unique<ActiveStreamEncoderFilter>(
+          manager_, std::move(filter), false, context_));
+    }
+
+    void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
+      StreamDecoderFilter* decoder_filter = filter.get();
+      manager_.addStreamFilterBase(decoder_filter);
+
+      manager_.addStreamDecoderFilter(
+          std::make_unique<ActiveStreamDecoderFilter>(manager_, filter, true, context_));
+      manager_.addStreamEncoderFilter(
+          std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), true, context_));
+    }
+
+    void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
+      manager_.addAccessLogHandler(std::move(handler));
+    }
+
+    Event::Dispatcher& dispatcher() override { return manager_.dispatcher_; }
+
+  private:
+    FilterManager& manager_;
+    const Http::FilterContext& context_;
+  };
+
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 

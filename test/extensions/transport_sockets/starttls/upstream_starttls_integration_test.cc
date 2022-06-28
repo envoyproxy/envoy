@@ -173,7 +173,7 @@ public:
       registered_config_factory_{config_factory_};
 
   std::unique_ptr<Ssl::ContextManager> tls_context_manager_;
-  Network::TransportSocketFactoryPtr tls_context_;
+  Network::DownstreamTransportSocketFactoryPtr tls_context_;
 
   // Technically unused.
   StreamInfo::StreamInfoImpl stream_info_;
@@ -236,7 +236,7 @@ void StartTlsIntegrationTest::initialize() {
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       downstream_tls_context, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
-  tls_context_ = Network::TransportSocketFactoryPtr{
+  tls_context_ = Network::DownstreamTransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ServerSslSocketFactory(
           std::move(cfg), *tls_context_manager_, *client_stats_store, {})};
 
@@ -270,10 +270,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 
   // Create TLS transport socket and install it in fake_upstream.
-  Network::TransportSocketPtr ts =
-      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(),
-          std::vector<std::string>{"envoyalpn"}));
+  Network::TransportSocketPtr ts = tls_context_->createDownstreamTransportSocket();
 
   // Synchronization object used to suspend execution
   // until dispatcher completes transport socket conversion.
