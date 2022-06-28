@@ -601,6 +601,45 @@ std::shared_ptr<SipSettings> ConnectionManager::DownstreamConnectionInfoItem::se
   return parent_.config_.settings(); 
 }
 
+void ConnectionManager::DownstreamConnectionInfoItem::startUpstreamResponse() {
+    // message_decoder_ = std::make_unique<ResponseDecoder>(*this);
+}
+
+SipFilters::ResponseStatus ConnectionManager::DownstreamConnectionInfoItem::upstreamData(MessageMetadataSharedPtr metadata) { 
+  if (parent_.read_callbacks_->connection().state() == Network::Connection::State::Closed) {
+    throw EnvoyException("downstream connection is closed");
+  }
+  Buffer::OwnedImpl buffer;
+  std::unique_ptr<Encoder> encoder = std::make_unique<EncoderImpl>();
+  encoder->encode(metadata, buffer);
+
+  ENVOY_LOG(info, "send upstream request downstream {}\n{}", parent_.local_ingress_id_->getDownstreamConnectionID(), buffer.length(), buffer.toString());
+  parent_.read_callbacks_->connection().write(buffer, false);
+
+  // try {
+  //   if (message_decoder_->onData(metadata)) {
+  //     // Completed upstream response.
+  //     // parent_.doDeferredRpcDestroy(*this);
+  //     return SipFilters::ResponseStatus::Complete;
+  //   }
+  //   return SipFilters::ResponseStatus::MoreData;
+  // } catch (const AppException& ex) {
+  //   ENVOY_LOG(error, "sip response application error: {}", ex.what());
+  //   // parent_.stats_.response_decoding_error_.inc();
+
+  //   sendLocalReply(ex, false);
+  //   return SipFilters::ResponseStatus::Reset;
+  // } catch (const EnvoyException& ex) {
+  //   ENVOY_CONN_LOG(error, "sip response error: {}", parent_.read_callbacks_->connection(),
+  //                  ex.what());
+  //   // parent_.stats_.response_decoding_error_.inc();
+
+  //   onError(ex.what());
+  //   return SipFilters::ResponseStatus::Reset;
+  // }
+  return SipFilters::ResponseStatus::Complete;
+}
+
 void DownstreamConnectionInfos::init()  {
   // Note: `this` and `cluster_name` have a lifetime of the filter.
   // That may be shorter than the tls callback if the listener is torn down shortly after it is

@@ -26,6 +26,7 @@
 #include "contrib/sip_proxy/filters/network/source/utility.h"
 #include "metadata.h"
 #include <cstddef>
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -399,12 +400,9 @@ private:
       UNREFERENCED_PARAMETER(end_stream);
     }
 
-    void startUpstreamResponse() override { };
+    void startUpstreamResponse() override;
 
-    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata) override { 
-      UNREFERENCED_PARAMETER(metadata);
-      return SipFilters::ResponseStatus::Complete;
-    };
+    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata) override;
 
     void resetDownstreamConnection() override { };
 
@@ -452,6 +450,7 @@ private:
   private:
     ConnectionManager& parent_;
     StreamInfo::StreamInfoImpl stream_info_;
+    // std::unique_ptr<ResponseDecoder> message_decoder_;
   };
 
   using ActiveTransPtr = std::unique_ptr<ActiveTrans>;
