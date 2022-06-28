@@ -7,6 +7,6 @@ public final class RequestTrailers: Trailers {
   ///
   /// - returns: The new builder.
   public func toRequestTrailersBuilder() -> RequestTrailersBuilder {
-    return RequestTrailersBuilder(headers: self.headers)
+    return RequestTrailersBuilder(container: self.container)
   }
 }

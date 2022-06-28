@@ -5,7 +5,7 @@ import Foundation
 public final class ResponseHeadersBuilder: HeadersBuilder {
   /// Initialize a new instance of the builder.
   public override convenience init() {
-    self.init(headers: [:])
+    self.init(container: HeadersContainer(headers: [:]))
   }
 
   /// Add an HTTP status to the response headers.
@@ -23,6 +23,6 @@ public final class ResponseHeadersBuilder: HeadersBuilder {
   ///
   /// - returns: New instance of response headers.
   public func build() -> ResponseHeaders {
-    return ResponseHeaders(headers: self.headers)
+    return ResponseHeaders(container: self.container)
   }
 }

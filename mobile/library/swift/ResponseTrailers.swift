@@ -7,6 +7,6 @@ public final class ResponseTrailers: Trailers {
   ///
   /// - returns: The new builder.
   public func toResponseTrailersBuilder() -> ResponseTrailersBuilder {
-    return ResponseTrailersBuilder(headers: self.headers)
+    return ResponseTrailersBuilder(container: self.container)
   }
 }

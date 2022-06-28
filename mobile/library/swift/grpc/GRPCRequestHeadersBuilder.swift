@@ -40,6 +40,6 @@ public final class GRPCRequestHeadersBuilder: HeadersBuilder {
   ///
   /// - returns: New instance of request headers.
   public func build() -> GRPCRequestHeaders {
-    return GRPCRequestHeaders(headers: self.headers)
+    return GRPCRequestHeaders(container: self.container)
   }
 }

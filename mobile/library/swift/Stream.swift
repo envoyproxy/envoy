@@ -26,7 +26,7 @@ public class Stream: NSObject {
   /// - returns: This stream, for chaining syntax.
   @discardableResult
   public func sendHeaders(_ headers: RequestHeaders, endStream: Bool) -> Stream {
-    self.underlyingStream.sendHeaders(headers.headers, close: endStream)
+    self.underlyingStream.sendHeaders(headers.caseSensitiveHeaders(), close: endStream)
     return self
   }
 
@@ -57,7 +57,7 @@ public class Stream: NSObject {
   ///
   /// - parameter trailers: Trailers with which to close the stream.
   public func close(trailers: RequestTrailers) {
-    self.underlyingStream.sendTrailers(trailers.headers)
+    self.underlyingStream.sendTrailers(trailers.caseSensitiveHeaders())
   }
 
   /// Close the stream with a data frame.

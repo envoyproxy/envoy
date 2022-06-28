@@ -52,7 +52,8 @@ public final class MockStream: Stream {
   /// - parameter headers:   Response headers to receive.
   /// - parameter endStream: Whether this is a headers-only response.
   public func receiveHeaders(_ headers: ResponseHeaders, endStream: Bool) {
-    self.mockStream.callbacks.onHeaders(headers.headers, endStream, EnvoyStreamIntel())
+    self.mockStream.callbacks.onHeaders(headers.caseSensitiveHeaders(), endStream,
+                                        EnvoyStreamIntel())
   }
 
   /// Simulate response data coming back over the stream.
@@ -67,7 +68,7 @@ public final class MockStream: Stream {
   ///
   /// - parameter trailers: Response trailers to receive.
   public func receiveTrailers(_ trailers: ResponseTrailers) {
-    self.mockStream.callbacks.onTrailers(trailers.headers, EnvoyStreamIntel())
+    self.mockStream.callbacks.onTrailers(trailers.caseSensitiveHeaders(), EnvoyStreamIntel())
   }
 
   /// Simulate the stream receiving a cancellation signal from Envoy.

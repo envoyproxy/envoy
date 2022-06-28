@@ -17,6 +17,7 @@ swift_library(
         "FinalStreamIntel.swift",
         "Headers.swift",
         "HeadersBuilder.swift",
+        "HeadersContainer.swift",
         "KeyValueStore.swift",
         "LogLevel.swift",
         "NetworkMonitoringMode.swift",
