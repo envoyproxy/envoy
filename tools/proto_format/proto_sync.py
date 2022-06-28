@@ -63,7 +63,7 @@ def sync(api_root, formatted, mode, is_ci):
                 print(diff.decode(), file=sys.stderr)
                 sys.exit(1)
             if mode == "fix":
-                _git_status = git_status(api_root)
+                _git_status = git_status(api_root_path)
                 if _git_status:
                     print('git status indicates a dirty API tree:\n%s' % _git_status)
                     print(
