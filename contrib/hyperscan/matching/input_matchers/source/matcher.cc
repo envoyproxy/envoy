@@ -98,14 +98,14 @@ bool Matcher::match(absl::string_view value) const {
 
 std::string Matcher::replaceAll(absl::string_view value, absl::string_view substitution) const {
   // Find matched pair.
-  std::vector<Matched> founds;
+  using Found = std::pair<unsigned long long, unsigned long long>;
+  std::vector<Found> founds;
   hs_scratch_t* scratch_ = tls_->get()->scratch_;
   hs_error_t err = hs_scan(
       som_database_, value.data(), value.size(), 0, scratch_,
       [](unsigned int, unsigned long long from, unsigned long long to, unsigned int,
          void* context) -> int {
-        std::vector<std::pair<unsigned long long, unsigned long long>>* founds =
-            static_cast<std::vector<std::pair<unsigned long long, unsigned long long>>*>(context);
+        std::vector<Found>* founds = static_cast<std::vector<Found>*>(context);
         founds->push_back({from, to});
 
         // Continue searching.
@@ -117,20 +117,25 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
     return std::string(value);
   }
 
-  // Sort founds.
-  std::sort(founds.begin(), founds.end());
+  // Sort founds. Make sure the longest length found in the front will appear first.
+  std::sort(founds.begin(), founds.end(), [](Found a, Found b) {
+    if (a.first == b.first) {
+      return a.second > b.second;
+    }
+    return a.first < b.first;
+  });
 
-  // Replace matched pair with substitution.
+  // Concatenate string and replace matched pair with substitution.
   std::string result;
   unsigned long long pos = 0;
   for (auto& found : founds) {
-    if (found.begin_ < pos) {
+    if (found.first < pos) {
       continue;
     }
 
-    result += std::string(value.substr(pos, found.begin_ - pos));
+    result += std::string(value.substr(pos, found.first - pos));
     result += std::string(substitution);
-    pos = found.end_;
+    pos = found.second;
   }
   result += std::string(value.substr(pos));
   return result;
