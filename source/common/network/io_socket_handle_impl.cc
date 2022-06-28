@@ -503,8 +503,8 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
     memset(&sin6, 0, sizeof(sin6));
     sin6.sin6_family = AF_INET6;
     sin6.sin6_port = sin4.sin_port;
-    sin6.sin6_addr.s6_addr32[2] = htonl(0xffff);
-    sin6.sin6_addr.s6_addr32[3] = sin4.sin_addr.s_addr;
+    sin6.sin6_addr.__u6_addr.__u6_addr32[2] = htonl(0xffff);
+    sin6.sin6_addr.__u6_addr.__u6_addr32[3] = sin4.sin_addr.s_addr;
     ASSERT(IN6_IS_ADDR_V4MAPPED(&sin6.sin6_addr));
 
     sockaddr_to_use = reinterpret_cast<sockaddr*>(&sin6);
