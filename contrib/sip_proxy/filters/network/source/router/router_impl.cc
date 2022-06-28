@@ -403,9 +403,6 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
-  // callbacks_->connection();
-  // callbacks_->ingressID().getDownstreamConnectionID();
-
   if (!metadata->affinity().empty() &&
       metadata->affinityIteration() != metadata->affinity().end()) {
     std::string host;
@@ -663,7 +660,10 @@ SipFilters::DecoderFilterCallbacks* UpstreamRequest::getTransaction(std::string&
 }
 
 SipFilters::DecoderFilterCallbacks* UpstreamRequest::getDownstreamConnection(std::string& downstream_connection_id) {
-  return &callbacks_->downstreamConnectionInfos()->getDownstreamConnection(downstream_connection_id);
+  if (callbacks_->downstreamConnectionInfos()->hasDownstreamConnection(downstream_connection_id)) {
+    return &callbacks_->downstreamConnectionInfos()->getDownstreamConnection(downstream_connection_id);
+  }
+  return nullptr;
 }
 
 // Tcp::ConnectionPool::UpstreamCallbacks
@@ -723,18 +723,27 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
   ENVOY_LOG(trace, "ResponseDecoder\n{}", metadata->rawMsg());
 
   if (metadata->msgType() == MsgType::Request) {
+    ENVOY_LOG(info, "Got Request!");
+
     // todo - create and save an UpstreamTransaction if this is a new Transaction
-    // lookup the downstream connection based off the IngressID connection id value
     // route to the downstream connection
+    auto ingress_id = metadata->ingressId();
+    if (ingress_id == nullptr) {
+      ENVOY_LOG(debug, "dropping upstream request with no X-Envoy-Origin-Ingress header: \n{}", metadata->rawMsg());
+      return FilterStatus::StopIteration;
+    }
 
-    auto downstream_conn_id = metadata->ingressId()->getDownstreamConnectionID();
-    parent_.getDownstreamConnection(downstream_conn_id);
-  
-    // parent._getDownstreamConnection()
-    // if it doesn't exist, then
+    auto downstream_conn_id = ingress_id->getDownstreamConnectionID();
 
-    // active_trans->startUpstreamResponse();
-    // active_trans->upstreamData(metadata);
+    ENVOY_LOG(info, "Got downstream conn-id: {}", downstream_conn_id);
+    auto downstream_conn = parent_.getDownstreamConnection(downstream_conn_id);
+    if (downstream_conn == nullptr) {
+      ENVOY_LOG(debug, "no downstream connection selected {}\n{}", downstream_conn_id, metadata->rawMsg());
+      return FilterStatus::StopIteration;
+    }
+    downstream_conn->startUpstreamResponse();
+    downstream_conn->upstreamData(metadata);
+    return FilterStatus::Continue;
   }
 
   if (metadata->transactionId().has_value()) {
