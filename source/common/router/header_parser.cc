@@ -316,18 +316,6 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const StreamInfo::StreamInfo& stream_info) const {
-  evaluateHeaders(headers, *Http::StaticEmptyHeaders::get().request_headers,
-                  *Http::StaticEmptyHeaders::get().response_headers, &stream_info);
-}
-
-void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
-                                   const StreamInfo::StreamInfo* stream_info) const {
-  evaluateHeaders(headers, *Http::StaticEmptyHeaders::get().request_headers,
-                  *Http::StaticEmptyHeaders::get().response_headers, stream_info);
-}
-
-void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
                                    const Http::RequestHeaderMap& request_headers,
                                    const Http::ResponseHeaderMap& response_headers,
                                    const StreamInfo::StreamInfo& stream_info) const {

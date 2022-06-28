@@ -55,8 +55,6 @@ public:
   void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
                        const Http::ResponseHeaderMap& response_headers,
                        const StreamInfo::StreamInfo* stream_info) const;
-  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
-  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const;
 
   /*
    * Same as evaluateHeaders, but returns the modifications that would have been made rather than
