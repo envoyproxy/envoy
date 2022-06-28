@@ -1,3 +1,5 @@
+#include "envoy/common/hashable.h"
+
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/application_protocol.h"
@@ -94,6 +96,7 @@ public:
     return nullptr;
   }
   absl::string_view defaultServerNameIndication() const override { return ""; }
+  bool implementsSecureTransport() const override { return false; }
 };
 
 class NonHashableObj : public StreamInfo::FilterState::Object {};
