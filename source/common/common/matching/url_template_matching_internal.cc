@@ -59,7 +59,7 @@ struct ToStringFormatter {
 
 // Visitor for converting a ParsedSegment variant to the regex.
 struct ToRegexPatternVisitor {
-  template <typename T> std::string operator()(const T& val) const { return ToRegexPattern(val); }
+  template <typename T> std::string operator()(const T& val) const { return toRegexPattern(val); }
 };
 
 // Formatter used to allow joining variants together with StrJoin.
@@ -69,9 +69,9 @@ struct ToRegexPatternFormatter {
   }
 };
 
-std::string ToString(const Literal val) { return std::string(val); }
+std::string toString(const Literal val) { return std::string(val); }
 
-std::string ToString(const Operator val) {
+std::string toString(const Operator val) {
   switch (val) {
   case Operator::kPathGlob:
     return "*";
@@ -80,7 +80,7 @@ std::string ToString(const Operator val) {
   }
 }
 
-std::string ToString(const Variable val) {
+std::string toString(const Variable val) {
   if (val.var_match.empty()) {
     return absl::StrCat("{", val.var_name, "}");
   }
@@ -90,7 +90,7 @@ std::string ToString(const Variable val) {
 }
 
 template <typename T> std::string ToStringVisitor::operator()(const T& val) const {
-  return ToString(val);
+  return toString(val);
 }
 
 template <typename T>
@@ -110,43 +110,43 @@ absl::StatusOr<T> AlsoUpdatePattern(
 
 } // namespace
 
-std::string Variable::DebugString() const { return ToString(*this); }
+std::string Variable::DebugString() const { return toString(*this); }
 
 std::string ParsedUrlPattern::DebugString() const {
   return absl::StrCat("/", absl::StrJoin(parsed_segments, "/", ToStringFormatter()),
                       suffix.value_or(""));
 }
 
-bool IsValidLiteral(absl::string_view pattern) {
+bool isValidLiteral(absl::string_view pattern) {
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "]+$"));
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  return RE2::FullMatch(ToStringPiece(pattern), *literal_regex);
+  return RE2::FullMatch(toStringPiece(pattern), *literal_regex);
 }
 
-bool IsValidRewriteLiteral(absl::string_view pattern) {
+bool isValidRewriteLiteral(absl::string_view pattern) {
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "/]+$"));
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  return RE2::FullMatch(ToStringPiece(pattern), *literal_regex);
+  return RE2::FullMatch(toStringPiece(pattern), *literal_regex);
 }
 
-bool IsValidIndent(absl::string_view pattern) {
+bool isValidIndent(absl::string_view pattern) {
   static const LazyRE2 ident_regex = {"^[a-zA-Z][a-zA-Z0-9_]*$"};
-  return RE2::FullMatch(ToStringPiece(pattern), *ident_regex);
+  return RE2::FullMatch(toStringPiece(pattern), *ident_regex);
 }
 
-absl::StatusOr<ParsedResult<Literal>> ConsumeLiteral(absl::string_view pattern) {
+absl::StatusOr<ParsedResult<Literal>> consumeLiteral(absl::string_view pattern) {
   absl::string_view lit =
       std::vector<absl::string_view>(absl::StrSplit(pattern, absl::MaxSplits('/', 1)))[0];
   absl::string_view unconsumed_pattern = pattern.substr(lit.size());
-  if (!IsValidLiteral(lit)) {
+  if (!isValidLiteral(lit)) {
     return absl::InvalidArgumentError("Invalid literal");
   }
   return ParsedResult<Literal>(lit, unconsumed_pattern);
 }
 
-absl::StatusOr<ParsedResult<Operator>> ConsumeOperator(absl::string_view pattern) {
+absl::StatusOr<ParsedResult<Operator>> consumeOperator(absl::string_view pattern) {
   if (absl::StartsWith(pattern, "**")) {
     return ParsedResult<Operator>(Operator::kTextGlob, pattern.substr(2));
   }
@@ -156,7 +156,7 @@ absl::StatusOr<ParsedResult<Operator>> ConsumeOperator(absl::string_view pattern
   return absl::InvalidArgumentError("Invalid Operator");
 }
 
-absl::StatusOr<ParsedResult<Variable>> ConsumeVariable(absl::string_view pattern) {
+absl::StatusOr<ParsedResult<Variable>> consumeVariable(absl::string_view pattern) {
   // Locate the variable pattern to parse.
   if (pattern.size() < 2 || (pattern)[0] != '{') {
     return absl::InvalidArgumentError("Invalid variable");
@@ -169,7 +169,7 @@ absl::StatusOr<ParsedResult<Variable>> ConsumeVariable(absl::string_view pattern
 
   // Parse the actual variable pattern, starting with the variable name.
   std::vector<absl::string_view> var_parts = absl::StrSplit(parts[0], absl::MaxSplits('=', 1));
-  if (!IsValidIndent(var_parts[0])) {
+  if (!isValidIndent(var_parts[0])) {
     return absl::InvalidArgumentError("Invalid variable name");
   }
   Variable var = Variable(var_parts[0], {});
@@ -186,7 +186,7 @@ absl::StatusOr<ParsedResult<Variable>> ConsumeVariable(absl::string_view pattern
     absl::variant<Operator, Literal> var_match;
     if (var_patt[0] == '*') {
 
-      absl::StatusOr<Operator> status = AlsoUpdatePattern<Operator>(ConsumeOperator, &var_patt);
+      absl::StatusOr<Operator> status = AlsoUpdatePattern<Operator>(consumeOperator, &var_patt);
       if (!status.ok()) {
         return status.status();
       }
@@ -194,7 +194,7 @@ absl::StatusOr<ParsedResult<Variable>> ConsumeVariable(absl::string_view pattern
 
     } else {
 
-      absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(ConsumeLiteral, &var_patt);
+      absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(consumeLiteral, &var_patt);
       if (!status.ok()) {
         return status.status();
       }
@@ -213,7 +213,7 @@ absl::StatusOr<ParsedResult<Variable>> ConsumeVariable(absl::string_view pattern
 }
 
 absl::StatusOr<absl::flat_hash_set<absl::string_view>>
-GatherCaptureNames(struct ParsedUrlPattern pattern) {
+gatherCaptureNames(struct ParsedUrlPattern pattern) {
   absl::flat_hash_set<absl::string_view> captured_variables;
 
   for (const ParsedSegment& segment : pattern.parsed_segments) {
@@ -238,7 +238,7 @@ GatherCaptureNames(struct ParsedUrlPattern pattern) {
   return captured_variables;
 }
 
-absl::Status ValidateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
+absl::Status validateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
   bool seen_text_glob = false;
   for (const ParsedSegment& segment : pattern.parsed_segments) {
     if (absl::holds_alternative<Operator>(segment)) {
@@ -269,11 +269,11 @@ absl::Status ValidateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
   return absl::OkStatus();
 }
 
-absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pattern) {
+absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pattern) {
   struct ParsedUrlPattern parsed_pattern;
 
   static const LazyRE2 printable_regex = {"^/[[:graph:]]*$"};
-  if (!RE2::FullMatch(ToStringPiece(url_pattern), *printable_regex)) {
+  if (!RE2::FullMatch(toStringPiece(url_pattern), *printable_regex)) {
 
     return absl::InvalidArgumentError("Invalid pattern");
   }
@@ -286,21 +286,21 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
     ParsedSegment segment;
     if (url_pattern[0] == '*') {
 
-      absl::StatusOr<Operator> status = AlsoUpdatePattern<Operator>(ConsumeOperator, &url_pattern);
+      absl::StatusOr<Operator> status = AlsoUpdatePattern<Operator>(consumeOperator, &url_pattern);
       if (!status.ok()) {
         return status.status();
       }
       segment = *std::move(status);
     } else if (url_pattern[0] == '{') {
 
-      absl::StatusOr<Variable> status = AlsoUpdatePattern<Variable>(ConsumeVariable, &url_pattern);
+      absl::StatusOr<Variable> status = AlsoUpdatePattern<Variable>(consumeVariable, &url_pattern);
       if (!status.ok()) {
         return status.status();
       }
       segment = *std::move(status);
     } else {
 
-      absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(ConsumeLiteral, &url_pattern);
+      absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(consumeLiteral, &url_pattern);
       if (!status.ok()) {
         return status.status();
       }
@@ -320,7 +320,7 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
       } else {
         // Not followed by '/', treat as suffix.
 
-        absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(ConsumeLiteral, &url_pattern);
+        absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(consumeLiteral, &url_pattern);
         if (!status.ok()) {
           return status.status();
         }
@@ -334,13 +334,13 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
     }
   }
   absl::StatusOr<absl::flat_hash_set<absl::string_view>> status =
-      GatherCaptureNames(parsed_pattern);
+      gatherCaptureNames(parsed_pattern);
   if (!status.ok()) {
     return status.status();
   }
   parsed_pattern.captured_variables = *std::move(status);
 
-  absl::Status validate_status = ValidateNoOperatorAfterTextGlob(parsed_pattern);
+  absl::Status validate_status = validateNoOperatorAfterTextGlob(parsed_pattern);
   if (!validate_status.ok()) {
     return validate_status;
   }
@@ -348,12 +348,12 @@ absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pat
   return parsed_pattern;
 }
 
-std::string ToRegexPattern(Literal pattern) {
+std::string toRegexPattern(absl::string_view pattern) {
   return absl::StrReplaceAll(
       pattern, {{"$", "\\$"}, {"(", "\\("}, {")", "\\)"}, {"+", "\\+"}, {".", "\\."}});
 }
 
-std::string ToRegexPattern(Operator pattern) {
+std::string toRegexPattern(Operator pattern) {
   static const std::string* kPathGlobRegex = new std::string(absl::StrCat("[", kLiteral, "]+"));
   static const std::string* kTextGlobRegex = new std::string(absl::StrCat("[", kLiteral, "/]*"));
   switch (pattern) {
@@ -364,17 +364,17 @@ std::string ToRegexPattern(Operator pattern) {
   }
 }
 
-std::string ToRegexPattern(const Variable& pattern) {
+std::string toRegexPattern(const Variable& pattern) {
   return absl::StrCat("(?P<", pattern.var_name, ">",
                       pattern.var_match.empty()
-                          ? ToRegexPattern(kDefaultVariableOperator)
+                          ? toRegexPattern(kDefaultVariableOperator)
                           : absl::StrJoin(pattern.var_match, "/", ToRegexPatternFormatter()),
                       ")");
 }
 
-std::string ToRegexPattern(const struct ParsedUrlPattern& pattern) {
+std::string toRegexPattern(const struct ParsedUrlPattern& pattern) {
   return absl::StrCat("/", absl::StrJoin(pattern.parsed_segments, "/", ToRegexPatternFormatter()),
-                      ToRegexPattern(pattern.suffix.value_or("")));
+                      toRegexPattern(pattern.suffix.value_or("")));
 }
 
 } // namespace url_template_matching_internal

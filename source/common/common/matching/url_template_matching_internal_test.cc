@@ -48,53 +48,53 @@ TEST(InternalParsing, ParsedUrlDebugString) {
   EXPECT_EQ(patt2.DebugString(), "/{var}");
 }
 
-TEST(InternalParsing, IsValidLiteralWorks) {
-  EXPECT_TRUE(IsValidLiteral("123abcABC"));
-  EXPECT_TRUE(IsValidLiteral("._~-"));
-  EXPECT_TRUE(IsValidLiteral("-._~%20!$&'()+,;:@"));
-  EXPECT_FALSE(IsValidLiteral("`~!@#$%^&()-_+;:,<.>'\"\\| "));
-  EXPECT_FALSE(IsValidLiteral("abc/"));
-  EXPECT_FALSE(IsValidLiteral("ab*c"));
-  EXPECT_FALSE(IsValidLiteral("a**c"));
-  EXPECT_FALSE(IsValidLiteral("a=c"));
-  EXPECT_FALSE(IsValidLiteral("?abc"));
-  EXPECT_FALSE(IsValidLiteral("?a=c"));
-  EXPECT_FALSE(IsValidLiteral("{abc"));
-  EXPECT_FALSE(IsValidLiteral("abc}"));
-  EXPECT_FALSE(IsValidLiteral("{abc}"));
+TEST(InternalParsing, isValidLiteralWorks) {
+  EXPECT_TRUE(isValidLiteral("123abcABC"));
+  EXPECT_TRUE(isValidLiteral("._~-"));
+  EXPECT_TRUE(isValidLiteral("-._~%20!$&'()+,;:@"));
+  EXPECT_FALSE(isValidLiteral("`~!@#$%^&()-_+;:,<.>'\"\\| "));
+  EXPECT_FALSE(isValidLiteral("abc/"));
+  EXPECT_FALSE(isValidLiteral("ab*c"));
+  EXPECT_FALSE(isValidLiteral("a**c"));
+  EXPECT_FALSE(isValidLiteral("a=c"));
+  EXPECT_FALSE(isValidLiteral("?abc"));
+  EXPECT_FALSE(isValidLiteral("?a=c"));
+  EXPECT_FALSE(isValidLiteral("{abc"));
+  EXPECT_FALSE(isValidLiteral("abc}"));
+  EXPECT_FALSE(isValidLiteral("{abc}"));
 }
 
-TEST(InternalParsing, IsValidRewriteLiteralWorks) {
-  EXPECT_TRUE(IsValidRewriteLiteral("123abcABC"));
-  EXPECT_TRUE(IsValidRewriteLiteral("abc/"));
-  EXPECT_TRUE(IsValidRewriteLiteral("abc/def"));
-  EXPECT_TRUE(IsValidRewriteLiteral("/abc.def"));
-  EXPECT_TRUE(IsValidRewriteLiteral("._~-"));
-  EXPECT_TRUE(IsValidRewriteLiteral("-._~%20!$&'()+,;:@"));
-  EXPECT_FALSE(IsValidRewriteLiteral("`~!@#$%^&()-_+;:,<.>'\"| "));
-  EXPECT_FALSE(IsValidRewriteLiteral("ab}c"));
-  EXPECT_FALSE(IsValidRewriteLiteral("ab{c"));
-  EXPECT_FALSE(IsValidRewriteLiteral("a=c"));
-  EXPECT_FALSE(IsValidRewriteLiteral("?a=c"));
+TEST(InternalParsing, isValidRewriteLiteralWorks) {
+  EXPECT_TRUE(isValidRewriteLiteral("123abcABC"));
+  EXPECT_TRUE(isValidRewriteLiteral("abc/"));
+  EXPECT_TRUE(isValidRewriteLiteral("abc/def"));
+  EXPECT_TRUE(isValidRewriteLiteral("/abc.def"));
+  EXPECT_TRUE(isValidRewriteLiteral("._~-"));
+  EXPECT_TRUE(isValidRewriteLiteral("-._~%20!$&'()+,;:@"));
+  EXPECT_FALSE(isValidRewriteLiteral("`~!@#$%^&()-_+;:,<.>'\"| "));
+  EXPECT_FALSE(isValidRewriteLiteral("ab}c"));
+  EXPECT_FALSE(isValidRewriteLiteral("ab{c"));
+  EXPECT_FALSE(isValidRewriteLiteral("a=c"));
+  EXPECT_FALSE(isValidRewriteLiteral("?a=c"));
 }
 
-TEST(InternalParsing, IsValidIdentWorks) {
-  EXPECT_TRUE(IsValidIndent("abc"));
-  EXPECT_TRUE(IsValidIndent("ABC_def_123"));
-  EXPECT_TRUE(IsValidIndent("a1"));
-  EXPECT_TRUE(IsValidIndent("T"));
-  EXPECT_FALSE(IsValidIndent("123"));
-  EXPECT_FALSE(IsValidIndent("__undefined__"));
-  EXPECT_FALSE(IsValidIndent("abc-def"));
-  EXPECT_FALSE(IsValidIndent("abc=def"));
-  EXPECT_FALSE(IsValidIndent("abc def"));
-  EXPECT_FALSE(IsValidIndent("a!!!"));
+TEST(InternalParsing, isValidIdentWorks) {
+  EXPECT_TRUE(isValidIndent("abc"));
+  EXPECT_TRUE(isValidIndent("ABC_def_123"));
+  EXPECT_TRUE(isValidIndent("a1"));
+  EXPECT_TRUE(isValidIndent("T"));
+  EXPECT_FALSE(isValidIndent("123"));
+  EXPECT_FALSE(isValidIndent("__undefined__"));
+  EXPECT_FALSE(isValidIndent("abc-def"));
+  EXPECT_FALSE(isValidIndent("abc=def"));
+  EXPECT_FALSE(isValidIndent("abc def"));
+  EXPECT_FALSE(isValidIndent("a!!!"));
 }
 
 TEST(InternalParsing, ConsumeLiteralWorks) {
   std::string pattern = "abc/123";
 
-  absl::StatusOr<ParsedResult<Literal>> result = ConsumeLiteral(pattern);
+  absl::StatusOr<ParsedResult<Literal>> result = consumeLiteral(pattern);
 
   ASSERT_OK(result);
   EXPECT_EQ(result->parsed_value, "abc");
@@ -104,7 +104,7 @@ TEST(InternalParsing, ConsumeLiteralWorks) {
 TEST(InternalParsing, ConsumeTextGlob) {
   std::string pattern = "***abc/123";
 
-  absl::StatusOr<ParsedResult<Operator>> result = ConsumeOperator(pattern);
+  absl::StatusOr<ParsedResult<Operator>> result = consumeOperator(pattern);
 
   ASSERT_OK(result);
   EXPECT_EQ(result->parsed_value, Operator::kTextGlob);
@@ -114,7 +114,7 @@ TEST(InternalParsing, ConsumeTextGlob) {
 TEST(InternalParsing, ConsumePathGlob) {
   std::string pattern = "*/123";
 
-  absl::StatusOr<ParsedResult<Operator>> result = ConsumeOperator(pattern);
+  absl::StatusOr<ParsedResult<Operator>> result = consumeOperator(pattern);
 
   ASSERT_OK(result);
   EXPECT_EQ(result->parsed_value, Operator::kPathGlob);
@@ -131,7 +131,7 @@ TEST_P(ConsumeVariableSuccess, ConsumeVariableSuccessTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  absl::StatusOr<ParsedResult<Variable>> result = ConsumeVariable(pattern);
+  absl::StatusOr<ParsedResult<Variable>> result = consumeVariable(pattern);
 
   ASSERT_OK(result);
   EXPECT_EQ(result->parsed_value.DebugString(), pattern);
@@ -150,13 +150,13 @@ TEST_P(ConsumeVariableFailure, ConsumeVariableFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_THAT(ConsumeVariable(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(consumeVariable(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-class ParseURLPatternSyntaxSuccess : public testing::TestWithParam<std::string> {};
+class parseURLPatternSyntaxSuccess : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(
-    ParseURLPatternSyntaxSuccessTestSuite, ParseURLPatternSyntaxSuccess,
+    parseURLPatternSyntaxSuccessTestSuite, parseURLPatternSyntaxSuccess,
     testing::Values("/**.m3u8", "/**.mpd", "/*_suf", "/{path=**}.m3u8", "/{foo}/**.ts",
                     "/media/*.m4s", "/media/{contentId=*}/**", "/media/*", "/api/*/*/**",
                     "/api/*/v1/**", "/api/*/v1/*", "/{version=api/*}/*", "/api/*/*/",
@@ -169,19 +169,19 @@ INSTANTIATE_TEST_SUITE_P(
                     "/api/{version=*}/{url=**}", "/api/{VERSION}/{version}/{verSION}",
                     "/api/1234/abcd", "/media/abcd/%10%20%30/{v1=*/%10%20}_suffix", "/"));
 
-TEST_P(ParseURLPatternSyntaxSuccess, ParseURLPatternSyntaxSuccessTest) {
+TEST_P(parseURLPatternSyntaxSuccess, parseURLPatternSyntaxSuccessTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  absl::StatusOr<ParsedUrlPattern> parsed_patt = ParseURLPatternSyntax(pattern);
+  absl::StatusOr<ParsedUrlPattern> parsed_patt = parseURLPatternSyntax(pattern);
   ASSERT_OK(parsed_patt);
   EXPECT_EQ(parsed_patt->DebugString(), pattern);
 }
 
-class ParseURLPatternSyntaxFailure : public testing::TestWithParam<std::string> {};
+class parseURLPatternSyntaxFailure : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(
-    ParseURLPatternSyntaxFailureTestSuite, ParseURLPatternSyntaxFailure,
+    parseURLPatternSyntaxFailureTestSuite, parseURLPatternSyntaxFailure,
     testing::Values("/api/v*/1234", "/api/{version=v*}/1234", "/api/v{versionNum=*}/1234",
                     "/api/{version=*beta}/1234", "/media/eff456/ll-sd-out.{ext}",
                     "/media/eff456/ll-sd-out.{ext=*}", "/media/eff456/ll-sd-out.**",
@@ -193,39 +193,39 @@ INSTANTIATE_TEST_SUITE_P(
                     "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", "/{=*}",
                     "/{var12345678901234=*}"));
 
-TEST_P(ParseURLPatternSyntaxFailure, ParseURLPatternSyntaxFailureTest) {
+TEST_P(parseURLPatternSyntaxFailure, parseURLPatternSyntaxFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_THAT(ParseURLPatternSyntax(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(parseURLPatternSyntax(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(InternalRegexGen, LiteralEscapes) {
-  EXPECT_EQ(ToRegexPattern("abcABC123/-._~%20!$&'()+,;:@"),
+  EXPECT_EQ(toRegexPattern("abcABC123/-._~%20!$&'()+,;:@"),
             "abcABC123/-\\._~%20!\\$&'\\(\\)\\+,;:@");
 }
 
 TEST(InternalRegexGen, LiteralMatches) {
   absl::string_view kPattern = "abcABC123/-._~%20!$&'()+,;:@";
 
-  EXPECT_TRUE(RE2::FullMatch(ToStringPiece(kPattern), ToRegexPattern(kPattern)));
+  EXPECT_TRUE(RE2::FullMatch(toStringPiece(kPattern), toRegexPattern(kPattern)));
 }
 
 TEST(InternalRegexGen, LiteralMatchesInNamedCapture) {
   absl::string_view kPattern = "abcABC123/-._~%20!$&'()+,;:@";
 
-  RE2 regex = RE2(absl::StrCat("(?P<var>", ToRegexPattern(kPattern), ")"));
+  RE2 regex = RE2(absl::StrCat("(?P<var>", toRegexPattern(kPattern), ")"));
   ASSERT_EQ(regex.NumberOfCapturingGroups(), 1);
 
   // Full matched string + capture groups
   std::vector<re2::StringPiece> captures(2);
-  ASSERT_TRUE(regex.Match(ToStringPiece(kPattern), /*startpos=*/0, /*endpos=*/kPattern.size(),
+  ASSERT_TRUE(regex.Match(toStringPiece(kPattern), /*startpos=*/0, /*endpos=*/kPattern.size(),
                           RE2::ANCHOR_BOTH, captures.data(), captures.size()));
 
   // Index 0 would be the full text of the matched string.
-  EXPECT_EQ(ToStringPiece(kPattern), captures[0]);
+  EXPECT_EQ(toStringPiece(kPattern), captures[0]);
   // Get the pattern matched with the named capture group.
-  EXPECT_EQ(ToStringPiece(kPattern), captures.at(regex.NamedCapturingGroups().at("var")));
+  EXPECT_EQ(toStringPiece(kPattern), captures.at(regex.NamedCapturingGroups().at("var")));
 }
 
 TEST(InternalRegexGen, LiteralOnlyMatchesItself) {
@@ -233,102 +233,102 @@ TEST(InternalRegexGen, LiteralOnlyMatchesItself) {
 
   for (const char c : kChars) {
     std::string s = {'z', c, 'z'};
-    EXPECT_TRUE(RE2::FullMatch(s, ToRegexPattern(s)));
-    EXPECT_FALSE(RE2::FullMatch("zzz", ToRegexPattern(s)));
+    EXPECT_TRUE(RE2::FullMatch(s, toRegexPattern(s)));
+    EXPECT_FALSE(RE2::FullMatch("zzz", toRegexPattern(s)));
   }
 }
 
 TEST(InternalRegexGen, RegexLikePatternIsMatchedLiterally) {
-  EXPECT_TRUE(RE2::FullMatch("(abc)", ToRegexPattern("(abc)")));
-  EXPECT_FALSE(RE2::FullMatch("abc", ToRegexPattern("(abc)+")));
+  EXPECT_TRUE(RE2::FullMatch("(abc)", toRegexPattern("(abc)")));
+  EXPECT_FALSE(RE2::FullMatch("abc", toRegexPattern("(abc)+")));
 
-  EXPECT_TRUE(RE2::FullMatch("(abc)+", ToRegexPattern("(abc)+")));
-  EXPECT_FALSE(RE2::FullMatch("", ToRegexPattern("(abc)+")));
-  EXPECT_FALSE(RE2::FullMatch("abc", ToRegexPattern("(abc)+")));
-  EXPECT_FALSE(RE2::FullMatch("abcabc", ToRegexPattern("(abc)+")));
+  EXPECT_TRUE(RE2::FullMatch("(abc)+", toRegexPattern("(abc)+")));
+  EXPECT_FALSE(RE2::FullMatch("", toRegexPattern("(abc)+")));
+  EXPECT_FALSE(RE2::FullMatch("abc", toRegexPattern("(abc)+")));
+  EXPECT_FALSE(RE2::FullMatch("abcabc", toRegexPattern("(abc)+")));
 
-  EXPECT_TRUE(RE2::FullMatch(".+", ToRegexPattern(".+")));
-  EXPECT_FALSE(RE2::FullMatch("abc", ToRegexPattern(".+")));
+  EXPECT_TRUE(RE2::FullMatch(".+", toRegexPattern(".+")));
+  EXPECT_FALSE(RE2::FullMatch("abc", toRegexPattern(".+")));
 
-  EXPECT_TRUE(RE2::FullMatch("a+", ToRegexPattern("a+")));
-  EXPECT_FALSE(RE2::FullMatch("aa", ToRegexPattern("a+")));
+  EXPECT_TRUE(RE2::FullMatch("a+", toRegexPattern("a+")));
+  EXPECT_FALSE(RE2::FullMatch("aa", toRegexPattern("a+")));
 }
 
 TEST(InternalRegexGen, DollarSignMatchesIfself) {
-  EXPECT_TRUE(RE2::FullMatch("abc$", ToRegexPattern("abc$")));
-  EXPECT_FALSE(RE2::FullMatch("abc", ToRegexPattern("abc$")));
+  EXPECT_TRUE(RE2::FullMatch("abc$", toRegexPattern("abc$")));
+  EXPECT_FALSE(RE2::FullMatch("abc", toRegexPattern("abc$")));
 }
 
 TEST(InternalRegexGen, OperatorRegexPattern) {
-  EXPECT_EQ(ToRegexPattern(Operator::kPathGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@]+");
-  EXPECT_EQ(ToRegexPattern(Operator::kTextGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@/]*");
+  EXPECT_EQ(toRegexPattern(Operator::kPathGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@]+");
+  EXPECT_EQ(toRegexPattern(Operator::kTextGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@/]*");
 }
 
 TEST(InternalRegexGen, PathGlobRegex) {
-  EXPECT_TRUE(RE2::FullMatch("abc.123", ToRegexPattern(Operator::kPathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("", ToRegexPattern(Operator::kPathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("abc/123", ToRegexPattern(Operator::kPathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("*", ToRegexPattern(Operator::kPathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("**", ToRegexPattern(Operator::kPathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("abc*123", ToRegexPattern(Operator::kPathGlob)));
+  EXPECT_TRUE(RE2::FullMatch("abc.123", toRegexPattern(Operator::kPathGlob)));
+  EXPECT_FALSE(RE2::FullMatch("", toRegexPattern(Operator::kPathGlob)));
+  EXPECT_FALSE(RE2::FullMatch("abc/123", toRegexPattern(Operator::kPathGlob)));
+  EXPECT_FALSE(RE2::FullMatch("*", toRegexPattern(Operator::kPathGlob)));
+  EXPECT_FALSE(RE2::FullMatch("**", toRegexPattern(Operator::kPathGlob)));
+  EXPECT_FALSE(RE2::FullMatch("abc*123", toRegexPattern(Operator::kPathGlob)));
 }
 
 TEST(InternalRegexGen, TextGlobRegex) {
-  EXPECT_TRUE(RE2::FullMatch("abc.123", ToRegexPattern(Operator::kTextGlob)));
-  EXPECT_TRUE(RE2::FullMatch("", ToRegexPattern(Operator::kTextGlob)));
-  EXPECT_TRUE(RE2::FullMatch("abc/123", ToRegexPattern(Operator::kTextGlob)));
-  EXPECT_FALSE(RE2::FullMatch("*", ToRegexPattern(Operator::kTextGlob)));
-  EXPECT_FALSE(RE2::FullMatch("**", ToRegexPattern(Operator::kTextGlob)));
-  EXPECT_FALSE(RE2::FullMatch("abc*123", ToRegexPattern(Operator::kTextGlob)));
+  EXPECT_TRUE(RE2::FullMatch("abc.123", toRegexPattern(Operator::kTextGlob)));
+  EXPECT_TRUE(RE2::FullMatch("", toRegexPattern(Operator::kTextGlob)));
+  EXPECT_TRUE(RE2::FullMatch("abc/123", toRegexPattern(Operator::kTextGlob)));
+  EXPECT_FALSE(RE2::FullMatch("*", toRegexPattern(Operator::kTextGlob)));
+  EXPECT_FALSE(RE2::FullMatch("**", toRegexPattern(Operator::kTextGlob)));
+  EXPECT_FALSE(RE2::FullMatch("abc*123", toRegexPattern(Operator::kTextGlob)));
 }
 
 TEST(InternalRegexGen, VariableRegexPattern) {
-  EXPECT_EQ(ToRegexPattern(Variable("var1", {})), "(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@]+)");
-  EXPECT_EQ(ToRegexPattern(Variable("var2", {Operator::kPathGlob, "abc", Operator::kTextGlob})),
+  EXPECT_EQ(toRegexPattern(Variable("var1", {})), "(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@]+)");
+  EXPECT_EQ(toRegexPattern(Variable("var2", {Operator::kPathGlob, "abc", Operator::kTextGlob})),
             "(?P<var2>[a-zA-Z0-9-._~%!$&'()+,;:@]+/abc/"
             "[a-zA-Z0-9-._~%!$&'()+,;:@/]*)");
 }
 
 TEST(InternalRegexGen, VariableRegexDefaultMatch) {
-  absl::StatusOr<ParsedResult<Variable>> var = ConsumeVariable("{var}");
+  absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var}");
   ASSERT_OK(var);
 
   std::string capture;
-  EXPECT_TRUE(RE2::FullMatch("abc", ToRegexPattern(var->parsed_value), &capture));
+  EXPECT_TRUE(RE2::FullMatch("abc", toRegexPattern(var->parsed_value), &capture));
   EXPECT_EQ(capture, "abc");
 }
 
 TEST(InternalRegexGen, VariableRegexDefaultNotMatch) {
-  absl::StatusOr<ParsedResult<Variable>> var = ConsumeVariable("{var}");
+  absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var}");
   ASSERT_OK(var);
 
-  EXPECT_FALSE(RE2::FullMatch("abc/def", ToRegexPattern(var->parsed_value)));
+  EXPECT_FALSE(RE2::FullMatch("abc/def", toRegexPattern(var->parsed_value)));
 }
 
 TEST(InternalRegexGen, VariableRegexSegmentsMatch) {
-  absl::StatusOr<ParsedResult<Variable>> var = ConsumeVariable("{var=abc/*/def}");
+  absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var=abc/*/def}");
   ASSERT_OK(var);
 
   std::string capture;
-  EXPECT_TRUE(RE2::FullMatch("abc/123/def", ToRegexPattern(var->parsed_value), &capture));
+  EXPECT_TRUE(RE2::FullMatch("abc/123/def", toRegexPattern(var->parsed_value), &capture));
   EXPECT_EQ(capture, "abc/123/def");
 }
 
 TEST(InternalRegexGen, VariableRegexTextGlobMatch) {
-  absl::StatusOr<ParsedResult<Variable>> var = ConsumeVariable("{var=**/def}");
+  absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var=**/def}");
   ASSERT_OK(var);
 
   std::string capture;
-  EXPECT_TRUE(RE2::FullMatch("abc/123/def", ToRegexPattern(var->parsed_value), &capture));
+  EXPECT_TRUE(RE2::FullMatch("abc/123/def", toRegexPattern(var->parsed_value), &capture));
   EXPECT_EQ(capture, "abc/123/def");
 }
 
 TEST(InternalRegexGen, VariableRegexNamedCapture) {
   re2::StringPiece kPattern = "abc";
-  absl::StatusOr<ParsedResult<Variable>> var = ConsumeVariable("{var=*}");
+  absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var=*}");
   ASSERT_OK(var);
 
-  RE2 regex = RE2(ToRegexPattern(var->parsed_value));
+  RE2 regex = RE2(toRegexPattern(var->parsed_value));
   ASSERT_EQ(regex.NumberOfCapturingGroups(), 1);
 
   // Full matched string + capture groups
@@ -344,13 +344,13 @@ TEST(InternalRegexGen, VariableRegexNamedCapture) {
 
 TEST(InternalRegexGen, ParsedURLPatternToRegex) {
   absl::StatusOr<ParsedUrlPattern> pattern =
-      ParseURLPatternSyntax("/abc/*/{var1}/def/{var2=*/ghi/**}.jkl");
+      parseURLPatternSyntax("/abc/*/{var1}/def/{var2=*/ghi/**}.jkl");
   ASSERT_OK(pattern);
 
   std::string var1_capture;
   std::string var2_capture;
   EXPECT_TRUE(RE2::FullMatch("/abc/123/456/def/789/ghi/%20/($).jkl",
-                             ToRegexPattern(pattern.value()), &var1_capture, &var2_capture));
+                             toRegexPattern(pattern.value()), &var1_capture, &var2_capture));
   EXPECT_EQ(var1_capture, "456");
   EXPECT_EQ(var2_capture, "789/ghi/%20/($)");
 }
@@ -413,10 +413,10 @@ INSTANTIATE_TEST_SUITE_P(
                            {{"VERSION", "v1"}, {"version", "v2"}, {"verSION", "v3"}})));
 
 TEST_P(GenPatternRegexWithMatch, WithCapture) {
-  absl::StatusOr<ParsedUrlPattern> pattern = ParseURLPatternSyntax(url_pattern());
+  absl::StatusOr<ParsedUrlPattern> pattern = parseURLPatternSyntax(url_pattern());
   ASSERT_OK(pattern);
 
-  RE2 regex = RE2(ToRegexPattern(pattern.value()));
+  RE2 regex = RE2(toRegexPattern(pattern.value()));
   ASSERT_TRUE(regex.ok()) << regex.error();
   ASSERT_EQ(regex.NumberOfCapturingGroups(), var_values().size());
 
@@ -426,7 +426,7 @@ TEST_P(GenPatternRegexWithMatch, WithCapture) {
                           /*endpos=*/request_path().size(), RE2::ANCHOR_BOTH, captures.data(),
                           captures.size()));
 
-  EXPECT_EQ(captures[0], ToStringPiece(request_path()));
+  EXPECT_EQ(captures[0], toStringPiece(request_path()));
 
   for (const auto& [name, value] : var_values()) {
     int capture_index = regex.NamedCapturingGroups().at(name);
@@ -452,10 +452,10 @@ INSTANTIATE_TEST_SUITE_P(GenPatternRegexWithoutMatchTestSuite, GenPatternRegexWi
                               {"/api/*/1234/", "/api/*/1234/"}})));
 
 TEST_P(GenPatternRegexWithoutMatch, WithCapture) {
-  absl::StatusOr<ParsedUrlPattern> pattern = ParseURLPatternSyntax(url_pattern());
+  absl::StatusOr<ParsedUrlPattern> pattern = parseURLPatternSyntax(url_pattern());
   ASSERT_OK(pattern);
 
-  RE2 regex = RE2(ToRegexPattern(pattern.value()));
+  RE2 regex = RE2(toRegexPattern(pattern.value()));
   ASSERT_TRUE(regex.ok()) << regex.error();
 
   EXPECT_FALSE(regex.Match(request_path(), /*startpos=*/0,

@@ -30,27 +30,27 @@ static constexpr absl::string_view kCaptureRegex = "/(?P<var1>[a-zA-Z0-9-._~%!$&
 static constexpr absl::string_view kMatchUrl = "/val1/val2/val3/val4/val5";
 
 TEST(ConvertURLPattern, ValidPattern) {
-  EXPECT_THAT(ConvertURLPatternSyntaxToRegex("/abc"), IsOkAndHolds("/abc"));
-  EXPECT_THAT(ConvertURLPatternSyntaxToRegex("/**.mpd"),
+  EXPECT_THAT(convertURLPatternSyntaxToRegex("/abc"), IsOkAndHolds("/abc"));
+  EXPECT_THAT(convertURLPatternSyntaxToRegex("/**.mpd"),
               IsOkAndHolds("/[a-zA-Z0-9-._~%!$&'()+,;:@/]*\\.mpd"));
-  EXPECT_THAT(ConvertURLPatternSyntaxToRegex("/api/*/{resource=*}/{method=**}"),
+  EXPECT_THAT(convertURLPatternSyntaxToRegex("/api/*/{resource=*}/{method=**}"),
               IsOkAndHolds("/api/[a-zA-Z0-9-._~%!$&'()+,;:@]+/"
                            "(?P<resource>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
                            "(?P<method>[a-zA-Z0-9-._~%!$&'()+,;:@/]*)"));
-  EXPECT_THAT(ConvertURLPatternSyntaxToRegex("/api/{VERSION}/{version}/{verSION}"),
+  EXPECT_THAT(convertURLPatternSyntaxToRegex("/api/{VERSION}/{version}/{verSION}"),
               IsOkAndHolds("/api/(?P<VERSION>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
                            "(?P<version>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
                            "(?P<verSION>[a-zA-Z0-9-._~%!$&'()+,;:@]+)"));
 }
 
 TEST(ConvertURLPattern, InvalidPattern) {
-  EXPECT_THAT(ConvertURLPatternSyntaxToRegex("/api/v*/1234"),
+  EXPECT_THAT(convertURLPatternSyntaxToRegex("/api/v*/1234"),
               StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(ConvertURLPatternSyntaxToRegex("/media/**/*/**"),
+  EXPECT_THAT(convertURLPatternSyntaxToRegex("/media/**/*/**"),
               StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(ConvertURLPatternSyntaxToRegex("/\001\002\003\004\005\006\007"),
+  EXPECT_THAT(convertURLPatternSyntaxToRegex("/\001\002\003\004\005\006\007"),
               StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(ConvertURLPatternSyntaxToRegex("/{var12345678901234=*}"),
+  EXPECT_THAT(convertURLPatternSyntaxToRegex("/{var12345678901234=*}"),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
@@ -65,7 +65,7 @@ TEST_P(ParseRewriteHelperSuccess, ParseRewriteHelperSuccessTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_OK(ParseRewritePatternHelper(pattern));
+  EXPECT_OK(parseRewritePatternHelper(pattern));
 }
 
 class ParseRewriteHelperFailure : public testing::TestWithParam<std::string> {};
@@ -78,7 +78,7 @@ TEST_P(ParseRewriteHelperFailure, ParseRewriteHelperFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_THAT(ParseRewritePatternHelper(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(parseRewritePatternHelper(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 class ParseRewriteSuccess : public testing::TestWithParam<std::pair<std::string, std::string>> {
@@ -92,7 +92,7 @@ protected:
 };
 
 TEST(ParseRewrite, InvalidRegex) {
-  EXPECT_THAT(ParseRewritePattern("/{var1}", "+[abc"), StatusIs(absl::StatusCode::kInternal));
+  EXPECT_THAT(parseRewritePattern("/{var1}", "+[abc"), StatusIs(absl::StatusCode::kInternal));
 }
 
 INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
@@ -146,7 +146,7 @@ INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
 
 TEST_P(ParseRewriteSuccess, ParseRewriteSuccessTest) {
   absl::StatusOr<envoy::config::route::v3::RouteUrlRewritePattern> rewrite =
-      ParseRewritePattern(rewrite_pattern(), kCaptureRegex);
+      parseRewritePattern(rewrite_pattern(), kCaptureRegex);
   ASSERT_OK(rewrite);
   // EXPECT_THAT(rewrite.value(), testing::EqualsProto(expected_proto()));
 }
@@ -161,7 +161,7 @@ TEST_P(ParseRewriteFailure, ParseRewriteFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_THAT(ParseRewritePattern(pattern, kCaptureRegex),
+  EXPECT_THAT(parseRewritePattern(pattern, kCaptureRegex),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
@@ -315,11 +315,11 @@ INSTANTIATE_TEST_SUITE_P(
           "/region/eu/bucket/prod-storage/object.pdf", "/euprod-storage/object.pdf"}})));
 
 TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
-  absl::StatusOr<std::string> regex = ConvertURLPatternSyntaxToRegex(url_pattern());
+  absl::StatusOr<std::string> regex = convertURLPatternSyntaxToRegex(url_pattern());
   ASSERT_OK(regex);
 
   absl::StatusOr<envoy::config::route::v3::RouteUrlRewritePattern> rewrite_proto =
-      ParseRewritePattern(rewrite_pattern(), regex.value());
+      parseRewritePattern(rewrite_pattern(), regex.value());
   ASSERT_OK(rewrite_proto);
 
   absl::StatusOr<std::string> rewritten_url =

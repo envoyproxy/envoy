@@ -41,11 +41,11 @@ struct ParsedUrlPattern {
   std::string DebugString() const;
 };
 
-bool IsValidLiteral(absl::string_view pattern);
+bool isValidLiteral(absl::string_view pattern);
 
-bool IsValidRewriteLiteral(absl::string_view pattern);
+bool isValidRewriteLiteral(absl::string_view pattern);
 
-bool IsValidIndent(absl::string_view pattern);
+bool isValidIndent(absl::string_view pattern);
 
 // Used by the following Consume{Literal.Operator,Variable} functions
 // in the return value. The functions would take the given pattern,
@@ -58,23 +58,23 @@ template <typename T> struct ParsedResult {
   absl::string_view unconsumed_pattern;
 };
 
-absl::StatusOr<ParsedResult<Literal>> ConsumeLiteral(absl::string_view pattern);
+absl::StatusOr<ParsedResult<Literal>> consumeLiteral(absl::string_view pattern);
 
-absl::StatusOr<ParsedResult<Operator>> ConsumeOperator(absl::string_view pattern);
+absl::StatusOr<ParsedResult<Operator>> consumeOperator(absl::string_view pattern);
 
-absl::StatusOr<ParsedResult<Variable>> ConsumeVariable(absl::string_view pattern);
+absl::StatusOr<ParsedResult<Variable>> consumeVariable(absl::string_view pattern);
 
-absl::StatusOr<ParsedUrlPattern> ParseURLPatternSyntax(absl::string_view url_pattern);
+absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pattern);
 
-std::string ToRegexPattern(Literal pattern);
+std::string toRegexPattern(Literal pattern);
 
-std::string ToRegexPattern(Operator pattern);
+std::string toRegexPattern(Operator pattern);
 
-std::string ToRegexPattern(const Variable& pattern);
+std::string toRegexPattern(const Variable& pattern);
 
-std::string ToRegexPattern(const struct ParsedUrlPattern& pattern);
+std::string toRegexPattern(const struct ParsedUrlPattern& pattern);
 
-inline re2::StringPiece ToStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
+inline re2::StringPiece toStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
 
 } // namespace url_template_matching_internal
 

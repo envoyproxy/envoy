@@ -26,24 +26,24 @@ using matching::url_template_matching_internal::ParsedUrlPattern;
 
 inline re2::StringPiece ToStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
 
-bool IsPatternMatch(absl::string_view pattern, absl::string_view capture_regex) {
+bool isPatternMatch(absl::string_view pattern, absl::string_view capture_regex) {
   RE2 regex = RE2(ToStringPiece(capture_regex));
   return RE2::FullMatch(ToStringPiece(pattern), regex);
 }
 
-absl::StatusOr<std::string> ConvertURLPatternSyntaxToRegex(absl::string_view url_pattern) {
+absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url_pattern) {
 
   absl::StatusOr<ParsedUrlPattern> status =
-      url_template_matching_internal::ParseURLPatternSyntax(url_pattern);
+      url_template_matching_internal::parseURLPatternSyntax(url_pattern);
   if (!status.ok()) {
     return status.status();
   }
   struct ParsedUrlPattern pattern = *std::move(status);
-  return url_template_matching_internal::ToRegexPattern(pattern);
+  return url_template_matching_internal::toRegexPattern(pattern);
 }
 
 absl::StatusOr<std::vector<RewritePatternSegment>>
-ParseRewritePatternHelper(absl::string_view pattern) {
+parseRewritePatternHelper(absl::string_view pattern) {
   std::vector<RewritePatternSegment> result;
 
   // Don't allow contiguous '/' patterns.
@@ -60,7 +60,7 @@ ParseRewritePatternHelper(absl::string_view pattern) {
   while (!pattern.empty()) {
     std::vector<absl::string_view> segments1 = absl::StrSplit(pattern, absl::MaxSplits('{', 1));
     if (!segments1[0].empty()) {
-      if (!url_template_matching_internal::IsValidRewriteLiteral(segments1[0])) {
+      if (!url_template_matching_internal::isValidRewriteLiteral(segments1[0])) {
         return absl::InvalidArgumentError("Invalid rewrite literal pattern");
       }
       result.emplace_back(segments1[0], RewriteStringKind::kLiteral);
@@ -78,7 +78,7 @@ ParseRewritePatternHelper(absl::string_view pattern) {
     }
     pattern = segments2[1];
 
-    if (!url_template_matching_internal::IsValidIndent(segments2[0])) {
+    if (!url_template_matching_internal::isValidIndent(segments2[0])) {
       return absl::InvalidArgumentError("Invalid variable name");
     }
     result.emplace_back(segments2[0], RewriteStringKind::kVariable);
@@ -87,14 +87,14 @@ ParseRewritePatternHelper(absl::string_view pattern) {
 }
 
 absl::StatusOr<envoy::config::route::v3::RouteUrlRewritePattern>
-ParseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) {
+parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) {
   envoy::config::route::v3::RouteUrlRewritePattern parsed_pattern;
   RE2 regex = RE2(ToStringPiece(capture_regex));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
   }
 
-  absl::StatusOr<std::vector<RewritePatternSegment>> status = ParseRewritePatternHelper(pattern);
+  absl::StatusOr<std::vector<RewritePatternSegment>> status = parseRewritePatternHelper(pattern);
   if (!status.ok()) {
     return status.status();
   }
@@ -153,16 +153,16 @@ RewriteURLTemplatePattern(absl::string_view url, absl::string_view capture_regex
 }
 
 bool IsValidPathTemplateMatchPattern(const std::string& path_template_match) {
-  return ConvertURLPatternSyntaxToRegex(path_template_match).ok();
+  return convertURLPatternSyntaxToRegex(path_template_match).ok();
 }
 
-bool IsValidPathTemplateRewritePattern(const std::string& path_template_rewrite) {
-  return ParseRewritePatternHelper(path_template_rewrite).ok();
+bool isValidPathTemplateRewritePattern(const std::string& path_template_rewrite) {
+  return parseRewritePatternHelper(path_template_rewrite).ok();
 }
 
-bool IsValidSharedVariableSet(const std::string& path_template_rewrite,
+bool isValidSharedVariableSet(const std::string& path_template_rewrite,
                               absl::string_view capture_regex) {
-  return ParseRewritePattern(path_template_rewrite, capture_regex).ok();
+  return parseRewritePattern(path_template_rewrite, capture_regex).ok();
 }
 
 } // namespace matching
