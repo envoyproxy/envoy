@@ -406,7 +406,7 @@ private:
 };
 
 // Wrapper around a connection to enable routing of requests from upstream to downstream
-class DownstreamConnectionInfoItem: public Logger::Loggable<Logger::Id::filter>, SipFilters::DecoderFilterCallbacks {
+class DownstreamConnectionInfoItem: public SipFilters::DecoderFilterCallbacks, Logger::Loggable<Logger::Id::filter> {
 public:
   DownstreamConnectionInfoItem(ConnectionManager& parent);
   ~DownstreamConnectionInfoItem() override = default;

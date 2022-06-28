@@ -616,12 +616,10 @@ void DownstreamConnectionInfos::init()  {
 }
 
 void DownstreamConnectionInfos::insertDownstreamConnection(std::string conn_id, ConnectionManager& conn_manager) {
-  //UNREFERENCED_PARAMETER(conn_manager);
-
   if (hasDownstreamConnection(conn_id)) {
     return;
   }
-  // Error here!
+  
   tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(std::make_pair(
       conn_id, std::make_shared<DownstreamConnectionInfoItem>(conn_manager)));
 }
