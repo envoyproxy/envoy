@@ -586,17 +586,18 @@ void ConnectionManager::ActiveTrans::resetDownstreamConnection() {
   parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
-DownstreamConnectionInfoItem::DownstreamConnectionInfoItem(ConnectionManager& parent)
+ConnectionManager::DownstreamConnectionInfoItem::DownstreamConnectionInfoItem(ConnectionManager& parent)
     : parent_(parent), stream_info_(parent.time_source_, parent.read_callbacks_->connection().connectionInfoProviderSharedPtr())  {}
 
 // // // SipFilters::DecoderFilterCallbacks
-const Network::Connection* DownstreamConnectionInfoItem::connection() const   { 
+const Network::Connection* 
+ConnectionManager::DownstreamConnectionInfoItem::connection() const   { 
   return &parent_.read_callbacks_->connection();
 }
 
-SipFilterStats& DownstreamConnectionInfoItem::stats() { return parent_.config_.stats(); }
+SipFilterStats& ConnectionManager::DownstreamConnectionInfoItem::stats() { return parent_.config_.stats(); }
 
-std::shared_ptr<SipSettings> DownstreamConnectionInfoItem::settings() const  { 
+std::shared_ptr<SipSettings> ConnectionManager::DownstreamConnectionInfoItem::settings() const  { 
   return parent_.config_.settings(); 
 }
 
@@ -621,7 +622,7 @@ void DownstreamConnectionInfos::insertDownstreamConnection(std::string conn_id, 
   }
   
   tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(std::make_pair(
-      conn_id, std::make_shared<DownstreamConnectionInfoItem>(conn_manager)));
+      conn_id, std::make_shared<ConnectionManager::DownstreamConnectionInfoItem>(conn_manager)));
 }
 
 size_t DownstreamConnectionInfos::size() {

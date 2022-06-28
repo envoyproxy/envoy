@@ -161,7 +161,7 @@ public:
 
 private:
   friend class SipConnectionManagerTest;
-  friend class DownstreamConnectionInfoItem; // maybe Try to make DownstreamConnectionInfoItem a private inner class, once other issues are sorted
+  friend class DownstreamConnectionInfos; // Needs to access DownstreamConnectionInfoItem private inner class
 
   struct ActiveTrans;
 
@@ -375,6 +375,85 @@ private:
     std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   };
 
+  // Wrapper around a connection to enable routing of requests from upstream to downstream
+  class DownstreamConnectionInfoItem: public SipFilters::DecoderFilterCallbacks, Logger::Loggable<Logger::Id::filter> {
+  public:
+    DownstreamConnectionInfoItem(ConnectionManager& parent);
+    ~DownstreamConnectionInfoItem() override = default;
+
+    // // // SipFilters::DecoderFilterCallbacks
+    const Network::Connection* connection() const override;
+    SipFilterStats& stats() override;
+    std::shared_ptr<SipSettings> settings() const override;
+
+    uint64_t streamId() const override { return 0; }
+    std::string transactionId() const override { return ""; }
+    IngressID ingressID() override { return IngressID{"", ""}; } 
+
+    Router::RouteConstSharedPtr route() override {
+      return nullptr;
+    }
+
+    void sendLocalReply(const DirectResponse& response, bool end_stream) override {
+      UNREFERENCED_PARAMETER(response);
+      UNREFERENCED_PARAMETER(end_stream);
+    }
+
+    void startUpstreamResponse() override { };
+
+    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata) override { 
+      UNREFERENCED_PARAMETER(metadata);
+      return SipFilters::ResponseStatus::Complete;
+    };
+
+    void resetDownstreamConnection() override { };
+
+    StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+
+    std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
+      return nullptr;
+    }
+    std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
+      return nullptr;
+    }
+    
+    void onReset() override {};
+
+    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
+      return nullptr;
+    }
+
+    void continueHandling(const std::string& key, bool try_next_affinity) override {
+      UNREFERENCED_PARAMETER(key);
+      UNREFERENCED_PARAMETER(try_next_affinity);  
+    }
+
+    MessageMetadataSharedPtr metadata() override { return nullptr; };
+
+    // SipFilters::PendingListHandler
+    void pushIntoPendingList(const std::string& type, const std::string& key,
+                                    SipFilters::DecoderFilterCallbacks& activetrans,
+                                    std::function<void(void)> func) override {
+      UNREFERENCED_PARAMETER(type);
+      UNREFERENCED_PARAMETER(key);
+      UNREFERENCED_PARAMETER(activetrans);
+      UNREFERENCED_PARAMETER(func);
+    }
+    void onResponseHandleForPendingList(
+        const std::string& type, const std::string& key,
+        std::function<void(MessageMetadataSharedPtr, DecoderEventHandler&)> func) override {
+      UNREFERENCED_PARAMETER(type);
+      UNREFERENCED_PARAMETER(key);
+      UNREFERENCED_PARAMETER(func);
+    }
+    void eraseActiveTransFromPendingList(std::string& transaction_id) override {
+      UNREFERENCED_PARAMETER(transaction_id);
+    }
+  private:
+    ConnectionManager& parent_;
+    StreamInfo::StreamInfoImpl stream_info_;
+  };
+
   using ActiveTransPtr = std::unique_ptr<ActiveTrans>;
 
   void dispatch();
@@ -403,85 +482,6 @@ private:
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos_;
   PendingList pending_list_;
-};
-
-// Wrapper around a connection to enable routing of requests from upstream to downstream
-class DownstreamConnectionInfoItem: public SipFilters::DecoderFilterCallbacks, Logger::Loggable<Logger::Id::filter> {
-public:
-  DownstreamConnectionInfoItem(ConnectionManager& parent);
-  ~DownstreamConnectionInfoItem() override = default;
-
-  // // // SipFilters::DecoderFilterCallbacks
-  const Network::Connection* connection() const override;
-  SipFilterStats& stats() override;
-  std::shared_ptr<SipSettings> settings() const override;
-
-  uint64_t streamId() const override { return 0; }
-  std::string transactionId() const override { return ""; }
-  IngressID ingressID() override { return IngressID{"", ""}; } 
-
-  Router::RouteConstSharedPtr route() override {
-    return nullptr;
-  }
-
-  void sendLocalReply(const DirectResponse& response, bool end_stream) override {
-    UNREFERENCED_PARAMETER(response);
-    UNREFERENCED_PARAMETER(end_stream);
-  }
-
-  void startUpstreamResponse() override { };
-
-  SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata) override { 
-    UNREFERENCED_PARAMETER(metadata);
-    return SipFilters::ResponseStatus::Complete;
-  };
-
-  void resetDownstreamConnection() override { };
-
-  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
-
-  std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
-    return nullptr;
-  }
-  std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
-    return nullptr;
-  }
-  
-  void onReset() override {};
-
-  std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
-    return nullptr;
-  }
-
-  void continueHandling(const std::string& key, bool try_next_affinity) override {
-    UNREFERENCED_PARAMETER(key);
-    UNREFERENCED_PARAMETER(try_next_affinity);  
-  }
-
-  MessageMetadataSharedPtr metadata() override { return nullptr; };
-
-  // SipFilters::PendingListHandler
-  void pushIntoPendingList(const std::string& type, const std::string& key,
-                                   SipFilters::DecoderFilterCallbacks& activetrans,
-                                   std::function<void(void)> func) override {
-    UNREFERENCED_PARAMETER(type);
-    UNREFERENCED_PARAMETER(key);
-    UNREFERENCED_PARAMETER(activetrans);
-    UNREFERENCED_PARAMETER(func);
-  }
-  void onResponseHandleForPendingList(
-      const std::string& type, const std::string& key,
-      std::function<void(MessageMetadataSharedPtr, DecoderEventHandler&)> func) override {
-    UNREFERENCED_PARAMETER(type);
-    UNREFERENCED_PARAMETER(key);
-    UNREFERENCED_PARAMETER(func);
-  }
-  void eraseActiveTransFromPendingList(std::string& transaction_id) override {
-    UNREFERENCED_PARAMETER(transaction_id);
-  }
-private:
-  ConnectionManager& parent_;
-  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 class DownstreamConnectionInfos: public std::enable_shared_from_this<DownstreamConnectionInfos>, Logger::Loggable<Logger::Id::connection> {
