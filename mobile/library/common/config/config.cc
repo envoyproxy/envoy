@@ -78,16 +78,16 @@ const char* brotli_config_insert = R"(
 // clang-format off
 const std::string config_header = R"(
 !ignore default_defs:
-- &android_force_ipv6 false
 - &connect_timeout 30s
 - &dns_fail_base_interval 2s
 - &dns_fail_max_interval 10s
-- &dns_query_timeout 25s
 - &dns_lookup_family ALL
 - &dns_min_refresh_rate 60s
 - &dns_multiple_addresses true
 - &dns_preresolve_hostnames []
+- &dns_query_timeout 25s
 - &dns_refresh_rate 60s
+- &force_ipv6 false
 )"
 #if defined(__APPLE__)
 R"(- &dns_resolver_name envoy.network.dns_resolver.apple
@@ -514,7 +514,7 @@ layered_runtime:
           disallow_global_stats: true
           reloadable_features:
             allow_multiple_dns_addresses: *dns_multiple_addresses
-            android_always_use_v6: *android_force_ipv6
+            always_use_v6: *force_ipv6
             http2_delay_keepalive_timeout: *h2_delay_keepalive_timeout
 )"
 // Needed due to warning in

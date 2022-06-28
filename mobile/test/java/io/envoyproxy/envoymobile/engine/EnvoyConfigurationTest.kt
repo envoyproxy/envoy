@@ -142,7 +142,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&enable_interface_binding false")
 
     // Forcing IPv6
-    assertThat(resolvedTemplate).contains("&android_force_ipv6 false")
+    assertThat(resolvedTemplate).contains("&force_ipv6 false")
 
     // H2 Ping
     assertThat(resolvedTemplate).contains("&h2_connection_keepalive_idle_interval 0.222s")
@@ -227,7 +227,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&enable_interface_binding true")
 
     // Forcing IPv6
-    assertThat(resolvedTemplate).contains("&android_force_ipv6 true")
+    assertThat(resolvedTemplate).contains("&force_ipv6 true")
   }
 
   @Test

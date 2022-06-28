@@ -28,6 +28,7 @@ open class EngineBuilder: NSObject {
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enableDrainPostDnsRefresh: Bool = false
+  private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
   private var h2ExtendKeepaliveTimeout: Bool = false
@@ -225,6 +226,18 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enforceTrustChainVerification(_ enforceTrustChainVerification: Bool) -> Self {
     self.enforceTrustChainVerification = enforceTrustChainVerification
+    return self
+  }
+
+  /// Specify whether to remap IPv4 addresses to the IPv6 space and always force connections
+  /// to use IPv6. Note this is an experimental option and should be enabled with caution.
+  ///
+  /// - parameter forceIPv6: whether to force connections to use IPv6.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func forceIPv6(_ forceIPv6: Bool) -> Self {
+    self.forceIPv6 = forceIPv6
     return self
   }
 
@@ -506,6 +519,7 @@ open class EngineBuilder: NSObject {
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
+      forceIPv6: self.forceIPv6,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
