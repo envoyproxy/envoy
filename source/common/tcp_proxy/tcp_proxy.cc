@@ -79,10 +79,12 @@ Config::SharedConfig::SharedConfig(
     idle_timeout_ = std::chrono::hours(1);
   }
   if (config.has_tunneling_config()) {
-    envoy::config::core::v3::SubstitutionFormatString sfs;
-    sfs.mutable_text_format_source()->set_inline_string(config.tunneling_config().hostname());
+    envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
+    substitution_format_config.mutable_text_format_source()->set_inline_string(
+        config.tunneling_config().hostname());
     Formatter::FormatterPtr hostname_fmt =
-        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sfs, context);
+        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(substitution_format_config,
+                                                                  context);
     tunneling_config_helper_ = std::make_unique<TunnelingConfigHelperImpl>(
         config.tunneling_config(), std::move(hostname_fmt));
   }

@@ -42,10 +42,12 @@ public:
   }
 
   void setupUpstream() {
-    envoy::config::core::v3::SubstitutionFormatString sfs;
-    sfs.mutable_text_format_source()->set_inline_string(config_message_.hostname());
+    envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
+    substitution_format_config.mutable_text_format_source()->set_inline_string(
+        config_message_.hostname());
     Formatter::FormatterPtr hostname_fmt =
-        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sfs, context_);
+        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(substitution_format_config,
+                                                                  context_);
     config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_, std::move(hostname_fmt));
     upstream_ = std::make_unique<T>(callbacks_, *this->config_, downstream_stream_info_);
     upstream_->setRequestEncoder(encoder_, true);
@@ -215,10 +217,12 @@ public:
   }
 
   void setupUpstream() {
-    envoy::config::core::v3::SubstitutionFormatString sfs;
-    sfs.mutable_text_format_source()->set_inline_string(config_message_.hostname());
+    envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
+    substitution_format_config.mutable_text_format_source()->set_inline_string(
+        config_message_.hostname());
     Formatter::FormatterPtr hostname_fmt =
-        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sfs, context_);
+        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(substitution_format_config,
+                                                                  context_);
     config_ = std::make_unique<TunnelingConfigHelperImpl>(config_message_, std::move(hostname_fmt));
     upstream_ = std::make_unique<T>(callbacks_, *this->config_, this->downstream_stream_info_);
   }
