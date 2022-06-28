@@ -750,7 +750,8 @@ class ProtoFormatVisitor(visitor.Visitor):
 class ProtoprintTraverser:
 
     def traverse_file(self, file_proto, visitor):
-        # This breaks the Visitor contract, ie class props should not be set on individual visitation.
+        # TODO(phlax): Figure out how to pass this to visitors
+        #   This currently breaks the Visitor contract, ie class props should not be set on individual visitation.
         visitor._frozen_proto = (
             file_proto.options.Extensions[status_pb2.file_status].package_version_status ==
             status_pb2.FROZEN)
