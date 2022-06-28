@@ -87,6 +87,20 @@ message GrpcJsonTranscoder {
     // :ref:`ignored_query_parameters <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignored_query_parameters>`
     // have priority over this strict validation behavior.
     bool reject_unknown_query_parameters = 2;
+
+    // By default, transcoding will default to the value in the body if there
+    // are conflict values in the bindings. For example,
+    //
+    // post: '/resources/a?id=123'
+    // body: {
+    //         id: 456,
+    // }
+
+    // "id: 456" in the body will override "id=123" in the binding.
+    //
+    // If this field is set to true, the request will be rejected if the binding
+    // value is different from the body value.
+    bool reject_binding_body_field_collisions = 3;
   }
 
   oneof descriptor_set {
