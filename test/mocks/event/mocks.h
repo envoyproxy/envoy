@@ -56,7 +56,7 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options,
-                         Network::TransportSocketOptionsConstSharedPtr = nullptr) override {
+                         const Network::TransportSocketOptionsConstSharedPtr& = nullptr) override {
     return Network::ClientConnectionPtr{
         createClientConnection_(address, source_address, transport_socket, options)};
   }

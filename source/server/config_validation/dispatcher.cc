@@ -11,10 +11,10 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
     Network::Address::InstanceConstSharedPtr source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsConstSharedPtr transport_options) {
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options) {
   return std::make_unique<Network::ConfigValidateConnection>(*this, remote_address, source_address,
                                                              std::move(transport_socket), options,
-                                                             std::move(transport_options));
+                                                             transport_options);
 }
 
 Network::ListenerPtr ValidationDispatcher::createListener(Network::SocketSharedPtr&&,

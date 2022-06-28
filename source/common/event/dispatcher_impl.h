@@ -71,7 +71,7 @@ public:
       Network::Address::InstanceConstSharedPtr source_address,
       Network::TransportSocketPtr&& transport_socket,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
-      Network::TransportSocketOptionsConstSharedPtr transport_options = nullptr) override;
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options = nullptr) override;
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;

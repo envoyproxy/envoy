@@ -116,6 +116,10 @@ minor_behavior_changes:
 - area: logging
   change: |
     changed category name for access log filter extensions to ``envoy.access_loggers.extension_filters``.
+- area: filter state
+  change: |
+    revert to respecting the life time of the filter state objects to be bound to the original stream and make sharing
+    filter state objects with the upstream explicit via a flag.
 
 bug_fixes:
 - area: http

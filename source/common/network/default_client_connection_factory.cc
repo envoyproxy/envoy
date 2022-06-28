@@ -14,7 +14,7 @@ Network::ClientConnectionPtr DefaultClientConnectionFactory::createClientConnect
     Network::Address::InstanceConstSharedPtr source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsConstSharedPtr transport_options) {
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options) {
   ASSERT(address->ip() || address->pipe());
   return std::make_unique<Network::ClientConnectionImpl>(
       dispatcher, address, source_address, std::move(transport_socket), options, transport_options);

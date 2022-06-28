@@ -160,7 +160,7 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
     Network::Address::InstanceConstSharedPtr source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsConstSharedPtr transport_options) {
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options) {
   ASSERT(isThreadSafe());
 
   auto* factory = Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(
@@ -171,8 +171,7 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
   // expects a non-null connection as of today so we cannot gracefully handle unsupported address
   // type.
   return factory->createClientConnection(*this, address, source_address,
-                                         std::move(transport_socket), options,
-                                         std::move(transport_options));
+                                         std::move(transport_socket), options, transport_options);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

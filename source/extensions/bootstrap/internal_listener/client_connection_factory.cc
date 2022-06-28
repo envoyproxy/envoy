@@ -21,7 +21,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
     Network::Address::InstanceConstSharedPtr source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsConstSharedPtr transport_options) {
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options) {
   // OS does not fill the address automatically so a pivotal address is populated.
   // TODO(lambdai): provide option to fill the downstream remote address here.
   if (source_address == nullptr) {

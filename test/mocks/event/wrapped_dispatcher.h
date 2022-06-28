@@ -46,7 +46,7 @@ public:
       Network::Address::InstanceConstSharedPtr source_address,
       Network::TransportSocketPtr&& transport_socket,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
-      Network::TransportSocketOptionsConstSharedPtr transport_options = nullptr) override {
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options = nullptr) override {
     return impl_.createClientConnection(std::move(address), std::move(source_address),
                                         std::move(transport_socket), options, transport_options);
   }
