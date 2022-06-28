@@ -99,6 +99,8 @@ void UberFilterFuzzer::fuzz(
     // If we were successful, run any pending events on the main thread's dispatcher loop. These
     // might be, for example, pending DNS resolution callbacks. If they generate exceptions, we want
     // to explode and fail the test, hence we do this outside of the try-catch above.
+    // TODO(ravenblackx): this can potentially exit the loop without the filter having completed.
+    // We should detect stream completion rather than just running one round of dispatcher.
     main_dispatcher_->run(Event::DispatcherImpl::RunType::Block);
   }
   reset();
