@@ -104,6 +104,8 @@ public:
   // Stats prefix for the Ratelimit network filter
   const std::string RATELIMIT_PREFIX = "envoy.ratelimit_prefix";
   // Stats prefix for the Local Ratelimit network filter
+  const std::string LOCAL_HTTP_RATELIMIT_PREFIX = "envoy.local_http_ratelimit_prefix";
+  // Stats prefix for the Local Ratelimit network filter
   const std::string LOCAL_RATELIMIT_PREFIX = "envoy.local_ratelimit_prefix";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
