@@ -102,7 +102,7 @@ open class EngineBuilder: NSObject {
   /// Add a rate at which to refresh DNS in case of DNS failure.
   ///
   /// - parameter base: Base rate in seconds.
-  /// - parameter max: Max rate in seconds.
+  /// - parameter max:  Max rate in seconds.
   ///
   /// - returns: This builder.
   @discardableResult
@@ -304,7 +304,7 @@ open class EngineBuilder: NSObject {
 
   /// Add a custom idle timeout for HTTP streams. Defaults to 15 seconds.
   ///
-  /// - parameter streamIdleSeconds: Idle timeout for HTTP streams.
+  /// - parameter streamIdleTimeoutSeconds: Idle timeout for HTTP streams.
   ///
   /// - returns: This builder.
   @discardableResult
@@ -315,7 +315,7 @@ open class EngineBuilder: NSObject {
 
   /// Add a custom per try idle timeout for HTTP streams. Defaults to 15 seconds.
   ///
-  /// - parameter perTryIdleSeconds: Idle timeout for HTTP streams.
+  /// - parameter perTryIdleTimeoutSeconds: Idle timeout for HTTP streams.
   ///
   /// - returns: This builder.
   @discardableResult
@@ -370,7 +370,7 @@ open class EngineBuilder: NSObject {
 
   /// Add a string accessor to this Envoy Client.
   ///
-  /// - parameter name: the name of the accessor.
+  /// - parameter name:     the name of the accessor.
   /// - parameter accessor: lambda to access a string from the platform layer.
   ///
   /// - returns: This builder.
@@ -382,7 +382,7 @@ open class EngineBuilder: NSObject {
 
   /// Register a key-value store implementation for internal use.
   ///
-  /// - parameter name: the name of the KV store.
+  /// - parameter name:          the name of the KV store.
   /// - parameter keyValueStore: the KV store implementation.
   ///
   /// - returns: This builder.
@@ -427,6 +427,8 @@ open class EngineBuilder: NSObject {
 
   /// Configure how the engine observes network reachability state changes.
   /// Defaults to `.pathMonitor`.
+  ///
+  /// - parameter mode: The mode to use.
   ///
   /// - returns: This builder.
   @discardableResult
@@ -481,6 +483,9 @@ open class EngineBuilder: NSObject {
 
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
+  /// - note: Must be strongly retained in order for network requests to be performed correctly.
+  ///
+  /// - returns: The built `Engine`.
   public func build() -> Engine {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
                                       eventTracker: self.eventTracker,
@@ -539,6 +544,11 @@ open class EngineBuilder: NSObject {
   /// A new instance of this engine will be created when `build()` is called.
   /// Used for testing, as initializing with `EnvoyEngine.Type` results in a
   /// segfault: https://github.com/envoyproxy/envoy-mobile/issues/334
+  ///
+  /// - parameter engineType: The specific implementation of `EnvoyEngine` to use for starting
+  ///                         Envoy.
+  ///
+  /// - returns: This builder.
   @discardableResult
   func addEngineType(_ engineType: EnvoyEngine.Type) -> Self {
     self.engineType = engineType

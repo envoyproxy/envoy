@@ -35,6 +35,8 @@ extension RetryPolicy {
   /// Initialize the retry policy from a set of headers.
   ///
   /// - parameter headers: The headers with which to initialize the retry policy.
+  ///
+  /// - returns: The `RetryPolicy` if one was derived from the headers.
   static func from(headers: Headers) -> RetryPolicy? {
     guard let maxRetryCount = headers.value(forName: "x-envoy-max-retries")?
       .first.flatMap(UInt.init) else
