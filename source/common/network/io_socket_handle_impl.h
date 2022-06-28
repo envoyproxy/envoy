@@ -18,7 +18,8 @@ namespace Network {
 class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
   /**
-   * Check whether we are configured via runtime to always use v6 sockets.
+   * Check whether we are a) on Android or an Apple platform and b) configured via runtime to always
+   * use v6 sockets.
    * This appears to be what Android OS does for all platform sockets.
    */
   static bool forceV6();

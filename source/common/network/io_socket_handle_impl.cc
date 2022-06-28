@@ -65,11 +65,10 @@ constexpr int messageTruncatedOption() {
 namespace Network {
 
 bool IoSocketHandleImpl::forceV6() {
-#ifndef __ANDROID_API__
+#if defined(__APPLE__) || defined(__ANDROID_API__)
   return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_use_v6");
 #else
-  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_use_v6") ||
-         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.android_always_use_v6");
+  return false;
 #endif
 }
 
@@ -478,6 +477,7 @@ IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
   auto sockaddr_to_use = address->sockAddr();
   auto sockaddr_len_to_use = address->sockAddrLen();
+#if defined(__APPLE__) || defined(__ANDROID_API__)
   sockaddr_in6 sin6;
   if (sockaddr_to_use->sa_family == AF_INET && forceV6()) {
     const sockaddr_in& sin4 = reinterpret_cast<const sockaddr_in&>(*sockaddr_to_use);
@@ -487,13 +487,19 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
     memset(&sin6, 0, sizeof(sin6));
     sin6.sin6_family = AF_INET6;
     sin6.sin6_port = sin4.sin_port;
+#if defined(__ANDROID_API__)
+    sin6.sin6_addr.s6_addr32[2] = htonl(0xffff);
+    sin6.sin6_addr.s6_addr32[3] = sin4.sin_addr.s_addr;
+#elif defined(__APPLE__)
     sin6.sin6_addr.__u6_addr.__u6_addr32[2] = htonl(0xffff);
     sin6.sin6_addr.__u6_addr.__u6_addr32[3] = sin4.sin_addr.s_addr;
+#endif
     ASSERT(IN6_IS_ADDR_V4MAPPED(&sin6.sin6_addr));
 
     sockaddr_to_use = reinterpret_cast<sockaddr*>(&sin6);
     sockaddr_len_to_use = sizeof(sin6);
   }
+#endif
 
   return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
 }
