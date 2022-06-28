@@ -336,17 +336,11 @@ TEST_F(FileSystemBufferFilterTest,
   EXPECT_EQ(response_sent_on_, "");
   expectAsyncFileCreated();
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data2, false));
-  std::cout << "A" << std::endl;
   auto handle = completeCreateFileAndExpectWrite("wor");
-  std::cout << "B" << std::endl;
   expectWriteWithPosition(handle, "ld", 3);
-  std::cout << "C" << std::endl;
   completeWriteOfSize(3); // "wor"
-  std::cout << "D" << std::endl;
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data3, true));
-  std::cout << "E" << std::endl;
   completeWriteOfSize(2); // "ld"
-  std::cout << "F" << std::endl;
   EXPECT_EQ(response_sent_on_, "");
   expectRead(handle, 0, 3); // "wor"
   sendResponseLowWatermark();
