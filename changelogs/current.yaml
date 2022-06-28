@@ -102,6 +102,11 @@ minor_behavior_changes:
 - area: logging
   change: |
     changed flag ``--log-format-escaped`` to only log one trailing newline per log line.
+- area: http
+  change: |
+    header invert match rule will apply when the header is not present and the header match rule is not present type.
+    This behavior change can be reverted by setting runtim guard
+    ``envoy.reloadable_features.apply_invert_match_when_header_is_not_present`` to false.
 
 bug_fixes:
 - area: http
