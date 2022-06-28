@@ -18,7 +18,7 @@ def generate_compilation_database(args):
     ]
 
     source_dir_targets = args.bazel_targets
-    if args.no_contrib:
+    if args.exclude_contrib:
         source_dir_targets.remove("//contrib/...")
 
     subprocess.check_call([args.bazel, "build"] + bazel_options + [
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     parser.add_argument('--include_headers', action='store_true')
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument('--include_all', action='store_true')
-    parser.add_argument('--no_contrib', action='store_true')
+    parser.add_argument('--exclude_contrib', action='store_true')
     parser.add_argument('--bazel', default='bazel')
     parser.add_argument(
         'bazel_targets', nargs='*', default=[
