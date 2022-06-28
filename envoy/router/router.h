@@ -53,9 +53,11 @@ public:
    * example, adding or removing headers. This should only be called ONCE immediately after
    * obtaining the initial response headers.
    * @param headers supplies the response headers, which may be modified during this call.
+   * @param request_headers request headers to be used in manipulation of the response headers.
    * @param stream_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                                       const Http::RequestHeaderMap& request_headers,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**

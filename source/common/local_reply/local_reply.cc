@@ -26,11 +26,12 @@ public:
                 Server::Configuration::CommonFactoryContext& context)
       : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, context)),
         content_type_(
-            !config.content_type().empty() ? config.content_type()
-            : config.format_case() ==
-                    envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
-                ? Http::Headers::get().ContentTypeValues.Json
-                : Http::Headers::get().ContentTypeValues.Text) {}
+            !config.content_type().empty()
+                ? config.content_type()
+                : config.format_case() ==
+                          envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
+                      ? Http::Headers::get().ContentTypeValues.Json
+                      : Http::Headers::get().ContentTypeValues.Text) {}
 
   void format(const Http::RequestHeaderMap& request_headers,
               const Http::ResponseHeaderMap& response_headers,
@@ -88,7 +89,8 @@ public:
       body = body_.value();
     }
 
-    header_parser_->evaluateHeaders(response_headers, stream_info);
+    header_parser_->evaluateHeaders(response_headers, request_headers, response_headers,
+                                    stream_info);
 
     if (status_code_.has_value() && code != status_code_.value()) {
       code = status_code_.value();

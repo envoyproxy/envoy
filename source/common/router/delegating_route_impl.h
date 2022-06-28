@@ -63,6 +63,7 @@ public:
 
   // Router::ResponseEntry
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                               const Http::RequestHeaderMap& request_headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;

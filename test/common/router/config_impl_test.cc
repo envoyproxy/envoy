@@ -1727,7 +1727,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
           genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestResponseHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers, stream_info);
+      route->finalizeResponseHeaders(headers, req_headers, stream_info);
       EXPECT_EQ("route-override", headers.get_("x-global-header1"));
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-override", headers.get_("x-route-header"));
@@ -1750,7 +1750,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
       Http::TestRequestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestResponseHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers, stream_info);
+      route->finalizeResponseHeaders(headers, req_headers, stream_info);
       EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
@@ -1773,7 +1773,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
           genHeaders("www-staging.lyft.net", "/foo", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestResponseHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers, stream_info);
+      route->finalizeResponseHeaders(headers, req_headers, stream_info);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
@@ -1792,7 +1792,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
       Http::TestRequestHeaderMapImpl req_headers = genHeaders("api.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
       Http::TestResponseHeaderMapImpl headers;
-      route->finalizeResponseHeaders(headers, stream_info);
+      route->finalizeResponseHeaders(headers, req_headers, stream_info);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       auto transforms = route->responseHeaderTransforms(stream_info);
       EXPECT_THAT(transforms.headers_to_append,
@@ -1817,7 +1817,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
       genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
   const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
   Http::TestResponseHeaderMapImpl headers;
-  route->finalizeResponseHeaders(headers, stream_info);
+  route->finalizeResponseHeaders(headers, req_headers, stream_info);
   EXPECT_EQ("global1", headers.get_("x-global-header1"));
   EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
   EXPECT_EQ("route-override", headers.get_("x-route-header"));
@@ -1845,7 +1845,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
       genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
   const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
   Http::TestResponseHeaderMapImpl headers;
-  route->finalizeResponseHeaders(headers, stream_info);
+  route->finalizeResponseHeaders(headers, req_headers, stream_info);
   EXPECT_EQ("route-override", headers.get_("x-global-header1"));
   EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
   EXPECT_EQ("route-override", headers.get_("x-route-header"));
@@ -1902,7 +1902,7 @@ protected:
         genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
     const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
     Http::TestResponseHeaderMapImpl headers;
-    route->finalizeResponseHeaders(headers, stream_info);
+    route->finalizeResponseHeaders(headers, req_headers, stream_info);
 
     auto transforms = run_request_header_test
                           ? route->requestHeaderTransforms(stream_info, /*do_formatting=*/true)
@@ -1956,7 +1956,7 @@ most_specific_header_mutations_wins: true
     Http::TestRequestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/cacheable", "GET");
     const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
     Http::TestResponseHeaderMapImpl headers;
-    route->finalizeResponseHeaders(headers, stream_info);
+    route->finalizeResponseHeaders(headers, req_headers, stream_info);
     EXPECT_FALSE(headers.has("cache-control"));
   }
 
@@ -1964,7 +1964,7 @@ most_specific_header_mutations_wins: true
     Http::TestRequestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/foo", "GET");
     const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
     Http::TestResponseHeaderMapImpl headers;
-    route->finalizeResponseHeaders(headers, stream_info);
+    route->finalizeResponseHeaders(headers, req_headers, stream_info);
     EXPECT_EQ("private", headers.get_("cache-control"));
   }
 }
@@ -5875,7 +5875,7 @@ virtual_hosts:
 
     Http::TestResponseHeaderMapImpl response_headers;
     StreamInfo::MockStreamInfo stream_info;
-    route_entry->finalizeResponseHeaders(response_headers, stream_info);
+    route_entry->finalizeResponseHeaders(response_headers, headers, stream_info);
     EXPECT_EQ(response_headers, Http::TestResponseHeaderMapImpl{});
   }
 
@@ -6239,7 +6239,7 @@ virtual_hosts:
     EXPECT_EQ("cluster1", headers.get_("x-req-cluster"));
     EXPECT_EQ("new_host1", headers.getHostValue());
 
-    route->finalizeResponseHeaders(resp_headers, stream_info);
+    route->finalizeResponseHeaders(resp_headers, headers, stream_info);
     EXPECT_EQ("cluster1", resp_headers.get_("x-resp-cluster"));
     EXPECT_FALSE(resp_headers.has("x-remove-cluster1"));
   }
@@ -6253,7 +6253,7 @@ virtual_hosts:
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("cluster2", headers.get_("x-req-cluster"));
 
-    route->finalizeResponseHeaders(resp_headers, stream_info);
+    route->finalizeResponseHeaders(resp_headers, headers, stream_info);
     EXPECT_EQ("cluster2", resp_headers.get_("x-resp-cluster"));
     EXPECT_FALSE(resp_headers.has("x-remove-cluster2"));
   }
@@ -6941,11 +6941,17 @@ request_headers_to_add:
     value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
-      "Invalid header configuration. Un-terminated variable expression "
-      "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+        EnvoyException,
+        "Invalid header configuration. Un-terminated variable expression "
+        "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
+  } else {
+    EXPECT_THROW(
+        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+        EnvoyException);
+  }
 }
 
 TEST(MetadataMatchCriteriaImpl, Create) {

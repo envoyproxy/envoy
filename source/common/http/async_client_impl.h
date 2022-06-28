@@ -214,7 +214,7 @@ private:
                                                    bool) const override {
       return {};
     }
-    void finalizeResponseHeaders(Http::ResponseHeaderMap&,
+    void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
                                                     bool) const override {

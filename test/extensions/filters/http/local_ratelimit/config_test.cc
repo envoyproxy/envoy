@@ -277,6 +277,41 @@ descriptors:
                EnvoyException);
 }
 
+TEST(Factory, NonexistingHeaderFormatter) {
+  const std::string config_yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: 1
+  tokens_per_fill: 1
+  fill_interval: 1000s
+filter_enabled:
+  runtime_key: test_enabled
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+filter_enforced:
+  runtime_key: test_enforced
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+response_headers_to_add:
+  - header:
+      key: original-req-id
+      value: '%WRONG_FORMATTER(x-request-id)%'
+  )";
+
+  LocalRateLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_CALL(context.dispatcher_, createTimer_(_));
+  EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                       ProtobufMessage::getNullValidationVisitor()),
+               EnvoyException);
+}
+
 } // namespace LocalRateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions

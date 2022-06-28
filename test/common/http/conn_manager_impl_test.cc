@@ -1111,7 +1111,8 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
 
         // Coverage for finalizeResponseHeaders
         Http::TestResponseHeaderMapImpl test_resp_headers;
-        delegating_route_foo->routeEntry()->finalizeResponseHeaders(test_resp_headers, stream_info);
+        delegating_route_foo->routeEntry()->finalizeResponseHeaders(test_resp_headers,
+                                                                    test_req_headers, stream_info);
         EXPECT_EQ(test_resp_headers, Http::TestResponseHeaderMapImpl{});
 
         return FilterHeadersStatus::StopIteration;

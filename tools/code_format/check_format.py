@@ -90,7 +90,8 @@ STD_REGEX_ALLOWLIST = (
     "./source/server/admin/utils.cc", "./source/server/admin/stats_params.h",
     "./source/server/admin/stats_request.cc", "./source/server/admin/prometheus_stats.h",
     "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
-    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/version/version.cc")
+    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/version/version.cc",
+    "./source/common/router/header_parser_utils.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")

@@ -81,7 +81,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
                                                // going to invoke check call.
   cluster_ = decoder_callbacks_->clusterInfo();
   initiating_call_ = true;
-  client_->check(*this, check_request_, decoder_callbacks_->activeSpan(),
+  client_->check(*this, check_request_, decoder_callbacks_->activeSpan(), headers,
                  decoder_callbacks_->streamInfo());
   initiating_call_ = false;
 }
@@ -380,7 +380,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         StreamInfo::ResponseFlag::UnauthorizedExternalService);
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [&headers = response->headers_to_set,
+        [& headers = response->headers_to_set,
          &callbacks = *decoder_callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);

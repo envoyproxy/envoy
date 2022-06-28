@@ -130,7 +130,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   config->stats().rate_limited_.inc();
 
   if (!config->enforced()) {
-    config->requestHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
+    config->requestHeadersParser().evaluateHeaders(
+        headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
+        decoder_callbacks_->streamInfo());
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -138,8 +140,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   decoder_callbacks_->sendLocalReply(
       config->status(), "local_rate_limited",
-      [this, config](Http::HeaderMap& headers) {
-        config->responseHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
+      [this, &headers, config](Http::HeaderMap& response_headers) {
+        config->responseHeadersParser().evaluateHeaders(
+            response_headers, headers, *Http::StaticEmptyHeaders::get().response_headers,
+            decoder_callbacks_->streamInfo());
       },
       absl::nullopt, "local_rate_limited");
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);

@@ -6,6 +6,8 @@
 
 #include "envoy/formatter/substitution_formatter.h"
 
+#include "source/common/http/header_map_impl.h"
+
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 
@@ -95,6 +97,77 @@ public:
 
 private:
   const std::vector<HeaderFormatterPtr> formatters_;
+  const bool append_;
+};
+
+/**
+ * HttpHeaderFormatter is used by HTTP headers manipulators.
+ **/
+class HttpHeaderFormatter {
+public:
+  virtual ~HttpHeaderFormatter() = default;
+
+  virtual const std::string format(const Http::RequestHeaderMap& request_headers,
+                                   const Http::ResponseHeaderMap& response_headers,
+                                   const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * @return bool indicating whether the formatted header should be appended to the existing
+   *              headers or replace any existing values for the header
+   */
+  virtual bool append() const PURE;
+};
+
+using HttpHeaderFormatterPtr = std::unique_ptr<HttpHeaderFormatter>;
+
+/**
+ * Implementation of HttpHeaderFormatter.
+ * Actual formatting is done via substitution formatters.
+ */
+class HttpHeaderFormatterImpl : public HttpHeaderFormatter {
+public:
+  HttpHeaderFormatterImpl(Formatter::FormatterPtr&& formatter, bool append)
+      : formatter_(std::move(formatter)), append_(append) {}
+
+  // HttpHeaderFormatter::format
+  const std::string format(const Http::RequestHeaderMap& request_headers,
+                           const Http::ResponseHeaderMap& response_headers,
+                           const Envoy::StreamInfo::StreamInfo& stream_info) const override {
+    std::string buf;
+
+    // Trailers are not available when HTTP headers are manipulated.
+    buf = formatter_->format(request_headers, response_headers,
+                             *Http::StaticEmptyHeaders::get().response_trailers, stream_info, "");
+
+    return buf;
+  };
+  bool append() const override { return append_; }
+
+private:
+  const Formatter::FormatterPtr formatter_;
+  const bool append_;
+};
+
+// TODO(cpakulski).
+// This class is used only when runtime guard envoy_reloadable_features_unified_header_formatter
+// is false and should be removed when the guard is removed. See issue 20389..
+// This is basically a bridge between "new" header formatters which take request_headers and
+// response_headers as parameters and "old" header formatters which take only stream_info as
+// parameter.
+class HttpHeaderFormatterBridge : public HttpHeaderFormatter {
+public:
+  HttpHeaderFormatterBridge() = delete;
+  HttpHeaderFormatterBridge(HeaderFormatterPtr&& header_formatter, bool append)
+      : header_formatter_(std::move(header_formatter)), append_(append) {}
+
+  const std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                           const Envoy::StreamInfo::StreamInfo& stream_info) const override {
+    return header_formatter_->format(stream_info);
+  }
+  bool append() const override { return append_; }
+
+private:
+  const HeaderFormatterPtr header_formatter_;
   const bool append_;
 };
 

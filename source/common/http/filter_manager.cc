@@ -910,7 +910,13 @@ void FilterManager::sendLocalReplyViaFilterChain(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
             if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
+              Http::RequestHeaderMap* request_headers =
+                  filter_manager_callbacks_.requestHeaders().ptr();
+              if (request_headers == nullptr) {
+                request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
+              }
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, *request_headers,
+                                                                          streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);
@@ -949,7 +955,13 @@ void FilterManager::sendDirectLocalReply(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
             if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
+              Http::RequestHeaderMap* request_headers =
+                  filter_manager_callbacks_.requestHeaders().ptr();
+              if (request_headers == nullptr) {
+                request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
+              }
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, *request_headers,
+                                                                          streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);
