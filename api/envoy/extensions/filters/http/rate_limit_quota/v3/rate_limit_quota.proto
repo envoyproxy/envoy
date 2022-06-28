@@ -128,7 +128,7 @@ message RateLimitQuotaFilterConfig {
   //
   // Note: this only applies to the fraction of enabled requests.
   //
-  // Defaults to 0% of requests for safety.
+  // Defaults to 100% of requests.
   config.core.v3.RuntimeFractionalPercent filter_enforced = 5;
 
   // Specifies a list of HTTP headers that should be added to each request that
