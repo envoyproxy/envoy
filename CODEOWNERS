@@ -20,8 +20,6 @@
 extensions/filters/common/original_src @snowp @klarose
 # dubbo_proxy extension
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan @wbpcode
-# thrift_proxy extension
-/*/extensions/filters/network/thrift_proxy @zuercher @rgs1
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
@@ -31,8 +29,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @snowp @zuercher
-# header_to_metadata extension
-/*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @antoniovicente @adisuissa @yangminzhu
 # tcp_stats transport socket extension
@@ -47,6 +43,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/transport_sockets/common @alyssawilk @wez470
 # starttls transport socket
 /*/extensions/transport_sockets/starttls @cpakulski @lizan
+# internal upstream transport socket
+/*/extensions/transport_sockets/internal_upstream @kyessenov @lambdai
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # sni_dynamic_forward_proxy extension
@@ -57,12 +55,12 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/tracers/xray @abaptiste @suniltheta @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @lizan @Shikugawa
+# tracers.opentelemetry extension
+/*/extensions/tracers/opentelemetry @alexanderellis @htuch
 # quic extension
 /*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # UDP packet writer
 /*/extensions/udp_packet_writer/ @danzh2010 @RyanTheOptimist @alyssawilk
-# zookeeper_proxy extension
-/*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @weisisea
 /*/extensions/common/redis @msukalski @henryyyang @mattklein123 @weisisea
@@ -141,7 +139,7 @@ extensions/filters/common/original_src @snowp @klarose
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @lambdai
 /*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder
-/*/extensions/filters/http/aws_request_signing @rgs1 @derekargueta @mattklein123 @marcomagdy @tonya11en
+/*/extensions/filters/http/aws_request_signing @derekargueta @mattklein123 @marcomagdy @tonya11en
 /*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes @tonya11en
 /*/extensions/filters/http/buffer @alyssawilk @mattklein123
 /*/extensions/transport_sockets/raw_buffer @alyssawilk @mattklein123
@@ -151,10 +149,10 @@ extensions/filters/common/original_src @snowp @klarose
 extensions/upstreams/http @alyssawilk @snowp @mattklein123
 extensions/upstreams/tcp @alyssawilk @ggreenway @mattklein123
 # OAuth2
-extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
+extensions/filters/http/oauth2 @derekargueta @snowp
 # HTTP Local Rate Limit
-/*/extensions/filters/http/local_ratelimit @rgs1 @mattklein123 @wbpcode
-/*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1 @wbpcode
+/*/extensions/filters/http/local_ratelimit @mattklein123 @wbpcode
+/*/extensions/filters/common/local_ratelimit @mattklein123 @wbpcode
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
 # Rate limit expression descriptor
@@ -177,8 +175,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # HTTP Bandwidth Limit
 /*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
 # Original IP detection
-/*/extensions/http/original_ip_detection/custom_header @rgs1 @alyssawilk @antoniovicente
-/*/extensions/http/original_ip_detection/xff @rgs1 @alyssawilk @antoniovicente
+/*/extensions/http/original_ip_detection/custom_header @alyssawilk @antoniovicente
+/*/extensions/http/original_ip_detection/xff @alyssawilk @antoniovicente
 # set_metadata extension
 /*/extensions/filters/http/set_metadata @aguinet @snowp
 # Formatters
@@ -224,15 +222,15 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # local rate limit
 /*/extensions/filters/network/local_ratelimit @mattklein123 @wbpcode
 # proxy protocol
-/*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu @rgs1
+/*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu
 # access loggers
-/*/extensions/access_loggers/grpc @wbpcode @cpakulski @rgs1 @giantcroc @gyohuangxin
+/*/extensions/access_loggers/grpc @wbpcode @cpakulski @giantcroc @gyohuangxin
 # stats
 /*/extensions/stat_sinks/statsd @mattklein123 @suniltheta
 /*/extensions/stat_sinks/common @mattklein123 @suniltheta
 /*/extensions/stat_sinks/common/statsd @mattklein123 @suniltheta
 # access loggers
-/*/extensions/access_loggers/file @wbpcode @cpakulski @rgs1 @giantcroc
+/*/extensions/access_loggers/file @wbpcode @cpakulski @giantcroc
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
 /*/extensions/filters/http/stateful_session @wbpcode @cpakulski
@@ -251,35 +249,39 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # mongo proxy
 /*/extensions/filters/network/mongo_proxy @mythra @giantcroc @mattklein123
 # formatter
-/*/extensions/formatter/req_without_query @alyssawilk @tsaarni @rgs1 @giantcroc
-# IP tagging
-/*/extensions/filters/http/ip_tagging @rgs1 @alyssawilk
+/*/extensions/formatter/req_without_query @alyssawilk @tsaarni @giantcroc
 # cors
 /*/extensions/filters/http/cors @wbpcode @daixiang0
 # Header Validators
 /*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
+# Thrift
+/*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
 
-# To be moved to Contrib
-/*/extensions/filters/http/dynamo @UNOWNED @UNOWNED
+# secondary owner needed or moving to contrib next release.
+/*/extensions/filters/http/ip_tagging @alyssawilk @UNOWNED
+/*/extensions/filters/http/header_to_metadata @zuercher @UNOWNED
+/*/extensions/filters/network/zookeeper_proxy @snowp @UNOWNED
 /*/extensions/tracers/lightstep @UNOWNED @UNOWNED
-/*/extensions/filters/network/client_ssl_auth @UNOWNED @UNOWNED
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
+/contrib/client_ssl_auth/ @UNOWNED @UNOWNED
 /contrib/common/sqlutils/ @cpakulski @cpakulski
+/contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/squash/ @yuval-k @alyssawilk
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan
 /contrib/mysql_proxy/ @rshriram @venilnoronha
 /contrib/postgres_proxy/ @fabriziomello @cpakulski
-/contrib/sxg/ @cpapazian @rgs1 @alyssawilk
+/contrib/sxg/ @cpapazian @alyssawilk
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
 /contrib/cryptomb/ @ipuustin @VillePihlava
 /contrib/vcl/ @florincoras @KfreeZ
 /contrib/hyperscan/ @zhxie @soulxu
 /contrib/language/ @diceride @diceride
+/contrib/dlb/ @mattklein123 @daixiang0

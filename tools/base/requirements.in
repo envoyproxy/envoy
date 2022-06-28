@@ -3,13 +3,14 @@ aio.api.bazel
 cffi>=1.15.0
 colorama
 coloredlogs
-envoy.code.check>=0.1.3
-envoy.dependency.check>=0.1.1
+envoy.base.utils>=0.3.6
+envoy.code.check>=0.2.1
+envoy.dependency.check>=0.1.2
 envoy.dependency.pip_check>=0.1.2
 envoy.distribution.release>=0.0.7
 envoy.distribution.repo>=0.0.5
 envoy.distribution.verify>=0.0.8
-envoy.docs.sphinx-runner>=0.1.2
+envoy.docs.sphinx-runner>=0.1.7
 envoy.gpg.identity>=0.1.0
 envoy.gpg.sign>=0.1.0
 flake8

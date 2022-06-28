@@ -23,7 +23,13 @@ def _path_ignoring_repository(f):
 def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     # Compute output files from the current proto_library node's dependencies.
     transitive_outputs = depset(transitive = [dep.output_groups[output_group] for dep in ctx.rule.attr.deps])
-    proto_sources = target[ProtoInfo].direct_sources
+    proto_sources = [
+        f
+        for f in target[ProtoInfo].direct_sources
+        if (f.path.startswith("external/envoy_api") or
+            f.path.startswith("tools/testdata/protoxform/envoy") or
+            f.path.startswith("external/com_github_cncf_udpa/xds"))
+    ]
 
     # If this proto_library doesn't actually name any sources, e.g. //api:api,
     # but just glues together other libs, we just need to follow the graph.

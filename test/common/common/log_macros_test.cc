@@ -4,7 +4,7 @@
 #include <string>
 #include <thread>
 
-#include "source/common/common/fancy_logger.h"
+#include "source/common/common/fine_grain_logger.h"
 #include "source/common/common/logger.h"
 
 #include "test/mocks/http/mocks.h"
@@ -287,76 +287,70 @@ TEST_F(FormatTest, OutputEscaped) {
 }
 
 /**
- * Test for Fancy Logger convenient macros.
+ * Test for Fine-Grain Logger convenient macros.
  */
-TEST(Fancy, Global) {
-  FANCY_LOG(info, "Hello world! Here's a line of fancy log!");
-  FANCY_LOG(error, "Fancy Error! Here's the second message!");
+TEST(FineGrainLog, Global) {
+  FINE_GRAIN_LOG(info, "Hello world! Here's a line of fine-grain log!");
+  FINE_GRAIN_LOG(error, "FineGrainLog Error! Here's the second message!");
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
-  FANCY_CONN_LOG(warn, "Fake info {} of connection", connection_, 1);
-  FANCY_STREAM_LOG(warn, "Fake warning {} of stream", stream_, 1);
+  FINE_GRAIN_CONN_LOG(warn, "Fake info {} of connection", connection_, 1);
+  FINE_GRAIN_STREAM_LOG(warn, "Fake warning {} of stream", stream_, 1);
 
-  FANCY_LOG(critical, "Critical message for later flush.");
-  FANCY_FLUSH_LOG();
+  FINE_GRAIN_LOG(critical, "Critical message for later flush.");
+  FINE_GRAIN_FLUSH_LOG();
 }
 
-TEST(Fancy, FastPath) {
-  getFancyContext().setFancyLogger(__FILE__, spdlog::level::info);
+TEST(FineGrainLog, FastPath) {
+  getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::info);
   for (int i = 0; i < 10; i++) {
-    FANCY_LOG(warn, "Fake warning No. {}", i);
+    FINE_GRAIN_LOG(warn, "Fake warning No. {}", i);
   }
 }
 
-TEST(Fancy, SetLevel) {
+TEST(FineGrainLog, SetLevel) {
   const char* file = "P=NP_file";
-  bool res = getFancyContext().setFancyLogger(file, spdlog::level::trace);
+  bool res = getFineGrainLogContext().setFineGrainLogger(file, spdlog::level::trace);
   EXPECT_EQ(res, false);
-  SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file);
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(file);
   EXPECT_EQ(p, nullptr);
 
-  res = getFancyContext().setFancyLogger(__FILE__, spdlog::level::err);
+  res = getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::err);
   EXPECT_EQ(res, true);
-  FANCY_LOG(error, "Fancy Error! Here's a test for level.");
-  FANCY_LOG(warn, "Warning: you shouldn't see this message!");
-  p = getFancyContext().getFancyLogEntry(__FILE__);
-  EXPECT_NE(p, nullptr);
+  FINE_GRAIN_LOG(error, "FineGrainLog Error! Here's a test for level.");
+  FINE_GRAIN_LOG(warn, "Warning: you shouldn't see this message!");
+  p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
+  ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::err);
 
-  getFancyContext().setAllFancyLoggers(spdlog::level::info);
-  FANCY_LOG(info, "Info: all loggers back to info.");
-  FANCY_LOG(debug, "Debug: you shouldn't see this message!");
-  EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(), spdlog::level::info);
+  getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::info);
+  FINE_GRAIN_LOG(info, "Info: all loggers back to info.");
+  FINE_GRAIN_LOG(debug, "Debug: you shouldn't see this message!");
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::info);
 }
 
-TEST(Fancy, Iteration) {
-  FANCY_LOG(info, "Info: iteration test begins.");
-  getFancyContext().setAllFancyLoggers(spdlog::level::info);
-  std::string output = getFancyContext().listFancyLoggers();
-  EXPECT_THAT(output, HasSubstr("   " __FILE__ ": 2\n"));
-  std::string log_format = "[%T.%e][%t][%l][%n] %v";
-  getFancyContext().setFancyLogger(__FILE__, spdlog::level::err);
-  // setDefaultFancyLevelFormat relies on previous default and might cause error online
-  // getFancyContext().setDefaultFancyLevelFormat(spdlog::level::warn, log_format);
-  FANCY_LOG(warn, "Warning: now level is warning, format changed (Date removed).");
-  FANCY_LOG(warn, getFancyContext().listFancyLoggers());
-  // EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(),
-  //           spdlog::level::warn); // note fancy_default_level isn't changed
+TEST(FineGrainLog, Iteration) {
+  FINE_GRAIN_LOG(info, "Info: iteration test begins.");
+  getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::info);
+  std::string output = getFineGrainLogContext().listFineGrainLoggers();
+  EXPECT_THAT(output, HasSubstr("  " __FILE__ ": 2"));
+  getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::err);
+
+  FINE_GRAIN_LOG(warn, "Warning: now level is warning, format changed (Date removed).");
+  FINE_GRAIN_LOG(warn, getFineGrainLogContext().listFineGrainLoggers());
 }
 
-TEST(Fancy, Context) {
-  FANCY_LOG(info, "Info: context API needs test.");
-  bool enable_fine_grain_logging = Logger::Context::useFancyLogger();
-  printf(" --> If use fancy logger: %d\n", enable_fine_grain_logging);
+TEST(FineGrainLog, Context) {
+  FINE_GRAIN_LOG(info, "Info: context API needs test.");
+  bool enable_fine_grain_logging = Logger::Context::useFineGrainLogger();
+  printf(" --> If use fine-grain logger: %d\n", enable_fine_grain_logging);
   if (enable_fine_grain_logging) {
-    FANCY_LOG(critical, "Cmd option set: all previous Envoy Log should be converted now!");
+    FINE_GRAIN_LOG(critical, "Cmd option set: all previous Envoy Log should be converted now!");
   }
-  Logger::Context::enableFancyLogger();
-  EXPECT_EQ(Logger::Context::useFancyLogger(), true);
-  EXPECT_EQ(Logger::Context::getFancyLogFormat(), "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v");
-  // EXPECT_EQ(Logger::Context::getFancyDefaultLevel(),
-  //           spdlog::level::err); // default is error in test environment
+  Logger::Context::enableFineGrainLogger();
+  EXPECT_EQ(Logger::Context::useFineGrainLogger(), true);
+  EXPECT_EQ(Logger::Context::getFineGrainLogFormat(), "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v");
 }
 
 } // namespace Envoy

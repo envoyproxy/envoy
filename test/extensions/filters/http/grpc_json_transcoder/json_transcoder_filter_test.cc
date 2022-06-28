@@ -274,6 +274,31 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
   EXPECT_FALSE(transcoder);
 }
 
+TEST_F(GrpcJsonTranscoderConfigTest, DecodedQueryParameterWithEncodedJsonName) {
+  JsonTranscoderConfig config(
+      getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                     "bookstore.Bookstore"),
+      *api_);
+
+  // When "json_name" is percent encoded, but the field name in query parameter
+  // is percent decoded, it will not match, transcoding fails.
+  // * json_name = "search%5Bencoded%5D", defined in "test/proto/bookstore.proto".
+  // " the query parameter is "search[encoded]".
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/shelf?shelf.search[encoded]=Google"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  TranscoderPtr transcoder;
+  MethodInfoSharedPtr method_info;
+  const auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+
+  EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
+  EXPECT_EQ("Could not find field \"search[encoded]\" in the type \"bookstore.Shelf\".",
+            status.message());
+  EXPECT_FALSE(transcoder);
+}
+
 TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
   auto proto_config = getProtoConfig(
       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore");
@@ -422,13 +447,13 @@ protected:
     ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(2 << 20));
   }
 
-  static const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
+  static envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
   bookstoreProtoConfig() {
     const std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
                                     "\",\"services\": [\"bookstore.Bookstore\"]}";
     return makeProtoConfig(json_string);
   }
-  static const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
+  static envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
   makeProtoConfig(const std::string json_string) {
     envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
     TestUtility::loadFromJson(json_string, proto_config);
@@ -1294,6 +1319,40 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamWithFragmentedHttpBody) {
   EXPECT_EQ(0, fragment1.length());
   // Second fragment contains entire body
   EXPECT_EQ(http_body.data(), fragment2->toString());
+}
+
+class GrpcJsonTranscoderFilterReportCollisionTest : public GrpcJsonTranscoderFilterTest {
+public:
+  GrpcJsonTranscoderFilterReportCollisionTest() : GrpcJsonTranscoderFilterTest(makeProtoConfig()) {}
+
+private:
+  const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
+  makeProtoConfig() {
+    auto proto_config = bookstoreProtoConfig();
+    proto_config.mutable_request_validation_options()->set_reject_binding_body_field_collisions(
+        true);
+    return proto_config;
+  }
+};
+
+TEST_F(GrpcJsonTranscoderFilterReportCollisionTest, CreateShelfBodyWildcard) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf/123"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("/shelf/123", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("POST", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelfBodyWildcard", request_headers.get_(":path"));
+  // decodeData() will cause request to be rejected due to the binding value is conflicted with the
+  // body value.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+
+  Buffer::OwnedImpl request_data{"{\"shelf\": {\"id\": 456, \"theme\": \"Children\"}}"};
+
+  // ID from body and binding are different.
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
 }
 
 class GrpcJsonTranscoderFilterGrpcStatusTest : public GrpcJsonTranscoderFilterTest {

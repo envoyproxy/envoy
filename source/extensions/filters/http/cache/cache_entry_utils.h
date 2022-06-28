@@ -36,6 +36,9 @@ enum class CacheEntryStatus {
   // This entry is fresh, and an appropriate basis for a 304 Not Modified
   // response.
   FoundNotModified,
+  // The cache lookup failed, e.g. because the cache was unreachable or an RPC
+  // timed out. The caller shouldn't use this lookup's context for an insert.
+  LookupError,
 };
 
 absl::string_view cacheEntryStatusString(CacheEntryStatus s);

@@ -2,6 +2,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
@@ -9,6 +10,8 @@
 #include "source/common/memory/stats.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/config/integration/certs/clientcert_hash.h"
+#include "test/config/integration/certs/servercert_info.h"
 #include "test/config/utility.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
@@ -45,6 +48,7 @@ TEST_P(StatsIntegrationTest, WithDefaultConfig) {
 }
 
 TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
+  skip_tag_extraction_rule_check_ = true;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
   });
@@ -57,7 +61,7 @@ TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
 // Regression test for https://github.com/envoyproxy/envoy/pull/21069 making
 // sure that the default error_level limits are not applied before runtime is
 // created. As described by the linked issue, this simply bypasses regex size checks.
-TEST_P(StatsIntegrationTest, WithLargeRegex) {
+TEST_P(StatsIntegrationTest, DEPRECATED_FEATURE_TEST(WithLargeGoogleRE2Regex)) {
   // This limit of 1000 will be ignored.
   config_helper_.addRuntimeOverride("re2.max_program_size.error_level", "1000");
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -149,6 +153,88 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   EXPECT_EQ(live->tags().size(), 1);
   EXPECT_EQ(live->tags()[0].name_, "test.x");
   EXPECT_EQ(live->tags()[0].value_, "xxx");
+}
+
+TEST_P(StatsIntegrationTest, WithoutCert) {
+  initialize();
+
+  EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(),
+            std::numeric_limits<uint32_t>::max());
+}
+
+TEST_P(StatsIntegrationTest, WithExpiringCert) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* transport_socket = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains(0)
+                                 ->mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+
+    common_tls_context->mutable_validation_context_sds_secret_config()->set_name(
+        "validation_context");
+    common_tls_context->add_tls_certificate_sds_secret_configs()->set_name("server_cert");
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    transport_socket->mutable_typed_config()->PackFrom(tls_context);
+
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("validation_context");
+    auto* validation_context = secret->mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+
+    secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("server_cert");
+    auto* tls_certificate = secret->mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+  });
+
+  initialize();
+  auto cert_expiry = TestUtility::parseTime(TEST_SERVER_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
+  EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(),
+            days_until_expiry);
+}
+
+TEST_P(StatsIntegrationTest, WithExpiredCert) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* transport_socket = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains(0)
+                                 ->mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+
+    common_tls_context->mutable_validation_context_sds_secret_config()->set_name(
+        "validation_context");
+    common_tls_context->add_tls_certificate_sds_secret_configs()->set_name("server_cert");
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    transport_socket->mutable_typed_config()->PackFrom(tls_context);
+
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("validation_context");
+    auto* validation_context = secret->mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+
+    secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("server_cert");
+    auto* tls_certificate = secret->mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/expired_cert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/expired_key.pem"));
+  });
+
+  initialize();
+  EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(), 0);
 }
 
 // TODO(cmluciano) Refactor once https://github.com/envoyproxy/envoy/issues/5624 is solved

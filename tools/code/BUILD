@@ -1,24 +1,21 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-genrule(
+jq(
     name = "extensions_build_config",
-    outs = ["extensions_build_config.json"],
-    cmd = """
-    jq -s '.[0] * .[1]' \
-        $(location //source/extensions:extensions_build_config) \
-        $(location //contrib:contrib_extensions_build_config) \
-            > $@
-    """,
-    tools = [
+    srcs = [
         "//contrib:contrib_extensions_build_config",
         "//source/extensions:extensions_build_config",
     ],
+    out = "extensions_build_config.json",
+    args = ["--slurp"],
+    filter = ".[0] * .[1]",
 )
 
 envoy_entry_point(
@@ -26,9 +23,11 @@ envoy_entry_point(
     args = [
         "--extensions_build_config=$(location :extensions_build_config)",
         "--path=%s" % PATH,
+        "-b shellcheck:$(location @com_github_aignas_rules_shellcheck//:shellcheck)",
     ],
     data = [
         ":extensions_build_config",
+        "@com_github_aignas_rules_shellcheck//:shellcheck",
     ],
     pkg = "envoy.code.check",
 )

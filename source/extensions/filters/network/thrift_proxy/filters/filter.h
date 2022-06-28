@@ -143,11 +143,38 @@ public:
 };
 
 /**
+ * Return codes for onLocalReply filter invocations.
+ */
+enum class LocalErrorStatus {
+  // Continue sending the local reply after onLocalError has been sent to all filters.
+  Continue,
+};
+
+/**
  * Common interface for Thrift filters.
  */
 class FilterBase {
 public:
   virtual ~FilterBase() = default;
+
+  /**
+   * Called after sendLocalReply is called, and before any local reply is
+   * serialized either to filters, or downstream.
+   * This will be called on both encoder and decoder filters starting at the
+   * first filter and working towards the terminal filter configured (generally the router filter).
+   *
+   * Filters implementing onLocalReply are responsible for never calling sendLocalReply
+   * from onLocalReply, as that has the potential for looping.
+   *
+   * @param metadata response metadata.
+   * @param reset_imminent True if the downstream connection should be closed after this response
+   * @param LocalErrorStatus the action to take after onLocalError completes.
+   */
+  virtual LocalErrorStatus onLocalReply([[maybe_unused]] const MessageMetadata& metadata,
+                                        [[maybe_unused]] bool end_stream) {
+    return LocalErrorStatus::Continue;
+  }
+
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
    * finish (both downstream and upstream) or due to reset. Every filter is responsible for making

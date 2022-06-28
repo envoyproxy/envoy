@@ -6,8 +6,8 @@ set -e
 
 
 build_setup_args=""
-if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "docs" ||  \
-          "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" || "$1" == "tooling" \
+if [[ "$1" == "format" || "$1" == "fix_proto_format" || "$1" == "check_proto_format" || "$1" == "docs" ||  \
+          "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" \
           || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "verify_build_examples" \
           || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
@@ -366,6 +366,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
   COMPILE_TIME_OPTIONS=(
+    "--define" "admin_html=disabled"
     "--define" "signal_trace=disabled"
     "--define" "hot_restart=disabled"
     "--define" "google_grpc=disabled"
@@ -473,22 +474,20 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=asan-fuzzer "${FUZZ_TEST_TARGETS[@]}" --test_arg="-runs=10"
   exit 0
-elif [[ "$CI_TARGET" == "format_pre" ]]; then
+elif [[ "$CI_TARGET" == "format" ]]; then
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/ci/format_pre.sh
-elif [[ "$CI_TARGET" == "fix_format" ]]; then
+elif [[ "$CI_TARGET" == "fix_proto_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
-
-  echo "fix_format..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix
   exit 0
-elif [[ "$CI_TARGET" == "check_format" ]]; then
+elif [[ "$CI_TARGET" == "check_proto_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
-
-  echo "check_format..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
+  echo "Run protoxform test"
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+        //tools/protoprint:protoprint_test
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
@@ -497,6 +496,9 @@ elif [[ "$CI_TARGET" == "docs" ]]; then
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "deps" ]]; then
+
+  echo "dependency validate_test..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate_test
 
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
@@ -507,25 +509,11 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
 
   echo "check dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check -- -v warn
 
   # Run pip requirements tests
   echo "check pip..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
-
-  exit 0
-elif [[ "$CI_TARGET" == "tooling" ]]; then
-  setup_clang_toolchain
-
-  echo "Run protoxform test"
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
-
-  # TODO(phlax): move this to a bazel rule
-  echo "check_format_test..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
-
-  echo "dependency validate_test..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate_test
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
