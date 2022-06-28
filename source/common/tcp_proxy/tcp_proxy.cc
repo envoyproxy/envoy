@@ -400,7 +400,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
-  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
+  transport_socket_options_ =
+      Network::TransportSocketOptionsUtility::fromFilterState(*filter_state);
 
   if (auto typed_state = filter_state->getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
           Network::UpstreamSocketOptionsFilterState::key());

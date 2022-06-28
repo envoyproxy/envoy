@@ -93,7 +93,7 @@ public:
    * nullptr if nothing is in the filter state.
    */
   static TransportSocketOptionsConstSharedPtr
-  fromFilterState(const StreamInfo::FilterStateSharedPtr& stream_info);
+  fromFilterState(const StreamInfo::FilterState& stream_info);
 };
 
 class CommonUpstreamTransportSocketFactory : public UpstreamTransportSocketFactory {

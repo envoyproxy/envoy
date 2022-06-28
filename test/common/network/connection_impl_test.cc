@@ -161,7 +161,7 @@ protected:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
-        createTransportSocket(), socket_options_);
+        createTransportSocket(), socket_options_, nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;

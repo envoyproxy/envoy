@@ -26,23 +26,7 @@ using FilterStateSharedPtr = std::shared_ptr<FilterState>;
  */
 class FilterState {
 public:
-  enum StateType {
-    // Readonly objects must be set once.
-    ReadOnly = 0x1,
-
-    // Mutable objects can be overwritten with the same state type, life span, and name.
-    Mutable = 0,
-
-    // Mark a filter state object as shared with the upstream connection.
-    // Shared filter state objects are copied by reference from the downstream
-    // requests and connections to the upstream connection filter state, and
-    // also participate in the hashing decisions in the transport socket
-    // options when connections are re-used between downstream requests.
-    SharedWithUpstreamConnection = 0x2,
-
-    // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-    LastFlag = SharedWithUpstreamConnection,
-  };
+  enum class StateType { ReadOnly, Mutable };
 
   // Objects stored in the FilterState may have different life span. Life span is what controls
   // how long an object stored in FilterState lives. Implementation of this interface actually
@@ -74,6 +58,22 @@ public:
   // be captured by an upstream connection for the original downstream request.
   enum LifeSpan { FilterChain, Request, Connection, TopSpan = Connection };
 
+  // Objects stored in the filter state can optionally be shared between the
+  // upstrean and downstream filter state.
+  enum class StreamSharing {
+    // None implies the object is exclusive to the stream.
+    None,
+
+    // Mark a filter state object as shared with the upstream connection.
+    // Shared filter state objects are copied by reference from the downstream
+    // requests and connections to the upstream connection filter state. When
+    // upstream connections are re-used between streams, the downstream objects
+    // are captured for the first, initiating stream. To force distinct
+    // upstream connections and prevent sharing, the shared filter state object
+    // must implement the hashing interface.
+    SharedWithUpstreamConnection,
+  };
+
   class Object {
   public:
     virtual ~Object() = default;
@@ -95,7 +95,8 @@ public:
 
   struct FilterObject {
     std::shared_ptr<Object> data_;
-    FilterState::StateType state_type_;
+    StateType state_type_;
+    StreamSharing stream_sharing_{StreamSharing::None};
     std::string name_{""};
   };
 
@@ -119,7 +120,8 @@ public:
    * data stored in FilterState.
    */
   virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain) PURE;
+                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain,
+                       StreamSharing stream_sharing = StreamSharing::None) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).

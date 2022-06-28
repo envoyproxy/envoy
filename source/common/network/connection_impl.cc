@@ -911,9 +911,9 @@ ClientConnectionImpl::ClientConnectionImpl(
 
   if (transport_options) {
     for (const auto& object : transport_options->filterStateObjects()) {
-      // TODO: handle exception
       stream_info_.filterState()->setData(object.name_, object.data_, object.state_type_,
-                                          StreamInfo::FilterState::LifeSpan::Connection);
+                                          StreamInfo::FilterState::LifeSpan::Connection,
+                                          object.stream_sharing_);
     }
   }
 }

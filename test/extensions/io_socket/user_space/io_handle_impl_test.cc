@@ -1131,12 +1131,13 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   ProtobufWkt::Value val;
   val.set_string_value("val");
   (*map.mutable_fields())["key"] = val;
-  auto source_filter_state = std::make_unique<FilterStateObjects>();
+  StreamInfo::FilterState::Objects source_filter_state;
   auto object = std::make_shared<TestObject>(1000);
-  source_filter_state->emplace_back("object_key", object);
+  source_filter_state.push_back(
+      {object, StreamInfo::FilterState::StateType::ReadOnly,
+       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection, "object_key"});
   ASSERT_NE(nullptr, io_handle_->passthroughState());
-  io_handle_->passthroughState()->initialize(std::move(source_metadata),
-                                             std::move(source_filter_state));
+  io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state);
 
   StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   envoy::config::core::v3::Metadata dest_metadata;
@@ -1150,10 +1151,12 @@ TEST_F(IoHandleImplTest, PassthroughState) {
 }
 
 TEST_F(IoHandleImplTest, PassthroughStateReadOnlyObject) {
-  auto source_filter_state = std::make_unique<FilterStateObjects>();
+  StreamInfo::FilterState::Objects source_filter_state;
   auto object = std::make_shared<TestObject>(1000);
-  source_filter_state->emplace_back("object_key", object);
-  io_handle_->passthroughState()->initialize(nullptr, std::move(source_filter_state));
+  source_filter_state.push_back(
+      {object, StreamInfo::FilterState::StateType::ReadOnly,
+       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection, "object_key"});
+  io_handle_->passthroughState()->initialize(nullptr, source_filter_state);
   StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   auto read_only = std::make_shared<TestObject>(1);
   dest_filter_state.setData("object_key", read_only, StreamInfo::FilterState::StateType::ReadOnly,

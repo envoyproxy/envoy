@@ -6,7 +6,8 @@ namespace Envoy {
 namespace StreamInfo {
 
 void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                              FilterState::StateType state_type, FilterState::LifeSpan life_span) {
+                              FilterState::StateType state_type, FilterState::LifeSpan life_span,
+                              FilterState::StreamSharing stream_sharing) {
   if (life_span > life_span_) {
     if (hasDataWithNameInternally(data_name)) {
       throw EnvoyException(
@@ -26,7 +27,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
     // violations namely: readonly data cannot be overwritten, mutable data
     // cannot be overwritten by readonly data.
     const FilterStateImpl::FilterObject* current = it->second.get();
-    if (current->state_type_ & FilterState::StateType::ReadOnly) {
+    if (current->state_type_ == FilterState::StateType::ReadOnly) {
       throw EnvoyException("FilterState::setData<T> called twice on same ReadOnly state.");
     }
 
@@ -38,6 +39,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
   std::unique_ptr<FilterStateImpl::FilterObject> filter_object(new FilterStateImpl::FilterObject());
   filter_object->data_ = data;
   filter_object->state_type_ = state_type;
+  filter_object->stream_sharing_ = stream_sharing;
   data_storage_[data_name] = std::move(filter_object);
 }
 
@@ -76,7 +78,7 @@ FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
   }
 
   FilterStateImpl::FilterObject* current = it->second.get();
-  if (current->state_type_ & FilterState::StateType::ReadOnly) {
+  if (current->state_type_ == FilterState::StateType::ReadOnly) {
     throw EnvoyException("FilterState tried to access immutable data as mutable.");
   }
 
@@ -94,8 +96,8 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
   auto objects = parent_ ? parent_->objectsSharedWithUpstreamConnection()
                          : std::make_unique<FilterState::Objects>();
   for (const auto& [name, object] : data_storage_) {
-    if (object->state_type_ & StateType::SharedWithUpstreamConnection) {
-      objects->push_back({object->data_, object->state_type_, name});
+    if (object->stream_sharing_ == StreamSharing::SharedWithUpstreamConnection) {
+      objects->push_back({object->data_, object->state_type_, object->stream_sharing_, name});
     }
   }
   return objects;
