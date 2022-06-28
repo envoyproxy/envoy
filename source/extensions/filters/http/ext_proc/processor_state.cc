@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
+#include "ext_proc.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
@@ -28,14 +29,14 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
   call_start_time_ = filter_callbacks_->dispatcher().timeSource().monotonicTime();
 }
 
-void ProcessorState::onFinishProcessorCall(CallbackState next_state) {
+void ProcessorState::onFinishProcessorCall(absl::Status call_status, CallbackState next_state) {
   if (message_timer_) {
     message_timer_->disableTimer();
   }
   if (call_start_time_.has_value()) {
     std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
         filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
-    filter_.grpcStats().record(duration, callback_state_);
+    filter_.grpcStats().record(duration, callback_state_, call_status);
     call_start_time_ = absl::nullopt;
   }
   callback_state_ = next_state;
@@ -58,7 +59,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     if (common_response.clear_route_cache()) {
       filter_callbacks_->clearRouteCache();
     }
-    onFinishProcessorCall();
+    onFinishProcessorCall(absl::OkStatus());
 
     if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
       ENVOY_LOG(debug, "Replacing complete message");
@@ -195,7 +196,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         });
       }
       clearWatermark();
-      onFinishProcessorCall();
+      onFinishProcessorCall(absl::OkStatus());
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback ||
                callback_state_ == CallbackState::StreamedBodyCallbackFinishing) {
@@ -224,9 +225,9 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         clearWatermark();
       }
       if (chunk_queue_.empty()) {
-        onFinishProcessorCall();
+        onFinishProcessorCall(absl::OkStatus());
       } else {
-        onFinishProcessorCall(callback_state_);
+        onFinishProcessorCall(absl::OkStatus(), callback_state_);
       }
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
       // Apply changes to the buffer that we sent to the server
@@ -243,7 +244,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       }
       should_continue = true;
       clearWatermark();
-      onFinishProcessorCall();
+      onFinishProcessorCall(absl::OkStatus());
       partial_body_processed_ = true;
 
       // If anything else is left on the queue, inject it too
@@ -256,7 +257,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         }
       }
     } else {
-      onFinishProcessorCall();
+      onFinishProcessorCall(absl::UnknownError(""));
     }
 
     if (response.response().clear_route_cache()) {
@@ -292,7 +293,7 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
       }
     }
     trailers_ = nullptr;
-    onFinishProcessorCall();
+    onFinishProcessorCall(absl::OkStatus());
     continueIfNecessary();
     return absl::OkStatus();
   }
@@ -308,7 +309,7 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 }
 
 void ProcessorState::clearAsyncState() {
-  onFinishProcessorCall();
+  onFinishProcessorCall(absl::UnknownError(""));
   while (auto queued_chunk = dequeueStreamingChunk(false)) {
     auto chunk = std::move(*queued_chunk);
     ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk->data.length());

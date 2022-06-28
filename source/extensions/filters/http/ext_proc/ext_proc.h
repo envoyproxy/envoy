@@ -43,25 +43,26 @@ inline constexpr absl::string_view ExtProcGrpcStatsName = "ext-proc-filter-state
 
 class ExtProcGrpcStats : public Envoy::StreamInfo::FilterState::Object {
 public:
-  void record(std::chrono::microseconds latency, ProcessorState::CallbackState callback_state) {
+  void record(std::chrono::microseconds latency, ProcessorState::CallbackState callback_state,
+              absl::Status call_status) {
     switch (callback_state) {
     case ProcessorState::CallbackState::Idle:
-      header_call_latencies.push_back(latency);
+      header_call_latencies.emplace_back(latency, call_status);
       break;
     case ProcessorState::CallbackState::HeadersCallback:
-      header_call_latencies.push_back(latency);
+      header_call_latencies.emplace_back(latency, call_status);
       break;
     case ProcessorState::CallbackState::TrailersCallback:
-      trailer_call_latencies.push_back(latency);
+      trailer_call_latencies.emplace_back(latency, call_status);
       break;
     default:
-      body_call_latencies.push_back(latency);
+      body_call_latencies.emplace_back(latency, call_status);
     }
   }
 
-  std::vector<std::chrono::microseconds> header_call_latencies;
-  std::vector<std::chrono::microseconds> body_call_latencies;
-  std::vector<std::chrono::microseconds> trailer_call_latencies;
+  std::vector<std::pair<std::chrono::microseconds, absl::Status>> header_call_latencies;
+  std::vector<std::pair<std::chrono::microseconds, absl::Status>> body_call_latencies;
+  std::vector<std::pair<std::chrono::microseconds, absl::Status>> trailer_call_latencies;
 };
 
 class FilterConfig {
@@ -192,7 +193,7 @@ private:
   StreamOpenState openStream();
   void closeStream();
 
-  void onFinishProcessorCalls();
+  void onFinishProcessorCalls(absl::Status);
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 

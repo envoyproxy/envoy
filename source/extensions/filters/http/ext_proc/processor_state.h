@@ -109,7 +109,8 @@ public:
 
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                             CallbackState callback_state);
-  void onFinishProcessorCall(CallbackState next_state = CallbackState::Idle);
+  void onFinishProcessorCall(absl::Status call_status,
+                             CallbackState next_state = CallbackState::Idle);
 
   // Idempotent methods for watermarking the body
   virtual void requestWatermark() PURE;

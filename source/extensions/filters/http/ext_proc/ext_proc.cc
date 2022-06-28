@@ -562,7 +562,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_LOG(debug, "Sending immediate response");
     processing_complete_ = true;
     closeStream();
-    onFinishProcessorCalls();
+    onFinishProcessorCalls(absl::OkStatus());
     sendImmediateResponse(response->immediate_response());
     processing_status = absl::OkStatus();
     break;
@@ -595,7 +595,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     stats_.stream_msgs_received_.inc();
     processing_complete_ = true;
     closeStream();
-    onFinishProcessorCalls();
+    onFinishProcessorCalls(absl::UnknownError(""));
     ImmediateResponse invalid_mutation_response;
     invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
     invalid_mutation_response.set_details(std::string(processing_status.message()));
@@ -621,7 +621,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     closeStream();
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
-    onFinishProcessorCalls();
+    onFinishProcessorCalls(absl::UnknownError(""));
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
@@ -656,8 +656,8 @@ void Filter::onMessageTimeout() {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
     closeStream();
-    decoding_state_.onFinishProcessorCall();
-    encoding_state_.onFinishProcessorCall();
+    decoding_state_.onFinishProcessorCall(absl::UnknownError(""));
+    encoding_state_.onFinishProcessorCall(absl::UnknownError(""));
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
@@ -674,9 +674,9 @@ void Filter::clearAsyncState() {
 
 // Regardless of the current state, ensure that the timers won't fire
 // again.
-void Filter::onFinishProcessorCalls() {
-  decoding_state_.onFinishProcessorCall();
-  encoding_state_.onFinishProcessorCall();
+void Filter::onFinishProcessorCalls(absl::Status call_status) {
+  decoding_state_.onFinishProcessorCall(call_status);
+  encoding_state_.onFinishProcessorCall(call_status);
 }
 
 static const ImmediateMutationChecker& immediateResponseChecker() {
