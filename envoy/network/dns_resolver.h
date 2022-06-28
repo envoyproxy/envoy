@@ -15,7 +15,7 @@ constexpr absl::string_view DnsResolverCategory = "envoy.network.dns_resolver";
 
 class DnsResolverFactory : public Config::TypedFactory {
 public:
-  /*
+  /**
    * @returns a DnsResolver object.
    * @param dispatcher: the local dispatcher thread
    * @param api: API interface to interact with system resources
@@ -27,19 +27,19 @@ public:
 
   std::string category() const override { return std::string(DnsResolverCategory); }
 
-  /*
+  /**
    * Initialize the related data for this type of DNS resolver.
    * For some DNS resolvers, like c-ares, there are some specific data structure
    * needs to be initialized before using it to resolve target.
    */
-  virtual void init() {}
+  virtual void initialize() {}
 
-  /*
+  /**
    * Cleanup the related data for this type of DNS resolver.
    * For some DNS resolvers, like c-ares, there are some specific data structure
    * needs to be cleaned up before terminates Envoy.
    */
-  virtual void cleanup() {}
+  virtual void terminate() {}
 };
 
 } // namespace Network

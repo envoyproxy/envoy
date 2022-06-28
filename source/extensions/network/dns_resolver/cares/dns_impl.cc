@@ -522,7 +522,7 @@ public:
     return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, resolvers);
   }
 
-  void init() override {
+  void initialize() override {
     // Initialize c-ares library in case first time.
     absl::MutexLock lock(&mutex_);
     if (!ares_library_initialized_) {
@@ -530,7 +530,7 @@ public:
       ares_library_init(ARES_LIB_INIT_ALL);
     }
   }
-  void cleanup() override {
+  void terminate() override {
     // Cleanup c-ares library if initialized.
     absl::MutexLock lock(&mutex_);
     if (ares_library_initialized_) {

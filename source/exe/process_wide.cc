@@ -61,7 +61,7 @@ ProcessWide::~ProcessWide() {
     // Clean it up here in case it is ever used.
     if (auto* dns_factory = Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(
             std::string(Network::CaresDnsResolver), true)) {
-      dns_factory->cleanup();
+      dns_factory->terminate();
     }
   }
 }

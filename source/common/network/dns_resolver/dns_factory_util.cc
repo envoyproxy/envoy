@@ -82,7 +82,7 @@ Network::DnsResolverFactory& createDnsResolverFactoryFromTypedConfig(
   auto& factory =
       Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
   // Perform factory initialization.
-  factory.init();
+  factory.initialize();
   return factory;
 }
 
