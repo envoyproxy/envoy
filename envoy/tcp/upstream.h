@@ -28,7 +28,7 @@ public:
 
   // The host name of the tunneling upstream HTTP request.
   // This function evaluates command operators if specified. Otherwise it returns host name as is.
-  virtual const std::string host(const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual std::string host(const StreamInfo::StreamInfo& stream_info) const PURE;
 
   // The method of the upstream HTTP request. True if using POST method, CONNECT otherwise.
   virtual bool usePost() const PURE;

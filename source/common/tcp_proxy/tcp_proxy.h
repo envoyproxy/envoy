@@ -119,7 +119,7 @@ public:
       : hostname_(config_message.hostname()), use_post_(config_message.use_post()),
         header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
         hostname_fmt_(std::move(hostname_fmt)) {}
-  const std::string host(const StreamInfo::StreamInfo& stream_info) const override {
+  std::string host(const StreamInfo::StreamInfo& stream_info) const override {
     return hostname_fmt_->format(*empty_request_headers_.get(), *empty_response_headers_.get(),
                                  *empty_response_trailers_.get(), stream_info, absl::string_view());
   }
