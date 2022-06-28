@@ -79,11 +79,8 @@ Config::SharedConfig::SharedConfig(
     idle_timeout_ = std::chrono::hours(1);
   }
   if (config.has_tunneling_config()) {
-    const auto& tunneling_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&>(
-        config.tunneling_config(), context.messageValidationVisitor());
     envoy::config::core::v3::SubstitutionFormatString sfs;
-    sfs.mutable_text_format_source()->set_inline_string(tunneling_config.hostname());
+    sfs.mutable_text_format_source()->set_inline_string(config.tunneling_config().hostname());
     Formatter::FormatterPtr hostname_fmt =
         Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sfs, context);
     tunneling_config_helper_ = std::make_unique<TunnelingConfigHelperImpl>(
