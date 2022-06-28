@@ -259,8 +259,8 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   // Local network Ratelimit
   local_ratelimit_prefix.name_ = tag_names.LOCAL_RATELIMIT_PREFIX;
-  regex_tester.testRegex("local_rate_limit.foo_ratelimiter.rate_limited", "local_rate_limit.rate_limited",
-                         {local_ratelimit_prefix});
+  regex_tester.testRegex("local_rate_limit.foo_ratelimiter.rate_limited",
+                         "local_rate_limit.rate_limited", {local_ratelimit_prefix});
 
   // Dynamo
   Tag dynamo_http_prefix;
