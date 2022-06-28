@@ -52,9 +52,8 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      Ssl::HandshakerFactoryCb handshaker_factory_cb)
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
-      info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
-          handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
-                                ctx_->sslExtendedSocketInfoIndex(), this))) {
+      info_(std::dynamic_pointer_cast<SslHandshakerImpl>(handshaker_factory_cb(
+          ctx_->newSsl(transport_socket_options_), ctx_->sslExtendedSocketInfoIndex(), this))) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {

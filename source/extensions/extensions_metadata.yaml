@@ -769,6 +769,13 @@ envoy.rate_limit_descriptors.expr:
   status: stable
   type_urls:
   - envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
+envoy.regex_engines.google_re2:
+  categories:
+  - envoy.regex_engines
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.regex_engines.v3.GoogleRE2
 envoy.request_id.uuid:
   categories:
   - envoy.request_id
