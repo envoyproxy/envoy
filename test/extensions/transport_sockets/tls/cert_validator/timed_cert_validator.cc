@@ -12,7 +12,7 @@ namespace Tls {
 ValidationResults TimedCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
-    const Network::TransportSocketOptions* transport_socket_options, SSL_CTX& ssl_ctx,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
     const CertValidator::ExtraValidationContext& validation_context, bool is_server,
     uint8_t current_tls_alert) {
   if (callback == nullptr) {
@@ -31,6 +31,8 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
     cert_chain_in_str_.emplace_back(reinterpret_cast<char*>(der), len);
     OPENSSL_free(der);
   }
+  Network::TransportSocketOptionsConstSharedPtr tmp = transport_socket_options;
+  tmp.reset();
   validation_timer_ =
       callback_->dispatcher().createTimer([&ssl_ctx, transport_socket_options, is_server, this]() {
         bssl::UniquePtr<STACK_OF(X509)> certs(sk_X509_new_null());

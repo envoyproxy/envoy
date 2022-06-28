@@ -49,9 +49,9 @@ public:
   ValidationResults
   doVerifyCertChain(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
                     Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                    const Network::TransportSocketOptions* transport_socket_options, SSL_CTX& ssl,
-                    const CertValidator::ExtraValidationContext& validation_context, bool is_server,
-                    uint8_t current_tls_alert) override;
+                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+                    SSL_CTX& ssl, const CertValidator::ExtraValidationContext& validation_context,
+                    bool is_server, uint8_t current_tls_alert) override;
 
   int initializeSslContexts(std::vector<SSL_CTX*> contexts, bool provides_certificates) override;
 

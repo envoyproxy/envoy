@@ -307,7 +307,7 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
 ValidationResults DefaultCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
-    const Network::TransportSocketOptions* transport_socket_options, SSL_CTX& ssl_ctx,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
     const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server,
     uint8_t current_tls_alert) {
   if (sk_X509_num(&cert_chain) == 0) {
@@ -365,8 +365,9 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     }
   }
   std::string error_details;
-  bool succeeded = verifyCertAndUpdateStatus(ssl_extended_info, leaf_cert, transport_socket_options,
-                                             &error_details, &current_tls_alert);
+  bool succeeded =
+      verifyCertAndUpdateStatus(ssl_extended_info, leaf_cert, transport_socket_options.get(),
+                                &error_details, &current_tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                        absl::nullopt, absl::nullopt}
                    : ValidationResults{ValidationResults::ValidationStatus::Failed,

@@ -398,7 +398,7 @@ typed_config:
       *context_manager_, *api_);
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
-      client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
+      client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr);
   ConnectionStatusCallbacks callbacks;
   connection->addConnectionCallbacks(callbacks);
   connection->connect();
@@ -444,7 +444,7 @@ typed_config:
       *context_manager_, *api_);
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
-      client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
+      client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr);
   ConnectionStatusCallbacks callbacks;
   connection->addConnectionCallbacks(callbacks);
   connection->connect();

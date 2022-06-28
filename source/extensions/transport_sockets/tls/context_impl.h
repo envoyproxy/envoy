@@ -94,11 +94,10 @@ public:
   bool verifyCertChain(X509& leaf_cert, STACK_OF(X509)& intermediates, std::string& error_details);
 
   // Validate cert asynchronously for a QUIC connection.
-  ValidationResults
-  customVerifyCertChainForQuic(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
-                               bool is_server,
-                               const Network::TransportSocketOptions* transport_socket_options,
-                               const CertValidator::ExtraValidationContext& validation_context);
+  ValidationResults customVerifyCertChainForQuic(
+      STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      const CertValidator::ExtraValidationContext& validation_context);
 
   static void keylogCallback(const SSL* ssl, const char* line);
 
@@ -127,10 +126,10 @@ protected:
                   const Stats::StatName fallback) const;
 
   // Helper function to validate cert for TCP connections asynchronously.
-  ValidationResults
-  customVerifyCertChain(Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
-                        const Network::TransportSocketOptions* transport_socket_options, SSL* ssl,
-                        uint8_t current_tls_alert);
+  ValidationResults customVerifyCertChain(
+      Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl,
+      uint8_t current_tls_alert);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
