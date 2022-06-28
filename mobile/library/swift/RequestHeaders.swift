@@ -29,6 +29,6 @@ public class RequestHeaders: Headers {
   ///
   /// - returns: The new builder.
   public func toRequestHeadersBuilder() -> RequestHeadersBuilder {
-    return RequestHeadersBuilder(headers: self.headers)
+    return RequestHeadersBuilder(container: self.container)
   }
 }

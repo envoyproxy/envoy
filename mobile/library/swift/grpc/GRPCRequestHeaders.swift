@@ -7,6 +7,6 @@ public final class GRPCRequestHeaders: RequestHeaders {
   ///
   /// - returns: The new builder.
   public func toGRPCRequestHeadersBuilder() -> GRPCRequestHeadersBuilder {
-    return GRPCRequestHeadersBuilder(headers: self.headers)
+    return GRPCRequestHeadersBuilder(container: self.container)
   }
 }

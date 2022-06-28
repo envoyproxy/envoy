@@ -100,11 +100,13 @@ class RequestHeadersBuilderTest {
       .add(":x-foo", "123")
       .add("x-envoy-mobile-foo", "abc")
       .add("host", "example.com")
+      .add("hostWithSuffix", "foo.bar")
       .build()
 
     assertThat(headers.allHeaders()).doesNotContainKey(":x-foo")
     assertThat(headers.allHeaders()).doesNotContainKey("x-envoy-mobile-foo")
     assertThat(headers.allHeaders()).doesNotContainKey("host")
+    assertThat(headers.value("hostWithSuffix")).containsExactly("foo.bar")
   }
 
   @Test

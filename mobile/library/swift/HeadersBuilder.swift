@@ -3,14 +3,19 @@ import Foundation
 private let kRestrictedPrefixes = [":", "x-envoy-mobile"]
 
 private func isRestrictedHeader(name: String) -> Bool {
-  return name == "host" || kRestrictedPrefixes.contains { name.hasPrefix($0) }
+  let isHostHeader = name.caseInsensitiveCompare("host") == .orderedSame
+  lazy var hasRestrictedPrefix = kRestrictedPrefixes
+    .contains { name.range(of: $0, options: [.caseInsensitive, .anchored]) != nil }
+  return isHostHeader || hasRestrictedPrefix
 }
 
 /// Base builder class used to construct `Headers` instances.
+/// It preserves the original casing of headers and enforces
+/// a case-insensitive lookup and setting of headers.
 /// See `{Request|Response}HeadersBuilder` for usage.
 @objcMembers
 public class HeadersBuilder: NSObject {
-  private(set) var headers: [String: [String]]
+  private(set) var container: HeadersContainer
 
   /// Append a value to the header name.
   ///
@@ -24,7 +29,7 @@ public class HeadersBuilder: NSObject {
       return self
     }
 
-    self.headers[name, default: []].append(value)
+    self.container.add(name: name, value: value)
     return self
   }
 
@@ -40,7 +45,7 @@ public class HeadersBuilder: NSObject {
       return self
     }
 
-    self.headers[name] = value
+    self.container.set(name: name, value: value)
     return self
   }
 
@@ -55,7 +60,7 @@ public class HeadersBuilder: NSObject {
       return self
     }
 
-    self.headers[name] = nil
+    self.container.set(name: name, value: nil)
     return self
   }
 
@@ -69,22 +74,34 @@ public class HeadersBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   func internalSet(name: String, value: [String]) -> Self {
-    self.headers[name] = value
+    self.container.set(name: name, value: value)
     return self
+  }
+
+  func allHeaders() -> [String: [String]] {
+    return self.container.allHeaders()
   }
 
   // Only explicitly implemented to work around a swiftinterface issue in Swift 5.1. This can be
   // removed once envoy is only built with Swift 5.2+
   public override init() {
-    self.headers = [:]
+    self.container = HeadersContainer()
     super.init()
   }
 
-  /// Initialize a new builder. Subclasses should provide their own public convenience initializers.
+  // Initialize a new builder using the provided headers container.
   ///
-  /// - parameter headers: The headers with which to start.
-  required init(headers: [String: [String]]) {
-    self.headers = headers
+  /// - parameter container: The headers container to initialize the receiver with.
+  init(container: HeadersContainer) {
+    self.container = container
+    super.init()
+  }
+
+  // Initialize a new builder. Subclasses should provide their own public convenience initializers.
+  //
+  // - parameter headers: The headers with which to start.
+  init(headers: [String: [String]]) {
+    self.container = HeadersContainer(headers: headers)
     super.init()
   }
 }
@@ -93,6 +110,6 @@ public class HeadersBuilder: NSObject {
 
 extension HeadersBuilder {
   public override func isEqual(_ object: Any?) -> Bool {
-    return (object as? Self)?.headers == self.headers
+    return (object as? Self)?.container == self.container
   }
 }

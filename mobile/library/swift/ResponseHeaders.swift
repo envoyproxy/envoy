@@ -11,6 +11,6 @@ public final class ResponseHeaders: Headers {
   ///
   /// - returns: The new builder.
   public func toResponseHeadersBuilder() -> ResponseHeadersBuilder {
-    return ResponseHeadersBuilder(headers: self.headers)
+    return ResponseHeadersBuilder(container: self.container)
   }
 }
