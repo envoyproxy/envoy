@@ -100,7 +100,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense
     // (see discussion in #6879), and so we should do something other than ignoring here.
-    ENVOY_LOG(error,
+    ENVOY_LOG(trace,
               "Server sent a delta {} update attempting to remove a resource (name: {}). Ignoring.",
               rds_type_, removed_resources[0]);
   }

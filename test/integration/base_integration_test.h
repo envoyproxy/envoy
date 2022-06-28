@@ -9,24 +9,21 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/common/common/thread.h"
-#include "source/common/config/api_version.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration_tcp_client.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/common.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
 
 #include "absl/types/optional.h"
-#include "spdlog/spdlog.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
@@ -357,12 +354,24 @@ public:
     return *fake_upstreams_.back();
   }
 
+  // Adds a fake upstream to the integration test setup. If `autonomous_upstream` is true, then a
+  // AutonomousUpstream instance will be created instead of a FakeUpstream instance. If
+  // `autonomous_upstream` is true, then `autonomous_allow_incomplete_streams` determines whether
+  // an end-of-stream is required on connections between the Envoy and the fake upstream. If
+  // `autonomous_upstream` is false, then `autonomous_allow_incomplete_streams` is ignored.
   FakeUpstream&
   addFakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
-                  Http::CodecType type) {
+                  Http::CodecType type, bool autonomous_upstream,
+                  bool autonomous_allow_incomplete_streams = false) {
     auto config = configWithType(type);
-    fake_upstreams_.emplace_back(
-        std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
+    if (autonomous_upstream) {
+      fake_upstreams_.emplace_back(
+          std::make_unique<AutonomousUpstream>(std::move(transport_socket_factory), 0, version_,
+                                               config, autonomous_allow_incomplete_streams));
+    } else {
+      fake_upstreams_.emplace_back(
+          std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
+    }
     return *fake_upstreams_.back();
   }
 
