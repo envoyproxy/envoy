@@ -1,7 +1,7 @@
 include = [
-    "library/swift/**/*.swift",
+    "library/swift/**.swift",
 ]
-column-limit = 110
+column-limit = 100
 ignore-throws = true
 first-letter = "lowercase"
 vertical-align = true

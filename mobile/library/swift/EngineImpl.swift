@@ -29,19 +29,19 @@ final class EngineImpl: NSObject {
 
   /// Initialize a new Envoy instance using a typed configuration.
   ///
-  /// - parameter config:          Configuration to use for starting Envoy.
-  /// - parameter logLevel:        Log level to use for this instance.
-  /// - parameter engine:          The underlying engine to use for starting Envoy.
+  /// - parameter config:   Configuration to use for starting Envoy.
+  /// - parameter logLevel: Log level to use for this instance.
+  /// - parameter engine:   The underlying engine to use for starting Envoy.
   convenience init(config: EnvoyConfiguration, logLevel: LogLevel = .info, engine: EnvoyEngine) {
     self.init(configType: .standard(config: config), logLevel: logLevel, engine: engine)
   }
 
   /// Initialize a new Envoy instance using a string configuration.
   ///
-  /// - parameter yaml:            Template yaml to use as basis for configuration.
-  /// - parameter config:          Configuration to use for starting Envoy.
-  /// - parameter logLevel:        Log level to use for this instance.
-  /// - parameter engine:          The underlying engine to use for starting Envoy.
+  /// - parameter yaml:     Template yaml to use as basis for configuration.
+  /// - parameter config:   Configuration to use for starting Envoy.
+  /// - parameter logLevel: Log level to use for this instance.
+  /// - parameter engine:   The underlying engine to use for starting Envoy.
   convenience init(yaml: String, config: EnvoyConfiguration, logLevel: LogLevel = .info,
                    engine: EnvoyEngine)
   {

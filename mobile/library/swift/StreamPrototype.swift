@@ -52,7 +52,8 @@ public class StreamPrototype: NSObject {
   /// reduced overall throughput, depending on usage.
   ///
   /// - parameter enabled: Whether explicit flow control will be enabled for the stream.
-  /// - returns:  This stream, for chaining syntax.
+  ///
+  /// - returns: This stream, for chaining syntax.
   public func setExplicitFlowControl(enabled: Bool) -> StreamPrototype {
     self.explicitFlowControl = enabled
     return self
