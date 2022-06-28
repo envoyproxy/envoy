@@ -46,91 +46,22 @@ public:
   virtual std::shared_ptr<SipSettings> settings() PURE;
 };
 
-class DownstreamConnectionInfoItem;
+//class DownstreamConnectionInfoItem;
+// class DownstreamConnectionInfos;
 class ConnectionManager;
 
 
 // Thread local wrapper aorund our map conn-id -> DownstreamConnectionInfoItem
 struct ThreadLocalDownstreamConnectionInfo : public ThreadLocal::ThreadLocalObject,
                                     public Logger::Loggable<Logger::Id::filter> {
-  ThreadLocalDownstreamConnectionInfo(std::shared_ptr<SipFilters::DownstreamConnectionInfos> parent)
+  ThreadLocalDownstreamConnectionInfo(std::shared_ptr<DownstreamConnectionInfos> parent)
       : parent_(parent) {
   }
   absl::flat_hash_map<std::string, std::shared_ptr<SipFilters::DecoderFilterCallbacks>> downstream_connection_info_map_{};
 
-  std::shared_ptr<SipFilters::DownstreamConnectionInfos> parent_;
+  std::shared_ptr<DownstreamConnectionInfos> parent_;
 };
 
-//, Logger::Loggable<Logger::Id::connection>
-class DownstreamConnectionInfosImpl: SipFilters::DownstreamConnectionInfos {
-public:
-   DownstreamConnectionInfosImpl(ThreadLocal::SlotAllocator& tls)
-      : tls_(tls.allocateSlot()){}
-
-  // init one threadlocal map per worker thread
-  void init() override {
-    // Note: `this` and `cluster_name` have a lifetime of the filter.
-    // That may be shorter than the tls callback if the listener is torn down shortly after it is
-    // created. We use a weak pointer to make sure this object outlives the tls callbacks.
-    std::weak_ptr<SipFilters::DownstreamConnectionInfos> this_weak_ptr = this->shared_from_this();
-    tls_->set(
-        [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-          UNREFERENCED_PARAMETER(dispatcher); // todo
-          if (auto this_shared_ptr = this_weak_ptr.lock()) {
-            return std::make_shared<ThreadLocalDownstreamConnectionInfo>(this_shared_ptr);
-          }
-          return nullptr;
-        });
-  }
-  ~DownstreamConnectionInfosImpl() override  = default;
-
-  void insertDownstreamConnection(std::string conn_id,
-                         Network::Connection* conn) override {
-    UNREFERENCED_PARAMETER(conn);
-    std::cerr << " POINTER DOWNSTREAM CONN MAP " << &(tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_) << std::endl;
-
-    if (hasDownstreamConnection(conn_id)) {
-      //ENVOY_LOG(info, "XXXXX NOT Inserting {} {}",  conn_id);
-      std::cerr << "XXXXX Not Inserting " << conn_id << std::endl;
-      return;
-    }
-    //ENVOY_LOG(info, "XXXXX Inserting {} {}",  conn_id);
-    std::cerr << "Contents before Inserting " << conn_id << std::endl;
-    for (const auto& i : tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_) {
-      std::cerr << "Item " << i.first << " ->  " << i.second << std::endl;
-    }
-    // // update the map in the local thread
-    // tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(std::make_pair(
-    //     conn_id, std::make_shared<DownstreamConnectionInfoItem>(conn)));
-
-    std::cerr << "Contents after Inserting " << conn_id << std::endl;
-    for (const auto& i : tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_) {
-      std::cerr << "XXY " << i.first << " -> " << i.second << std::endl;
-    }
-  }
-
-  size_t size() override {
-    return tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.size();
-  }
-
-  void deleteDownstreamConnection(std::string&& conn_id) override {
-    if (hasDownstreamConnection(conn_id)) {
-      // fixme - probably need to have this run on the main thread?
-      tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.erase(conn_id);
-    }
-  }
-
-  bool hasDownstreamConnection(std::string& conn_id) override {
-    return tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.contains(conn_id);
-  }
-
-  SipFilters::DecoderFilterCallbacks& getDownstreamConnection(std::string& conn_id) override {
-    return *(tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.at(conn_id));
-  }
-
-private:
-  ThreadLocal::SlotPtr tls_;
-};
 
 /**
  * Extends Upstream::ProtocolOptionsConfig with Sip-specific cluster options.
@@ -145,7 +76,6 @@ public:
   customizedAffinity() const PURE;
 };
 
-class ConnectionManager;
 class TrafficRoutingAssistantHandler : public TrafficRoutingAssistant::RequestCallbacks,
                                        public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -190,30 +120,12 @@ class ConnectionManager : public Network::ReadFilter,
 public:
   ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                     TimeSource& time_system, Server::Configuration::FactoryContext& context,
-                    std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstream_connections_info);
+                    std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connections_info);
   ~ConnectionManager() override;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
-  Network::FilterStatus onNewConnection() override {
-    // fixme - we need a somethign better than integer thread number here 
-    // - ideally some sort of base64(host@uuid) which is stored at the thread level and passed to each filter instance
-    std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString();
-    
-    // fixme - sja3Hash or connectionID doesn't appear to be populated
-    // downstream_conn_id_ = read_callbacks_->connection().connectionInfoProvider().ja3Hash().data();
-    // also going to need a unique value for the connection - e.g base64(remoteIPport@host@uuid)
-    Random::RandomGeneratorImpl random;
-    std::string remote_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
-    std::string local_address = read_callbacks_->connection().connectionInfoProvider().localAddress()->asString();
-    std::string uuid = random.uuid();
-    std::string downstream_conn_id = remote_address + "@" + local_address + "@" + uuid;
-    local_ingress_id_ = IngressID(thread_id, downstream_conn_id);
-
-    downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, &(read_callbacks_->connection()));
-    ENVOY_LOG(info, "XXXXXXXXXXXXXXXXXX thread_id={}, downstream_connection_id={}, n-connections={}", thread_id, downstream_conn_id, downstream_connection_infos_->size());
-    return Network::FilterStatus::Continue; 
-  }
+  Network::FilterStatus onNewConnection() override;
 
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks&) override;
 
@@ -245,10 +157,12 @@ public:
   }
   void eraseActiveTransFromPendingList(std::string& transaction_id) override {
     return pending_list_.eraseActiveTransFromPendingList(transaction_id);
-  }
+  }  
 
 private:
   friend class SipConnectionManagerTest;
+  friend class DownstreamConnectionInfoItem; // maybe Try to make DownstreamConnectionInfoItem a private inner class, once other issues are sorted
+
   struct ActiveTrans;
 
   struct ResponseDecoder : public DecoderCallbacks, public DecoderEventHandler {
@@ -308,7 +222,7 @@ private:
     std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
       return parent_.transactionInfos();
     }
-    std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstreamConnectionInfos() override {
+    std::shared_ptr<DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return parent_.downstreamConnectionInfos();
     }
     std::shared_ptr<SipSettings> settings() const override { return parent_.settings(); }
@@ -411,7 +325,7 @@ private:
     std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
       return parent_.transaction_infos_;
     }
-    std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstreamConnectionInfos() override {
+    std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return parent_.downstream_connection_infos_;
     }
     std::shared_ptr<SipSettings> settings() const override { return parent_.config_.settings(); }
@@ -469,64 +383,6 @@ private:
   void doDeferredTransDestroy(ActiveTrans& trans);
   void resetAllTrans(bool local_reset);
 
-  // Wrapper around a connection to enable routing of requests from upstream to downstream
-  class DownstreamConnectionInfoItem: public Logger::Loggable<Logger::Id::filter>, SipFilters::DecoderFilterCallbacks {
-  public:
-    DownstreamConnectionInfoItem(ConnectionManager& parent)
-        : parent_(parent), stream_info_(parent.time_source_, parent.read_callbacks_->connection().connectionInfoProviderSharedPtr())  {}
-
-    ~DownstreamConnectionInfoItem() override = default;
-
-    // // // SipFilters::DecoderFilterCallbacks
-    const Network::Connection* connection() const override  { return &parent_.read_callbacks_->connection(); }
-
-    uint64_t streamId() const override { return 0; }
-    std::string transactionId() const override { return ""; }
-    IngressID ingressID() override { return IngressID{"", ""}; } 
-
-    Router::RouteConstSharedPtr route() override {
-      return nullptr;
-    }
-    SipFilterStats& stats() override { return parent_.config_.stats(); }
-    void sendLocalReply(const DirectResponse& response, bool end_stream) override{
-      UNREFERENCED_PARAMETER(response);
-      UNREFERENCED_PARAMETER(end_stream);
-    }
-
-    void startUpstreamResponse() override;
-    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata) override { 
-      UNREFERENCED_PARAMETER(metadata);
-      return SipFilters::ResponseStatus::Complete;
-    };
-    void resetDownstreamConnection() override { };
-    StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
-
-    std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
-      return nullptr;
-    }
-    std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstreamConnectionInfos() override {
-      return nullptr;
-    }
-    std::shared_ptr<SipSettings> settings() const override { return parent_.config_.settings(); }
-    
-    void onReset() override {};
-
-    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
-      return nullptr;
-    }
-    
-    // N/A
-    void continueHandling(const std::string& key, bool try_next_affinity) override {
-      UNREFERENCED_PARAMETER(key);
-      UNREFERENCED_PARAMETER(try_next_affinity);  
-    }
-
-
-  private:
-    ConnectionManager& parent_;
-    StreamInfo::StreamInfoImpl stream_info_;
-  };
-
   Config& config_;
   SipFilterStats& stats_;
 
@@ -545,9 +401,110 @@ private:
 
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
-  std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstream_connection_infos_;
+  std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos_;
   PendingList pending_list_;
 };
+
+// Wrapper around a connection to enable routing of requests from upstream to downstream
+class DownstreamConnectionInfoItem: public Logger::Loggable<Logger::Id::filter>, SipFilters::DecoderFilterCallbacks {
+public:
+  DownstreamConnectionInfoItem(ConnectionManager& parent);
+  ~DownstreamConnectionInfoItem() override = default;
+
+  // // // SipFilters::DecoderFilterCallbacks
+  const Network::Connection* connection() const override;
+  SipFilterStats& stats() override;
+  std::shared_ptr<SipSettings> settings() const override;
+
+  uint64_t streamId() const override { return 0; }
+  std::string transactionId() const override { return ""; }
+  IngressID ingressID() override { return IngressID{"", ""}; } 
+
+  Router::RouteConstSharedPtr route() override {
+    return nullptr;
+  }
+
+  void sendLocalReply(const DirectResponse& response, bool end_stream) override {
+    UNREFERENCED_PARAMETER(response);
+    UNREFERENCED_PARAMETER(end_stream);
+  }
+
+  void startUpstreamResponse() override { };
+
+  SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata) override { 
+    UNREFERENCED_PARAMETER(metadata);
+    return SipFilters::ResponseStatus::Complete;
+  };
+
+  void resetDownstreamConnection() override { };
+
+  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+
+  std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
+    return nullptr;
+  }
+  std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
+    return nullptr;
+  }
+  
+  void onReset() override {};
+
+  std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
+    return nullptr;
+  }
+
+  void continueHandling(const std::string& key, bool try_next_affinity) override {
+    UNREFERENCED_PARAMETER(key);
+    UNREFERENCED_PARAMETER(try_next_affinity);  
+  }
+
+  MessageMetadataSharedPtr metadata() override { return nullptr; };
+
+  // SipFilters::PendingListHandler
+  void pushIntoPendingList(const std::string& type, const std::string& key,
+                                   SipFilters::DecoderFilterCallbacks& activetrans,
+                                   std::function<void(void)> func) override {
+    UNREFERENCED_PARAMETER(type);
+    UNREFERENCED_PARAMETER(key);
+    UNREFERENCED_PARAMETER(activetrans);
+    UNREFERENCED_PARAMETER(func);
+  }
+  void onResponseHandleForPendingList(
+      const std::string& type, const std::string& key,
+      std::function<void(MessageMetadataSharedPtr, DecoderEventHandler&)> func) override {
+    UNREFERENCED_PARAMETER(type);
+    UNREFERENCED_PARAMETER(key);
+    UNREFERENCED_PARAMETER(func);
+  }
+  void eraseActiveTransFromPendingList(std::string& transaction_id) override {
+    UNREFERENCED_PARAMETER(transaction_id);
+  }
+private:
+  ConnectionManager& parent_;
+  StreamInfo::StreamInfoImpl stream_info_;
+};
+
+class DownstreamConnectionInfos: public std::enable_shared_from_this<DownstreamConnectionInfos>, Logger::Loggable<Logger::Id::connection> {
+public:
+   DownstreamConnectionInfos(ThreadLocal::SlotAllocator& tls)
+      : tls_(tls.allocateSlot()){}
+
+  // init one threadlocal map per worker thread
+  void init();
+  ~DownstreamConnectionInfos()  = default;
+
+  void insertDownstreamConnection(std::string conn_id, ConnectionManager& conn_manager);
+  size_t size();
+
+  void deleteDownstreamConnection(std::string&& conn_id);
+
+  bool hasDownstreamConnection(std::string& conn_id);
+  SipFilters::DecoderFilterCallbacks& getDownstreamConnection(std::string& conn_id);
+
+private:
+  ThreadLocal::SlotPtr tls_;
+};
+
 
 } // namespace SipProxy
 } // namespace NetworkFilters

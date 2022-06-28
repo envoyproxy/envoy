@@ -364,9 +364,7 @@ public:
   void releaseConnection(bool close);
 
   SipFilters::DecoderFilterCallbacks* getTransaction(std::string&& transaction_id);
-  SipFilters::DecoderFilterCallbacks* getDownstreamConnection(std::string& downstream_connection_id) {
-    return &callbacks_->downstreamConnectionInfos()->getDownstreamConnection(downstream_connection_id);
-  }
+  SipFilters::DecoderFilterCallbacks* getDownstreamConnection(std::string& downstream_connection_id); 
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -409,7 +407,7 @@ private:
   ConnectionState conn_state_{ConnectionState::NotConnected};
 
   std::shared_ptr<TransactionInfo> transaction_info_;
-  std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstream_connection_info_;
+  std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_info_;
   SipFilters::DecoderFilterCallbacks* callbacks_{};
   MessageMetadataSharedPtr metadata_;
   Buffer::OwnedImpl upstream_buffer_;

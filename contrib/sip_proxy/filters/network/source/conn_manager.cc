@@ -159,12 +159,32 @@ void TrafficRoutingAssistantHandler::doSubscribe(
 ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                                      TimeSource& time_source,
                                      Server::Configuration::FactoryContext& context,
-                                     std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstream_connection_infos)
+                                     std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos)
     : config_(config), stats_(config_.stats()), decoder_(std::make_unique<Decoder>(*this)),
       random_generator_(random_generator), time_source_(time_source), context_(context),
       transaction_infos_(transaction_infos), downstream_connection_infos_(downstream_connection_infos) {}
 
 ConnectionManager::~ConnectionManager() = default;
+
+  Network::FilterStatus ConnectionManager::onNewConnection() {
+    // fixme - we need a somethign better than integer thread number here 
+    // - ideally some sort of base64(host@uuid) which is stored at the thread level and passed to each filter instance
+    std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString();
+    
+    // fixme - sja3Hash or connectionID doesn't appear to be populated
+    // downstream_conn_id_ = read_callbacks_->connection().connectionInfoProvider().ja3Hash().data();
+    // also going to need a unique value for the connection - e.g base64(remoteIPport@host@uuid)
+    Random::RandomGeneratorImpl random;
+    std::string remote_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
+    std::string local_address = read_callbacks_->connection().connectionInfoProvider().localAddress()->asString();
+    std::string uuid = random.uuid();
+    std::string downstream_conn_id = remote_address + "@" + local_address + "@" + uuid;
+    local_ingress_id_ = IngressID(thread_id, downstream_conn_id);
+
+    downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
+    ENVOY_LOG(info, "XXXXXXXXXXXXXXXXXX thread_id={}, downstream_connection_id={}, n-connections={}", thread_id, downstream_conn_id, downstream_connection_infos_->size());
+    return Network::FilterStatus::Continue; 
+  }
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(
@@ -564,6 +584,65 @@ ConnectionManager::ActiveTrans::upstreamData(MessageMetadataSharedPtr metadata) 
 
 void ConnectionManager::ActiveTrans::resetDownstreamConnection() {
   parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+DownstreamConnectionInfoItem::DownstreamConnectionInfoItem(ConnectionManager& parent)
+    : parent_(parent), stream_info_(parent.time_source_, parent.read_callbacks_->connection().connectionInfoProviderSharedPtr())  {}
+
+// // // SipFilters::DecoderFilterCallbacks
+const Network::Connection* DownstreamConnectionInfoItem::connection() const   { 
+  return &parent_.read_callbacks_->connection();
+}
+
+SipFilterStats& DownstreamConnectionInfoItem::stats() { return parent_.config_.stats(); }
+
+std::shared_ptr<SipSettings> DownstreamConnectionInfoItem::settings() const  { 
+  return parent_.config_.settings(); 
+}
+
+void DownstreamConnectionInfos::init()  {
+  // Note: `this` and `cluster_name` have a lifetime of the filter.
+  // That may be shorter than the tls callback if the listener is torn down shortly after it is
+  // created. We use a weak pointer to make sure this object outlives the tls callbacks.
+  std::weak_ptr<DownstreamConnectionInfos> this_weak_ptr = this->shared_from_this();
+  tls_->set(
+      [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        UNREFERENCED_PARAMETER(dispatcher); // todo
+        if (auto this_shared_ptr = this_weak_ptr.lock()) {
+          return std::make_shared<ThreadLocalDownstreamConnectionInfo>(this_shared_ptr);
+        }
+        return nullptr;
+      });
+}
+
+void DownstreamConnectionInfos::insertDownstreamConnection(std::string conn_id, ConnectionManager& conn_manager) {
+  //UNREFERENCED_PARAMETER(conn_manager);
+
+  if (hasDownstreamConnection(conn_id)) {
+    return;
+  }
+  // Error here!
+  tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(std::make_pair(
+      conn_id, std::make_shared<DownstreamConnectionInfoItem>(conn_manager)));
+}
+
+size_t DownstreamConnectionInfos::size() {
+  return tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.size();
+}
+
+void DownstreamConnectionInfos::deleteDownstreamConnection(std::string&& conn_id) {
+  if (hasDownstreamConnection(conn_id)) {
+    // fixme - probably need to have this run on the main thread?
+    tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.erase(conn_id);
+  }
+}
+
+bool DownstreamConnectionInfos::hasDownstreamConnection(std::string& conn_id) {
+  return tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.contains(conn_id);
+}
+
+SipFilters::DecoderFilterCallbacks& DownstreamConnectionInfos::getDownstreamConnection(std::string& conn_id) {
+  return *(tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.at(conn_id));
 }
 
 } // namespace SipProxy

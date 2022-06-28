@@ -5,7 +5,6 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "filters/filter.h"
 #include "router/router.h"
 #include "source/common/config/utility.h"
 
@@ -74,7 +73,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   // to enable demultiplexing of new upstream transactions to the correct downstream 
   // Shouldn't really need to use a TLS I don't think, but we need a common place in a worker thread
   // to share out the map from
-  std::shared_ptr<SipFilters::DownstreamConnectionInfos> downstream_connection_info = std::make_shared<SipProxy::DownstreamConnectionInfosImpl>(context.threadLocal(), *filter_config);
+  auto downstream_connection_info = std::make_shared<SipProxy::DownstreamConnectionInfos>(context.threadLocal());
   downstream_connection_info->init();
 
   std::cerr << "Main Thread: " << context.api().threadFactory().currentThreadId().debugString() << std::endl;
@@ -82,7 +81,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   return
       [filter_config, &context, transaction_infos, downstream_connection_info](Network::FilterManager& filter_manager) -> void {
 
-        std::cerr << "Creating New ConnectionManager. Thread: " << context.api().threadFactory().currentThreadId().debugString() << std::endl;
+        std::cerr << "Creating New ConnectionManager. Thread: " << context.api().threadFactory().currentThreadId().debugString() << std::endl;  
 
         filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
             *filter_config, context.api().randomGenerator(),

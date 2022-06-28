@@ -662,6 +662,10 @@ SipFilters::DecoderFilterCallbacks* UpstreamRequest::getTransaction(std::string&
   }
 }
 
+SipFilters::DecoderFilterCallbacks* UpstreamRequest::getDownstreamConnection(std::string& downstream_connection_id) {
+  return &callbacks_->downstreamConnectionInfos()->getDownstreamConnection(downstream_connection_id);
+}
+
 // Tcp::ConnectionPool::UpstreamCallbacks
 void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   UNREFERENCED_PARAMETER(end_stream);
