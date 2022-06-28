@@ -253,7 +253,7 @@ public class EnvoyConfiguration {
                               enableDrainPostDnsRefresh ? "true" : "false"))
         .append(String.format("- &enable_interface_binding %s\n",
                               enableInterfaceBinding ? "true" : "false"))
-        .append(String.format("- &android_force_ipv6 %s\n", forceIPv6 ? "true" : "false"))
+        .append(String.format("- &force_ipv6 %s\n", forceIPv6 ? "true" : "false"))
         .append(String.format("- &h2_connection_keepalive_idle_interval %ss\n",
                               h2ConnectionKeepaliveIdleIntervalMilliseconds / 1000.0))
         .append(String.format("- &h2_connection_keepalive_timeout %ss\n",
