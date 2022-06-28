@@ -524,8 +524,7 @@ public:
 
   void init() override {
     // Initialize c-ares library in case first time.
-    absl::Mutex mutex;
-    absl::MutexLock lock(&mutex);
+    absl::MutexLock lock(&mutex_);
     if (!ares_library_initialized_) {
       ares_library_initialized_ = true;
       ares_library_init(ARES_LIB_INIT_ALL);
@@ -533,13 +532,16 @@ public:
   }
   void cleanup() override {
     // Cleanup c-ares library if initialized.
+    absl::MutexLock lock(&mutex_);
     if (ares_library_initialized_) {
+      ares_library_initialized_ = false;
       ares_library_cleanup();
     }
   }
 
 private:
-  mutable bool ares_library_initialized_{false};
+  bool ares_library_initialized_ ABSL_GUARDED_BY(mutex_){false};
+  absl::Mutex mutex_;
 };
 
 // Register the CaresDnsResolverFactory

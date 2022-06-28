@@ -26,7 +26,19 @@ public:
       const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) const PURE;
 
   std::string category() const override { return std::string(DnsResolverCategory); }
+
+  /*
+   * Initialize the related data for this type of DNS resolver.
+   * For some DNS resolvers, like c-ares, there are some specific data structure
+   * needs to be initialized before using it to resolve target.
+   */
   virtual void init() {}
+
+  /*
+   * Cleanup the related data for this type of DNS resolver.
+   * For some DNS resolvers, like c-ares, there are some specific data structure
+   * needs to be cleaned up before terminates Envoy.
+   */
   virtual void cleanup() {}
 };
 
