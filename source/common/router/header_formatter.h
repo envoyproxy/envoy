@@ -100,12 +100,15 @@ private:
   const bool append_;
 };
 
-class HeaderFormatterNew {
+/**
+ * HttpHeaderFormatter is used by HTTP headers manipulators.
+ **/
+class HttpHeaderFormatter {
 public:
-  virtual ~HeaderFormatterNew() = default;
+  virtual ~HttpHeaderFormatter() = default;
 
   virtual const std::string format(const Http::RequestHeaderMap& request_headers,
-                                   const Http::ResponseHeaderMap& headers,
+                                   const Http::ResponseHeaderMap& response_headers,
                                    const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
@@ -115,76 +118,26 @@ public:
   virtual bool append() const PURE;
 };
 
-using HeaderFormatterNewPtr = std::unique_ptr<HeaderFormatterNew>;
+using HttpHeaderFormatterPtr = std::unique_ptr<HttpHeaderFormatter>;
 
 /**
- * A formatter that expands the request header variable to a value based on info in StreamInfo.
+ * Implementaion of HttpHeaderFormatter.
+ * Actual formatting is done via substitution formatters.
  */
-#if 0
-class StreamInfoHeaderFormatterNew : public HeaderFormatterNew {
+class HttpHeaderFormatterImpl : public HttpHeaderFormatter {
 public:
-  StreamInfoHeaderFormatterNew(absl::string_view field_name, bool append);
-
-  // HeaderFormatter::format
-  const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override;
-  bool append() const override { return append_; }
-
-  using FieldExtractor = std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>;
-  using FormatterPtrMap = absl::node_hash_map<std::string, Envoy::Formatter::FormatterPtr>;
-
-private:
-  FieldExtractor field_extractor_;
-  const bool append_;
-
-  // Maps a string format pattern (including field name and any command operators between
-  // parenthesis) to the list of FormatterProviderPtrs that are capable of formatting that pattern.
-  // We use a map here to make sure that we only create a single parser for a given format pattern
-  // even if it appears multiple times in the larger formatting context (e.g. it shows up multiple
-  // times in a format string).
-  FormatterPtrMap formatter_map_;
-};
-
-/**
- * A formatter that returns back the same static header value.
- */
-class PlainHeaderFormatterNew : public HeaderFormatterNew {
-public:
-  PlainHeaderFormatterNew(const std::string& static_header_value, bool append)
-      : static_value_(static_header_value), append_(append) {}
-
-  // HeaderFormatter::format
-  const std::string format(const Envoy::StreamInfo::StreamInfo&) const override {
-    return static_value_;
-  };
-  bool append() const override { return append_; }
-
-private:
-  const std::string static_value_;
-  const bool append_;
-};
-#endif
-
-/**
- * A formatter that produces a value by concatenating the results of multiple HeaderFormatters.
- */
-class CompoundHeaderFormatterNew : public HeaderFormatterNew {
-public:
-  CompoundHeaderFormatterNew(Formatter::FormatterPtr&& formatter, bool append)
+  HttpHeaderFormatterImpl(Formatter::FormatterPtr&& formatter, bool append)
       : formatter_(std::move(formatter)), append_(append) {}
 
-  // HeaderFormatter::format
+  // HttpHeaderFormatter::format
   const std::string format(const Http::RequestHeaderMap& request_headers,
                            const Http::ResponseHeaderMap& response_headers,
                            const Envoy::StreamInfo::StreamInfo& stream_info) const override {
     std::string buf;
-    // auto empty_req_map = Http::RequestHeaderMapImpl::create();
-    //   auto empty_response_map = Http::ResponseHeaderMapImpl::create();
-    auto empty_trailers_map = Http::ResponseTrailerMapImpl::create();
 
-    // for (const auto& formatter : formatters_) {
-    buf =
-        formatter_->format(request_headers, response_headers, *empty_trailers_map, stream_info, "");
-    //}
+    // Trailers are not available when HTTP headers are manipulated.
+    buf = formatter_->format(request_headers, response_headers,
+                             *Http::StaticEmptyHeaders::get().response_trailers, stream_info, "");
 
     return buf;
   };
@@ -201,10 +154,10 @@ private:
 // This is basically a bridge between "new" header formatters which take request_headers and
 // response_headers as parameters and "old" header formatters which take only stream_info as
 // parameter.
-class HeaderFormatterBridge : public HeaderFormatterNew {
+class HttpHeaderFormatterBridge : public HttpHeaderFormatter {
 public:
-  HeaderFormatterBridge() = delete;
-  HeaderFormatterBridge(HeaderFormatterPtr&& header_formatter, bool append)
+  HttpHeaderFormatterBridge() = delete;
+  HttpHeaderFormatterBridge(HeaderFormatterPtr&& header_formatter, bool append)
       : header_formatter_(std::move(header_formatter)), append_(append) {}
 
   const std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,

@@ -35,8 +35,8 @@ enum class ParserState {
 
 std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%%", "%"}}); }
 
-HeaderFormatterNewPtr parseInternalNew(const envoy::config::core::v3::HeaderValue& header_value,
-                                       bool append) {
+HttpHeaderFormatterPtr
+parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_value, bool append) {
   const std::string& key = header_value.key();
   // PGV constraints provide this guarantee.
   ASSERT(!key.empty());
@@ -58,7 +58,7 @@ HeaderFormatterNewPtr parseInternalNew(const envoy::config::core::v3::HeaderValu
   final_header_value = HeaderParser::translatePerRequestState(final_header_value);
 
   // Let the substitution formatter Parse the final_header_value.
-  return std::make_unique<CompoundHeaderFormatterNew>(
+  return std::make_unique<HttpHeaderFormatterImpl>(
       std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true), append);
 }
 
@@ -258,14 +258,12 @@ HeaderParserPtr HeaderParser::configure(
 
   for (const auto& header_value_option : headers_to_add) {
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
-    HeaderFormatterNewPtr header_formatter;
+    HttpHeaderFormatterPtr header_formatter;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-      // header_formatter =
-      // std::make_unique<CompoundHeaderFormatterNew>(parseInternalNew(header_value, append),
-      // append);
-      header_formatter = parseInternalNew(header_value_option.header(), append);
+      header_formatter = parseHttpHeaderFormatter(header_value_option.header(), append);
     } else {
-      header_formatter = std::make_unique<HeaderFormatterBridge>(
+      // Use "old" implementation of header formatters.
+      header_formatter = std::make_unique<HttpHeaderFormatterBridge>(
           parseInternal(header_value_option.header(), append), append);
     }
     header_parser->headers_to_add_.emplace_back(
@@ -283,15 +281,13 @@ HeaderParserPtr HeaderParser::configure(
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value : headers_to_add) {
-    HeaderFormatterNewPtr header_formatter;
+    HttpHeaderFormatterPtr header_formatter;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-      // header_formatter =
-      // std::make_unique<CompoundHeaderFormatterNew>(parseInternalNew(header_value, append),
-      // append);
-      header_formatter = parseInternalNew(header_value, append);
+      header_formatter = parseHttpHeaderFormatter(header_value, append);
     } else {
+      // Use "old" implementation of header formatters.
       header_formatter =
-          std::make_unique<HeaderFormatterBridge>(parseInternal(header_value, append), append);
+          std::make_unique<HttpHeaderFormatterBridge>(parseInternal(header_value, append), append);
     }
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value.key()),

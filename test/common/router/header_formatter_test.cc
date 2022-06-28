@@ -1039,6 +1039,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"before %%%VAR after",
        {},
        {"Invalid header configuration. Un-terminated variable expression 'VAR after'"}},
+      {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
 
       // Parsing errors in variable expressions that take a JSON-array parameter.
       {"%UPSTREAM_METADATA([\"\\",
@@ -1088,8 +1089,6 @@ TEST(HeaderParserTest, TestParseInternal) {
     envoy_reloadable_features_unified_header_formatter is deprecated.
     */
   static const TestCase obsolete_test_cases[] = {
-      // It will be treated as string "% ".
-      {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
       // Single key is allowed in UPSTREAM_METADATA
       {"%UPSTREAM_METADATA(no array)%",
        {},

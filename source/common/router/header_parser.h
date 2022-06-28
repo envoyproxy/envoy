@@ -76,7 +76,7 @@ protected:
 
 private:
   struct HeadersToAddEntry {
-    HeaderFormatterNewPtr formatter_;
+    HttpHeaderFormatterPtr formatter_;
     const std::string original_value_;
     const bool add_if_empty_ = false;
   };
