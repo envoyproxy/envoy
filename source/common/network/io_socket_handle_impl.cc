@@ -9,22 +9,6 @@
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
-#include <net/if.h>
-//#include <net/route.h>
-//#include <net/raw_cb.h>
-//#include <net/dlil.h>
-
-#include <netinet/in.h>
-//#include <netinet/in_var.h>
-
-#include <netinet/ip6.h>
-//#include <netinet6/ip6_var.h>
-//#include <netinet6/scope6_var.h>
-//#include <netinet6/ip6_mroute.h>
-#include <netinet/icmp6.h>
-//#include <netinet6/pim6.h>
-//#include <netinet6/pim6_var.h>
-
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
 
