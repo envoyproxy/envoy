@@ -86,6 +86,45 @@ TEST_F(TransportSocketOptionsImplTest, Both) {
   EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
 }
 
+class TestTransportSocketFactory : public CommonUpstreamTransportSocketFactory {
+public:
+  TransportSocketPtr
+  createTransportSocket(TransportSocketOptionsConstSharedPtr,
+                        std::shared_ptr<const Upstream::HostDescription>) const override {
+    return nullptr;
+  }
+  absl::string_view defaultServerNameIndication() const override { return ""; }
+};
+
+class NonHashableObj : public StreamInfo::FilterState::Object {};
+class HashableObj : public StreamInfo::FilterState::Object, public Hashable {
+  absl::optional<uint64_t> hash() const override { return 12345; };
+};
+
+TEST_F(TransportSocketOptionsImplTest, FilterStateHashable) {
+  filter_state_.setData("hashable", std::make_shared<HashableObj>(),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  TestTransportSocketFactory factory;
+  std::vector<uint8_t> keys;
+  factory.hashKey(keys, transport_socket_options);
+  EXPECT_GT(keys.size(), 0);
+}
+
+TEST_F(TransportSocketOptionsImplTest, FilterStateNonHashable) {
+  filter_state_.setData("non-hashable", std::make_shared<NonHashableObj>(),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  TestTransportSocketFactory factory;
+  std::vector<uint8_t> keys;
+  factory.hashKey(keys, transport_socket_options);
+  EXPECT_EQ(keys.size(), 0);
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

@@ -161,7 +161,7 @@ protected:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
-        createTransportSocket(), socket_options_, nullptr);
+        createTransportSocket(), socket_options_, transport_socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -293,6 +293,7 @@ protected:
   Address::InstanceConstSharedPtr source_address_;
   Socket::OptionsSharedPtr socket_options_;
   StreamInfo::StreamInfoImpl stream_info_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_ = nullptr;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplTest,
@@ -3085,10 +3086,20 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClientConnectionWithCustomRawBufferSocketTe
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+class TestObject : public StreamInfo::FilterState::Object {};
+
 TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) {
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  auto filter_state_object = std::make_shared<TestObject>();
+  filter_state.setData("test-filter-state", filter_state_object,
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::Connection,
+                       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+  transport_socket_options_ = TransportSocketOptionsUtility::fromFilterState(filter_state);
   setUpBasicConnection();
 
   EXPECT_TRUE(getTransportSocket()->compareCallbacks(testClientConnection()));
+  EXPECT_TRUE(client_connection_->streamInfo().filterState()->hasDataWithName("test-filter-state"));
 
   disconnect(false);
 }

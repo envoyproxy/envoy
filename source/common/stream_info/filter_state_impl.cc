@@ -14,7 +14,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
           "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
     }
     maybeCreateParent(ParentAccessMode::ReadWrite);
-    parent_->setData(data_name, data, state_type, life_span);
+    parent_->setData(data_name, data, state_type, life_span, stream_sharing);
     return;
   }
   if (parent_ && parent_->hasDataWithName(data_name)) {
