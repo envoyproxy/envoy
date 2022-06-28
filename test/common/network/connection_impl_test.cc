@@ -433,7 +433,7 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   }
 
   client_connection_ = dispatcher_->createClientConnection(
-      broadcast_address, source_address_, Network::Test::createRawBufferSocket(), nullptr);
+      broadcast_address, source_address_, Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection_->addConnectionCallbacks(client_callbacks_);
   client_connection_->connect();
 
@@ -551,7 +551,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_->connectionInfoProvider().localAddress(), source_address_,
-            Network::Test::createRawBufferSocket(), server_connection_->socketOptions());
+            Network::Test::createRawBufferSocket(), server_connection_->socketOptions(), nullptr);
       }));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -600,7 +600,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_->connectionInfoProvider().localAddress(), source_address_,
-            Network::Test::createRawBufferSocket(), server_connection_->socketOptions());
+            Network::Test::createRawBufferSocket(), server_connection_->socketOptions(), nullptr);
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
       }));
 
@@ -1407,7 +1407,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->connectionInfoProvider().localAddress(), source_address_,
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
 
   MockConnectionStats connection_stats;
   client_connection_->setConnectionStats(connection_stats.toBufferStats());
@@ -2879,10 +2879,10 @@ public:
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
 
-    client_connection_ =
-        dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
-                                            Network::Address::InstanceConstSharedPtr(),
-                                            Network::Test::createRawBufferSocket(), nullptr);
+    client_connection_ = dispatcher_->createClientConnection(
+        socket_->connectionInfoProvider().localAddress(),
+        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
+        nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 
@@ -2965,7 +2965,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   }
   ClientConnectionPtr connection =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          Network::Test::createRawBufferSocket(), nullptr);
+                                          Network::Test::createRawBufferSocket(), nullptr, nullptr);
   connection->connect();
   connection->noDelay(true);
   connection->close(ConnectionCloseType::NoFlush);
@@ -2978,7 +2978,8 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
       Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
+      nullptr);
   connection->connect();
   connection->noDelay(true);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -2993,7 +2994,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefusedWithTransportError) {
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
       Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
-      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr, nullptr);
   connection->connect();
   connection->noDelay(true);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -3019,7 +3020,7 @@ TEST_F(PipeClientConnectionImplTest, SkipSocketOptions) {
   options->emplace_back(option);
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
       Utility::resolveUrl("unix://" + path_), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), options);
+      Network::Test::createRawBufferSocket(), options, nullptr);
   connection->close(ConnectionCloseType::NoFlush);
 }
 
@@ -3027,7 +3028,7 @@ TEST_F(PipeClientConnectionImplTest, SkipSocketOptions) {
 TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
       Utility::resolveUrl("unix://" + path_), Utility::resolveUrl("tcp://1.2.3.4:5"),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
   connection->close(ConnectionCloseType::NoFlush);
 }
 
@@ -3056,9 +3057,9 @@ TEST_F(InternalClientConnectionImplTest,
 
   ASSERT_DEATH(
       {
-        ClientConnectionPtr connection =
-            dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                                Network::Test::createRawBufferSocket(), nullptr);
+        ClientConnectionPtr connection = dispatcher_->createClientConnection(
+            address, Network::Address::InstanceConstSharedPtr(),
+            Network::Test::createRawBufferSocket(), nullptr, nullptr);
       },
       "");
 }
