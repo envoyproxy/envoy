@@ -1088,7 +1088,7 @@ envoy.matching.inputs.cookies:
   security_posture: unknown
   status: alpha
   type_urls:
-  - envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+  - envoy.type.matcher.v3.HttpRequestCookieMatchInput
 envoy.matching.inputs.request_headers:
   categories:
   - envoy.matching.http.input
