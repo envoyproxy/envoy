@@ -247,6 +247,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->headers().getConnectionValue(), "close");
   } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
   codec_client_->close();

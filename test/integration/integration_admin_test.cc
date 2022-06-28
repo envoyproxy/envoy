@@ -138,8 +138,13 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(response->body(), HasSubstr("admin commands are:"));
 
   EXPECT_EQ("200", request("admin", "GET", "/", response));
+#ifdef ENVOY_ADMIN_HTML
   EXPECT_EQ("text/html; charset=UTF-8", contentType(response));
   EXPECT_THAT(response->body(), HasSubstr("<title>Envoy Admin</title>"));
+#else
+  EXPECT_EQ("text/plain", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("HTML output was disabled"));
+#endif
 
   EXPECT_EQ("200", request("admin", "GET", "/server_info", response));
   EXPECT_EQ("application/json", contentType(response));

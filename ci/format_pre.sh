@@ -65,6 +65,11 @@ fix_format () {
 CURRENT=check_format
 "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check || fix_format
 
+CURRENT=buf
+cd api/ || exit 1
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" @com_github_bufbuild_buf//:bin/buf lint
+cd - || exit 1
+
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2
     for failed in "${FAILED[@]}"; do

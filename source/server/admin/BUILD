@@ -2,6 +2,8 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_admin_html",
+    "envoy_select_admin_no_html",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +12,11 @@ envoy_package()
 
 envoy_cc_library(
     name = "admin_lib",
-    srcs = ["admin.cc"],
+    srcs = ["admin.cc"] + envoy_select_admin_html([
+        "admin_html.cc",
+    ]) + envoy_select_admin_no_html([
+        "admin_no_html.cc",
+    ]),
     hdrs = ["admin.h"],
     deps = [
         ":admin_filter_lib",
@@ -45,7 +51,6 @@ envoy_cc_library(
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
-        "//source/common/html:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:date_provider_lib",
