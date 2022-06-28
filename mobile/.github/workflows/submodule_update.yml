@@ -46,5 +46,5 @@ jobs:
         base: main
         delete-branch: true
         branch: update-envoy
-        branch-suffix: short-commit-hash
+        branch-suffix: timestamp
         reviewers: ${{ steps.support.outputs.maintainer }}
