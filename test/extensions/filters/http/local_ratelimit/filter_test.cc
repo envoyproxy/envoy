@@ -36,7 +36,7 @@ response_headers_to_add:
       key: x-test-rate-limit
       value: 'true'
   - header:
-      key: test-resp-req-id 
+      key: test-resp-req-id
       value: '%REQ(test-req-id)%'
 request_headers_to_add_when_not_enforced:
   - append: false

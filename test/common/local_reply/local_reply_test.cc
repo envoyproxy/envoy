@@ -370,7 +370,7 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
           append: true
         - header:
             key: local-reply-req-id
-            value: '%REQ(req-id)%' 
+            value: '%REQ(req-id)%'
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
