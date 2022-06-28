@@ -330,6 +330,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   }
 
   struct RequestInfo request_info;
+  request_info.reject_binding_body_field_collisions =
+      request_validation_options_.reject_binding_body_field_collisions();
   std::vector<VariableBinding> variable_bindings;
   method_info =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
