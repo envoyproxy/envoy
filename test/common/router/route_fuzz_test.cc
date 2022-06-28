@@ -69,11 +69,8 @@ bool validateOnMatchConfig(const xds::type::matcher::v3::Matcher::OnMatch& on_ma
     // fuzzer will not follow this path any further.
     return false;
   }
-    // By not providing a default: the compiler will indicate new constants in the
-    // Matcher_OnMatch enum as compile warnings.
   }
-  // This is present only to silence compilers that do not analyze the switch above correctly.
-  return false;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool validateMatcherConfig(const xds::type::matcher::v3::Matcher& matcher) {
