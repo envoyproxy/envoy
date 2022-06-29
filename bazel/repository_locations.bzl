@@ -1,4 +1,19 @@
 # This should match the schema defined in external_deps.bzl.
+
+PROTOBUF_VERSION = "3.19.4"
+
+# These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
+# and both must match the names from the protobuf releases (see
+# https://github.com/protocolbuffers/protobuf/releases).
+# The names change in upcoming versions.
+# The shas are calculated from the downloads on the releases page.
+PROTOC_VERSIONS = dict(
+    linux_aarch_64 = "95584939e733bdd6ffb8245616b2071f565cd4c28163b6c21c8f936a9ee20861",
+    linux_x86_64 = "058d29255a08f8661c8096c92961f3676218704cbd516d3916ec468e139cbd87",
+    osx_x86_64 = "d8b55cf1e887917dd43c447d77bd5bd213faff1e18ac3a176b35558d86f7ffff",
+    win64 = "828d2bdfe410e988cfc46462bcabd34ffdda8cc172867989ec647eadc55b03b5",
+)
+
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_compdb = dict(
         project_name = "bazel-compilation-database",
@@ -15,10 +30,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Gazelle",
         project_desc = "Bazel BUILD file generator for Go projects",
         project_url = "https://github.com/bazelbuild/bazel-gazelle",
-        version = "0.24.0",
-        sha256 = "de69a09dc70417580aabf20a28619bb3ef60d038470c7cf8442fafcf627c21cb",
+        version = "0.25.0",
+        sha256 = "5982e5463f171da99e3bdaeff8c0f48283a7a5f396ec5282910b9e8a49c0dd7e",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
-        release_date = "2021-10-11",
+        release_date = "2022-03-23",
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
@@ -80,13 +95,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-100.0.4896.30 (linux/beta)
-        version = "cacb5526268191ab52e3a8b2d71f686115776646",
-        sha256 = "fd72798ee22beb9f052d792d6c701d3ea94183c2e5b94e737866a53152b46f41",
+        # chromium-103.0.5060.24 (linux/beta)
+        version = "62079f7cb4e9a2d5d8a68fe8a4a3f2375dd53585",
+        sha256 = "770faf8dcea0c2872e0c8202fc0d71f5b623c71510d1fa580ab271d2de7e72a9",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-02-08",
+        release_date = "2022-05-10",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -104,12 +119,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Aspect Bazel helpers",
         project_desc = "Base Starlark libraries and basic Bazel rules which are useful for constructing rulesets and BUILD files",
         project_url = "https://github.com/aspect-build/bazel-lib",
-        version = "0.12.0",
-        sha256 = "d1d712d115b908eaaa22aa899fa0e9016d70347debdafe295059e79adda93b02",
+        version = "1.3.1",
+        sha256 = "4ef2f746bae7bd7f1ec39dc9b53a9d7e8002f18233ea2c2ee4702bbb5283c7ca",
         strip_prefix = "bazel-lib-{version}",
         urls = ["https://github.com/aspect-build/bazel-lib/archive/v{version}.tar.gz"],
         use_category = ["build"],
-        release_date = "2022-05-26",
+        release_date = "2022-06-21",
         cpe = "N/A",
     ),
     com_google_absl = dict(
@@ -128,11 +143,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Shellcheck rules for bazel",
         project_desc = "Now you do not need to depend on the system shellcheck version in your bazel-managed (mono)repos.",
         project_url = "https://github.com/aignas/rules_shellcheck",
-        version = "0.1.0",
-        sha256 = "180325028cddda58df209765947839e78e75a0cf90b2dc6303bdf7a90c735e0c",
+        version = "0.1.1",
+        sha256 = "4e7cc56d344d0adfd20283f7ad8cb4fba822c0b15ce122665b00dd87a27a74b6",
         strip_prefix = "rules_shellcheck-{version}",
         urls = ["https://github.com/aignas/rules_shellcheck/archive/v{version}.tar.gz"],
-        release_date = "2022-05-29",
+        release_date = "2022-05-30",
         use_category = ["build"],
         cpe = "N/A",
     ),
@@ -613,7 +628,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "jwt_verify_lib-{version}",
         urls = ["https://github.com/google/jwt_verify_lib/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
-        extensions = ["envoy.filters.http.jwt_authn"],
+        extensions = ["envoy.filters.http.jwt_authn", "envoy.filters.http.gcp_authn"],
         release_date = "2021-03-05",
         cpe = "N/A",
     ),
@@ -693,7 +708,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Protocol Buffers",
         project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
         project_url = "https://developers.google.com/protocol-buffers",
-        version = "3.19.4",
+        version = PROTOBUF_VERSION,
         # When upgrading the protobuf library, please re-run
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
@@ -709,24 +724,24 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "grpc-httpjson-transcoding",
         project_desc = "Library that supports transcoding so that HTTP/JSON can be converted to gRPC",
         project_url = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
-        version = "9e2a4b583fef47d85775fb8bd3baf7115b0e71b1",
-        sha256 = "4637b335dfd82f721c675159101714a7e1ad42129a8a118a5c62680dbc90bdb2",
+        version = "8dcb5179be6169783fd453be7df8c3288cdc4af4",
+        sha256 = "440ec38256a3958fceb3b5d39e21983f2e29dfba73f5885699878779267ec0f4",
         strip_prefix = "grpc-httpjson-transcoding-{version}",
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder"],
-        release_date = "2022-01-06",
+        release_date = "2022-06-18",
         cpe = "N/A",
     ),
     io_bazel_rules_go = dict(
         project_name = "Go rules for Bazel",
         project_desc = "Bazel rules for the Go language",
         project_url = "https://github.com/bazelbuild/rules_go",
-        version = "0.32.0",
-        sha256 = "ab21448cef298740765f33a7f5acee0607203e4ea321219f2a4c85a6e0fb0a27",
+        version = "0.33.0",
+        sha256 = "685052b498b6ddfe562ca7a97736741d87916fe536623afb7da2824c0211c369",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
         use_category = ["build", "api"],
-        release_date = "2022-05-11",
+        release_date = "2022-06-06",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
@@ -749,9 +764,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Python rules for Bazel",
         project_desc = "Bazel rules for the Python language",
         project_url = "https://github.com/bazelbuild/rules_python",
-        version = "0.8.1",
-        sha256 = "cdf6b84084aad8f10bf20b46b77cb48d83c319ebe6458a18e9d2cebf57807cdd",
-        release_date = "2022-04-22",
+        version = "0.9.0",
+        sha256 = "5fa3c738d33acca3b97622a13a741129f67ef43f5fdfcec63b29374cc0574c29",
+        release_date = "2022-06-12",
         strip_prefix = "rules_python-{version}",
         urls = ["https://github.com/bazelbuild/rules_python/archive/{version}.tar.gz"],
         use_category = ["build"],
@@ -919,12 +934,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "ac5d3befbfeb25d0342a1b92dceeb0e41a23b320",
-        sha256 = "341ee9272303815b5163e3aca11c8a782714b286a4b2485cec738fc494c931af",
+        version = "9e822e9494e1dcba1740a0fa4cc9f6605c97a7f9",
+        sha256 = "9d3ca5e9667a42cc49f53aa6986f188ad5a17a2b4d667b38959d1d3ef91d1ecf",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2022-06-02",
+        release_date = "2022-06-18",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -944,8 +959,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Common Expression Language (CEL) C++ library",
         project_desc = "Common Expression Language (CEL) C++ library",
         project_url = "https://opensource.google/projects/cel",
-        version = "60c7aeabb4e6fa633b49c14d6c6fc8f0516761b9",
-        sha256 = "7cb1e8ce293182e1d28321d4d6baecdacbc263cffcd9da1f7ffd25312611a329",
+        version = "1adb61321cf1975bee8e1df3300984166f45cb1d",
+        sha256 = "32b57e5c8b6ad95e58cf2fc7d2ac8a79f106ddb88285d06974ef62b1474594b7",
         strip_prefix = "cel-cpp-{version}",
         urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -961,7 +976,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.stat_sinks.wasm",
             "envoy.rbac.matchers.upstream_ip_port",
         ],
-        release_date = "2021-11-08",
+        release_date = "2022-06-02",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
@@ -1160,49 +1175,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-04-26",
         cpe = "N/A",
     ),
-    rules_antlr = dict(
-        project_name = "ANTLR Rules for Bazel",
-        project_desc = "Bazel rules for ANTLR",
-        project_url = "https://github.com/marcohu/rules_antlr",
-        version = "3cc2f9502a54ceb7b79b37383316b23c4da66f9a",
-        sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
-        strip_prefix = "rules_antlr-{version}",
-        urls = ["https://github.com/marcohu/rules_antlr/archive/{version}.tar.gz"],
-        # ANTLR has a runtime component, so is not purely build.
-        use_category = ["dataplane_ext"],
-        extensions = [
-            "envoy.access_loggers.extension_filters.cel",
-            "envoy.access_loggers.wasm",
-            "envoy.bootstrap.wasm",
-            "envoy.rate_limit_descriptors.expr",
-            "envoy.filters.http.wasm",
-            "envoy.filters.network.wasm",
-            "envoy.stat_sinks.wasm",
-        ],
-        release_date = "2019-06-21",
-        cpe = "N/A",
-    ),
-    antlr4_runtimes = dict(
-        project_name = "ANTLR v4",
-        project_desc = "ANTLR (ANother Tool for Language Recognition) is a powerful parser generator for reading, processing, executing, or translating structured text or binary files",
-        project_url = "https://github.com/antlr/antlr4",
-        version = "4.7.2",
-        sha256 = "46f5e1af5f4bd28ade55cb632f9a069656b31fc8c2408f9aa045f9b5f5caad64",
-        strip_prefix = "antlr4-{version}",
-        urls = ["https://github.com/antlr/antlr4/archive/{version}.tar.gz"],
-        use_category = ["dataplane_ext"],
-        extensions = [
-            "envoy.access_loggers.extension_filters.cel",
-            "envoy.access_loggers.wasm",
-            "envoy.bootstrap.wasm",
-            "envoy.rate_limit_descriptors.expr",
-            "envoy.filters.http.wasm",
-            "envoy.filters.network.wasm",
-            "envoy.stat_sinks.wasm",
-        ],
-        release_date = "2018-12-18",
-        cpe = "N/A",
-    ),
     com_github_fdio_vpp_vcl = dict(
         project_name = "VPP Comms Library",
         project_desc = "FD.io Vector Packet Processor (VPP) Comms Library",
@@ -1216,4 +1188,32 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-03-02",
         cpe = "N/A",
     ),
+    intel_dlb = dict(
+        project_name = "Intel Dlb",
+        project_desc = "Dlb",
+        project_url = "https://networkbuilders.intel.com/solutionslibrary/queue-management-and-load-balancing-on-intel-architecture",
+        version = "7.6.0",
+        sha256 = "b74c1bb2863fb6374bf80b9268b5978ab7b9d4eabb2d47ea427a5460aa3ae5fe",
+        urls = ["https://downloadmirror.intel.com/727424/dlb_linux_src_release7.6.0_2022_03_30.txz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.network.connection_balance.dlb"],
+        release_date = "2022-03-30",
+        cpe = "N/A",
+    ),
 )
+
+def _compiled_protoc_deps(locations, versions):
+    for platform, sha in versions.items():
+        locations["com_google_protobuf_protoc_%s" % platform] = dict(
+            project_name = "Protocol Buffers (protoc) %s" % platform,
+            project_desc = "Protoc compiler for protobuf (%s)" % platform,
+            project_url = "https://developers.google.com/protocol-buffers",
+            version = PROTOBUF_VERSION,
+            sha256 = sha,
+            urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
+            use_category = ["dataplane_core", "controlplane"],
+            release_date = "2022-01-28",
+            cpe = "N/A",
+        )
+
+_compiled_protoc_deps(REPOSITORY_LOCATIONS_SPEC, PROTOC_VERSIONS)

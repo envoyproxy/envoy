@@ -40,6 +40,7 @@
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/context_impl.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -97,6 +98,11 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix: {
     route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
         vhost, route_config, optional_http_filters, factory_context, validator);
+    break;
+  }
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathTemplate: {
+    route = std::make_shared<PathTemplateRouteEntryImpl>(vhost, route_config, optional_http_filters,
+                                                         factory_context, validator);
     break;
   }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
@@ -654,6 +660,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               "not be stripped: {}",
               path_redirect_);
   }
+  if (!route.stat_prefix().empty()) {
+    route_stats_context_ = std::make_unique<RouteStatsContextImpl>(
+        factory_context.scope(), factory_context.routerContext().routeStatNames(), vhost.statName(),
+        route.stat_prefix());
+  }
 
   if (route.route().has_early_data_policy()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<EarlyDataPolicyFactory>(
@@ -671,6 +682,18 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
                    : loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_,
                                                        runtime_->fractional_runtime_default_,
                                                        random_value);
+}
+
+absl::string_view
+RouteEntryImplBase::sanitizePathBeforePathMatching(const absl::string_view path) const {
+  absl::string_view ret = path;
+  if (vhost_.globalRouteConfig().ignorePathParametersInPathMatching()) {
+    auto pos = ret.find_first_of(";");
+    if (pos != absl::string_view::npos) {
+      ret.remove_suffix(ret.length() - pos);
+    }
+  }
+  return ret;
 }
 
 bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const {
@@ -1352,6 +1375,35 @@ void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
   }
 }
 
+PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    const OptionalHttpFilters& optional_http_filters,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator)
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      path_template_(route.match().path_template()),
+      path_matcher_(Matchers::PathMatcher::createPattern(path_template_, !case_sensitive_)) {}
+
+void PathTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
+                                                   bool insert_envoy_original_path) const {
+  finalizePathHeader(headers, path_template_, insert_envoy_original_path);
+}
+
+absl::optional<std::string> PathTemplateRouteEntryImpl::currentUrlPathAfterRewrite(
+    const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_template_);
+}
+
+RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                        const StreamInfo::StreamInfo& stream_info,
+                                                        uint64_t random_value) const {
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
+      path_matcher_->match(headers.getPathValue())) {
+    return clusterEntry(headers, random_value);
+  }
+  return nullptr;
+}
+
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
     const OptionalHttpFilters& optional_http_filters,
@@ -1375,7 +1427,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(headers.getPathValue())) {
+      path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -1404,7 +1456,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(headers.getPathValue())) {
+      path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
     return clusterEntry(headers, random_value);
   }
 
@@ -1425,9 +1477,9 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                             bool insert_envoy_original_path) const {
-  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-  // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
-  // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
+  absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+  // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing
+  // the route cache. We should consider if ASSERT-ing is the desired behavior in this case.
   ASSERT(path_matcher_->match(path));
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
@@ -1442,8 +1494,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-    if (path_matcher_->match(path)) {
+    if (path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
       return clusterEntry(headers, random_value);
     }
   }
@@ -1505,9 +1556,10 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
   if (!RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return nullptr;
   }
-  absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-  if (path.size() >= prefix_.size() && path_matcher_->match(path) &&
-      (path.size() == prefix_.size() || path[prefix_.size()] == '/')) {
+  absl::string_view sanitized_path = sanitizePathBeforePathMatching(
+      Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
+  if (sanitized_path.size() >= prefix_.size() && path_matcher_->match(sanitized_path) &&
+      (sanitized_path.size() == prefix_.size() || sanitized_path[prefix_.size()] == '/')) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -1865,7 +1917,8 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()),
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
-                                          DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
+                                          DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
+      ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()) {
   if (!config.request_mirror_policies().empty()) {
     shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {

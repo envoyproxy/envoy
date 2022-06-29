@@ -14,9 +14,13 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Upstream {
+class HostDescription;
+}
+
 namespace Network {
 
-class TransportSocketFactory;
 class Connection;
 enum class ConnectionEvent;
 
@@ -239,23 +243,33 @@ public:
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;
 
 /**
- * A factory for creating transport socket. It will be associated to filter chains and clusters.
- */
-class TransportSocketFactory {
+ * A factory for creating transport sockets.
+ **/
+class TransportSocketFactoryBase {
 public:
-  virtual ~TransportSocketFactory() = default;
+  virtual ~TransportSocketFactoryBase() = default;
 
   /**
    * @return bool whether the transport socket implements secure transport.
    */
   virtual bool implementsSecureTransport() const PURE;
+};
+
+/**
+ * A factory for creating upstream transport sockets. It will be associated to clusters.
+ */
+class UpstreamTransportSocketFactory : public virtual TransportSocketFactoryBase {
+public:
+  ~UpstreamTransportSocketFactory() override = default;
 
   /**
    * @param options for creating the transport socket
-   * @return Network::TransportSocketPtr a transport socket to be passed to connection.
+   * @param host description for the destination upstream host
+   * @return Network::TransportSocketPtr a transport socket to be passed to client connection.
    */
   virtual TransportSocketPtr
-  createTransportSocket(TransportSocketOptionsConstSharedPtr options) const PURE;
+  createTransportSocket(TransportSocketOptionsConstSharedPtr options,
+                        std::shared_ptr<const Upstream::HostDescription> host) const PURE;
 
   /**
    * Returns true if the transport socket created by this factory supports some form of ALPN
@@ -280,7 +294,21 @@ public:
                        TransportSocketOptionsConstSharedPtr options) const PURE;
 };
 
-using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;
+/**
+ * A factory for creating downstream transport sockets. It will be associated to listeners.
+ */
+class DownstreamTransportSocketFactory : public virtual TransportSocketFactoryBase {
+public:
+  ~DownstreamTransportSocketFactory() override = default;
+
+  /**
+   * @return Network::TransportSocketPtr a transport socket to be passed to server connection.
+   */
+  virtual TransportSocketPtr createDownstreamTransportSocket() const PURE;
+};
+
+using UpstreamTransportSocketFactoryPtr = std::unique_ptr<UpstreamTransportSocketFactory>;
+using DownstreamTransportSocketFactoryPtr = std::unique_ptr<DownstreamTransportSocketFactory>;
 
 } // namespace Network
 } // namespace Envoy

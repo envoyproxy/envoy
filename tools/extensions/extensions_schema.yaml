@@ -19,6 +19,10 @@ builtin:
 - envoy.matching.inputs.server_name
 - envoy.matching.inputs.transport_protocol
 - envoy.matching.inputs.application_protocol
+- envoy.matching.inputs.uri_san
+- envoy.matching.inputs.dns_san
+- envoy.matching.inputs.subject
+- envoy.regex_engines.google_re2
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
@@ -59,7 +63,6 @@ categories:
 - envoy.compression.decompressor
 - envoy.config.validators
 - envoy.filters.http
-- envoy.filters.http.cache
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
@@ -67,6 +70,7 @@ categories:
 - envoy.grpc_credentials
 - envoy.guarddog_actions
 - envoy.health_checkers
+- envoy.http.cache
 - envoy.http.header_validators
 - envoy.http.stateful_header_formatters
 - envoy.internal_redirect_predicates
@@ -78,6 +82,7 @@ categories:
 - envoy.quic.proof_source
 - envoy.quic.server.crypto_stream
 - envoy.rate_limit_descriptors
+- envoy.regex_engines
 - envoy.request_id
 - envoy.resource_monitors
 - envoy.retry_host_predicates
@@ -95,6 +100,7 @@ categories:
 - envoy.wasm.runtime
 - envoy.common.key_value
 - envoy.network.dns_resolver
+- envoy.network.connection_balance
 - envoy.rbac.matchers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session

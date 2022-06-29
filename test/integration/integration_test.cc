@@ -3,8 +3,10 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
@@ -127,6 +129,75 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   initialize();
 
   // Per-worker listener stats.
+  auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
+    if (GetParam() == Network::Address::IpVersion::v4) {
+      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
+      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_1.downstream_cx_total", cx_total);
+    } else {
+      test_server_->waitForGaugeEq("listener.[__1]_0.worker_0.downstream_cx_active", cx_active);
+      test_server_->waitForGaugeEq("listener.[__1]_0.worker_1.downstream_cx_active", cx_active);
+      test_server_->waitForCounterEq("listener.[__1]_0.worker_0.downstream_cx_total", cx_total);
+      test_server_->waitForCounterEq("listener.[__1]_0.worker_1.downstream_cx_total", cx_total);
+    }
+  };
+  check_listener_stats(0, 0);
+
+  // Main thread admin listener stats.
+  test_server_->waitForCounterExists("listener.admin.main_thread.downstream_cx_total");
+
+  // Per-thread watchdog stats.
+  test_server_->waitForCounterExists("server.main_thread.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_0.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_1.watchdog_miss");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+  check_listener_stats(1, 1);
+
+  codec_client_->close();
+  codec_client2->close();
+  check_listener_stats(0, 1);
+}
+
+class TestConnectionBalanceFactory : public Network::ConnectionBalanceFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    // Using Struct instead of a custom empty config proto. This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+  Network::ConnectionBalancerSharedPtr
+  createConnectionBalancerFromProto(const Protobuf::Message&,
+                                    Server::Configuration::FactoryContext&) override {
+    return std::make_shared<Network::ExactConnectionBalancerImpl>();
+  }
+  std::string name() const override { return "envoy.network.connection_balance.test"; }
+};
+
+// Test extend balance.
+TEST_P(IntegrationTest, ConnectionBalanceFactory) {
+  concurrency_ = 2;
+
+  TestConnectionBalanceFactory factory;
+  Registry::InjectFactory<Envoy::Network::ConnectionBalanceFactory> registered(factory);
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    TestConnectionBalanceFactory test_connection_balancer;
+    Registry::InjectFactory<Envoy::Network::ConnectionBalanceFactory> inject_factory(
+        test_connection_balancer);
+
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+    auto* connection_balance_config = listener->mutable_connection_balance_config();
+    auto* extend_balance_config = connection_balance_config->mutable_extend_balance();
+    extend_balance_config->set_name("envoy.network.connection_balance.test");
+    extend_balance_config->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/google.protobuf.Struct");
+  });
+
+  initialize();
+
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
     if (GetParam() == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
@@ -1059,6 +1130,38 @@ TEST_P(IntegrationTest, Http10Enabled) {
   EXPECT_THAT(response, StartsWith("HTTP/1.0 200 OK\r\n"));
   EXPECT_THAT(response, HasSubstr("connection: close"));
   EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
+}
+
+TEST_P(IntegrationTest, SendFullyQualifiedUrl) {
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http_protocol_options()
+        ->set_send_fully_qualified_url(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  initialize();
+
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+  ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: host\r\n\r\n"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
+  EXPECT_TRUE(absl::StrContains(data, "http://host/"));
+
+  ASSERT_TRUE(
+      fake_upstream_connection->write("HTTP/1.1 200 OK\r\nTransfer-encoding: chunked\r\n\r\n"));
+  tcp_client->waitForData("\r\n\r\n", false);
+  std::string response = tcp_client->data();
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->close();
 }
 
 TEST_P(IntegrationTest, TestInlineHeaders) {

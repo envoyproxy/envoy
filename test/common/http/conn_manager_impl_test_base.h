@@ -149,6 +149,26 @@ public:
     return proxy_status_config_.get();
   }
 
+  // Simple helper to wrapper filter to the factory function.
+  FilterFactoryCb createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr filter) {
+    return [filter](FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addStreamDecoderFilter(filter);
+    };
+  }
+  FilterFactoryCb createEncoderFilterFactoryCb(StreamEncoderFilterSharedPtr filter) {
+    return [filter](FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addStreamEncoderFilter(filter);
+    };
+  }
+  FilterFactoryCb createStreamFilterFactoryCb(StreamFilterSharedPtr filter) {
+    return [filter](FilterChainFactoryCallbacks& callbacks) { callbacks.addStreamFilter(filter); };
+  }
+  FilterFactoryCb createLogHandlerFactoryCb(AccessLog::InstanceSharedPtr handler) {
+    return [handler](FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addAccessLogHandler(handler);
+    };
+  }
+
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
