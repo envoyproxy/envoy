@@ -241,7 +241,6 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   }
 #ifdef ENVOY_ENABLE_QUIC
   // Setting socket options is not supported for HTTP3.
-  ASSERT(!options);
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
       fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Address::InstanceConstSharedPtr local_addr =
@@ -253,7 +252,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
       quic::QuicServerId(
           quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
           static_cast<uint16_t>(port)),
-      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_);
+      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_, options, nullptr);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -751,6 +750,32 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
 
   test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
   test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 1);
+}
+
+// Make sure route level stats are generated correctly.
+void HttpIntegrationTest::testRouteStats() {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route_config = hcm.mutable_route_config();
+        ASSERT_EQ(1, route_config->virtual_hosts_size());
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0);
+        route->set_stat_prefix("test_route");
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response.get());
+
+  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_total", 1);
+  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_completed", 1);
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {

@@ -217,7 +217,7 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   DUMP_DETAILS(request_headers);
 }
 
-const RouteEntry& UpstreamRequest::routeEntry() const { return *parent_.routeEntry(); }
+const Route& UpstreamRequest::route() const { return *parent_.route(); }
 
 const Network::Connection& UpstreamRequest::connection() const {
   return *parent_.callbacks()->connection();
@@ -416,7 +416,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 void UpstreamRequest::onPoolReady(
     std::unique_ptr<GenericUpstream>&& upstream, Upstream::HostDescriptionConstSharedPtr host,
     const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-    const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
@@ -431,6 +431,12 @@ void UpstreamRequest::onPoolReady(
     // here.
     parent_.requestVcluster()->stats().upstream_rq_total_.inc();
   }
+  if (parent_.routeStatsContext().has_value()) {
+    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
+    // callback. Hence, the upstream request increases the route level upstream_rq_total_ stat
+    // here.
+    parent_.routeStatsContext()->stats().upstream_rq_total_.inc();
+  }
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
@@ -442,16 +448,22 @@ void UpstreamRequest::onPoolReady(
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
-  if (info.upstreamInfo().has_value()) {
-    auto& upstream_timing = info.upstreamInfo().value().get().upstreamTiming();
+  if (info.upstreamInfo()) {
+    auto& upstream_timing = info.upstreamInfo()->upstreamTiming();
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
     upstreamTiming().upstream_connect_complete_ = upstream_timing.upstream_connect_complete_;
     upstreamTiming().upstream_handshake_complete_ = upstream_timing.upstream_handshake_complete_;
-    upstream_info.setUpstreamNumStreams(info.upstreamInfo().value().get().upstreamNumStreams());
+    upstream_info.setUpstreamNumStreams(info.upstreamInfo()->upstreamNumStreams());
   }
 
-  upstream_info.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
-      info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
+  // Upstream filters might have already created/set a filter state.
+  const StreamInfo::FilterStateSharedPtr& filter_state = info.filterState();
+  if (!filter_state) {
+    upstream_info.setUpstreamFilterState(
+        std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request));
+  } else {
+    upstream_info.setUpstreamFilterState(filter_state);
+  }
   upstream_info.setUpstreamLocalAddress(upstream_local_address);
   upstream_info.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
 
@@ -484,9 +496,10 @@ void UpstreamRequest::onPoolReady(
 
   calling_encode_headers_ = true;
   auto* headers = parent_.downstreamHeaders();
-  if (parent_.routeEntry()->autoHostRewrite() && !host->hostname().empty()) {
+  const auto* route_entry = parent_.route()->routeEntry();
+  if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
-                                   parent_.routeEntry()->appendXfh());
+                                   route_entry->appendXfh());
   }
 
   if (span_ != nullptr) {

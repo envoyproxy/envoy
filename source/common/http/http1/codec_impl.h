@@ -230,6 +230,7 @@ public:
   virtual void maybeAddSentinelBufferFragment(Buffer::Instance&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
+  bool sendFullyQualifiedUrl() const { return codec_settings_.send_fully_qualified_url_; }
   HeaderKeyFormatterOptConstRef formatter() const {
     return makeOptRefFromPtr(encode_only_header_key_formatter_.get());
   }
@@ -341,14 +342,14 @@ private:
   void onDispatch(const Buffer::Instance& data);
 
   // ParserCallbacks.
-  ParserStatus onMessageBegin() override;
-  ParserStatus onUrl(const char* data, size_t length) override;
-  ParserStatus onStatus(const char* data, size_t length) override;
-  ParserStatus onHeaderField(const char* data, size_t length) override;
-  ParserStatus onHeaderValue(const char* data, size_t length) override;
-  ParserStatus onHeadersComplete() override;
+  CallbackResult onMessageBegin() override;
+  CallbackResult onUrl(const char* data, size_t length) override;
+  CallbackResult onStatus(const char* data, size_t length) override;
+  CallbackResult onHeaderField(const char* data, size_t length) override;
+  CallbackResult onHeaderValue(const char* data, size_t length) override;
+  CallbackResult onHeadersComplete() override;
   void bufferBody(const char* data, size_t length) override;
-  ParserStatus onMessageComplete() override;
+  CallbackResult onMessageComplete() override;
   void onChunkHeader(bool is_final_chunk) override;
 
   // Internal implementations of ParserCallbacks methods,
@@ -358,15 +359,15 @@ private:
   virtual Status onStatusBase(const char* data, size_t length) PURE;
   Status onHeaderFieldImpl(const char* data, size_t length);
   Status onHeaderValueImpl(const char* data, size_t length);
-  StatusOr<ParserStatus> onHeadersCompleteImpl();
-  virtual StatusOr<ParserStatus> onHeadersCompleteBase() PURE;
-  StatusOr<ParserStatus> onMessageCompleteImpl();
-  virtual ParserStatus onMessageCompleteBase() PURE;
+  StatusOr<CallbackResult> onHeadersCompleteImpl();
+  virtual StatusOr<CallbackResult> onHeadersCompleteBase() PURE;
+  StatusOr<CallbackResult> onMessageCompleteImpl();
+  virtual CallbackResult onMessageCompleteBase() PURE;
 
   // These helpers wrap *Impl() calls in the overrides of non-void
   // ParserCallbacks methods.
-  ParserStatus setAndCheckCallbackStatus(Status&& status);
-  ParserStatus setAndCheckCallbackStatusOr(StatusOr<ParserStatus>&& statusor);
+  CallbackResult setAndCheckCallbackStatus(Status&& status);
+  CallbackResult setAndCheckCallbackStatusOr(StatusOr<CallbackResult>&& statusor);
 
   /**
    * Push the accumulated body through the filter pipeline.
@@ -464,7 +465,7 @@ protected:
   };
   ActiveRequest* activeRequest() { return active_request_.get(); }
   // ConnectionImpl
-  ParserStatus onMessageCompleteBase() override;
+  CallbackResult onMessageCompleteBase() override;
   // Add the size of the request_url to the reported header size when processing request headers.
   uint32_t getHeadersSize() override;
 
@@ -496,7 +497,7 @@ private:
     return *bytes_meter_before_stream_;
   }
   Status onMessageBeginBase() override;
-  Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
+  Envoy::StatusOr<CallbackResult> onHeadersCompleteBase() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
@@ -593,10 +594,10 @@ private:
     return *bytes_meter_before_stream_;
   }
   Status onMessageBeginBase() override { return okStatus(); }
-  Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
+  Envoy::StatusOr<CallbackResult> onHeadersCompleteBase() override;
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
-  ParserStatus onMessageCompleteBase() override;
+  CallbackResult onMessageCompleteBase() override;
   void onResetStream(StreamResetReason reason) override;
   Status sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;

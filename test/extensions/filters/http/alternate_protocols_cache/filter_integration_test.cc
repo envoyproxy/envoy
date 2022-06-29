@@ -80,12 +80,15 @@ typed_config:
       TRY_ASSERT_MAIN_THREAD {
         // Make the first upstream HTTP/2
         auto http2_config = configWithType(Http::CodecType::HTTP2);
-        Network::TransportSocketFactoryPtr http2_factory = createUpstreamTlsContext(http2_config);
-        addFakeUpstream(std::move(http2_factory), Http::CodecType::HTTP2);
+        Network::DownstreamTransportSocketFactoryPtr http2_factory =
+            createUpstreamTlsContext(http2_config);
+        addFakeUpstream(std::move(http2_factory), Http::CodecType::HTTP2,
+                        /*autonomous_upstream=*/false);
 
         // Make the next upstream is HTTP/3
         auto http3_config = configWithType(Http::CodecType::HTTP3);
-        Network::TransportSocketFactoryPtr http3_factory = createUpstreamTlsContext(http3_config);
+        Network::DownstreamTransportSocketFactoryPtr http3_factory =
+            createUpstreamTlsContext(http3_config);
         // If the UDP port is in use, this will throw an exception and get caught below.
         fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
             std::move(http3_factory), fake_upstreams_[0]->localAddress()->ip()->port(), version_,
@@ -288,12 +291,12 @@ protected:
 
     if (use_http2_) {
       auto config = configWithType(Http::CodecType::HTTP2);
-      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      addFakeUpstream(std::move(factory), Http::CodecType::HTTP2);
+      Network::DownstreamTransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
+      addFakeUpstream(std::move(factory), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
     } else {
       auto config = configWithType(Http::CodecType::HTTP3);
-      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      addFakeUpstream(std::move(factory), Http::CodecType::HTTP3);
+      Network::DownstreamTransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
+      addFakeUpstream(std::move(factory), Http::CodecType::HTTP3, /*autonomous_upstream=*/false);
       writeFile();
     }
   }

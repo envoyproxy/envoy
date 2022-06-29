@@ -19,13 +19,21 @@ class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Addres
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
     upstream_tls_ = true;
+    filename_ = TestEnvironment::temporaryPath("dns_cache.txt");
+    ::unlink(filename_.c_str());
+    key_value_config_ = fmt::format(R"EOF(
+    key_value_config:
+      config:
+        name: envoy.key_value.file_based
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
+          filename: {})EOF",
+                                    filename_);
   }
 
   void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
                           const std::string& override_auto_sni_header = "") {
     setUpstreamProtocol(Http::CodecType::HTTP1);
-    const std::string filename = TestEnvironment::temporaryPath("dns_cache.txt");
-    ::unlink(filename.c_str());
 
     const std::string filter = fmt::format(R"EOF(
 name: dynamic_forward_proxy
@@ -36,16 +44,10 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
     dns_cache_circuit_breaker:
-      max_pending_requests: {}
-    key_value_config:
-      config:
-        name: envoy.key_value.file_based
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
-          filename: {}
+      max_pending_requests: {}{}
 )EOF",
                                            Network::Test::ipVersionToDnsFamily(GetParam()),
-                                           max_hosts, max_pending_requests, filename);
+                                           max_hosts, max_pending_requests, key_value_config_);
     config_helper_.prependFilter(filter);
 
     config_helper_.prependFilter(fmt::format(R"EOF(
@@ -106,15 +108,10 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
     dns_cache_circuit_breaker:
-      max_pending_requests: {}
-    key_value_config:
-      config:
-        name: envoy.key_value.file_based
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
-          filename: {}
+      max_pending_requests: {}{}
 )EOF",
-        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests, filename);
+        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests,
+        key_value_config_);
 
     TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
     cluster_.mutable_circuit_breakers()
@@ -133,7 +130,7 @@ typed_config:
     if (upstream_tls_) {
       addFakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
                                                         factory_context_),
-                      Http::CodecType::HTTP1);
+                      Http::CodecType::HTTP1, /*autonomous_upstream=*/false);
     } else {
       HttpIntegrationTest::createUpstreams();
     }
@@ -176,6 +173,8 @@ typed_config:
   envoy::config::cluster::v3::Cluster cluster_;
   std::string cache_file_value_contents_;
   bool use_cache_file_{};
+  std::string filename_;
+  std::string key_value_config_;
 };
 
 int64_t getHeaderValue(const Http::ResponseHeaderMap& headers, absl::string_view name) {
@@ -280,6 +279,33 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
+
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
+}
+
+TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainAndNoCaching) {
+  key_value_config_ = "";
+
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "doesnotexist.example.com"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
+
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
 }
 
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with

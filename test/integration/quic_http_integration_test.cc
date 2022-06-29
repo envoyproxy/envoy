@@ -150,12 +150,12 @@ public:
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
     // Setting socket options is not supported.
-    ASSERT(!options);
-    return makeClientConnectionWithHost(port, "");
+    return makeClientConnectionWithHost(port, "", options);
   }
 
-  Network::ClientConnectionPtr makeClientConnectionWithHost(uint32_t port,
-                                                            const std::string& host) {
+  Network::ClientConnectionPtr makeClientConnectionWithHost(
+      uint32_t port, const std::string& host,
+      const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr) {
     // Setting socket options is not supported.
     server_addr_ = Network::Utility::resolveUrl(
         fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
@@ -167,7 +167,7 @@ public:
     // different version set on server side to test that.
     auto connection = std::make_unique<TestEnvoyQuicClientConnection>(
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
-        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr,
+        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, options,
         validation_failure_on_path_response_);
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
@@ -183,7 +183,7 @@ public:
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
-        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_);
+        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_, nullptr);
     return session;
   }
 
@@ -594,7 +594,11 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   initialize();
   client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(2);
   uint32_t old_port = lookupPort("http");
-  codec_client_ = makeHttpConnection(old_port);
+  auto options = std::make_shared<Network::Socket::Options>();
+  auto option = std::make_shared<Network::MockSocketOption>();
+  options->push_back(option);
+  EXPECT_CALL(*option, setOption(_, _)).Times(3u);
+  codec_client_ = makeHttpConnection(makeClientConnectionWithOptions(old_port, options));
 
   // Make sure that the port migration config is plumbed through.
   EXPECT_EQ(2u, quic::test::QuicSentPacketManagerPeer::GetNumPtosForPathDegrading(
@@ -612,6 +616,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
 
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   auto old_self_addr = quic_connection_->self_address();
+  EXPECT_CALL(*option, setOption(_, _)).Times(3u);
   quic_connection_->OnPathDegradingDetected();
   ASSERT_TRUE(quic_connection_->waitForPathResponse());
   auto self_addr = quic_connection_->self_address();

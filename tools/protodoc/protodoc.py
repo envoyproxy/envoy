@@ -3,41 +3,36 @@
 # for the underlying protos mentioned in this file. See
 # https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
-import json
 import logging
 import functools
 import sys
 from collections import defaultdict
 from functools import cached_property
 
-from google.protobuf import json_format
-from bazel_tools.tools.python.runfiles import runfiles
 import yaml
 
-from jinja2 import Template
-
-# We have to do some evil things to sys.path due to the way that Python module
-# resolution works; we have both tools/ trees in bazel_tools and envoy. By
-# default, Bazel leaves us with a sys.path in which the @bazel_tools repository
-# takes precedence. Now that we're done with importing runfiles above, we can
-# just remove it from the sys.path.
-sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
-
-from envoy.base import utils
 from envoy.code.check.checker import BackticksCheck
 
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
-from tools.config_validation import validate_fragment
+from tools.protodoc.data import data
+from tools.protodoc.jinja import env as jinja_env
 
-from tools.protodoc import manifest_pb2
 from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
 from validate import validate_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
 
 logger = logging.getLogger(__name__)
+
+manifest_db = data["manifest"]
+EXTENSION_DB = data["extensions"]
+CONTRIB_EXTENSION_DB = data["contrib_extensions"]
+EXTENSION_CATEGORIES = data["extension_categories"]
+CONTRIB_EXTENSION_CATEGORIES = data["contrib_extension_categories"]
+EXTENSION_SECURITY_POSTURES = data["extension_security_postures"]
+EXTENSION_STATUS_VALUES = data["extension_status_values"]
 
 # Namespace prefix for Envoy core APIs.
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
@@ -60,104 +55,12 @@ CNCF_PREFIX = '.xds.'
 # http://www.fileformat.info/info/unicode/char/2063/index.htm
 UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
 
-# Template for formating extension descriptions.
-EXTENSION_TEMPLATE = Template(
-    """
-.. _extension_{{extension}}:
-
-This extension may be referenced by the qualified name ``{{extension}}``
-{{contrib}}
-.. note::
-  {{status}}
-
-  {{security_posture}}
-
-.. tip::
-  This extension extends and can be used with the following extension {% if categories|length > 1 %}categories{% else %}category{% endif %}:
-
-{% for cat in categories %}
-  - :ref:`{{cat}} <extension_category_{{cat}}>`
-{% endfor %}
-
-""")
-
-# Template for formating an extension category.
-EXTENSION_CATEGORY_TEMPLATE = Template(
-    """
-.. _extension_category_{{category}}:
-
-.. tip::
-{% if extensions %}
-  This extension category has the following known extensions:
-
-{% for ext in extensions %}
-  - :ref:`{{ext}} <extension_{{ext}}>`
-{% endfor %}
-
-{% endif %}
-{% if contrib_extensions %}
-  The following extensions are available in :ref:`contrib <install_contrib>` images only:
-
-{% for ext in contrib_extensions %}
-  - :ref:`{{ext}} <extension_{{ext}}>`
-{% endfor %}
-{% endif %}
-
-""")
-
-# A map from the extension security postures (as defined in the
-# envoy_cc_extension build macro) to human readable text for extension docs.
-EXTENSION_SECURITY_POSTURES = {
-    'robust_to_untrusted_downstream':
-        'This extension is intended to be robust against untrusted downstream traffic. It '
-        'assumes that the upstream is trusted.',
-    'robust_to_untrusted_downstream_and_upstream':
-        'This extension is intended to be robust against both untrusted downstream and '
-        'upstream traffic.',
-    'requires_trusted_downstream_and_upstream':
-        'This extension is not hardened and should only be used in deployments'
-        ' where both the downstream and upstream are trusted.',
-    'unknown':
-        'This extension has an unknown security posture and should only be '
-        'used in deployments where both the downstream and upstream are '
-        'trusted.',
-    'data_plane_agnostic':
-        'This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.',
-}
-
-# A map from the extension status value to a human readable text for extension
-# docs.
-EXTENSION_STATUS_VALUES = {
-    'alpha':
-        'This extension is functional but has not had substantial production burn time, use only with this caveat.',
-    'wip':
-        'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
-}
-
 WIP_WARNING = (
     '.. warning::\n   This API feature is currently work-in-progress. API features marked as '
     'work-in-progress are not considered stable, are not covered by the :ref:`threat model '
     '<arch_overview_threat_model>`, are not supported by the security team, and are subject to '
     'breaking changes. Do not use this feature without understanding each of the previous '
     'points.\n\n')
-
-r = runfiles.Create()
-
-EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml"))
-CONTRIB_EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/contrib/extensions_metadata.yaml"))
-
-
-# create an index of extension categories from extension db
-def build_categories(extensions_db):
-    ret = {}
-    for _k, _v in extensions_db.items():
-        for _cat in _v['categories']:
-            ret.setdefault(_cat, []).append(_k)
-    return ret
-
-
-EXTENSION_CATEGORIES = build_categories(EXTENSION_DB)
-CONTRIB_EXTENSION_CATEGORIES = build_categories(CONTRIB_EXTENSION_DB)
 
 
 class ProtodocError(Exception):
@@ -276,9 +179,11 @@ def format_extension(extension):
   This extension is only available in :ref:`contrib <install_contrib>` images.
 
 """
-        status = EXTENSION_STATUS_VALUES.get(extension_metadata.get('status'), '')
-        security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
+        status = (EXTENSION_STATUS_VALUES.get(extension_metadata.get('status')) or "").strip()
+        security_posture = EXTENSION_SECURITY_POSTURES[
+            extension_metadata['security_posture']].strip()
         categories = extension_metadata["categories"]
+        type_urls = extension_metadata.get('type_urls') or []
     except KeyError as e:
         sys.stderr.write(
             f"\n\nDid you forget to add '{extension}' to extensions_build_config.bzl, "
@@ -286,12 +191,14 @@ def format_extension(extension):
             "or contrib/extensions_metadata.yaml?\n\n")
         exit(1)  # Raising the error buries the above message in tracebacks.
 
-    return EXTENSION_TEMPLATE.render(
+    extension = jinja_env.get_template("extension.rst.tpl").render(
         extension=extension,
         contrib=contrib,
         status=status,
         security_posture=security_posture,
-        categories=categories)
+        categories=categories,
+        type_urls=type_urls)
+    return f"\n{extension}\n"
 
 
 def format_extension_category(extension_category):
@@ -307,10 +214,11 @@ def format_extension_category(extension_category):
     contrib_extensions = CONTRIB_EXTENSION_CATEGORIES.get(extension_category, [])
     if not extensions and not contrib_extensions:
         raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
-    return EXTENSION_CATEGORY_TEMPLATE.render(
+    extension_category = jinja_env.get_template("extension_category.rst.tpl").render(
         category=extension_category,
         extensions=sorted(extensions),
         contrib_extensions=sorted(contrib_extensions))
+    return f"\n{extension_category}\n"
 
 
 def format_header_from_file(style, source_code_info, proto_name):
@@ -526,11 +434,10 @@ def format_security_options(security_option, field, type_context, edge_config):
     if security_option.configure_for_untrusted_upstream:
         sections.append(
             indent(4, 'This field should be configured in the presence of untrusted *upstreams*.'))
-    if edge_config.note:
-        sections.append(indent(4, edge_config.note))
+    if edge_config["note"]:
+        sections.append(indent(4, edge_config["note"].strip()))
 
-    example_dict = json_format.MessageToDict(edge_config.example)
-    validate_fragment.validate_fragment(field.type_name[1:], example_dict)
+    example_dict = edge_config["example"]
     field_name = type_context.name.split('.')[-1]
     example = {field_name: example_dict}
     sections.append(
@@ -603,12 +510,12 @@ def format_field_as_definition_list_item(
 
     # If there is a udpa.annotations.security option, include it after the comment.
     if field.options.HasExtension(security_pb2.security):
-        manifest_description = protodoc_manifest.fields.get(type_context.name)
+        manifest_description = protodoc_manifest.get(type_context.name)
         if not manifest_description:
             raise ProtodocError('Missing protodoc manifest YAML for %s' % type_context.name)
         formatted_security_options = format_security_options(
             field.options.Extensions[security_pb2.security], field, type_context,
-            manifest_description.edge_config)
+            manifest_description)
     else:
         formatted_security_options = ''
     pretty_label_names = {
@@ -706,12 +613,7 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-        # Load as YAML, emit as JSON and then parse as proto to provide type
-        # checking.
-        protodoc_manifest_untyped = utils.from_yaml(
-            r.Rlocation('envoy/docs/protodoc_manifest.yaml'))
-        self.protodoc_manifest = manifest_pb2.Manifest()
-        json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
+        self.protodoc_manifest = manifest_db
 
     @cached_property
     def backticks_check(self):

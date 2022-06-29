@@ -510,12 +510,25 @@ public:
 };
 
 /**
+ * FormatterProvider for UpstreamHostMetadata from StreamInfo.
+ */
+class UpstreamHostMetadataFormatter : public MetadataFormatter {
+public:
+  UpstreamHostMetadataFormatter(const std::string& filter_namespace,
+                                const std::vector<std::string>& path,
+                                absl::optional<size_t> max_length);
+};
+
+/**
  * FormatterProvider for FilterState from StreamInfo.
  */
 class FilterStateFormatter : public FormatterProvider {
 public:
+  static std::unique_ptr<FilterStateFormatter>
+  create(const std::string& format, const absl::optional<size_t>& max_length, bool is_upstream);
+
   FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
-                       bool serialize_as_string);
+                       bool serialize_as_string, bool is_upstream = false);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -533,6 +546,7 @@ private:
   absl::optional<size_t> max_length_;
 
   bool serialize_as_string_;
+  const bool is_upstream_;
 };
 
 /**

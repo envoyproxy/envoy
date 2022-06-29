@@ -273,11 +273,6 @@ static_resources:
                   {% endif %}
             {% endfor %}
           http_filters:
-          {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] -%}
-          - name: envoy.filters.http.dynamo
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.dynamo.v3.Dynamo
-          {% endif -%}
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

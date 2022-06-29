@@ -35,10 +35,16 @@ ListenerFilterWithDataFuzzer::ListenerFilterWithDataFuzzer()
       connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
       name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
       init_manager_(nullptr) {
-  EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
-  EXPECT_CALL(socket_factory_, localAddress())
+  socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
+              socketType())
+      .WillOnce(Return(Network::Socket::Type::Stream));
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
+              localAddress())
       .WillRepeatedly(ReturnRef(socket_->connectionInfoProvider().localAddress()));
-  EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
+              getListenSocket(_))
+      .WillOnce(Return(socket_));
   connection_handler_->addListener(absl::nullopt, *this, runtime_);
   conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                               Network::Address::InstanceConstSharedPtr(),
@@ -56,16 +62,21 @@ void ListenerFilterWithDataFuzzer::connect(Network::ListenerFilterPtr filter) {
   conn_->connect();
 
   EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        connection_established_ = true;
+        dispatcher_->exit();
+      }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 void ListenerFilterWithDataFuzzer::disconnect() {
-  EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  if (connection_established_) {
+    EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
-  conn_->close(Network::ConnectionCloseType::NoFlush);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+    conn_->close(Network::ConnectionCloseType::NoFlush);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void ListenerFilterWithDataFuzzer::fuzz(

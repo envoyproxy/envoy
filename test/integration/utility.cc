@@ -125,7 +125,7 @@ private:
   bool connected_{false};
 };
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                                           Ssl::ContextManager& context_manager,
                                                           const std::string& san_to_match) {
@@ -211,7 +211,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
 
 #ifdef ENVOY_ENABLE_QUIC
   Extensions::TransportSockets::Tls::ContextManagerImpl manager(time_system);
-  Network::TransportSocketFactoryPtr transport_socket_factory =
+  Network::UpstreamTransportSocketFactoryPtr transport_socket_factory =
       createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
                                                "spiffe://lyft.com/backend-team");
   auto& quic_transport_socket_factory =
@@ -229,7 +229,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       *persistent_info, quic_transport_socket_factory.getCryptoConfig(),
       quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
                          static_cast<uint16_t>(addr->ip()->port())),
-      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store);
+      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store, nullptr, nullptr);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.

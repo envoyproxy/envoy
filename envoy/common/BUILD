@@ -60,6 +60,8 @@ envoy_cc_library(
     hdrs = ["regex.h"],
     deps = [
         ":matchers_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
     ],
 )
 

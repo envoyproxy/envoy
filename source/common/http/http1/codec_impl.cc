@@ -294,9 +294,12 @@ void StreamEncoderImpl::endEncode() {
 
   flushOutput(true);
   connection_.onEncodeComplete();
-  // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream.
-  if (connect_request_ || is_tcp_tunneling_) {
-    connection_.connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+  // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream so
+  // don't delay that signal.
+  if (connect_request_ || is_tcp_tunneling_ ||
+      (is_response_to_connect_request_ &&
+       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades"))) {
+    connection_.connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
 
@@ -381,7 +384,7 @@ static constexpr absl::string_view HTTP_10_RESPONSE_PREFIX = "HTTP/1.0 ";
 void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
   started_response_ = true;
 
-  // The contract is that client codecs must ensure that :status is present.
+  // The contract is that client codecs must ensure that :status is present and valid.
   ASSERT(headers.Status() != nullptr);
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
@@ -438,34 +441,54 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     upgrade_request_ = true;
   }
 
-  absl::string_view host_or_path_view;
-  if (is_connect) {
-    host_or_path_view = host->value().getStringView();
-  } else {
-    host_or_path_view = path->value().getStringView();
-  }
+  if (connection_.sendFullyQualifiedUrl() && !is_connect) {
+    const HeaderEntry* scheme = headers.Scheme();
+    if (!scheme) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Scheme.get()));
+    }
+    if (!host) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
+    }
+    ASSERT(path);
+    ASSERT(host);
 
-  connection_.buffer().addFragments(
-      {method->value().getStringView(), SPACE, host_or_path_view, REQUEST_POSTFIX});
+    std::string url = absl::StrCat(scheme->value().getStringView(), "://",
+                                   host->value().getStringView(), path->value().getStringView());
+    connection_.buffer().addFragments(
+        {method->value().getStringView(), SPACE, url, REQUEST_POSTFIX});
+  } else {
+    absl::string_view host_or_path_view;
+    if (is_connect) {
+      host_or_path_view = host->value().getStringView();
+    } else {
+      host_or_path_view = path->value().getStringView();
+    }
+
+    connection_.buffer().addFragments(
+        {method->value().getStringView(), SPACE, host_or_path_view, REQUEST_POSTFIX});
+  }
 
   encodeHeadersBase(headers, absl::nullopt, end_stream,
                     HeaderUtility::requestShouldHaveNoBody(headers));
   return okStatus();
 }
 
-ParserStatus ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {
+CallbackResult ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {
   ASSERT(codec_status_.ok());
   codec_status_ = std::move(status);
-  return codec_status_.ok() ? ParserStatus::Success : ParserStatus::Error;
+  return codec_status_.ok() ? CallbackResult::Success : CallbackResult::Error;
 }
 
-ParserStatus ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) {
+CallbackResult
+ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<CallbackResult>&& statusor) {
   ASSERT(codec_status_.ok());
   if (statusor.ok()) {
     return statusor.value();
   } else {
     codec_status_ = std::move(statusor.status());
-    return ParserStatus::Error;
+    return CallbackResult::Error;
   }
 }
 
@@ -615,7 +638,7 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
       }
 
       total_parsed += statusor_parsed.value();
-      if (parser_->getStatus() != ParserStatus::Success) {
+      if (parser_->getStatus() != ParserStatus::Ok) {
         // Parse errors trigger an exception in dispatchSlice so we are guaranteed to be paused at
         // this point.
         ASSERT(parser_->getStatus() == ParserStatus::Paused);
@@ -648,7 +671,7 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
   }
 
   const ParserStatus status = parser_->getStatus();
-  if (status != ParserStatus::Success && status != ParserStatus::Paused) {
+  if (status != ParserStatus::Ok && status != ParserStatus::Paused) {
     RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError));
     // Avoid overwriting the codec_status_ set in the callbacks.
     ASSERT(codec_status_.ok());
@@ -660,27 +683,27 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
   return nread;
 }
 
-ParserStatus ConnectionImpl::onMessageBegin() {
+CallbackResult ConnectionImpl::onMessageBegin() {
   return setAndCheckCallbackStatus(onMessageBeginImpl());
 }
 
-ParserStatus ConnectionImpl::onUrl(const char* data, size_t length) {
+CallbackResult ConnectionImpl::onUrl(const char* data, size_t length) {
   return setAndCheckCallbackStatus(onUrlBase(data, length));
 }
 
-ParserStatus ConnectionImpl::onStatus(const char* data, size_t length) {
+CallbackResult ConnectionImpl::onStatus(const char* data, size_t length) {
   return setAndCheckCallbackStatus(onStatusBase(data, length));
 }
 
-ParserStatus ConnectionImpl::onHeaderField(const char* data, size_t length) {
+CallbackResult ConnectionImpl::onHeaderField(const char* data, size_t length) {
   return setAndCheckCallbackStatus(onHeaderFieldImpl(data, length));
 }
 
-ParserStatus ConnectionImpl::onHeaderValue(const char* data, size_t length) {
+CallbackResult ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   return setAndCheckCallbackStatus(onHeaderValueImpl(data, length));
 }
 
-ParserStatus ConnectionImpl::onHeadersComplete() {
+CallbackResult ConnectionImpl::onHeadersComplete() {
   return setAndCheckCallbackStatusOr(onHeadersCompleteImpl());
 }
 
@@ -694,7 +717,7 @@ void ConnectionImpl::bufferBody(const char* data, size_t length) {
   }
 }
 
-ParserStatus ConnectionImpl::onMessageComplete() {
+CallbackResult ConnectionImpl::onMessageComplete() {
   return setAndCheckCallbackStatusOr(onMessageCompleteImpl());
 }
 
@@ -762,13 +785,13 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
   return checkMaxHeadersSize();
 }
 
-StatusOr<ParserStatus> ConnectionImpl::onHeadersCompleteImpl() {
+StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   ASSERT(!processing_trailers_);
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "onHeadersCompleteBase", connection_);
   RETURN_IF_ERROR(completeLastHeader());
 
-  if (!(parser_->httpMajor() == 1 && parser_->httpMinor() == 1)) {
+  if (!parser_->isHttp11()) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
@@ -858,12 +881,12 @@ StatusOr<ParserStatus> ConnectionImpl::onHeadersCompleteImpl() {
 
   header_parsing_state_ = HeaderParsingState::Done;
 
-  // Returning ParserStatus::NoBodyData informs http_parser to not expect a body or further data
+  // Returning CallbackResult::NoBodyData informs http_parser to not expect a body or further data
   // on this connection.
-  return handling_upgrade_ ? ParserStatus::NoBodyData : statusor.value();
+  return handling_upgrade_ ? CallbackResult::NoBodyData : statusor.value();
 }
 
-StatusOr<ParserStatus> ConnectionImpl::onMessageCompleteImpl() {
+StatusOr<CallbackResult> ConnectionImpl::onMessageCompleteImpl() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
 
   dispatchBufferedBody();
@@ -886,8 +909,7 @@ StatusOr<ParserStatus> ConnectionImpl::onMessageCompleteImpl() {
 }
 
 void ConnectionImpl::dispatchBufferedBody() {
-  ASSERT(parser_->getStatus() == ParserStatus::Success ||
-         parser_->getStatus() == ParserStatus::Paused);
+  ASSERT(parser_->getStatus() == ParserStatus::Ok || parser_->getStatus() == ParserStatus::Paused);
   ASSERT(codec_status_.ok());
   if (buffered_body_.length() > 0) {
     onBody(buffered_body_);
@@ -1074,7 +1096,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   return okStatus();
 }
 
-Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
+Envoy::StatusOr<CallbackResult> ServerConnectionImpl::onHeadersCompleteBase() {
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
@@ -1137,7 +1159,7 @@ Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
     }
   }
 
-  return ParserStatus::Success;
+  return CallbackResult::Success;
 }
 
 Status ServerConnectionImpl::onMessageBeginBase() {
@@ -1199,7 +1221,7 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   return status;
 }
 
-ParserStatus ServerConnectionImpl::onMessageCompleteBase() {
+CallbackResult ServerConnectionImpl::onMessageCompleteBase() {
   ASSERT(!handling_upgrade_);
   if (active_request_) {
 
@@ -1233,8 +1255,10 @@ ParserStatus ServerConnectionImpl::onMessageCompleteBase() {
 }
 
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
-  active_request_->response_encoder_.runResetCallbacks(reason);
-  connection_.dispatcher().deferredDelete(std::move(active_request_));
+  if (active_request_) {
+    active_request_->response_encoder_.runResetCallbacks(reason);
+    connection_.dispatcher().deferredDelete(std::move(active_request_));
+  }
 }
 
 Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
@@ -1349,7 +1373,7 @@ Status ClientConnectionImpl::onStatusBase(const char* data, size_t length) {
   return okStatus();
 }
 
-Envoy::StatusOr<ParserStatus> ClientConnectionImpl::onHeadersCompleteBase() {
+Envoy::StatusOr<CallbackResult> ClientConnectionImpl::onHeadersCompleteBase() {
   ENVOY_CONN_LOG(trace, "status_code {}", connection_, parser_->statusCode());
 
   // Handle the case where the client is closing a kept alive connection (by sending a 408
@@ -1411,8 +1435,8 @@ Envoy::StatusOr<ParserStatus> ClientConnectionImpl::onHeadersCompleteBase() {
   }
 
   // Here we deal with cases where the response cannot have a body by returning
-  // ParserStatus::NoBody, but http_parser does not deal with it for us.
-  return cannotHaveBody() ? ParserStatus::NoBody : ParserStatus::Success;
+  // CallbackResult::NoBody, but http_parser does not deal with it for us.
+  return cannotHaveBody() ? CallbackResult::NoBody : CallbackResult::Success;
 }
 
 bool ClientConnectionImpl::upgradeAllowed() const {
@@ -1430,11 +1454,11 @@ void ClientConnectionImpl::onBody(Buffer::Instance& data) {
   }
 }
 
-ParserStatus ClientConnectionImpl::onMessageCompleteBase() {
+CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
   if (ignore_message_complete_for_1xx_) {
     ignore_message_complete_for_1xx_ = false;
-    return ParserStatus::Success;
+    return CallbackResult::Success;
   }
   if (pending_response_.has_value()) {
     ASSERT(!pending_response_done_);

@@ -74,7 +74,7 @@ message Trds {
   string route_config_name = 2;
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message ThriftProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy";
@@ -117,6 +117,13 @@ message ThriftProxy {
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by Thrift proxy.
   repeated config.accesslog.v3.AccessLog access_log = 9;
+
+  // If set to true, Envoy will preserve the case of Thrift header keys instead of serializing them to
+  // lower case as per the default behavior. Note that NUL, CR and LF characters will also be preserved
+  // as mandated by the Thrift spec.
+  //
+  // More info: https://github.com/apache/thrift/commit/e165fa3c85d00cb984f4d9635ed60909a1266ce1.
+  bool header_keys_preserve_case = 10;
 }
 
 // ThriftFilter configures a Thrift filter.

@@ -171,6 +171,7 @@ ContextConfigImpl::ContextConfigImpl(
     const std::string& default_cipher_suites, const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : api_(factory_context.api()), options_(factory_context.options()),
+      singleton_manager_(factory_context.singletonManager()),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
@@ -221,7 +222,8 @@ ContextConfigImpl::ContextConfigImpl(
     }
   }
 
-  HandshakerFactoryContextImpl handshaker_factory_context(api_, options_, alpn_protocols_);
+  HandshakerFactoryContextImpl handshaker_factory_context(api_, options_, alpn_protocols_,
+                                                          singleton_manager_);
   Ssl::HandshakerFactory* handshaker_factory;
   if (config.has_custom_handshaker()) {
     // If a custom handshaker is configured, derive the factory from the config.

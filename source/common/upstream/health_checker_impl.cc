@@ -815,10 +815,17 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway(
   // Even if we have active health check probe, fail it on GOAWAY and schedule new one.
   if (request_encoder_) {
     handleFailure(envoy::data::core::v3::NETWORK);
-    expect_reset_ = true;
-    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+    // request_encoder_ can already be destroyed if the host was removed during the failure callback
+    // above.
+    if (request_encoder_ != nullptr) {
+      expect_reset_ = true;
+      request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+    }
   }
-  client_->close();
+  // client_ can already be destroyed if the host was removed during the failure callback above.
+  if (client_ != nullptr) {
+    client_->close();
+  }
 }
 
 bool GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::isHealthCheckSucceeded(
@@ -852,12 +859,17 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
   if (end_stream) {
     resetState();
   } else {
-    // resetState() will be called by onResetStream().
-    expect_reset_ = true;
-    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+    // request_encoder_ can already be destroyed if the host was removed during the failure callback
+    // above.
+    if (request_encoder_ != nullptr) {
+      // resetState() will be called by onResetStream().
+      expect_reset_ = true;
+      request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+    }
   }
 
-  if (!parent_.reuse_connection_ || goaway) {
+  // client_ can already be destroyed if the host was removed during the failure callback above.
+  if (client_ != nullptr && (!parent_.reuse_connection_ || goaway)) {
     client_->close();
   }
 }

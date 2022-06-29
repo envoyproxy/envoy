@@ -24,7 +24,6 @@ static_resources:
               cors:
                 allow_origin_string_match:
                 - safe_regex:
-                    google_re2: {}
                     regex: \*
                 allow_methods: "GET"
                 filter_enabled:
@@ -58,7 +57,6 @@ static_resources:
                   cors:
                     allow_origin_string_match:
                     - safe_regex:
-                        google_re2: {}
                         regex: .*\.envoyproxy\.io
                     allow_methods: "GET"
               - match:

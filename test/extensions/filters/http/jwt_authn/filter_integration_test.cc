@@ -303,16 +303,11 @@ TEST_P(LocalJwksIntegrationTest, ConnectRequestWithRegExMatch) {
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  if (downstreamProtocol() == Http::CodecType::HTTP1) {
-    // Because CONNECT requests for HTTP/1 do not include a path, they will fail
-    // to find a route match and return a 404.
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("404", response->headers().getStatusValue());
-  } else {
-    ASSERT_TRUE(response->waitForReset());
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  }
+  // Because CONNECT requests do not include a path, they will fail
+  // to find a route match and return a 404.
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
 }
 
 // The test case with a fake upstream for remote Jwks server.

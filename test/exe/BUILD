@@ -99,6 +99,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "check_extensions_against_registry_test",
+    srcs = ["check_extensions_against_registry_test.cc"],
+    data = [
+        "//source/extensions:extensions_metadata.yaml",
+    ],
+    deps = [
+        "//test/test_common:environment_lib",
+    ] + select({
+        # gcc RBE build has trouble compiling target with all extensions
+        "//bazel:gcc_build": ["//source/exe:envoy_main_common_with_core_extensions_lib"],
+        # This dependency MUST be main_common_lib to meet the purpose of this test
+        "//conditions:default": ["//source/exe:main_common_lib"],
+    }),
+)
+
+envoy_cc_test(
     name = "win32_scm_test",
     srcs = ["win32_scm_test.cc"],
     coverage = False,

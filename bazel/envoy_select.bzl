@@ -25,6 +25,19 @@ def envoy_select_google_grpc(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if admin HTML is enabled in the current build.
+def envoy_select_admin_html(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_admin_html": [],
+        "//conditions:default": xs,
+    })
+
+def envoy_select_admin_no_html(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_admin_html": xs,
+        "//conditions:default": [],
+    })
+
 # Selects the given values if http3 is enabled in the current build.
 def envoy_select_enable_http3(xs, repository = ""):
     return select({

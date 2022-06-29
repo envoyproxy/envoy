@@ -285,19 +285,15 @@ public:
     if (it != cache.access_loggers_.end()) {
       return it->second;
     }
-    // We pass skip_cluster_check=true to factoryForGrpcService in order to avoid throwing
-    // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
-    // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in
-    // the main thread if necessary.
-    auto client = async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
-                      ->createUncachedRawAsyncClient();
-    const auto logger = createLogger(config, std::move(client), cache.dispatcher_);
+
+    const auto logger = createLogger(config, cache.dispatcher_);
     cache.access_loggers_.emplace(cache_key, logger);
     return logger;
   }
 
 protected:
   Stats::Scope& scope_;
+  Grpc::AsyncClientManager& async_client_manager_;
 
 private:
   /**
@@ -314,11 +310,9 @@ private:
   };
 
   // Create the specific logger type for this cache.
-  virtual typename GrpcAccessLogger::SharedPtr
-  createLogger(const ConfigProto& config, const Grpc::RawAsyncClientSharedPtr& client,
-               Event::Dispatcher& dispatcher) PURE;
+  virtual typename GrpcAccessLogger::SharedPtr createLogger(const ConfigProto& config,
+                                                            Event::Dispatcher& dispatcher) PURE;
 
-  Grpc::AsyncClientManager& async_client_manager_;
   ThreadLocal::SlotPtr tls_slot_;
 };
 

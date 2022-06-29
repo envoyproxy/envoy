@@ -389,10 +389,34 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   // Listener manager worker id
   Tag worker_id;
   worker_id.name_ = tag_names.WORKER_ID;
-  worker_id.value_ = "worker_123";
+  worker_id.value_ = "123";
 
   regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
                          "listener_manager.dispatcher.loop_duration_us", {worker_id});
+
+  // Listener worker id
+  listener_address.value_ = "127.0.0.1_3012";
+  regex_tester.testRegex("listener.127.0.0.1_3012.worker_123.downstream_cx_active",
+                         "listener.downstream_cx_active", {listener_address, worker_id});
+
+  listener_address.value_ = "myprefix";
+  regex_tester.testRegex("listener.myprefix.worker_123.downstream_cx_active",
+                         "listener.downstream_cx_active", {listener_address, worker_id});
+
+  // Server worker id
+  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.watchdog_miss", {worker_id});
+
+  // Thrift Proxy Prefix
+  Tag thrift_prefix;
+  thrift_prefix.name_ = tag_names.THRIFT_PREFIX;
+  thrift_prefix.value_ = "thrift_prefix";
+  regex_tester.testRegex("thrift.thrift_prefix.response", "thrift.response", {thrift_prefix});
+
+  // Redis Proxy Prefix
+  Tag redis_prefix;
+  redis_prefix.name_ = tag_names.REDIS_PREFIX;
+  redis_prefix.value_ = "my_redis_prefix";
+  regex_tester.testRegex("redis.my_redis_prefix.response", "redis.response", {redis_prefix});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {

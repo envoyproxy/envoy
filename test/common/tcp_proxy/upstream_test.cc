@@ -9,6 +9,7 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -223,7 +224,10 @@ public:
 
 TYPED_TEST_SUITE(HttpUpstreamRequestEncoderTest, Implementations);
 
-TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderOld) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_rfc_connect", "false"}});
+
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
@@ -238,6 +242,18 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
     expected_headers->setReferenceKey(Http::Headers::get().Protocol,
                                       Http::Headers::get().ProtocolValues.Bytestream);
   }
+
+  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
+  this->upstream_->setRequestEncoder(this->encoder_, false);
+}
+
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
+  this->setupUpstream();
+  std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
+  expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, "CONNECT"},
+      {Http::Headers::get().Host, this->config_->hostname()},
+  });
 
   EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
   this->upstream_->setRequestEncoder(this->encoder_, false);
@@ -287,14 +303,6 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
       {Http::Headers::get().Host, this->config_->hostname()},
   });
 
-  if (this->is_http2_) {
-    expected_headers->setReferenceKey(Http::Headers::get().Path, "/");
-    expected_headers->setReferenceKey(Http::Headers::get().Scheme,
-                                      Http::Headers::get().SchemeValues.Http);
-    expected_headers->setReferenceKey(Http::Headers::get().Protocol,
-                                      Http::Headers::get().ProtocolValues.Bytestream);
-  }
-
   expected_headers->setCopy(Http::LowerCaseString("header0"), "value0");
   expected_headers->addCopy(Http::LowerCaseString("header1"), "value1");
   expected_headers->addCopy(Http::LowerCaseString("header1"), "value2");
@@ -323,24 +331,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
       {Http::Headers::get().Host, this->config_->hostname()},
   });
 
-  if (this->is_http2_) {
-    expected_headers->setReferenceKey(Http::Headers::get().Path, "/");
-    expected_headers->setReferenceKey(Http::Headers::get().Scheme,
-                                      Http::Headers::get().SchemeValues.Http);
-    expected_headers->setReferenceKey(Http::Headers::get().Protocol,
-                                      Http::Headers::get().ProtocolValues.Bytestream);
-  }
-
   expected_headers->setCopy(Http::LowerCaseString("key"), "value1");
   expected_headers->addCopy(Http::LowerCaseString("key"), "value2");
-
-  if (this->is_http2_) {
-    expected_headers->setReferenceKey(Http::Headers::get().Path, "/");
-    expected_headers->setReferenceKey(Http::Headers::get().Scheme,
-                                      Http::Headers::get().SchemeValues.Http);
-    expected_headers->setReferenceKey(Http::Headers::get().Protocol,
-                                      Http::Headers::get().ProtocolValues.Bytestream);
-  }
 
   expected_headers->setCopy(Http::LowerCaseString("key"), "value1");
   expected_headers->addCopy(Http::LowerCaseString("key"), "value2");
@@ -381,14 +373,6 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamIn
       {Http::Headers::get().Method, "CONNECT"},
       {Http::Headers::get().Host, this->config_->hostname()},
   });
-
-  if (this->is_http2_) {
-    expected_headers->setReferenceKey(Http::Headers::get().Path, "/");
-    expected_headers->setReferenceKey(Http::Headers::get().Scheme,
-                                      Http::Headers::get().SchemeValues.Http);
-    expected_headers->setReferenceKey(Http::Headers::get().Protocol,
-                                      Http::Headers::get().ProtocolValues.Bytestream);
-  }
 
   expected_headers->setCopy(Http::LowerCaseString("header0"), "value0");
   expected_headers->addCopy(Http::LowerCaseString("downstream_local_port"), "80");

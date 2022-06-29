@@ -37,11 +37,13 @@ RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
 RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
 RUNTIME_GUARD(envoy_reloadable_features_cares_accept_nodata);
+RUNTIME_GUARD(envoy_reloadable_features_combine_sds_requests);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_correctly_validate_alpn);
 RUNTIME_GUARD(envoy_reloadable_features_deprecate_global_ints);
 RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats);
+RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_grpc_async_client_cache);
 RUNTIME_GUARD(envoy_reloadable_features_get_route_config_factory_by_type);
 RUNTIME_GUARD(envoy_reloadable_features_handle_stream_reset_during_hcm_encoding);
@@ -56,6 +58,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_
 RUNTIME_GUARD(envoy_reloadable_features_internal_address);
 RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_match_all_descriptors);
 RUNTIME_GUARD(envoy_reloadable_features_lua_respond_with_send_local_reply);
+RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_override_request_timeout_by_gateway_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
@@ -70,6 +73,7 @@ RUNTIME_GUARD(envoy_reloadable_features_top_level_ecds_stats);
 RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
 RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
+RUNTIME_GUARD(envoy_reloadable_features_use_rfc_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_remove_runtime_singleton);
@@ -90,6 +94,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
+// TODO(mattklein123): Flip this to true and/or remove completely once verified by Envoy Mobile.
+// TODO(mattklein123): Also unit test this if this sticks and this becomes the default for Apple &
+// Android.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT

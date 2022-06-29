@@ -66,9 +66,6 @@ class ActiveRawUdpListener : public ActiveUdpListenerBase,
                              Logger::Loggable<Logger::Id::conn_handler> {
 public:
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
-                       Network::UdpConnectionHandler& parent, Event::Dispatcher& dispatcher,
-                       Network::ListenerConfig& config);
-  ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                        Network::UdpConnectionHandler& parent,
                        Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);

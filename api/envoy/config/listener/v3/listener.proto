@@ -5,6 +5,7 @@ package envoy.config.listener.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
@@ -32,13 +33,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
 
+// The additional address the listener is listening on.
+// [#not-implemented-hide:]
+message AdditionalAddress {
+  core.v3.Address address = 1;
+}
+
 // Listener list collections. Entries are *Listener* resources or references.
 // [#not-implemented-hide:]
 message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -88,6 +95,11 @@ message Listener {
 
       // If specified, the listener will use the exact connection balancer.
       ExactBalance exact_balance = 1;
+
+      // The listener will use the connection balancer according to ``type_url``. If ``type_url`` is invalid,
+      // Envoy will not attempt to balance active connections between worker threads.
+      // [#extension-category: envoy.network.connection_balance]
+      core.v3.TypedExtensionConfig extend_balance = 2;
     }
   }
 
@@ -108,6 +120,12 @@ message Listener {
   // Linux as the actual port will be allocated by the OS.
   // Required unless *api_listener* or *listener_specifier* is populated.
   core.v3.Address address = 2;
+
+  // The additional addresses the listener should listen on. The addresses must be unique across all
+  // listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in a single listener,
+  // all addresses use the same protocol, and multiple internal addresses are not supported.
+  // [#not-implemented-hide:]
+  repeated AdditionalAddress additional_addresses = 33;
 
   // Optional prefix to use on listener stats. If empty, the stats will be rooted at
   // `listener.<address as string>.`. If non-empty, stats will be rooted at
