@@ -25,8 +25,8 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Network {
 
-MockUdpListenerConfig::MockUdpListenerConfig()
-    : udp_listener_worker_router_(std::make_unique<UdpListenerWorkerRouterImpl>(1)) {
+MockUdpListenerConfig::MockUdpListenerConfig(uint32_t concurrency)
+    : udp_listener_worker_router_(std::make_unique<UdpListenerWorkerRouterImpl>(concurrency)) {
   ON_CALL(*this, listenerWorkerRouter(_)).WillByDefault(ReturnRef(*udp_listener_worker_router_));
   ON_CALL(*this, config()).WillByDefault(ReturnRef(config_));
 }
@@ -183,6 +183,8 @@ MockConnectionHandler::MockConnectionHandler() {
   }));
 }
 MockConnectionHandler::~MockConnectionHandler() = default;
+
+MockUdpListenerWorkerRouter::~MockUdpListenerWorkerRouter() = default;
 
 MockIp::MockIp() = default;
 MockIp::~MockIp() = default;
