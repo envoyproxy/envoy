@@ -4,6 +4,12 @@ package envoy.extensions.filters.http.custom_response.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
+import "envoy/config/core/v3/substitution_format_string.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -24,53 +30,47 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // The filter configuration is a collection of custom response
 // policies.
 message CustomResponse {
-
   // Definition of the custom response to be provided to the downstream.
-  message DataSource {
-    // Locally defined custom response.
-    message LocalDataSource {
-      // The new response status code if specified.
-      google.protobuf.UInt32Value status_code = 1 [(validate.rules).uint32 = {lt: 600 gte: 200}];
-
-      // The new local reply body text if specified. It will be used
-      // in the `%LOCAL_REPLY_BODY%` command operator in the `body_format`.
-      config.core.v3.DataSource body = 2;
-
-      // HTTP headers to add to the response. This allows the
-      // response policy to append, to add or to override headers of
-      // the response before it is sent to a downstream client.
-      repeated config.core.v3.HeaderValueOption headers_to_add = 3
-          [(validate.rules).repeated = {max_items: 1000}];
+  message Response {
+    message RemoteDataSource {
+      config.core.v3.HttpUri http_uri = 1;
+      config.core.v3.RetryPolicy retry_policy = 2;
+      //TODO(pradeepcrao): Does it make sense to have a TypedExtensionConfig to interpret the
+      // response of the upstream?
     }
 
-    // Name needs to be unique for selection using the unified matcher api.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    // The new response status code if specified.
+    google.protobuf.UInt32Value status_code = 1 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
+    // The new local reply body text if specified. It will be used
+    // in the `%LOCAL_REPLY_BODY%` command operator in the `body_format`.
     // The custom response generated either locally or retrieved
     // from a remote source.
-    oneof data_source {
-      option (validate.required) = true;
-      LocalDataSource local = 2;
-      config.core.HttpUri remote = 3;
+    oneof body {
+      config.core.v3.DataSource local = 2;
+
+      RemoteDataSource remote = 3;
     }
 
+    // HTTP headers to add to the response. This allows the
+    // response policy to append, to add or to override headers of
+    // the response before it is sent to a downstream client.
+    repeated config.core.v3.HeaderValueOption headers_to_add = 4
+        [(validate.rules).repeated = {max_items: 1000}];
+
+    // Name needs to be unique for selection using the unified matcher api.
+    string name = 5 [(validate.rules).string = {min_len: 1}];
+
     // Optional body format to be used for this response.
-    config.core.v3.SubstitutionFormatString body_format = 4;
-  }
-
-  // For routes with a per-route configuration, the global filter level
-  // configuration is ignored.
-  message CustomResponsePerRoute {
-
-    repeated DataSource custom_responses = 1;
-
-    xds.type.matcher.v3.Matcher custom_response_matcher = 2;
+    config.core.v3.SubstitutionFormatString body_format = 6;
   }
 
   // A list of custom responses.
-  repeated DataSource custom_responses = 1;
+  repeated Response custom_responses = 1;
+
   // Matcher to match against the original response using filters of type
   // config.accesslog.v3.AccessLogFilter to select a custom_response
   // by name.
-  xds.type.matcher.v3.Matcher custom_response_matcher = 2;
+  xds.type.matcher.v3.Matcher custom_response_matcher = 2
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
