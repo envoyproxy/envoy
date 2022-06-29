@@ -1,6 +1,5 @@
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
-#include "ext_proc.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
