@@ -19,24 +19,24 @@ The filter configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.fil
 
 The audience configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience>` is the URL of the destionation service, which is the receving service that calling service is invoking. This information is provided through cluster metadata :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`
 
-The token cache configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Token>` is used to avoid the redundant queries to authentication server (GCE metadata server in the context of this filter) for duplicated tokens.
+The token cache configuration :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.TokenCacheConfig>` is used to avoid the redundant queries to authentication server (GCE metadata server in the context of this filter) for duplicated tokens.
 
 Configuration example
---------------------
+---------------------
 Static and dynamic resouce configuration example:
 
-.. literalinclude:: _include/gcp-authn-resource-configuration.yaml
+.. literalinclude:: _include/gcp-authn-filter-configuration.yaml
    :language: yaml
-   :lines: 1-75
+   :lines: 39-80
    :linenos:
-   :lineno-start: 21
-   :caption: :download:`gcp-authn-resource-configuration.yaml <_include/gcp-authn-resource-configuration.yaml>`
+   :lineno-start: 39
+   :caption: :download:`gcp-authn-filter-configuration.yaml <_include/gcp-authn-filter-configuration.yaml>`
 
 Http filter configuration example in the filter chain:
 
 .. literalinclude:: _include/gcp-authn-filter-configuration.yaml
    :language: yaml
-   :lines: 17-24
+   :lines: 8-38
    :linenos:
-   :lineno-start: 17
+   :lineno-start: 8
    :caption: :download:`gcp-authn-filter-configuration.yaml <_include/gcp-authn-filter-configuration.yaml>`
