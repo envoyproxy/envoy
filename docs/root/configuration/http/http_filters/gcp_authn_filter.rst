@@ -23,7 +23,7 @@ The token cache configuration :ref:`v3 API reference <envoy_v3_api_msg_extension
 
 Configuration example
 ---------------------
-Static and dynamic resouce configuration example:
+Resouce configuration example:
 
 .. literalinclude:: _include/gcp-authn-filter-configuration.yaml
    :language: yaml
