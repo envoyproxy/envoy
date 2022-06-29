@@ -29,14 +29,42 @@ envoy_cc_test(
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
     },
+    external_deps = [
+        "abseil_strings",
+    ],
     repository = "@envoy",
     deps = [
-        ":base_client_integration_test_lib",
-        "@envoy//test/common/grpc:grpc_client_integration_lib",
-        "@envoy//test/server:utility_lib",
+        ":xds_integration_test_lib",
+        "@envoy//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "sds_integration_test",
+    srcs = [
+        "sds_integration_test.cc",
+    ],
+    data = [
+        "@envoy//test/config/integration/certs",
+    ],
+    exec_properties = {
+        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
+        "sandboxNetwork": "standard",
+    },
+    repository = "@envoy",
+    deps = [
+        ":xds_integration_test_lib",
+        "@envoy//source/common/config:protobuf_link_hacks",
+        "@envoy//source/extensions/transport_sockets/tls:config",
+        "@envoy//source/extensions/transport_sockets/tls:context_config_lib",
+        "@envoy//source/extensions/transport_sockets/tls:context_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
     ],
 )
 
@@ -54,10 +82,26 @@ envoy_cc_test_library(
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
-        "@envoy//source/extensions/http/header_formatters/preserve_case:config",
-        "@envoy//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "@envoy//test/common/http:common_lib",
         "@envoy//test/integration:http_integration_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "xds_integration_test_lib",
+    srcs = [
+        "xds_integration_test.cc",
+    ],
+    hdrs = [
+        "xds_integration_test.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":base_client_integration_test_lib",
+        "@envoy//source/common/config:api_version_lib",
+        "@envoy//test/common/grpc:grpc_client_integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
