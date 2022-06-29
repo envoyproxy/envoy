@@ -2256,26 +2256,20 @@ TEST_F(ConnectionHandlerTest, UdpListenerWorkerRouterWithMultipleAddresses) {
   TestMultiAddressesListener* test_listener = addMultiAddrsListener(
       1, false, false, "test_listener", mock_listeners, addresses, connection_balancers,
       listener_callbacks_map, false, Network::Socket::Type::Datagram);
-  
+
   auto udp_listener_worker_router1 = static_cast<Network::MockUdpListenerWorkerRouter*>(
-                  test_listener->udp_listener_config_->listener_worker_router_map_
-                      .find(address1->asString())
-                      ->second.get());
+      test_listener->udp_listener_config_->listener_worker_router_map_.find(address1->asString())
+          ->second.get());
   auto udp_listener_worker_router2 = static_cast<Network::MockUdpListenerWorkerRouter*>(
-                  test_listener->udp_listener_config_->listener_worker_router_map_
-                      .find(address2->asString())
-                      ->second.get());
-  EXPECT_CALL(*udp_listener_worker_router1,
-              registerWorkerForListener(_));
-  EXPECT_CALL(*udp_listener_worker_router2,
-              registerWorkerForListener(_));
+      test_listener->udp_listener_config_->listener_worker_router_map_.find(address2->asString())
+          ->second.get());
+  EXPECT_CALL(*udp_listener_worker_router1, registerWorkerForListener(_));
+  EXPECT_CALL(*udp_listener_worker_router2, registerWorkerForListener(_));
 
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
 
-  EXPECT_CALL(*udp_listener_worker_router1,
-              unregisterWorkerForListener(_));
-  EXPECT_CALL(*udp_listener_worker_router2,
-              unregisterWorkerForListener(_));
+  EXPECT_CALL(*udp_listener_worker_router1, unregisterWorkerForListener(_));
+  EXPECT_CALL(*udp_listener_worker_router2, unregisterWorkerForListener(_));
   EXPECT_CALL(*listener1, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
 }
