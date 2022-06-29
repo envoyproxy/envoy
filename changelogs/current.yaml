@@ -214,7 +214,7 @@ new_features:
     added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
 - area: header_formatters
   change: |
-    all access log formatters can be used in header formatters. This feature can be reversed by setting runtime guard ``envoy.reloadable_features.unified_header_formatter`` to false.
+    all access log formatters can be used as custom request/response headers. Custom header's syntax is parsed using access logger's parser and header values are obtained using access logger's substitution operators. This feature can be reversed by setting runtime guard ``envoy.reloadable_features.unified_header_formatter`` to false.
 - area: http
   change: |
     added new :ref:`file_system_buffer <config_http_filters_file_system_buffer>` http filter.

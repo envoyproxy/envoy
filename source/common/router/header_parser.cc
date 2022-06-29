@@ -57,7 +57,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
   // Change PER_REQUEST_STATE to FILTER_STATE.
   final_header_value = HeaderParser::translatePerRequestState(final_header_value);
 
-  // Let the substitution formatter Parse the final_header_value.
+  // Let the substitution formatter parse the final_header_value.
   return std::make_unique<HttpHeaderFormatterImpl>(
       std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true), append);
 }
@@ -68,8 +68,8 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
 // StreamInfoHeaderFormatter.
 // TODO(cpakulski): parseInternal function is executed only when
-// envoy_reloadable_features_unified_header_formatter runtime guard is false. The the guard is
-// deprecated, parseInternal function is not needed.
+// envoy_reloadable_features_unified_header_formatter runtime guard is false. When the guard is
+// deprecated, parseInternal function is not needed anymore.
 HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
                                  bool append) {
   const std::string& key = header_value.key();

@@ -150,7 +150,7 @@ private:
 
 // TODO(cpakulski).
 // This class is used only when runtime guard envoy_reloadable_features_unified_header_formatter
-// is false and should be removed when the guard is removed. See issue 20389..
+// is false and should be removed when the guard is removed. See issue 20389.
 // This is basically a bridge between "new" header formatters which take request_headers and
 // response_headers as parameters and "old" header formatters which take only stream_info as
 // parameter.
