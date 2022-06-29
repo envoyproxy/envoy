@@ -2249,7 +2249,7 @@ TEST_F(ConnectionHandlerTest, UdpListenerWorkerRouterWithMultipleAddresses) {
   addresses.emplace_back(address1);
   addresses.emplace_back(address2);
 
-  // Using empty map for those since those are uselss for UDP.
+  // Using empty map here since those are useless for UDP.
   absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map;
   absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
 
