@@ -15,5 +15,6 @@ envoy_cc_test(
         "//source/common/tcp_proxy",
         "//source/extensions/upstreams/tcp/generic:config",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/server:factory_context_mocks",
     ],
 )
