@@ -218,7 +218,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 2),
                 testing::HasSubstr("RFCF cache.response_from_cache_filter"));
   }
 }
@@ -276,7 +276,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
   }
 }
 
@@ -390,7 +390,7 @@ TEST_P(CacheIntegrationTest, ServeHeadRequest) {
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
   }
 }
 
@@ -593,7 +593,7 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead200WithValidation) {
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
   }
 }
 
