@@ -1150,23 +1150,6 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   ASSERT_EQ(object->value_, dest_object->value_);
 }
 
-TEST_F(IoHandleImplTest, PassthroughStateReadOnlyObject) {
-  StreamInfo::FilterState::Objects source_filter_state;
-  auto object = std::make_shared<TestObject>(1000);
-  source_filter_state.push_back(
-      {object, StreamInfo::FilterState::StateType::ReadOnly,
-       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection, "object_key"});
-  io_handle_->passthroughState()->initialize(nullptr, source_filter_state);
-  StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  auto read_only = std::make_shared<TestObject>(1);
-  dest_filter_state.setData("object_key", read_only, StreamInfo::FilterState::StateType::ReadOnly,
-                            StreamInfo::FilterState::LifeSpan::Connection);
-  envoy::config::core::v3::Metadata dest_metadata;
-  io_handle_peer_->passthroughState()->mergeInto(dest_metadata, dest_filter_state);
-  auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
-  ASSERT_EQ(read_only->value_, dest_object->value_);
-}
-
 class IoHandleImplNotImplementedTest : public testing::Test {
 public:
   IoHandleImplNotImplementedTest() {

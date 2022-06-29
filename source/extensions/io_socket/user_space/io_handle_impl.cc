@@ -393,12 +393,9 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
     metadata.MergeFrom(*metadata_);
   }
   for (const auto& object : filter_state_objects_) {
-    try {
-      filter_state.setData(object.name_, object.data_, object.state_type_,
-                           StreamInfo::FilterState::LifeSpan::Connection, object.stream_sharing_);
-    } catch (const EnvoyException& e) {
-      ENVOY_LOG(trace, "Failed to set data for '{}': {}", object.name_, e.what());
-    }
+    // This should not throw as stream info is new and filter objects are uniquely named.
+    filter_state.setData(object.name_, object.data_, object.state_type_,
+                         StreamInfo::FilterState::LifeSpan::Connection, object.stream_sharing_);
   }
   metadata_ = nullptr;
   filter_state_objects_.clear();

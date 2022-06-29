@@ -37,7 +37,7 @@ TEST_F(TransportSocketOptionsImplTest, SharedFilterState) {
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain,
       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
-  auto objects = transport_socket_options->filterStateObjects();
+  auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
   EXPECT_EQ(1, objects.size());
   EXPECT_EQ("random_key_has_effect", objects.at(0).name_);
 }

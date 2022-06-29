@@ -43,7 +43,7 @@ void CommonUpstreamTransportSocketFactory::hashKey(
     pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
   }
 
-  for (const auto& object : options->filterStateObjects()) {
+  for (const auto& object : options->downstreamSharedFilterStateObjects()) {
     if (auto hashable = dynamic_cast<const Hashable*>(object.data_.get()); hashable != nullptr) {
       if (auto hash = hashable->hash(); hash) {
         pushScalarToByteVector(hash.value(), key);
@@ -89,7 +89,7 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   }
 
   StreamInfo::FilterState::ObjectsPtr objects = filter_state.objectsSharedWithUpstreamConnection();
-  if (objects->size() > 0) {
+  if (!objects->empty()) {
     needs_transport_socket_options = true;
   }
 

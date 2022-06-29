@@ -29,8 +29,8 @@ public:
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
     return inner_options_->proxyProtocolOptions();
   }
-  const StreamInfo::FilterState::Objects& filterStateObjects() const override {
-    return inner_options_->filterStateObjects();
+  const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
+    return inner_options_->downstreamSharedFilterStateObjects();
   }
 
 private:
@@ -71,7 +71,7 @@ public:
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
     return proxy_protocol_options_;
   }
-  const StreamInfo::FilterState::Objects& filterStateObjects() const override {
+  const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
     return *filter_state_objects_;
   }
 

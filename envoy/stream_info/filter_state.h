@@ -52,10 +52,11 @@ public:
   // state.
   //
   // As a special case, objects that are marked as shared with the upstream
-  // become bound to the upstream connection life span, regardless of the
-  // original life span. That means, for example, that a shared request span
-  // object may outlive the original request when it is shared, because it may
-  // be captured by an upstream connection for the original downstream request.
+  // become bound to the upstream connection life span in addition to the
+  // original stream life span. That means, for example, that a shared request
+  // span object may outlive the original request when it is shared, because it
+  // may be captured by an upstream connection for the original downstream
+  // request, which remains open after the downstream request completes.
   enum LifeSpan { FilterChain, Request, Connection, TopSpan = Connection };
 
   // Objects stored in the filter state can optionally be shared between the
@@ -69,8 +70,10 @@ public:
     // requests and connections to the upstream connection filter state. When
     // upstream connections are re-used between streams, the downstream objects
     // are captured for the first, initiating stream. To force distinct
-    // upstream connections and prevent sharing, the shared filter state object
-    // must implement the hashing interface.
+    // upstream connections, the shared filter state object must implement the
+    // hashing interface. Shared objects with distinct hashes will use distinct
+    // upstream connections. Note that this affects connection pooling,
+    // preventing any re-use of the upstream connections in the worst case.
     SharedWithUpstreamConnection,
   };
 
@@ -97,7 +100,7 @@ public:
     std::shared_ptr<Object> data_;
     StateType state_type_;
     StreamSharing stream_sharing_{StreamSharing::None};
-    std::string name_{""};
+    std::string name_;
   };
 
   using Objects = std::vector<FilterObject>;

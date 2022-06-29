@@ -118,7 +118,7 @@ InternalSocketFactory::createTransportSocket(Network::TransportSocketOptionsCons
     extracted_metadata = config_.extractMetadata(host);
   }
   return std::make_unique<InternalSocket>(std::move(inner_socket), std::move(extracted_metadata),
-                                          options ? options->filterStateObjects()
+                                          options ? options->downstreamSharedFilterStateObjects()
                                                   : StreamInfo::FilterState::Objects());
 }
 

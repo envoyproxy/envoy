@@ -119,7 +119,7 @@ minor_behavior_changes:
 - area: filter state
   change: |
     revert to respecting the life time of the filter state objects to be bound to the original stream and make sharing
-    filter state objects with the upstream explicit via a flag.
+    filter state objects with the upstream info explicit via an extra flag in ``setData``.
 
 bug_fixes:
 - area: http
