@@ -116,11 +116,6 @@ minor_behavior_changes:
 - area: logging
   change: |
     changed category name for access log filter extensions to ``envoy.access_loggers.extension_filters``.
-- area: http
-  change: |
-    header invert match rule will apply when the header is not present and the header match rule is not present type.
-    This behavior change can be reverted by setting runtim guard
-    ``envoy.reloadable_features.apply_invert_match_when_header_is_not_present`` to false.
 
 bug_fixes:
 - area: http
@@ -167,6 +162,11 @@ bug_fixes:
 - area: upstream
   change: |
     Fixed the LOGICAL_DNS and STRICT_DNS clusters to work for IPv6.
+- area: http
+  change: |
+    header invert match rule will apply when the header is not present and the header match rule is not present type.
+    This behavior change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.apply_invert_match_when_header_is_not_present`` to false.
 
 removed_config_or_runtime:
 - area: compressor
