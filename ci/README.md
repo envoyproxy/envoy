@@ -131,7 +131,6 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`. Specify `//contrib/...` to get contrib coverage.
-* `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
 * `bazel.msan` &mdash; build and run tests under `-c dbg --config=clang-msan` with clang.
 * `bazel.msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-msan` with clang.
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
@@ -192,20 +191,3 @@ Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](ht
 which is pre-installed on the [Azure Pipelines macOS image](https://github.com/actions/virtual-environments/blob/main/images/macos/macos-10.15-Readme.md).
 The dependencies are cached and re-installed on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
 build and test Envoy. Note that the full version of Xcode (not just Command Line Tools) is required.
-
-# Coverity Scan Build Flow
-
-[Coverity Scan Envoy Project](https://scan.coverity.com/projects/envoy-proxy)
-
-Coverity Scan static analysis is not run within Envoy CI. However, Envoy can be locally built and
-submitted for analysis. A Coverity Scan Envoy project token must be generated from the
-[Coverity Project Settings](https://scan.coverity.com/projects/envoy-proxy?tab=project_settings).
-Only a Coverity Project Administrator can create a token. With this token, running
-`ci/do_coverity_local.sh` will use the Ubuntu based `envoyproxy/envoy-build-ubuntu` image to build the
-Envoy static binary with the Coverity Scan tool chain. This process generates an artifact,
-envoy-coverity-output.tgz, that is uploaded to Coverity for static analysis.
-
-To build and submit for analysis:
-```bash
-COVERITY_TOKEN={generated Coverity project token} ./ci/do_coverity_local.sh
-```
