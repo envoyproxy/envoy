@@ -98,7 +98,7 @@ public:
 
   struct FilterObject {
     std::shared_ptr<Object> data_;
-    StateType state_type_;
+    StateType state_type_{StateType::ReadOnly};
     StreamSharing stream_sharing_{StreamSharing::None};
     std::string name_;
   };
