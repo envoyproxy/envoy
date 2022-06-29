@@ -136,7 +136,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectData) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
@@ -170,7 +171,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithPeek) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   // calling the onAcceptWorker() to create the ActiveTcpSocket.
@@ -240,7 +242,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
 
   Event::FileReadyCb file_event_callback;
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 
@@ -329,7 +332,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters2) {
   Event::FileReadyCb file_event_callback;
 
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, recv)
       .WillOnce([&](void*, size_t size, int) {
@@ -389,7 +393,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
@@ -424,7 +429,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterCloseSockets) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   EXPECT_CALL(io_handle_, recv)
@@ -452,7 +458,8 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 

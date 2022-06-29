@@ -957,6 +957,43 @@ TEST_P(ListenerFilterIntegrationTest, MixNoInspectDataFilterAndInspectDataFilter
   tcp_client->close();
 }
 
+TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersClientCloseConnectionWithFewData) {
+// This is required `EV_FEATURE_EARLY_CLOSE` feature for libevent, and this feature is
+// only supported with `epoll`. But `MacOS` uses the `kqueue`.
+// https://libevent.org/doc/event_8h.html#a98f643f9c9063a4cbf410f519eb61e55
+#if !defined(__APPLE__)
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 10
+        close_connection: false
+        )EOF");
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->set_continue_on_listener_filters_timeout(false);
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_listener_filters_timeout()
+        ->MergeFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(1000000));
+    bootstrap.mutable_static_resources()->mutable_listeners(0)->set_stat_prefix("listener_0");
+  });
+
+  std::string data = "hello";
+  initialize();
+  enableHalfClose(true);
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  auto result = tcp_client->write(data, true);
+  // The connection could be closed when writing or after write.
+  if (result == true) {
+    tcp_client->waitForDisconnect();
+  }
+  test_server_->waitForCounterEq("listener.listener_0.downstream_listener_filter_remote_close", 1);
+#endif
+}
+
 // Only update the order of listener filters, ensure the listener filters
 // was update.
 TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
