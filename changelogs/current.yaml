@@ -120,6 +120,9 @@ minor_behavior_changes:
   change: |
     revert to respecting the life time of the filter state objects to be bound to the original stream and make sharing
     filter state objects with the upstream info explicit via an extra flag in ``setData``.
+- area: tracers
+  change: |
+    remove unnecessary "spawnChild" annotations in OpenCensus tracer.
 
 bug_fixes:
 - area: http
