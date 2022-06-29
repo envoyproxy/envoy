@@ -1,26 +1,25 @@
 #include "test/common/integration/base_client_integration_test.h"
 
-#include "source/extensions/http/header_formatters/preserve_case/config.h"
-#include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
-
-#include "test/common/http/common.h"
-
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "library/common/config/internal.h"
-#include "library/common/http/header_utility.h"
 
 namespace Envoy {
 namespace {
 
-void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expect_dns) {
+void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expect_dns,
+                         bool upstream_tls) {
   if (expect_dns) {
     EXPECT_NE(-1, final_intel.dns_start_ms);
     EXPECT_NE(-1, final_intel.dns_end_ms);
   }
-  // This test doesn't do TLS.
-  EXPECT_EQ(-1, final_intel.ssl_start_ms);
-  EXPECT_EQ(-1, final_intel.ssl_end_ms);
+
+  if (upstream_tls) {
+    EXPECT_GT(final_intel.ssl_start_ms, 0);
+    EXPECT_GT(final_intel.ssl_end_ms, 0);
+  } else {
+    EXPECT_EQ(-1, final_intel.ssl_start_ms);
+    EXPECT_EQ(-1, final_intel.ssl_end_ms);
+  }
 
   ASSERT_NE(-1, final_intel.stream_start_ms);
   ASSERT_NE(-1, final_intel.connect_start_ms);
@@ -72,7 +71,7 @@ void BaseClientIntegrationTest::initialize() {
   });
   stream_prototype_->setOnComplete(
       [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        validateStreamIntel(final_intel, expect_dns_);
+        validateStreamIntel(final_intel, expect_dns_, upstream_tls_);
         cc_.on_complete_received_byte_count = final_intel.received_byte_count;
         cc_.on_complete_calls++;
         cc_.terminal_callback->setReady();
