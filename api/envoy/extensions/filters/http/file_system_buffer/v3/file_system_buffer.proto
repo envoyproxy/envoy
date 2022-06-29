@@ -71,7 +71,7 @@ message StreamConfig {
 
   // The amount stored in the memory buffer before buffering to disk.
   // If unset in route, vhost and listener config, defaults to a hardcoded value of 1MiB
-  google.protobuf.UInt64Value memory_buffer_bytes_limit = 2;
+  google.protobuf.UInt64Value memory_buffer_bytes_limit = 2 [(validate.rules).uint64 = {gt: 0}];
 
   // The maximum storage (excluding memory) to be buffered in this filter.
   // If unset in route, vhost and listener config, defaults to a hardcoded value of 32MiB

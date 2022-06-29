@@ -8,17 +8,30 @@ behavior_changes:
   change: |
     Multiple SDS resources of multiple clusters or listeners are sent in a single SDS requests, instead of multiple SDS requests.
     This behavioral change can be reverted by setting ``envoy.reloadable_features.combine_sds_requests`` to false.
-- area: listener
+- area: stats listener
   change: |
     Fixed metric tag extraction so that :ref:stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>
     is properly extracted. This changes the Prometheus name from
     envoy_listener_myprefix_downstream_cx_overflow{} to envoy_listener_downstream_cx_overflow{envoy_listener_address="myprefix"}.
     This does not affect the Prometheus name if stat_prefix is not set.
-- area: thrift_proxy
+- area: stats listener
+  change: |
+    Fixed metric tag extraction so that worker_id is properly extracted from the listener stats. This changes the Prometheus name from
+    envoy_listener_worker_1_downstream_cx_active{envoy_listener_address="0.0.0.0_10000"} to envoy_listener_downstream_cx_active{envoy_listener_address="0.0.0.0_10000", envoy_worker_id="1"} .
+- area: stats server
+  change: |
+    Fixed metric tag extraction so that worker_id is properly extracted fromt the server stats. This changes the Prometheus name from
+    envoy_server_worker_1_watchdog_miss{} to envoy_server_watchdog_miss{envoy_worker_id="1"}.
+- area: stats thrift_proxy
   change: |
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.stat_prefix>`
     is properly extracted. This changes the Prometheus name from
     envoy_thrift_myprefix_request{} to envoy_thrift_request{envoy_thrift_prefix="myprefix"}.
+- area: stats redis_proxy
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.stat_prefix>`
+    is properly extracted. This changes the Prometheus name from
+    envoy_redis_myprefix_command_pttl_latency_sum{} to envoy_redis_command_pttl_latency_sum{envoy_redis_prefix="myprefix"}.
 
 minor_behavior_changes:
 - area: thrift
@@ -61,8 +74,11 @@ minor_behavior_changes:
     that loads shared object libraries, such as those installed via luarocks.
 - area: admin
   change: |
-    changed default regex engine for /stats?filter= from std::regex to RE2, improving filtering speed
-    20x.
+    changed default regex engine for ``/stats?filter=`` from std::regex to RE2, improving
+    filtering speed 20x.
+- area: admin
+  change: |
+    added compile-time option ``--define=admin_html=disabled`` to disable HTML home page.
 - area: skywalking
   change: |
     use request path as operation name of ENTRY/EXIT spans.
@@ -97,6 +113,9 @@ minor_behavior_changes:
 - area: logging
   change: |
     changed flag ``--log-format-escaped`` to only log one trailing newline per log line.
+- area: logging
+  change: |
+    changed category name for access log filter extensions to ``envoy.access_loggers.extension_filters``.
 
 bug_fixes:
 - area: http
@@ -174,6 +193,9 @@ removed_config_or_runtime:
     removed ``envoy.restart_features.no_runtime_singleton`` and replaced with ``envoy.restart_features.remove_runtime_singleton``.
 
 new_features:
+- area: access_log
+  change: |
+    added formatters for :ref:`UPSTREAM_METADATA<config_access_log_format_upstream_host_metadata>` and :ref:`METADATA(UPSTREAM_HOST)<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>`.
 - area: access_log
   change: |
     added new access_log command operators to retrieve upstream connection information change: ``%UPSTREAM_PROTOCOL%``, ``%UPSTREAM_PEER_SUBJECT%``, ``%UPSTREAM_PEER_ISSUER%``, ``%UPSTREAM_TLS_SESSION_ID%``, ``%UPSTREAM_TLS_CIPHER%``, ``%UPSTREAM_TLS_VERSION%``, ``%UPSTREAM_PEER_CERT_V_START%``, ``%UPSTREAM_PEER_CERT_V_END%``, ``%UPSTREAM_PEER_CERT%` and ``%UPSTREAM_FILTER_STATE%``.
@@ -280,3 +302,10 @@ deprecated:
     deprecated :ref:`old dubbo route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.route_config>`. Please use
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config>` or
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.
+- area: http
+  change: |
+    deprecate the short name ``preserve_case`` for the header formatter extension in favor of the fully-qualified name
+    ``envoy.http.stateful_header_formatters.preserve_case``.
+- area: matching
+  change: |
+    :ref:`google_re2 <envoy_v3_api_field_type.matcher.v3.RegexMatcher.google_re2>` has been deprecated.

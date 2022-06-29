@@ -86,7 +86,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
     // TODO(danzh): investigate the cost of allocating one buffer per slice.
     // If it turns out to be expensive, add a new function to free data in the middle in buffer
     // interface and re-design QuicheMemSliceImpl.
-    quic_slices.emplace_back(quiche::QuicheMemSliceImpl(data, slice.len_));
+    quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
   }
   quic::QuicConsumedData result{0, false};
   absl::Span<quiche::QuicheMemSlice> span(quic_slices);

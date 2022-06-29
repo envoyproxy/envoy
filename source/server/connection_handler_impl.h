@@ -58,7 +58,9 @@ public:
 
   // Network::TcpConnectionHandler
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  Network::BalancedConnectionHandlerOptRef getBalancedHandlerByTag(uint64_t listener_tag) override;
+  Network::BalancedConnectionHandlerOptRef
+  getBalancedHandlerByTag(uint64_t listener_tag,
+                          const Network::Address::Instance& address) override;
   Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) override;
 
@@ -107,13 +109,13 @@ private:
      */
     template <class ActiveListener>
     void addActiveListener(Network::ListenerConfig& config,
-                           const Network::ListenSocketFactoryPtr& socket_factory,
+                           const Network::Address::InstanceConstSharedPtr& address,
                            UnitFloat& listener_reject_fraction, bool disable_listeners,
                            ActiveListener&& listener) {
       auto per_address_details = std::make_shared<PerAddressActiveListenerDetails>();
       per_address_details->typed_listener_ = *listener;
       per_address_details->listener_ = std::move(listener);
-      per_address_details->address_ = socket_factory->localAddress();
+      per_address_details->address_ = address;
       if (disable_listeners) {
         per_address_details->listener_->pauseListening();
       }

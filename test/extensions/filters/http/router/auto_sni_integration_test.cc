@@ -46,7 +46,8 @@ public:
   }
 
   void createUpstreams() override {
-    addFakeUpstream(createUpstreamSslContext(), Http::CodecType::HTTP1);
+    addFakeUpstream(createUpstreamSslContext(), Http::CodecType::HTTP1,
+                    /*autonomous_upstream=*/false);
   }
 
   Network::DownstreamTransportSocketFactoryPtr createUpstreamSslContext() {
