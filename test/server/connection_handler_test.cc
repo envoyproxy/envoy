@@ -2249,34 +2249,32 @@ TEST_F(ConnectionHandlerTest, UdpListenerWorkerRouterWithMultipleAddresses) {
   addresses.emplace_back(address1);
   addresses.emplace_back(address2);
 
+  // Using empty map for those since those are uselss for UDP.
   absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map;
   absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
 
   TestMultiAddressesListener* test_listener = addMultiAddrsListener(
       1, false, false, "test_listener", mock_listeners, addresses, connection_balancers,
       listener_callbacks_map, false, Network::Socket::Type::Datagram);
-  EXPECT_CALL(*static_cast<Network::MockUdpListenerWorkerRouter*>(
+  
+  auto udp_listener_worker_router1 = static_cast<Network::MockUdpListenerWorkerRouter*>(
                   test_listener->udp_listener_config_->listener_worker_router_map_
                       .find(address1->asString())
-                      ->second.get()),
-              registerWorkerForListener(_));
-  EXPECT_CALL(*static_cast<Network::MockUdpListenerWorkerRouter*>(
+                      ->second.get());
+  auto udp_listener_worker_router2 = static_cast<Network::MockUdpListenerWorkerRouter*>(
                   test_listener->udp_listener_config_->listener_worker_router_map_
                       .find(address2->asString())
-                      ->second.get()),
+                      ->second.get());
+  EXPECT_CALL(*udp_listener_worker_router1,
+              registerWorkerForListener(_));
+  EXPECT_CALL(*udp_listener_worker_router2,
               registerWorkerForListener(_));
 
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
 
-  EXPECT_CALL(*static_cast<Network::MockUdpListenerWorkerRouter*>(
-                  test_listener->udp_listener_config_->listener_worker_router_map_
-                      .find(address1->asString())
-                      ->second.get()),
+  EXPECT_CALL(*udp_listener_worker_router1,
               unregisterWorkerForListener(_));
-  EXPECT_CALL(*static_cast<Network::MockUdpListenerWorkerRouter*>(
-                  test_listener->udp_listener_config_->listener_worker_router_map_
-                      .find(address2->asString())
-                      ->second.get()),
+  EXPECT_CALL(*udp_listener_worker_router2,
               unregisterWorkerForListener(_));
   EXPECT_CALL(*listener1, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
