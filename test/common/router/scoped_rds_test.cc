@@ -13,6 +13,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/api_version.h"
+#include "source/common/config/config_provider_impl.h"
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/scoped_rds.h"
@@ -513,6 +514,48 @@ key:
   EXPECT_THROW_WITH_MESSAGE(pushRdsConfig({"foo_routes"}, "111", route_config_tmpl), EnvoyException,
                             "Didn't find a registered implementation for 'filter.unknown' with "
                             "type URL: 'google.protobuf.Struct'");
+}
+
+// Test that scopes with same config as existing scopes will be skipped in a config push.
+TEST_F(ScopedRdsTest, UnchangedScopesAreSkipped) {
+  setup();
+  init_watcher_.expectReady();
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+  const std::string config_yaml2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto resource_2 = parseScopedRouteConfigurationFromYaml(config_yaml2);
+
+  // Delta API.
+  const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
+  context_init_manager_.initialize(init_watcher_);
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "v1"));
+  EXPECT_EQ(1UL,
+            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  EXPECT_EQ(2UL, all_scopes_.value());
+  pushRdsConfig({"foo_routes"}, "111");
+  Envoy::Router::ScopedRdsConfigSubscription* srds_delta_subscription =
+      static_cast<Envoy::Router::ScopedRdsConfigSubscription*>(srds_subscription_);
+  ASSERT_NE(srds_delta_subscription, nullptr);
+  ASSERT_EQ("v1", srds_delta_subscription->configInfo()->last_config_version_);
+  // Push again the same set of config with different version number, the config will be skipped.
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "123"));
+  ASSERT_EQ("v1", srds_delta_subscription->configInfo()->last_config_version_);
+  EXPECT_EQ(2UL,
+            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
 }
 
 // Test ignoring the optional unknown factory in the per-virtualhost typed config.
