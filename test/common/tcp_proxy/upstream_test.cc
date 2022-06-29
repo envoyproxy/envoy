@@ -1,6 +1,5 @@
 #include <memory>
 
-#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tcp_proxy/upstream.h"
 
