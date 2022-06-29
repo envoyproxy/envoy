@@ -302,6 +302,10 @@ deprecated:
     deprecated :ref:`old dubbo route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.route_config>`. Please use
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config>` or
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.
+- area: http
+  change: |
+    deprecate the short name ``preserve_case`` for the header formatter extension in favor of the fully-qualified name
+    ``envoy.http.stateful_header_formatters.preserve_case``.
 - area: matching
   change: |
     :ref:`google_re2 <envoy_v3_api_field_type.matcher.v3.RegexMatcher.google_re2>` has been deprecated.

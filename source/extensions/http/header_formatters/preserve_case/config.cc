@@ -23,7 +23,7 @@ PreserveCaseFormatterFactoryConfig::createFromProto(const Protobuf::Message& mes
 }
 
 REGISTER_FACTORY(PreserveCaseFormatterFactoryConfig,
-                 Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig);
+                 Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig){"preserve_case"};
 
 } // namespace PreserveCase
 } // namespace HeaderFormatters
