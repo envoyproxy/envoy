@@ -22,6 +22,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/filter_impl.h"
@@ -116,10 +117,15 @@ public:
   TunnelingConfigHelperImpl(
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
           config_message,
-      Formatter::FormatterPtr hostname_fmt)
+      Server::Configuration::FactoryContext& context)
       : hostname_(config_message.hostname()), use_post_(config_message.use_post()),
-        header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
-        hostname_fmt_(std::move(hostname_fmt)) {}
+        header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())) {
+    envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
+    substitution_format_config.mutable_text_format_source()->set_inline_string(
+        config_message.hostname());
+    this->hostname_fmt_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+        substitution_format_config, context);
+  }
   std::string host(const StreamInfo::StreamInfo& stream_info) const override {
     return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
                                  *Http::StaticEmptyHeaders::get().response_headers,

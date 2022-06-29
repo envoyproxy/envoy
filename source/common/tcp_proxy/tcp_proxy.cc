@@ -23,7 +23,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
-#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/socket_option_factory.h"
@@ -79,14 +78,8 @@ Config::SharedConfig::SharedConfig(
     idle_timeout_ = std::chrono::hours(1);
   }
   if (config.has_tunneling_config()) {
-    envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
-    substitution_format_config.mutable_text_format_source()->set_inline_string(
-        config.tunneling_config().hostname());
-    Formatter::FormatterPtr hostname_fmt =
-        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(substitution_format_config,
-                                                                  context);
-    tunneling_config_helper_ = std::make_unique<TunnelingConfigHelperImpl>(
-        config.tunneling_config(), std::move(hostname_fmt));
+    tunneling_config_helper_ =
+        std::make_unique<TunnelingConfigHelperImpl>(config.tunneling_config(), context);
   }
   if (config.has_max_downstream_connection_duration()) {
     const uint64_t connection_duration =
