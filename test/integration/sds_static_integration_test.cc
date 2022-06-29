@@ -85,7 +85,7 @@ public:
     Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
-        client_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr);
+        client_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
   }
 
 private:
