@@ -2153,7 +2153,7 @@ message RateLimit {
 //   value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message HeaderMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.HeaderMatcher";
 
@@ -2245,9 +2245,23 @@ message HeaderMatcher {
   // Examples:
   //
   // * The regex ``\d{3}`` does not match the value *1234*, so it will match when inverted.
-  // * The prefix *abc* does not match when the header is not present, so it will match when inverted.
   // * The range [-10,0) will match the value -1, so it will not match when inverted.
   bool invert_match = 8;
+
+  // If specified, for any header match rule, if the speficied header does not
+  // exist, it will treat it as an empty header. Defaults to false.
+  //
+  // Examples:
+  //
+  // * The header match rule specified header "header1" to range match of [0,
+  //   10], and invert_match is set to true; The "header1" header is not present.
+  //   The empty header does not match the range, so it will match when
+  //   inverted.
+  // * The header match rule specified header "header2" to a string regex match
+  //   ``^$`` which means an empty string; The "header2" header is not present.
+  //   The match rule will treat the "header2" header as an empty header so it
+  //   will match.
+  bool treat_missing_header_as_empty = 14;
 }
 
 // Query parameter matching treats the query string of a request's :path header
