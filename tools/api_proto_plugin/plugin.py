@@ -85,6 +85,8 @@ def plugin(output_descriptors, traverser=None):
             stats_file.name = file_proto.name + '.profile'
             ps.print_stats()
             stats_file.content = stats_stream.getvalue()
+        if not cprofile_enabled:
+            continue
         # Also include the original FileDescriptorProto as text proto, this is
         # useful when debugging.
         descriptor_file = response.file.add()
