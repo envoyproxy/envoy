@@ -20,6 +20,5 @@ envoy_cc_contrib_extension(
         "//envoy/server:filter_config_interface",
         "//source/common/network:connection_balancer_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//contrib/envoy/extensions/network/connection_balance/random/v3alpha:pkg_cc_proto",
     ],
 )
