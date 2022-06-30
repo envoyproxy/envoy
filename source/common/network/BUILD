@@ -354,9 +354,9 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         ":listen_socket_lib",
-        "//envoy/network:socket_tag_interface",
         "//envoy/api:os_sys_calls_interface",
         "//envoy/network:listen_socket_interface",
+        "//envoy/network:socket_tag_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",

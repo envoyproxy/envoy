@@ -162,13 +162,11 @@ private:
   const std::vector<uint8_t> value_;
 };
 
-
 class SocketTagSocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
   SocketTagSocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
                             Network::SocketTagSharedPtr& tag)
-      : in_state_(in_state), optname_(0, 0, "socket_tag"), tag_(tag) {
-  }
+      : in_state_(in_state), optname_(0, 0, "socket_tag"), tag_(tag) {}
 
   // Socket::Option
   bool setOption(Socket& socket,

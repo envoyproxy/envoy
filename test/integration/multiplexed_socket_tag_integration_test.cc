@@ -12,7 +12,6 @@ public:
     config_helper_.addFilter("{ name: header-to-socket-tag-filter }");
     HttpProtocolIntegrationTest::initialize();
   }
-
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTest,

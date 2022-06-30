@@ -36,5 +36,5 @@ public:
 using SocketTagPtr = std::unique_ptr<SocketTag>;
 using SocketTagSharedPtr = std::shared_ptr<SocketTag>;
 
-}  // namespace Network
-}  // namespace Envoy
+} // namespace Network
+} // namespace Envoy

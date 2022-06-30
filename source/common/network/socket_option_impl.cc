@@ -66,8 +66,8 @@ Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
   return socket.setSocketOption(optname.level(), optname.option(), value, size);
 }
 
-bool SocketTagSocketOptionImpl::setOption(Socket& socket,
-                                          envoy::config::core::v3::SocketOption::SocketState state) const {
+bool SocketTagSocketOptionImpl::setOption(
+    Socket& socket, envoy::config::core::v3::SocketOption::SocketState state) const {
   if (state != in_state_) {
     return true;
   }
@@ -79,16 +79,14 @@ bool SocketTagSocketOptionImpl::setOption(Socket& socket,
 
   tag_->apply(socket.ioHandle());
   return true;
-
 }
 
 void SocketTagSocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
   tag_->hashKey(hash_key);
 }
 
-absl::optional<Socket::Option::Details>
-SocketTagSocketOptionImpl::getOptionDetails(const Socket&,
-                                            envoy::config::core::v3::SocketOption::SocketState state) const {
+absl::optional<Socket::Option::Details> SocketTagSocketOptionImpl::getOptionDetails(
+    const Socket&, envoy::config::core::v3::SocketOption::SocketState state) const {
   if (state != in_state_ || !isSupported()) {
     return absl::nullopt;
   }
@@ -100,9 +98,7 @@ SocketTagSocketOptionImpl::getOptionDetails(const Socket&,
   return absl::make_optional(std::move(details));
 }
 
-bool SocketTagSocketOptionImpl::isSupported() const {
-  return optname_.hasValue();
-}
+bool SocketTagSocketOptionImpl::isSupported() const { return optname_.hasValue(); }
 
 } // namespace Network
 } // namespace Envoy
