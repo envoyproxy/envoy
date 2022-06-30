@@ -510,6 +510,16 @@ public:
 };
 
 /**
+ * FormatterProvider for UpstreamHostMetadata from StreamInfo.
+ */
+class UpstreamHostMetadataFormatter : public MetadataFormatter {
+public:
+  UpstreamHostMetadataFormatter(const std::string& filter_namespace,
+                                const std::vector<std::string>& path,
+                                absl::optional<size_t> max_length);
+};
+
+/**
  * FormatterProvider for FilterState from StreamInfo.
  */
 class FilterStateFormatter : public FormatterProvider {

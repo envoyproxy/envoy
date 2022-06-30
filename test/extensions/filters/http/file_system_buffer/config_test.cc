@@ -69,18 +69,16 @@ public:
   }
 };
 
-using FileSystemBufferFilterConfigDeathTest = FileSystemBufferFilterConfigTest;
-
 // Declared here because it's only visible for the sake of this test.
 const BufferBehavior& selectBufferBehavior(const ProtoBufferBehavior& behavior);
-TEST_F(FileSystemBufferFilterConfigDeathTest, ThrowsExceptionOnUnsetBufferBehavior) {
+TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionOnUnsetBufferBehavior) {
   BufferBehavior just_to_add_coverage_for_destructor;
   ProtoBufferBehavior unset_behavior;
   EXPECT_THROW_WITH_REGEX(selectBufferBehavior(unset_behavior), EnvoyException,
                           "invalid BufferBehavior");
 }
 
-TEST_F(FileSystemBufferFilterConfigDeathTest, ThrowsExceptionWithConfiguredInvalidPath) {
+TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionWithConfiguredInvalidPath) {
   auto proto_config = configFromYaml(R"(
     storage_buffer_path: "/hat/banana/this/is/not/a/valid/path"
     manager_config:
@@ -89,6 +87,15 @@ TEST_F(FileSystemBufferFilterConfigDeathTest, ThrowsExceptionWithConfiguredInval
   )");
   EXPECT_THROW_WITH_REGEX(captureConfigFromProto(proto_config), EnvoyException,
                           "is not a directory");
+}
+
+TEST_F(FileSystemBufferFilterConfigTest, ThrowsExceptionWithConfigured0BytesMemoryBufferLimit) {
+  auto proto_config = configFromYaml(R"(
+    response:
+      memory_buffer_bytes_limit: 0
+  )");
+  EXPECT_THROW_WITH_REGEX(captureConfigFromProto(proto_config), ProtoValidationException,
+                          "value must be greater than 0");
 }
 
 TEST_F(FileSystemBufferFilterConfigTest, FallsBackToZeroStorageIfManagerNotConfigured) {
