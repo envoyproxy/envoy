@@ -186,7 +186,8 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   // Maybe put it to parent_context?
   parent_.metadata_parser_->evaluateHeaders(
       *initial_metadata,
-      (options_.parent_context.stream_info != nullptr)
+      ((options_.parent_context.stream_info != nullptr) &&
+       (options_.parent_context.stream_info->getRequestHeaders() != nullptr))
           ? *options_.parent_context.stream_info->getRequestHeaders()
           : *Http::StaticEmptyHeaders::get().request_headers,
       *Http::StaticEmptyHeaders::get().response_headers, options_.parent_context.stream_info);
