@@ -78,3 +78,8 @@ envoy.network.connection_balance.dlb:
   - envoy.network.connection_balance
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.network.connection_balance.random:
+  categories:
+  - envoy.network.connection_balance
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha

@@ -675,20 +675,6 @@ void ListenerImpl::buildFilterChains() {
 void ListenerImpl::buildConnectionBalancer(const Network::Address::Instance& address) {
   auto iter = connection_balancers_.find(address.asString());
   if (iter == connection_balancers_.end() && socket_type_ == Network::Socket::Type::Stream) {
-#ifdef WIN32
-    // On Windows we use the exact connection balancer to dispatch connections
-    // from worker 1 to all workers. This is a perf hit but it is the only way
-    // to make all the workers do work.
-    // TODO(davinci26): We can be faster here if we create a balancer implementation
-    // that dispatches the connection to a random thread.
-    ENVOY_LOG(warn,
-              "ExactBalance was forced enabled for TCP listener '{}' because "
-              "Envoy is running on Windows."
-              "ExactBalance is used to load balance connections between workers on Windows.",
-              config_.name());
-    connection_balancers_.emplace(address.asString(),
-                                  std::make_shared<Network::ExactConnectionBalancerImpl>());
-#else
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
       switch (config_.connection_balance_config().balance_type_case()) {
@@ -718,10 +704,21 @@ void ListenerImpl::buildConnectionBalancer(const Network::Address::Instance& add
       }
       }
     } else {
+#ifdef WIN32
+      // We use random or exact connection balancer on Windows to make all the workers do work.
+      // If not specified, use exact connection balancer as default.
+      ENVOY_LOG(warn,
+                "ExactBalance was forced enabled as default for TCP listener '{}' because "
+                "Envoy is running on Windows."
+                "ExactBalance is used to load balance connections between workers on Windows.",
+                config_.name());
+      connection_balancers_.emplace(address.asString(),
+                                    std::make_shared<Network::ExactConnectionBalancerImpl>());
+#else
       connection_balancers_.emplace(address.asString(),
                                     std::make_shared<Network::NopConnectionBalancerImpl>());
-    }
 #endif
+    }
   }
 }
 

@@ -50,4 +50,5 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.network.connection_balance.dlb":                     "//contrib/network/connection_balance/dlb/source:connection_balancer",
+    "envoy.network.connection_balance.random":                  "//contrib/network/connection_balance/random/source:connection_balancer",
 }
