@@ -196,7 +196,6 @@ ContextConfigImpl::ContextConfigImpl(
       tls_certificate_name_ = config.tls_certificate_provider_instance().certificate_name();
       if (tls_certificates_hybrid_provider_) {
         cert_provider_caps_ = tls_certificates_hybrid_provider_->capabilities();
-        cert_provider_caps_.provide_on_demand_identity_certs = true;
       }
     }
   }
