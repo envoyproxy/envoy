@@ -61,7 +61,7 @@ private:
 
   Api::MockApi api_{};
   Thread::ThreadFactory& thread_factory_;
-  Event::DispatcherPtr main_dispatcher_;
+  Event::DispatcherPtr worker_thread_dispatcher_;
   bool with_main_event_loop_{};
 
   const Buffer::Instance* decoding_buffer_{};

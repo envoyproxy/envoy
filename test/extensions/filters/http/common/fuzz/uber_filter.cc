@@ -18,7 +18,7 @@ UberFilterFuzzer::UberFilterFuzzer()
     : async_request_{&cluster_manager_.thread_local_cluster_.async_client_},
       thread_factory_(Thread::threadFactoryForTest()) {
   ON_CALL(api_, threadFactory()).WillByDefault(testing::ReturnRef(thread_factory_));
-  main_dispatcher_ =
+  worker_thread_dispatcher_ =
       std::make_unique<Event::DispatcherImpl>("filter_fuzz_test", api_, api_.time_system_);
   // This is a decoder filter.
   ON_CALL(filter_callback_, addStreamDecoderFilter(_))
@@ -73,6 +73,13 @@ void UberFilterFuzzer::fuzz(
         proto_config, factory_context_.messageValidationVisitor(), factory);
     // Clean-up config with filter-specific logic before it runs through validations.
     cleanFuzzedConfig(proto_config.name(), message.get());
+    if (with_main_event_loop_) {
+      // For filters that need main event loop.
+      ON_CALL(encoder_callbacks_, dispatcher())
+          .WillByDefault(testing::ReturnRef(*worker_thread_dispatcher_));
+      ON_CALL(decoder_callbacks_, dispatcher())
+          .WillByDefault(testing::ReturnRef(*worker_thread_dispatcher_));
+    }
     cb_ = factory.createFilterFactoryFromProto(*message, "stats", factory_context_);
     cb_(filter_callback_);
   } catch (const EnvoyException& e) {
@@ -93,15 +100,15 @@ void UberFilterFuzzer::fuzz(
 
   if (with_main_event_loop_) {
     // Ensure the event loop gets at least one event to end the test.
-    auto end_timer =
-        main_dispatcher_->createTimer([]() { ENVOY_LOG_MISC(trace, "server timer fired"); });
+    auto end_timer = worker_thread_dispatcher_->createTimer(
+        []() { ENVOY_LOG_MISC(trace, "server timer fired"); });
     end_timer->enableTimer(std::chrono::milliseconds(5000));
     // If we were successful, run any pending events on the main thread's dispatcher loop. These
     // might be, for example, pending DNS resolution callbacks. If they generate exceptions, we want
     // to explode and fail the test, hence we do this outside of the try-catch above.
     // TODO(ravenblackx): this can potentially exit the loop without the filter having completed.
     // We should detect stream completion rather than just running one round of dispatcher.
-    main_dispatcher_->run(Event::DispatcherImpl::RunType::Block);
+    worker_thread_dispatcher_->run(Event::DispatcherImpl::RunType::Block);
   }
   reset();
 }
