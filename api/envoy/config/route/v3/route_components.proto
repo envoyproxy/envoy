@@ -2248,8 +2248,8 @@ message HeaderMatcher {
   // * The range [-10,0) will match the value -1, so it will not match when inverted.
   bool invert_match = 8;
 
-  // If specified, for any header match rule, if the speficied header does not
-  // exist, it will treat it as an empty header. Defaults to false.
+  // If specified, for any header match rule, if the header match rule specified header
+  // does not exist, this header value will be treated as empty. Defaults to false.
   //
   // Examples:
   //
