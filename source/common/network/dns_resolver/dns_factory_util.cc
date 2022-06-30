@@ -81,9 +81,7 @@ Network::DnsResolverFactory& createDnsResolverFactoryFromTypedConfig(
   ENVOY_LOG_MISC(debug, "create DNS resolver type: {}", typed_dns_resolver_config.name());
   auto& factory =
       Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
-  if (factory.name() == std::string(CaresDnsResolver)) {
-    factory.initialize();
-  }
+  factory.initialize();
   return factory;
 }
 

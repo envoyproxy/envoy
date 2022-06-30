@@ -57,11 +57,9 @@ ProcessWide::~ProcessWide() {
 
   ASSERT(init_data.count_ > 0);
   if (--init_data.count_ == 0) {
-    // The c-ares library init is done in a thread-safe way when it is actually used for resolving.
-    // Clean it up here in case it is ever used.
-    if (auto* dns_factory = Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(
-            std::string(Network::CaresDnsResolver), true)) {
-      dns_factory->terminate();
+    for (const auto& dns_factory :
+         Config::Utility::getFactoryMap<Network::DnsResolverFactory>()) {
+      dns_factory.second->terminate();
     }
   }
 }
