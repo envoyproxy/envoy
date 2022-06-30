@@ -1,3 +1,4 @@
+load("//tools/build_defs/proto/cpp:cc_proto_library.bzl", "cc_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",

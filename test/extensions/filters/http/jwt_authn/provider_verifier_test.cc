@@ -189,8 +189,9 @@ rules:
 // This test verifies that JWT requirement can override audiences
 TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
-  auto* requires =
-      proto_config_.mutable_rules(0)->mutable_requires()->mutable_provider_and_audiences();
+  auto*
+    requires
+  = proto_config_.mutable_rules(0)->mutable_requires()->mutable_provider_and_audiences();
   requires->set_provider_name("example_provider");
   requires->add_audiences("invalid_service");
   createVerifier();
