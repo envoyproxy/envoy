@@ -401,8 +401,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/intel/hyperscan/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
-            "envoy.regex_engines.hyperscan",
             "envoy.matching.input_matchers.hyperscan",
+            "envoy.regex_engines.hyperscan",
         ],
         release_date = "2021-01-13",
         cpe = "N/A",
@@ -520,8 +520,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://www.colm.net/files/ragel/ragel-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
-            "envoy.regex_engines.hyperscan",
             "envoy.matching.input_matchers.hyperscan",
+            "envoy.regex_engines.hyperscan",
         ],
         release_date = "2017-03-24",
         cpe = "N/A",
@@ -549,8 +549,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://boostorg.jfrog.io/artifactory/main/release/{version}/source/boost_{underscore_version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
-            "envoy.regex_engines.hyperscan",
             "envoy.matching.input_matchers.hyperscan",
+            "envoy.regex_engines.hyperscan",
         ],
         release_date = "2021-12-08",
         cpe = "cpe:2.3:a:boost:boost:*",
