@@ -274,6 +274,9 @@ new_features:
 - area: upstream
   change: |
     added :ref:`internal upstream transport <envoy_v3_api_msg_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport>` for passing metadata and filter state across the user space sockets and the internal listeners.
+- area: upstream
+  change: |
+    added a mechanism to apply Android socket tags to upsteam sockets.
 - area: router
   change:
     added :ref:`keep_empty_value <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>` to allow keeping empty values in custom headers.
