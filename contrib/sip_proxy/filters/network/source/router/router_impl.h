@@ -144,7 +144,7 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr audit_timer_;
   std::chrono::milliseconds transaction_timeout_;
-
+  
   void auditTimerAction() {
     const auto p1 = dispatcher_.timeSource().systemTime();
     for (auto it = transaction_info_map_.cbegin(); it != transaction_info_map_.cend();) {
@@ -365,6 +365,10 @@ public:
 
   SipFilters::DecoderFilterCallbacks* getTransaction(std::string&& transaction_id);
   SipFilters::DecoderFilterCallbacks* getDownstreamConnection(std::string& downstream_connection_id); 
+  
+  Upstream::HostDescriptionConstSharedPtr getUpstreamHost() {
+    return upstream_host_;
+  } 
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -396,8 +400,11 @@ public:
   void setMetadata(MessageMetadataSharedPtr metadata) { metadata_ = metadata; }
   MessageMetadataSharedPtr metadata() { return metadata_; }
 
-  std::shared_ptr<SipSettings> settings() { return callbacks_->settings(); }
+  std::shared_ptr<SipSettings> settings() { return settings_; }
 
+  RouteConstSharedPtr route() {
+    return route_;
+  }
 private:
   std::shared_ptr<Upstream::TcpPoolData> conn_pool_;
 
@@ -408,6 +415,8 @@ private:
 
   std::shared_ptr<TransactionInfo> transaction_info_;
   std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_info_;
+  RouteConstSharedPtr route_;
+  std::shared_ptr<SipSettings> settings_;
   SipFilters::DecoderFilterCallbacks* callbacks_{};
   MessageMetadataSharedPtr metadata_;
   Buffer::OwnedImpl upstream_buffer_;

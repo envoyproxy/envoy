@@ -355,6 +355,14 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
+  // add response handling here
+  // if (metadata->msgType() == MsgType::Response) {
+      // lookup transaction which has been saved off by the DownstreamConnectionInfoItem
+  // }
+
+  // request handling
+  stats_.request_active_.inc();
+  
   stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
 
   std::string&& k = std::string(metadata->transactionId().value());
@@ -529,15 +537,21 @@ const Network::Connection* ConnectionManager::ActiveTrans::connection() const {
 }
 
 Router::RouteConstSharedPtr ConnectionManager::ActiveTrans::route() {
+  ENVOY_LOG(info, "activrTrans::route()");
+
   if (!cached_route_) {
+    ENVOY_LOG(info, "activrTrans::route() not cached");
     if (metadata_ != nullptr) {
+      ENVOY_LOG(info, "activrTrans::route() metadata not null");
       Router::RouteConstSharedPtr route = parent_.config_.routerConfig().route(*metadata_);
       cached_route_ = std::move(route);
     } else {
+      ENVOY_LOG(info, "activrTrans::route() set cachd to null");
       cached_route_ = nullptr;
     }
   }
 
+  ENVOY_LOG(info, "activeTrans::route() return {}", cached_route_.value()->routeEntry()->clusterName());
   return cached_route_.value();
 }
 
@@ -606,9 +620,19 @@ void ConnectionManager::DownstreamConnectionInfoItem::startUpstreamResponse() {
 }
 
 SipFilters::ResponseStatus ConnectionManager::DownstreamConnectionInfoItem::upstreamData(MessageMetadataSharedPtr metadata) { 
+
+  // Create some sort of Filter chain / and Transaction here
+  // save of the transaction into a new map, which can be queried when a response is received from a downstream connection
+  // Question
+  //  - what should the filter chain look like!
+  //       - look at what the current activeTrans filter chain does
+  //  - and does it write the request, or just handle the response
+  //  - whatever it does it needs to provide affinity to the host which initiated the request
+
   if (parent_.read_callbacks_->connection().state() == Network::Connection::State::Closed) {
     throw EnvoyException("downstream connection is closed");
   }
+
   Buffer::OwnedImpl buffer;
   std::unique_ptr<Encoder> encoder = std::make_unique<EncoderImpl>();
   encoder->encode(metadata, buffer);

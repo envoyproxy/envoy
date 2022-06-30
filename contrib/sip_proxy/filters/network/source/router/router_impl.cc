@@ -286,7 +286,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   //metadata_->addXEnvoyOriginIngressHeader()
    // fixme 
   // - move this somewhere more appropriate??
-  // - only add the header if does not already exist
+  // - only add the header if does not already exist - / need to revisit this - see security considerations
   // - only add the header if the outbound-transactions feature is enabled for the cluster (may need to move this to the router where we have the route config)
   // todo
   // - add cache of conn-id to -> downstream, and cache of upstream_transaction for mapping responses from downstream to upstream
@@ -660,8 +660,11 @@ SipFilters::DecoderFilterCallbacks* UpstreamRequest::getTransaction(std::string&
 }
 
 SipFilters::DecoderFilterCallbacks* UpstreamRequest::getDownstreamConnection(std::string& downstream_connection_id) {
-  if (callbacks_->downstreamConnectionInfos()->hasDownstreamConnection(downstream_connection_id)) {
-    return &callbacks_->downstreamConnectionInfos()->getDownstreamConnection(downstream_connection_id);
+  if (downstream_connection_info_ == nullptr) {
+    return nullptr;
+  }
+  if (downstream_connection_info_->hasDownstreamConnection(downstream_connection_id)) {
+    return &downstream_connection_info_->getDownstreamConnection(downstream_connection_id);
   }
   return nullptr;
 }
@@ -674,11 +677,12 @@ void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
             conn_data_->connection().connectionInfoProvider().localAddress()->asStringView(),
             data.length());
 
-  if (!callbacks_) {
-    ENVOY_LOG(error, "There is no activeTrans, drain data.");
-    data.drain(data.length());
-    return;
-  }
+  // A new Transaction from Upstream won't have an activeTrans
+  // if (!callbacks_) {
+  //   ENVOY_LOG(error, "There is no activeTrans, drain data.");
+  //   data.drain(data.length());
+  //   return;
+  // }
 
   upstream_buffer_.move(data);
   auto response_decoder = std::make_unique<ResponseDecoder>(*this);
@@ -705,6 +709,9 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
 
 void UpstreamRequest::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
+  downstream_connection_info_ = callbacks_->downstreamConnectionInfos();
+  route_ = callbacks_->route();
+  settings_ = callbacks_->settings();
 }
 
 void UpstreamRequest::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
@@ -724,6 +731,13 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
   if (metadata->msgType() == MsgType::Request) {
     ENVOY_LOG(info, "Got Request!");
+
+    // JONAH reminder
+    //auto upstream_host = parent_.getUpstreamHost();
+    ENVOY_LOG(info, "parent_.getUpstreamHost() {}", parent_.getUpstreamHost());
+
+    // Todo pass in the route
+    ENVOY_LOG(info, "parent_.decoderFilterCallbacks().route(), {}", parent_.route());
 
     // todo - create and save an UpstreamTransaction if this is a new Transaction
     // route to the downstream connection

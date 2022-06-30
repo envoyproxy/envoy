@@ -503,8 +503,6 @@ public:
 private:
   ThreadLocal::SlotPtr tls_;
 };
-
-
 } // namespace SipProxy
 } // namespace NetworkFilters
 } // namespace Extensions
