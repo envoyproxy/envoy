@@ -96,7 +96,7 @@ SocketTagSocketOptionImpl::getOptionDetails(const Socket&,
   static std::string name = "socket_tag";
   Socket::Option::Details details;
   details.name_ = optname_;
-  details.value_ = "xxxxx";
+  details.value_ = tag_->dataForLogging();
   return absl::make_optional(std::move(details));
 }
 

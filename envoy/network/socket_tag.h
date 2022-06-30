@@ -25,6 +25,12 @@ public:
    *        not be modified.
    */
   virtual void hashKey(std::vector<uint8_t>& key) const PURE;
+
+  /**
+   * @return a string containing an opaque representation of the underlying tag which
+   *         can be used for logging purposes
+   */
+  virtual std::string dataForLogging() const PURE;
 };
 
 using SocketTagPtr = std::unique_ptr<SocketTag>;

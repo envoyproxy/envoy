@@ -19,10 +19,8 @@ namespace Envoy {
 class HeaderToSocketTagFilter : public Http::PassThroughFilter {
 public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& request_headers, bool) override {
-    std::cerr << "Filter Running\n";
     auto socket_tag = Http::LowerCaseString("socket-tag");
     if (!request_headers.get(socket_tag).empty()) {
-      std::cerr << "Filter Saw Header\n";
       //auto tag = std::make_shared<Network::MockSocketTag>();
       Network::MockSocketTag* tag = new Network::MockSocketTag;
       std::string tag_string(request_headers.get(socket_tag)[0]->value().getStringView());
@@ -31,10 +29,7 @@ public:
       }));
       EXPECT_CALL(*tag, apply(testing::_)).Times(1);
       Network::SocketTagSharedPtr st(tag);
-      //st.reset(tag.get());
-      std::cerr << "Filter added option\n";
       callbacks_->addUpstreamSocketOptions(Network::SocketOptionFactory::buildSocketTagOptions(st));
-      //callbacks_->addUpstreamSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
       request_headers.remove(socket_tag);
     }
     return Http::FilterHeadersStatus::Continue;

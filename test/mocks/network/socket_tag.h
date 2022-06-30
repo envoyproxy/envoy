@@ -14,6 +14,7 @@ public:
 
   MOCK_METHOD(void, apply, (IoHandle& io_handle), (const override));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>& key), (const override));
+  MOCK_METHOD(std::string, dataForLogging, (), (const override));
 };
 
 } // namespace Network
