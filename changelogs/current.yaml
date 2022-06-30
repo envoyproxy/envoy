@@ -307,6 +307,8 @@ deprecated:
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.
 - area: http
   change: |
+    deprecated ``envoy.reloadable_features.skip_dispatching_frames_for_closed_connection`` and legacy code paths.
+  change: |
     deprecate the short name ``preserve_case`` for the header formatter extension in favor of the fully-qualified name
     ``envoy.http.stateful_header_formatters.preserve_case``.
 - area: matching
