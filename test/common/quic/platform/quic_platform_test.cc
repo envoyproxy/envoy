@@ -596,14 +596,15 @@ TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
         fragment_releaser_called = true;
       });
   Envoy::Buffer::OwnedImpl buffer;
-  EXPECT_DEBUG_DEATH(quiche::QuicheMemSlice slice0{quiche::QuicheMemSliceImpl(buffer, 0)}, "");
+  EXPECT_DEBUG_DEATH(quiche::QuicheMemSlice slice0(quiche::QuicheMemSlice::InPlace(), buffer, 0u),
+                     "");
   std::string str2(1024, 'a');
   // str2 is copied.
   buffer.add(str2);
   EXPECT_EQ(1u, buffer.getRawSlices().size());
   buffer.addBufferFragment(fragment);
 
-  quiche::QuicheMemSlice slice1{quiche::QuicheMemSliceImpl(buffer, str2.length())};
+  quiche::QuicheMemSlice slice1(quiche::QuicheMemSlice::InPlace(), buffer, str2.length());
   EXPECT_EQ(str.length(), buffer.length());
   EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
   std::string str2_old = str2; // NOLINT(performance-unnecessary-copy-initialization)
@@ -613,7 +614,7 @@ TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_EQ(nullptr, slice1.data());
   EXPECT_EQ(str2_old, str2);
 
-  quiche::QuicheMemSlice slice2{quiche::QuicheMemSliceImpl(buffer, str.length())};
+  quiche::QuicheMemSlice slice2(quiche::QuicheMemSlice::InPlace(), buffer, str.length());
   EXPECT_EQ(0, buffer.length());
   EXPECT_EQ(str.data(), slice2.data());
   EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));

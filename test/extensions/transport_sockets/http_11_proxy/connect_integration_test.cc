@@ -286,7 +286,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSingleEndpoint) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// TODO(alyssawilk) test with DFP, and make sure we will skip the DNS lookup in
+// TODO(alyssawilk) test with Dynamic Forward Proxy, and make sure we will skip the DNS lookup in
 // case DNS to those endpoints is disallowed.
 
 } // namespace

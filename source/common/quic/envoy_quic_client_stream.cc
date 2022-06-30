@@ -98,7 +98,7 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
     // TODO(danzh): investigate the cost of allocating one buffer per slice.
     // If it turns out to be expensive, add a new function to free data in the middle in buffer
     // interface and re-design QuicheMemSliceImpl.
-    quic_slices.emplace_back(quiche::QuicheMemSliceImpl(data, slice.len_));
+    quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
   }
   quic::QuicConsumedData result{0, false};
   absl::Span<quiche::QuicheMemSlice> span(quic_slices);
@@ -190,7 +190,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   const absl::optional<uint64_t> optional_status =
-      Http::Utility::getResponseStatusNoThrow(*headers);
+      Http::Utility::getResponseStatusOrNullopt(*headers);
   if (!optional_status.has_value()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),

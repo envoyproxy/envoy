@@ -183,8 +183,13 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     pending_response_.status_ = ResolutionStatus::Success;
 
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
-      if (addrinfo->nodes->ai_family == AF_INET) {
-        for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
+      bool can_process_v4 =
+          (!parent_.filter_unroutable_families_ || available_interfaces_.v4_available_);
+      bool can_process_v6 =
+          (!parent_.filter_unroutable_families_ || available_interfaces_.v6_available_);
+
+      for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
+        if (ai->ai_family == AF_INET && can_process_v4) {
           sockaddr_in address;
           memset(&address, 0, sizeof(address));
           address.sin_family = AF_INET;
@@ -194,9 +199,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
           pending_response_.address_list_.emplace_back(
               DnsResponse(std::make_shared<const Address::Ipv4Instance>(&address),
                           std::chrono::seconds(ai->ai_ttl)));
-        }
-      } else if (addrinfo->nodes->ai_family == AF_INET6) {
-        for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
+        } else if (ai->ai_family == AF_INET6 && can_process_v6) {
           sockaddr_in6 address;
           memset(&address, 0, sizeof(address));
           address.sin6_family = AF_INET6;
@@ -375,8 +378,7 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
       accept_nodata_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cares_accept_nodata")) {
   if (dns_lookup_family == DnsLookupFamily::Auto ||
-      dns_lookup_family == DnsLookupFamily::V4Preferred ||
-      dns_lookup_family == DnsLookupFamily::All) {
+      dns_lookup_family == DnsLookupFamily::V4Preferred) {
     dual_resolution_ = true;
   }
 
@@ -389,10 +391,8 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
   case DnsLookupFamily::Auto:
     family_ = AF_INET6;
     break;
-  // NOTE: DnsLookupFamily::All performs both lookups concurrently as addresses from both families
-  // are being requested.
   case DnsLookupFamily::All:
-    lookup_all_ = true;
+    family_ = AF_UNSPEC;
     break;
   }
 }
@@ -402,18 +402,11 @@ DnsResolverImpl::AddrInfoPendingResolution::~AddrInfoPendingResolution() {
   ASSERT(pending_resolutions_ == 0);
 }
 
-void DnsResolverImpl::AddrInfoPendingResolution::startResolution() {
-  if (lookup_all_) {
-    startResolutionImpl(AF_INET);
-    startResolutionImpl(AF_INET6);
-  } else {
-    startResolutionImpl(family_);
-  }
-}
+void DnsResolverImpl::AddrInfoPendingResolution::startResolution() { startResolutionImpl(family_); }
 
 void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family) {
   pending_resolutions_++;
-  if (parent_.filter_unroutable_families_) {
+  if (parent_.filter_unroutable_families_ && family != AF_UNSPEC) {
     switch (family) {
     case AF_INET:
       if (!available_interfaces_.v4_available_) {

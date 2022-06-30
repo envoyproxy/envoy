@@ -39,11 +39,13 @@ private:
 
 class UpstreamHttp11ConnectSocketFactory : public PassthroughFactory {
 public:
-  UpstreamHttp11ConnectSocketFactory(Network::TransportSocketFactoryPtr transport_socket_factory);
+  UpstreamHttp11ConnectSocketFactory(
+      Network::UpstreamTransportSocketFactoryPtr transport_socket_factory);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        std::shared_ptr<const Upstream::HostDescription> host) const override;
   void hashKey(std::vector<uint8_t>& key,
                Network::TransportSocketOptionsConstSharedPtr options) const override;
 };

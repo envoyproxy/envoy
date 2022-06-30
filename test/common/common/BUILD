@@ -183,7 +183,7 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "fancy_log_macros_test",
+    name = "fine_grain_log_macros_test",
     srcs = ["log_macros_test.cc"],
     args = ["--enable-fine-grain-logging"],
     deps = [

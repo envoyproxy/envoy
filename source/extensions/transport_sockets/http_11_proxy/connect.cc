@@ -112,12 +112,13 @@ Network::IoResult UpstreamHttp11ConnectSocket::writeHeader() {
 }
 
 UpstreamHttp11ConnectSocketFactory::UpstreamHttp11ConnectSocketFactory(
-    Network::TransportSocketFactoryPtr transport_socket_factory)
+    Network::UpstreamTransportSocketFactoryPtr transport_socket_factory)
     : PassthroughFactory(std::move(transport_socket_factory)) {}
 
 Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsConstSharedPtr options) const {
-  auto inner_socket = transport_socket_factory_->createTransportSocket(options);
+    Network::TransportSocketOptionsConstSharedPtr options,
+    std::shared_ptr<const Upstream::HostDescription> host) const {
+  auto inner_socket = transport_socket_factory_->createTransportSocket(options, host);
   if (inner_socket == nullptr) {
     return nullptr;
   }

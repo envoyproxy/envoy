@@ -4,10 +4,12 @@
 #include <regex>
 
 #include "envoy/common/regex.h"
+#include "envoy/registry/registry.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "re2/re2.h"
@@ -41,6 +43,24 @@ public:
 private:
   const re2::RE2 regex_;
 };
+
+class GoogleReEngine : public Engine {
+public:
+  CompiledMatcherPtr matcher(const std::string& regex) const override;
+};
+
+class GoogleReEngineFactory : public EngineFactory {
+public:
+  EnginePtr
+  createEngine(const Protobuf::Message& config,
+               Server::Configuration::ServerFactoryContext& server_factory_context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+  std::string name() const override { return "envoy.regex_engines.google_re2"; };
+};
+
+using EngineSingleton = InjectableSingleton<Engine>;
+
 enum class Type { Re2, StdRegex };
 
 /**
@@ -63,9 +83,12 @@ public:
    */
   template <class RegexMatcherType>
   static CompiledMatcherPtr parseRegex(const RegexMatcherType& matcher) {
-    // Google Re is the only currently supported engine.
-    ASSERT(matcher.has_google_re2());
-    return std::make_unique<CompiledGoogleReMatcher>(matcher);
+    // Fallback deprecated engine type in regex matcher.
+    if (matcher.has_google_re2()) {
+      return std::make_unique<CompiledGoogleReMatcher>(matcher);
+    }
+
+    return EngineSingleton::get().matcher(matcher.regex());
   }
 };
 

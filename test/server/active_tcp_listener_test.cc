@@ -36,7 +36,7 @@ class MockTcpConnectionHandler : public Network::TcpConnectionHandler,
 public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Network::BalancedConnectionHandlerOptRef, getBalancedHandlerByTag,
-              (uint64_t listener_tag));
+              (uint64_t listener_tag, const Network::Address::Instance&));
   MOCK_METHOD(Network::BalancedConnectionHandlerOptRef, getBalancedHandlerByAddress,
               (const Network::Address::Instance& address));
 };
@@ -51,7 +51,6 @@ public:
   }
 
   void initialize() {
-    EXPECT_CALL(listener_config_, connectionBalancer()).WillRepeatedly(ReturnRef(balancer_));
     EXPECT_CALL(listener_config_, listenerScope).Times(testing::AnyNumber());
     EXPECT_CALL(listener_config_, listenerFiltersTimeout());
     EXPECT_CALL(listener_config_, continueOnListenerFiltersTimeout());
@@ -72,8 +71,11 @@ public:
         }));
     generic_listener_ = std::make_unique<NiceMock<Network::MockListener>>();
     EXPECT_CALL(*generic_listener_, onDestroy());
-    generic_active_listener_ = std::make_unique<ActiveTcpListener>(
-        conn_handler_, std::move(generic_listener_), listener_config_, runtime_);
+    Network::Address::InstanceConstSharedPtr address(
+        new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+    generic_active_listener_ =
+        std::make_unique<ActiveTcpListener>(conn_handler_, std::move(generic_listener_), address,
+                                            listener_config_, balancer_, runtime_);
     generic_active_listener_->incNumConnections();
     generic_accepted_socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     EXPECT_CALL(*generic_accepted_socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
@@ -90,8 +92,11 @@ public:
         }));
     generic_listener_ = std::make_unique<NiceMock<Network::MockListener>>();
     EXPECT_CALL(*generic_listener_, onDestroy());
-    generic_active_listener_ = std::make_unique<ActiveTcpListener>(
-        conn_handler_, std::move(generic_listener_), listener_config_, runtime_);
+    Network::Address::InstanceConstSharedPtr address(
+        new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+    generic_active_listener_ =
+        std::make_unique<ActiveTcpListener>(conn_handler_, std::move(generic_listener_), address,
+                                            listener_config_, balancer_, runtime_);
     generic_active_listener_->incNumConnections();
     generic_accepted_socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     EXPECT_CALL(*generic_accepted_socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
@@ -131,7 +136,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectData) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
@@ -165,7 +171,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithPeek) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   // calling the onAcceptWorker() to create the ActiveTcpSocket.
@@ -220,8 +227,11 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
 
   auto listener = std::make_unique<NiceMock<Network::MockListener>>();
   EXPECT_CALL(*listener, onDestroy());
-  auto active_listener = std::make_unique<ActiveTcpListener>(conn_handler_, std::move(listener),
-                                                             listener_config_, runtime_);
+  Network::NopConnectionBalancerImpl balancer;
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  auto active_listener = std::make_unique<ActiveTcpListener>(
+      conn_handler_, std::move(listener), address, listener_config_, balancer, runtime_);
   auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
 
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
@@ -232,7 +242,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
 
   Event::FileReadyCb file_event_callback;
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 
@@ -309,8 +320,11 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters2) {
 
   auto listener = std::make_unique<NiceMock<Network::MockListener>>();
   EXPECT_CALL(*listener, onDestroy());
-  auto active_listener = std::make_unique<ActiveTcpListener>(conn_handler_, std::move(listener),
-                                                             listener_config_, runtime_);
+  Network::NopConnectionBalancerImpl balancer;
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  auto active_listener = std::make_unique<ActiveTcpListener>(
+      conn_handler_, std::move(listener), address, listener_config_, balancer, runtime_);
   auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
 
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
@@ -318,7 +332,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters2) {
   Event::FileReadyCb file_event_callback;
 
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, recv)
       .WillOnce([&](void*, size_t size, int) {
@@ -378,7 +393,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
@@ -413,7 +429,8 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterCloseSockets) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   EXPECT_CALL(io_handle_, recv)
@@ -441,7 +458,8 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   Event::FileReadyCb file_event_callback;
   // ensure the listener filter buffer will register the file event.
   EXPECT_CALL(io_handle_,
-              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .WillOnce(SaveArg<1>(&file_event_callback));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 
@@ -477,7 +495,6 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   Network::Address::InstanceConstSharedPtr normal_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
-  EXPECT_CALL(listener_config1, connectionBalancer()).WillRepeatedly(ReturnRef(balancer1));
   EXPECT_CALL(listener_config1, listenerScope).Times(testing::AnyNumber());
   EXPECT_CALL(listener_config1, listenerFiltersTimeout());
   EXPECT_CALL(listener_config1, continueOnListenerFiltersTimeout());
@@ -488,8 +505,9 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
 
   auto mock_listener_will_be_moved1 = std::make_unique<Network::MockListener>();
   auto& listener1 = *mock_listener_will_be_moved1;
-  auto active_listener1 = std::make_unique<ActiveTcpListener>(
-      conn_handler_, std::move(mock_listener_will_be_moved1), listener_config1, runtime_);
+  auto active_listener1 =
+      std::make_unique<ActiveTcpListener>(conn_handler_, std::move(mock_listener_will_be_moved1),
+                                          normal_address, listener_config1, balancer1, runtime_);
 
   NiceMock<Network::MockListenerConfig> listener_config2;
   Network::MockConnectionBalancer balancer2;
@@ -500,7 +518,6 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
       new Network::Address::Ipv4Instance("127.0.0.2", 20002));
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(alt_address));
   EXPECT_CALL(listener_config2, listenerFiltersTimeout());
-  EXPECT_CALL(listener_config2, connectionBalancer()).WillRepeatedly(ReturnRef(balancer2));
   EXPECT_CALL(listener_config2, listenerScope).Times(testing::AnyNumber());
   EXPECT_CALL(listener_config2, handOffRestoredDestinationConnections())
       .WillRepeatedly(Return(false));
@@ -509,8 +526,9 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(listener_config2, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
   auto mock_listener_will_be_moved2 = std::make_unique<Network::MockListener>();
   auto& listener2 = *mock_listener_will_be_moved2;
-  auto active_listener2 = std::make_shared<ActiveTcpListener>(
-      conn_handler_, std::move(mock_listener_will_be_moved2), listener_config2, runtime_);
+  auto active_listener2 =
+      std::make_shared<ActiveTcpListener>(conn_handler_, std::move(mock_listener_will_be_moved2),
+                                          alt_address, listener_config2, balancer2, runtime_);
 
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
   EXPECT_CALL(*test_filter, destroy_());
@@ -555,7 +573,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
           ReturnRef(*active_listener2)));
 
   auto filter_factory_callback = std::make_shared<std::vector<Network::FilterFactoryCb>>();
-  auto transport_socket_factory = Network::Test::createRawBufferSocketFactory();
+  auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
 
   EXPECT_CALL(conn_handler_, incNumConnections());
@@ -582,6 +600,89 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(listener2, onDestroy());
   active_listener2.reset();
 }
+
+TEST_F(ActiveTcpListenerTest, Rebalance) {
+  NiceMock<Network::MockListenerConfig> listener_config1;
+  NiceMock<Network::MockConnectionBalancer> balancer1;
+  EXPECT_CALL(balancer1, registerHandler(_)).Times(2);
+  EXPECT_CALL(balancer1, unregisterHandler(_)).Times(2);
+
+  Network::Address::InstanceConstSharedPtr normal_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
+  EXPECT_CALL(listener_config1, listenerScope).Times(testing::AnyNumber());
+  EXPECT_CALL(listener_config1, listenerFiltersTimeout());
+  EXPECT_CALL(listener_config1, continueOnListenerFiltersTimeout());
+  EXPECT_CALL(listener_config1, filterChainManager()).WillRepeatedly(ReturnRef(manager_));
+  EXPECT_CALL(listener_config1, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
+  EXPECT_CALL(listener_config1, handOffRestoredDestinationConnections())
+      .WillRepeatedly(Return(true));
+
+  auto mock_listener_will_be_moved1 = std::make_unique<Network::MockListener>();
+  auto& listener1 = *mock_listener_will_be_moved1;
+  auto active_listener1 =
+      std::make_unique<ActiveTcpListener>(conn_handler_, std::move(mock_listener_will_be_moved1),
+                                          normal_address, listener_config1, balancer1, runtime_);
+
+  NiceMock<Network::MockListenerConfig> listener_config2;
+
+  EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
+  EXPECT_CALL(listener_config2, listenerFiltersTimeout());
+  EXPECT_CALL(listener_config2, listenerScope).Times(testing::AnyNumber());
+  EXPECT_CALL(listener_config2, handOffRestoredDestinationConnections())
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(listener_config2, continueOnListenerFiltersTimeout());
+  EXPECT_CALL(listener_config2, filterChainManager()).WillRepeatedly(ReturnRef(manager_));
+  EXPECT_CALL(listener_config2, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
+  auto mock_listener_will_be_moved2 = std::make_unique<Network::MockListener>();
+  auto& listener2 = *mock_listener_will_be_moved2;
+  auto active_listener2 =
+      std::make_shared<ActiveTcpListener>(conn_handler_, std::move(mock_listener_will_be_moved2),
+                                          normal_address, listener_config2, balancer1, runtime_);
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+
+  // active_listener1 re-balance. Set the balance target to the the active_listener2.
+  EXPECT_CALL(balancer1, pickTargetHandler(_))
+      .WillOnce(testing::DoAll(testing::WithArg<0>(Invoke([&active_listener2](auto&) {
+                                 active_listener2->incNumConnections();
+                               })),
+                               ReturnRef(*active_listener2)));
+
+  EXPECT_CALL(conn_handler_, getBalancedHandlerByTag)
+      .WillOnce(Invoke([&normal_address,
+                        &active_listener2](uint64_t, const Network::Address::Instance& address) {
+        EXPECT_EQ(address, *normal_address);
+        return Network::BalancedConnectionHandlerOptRef(*active_listener2);
+      }));
+  auto filter_factory_callback = std::make_shared<std::vector<Network::FilterFactoryCb>>();
+  auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
+  filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
+
+  EXPECT_CALL(conn_handler_, incNumConnections());
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(*filter_chain_, transportSocketFactory)
+      .WillOnce(testing::ReturnRef(*transport_socket_factory));
+  EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
+  EXPECT_CALL(listener_config2, filterChainFactory())
+      .WillRepeatedly(ReturnRef(filter_chain_factory_));
+
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  active_listener1->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+
+  // Verify per-listener connection stats.
+  EXPECT_EQ(1UL, conn_handler_.numConnections());
+
+  EXPECT_CALL(conn_handler_, decNumConnections());
+  connection->close(Network::ConnectionCloseType::NoFlush);
+
+  EXPECT_CALL(listener1, onDestroy());
+  active_listener1.reset();
+  EXPECT_CALL(listener2, onDestroy());
+  active_listener2.reset();
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

@@ -50,7 +50,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 
   int domain;
   if (addr_type == Address::Type::Ip) {
-    if (version == Address::IpVersion::v6) {
+    if (version == Address::IpVersion::v6 || IoSocketHandleImpl::forceV6()) {
       domain = AF_INET6;
     } else {
       ASSERT(version == Address::IpVersion::v4);
@@ -91,7 +91,8 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
 
   IoHandlePtr io_handle =
       SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only, options);
-  if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
+  if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6 &&
+      !IoSocketHandleImpl::forceV6()) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
     const Api::SysCallIntResult result = io_handle->setOption(
         IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only), sizeof(v6only));
