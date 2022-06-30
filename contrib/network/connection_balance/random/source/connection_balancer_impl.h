@@ -9,7 +9,6 @@
 
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/server/active_tcp_listener.h"
 
 namespace Envoy {
 namespace Extensions {
