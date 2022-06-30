@@ -24,14 +24,15 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     ports:
-    - 8000:8000
-    - 8001:8001
+    - "${PORT_PROXY:-8000}:8000"
+    - "${PORT_ADMIN:-8001}:8001"
     depends_on:
     - skywalking-oap
 
   # First service.
   service1:
-    image: envoyproxy:tracing
+    build:
+      context: ../shared/tracing
     volumes:
     - ./service1-envoy-skywalking.yaml:/etc/service-envoy.yaml
     environment:
@@ -41,7 +42,8 @@ services:
 
   # Second service.
   service2:
-    image: envoyproxy:tracing
+    build:
+      context: ../shared/tracing
     volumes:
     - ./service2-envoy-skywalking.yaml:/etc/service-envoy.yaml
     environment:
@@ -51,7 +53,9 @@ services:
 
   # Skywalking components.
   elasticsearch:
-    image: elasticsearch:7.9.2
+    build:
+      context: .
+      dockerfile: Dockerfile-elasticsearch
     healthcheck:
       test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
       interval: 30s
@@ -66,25 +70,45 @@ services:
         hard: -1
 
   skywalking-oap:
-    image: apache/skywalking-oap-server:8.6.0-es7
+    build:
+      context: .
+      dockerfile: Dockerfile-skywalking-oap
     depends_on:
-    - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     environment:
-      SW_STORAGE: elasticsearch7
+      SW_HEALTH_CHECKER: default
+      SW_STORAGE: elasticsearch
       SW_STORAGE_ES_CLUSTER_NODES: elasticsearch:9200
     healthcheck:
-      test: ["CMD-SHELL", "/skywalking/bin/swctl"]
+      test: ["CMD-SHELL", "/skywalking/bin/swctl ch"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 10s
     restart: on-failure
 
   skywalking-ui:
-    image: apache/skywalking-ui:8.6.0
+    build:
+      context: .
+      dockerfile: Dockerfile-skywalking-ui
+    healthcheck:
+      test: ["CMD-SHELL", 'curl --silent --fail curl http://localhost:8080/graphql -X POST -H "Content-Type:application/json" -d "{ \"query\": \"query version { version }\"}" || exit 1']
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
     depends_on:
-    - skywalking-oap
+      skywalking-oap:
+        condition: service_healthy
     ports:
-    - 8080:8080
+    - "${PORT_UI:-8080}:8080"
     environment:
-      SW_OAP_ADDRESS: skywalking-oap:12800
+      SW_OAP_ADDRESS: http://skywalking-oap:12800
+      SW_HEALTH_CHECKER: default
+
+  started:
+    image: hello-world:latest
+    depends_on:
+      skywalking-ui:
+        condition: service_healthy

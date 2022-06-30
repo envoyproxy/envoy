@@ -7,11 +7,11 @@ export DELAY=5
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
 check_health() {
-    docker-compose exec -T client-envoy curl -s localhost:8001/clusters | grep health_flags
+    "$DOCKER_COMPOSE" exec -T client-envoy curl -s "localhost:8001/clusters" | grep health_flags
 }
 
 check_backend() {
-    output=$(docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100)
+    output=$("$DOCKER_COMPOSE" exec -T client-envoy python3 client.py http://localhost:3000/ 100)
     echo "$output"
     for expected in "$@"
     do
@@ -27,14 +27,14 @@ bring_up_backend() {
     local server
     server="$1"
 
-    docker-compose exec -T client-envoy curl -s "$server":8000/healthy
+    "$DOCKER_COMPOSE" exec -T client-envoy curl -s "$server":8000/healthy
 }
 
 bring_down_backend() {
     local server
     server="$1"
 
-    docker-compose exec -T client-envoy curl -s "$server":8000/unhealthy
+    "$DOCKER_COMPOSE" exec -T client-envoy curl -s "$server":8000/unhealthy
 }
 
 run_log "=== Demo setup
@@ -74,7 +74,7 @@ bring_up_backend "${NAME}"_backend-local-2_1
 sleep ${DELAY}
 
 run_log "Scale backend-local-1 to 5 replicas then snooze for ${DELAY}s"
-docker-compose -p ${NAME} up --scale backend-local-1=5 -d --build
+"$DOCKER_COMPOSE" -p ${NAME} up --scale backend-local-1=5 -d --build
 sleep ${DELAY}
 
 run_log "Bring down 4 replicas in backend-local-1 then snooze for ${DELAY}s. Priority 0 locality is 20% healthy."
