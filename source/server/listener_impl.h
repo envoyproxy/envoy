@@ -264,7 +264,7 @@ public:
    */
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, uint32_t concurrency);
+               bool workers_started, uint64_t hash);
   ~ListenerImpl() override;
 
   // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
@@ -499,7 +499,6 @@ private:
 
   Quic::QuicStatNames& quic_stat_names_;
   MissingListenerConfigStats missing_listener_config_stats_;
-  uint32_t concurrency_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

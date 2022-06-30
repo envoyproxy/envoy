@@ -297,7 +297,7 @@ Init::Manager& ListenerFactoryContextBaseImpl::initManager() { PANIC("not implem
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, uint32_t concurrency)
+                           uint64_t hash)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
       bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
@@ -352,8 +352,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               parent_.server_.accessLogManager())),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
-          POOL_COUNTER(listener_factory_context_->listenerScope()))}),
-      concurrency_(concurrency) {
+          POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
 
   if ((address_->type() == Network::Address::Type::Ip &&
        config.address().socket_address().ipv4_compat()) &&
@@ -383,7 +382,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   validateConfig();
   // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
   // listener factory can provide additional options.
-  buildUdpListenerFactory(concurrency);
+  buildUdpListenerFactory(parent_.server_.options().concurrency());
   buildListenSocketOptions();
   createListenerFilterFactories();
   validateFilterChains();
@@ -445,8 +444,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       transport_factory_context_(origin.transport_factory_context_),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
-          POOL_COUNTER(listener_factory_context_->listenerScope()))}),
-      concurrency_(origin.concurrency_) {
+          POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
   buildAccessLog();
   validateConfig();
   buildListenSocketOptions();
@@ -921,7 +919,8 @@ Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 void ListenerImpl::addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
   buildConnectionBalancer(*socket_factory->localAddress());
-  buildUdpListenerWorkerRouter(*socket_factory->localAddress(), concurrency_);
+  buildUdpListenerWorkerRouter(*socket_factory->localAddress(),
+                               parent_.server_.options().concurrency());
   socket_factories_.emplace_back(std::move(socket_factory));
 }
 
