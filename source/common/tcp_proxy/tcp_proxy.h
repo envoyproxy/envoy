@@ -117,21 +117,8 @@ public:
   TunnelingConfigHelperImpl(
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
           config_message,
-      Server::Configuration::FactoryContext& context)
-      : use_post_(config_message.use_post()),
-        header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())) {
-    envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
-    substitution_format_config.mutable_text_format_source()->set_inline_string(
-        config_message.hostname());
-    this->hostname_fmt_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-        substitution_format_config, context);
-  }
-  std::string host(const StreamInfo::StreamInfo& stream_info) const override {
-    return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
-                                 *Http::StaticEmptyHeaders::get().response_headers,
-                                 *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                                 absl::string_view());
-  }
+      Server::Configuration::FactoryContext& context);
+  std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
 

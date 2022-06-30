@@ -540,6 +540,26 @@ const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
   }
 }
 
+TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
+    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
+        config_message,
+    Server::Configuration::FactoryContext& context)
+    : use_post_(config_message.use_post()),
+      header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())) {
+  envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
+  substitution_format_config.mutable_text_format_source()->set_inline_string(
+      config_message.hostname());
+  hostname_fmt_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+      substitution_format_config, context);
+}
+
+std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
+  return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
+                               *Http::StaticEmptyHeaders::get().response_headers,
+                               *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
+                               absl::string_view());
+}
+
 void Filter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
