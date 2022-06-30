@@ -77,7 +77,7 @@ public:
     envoy::type::v3::Int64Range range_;
     Matchers::StringMatcherPtr string_match_;
     const bool invert_match_;
-    const bool treat_missing_as_empty_;
+    const bool treat_missing_as_empty;
     bool present_;
 
     // HeaderMatcher
