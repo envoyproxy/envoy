@@ -36,7 +36,7 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 //   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
 //   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
 HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config)
-    : name_(config.name()), invert_match_(config.invert_match()), treat_missing_as_empty_(config.treat_missing_header_as_empty())) {
+    : name_(config.name()), invert_match_(config.invert_match()), treat_missing_as_empty_(config.treat_missing_header_as_empty()) {
   switch (config.header_match_specifier_case()) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     header_match_type_ = HeaderMatchType::Value;
