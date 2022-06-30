@@ -41,17 +41,11 @@ namespace {
 constexpr auto filter_metadata_key = "com.amazonaws.lambda";
 constexpr auto egress_gateway_metadata_key = "egress_gateway";
 
-void setLambdaHeaders(Http::RequestHeaderMap& headers,
-                      const absl::optional<Arn>& arn,
+void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>& arn,
                       InvocationMode mode) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
-  auto lambda_arn = "arn:" +
-      arn->partition() + ":" +
-      arn->service() + ":" +
-      arn->region() + ":" +
-      arn->accountId() + ":" +
-      arn->resourceType() + ":" +
-      arn->functionName();
+  auto lambda_arn = "arn:" + arn->partition() + ":" + arn->service() + ":" + arn->region() + ":" +
+                    arn->accountId() + ":" + arn->resourceType() + ":" + arn->functionName();
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", lambda_arn));
   if (mode == InvocationMode::Synchronous) {
     headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "RequestResponse");
