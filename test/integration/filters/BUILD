@@ -61,7 +61,6 @@ envoy_cc_test_library(
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
-        "//source/common/network:filter_state_socket_tag_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",

@@ -68,18 +68,15 @@ Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
 
 bool SocketTagSocketOptionImpl::setOption(Socket& socket,
                                           envoy::config::core::v3::SocketOption::SocketState state) const {
-  std::cerr << "set! state: " << state << " in_state_: " << in_state_ << "\n";
   if (state != in_state_) {
     return true;
   }
 
-  std::cerr << "set!\n";
   if (!isSupported()) {
     ENVOY_LOG(warn, "Failed to set unsupported option on socket");
     return false;
   }
 
-  std::cerr << "set!\n";
   tag_->apply(socket.ioHandle());
   return true;
 

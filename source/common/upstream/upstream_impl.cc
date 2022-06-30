@@ -343,11 +343,6 @@ Host::CreateConnectionData HostImpl::createConnection(
   Network::ConnectionSocket::OptionsSharedPtr connection_options =
       combineConnectionSocketOptions(cluster, options);
 
-  std::cerr << "Have Options: " << (options != nullptr) << "\n";
-  if (options) {
-    std::cerr << "Num Options: " << (options->size()) << "\n";
-  }
-
   ASSERT(!address->envoyInternalAddress() ||
          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
 
@@ -360,6 +355,7 @@ Host::CreateConnectionData HostImpl::createConnection(
                 address, cluster.sourceAddress(),
                 socket_factory.createTransportSocket(transport_socket_options, host),
                 connection_options);
+
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());

@@ -443,7 +443,6 @@ envoy_cc_library(
     hdrs = ["transport_socket_options_impl.h"],
     deps = [
         ":application_protocol_lib",
-        ":filter_state_socket_tag_lib",
         ":proxy_protocol_filter_state_lib",
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
@@ -510,17 +509,6 @@ envoy_cc_library(
     hdrs = ["proxy_protocol_filter_state.h"],
     deps = [
         "//envoy/network:proxy_protocol_options_lib",
-        "//envoy/stream_info:filter_state_interface",
-        "//source/common/common:macros",
-    ],
-)
-
-envoy_cc_library(
-    name = "filter_state_socket_tag_lib",
-    hdrs = ["filter_state_socket_tag.h"],
-    srcs = ["filter_state_socket_tag.cc"],
-    deps = [
-        "//envoy/network:socket_tag_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],

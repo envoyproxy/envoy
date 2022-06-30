@@ -5,7 +5,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/scalar_to_byte_vector.h"
-#include "source/common/network/filter_state_socket_tag.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
