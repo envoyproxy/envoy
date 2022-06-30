@@ -282,10 +282,10 @@ Host::CreateConnectionData HostImpl::createConnection(
   // If the transport socket options indicate the connection should be
   // redirected to a proxy, create the TCP connection to the proxy's address not
   // the host's address.
-  if (transport_socket_options && transport_socket_options->proxyInfo()) {
+  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
     return {createConnection(dispatcher, cluster(),
-                             transport_socket_options->proxyInfo()->proxy_address,
-                             {transport_socket_options->proxyInfo()->proxy_address},
+                             transport_socket_options->http11ProxyInfo()->proxy_address,
+                             {transport_socket_options->http11ProxyInfo()->proxy_address},
                              transportSocketFactory(), options, transport_socket_options),
             shared_from_this()};
   }

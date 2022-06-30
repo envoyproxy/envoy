@@ -53,7 +53,7 @@ TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterSt
   std::vector<std::string> subject_alt_names;
   std::vector<std::string> alpn_fallback;
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
-  std::unique_ptr<const TransportSocketOptions::ProxyInfo> proxy_info;
+  std::unique_ptr<const TransportSocketOptions::Http11ProxyInfo> proxy_info;
 
   if (auto typed_data =
           filter_state->getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
@@ -79,10 +79,11 @@ TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterSt
     proxy_protocol_options.emplace(typed_data->value());
   }
 
-  if (auto typed_data =
-          filter_state->getDataReadOnly<FilterStateProxyInfo>(FilterStateProxyInfo::key());
+  if (auto typed_data = filter_state->getDataReadOnly<Http11ProxyInfoFilterState>(
+          Http11ProxyInfoFilterState::key());
       typed_data != nullptr) {
-    proxy_info = std::make_unique<TransportSocketOptions::ProxyInfo>("host", typed_data->address());
+    proxy_info = std::make_unique<TransportSocketOptions::Http11ProxyInfo>(typed_data->hostname(),
+                                                                           typed_data->address());
   }
 
   return std::make_shared<Network::TransportSocketOptionsImpl>(

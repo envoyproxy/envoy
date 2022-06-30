@@ -38,9 +38,10 @@ public:
   void initialize(bool no_proxy_protocol = false) {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
-    auto address = Network::Utility::parseInternetAddressAndPort(address_string);
+    Network::Address::InstanceConstSharedPtr address =
+        Network::Utility::parseInternetAddressAndPort(address_string);
     auto info =
-        std::make_unique<Network::TransportSocketOptions::ProxyInfo>("www.foo.com", address);
+        std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>("www.foo.com", address);
     if (no_proxy_protocol) {
       info.reset();
     }
@@ -68,7 +69,7 @@ public:
     auto address = Network::Utility::parseInternetAddressAndPort(address_string);
     transport_callbacks_.connection_.stream_info_.filterState()->setData(
         "envoy.network.transport_socket.http_11_proxy.address",
-        std::make_unique<Network::FilterStateProxyInfo>("www.foo.com", address),
+        std::make_unique<Network::Http11ProxyInfoFilterState>("www.foo.com", address),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
@@ -93,14 +94,14 @@ TEST_P(Http11ConnectTest, InjectesHeaderOnlyOnce) {
         buffer.drain(length);
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
-  auto msg = Buffer::OwnedImpl("initial data");
+  Buffer::OwnedImpl msg("initial data");
 
-  auto rc1 = connect_socket_->doWrite(msg, false);
+  Network::IoResult rc1 = connect_socket_->doWrite(msg, false);
   // Only the connect will be written initially. All other writes should be
   // buffered in the Network::Connection buffer until the connect has been
   // processed.
   EXPECT_EQ(connect_data_.length(), rc1.bytes_processed_);
-  auto rc2 = connect_socket_->doWrite(msg, false);
+  Network::IoResult rc2 = connect_socket_->doWrite(msg, false);
   EXPECT_EQ(0, rc2.bytes_processed_);
 
   EXPECT_CALL(*inner_socket_, onConnected());
@@ -112,8 +113,8 @@ TEST_P(Http11ConnectTest, NoInjectHeaderProtoAbsent) {
   initialize(true);
 
   EXPECT_CALL(io_handle_, write(_)).Times(0);
-  auto msg = Buffer::OwnedImpl("initial data");
-  auto msg2 = Buffer::OwnedImpl("new data");
+  Buffer::OwnedImpl msg("initial data");
+  Buffer::OwnedImpl msg2("new data");
 
   {
     InSequence s;
@@ -123,9 +124,9 @@ TEST_P(Http11ConnectTest, NoInjectHeaderProtoAbsent) {
         .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg2.length(), false}));
   }
 
-  auto rc1 = connect_socket_->doWrite(msg, false);
+  Network::IoResult rc1 = connect_socket_->doWrite(msg, false);
   EXPECT_EQ(msg.length(), rc1.bytes_processed_);
-  auto rc2 = connect_socket_->doWrite(msg2, false);
+  Network::IoResult rc2 = connect_socket_->doWrite(msg2, false);
   EXPECT_EQ(msg2.length(), rc2.bytes_processed_);
 
   EXPECT_CALL(*inner_socket_, onConnected());
@@ -143,8 +144,8 @@ TEST_P(Http11ConnectTest, NoInjectTlsAbsent) {
   initialize(false);
 
   EXPECT_CALL(io_handle_, write(_)).Times(0);
-  auto msg = Buffer::OwnedImpl("initial data");
-  auto msg2 = Buffer::OwnedImpl("new data");
+  Buffer::OwnedImpl msg("initial data");
+  Buffer::OwnedImpl msg2("new data");
 
   {
     InSequence s;
@@ -154,9 +155,9 @@ TEST_P(Http11ConnectTest, NoInjectTlsAbsent) {
         .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg2.length(), false}));
   }
 
-  auto rc1 = connect_socket_->doWrite(msg, false);
+  Network::IoResult rc1 = connect_socket_->doWrite(msg, false);
   EXPECT_EQ(msg.length(), rc1.bytes_processed_);
-  auto rc2 = connect_socket_->doWrite(msg2, false);
+  Network::IoResult rc2 = connect_socket_->doWrite(msg2, false);
   EXPECT_EQ(msg2.length(), rc2.bytes_processed_);
 
   EXPECT_CALL(*inner_socket_, onConnected());
@@ -173,7 +174,7 @@ TEST_P(Http11ConnectTest, NoInjectTlsAbsent) {
 TEST_P(Http11ConnectTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
   initialize();
 
-  auto msg = Buffer::OwnedImpl("data");
+  Buffer::OwnedImpl msg("initial data");
   {
     InSequence s;
     EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
@@ -190,7 +191,7 @@ TEST_P(Http11ConnectTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
         }));
   }
 
-  auto rc = connect_socket_->doWrite(msg, false);
+  Network::IoResult rc = connect_socket_->doWrite(msg, false);
   EXPECT_EQ(Network::PostIoAction::KeepOpen, rc.action_);
   rc = connect_socket_->doWrite(msg, false);
   EXPECT_EQ(Network::PostIoAction::KeepOpen, rc.action_);
@@ -200,7 +201,7 @@ TEST_P(Http11ConnectTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
 TEST_P(Http11ConnectTest, ReturnsCloseWhenWriteErrorIsNotAgain) {
   initialize();
 
-  auto msg = Buffer::OwnedImpl("some data");
+  Buffer::OwnedImpl msg("initial data");
   {
     InSequence s;
     EXPECT_CALL(io_handle_, write(_))
@@ -211,7 +212,7 @@ TEST_P(Http11ConnectTest, ReturnsCloseWhenWriteErrorIsNotAgain) {
         }));
   }
 
-  auto rc = connect_socket_->doWrite(msg, false);
+  Network::IoResult rc = connect_socket_->doWrite(msg, false);
   EXPECT_EQ(Network::PostIoAction::Close, rc.action_);
 }
 

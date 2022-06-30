@@ -65,7 +65,7 @@ public:
     // Strip the CONNECT upgrade.
     std::string prefix_data;
     ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", &prefix_data));
-    EXPECT_EQ("CONNECT host:443 HTTP/1.1\r\n\r\n", prefix_data);
+    EXPECT_EQ("CONNECT sni.lyft.com:443 HTTP/1.1\r\n\r\n", prefix_data);
 
     // Ship the CONNECT response.
     fake_upstream_connection_->writeRawData("HTTP/1.1 200 OK\r\n\r\n");
@@ -132,6 +132,51 @@ TEST_P(Http11ConnectHttpIntegrationTest, CleartextRequestResponse) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("bar")).empty());
+}
+// Test sending 2 requests to one proxy
+TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSignleEndpoint) {
+  initialize();
+
+  // Point at the second fake upstream. Envoy doesn't actually know about this one.
+  absl::string_view second_upstream_address(fake_upstreams_[1]->localAddress()->asStringView());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // The connect-proxy header will be stripped by the header-to-proxy-filter and inserted as
+  // metadata.
+  default_request_headers_.setCopy(Envoy::Http::LowerCaseString("connect-proxy"),
+                                   second_upstream_address);
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // The request should be sent to fake upstream 1, due to the connect-proxy header.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  stripConnectUpgradeAndRespond();
+
+  // Enable reading on the new stream, and read the encapsulated request.
+  ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Send the encapsulated response.
+  default_response_headers_.setCopy(Envoy::Http::LowerCaseString("bar"), "eep");
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Wait for the encapsulated response to be received.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // Make sure the upgrade headers were swallowed and the second were received.
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("bar")).empty());
+
+  // Now send a second request, and make sure it goes to the same upstream.
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // The request should be sent to fake upstream 2, due to the connect-proxy header.
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Wait for the encapsulated response to be received.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Test sending requests to different proxies.
@@ -240,6 +285,9 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSingleEndpoint) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
+
+// TODO(alyssawilk) test with DFP, and make sure we will skip the DNS lookup in
+// case DNS to those endpoints is disallowed.
 
 } // namespace
 } // namespace Envoy

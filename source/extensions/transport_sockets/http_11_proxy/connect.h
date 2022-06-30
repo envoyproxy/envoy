@@ -12,7 +12,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
 
-// If the transport socket options contain proxyInfo and the transport is
+// If the transport socket options contain http11ProxyInfo and the transport is
 // secure, this will prepend a CONNECT request to the outbound data and strip
 // the CONNECT response from the inbound data.
 class UpstreamHttp11ConnectSocket : public TransportSockets::PassthroughSocket,
@@ -34,7 +34,7 @@ private:
   Network::TransportSocketOptionsConstSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
-  bool stripped_connect_{};
+  bool need_to_strip_connect_response_{};
 };
 
 class UpstreamHttp11ConnectSocketFactory : public PassthroughFactory {
@@ -46,9 +46,6 @@ public:
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   void hashKey(std::vector<uint8_t>& key,
                Network::TransportSocketOptionsConstSharedPtr options) const override;
-
-private:
-  //  Http11ConnectConfig config_;
 };
 
 } // namespace Http11Connect

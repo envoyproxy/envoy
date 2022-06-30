@@ -12,13 +12,16 @@ namespace Network {
  * Information which filters can add if they detect the stream should go
  * upstream through an HTTP/1.1 proxy.
  */
-class FilterStateProxyInfo : public StreamInfo::FilterState::Object {
+class Http11ProxyInfoFilterState : public StreamInfo::FilterState::Object {
 public:
+  // Returns the key for looking up the Http11ProxyInfoFilterState in the FilterState.
   static const std::string& key();
 
-  FilterStateProxyInfo(absl::string_view hostname, Network::Address::InstanceConstSharedPtr address)
+  Http11ProxyInfoFilterState(absl::string_view hostname,
+                             Network::Address::InstanceConstSharedPtr address)
       : hostname_(hostname), address_(address) {}
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
+  const std::string& hostname() const { return hostname_; }
 
 private:
   // The hostname of this individual request.

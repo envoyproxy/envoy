@@ -22,11 +22,10 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
     Network::TransportSocketOptionsConstSharedPtr options)
     : PassthroughSocket(std::move(transport_socket)), options_(options) {
-  if (options_ && options_->proxyInfo() && transport_socket_->ssl()) {
+  if (options_ && options_->http11ProxyInfo() && transport_socket_->ssl()) {
     header_buffer_.add(
-        absl::StrCat("CONNECT ", options_->proxyInfo()->hostname, ":443 HTTP/1.1\r\n\r\n"));
-  } else {
-    stripped_connect_ = true;
+        absl::StrCat("CONNECT ", options_->http11ProxyInfo()->hostname, ":443 HTTP/1.1\r\n\r\n"));
+    need_to_strip_connect_response_ = true;
   }
 }
 
@@ -38,9 +37,9 @@ void UpstreamHttp11ConnectSocket::setTransportSocketCallbacks(
 
 Network::IoResult UpstreamHttp11ConnectSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   if (header_buffer_.length() > 0) {
-    auto header_res = writeHeader();
-    return header_res;
-  } else if (stripped_connect_) {
+    return writeHeader();
+  }
+  if (!need_to_strip_connect_response_) {
     // Don't pass events up until the connect response is read because TLS reads
     // kick off writes which don't pass through the transport socket.
     return transport_socket_->doWrite(buffer, end_stream);
@@ -49,38 +48,40 @@ Network::IoResult UpstreamHttp11ConnectSocket::doWrite(Buffer::Instance& buffer,
 }
 
 Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) {
-  if (!stripped_connect_) {
-    char peek_buf[200];
-    auto result = callbacks_->ioHandle().recv(peek_buf, 200, MSG_PEEK);
+  if (need_to_strip_connect_response_) {
+    // Limit the CONNECT response headers to an arbitrary 200 bytes.
+    constexpr uint32_t MAX_RESPONSE_HEADER_SIZE = 200;
+    char peek_buf[MAX_RESPONSE_HEADER_SIZE];
+    Api::IoCallUint64Result result =
+        callbacks_->ioHandle().recv(peek_buf, MAX_RESPONSE_HEADER_SIZE, MSG_PEEK);
     if (!result.ok() && result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       return {Network::PostIoAction::Close, 0, false};
     }
     absl::string_view peek_data(peek_buf, result.return_value_);
     size_t index = peek_data.find("\r\n\r\n");
     if (index == absl::string_view::npos) {
-      if (result.return_value_ == 200) {
-        ENVOY_CONN_LOG(trace, "failed to receive CONNECT headers within 200 bytes",
-                       callbacks_->connection());
+      if (result.return_value_ == MAX_RESPONSE_HEADER_SIZE) {
+        ENVOY_CONN_LOG(trace, "failed to receive CONNECT headers within {} bytes",
+                       callbacks_->connection(), MAX_RESPONSE_HEADER_SIZE);
         return {Network::PostIoAction::Close, 0, false};
       }
       return Network::IoResult{Network::PostIoAction::KeepOpen, 0, false};
-    } else {
-      result = callbacks_->ioHandle().read(buffer, index + 4);
-      if (!result.ok() || result.return_value_ != index + 4) {
-        ENVOY_CONN_LOG(trace, "failed to drain CONNECT header", callbacks_->connection());
-        return {Network::PostIoAction::Close, 0, false};
-      }
-      // Note this is not in any way proper HTTP/1.1 parsing.
-      // Before this is used with any untrusted upstream, proper checks should
-      // be done rather than this.
-      if (!absl::StartsWith(peek_data, "HTTP/1.1 200")) {
-        ENVOY_CONN_LOG(trace, "Response does not match strict connect checks",
-                       callbacks_->connection());
-        return {Network::PostIoAction::Close, 0, false};
-      }
-      buffer.drain(buffer.length());
-      stripped_connect_ = true;
     }
+    result = callbacks_->ioHandle().read(buffer, index + 4);
+    if (!result.ok() || result.return_value_ != index + 4) {
+      ENVOY_CONN_LOG(trace, "failed to drain CONNECT header", callbacks_->connection());
+      return {Network::PostIoAction::Close, 0, false};
+    }
+    // Note this is not in any way proper HTTP/1.1 parsing.
+    // Before this is used with any untrusted upstream, proper checks should
+    // be done rather than this.
+    if (!absl::StartsWith(peek_data, "HTTP/1.1 200")) {
+      ENVOY_CONN_LOG(trace, "Response does not match strict connect checks",
+                     callbacks_->connection());
+      return {Network::PostIoAction::Close, 0, false};
+    }
+    buffer.drain(buffer.length());
+    need_to_strip_connect_response_ = false;
   }
   return transport_socket_->doRead(buffer);
 }
@@ -95,10 +96,7 @@ Network::IoResult UpstreamHttp11ConnectSocket::writeHeader() {
 
     Api::IoCallUint64Result result = callbacks_->ioHandle().write(header_buffer_);
 
-    if (result.ok()) {
-      ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.return_value_);
-      bytes_written += result.return_value_;
-    } else {
+    if (!result.ok()) {
       ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
                      result.err_->getErrorDetails());
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
@@ -106,6 +104,8 @@ Network::IoResult UpstreamHttp11ConnectSocket::writeHeader() {
       }
       break;
     }
+    ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.return_value_);
+    bytes_written += result.return_value_;
   } while (true);
 
   return {action, bytes_written, false};
@@ -127,10 +127,12 @@ Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportS
 void UpstreamHttp11ConnectSocketFactory::hashKey(
     std::vector<uint8_t>& key, Network::TransportSocketOptionsConstSharedPtr options) const {
   PassthroughFactory::hashKey(key, options);
-  if (options && options->proxyInfo()) {
+  if (options && options->http11ProxyInfo().has_value()) {
     pushScalarToByteVector(
-        StringUtil::CaseInsensitiveHash()(options->proxyInfo()->proxy_address->asString()), key);
-    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(options->proxyInfo()->hostname), key);
+        StringUtil::CaseInsensitiveHash()(options->http11ProxyInfo()->proxy_address->asString()),
+        key);
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(options->http11ProxyInfo()->hostname),
+                           key);
   }
 }
 

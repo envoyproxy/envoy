@@ -24,8 +24,8 @@ public:
       std::string address_string(request_headers.get(connect_proxy)[0]->value().getStringView());
       auto address = Network::Utility::parseInternetAddressAndPort(address_string);
       decoder_callbacks_->streamInfo().filterState()->setData(
-          Network::FilterStateProxyInfo::key(),
-          std::make_unique<Network::FilterStateProxyInfo>(hostname, address),
+          Network::Http11ProxyInfoFilterState::key(),
+          std::make_unique<Network::Http11ProxyInfoFilterState>(hostname, address),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::FilterChain);
       request_headers.remove(connect_proxy);

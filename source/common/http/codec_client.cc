@@ -186,7 +186,7 @@ NoConnectCodecClientProd::NoConnectCodecClientProd(
     // If the transport socket indicates this is being proxied, inform the HTTP/1.1 codec. It will
     // send fully qualified URLs iff the underlying transport is plaintext.
     bool proxied = false;
-    if (options && options->proxyInfo()) {
+    if (options && options->http11ProxyInfo().has_value()) {
       proxied = true;
     }
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
