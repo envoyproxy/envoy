@@ -31,6 +31,10 @@ bool FileSystemBufferFilter::initPerRouteConfig() {
   config_.emplace(config_chain);
   request_state_.setConfig(config_->request());
   response_state_.setConfig(config_->response());
+  if (config_->request().behavior().bypass() && config_->response().behavior().bypass()) {
+    // It's okay to not have an AsyncFileManager if the filter is bypassed.
+    return true;
+  }
   return config_->hasAsyncFileManager();
 }
 
