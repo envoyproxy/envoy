@@ -22,11 +22,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(MultiplexedIntegrationTest, TwoRequestsSameUpstream) {
+  std::cerr << "1\n";
   testRouterRequestAndResponseWithBody(1024, 512, false, false);
+  std::cerr << "2\n";
 
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 1024, default_response_headers_, 512,
                                     0, TestUtility::DefaultTimeout);
+  std::cerr << "3\n";
   checkSimpleRequestSuccess(1024, 512, response.get());
 }
 

@@ -66,5 +66,46 @@ Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
   return socket.setSocketOption(optname.level(), optname.option(), value, size);
 }
 
+bool SocketTagSocketOptionImpl::setOption(Socket& socket,
+                                          envoy::config::core::v3::SocketOption::SocketState state) const {
+  std::cerr << "set! state: " << state << " in_state_: " << in_state_ << "\n";
+  if (state != in_state_) {
+    return true;
+  }
+
+  std::cerr << "set!\n";
+  if (!isSupported()) {
+    ENVOY_LOG(warn, "Failed to set unsupported option on socket");
+    return false;
+  }
+
+  std::cerr << "set!\n";
+  tag_->apply(socket.ioHandle());
+  return true;
+
+}
+
+void SocketTagSocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
+  tag_->hashKey(hash_key);
+}
+
+absl::optional<Socket::Option::Details>
+SocketTagSocketOptionImpl::getOptionDetails(const Socket&,
+                                            envoy::config::core::v3::SocketOption::SocketState state) const {
+  if (state != in_state_ || !isSupported()) {
+    return absl::nullopt;
+  }
+
+  static std::string name = "socket_tag";
+  Socket::Option::Details details;
+  details.name_ = optname_;
+  details.value_ = "xxxxx";
+  return absl::make_optional(std::move(details));
+}
+
+bool SocketTagSocketOptionImpl::isSupported() const {
+  return optname_.hasValue();
+}
+
 } // namespace Network
 } // namespace Envoy

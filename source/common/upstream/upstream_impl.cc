@@ -343,6 +343,11 @@ Host::CreateConnectionData HostImpl::createConnection(
   Network::ConnectionSocket::OptionsSharedPtr connection_options =
       combineConnectionSocketOptions(cluster, options);
 
+  std::cerr << "Have Options: " << (options != nullptr) << "\n";
+  if (options) {
+    std::cerr << "Num Options: " << (options->size()) << "\n";
+  }
+
   ASSERT(!address->envoyInternalAddress() ||
          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
 

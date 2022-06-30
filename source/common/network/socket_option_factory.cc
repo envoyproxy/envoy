@@ -147,5 +147,12 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildUdpGroOptions() {
   return options;
 }
 
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildSocketTagOptions(Network::SocketTagSharedPtr& tag) {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<SocketTagSocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, tag));
+  return options;
+}
+
 } // namespace Network
 } // namespace Envoy

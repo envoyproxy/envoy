@@ -4,6 +4,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/socket_tag.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
@@ -159,6 +160,29 @@ private:
   // This has to be a std::vector<uint8_t> but not std::string because std::string might inline
   // the buffer so its data() is not aligned in to alignof(void*).
   const std::vector<uint8_t> value_;
+};
+
+
+class SocketTagSocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
+public:
+  SocketTagSocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
+                            Network::SocketTagSharedPtr& tag)
+      : in_state_(in_state), optname_(0, 0, "socket_tag"), tag_(tag) {
+  }
+
+  // Socket::Option
+  bool setOption(Socket& socket,
+                 envoy::config::core::v3::SocketOption::SocketState state) const override;
+  void hashKey(std::vector<uint8_t>& hash_key) const override;
+  absl::optional<Details>
+  getOptionDetails(const Socket& socket,
+                   envoy::config::core::v3::SocketOption::SocketState state) const override;
+  bool isSupported() const override;
+
+private:
+  const envoy::config::core::v3::SocketOption::SocketState in_state_;
+  const Network::SocketOptionName optname_;
+  Network::SocketTagSharedPtr tag_;
 };
 
 } // namespace Network

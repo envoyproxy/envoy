@@ -3,6 +3,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/socket.h"
+#include "envoy/network/socket_tag.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
@@ -36,6 +37,7 @@ public:
   static std::unique_ptr<Socket::Options> buildRxQueueOverFlowOptions();
   static std::unique_ptr<Socket::Options> buildReusePortOptions();
   static std::unique_ptr<Socket::Options> buildUdpGroOptions();
+  static std::unique_ptr<Socket::Options> buildSocketTagOptions(Network::SocketTagSharedPtr& tag);
 };
 } // namespace Network
 } // namespace Envoy
