@@ -431,6 +431,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "multiplexed_socket_tag_integration_test",
+    srcs = [
+        "multiplexed_socket_tag_integration_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/integration/filters:header_to_socket_tag_filter_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "shadow_policy_integration_test",
     srcs = ["shadow_policy_integration_test.cc"],
     deps = [

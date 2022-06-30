@@ -42,6 +42,15 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "socket_tag_mocks",
+    hdrs = ["socket_tag.h"],
+    deps = [
+        ":io_handle_mocks",
+        "//envoy/network:socket_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "network_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],

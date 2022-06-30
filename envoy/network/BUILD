@@ -173,12 +173,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "socket_tag_interface",
+    hdrs = ["socket_tag.h"],
+    deps = [
+        ":io_handle_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "transport_socket_interface",
     hdrs = ["transport_socket.h"],
     deps = [
         ":io_handle_interface",
         ":post_io_action_interface",
         ":proxy_protocol_options_lib",
+        ":socket_tag_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/ssl:connection_interface",

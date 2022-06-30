@@ -25,6 +25,8 @@ public:
   bool startSecureTransport() override { return false; }
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
 
+  void setSocketTag();
+
 protected:
   TransportSocketCallbacks* transportSocketCallbacks() const { return callbacks_; };
 

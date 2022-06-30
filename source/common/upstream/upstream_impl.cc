@@ -355,7 +355,6 @@ Host::CreateConnectionData HostImpl::createConnection(
                 address, cluster.sourceAddress(),
                 socket_factory.createTransportSocket(transport_socket_options, host),
                 connection_options);
-
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());

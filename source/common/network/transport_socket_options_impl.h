@@ -29,6 +29,9 @@ public:
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
     return inner_options_->proxyProtocolOptions();
   }
+  const absl::optional<Network::SocketTagSharedPtr>& socketTag() const override {
+    return inner_options_->socketTag();
+  }
   const StreamInfo::FilterStateSharedPtr& filterState() const override {
     return inner_options_->filterState();
   }
@@ -45,13 +48,14 @@ public:
       std::vector<std::string>&& override_verify_san_list = {},
       std::vector<std::string>&& override_alpn = {}, std::vector<std::string>&& fallback_alpn = {},
       absl::optional<Network::ProxyProtocolData> proxy_proto_options = absl::nullopt,
+      absl::optional<Network::SocketTagSharedPtr> socket_tag = absl::nullopt,
       const StreamInfo::FilterStateSharedPtr filter_state = nullptr)
       : override_server_name_(override_server_name.empty()
                                   ? absl::nullopt
                                   : absl::optional<std::string>(override_server_name)),
-        override_verify_san_list_{std::move(override_verify_san_list)},
-        override_alpn_list_{std::move(override_alpn)}, alpn_fallback_{std::move(fallback_alpn)},
-        proxy_protocol_options_(proxy_proto_options), filter_state_(filter_state) {}
+        override_verify_san_list_(std::move(override_verify_san_list)),
+        override_alpn_list_(std::move(override_alpn)), alpn_fallback_(std::move(fallback_alpn)),
+        proxy_protocol_options_(proxy_proto_options), socket_tag_(socket_tag), filter_state_(filter_state) {}
 
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
@@ -66,6 +70,9 @@ public:
   const std::vector<std::string>& applicationProtocolFallback() const override {
     return alpn_fallback_;
   }
+  const absl::optional<Network::SocketTagSharedPtr>& socketTag() const override {
+    return socket_tag_;
+  }
   absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
     return proxy_protocol_options_;
   }
@@ -77,6 +84,7 @@ private:
   const std::vector<std::string> override_alpn_list_;
   const std::vector<std::string> alpn_fallback_;
   const absl::optional<Network::ProxyProtocolData> proxy_protocol_options_;
+  const absl::optional<Network::SocketTagSharedPtr> socket_tag_;
   const StreamInfo::FilterStateSharedPtr filter_state_;
 };
 

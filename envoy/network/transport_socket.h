@@ -8,6 +8,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/post_io_action.h"
 #include "envoy/network/proxy_protocol.h"
+#include "envoy/network/socket_tag.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -233,6 +234,11 @@ public:
    * @return optional PROXY protocol address information.
    */
   virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
+
+  /**
+   * @return optional socket tag.
+   */
+  virtual const absl::optional<Network::SocketTagSharedPtr>& socketTag() const PURE;
 
   /**
    * @return filter state from the downstream request or connection.

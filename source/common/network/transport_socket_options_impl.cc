@@ -9,6 +9,7 @@
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/application_protocol.h"
+#include "source/common/network/filter_state_socket_tag.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_subject_alt_names.h"
@@ -40,6 +41,11 @@ void CommonUpstreamTransportSocketFactory::hashKey(
   for (const auto& protocol : alpn_fallback) {
     pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
   }
+
+  const auto& socket_tag = options->socketTag();
+  if (socket_tag.has_value()) {
+    socket_tag.value()->hashKey(key);
+  }
 }
 
 TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterState(
@@ -51,6 +57,7 @@ TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterSt
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
   std::vector<std::string> alpn_fallback;
+  absl::optional<Network::SocketTagSharedPtr> socket_tag;
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
   if (auto typed_data =
@@ -77,9 +84,15 @@ TransportSocketOptionsConstSharedPtr TransportSocketOptionsUtility::fromFilterSt
     proxy_protocol_options.emplace(typed_data->value());
   }
 
+  if (auto typed_data =
+      filter_state->getDataReadOnly<FilterStateSocketTag>(Network::FilterStateSocketTag::key());
+      typed_data != nullptr) {
+    socket_tag = typed_data->value();
+  }
+
   return std::make_shared<Network::TransportSocketOptionsImpl>(
       server_name, std::move(subject_alt_names), std::move(application_protocols),
-      std::move(alpn_fallback), proxy_protocol_options, filter_state);
+      std::move(alpn_fallback), proxy_protocol_options, socket_tag, filter_state);
 }
 
 } // namespace Network
