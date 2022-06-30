@@ -63,6 +63,7 @@ jq(
 
 protoxform_rule(
     name = "test_protoxform",
+    visibility = ["//visibility:public"],
     deps = ["//tools/testdata/protoxform:fix_protos"],
 )
 

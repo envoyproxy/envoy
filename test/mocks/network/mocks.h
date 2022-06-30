@@ -407,12 +407,12 @@ public:
 
 class MockUdpListenerConfig : public UdpListenerConfig {
 public:
-  MockUdpListenerConfig();
+  MockUdpListenerConfig(uint32_t concurrency = 1);
   ~MockUdpListenerConfig() override;
 
   MOCK_METHOD(ActiveUdpListenerFactory&, listenerFactory, ());
   MOCK_METHOD(UdpPacketWriterFactory&, packetWriterFactory, ());
-  MOCK_METHOD(UdpListenerWorkerRouter&, listenerWorkerRouter, ());
+  MOCK_METHOD(UdpListenerWorkerRouter&, listenerWorkerRouter, (const Network::Address::Instance&));
   MOCK_METHOD(const envoy::config::listener::v3::UdpListenerConfig&, config, ());
 
   UdpListenerWorkerRouterPtr udp_listener_worker_router_;
@@ -494,6 +494,15 @@ public:
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
 
   uint64_t num_handler_connections_{};
+};
+
+class MockUdpListenerWorkerRouter : public UdpListenerWorkerRouter {
+public:
+  ~MockUdpListenerWorkerRouter() override;
+
+  MOCK_METHOD(void, registerWorkerForListener, (UdpListenerCallbacks & listener));
+  MOCK_METHOD(void, unregisterWorkerForListener, (UdpListenerCallbacks & listener));
+  MOCK_METHOD(void, deliver, (uint32_t dest_worker_index, UdpRecvData&& data));
 };
 
 class MockIp : public Address::Ip {
