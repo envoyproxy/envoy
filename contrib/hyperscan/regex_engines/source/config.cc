@@ -28,9 +28,6 @@ Config::createEngine(const Protobuf::Message& config,
   if (hyperscan.multiline()) {
     flag |= HS_FLAG_MULTILINE;
   }
-  if (hyperscan.allow_empty()) {
-    flag |= HS_FLAG_ALLOWEMPTY;
-  }
   if (hyperscan.utf8()) {
     flag |= HS_FLAG_UTF8;
     if (hyperscan.ucp()) {

@@ -24,6 +24,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // expressions, swapping regex engine may cause match rules to no longer be valid.
 // [#next-free-field: 7]
 message Hyperscan {
+  reserved 4;
+
   // Matching will be performed case-insensitively.
   //
   // The expression may still use PCRE tokens (notably `(?i)` and `(?-i)`) to switch
@@ -35,13 +37,6 @@ message Hyperscan {
 
   // `^` and `$` anchors match any newlines in data.
   bool multiline = 3;
-
-  // Allow expressions which can match against an empty string.
-  //
-  // This option instructs the compiler to allow expressions that can match against empty buffers,
-  // such as `.?`, `.*`, `(a|)`. Since Hyperscan can return every possible match for an expression,
-  // such expressions generally execute very slowly.
-  bool allow_empty = 4;
 
   // Treat the pattern as a sequence of UTF-8 characters.
   bool utf8 = 5;
