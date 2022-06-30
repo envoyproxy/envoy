@@ -8,7 +8,7 @@ import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.http_11_proxy.v3";
-option java_outer_classname = "UpstreamHttp11ConnectProto";
+option java_outer_classname = "Http11ProxyUpstreamTransport";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/http_11_proxy/v3;http_11_proxyv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
@@ -19,12 +19,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for HTTP/1.1 proxy transport sockets.
 // If this is configured and an intermediate filter adds proxy metadata to the
 // stream info then
-//   - Upstream connections will be directed to the specified proxy address rather
-//     than the host's address
-//   - Upstream TLS connections will have a raw HTTP/1.1 CONNECT header prefaced
-//     to the payload, and 200 response stripped (if less than 200 bytes)
-//  -  Plaintext HTTP/1.1 connections will be sent with a fully qualified URL.
-//  This transport socket is not compatible with HTTP/3, plaintext HTTP/2, or raw TCP.
+//
+// *  Upstream connections will be directed to the specified proxy address rather
+//    than the host's address
+// * Upstream TLS connections will have a raw HTTP/1.1 CONNECT header prefaced
+//   to the payload, and 200 response stripped (if less than 200 bytes)
+// * Plaintext HTTP/1.1 connections will be sent with a fully qualified URL.
+//
+// This transport socket is not compatible with HTTP/3, plaintext HTTP/2, or raw TCP.
 message Http11ProxyUpstreamTransport {
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 1 [(validate.rules).message = {required: true}];
