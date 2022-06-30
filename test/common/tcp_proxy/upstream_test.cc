@@ -214,8 +214,8 @@ public:
     upstream_ = std::make_unique<T>(callbacks_, *this->config_, this->downstream_stream_info_);
   }
 
-  void populateMetadata(envoy::config::core::v3::Metadata& metadata, const std::string ns,
-                        const std::string key, const std::string value) {
+  void populateMetadata(envoy::config::core::v3::Metadata& metadata, const std::string& ns,
+                        const std::string& key, const std::string& value) {
     ProtobufWkt::Struct struct_obj;
     auto& fields_map = *struct_obj.mutable_fields();
     fields_map[key] = ValueUtil::stringValue(value);
