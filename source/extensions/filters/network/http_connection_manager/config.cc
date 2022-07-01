@@ -143,10 +143,10 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
       KEEP_UNCHANGED;
 }
 
-Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
-    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-        config,
-    Server::Configuration::FactoryContext& context) {
+Http::HeaderValidatorFactoryPtr
+createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::network::
+                                 http_connection_manager::v3::HttpConnectionManager& config,
+                             [[maybe_unused]] Server::Configuration::FactoryContext& context) {
 
   Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
