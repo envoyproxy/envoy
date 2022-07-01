@@ -44,9 +44,7 @@ constexpr auto egress_gateway_metadata_key = "egress_gateway";
 void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>& arn,
                       InvocationMode mode) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
-  auto lambda_arn = "arn:" + arn->partition() + ":" + arn->service() + ":" + arn->region() + ":" +
-                    arn->accountId() + ":" + arn->resourceType() + ":" + arn->functionName();
-  headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", lambda_arn));
+  headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", arn->arn()));
   if (mode == InvocationMode::Synchronous) {
     headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "RequestResponse");
   } else {
@@ -381,10 +379,10 @@ absl::optional<Arn> parseArn(absl::string_view arn) {
     std::string versioned_function_name = std::string(function_name);
     versioned_function_name.push_back(':');
     versioned_function_name += std::string(parts[7]);
-    return Arn{partition, service, region, account_id, resource_type, versioned_function_name};
+    return Arn{arn, partition, service, region, account_id, resource_type, versioned_function_name};
   }
 
-  return Arn{partition, service, region, account_id, resource_type, function_name};
+  return Arn{arn, partition, service, region, account_id, resource_type, function_name};
 }
 
 FilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {

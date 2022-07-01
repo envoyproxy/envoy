@@ -165,6 +165,9 @@ bug_fixes:
 - area: upstream
   change: |
     Fixed the LOGICAL_DNS and STRICT_DNS clusters to work for IPv6.
+- area: aws_lambda
+  change: |
+    Fixed the AWS cross account lambda function invocation issue.
 
 removed_config_or_runtime:
 - area: compressor
