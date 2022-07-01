@@ -65,7 +65,9 @@ public:
   getBalancedHandlerByAddress(const Network::Address::Instance& address) override;
 
   // Network::UdpConnectionHandler
-  Network::UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) override;
+  Network::UdpListenerCallbacksOptRef
+  getUdpListenerCallbacks(uint64_t listener_tag,
+                          const Network::Address::Instance& address) override;
 
   // Network::InternalListenerManager
   Network::InternalListenerOptRef
