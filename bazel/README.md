@@ -272,12 +272,14 @@ for how to update or override dependencies.
 
 ## Running the built Envoy binary on the host system
 
-After Envoy is built, it can be executed via CLI.
+After Envoy is built, it can be executed via CLI. 
+
+As Bazel's current ability to provide information about where it just built the artifacts is limited (as stated in [bazel's issue #8739](https://github.com/bazelbuild/bazel/issues/8739)), we can use the `bazel info bazel-genfiles` command to get the path where Envoy was built.
 
 For example, if Envoy was built using the `bazel build -c opt //source/exe:envoy-static` command, then it can be executed from the project's root directory by running:
 
 ```console
-bazel-bin/source/exe/envoy-static --config-path /path/to/your/envoy/config.yaml
+$(bazel info bazel-genfiles)/source/exe/envoy-static --config-path /path/to/your/envoy/config.yaml
 ```
 
 ## Building Envoy with the CI Docker image
