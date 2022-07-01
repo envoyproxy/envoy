@@ -9,4 +9,5 @@ Contrib Extensions
 
   sip/sip
   cryptomb/cryptomb
-  hyperscan/hyperscan
+  hyperscan/matcher
+  hyperscan/regex_engine
