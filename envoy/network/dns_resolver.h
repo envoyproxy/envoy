@@ -46,8 +46,8 @@ public:
    * @returns the DNS Resolver factory.
    * @param typed_dns_resolver_config: the typed DNS resolver config
    */
-  static Network::DnsResolverFactory& createFactory(
-      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
+  static Network::DnsResolverFactory&
+  createFactory(const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
   /**
    * Terminate the DNS resolver factory.
