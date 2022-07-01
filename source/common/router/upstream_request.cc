@@ -308,6 +308,14 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                     absl::string_view transport_failure_reason) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
+  if (upstream_info_ && upstream_info_->upstreamConnectionTerminationDetails().has_value()) {
+    stream_info_.upstreamInfo()->setUpstreamConnectionTerminationDetails(
+        upstream_info_->upstreamConnectionTerminationDetails().value());
+    if (transport_failure_reason.empty()) {
+      transport_failure_reason = upstream_info_->upstreamConnectionTerminationDetails().value();
+    }
+  }
+
   if (span_ != nullptr) {
     // Add tags about reset.
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
@@ -449,6 +457,9 @@ void UpstreamRequest::onPoolReady(
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
   if (info.upstreamInfo()) {
+    // TODO(surki): check if its safe to store and use the
+    // info.upstreamInfo() return value
+    upstream_info_ = info.upstreamInfo();
     auto& upstream_timing = info.upstreamInfo()->upstreamTiming();
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
     upstreamTiming().upstream_connect_complete_ = upstream_timing.upstream_connect_complete_;

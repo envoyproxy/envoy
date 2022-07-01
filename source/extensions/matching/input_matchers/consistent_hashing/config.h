@@ -18,7 +18,7 @@ class ConsistentHashingConfig : public Envoy::Matcher::InputMatcherFactory {
 public:
   Envoy::Matcher::InputMatcherFactoryCb createInputMatcherFactoryCb(
       const Protobuf::Message& config,
-      Server::Configuration::ServerFactoryContext& factory_context) override;
+      Server::Configuration::CommonFactoryContext& factory_context) override;
 
   std::string name() const override { return "envoy.matching.matchers.consistent_hashing"; }
 

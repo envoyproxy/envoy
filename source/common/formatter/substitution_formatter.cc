@@ -974,6 +974,17 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                     return stream_info.connectionTerminationDetails();
                                   });
                             }}},
+                          {"UPSTREAM_CONNECTION_TERMINATION_DETAILS",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    return stream_info.upstreamInfo()
+                                               ? stream_info.upstreamInfo()
+                                                     ->upstreamConnectionTerminationDetails()
+                                               : absl::nullopt;
+                                  });
+                            }}},
                           {"BYTES_SENT",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {

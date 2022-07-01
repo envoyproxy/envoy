@@ -25,9 +25,11 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
     return std::make_shared<const IPMatcher>(permission.destination_ip(),
                                              IPMatcher::Type::DownstreamLocal);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
-    return std::make_shared<const PortMatcher>(permission.destination_port());
+    return std::make_shared<const PortMatcher>(permission.destination_port(),
+                                               PortMatcher::Type::DownstreamPort);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPortRange:
-    return std::make_shared<const PortRangeMatcher>(permission.destination_port_range());
+    return std::make_shared<const PortRangeMatcher>(permission.destination_port_range(),
+                                                    PortRangeMatcher::Type::DownstreamPort);
   case envoy::config::rbac::v3::Permission::RuleCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v3::Permission::RuleCase::kMetadata:
@@ -43,6 +45,15 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
         Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.matcher());
     return factory.create(permission.matcher(), validation_visitor);
   }
+  case envoy::config::rbac::v3::Permission::RuleCase::kUpstreamDestinationIp:
+    return std::make_shared<const IPMatcher>(permission.upstream_destination_ip(),
+                                             IPMatcher::Type::UpstreamRemote);
+  case envoy::config::rbac::v3::Permission::RuleCase::kUpstreamDestinationPort:
+    return std::make_shared<const PortMatcher>(permission.upstream_destination_port(),
+                                               PortMatcher::Type::UpstreamPort);
+  case envoy::config::rbac::v3::Permission::RuleCase::kUpstreamDestinationPortRange:
+    return std::make_shared<const PortRangeMatcher>(permission.upstream_destination_port_range(),
+                                                    PortRangeMatcher::Type::UpstreamPort);
   case envoy::config::rbac::v3::Permission::RuleCase::RULE_NOT_SET:
     break; // Fall through to PANIC.
   }
@@ -160,19 +171,31 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   case DownstreamRemote:
     ip = info.downstreamAddressProvider().remoteAddress();
     break;
+  case UpstreamRemote:
+    ip = info.downstreamAddressProvider().remoteAddress();
+    break;
   }
   return range_.isInRange(*ip.get());
 }
 
 bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                           const StreamInfo::StreamInfo& info) const {
-  const Envoy::Network::Address::Ip* ip =
-      info.downstreamAddressProvider().localAddress().get()->ip();
+  const Envoy::Network::Address::Ip* ip;
+  switch (type_) {
+  case DownstreamPort:
+    ip = info.downstreamAddressProvider().localAddress().get()->ip();
+    break;
+  case UpstreamPort:
+    ip = info.downstreamAddressProvider().remoteAddress().get()->ip();
+    break;
+  }
+
   return ip && ip->port() == port_;
 }
 
-PortRangeMatcher::PortRangeMatcher(const ::envoy::type::v3::Int32Range& range)
-    : start_(range.start()), end_(range.end()) {
+PortRangeMatcher::PortRangeMatcher(const ::envoy::type::v3::Int32Range& range,
+                                   PortRangeMatcher::Type type)
+    : start_(range.start()), end_(range.end()), type_(type) {
   auto start = range.start();
   auto end = range.end();
   if (start < 0 || start > 65536) {
@@ -189,8 +212,16 @@ PortRangeMatcher::PortRangeMatcher(const ::envoy::type::v3::Int32Range& range)
 
 bool PortRangeMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                                const StreamInfo::StreamInfo& info) const {
-  const Envoy::Network::Address::Ip* ip =
-      info.downstreamAddressProvider().localAddress().get()->ip();
+  const Envoy::Network::Address::Ip* ip;
+  switch (type_) {
+  case DownstreamPort:
+    ip = info.downstreamAddressProvider().localAddress().get()->ip();
+    break;
+  case UpstreamPort:
+    ip = info.downstreamAddressProvider().remoteAddress().get()->ip();
+    break;
+  }
+
   if (ip) {
     const auto port = ip->port();
     return start_ <= port && port < end_;

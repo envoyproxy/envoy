@@ -99,6 +99,26 @@ RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
 REGISTER_FACTORY(RoleBasedAccessControlNetworkFilterConfigFactory,
                  Server::Configuration::NamedNetworkFilterConfigFactory);
 
+Network::FilterFactoryCb
+UpstreamRoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config,
+    Server::Configuration::CommonFactoryContext& context) {
+  validateRbacRules(proto_config.rules());
+  validateRbacRules(proto_config.shadow_rules());
+  RoleBasedAccessControlFilterConfigSharedPtr config(
+      std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, context.scope(), context,
+                                                           context.messageValidationVisitor()));
+  return [config](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(std::make_shared<RoleBasedAccessControlFilter>(config));
+  };
+}
+
+/**
+ * Static registration for the upstream RBAC network filter. @see RegisterFactory.
+ */
+REGISTER_FACTORY(UpstreamRoleBasedAccessControlNetworkFilterConfigFactory,
+                 Server::Configuration::NamedUpstreamNetworkFilterConfigFactory);
+
 } // namespace RBACFilter
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -93,7 +93,7 @@ class RoleBasedAccessControlMatcherEngineImpl : public RoleBasedAccessControlEng
 public:
   RoleBasedAccessControlMatcherEngineImpl(
       const xds::type::matcher::v3::Matcher& matcher,
-      Server::Configuration::ServerFactoryContext& factory_context,
+      Server::Configuration::CommonFactoryContext& factory_context,
       ActionValidationVisitor& validation_visitor,
       const EnforcementMode mode = EnforcementMode::Enforced);
 

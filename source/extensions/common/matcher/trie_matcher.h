@@ -115,7 +115,7 @@ class TrieMatcherFactoryBase : public ::Envoy::Matcher::CustomMatcherFactory<Dat
 public:
   ::Envoy::Matcher::MatchTreeFactoryCb<DataType>
   createCustomMatcherFactoryCb(const Protobuf::Message& config,
-                               Server::Configuration::ServerFactoryContext& factory_context,
+                               Server::Configuration::CommonFactoryContext& factory_context,
                                DataInputFactoryCb<DataType> data_input,
                                absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
                                OnMatchFactory<DataType>& on_match_factory) override {

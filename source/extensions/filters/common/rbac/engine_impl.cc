@@ -106,7 +106,7 @@ bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(
 
 RoleBasedAccessControlMatcherEngineImpl::RoleBasedAccessControlMatcherEngineImpl(
     const xds::type::matcher::v3::Matcher& matcher,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::CommonFactoryContext& factory_context,
     ActionValidationVisitor& validation_visitor, const EnforcementMode mode)
     : mode_(mode) {
   ActionContext context{false};

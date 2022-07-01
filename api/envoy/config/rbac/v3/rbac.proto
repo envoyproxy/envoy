@@ -148,7 +148,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 13]
+// [#next-free-field: 16]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Permission";
 
@@ -224,6 +224,18 @@ message Permission {
     // Extension for configuring custom matchers for RBAC.
     // [#extension-category: envoy.rbac.matchers]
     core.v3.TypedExtensionConfig matcher = 12;
+
+    // A CIDR block that describes the upstream destination IP.
+    // Note: Only valid in upstream filter context
+    core.v3.CidrRange upstream_destination_ip = 13;
+
+    // A port number that describes the destination port connecting to.
+    // Note: Only valid in upstream filter context
+    uint32 upstream_destination_port = 14 [(validate.rules).uint32 = {lte: 65535}];
+
+    // A port number range that describes a range of destination ports connecting to.
+    // Note: Only valid in upstream filter context
+    type.v3.Int32Range upstream_destination_port_range = 15;
   }
 }
 

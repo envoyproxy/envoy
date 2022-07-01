@@ -35,7 +35,7 @@ class RoleBasedAccessControlFilterConfig {
 public:
   RoleBasedAccessControlFilterConfig(
       const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope,
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::CommonFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }

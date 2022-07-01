@@ -27,6 +27,19 @@ private:
       Server::Configuration::FactoryContext& context) override;
 };
 
+class UpstreamRoleBasedAccessControlNetworkFilterConfigFactory
+    : public Common::FactoryBaseUpstream<envoy::extensions::filters::network::rbac::v3::RBAC> {
+
+public:
+  UpstreamRoleBasedAccessControlNetworkFilterConfigFactory()
+      : FactoryBaseUpstream(NetworkFilterNames::get().Rbac) {}
+
+private:
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config,
+      Server::Configuration::CommonFactoryContext& context) override;
+};
+
 } // namespace RBACFilter
 } // namespace NetworkFilters
 } // namespace Extensions

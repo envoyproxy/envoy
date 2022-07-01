@@ -34,8 +34,9 @@ void checkMatcher(
   EXPECT_EQ(expected, matcher.matches(connection, headers, info));
 }
 
-PortRangeMatcher createPortRangeMatcher(envoy::type::v3::Int32Range range) {
-  return PortRangeMatcher(range);
+PortRangeMatcher createPortRangeMatcher(envoy::type::v3::Int32Range range,
+                                        PortRangeMatcher::Type type) {
+  return PortRangeMatcher(range, type);
 }
 
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
@@ -182,9 +183,9 @@ TEST(HeaderMatcher, HeaderMatcher) {
 }
 
 TEST(IPMatcher, IPMatcher) {
-  NiceMock<Envoy::Network::MockConnection> conn;
+  NiceMock<Envoy::Network::MockConnection> conn, upstream_conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
-  NiceMock<StreamInfo::MockStreamInfo> info;
+  NiceMock<StreamInfo::MockStreamInfo> info, upstream_info;
   Envoy::Network::Address::InstanceConstSharedPtr connection_remote =
       Envoy::Network::Utility::parseInternetAddress("12.13.14.15", 789, false);
   Envoy::Network::Address::InstanceConstSharedPtr direct_local =
@@ -236,6 +237,20 @@ TEST(IPMatcher, IPMatcher) {
                false, conn, headers, info);
   checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), false, conn,
                headers, info);
+
+  envoy::config::core::v3::CidrRange upstream_connection_remote_cidr;
+  upstream_connection_remote_cidr.set_address_prefix("21.22.23.24");
+  upstream_connection_remote_cidr.mutable_prefix_len()->set_value(32);
+  Envoy::Network::Address::InstanceConstSharedPtr upstream_connection_remote =
+      Envoy::Network::Utility::parseInternetAddress("21.22.23.24", 789, false);
+  upstream_conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      upstream_connection_remote);
+  upstream_info.downstream_connection_info_provider_->setRemoteAddress(upstream_connection_remote);
+  checkMatcher(IPMatcher(upstream_connection_remote_cidr, IPMatcher::Type::UpstreamRemote), true,
+               upstream_conn, headers, upstream_info);
+  upstream_connection_remote_cidr.set_address_prefix("1.1.1.1");
+  checkMatcher(IPMatcher(upstream_connection_remote_cidr, IPMatcher::Type::UpstreamRemote), false,
+               upstream_conn, headers, upstream_info);
 }
 
 TEST(PortMatcher, PortMatcher) {
@@ -246,8 +261,8 @@ TEST(PortMatcher, PortMatcher) {
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  checkMatcher(PortMatcher(123), true, conn, headers, info);
-  checkMatcher(PortMatcher(456), false, conn, headers, info);
+  checkMatcher(PortMatcher(123, PortMatcher::Type::DownstreamPort), true, conn, headers, info);
+  checkMatcher(PortMatcher(456, PortMatcher::Type::DownstreamPort), false, conn, headers, info);
 }
 
 // Test valid and invalid destination_port_range permission rule in RBAC.
@@ -257,48 +272,74 @@ TEST(PortRangeMatcher, PortRangeMatcher) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
+  Envoy::Network::Address::InstanceConstSharedPtr upstream_remote_addr =
+      Envoy::Network::Utility::parseInternetAddress("5.6.7.8", 456, false);
   info.downstream_connection_info_provider_->setLocalAddress(addr);
+  info.downstream_connection_info_provider_->setRemoteAddress(upstream_remote_addr);
 
   // IP address with port 456 is in range [123, 789) and [456, 789), but not in range [123, 456) or
   // [12, 34).
   envoy::type::v3::Int32Range range;
   range.set_start(123);
   range.set_end(789);
-  checkMatcher(PortRangeMatcher(range), true, conn, headers, info);
+  checkMatcher(PortRangeMatcher(range, PortRangeMatcher::Type::DownstreamPort), true, conn, headers,
+               info);
+  checkMatcher(PortRangeMatcher(range, PortRangeMatcher::Type::UpstreamPort), true, conn, headers,
+               info);
 
   range.set_start(456);
   range.set_end(789);
-  checkMatcher(PortRangeMatcher(range), true, conn, headers, info);
+  checkMatcher(PortRangeMatcher(range, PortRangeMatcher::Type::DownstreamPort), true, conn, headers,
+               info);
+  checkMatcher(PortRangeMatcher(range, PortRangeMatcher::Type::UpstreamPort), true, conn, headers,
+               info);
 
   range.set_start(123);
   range.set_end(456);
-  checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
+  checkMatcher(PortRangeMatcher(range, PortRangeMatcher::Type::DownstreamPort), false, conn,
+               headers, info);
+  checkMatcher(PortRangeMatcher(range, PortRangeMatcher::Type::UpstreamPort), false, conn, headers,
+               info);
 
   range.set_start(12);
   range.set_end(34);
-  checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
+  checkMatcher(PortRangeMatcher(range, PortRangeMatcher::Type::DownstreamPort), false, conn,
+               headers, info);
+  checkMatcher(PortRangeMatcher(range, PortRangeMatcher::Type::UpstreamPort), false, conn, headers,
+               info);
 
   // Only IP address is valid for the permission rule.
   NiceMock<StreamInfo::MockStreamInfo> info2;
   Envoy::Network::Address::InstanceConstSharedPtr addr2 =
       std::make_shared<const Envoy::Network::Address::PipeInstance>("test");
   info2.downstream_connection_info_provider_->setLocalAddress(addr2);
-  checkMatcher(PortRangeMatcher(range), false, conn, headers, info2);
+  checkMatcher(PortRangeMatcher(range, PortRangeMatcher::Type::DownstreamPort), false, conn,
+               headers, info2);
+  checkMatcher(PortRangeMatcher(range, PortRangeMatcher::Type::UpstreamPort), false, conn, headers,
+               info2);
 
   // Invalid rule will cause an exception.
   range.set_start(-1);
   range.set_end(80);
-  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
-                          "range start .* is out of bounds");
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range, PortRangeMatcher::Type::DownstreamPort),
+                          EnvoyException, "range start .* is out of bounds");
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range, PortRangeMatcher::Type::UpstreamPort),
+                          EnvoyException, "range start .* is out of bounds");
 
   range.set_start(80);
   range.set_end(65537);
-  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
-                          "range end .* is out of bounds");
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range, PortRangeMatcher::Type::DownstreamPort),
+                          EnvoyException, "range end .* is out of bounds");
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range, PortRangeMatcher::Type::UpstreamPort),
+                          EnvoyException, "range end .* is out of bounds");
 
   range.set_start(80);
   range.set_end(80);
-  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range, PortRangeMatcher::Type::DownstreamPort),
+                          EnvoyException,
+                          "range start .* cannot be greater or equal than range end .*");
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range, PortRangeMatcher::Type::UpstreamPort),
+                          EnvoyException,
                           "range start .* cannot be greater or equal than range end .*");
 }
 

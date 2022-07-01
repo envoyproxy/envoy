@@ -39,7 +39,7 @@ generateStats(const std::string& prefix, const std::string& shadow_prefix, Stats
 
 template <class ConfigType>
 std::unique_ptr<RoleBasedAccessControlEngine>
-createEngine(const ConfigType& config, Server::Configuration::ServerFactoryContext& context,
+createEngine(const ConfigType& config, Server::Configuration::CommonFactoryContext& context,
              ProtobufMessage::ValidationVisitor& validation_visitor,
              ActionValidationVisitor& action_validation_visitor) {
   if (config.has_matcher()) {
@@ -59,7 +59,7 @@ createEngine(const ConfigType& config, Server::Configuration::ServerFactoryConte
 
 template <class ConfigType>
 std::unique_ptr<RoleBasedAccessControlEngine>
-createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactoryContext& context,
+createShadowEngine(const ConfigType& config, Server::Configuration::CommonFactoryContext& context,
                    ProtobufMessage::ValidationVisitor& validation_visitor,
                    ActionValidationVisitor& action_validation_visitor) {
   if (config.has_shadow_matcher()) {

@@ -54,7 +54,7 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope,
-    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::CommonFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(),
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
@@ -116,8 +116,12 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
   if (engine_result_ == Allow) {
     return Network::FilterStatus::Continue;
   } else if (engine_result_ == Deny) {
-    callbacks_->connection().streamInfo().setConnectionTerminationDetails(
-        Filters::Common::RBAC::responseDetail(log_policy_id));
+    auto resp_detail = Filters::Common::RBAC::responseDetail(log_policy_id);
+    if (callbacks_->connection().streamInfo().upstreamInfo()) {
+      callbacks_->connection().streamInfo().upstreamInfo()->setUpstreamConnectionTerminationDetails(
+          resp_detail);
+    }
+    callbacks_->connection().streamInfo().setConnectionTerminationDetails(resp_detail);
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }

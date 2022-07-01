@@ -59,6 +59,13 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   const std::string& upstreamTransportFailureReason() const override {
     return upstream_transport_failure_reason_;
   }
+  void setUpstreamConnectionTerminationDetails(
+      absl::string_view connection_termination_details) override {
+    upstream_connection_termination_details_.emplace(connection_termination_details);
+  }
+  const absl::optional<std::string>& upstreamConnectionTerminationDetails() const override {
+    return upstream_connection_termination_details_;
+  }
   void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
@@ -88,6 +95,7 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<std::string> upstream_connection_interface_name_;
+  absl::optional<std::string> upstream_connection_termination_details_;
   std::string upstream_transport_failure_reason_;
   FilterStateSharedPtr upstream_filter_state_;
   size_t num_streams_{};

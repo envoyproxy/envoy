@@ -149,9 +149,9 @@ template <class DataType, class ActionFactoryContext>
 class MatchTreeFactory : public OnMatchFactory<DataType> {
 public:
   MatchTreeFactory(ActionFactoryContext& context,
-                   Server::Configuration::ServerFactoryContext& factory_context,
+                   Server::Configuration::CommonFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
-      : action_factory_context_(context), server_factory_context_(factory_context),
+      : action_factory_context_(context), common_factory_context_(factory_context),
         match_input_factory_(factory_context.messageValidationVisitor(), validation_visitor) {}
 
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
@@ -283,8 +283,8 @@ private:
           matcher.matcher_tree().custom_match());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           matcher.matcher_tree().custom_match().typed_config(),
-          server_factory_context_.messageValidationVisitor(), factory);
-      return factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
+          common_factory_context_.messageValidationVisitor(), factory);
+      return factory.createCustomMatcherFactoryCb(*message, common_factory_context_, data_input,
                                                   on_no_match, *this);
     }
     }
@@ -323,11 +323,11 @@ private:
       auto& factory = Config::Utility::getAndCheckFactory<ActionFactory<ActionFactoryContext>>(
           on_match.action());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          on_match.action().typed_config(), server_factory_context_.messageValidationVisitor(),
+          on_match.action().typed_config(), common_factory_context_.messageValidationVisitor(),
           factory);
 
       auto action_factory = factory.createActionFactoryCb(
-          *message, action_factory_context_, server_factory_context_.messageValidationVisitor());
+          *message, action_factory_context_, common_factory_context_.messageValidationVisitor());
       return [action_factory] { return OnMatch<DataType>{action_factory, {}}; };
     }
 
@@ -347,8 +347,8 @@ private:
           Config::Utility::getAndCheckFactory<InputMatcherFactory>(predicate.custom_match());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           predicate.custom_match().typed_config(),
-          server_factory_context_.messageValidationVisitor(), factory);
-      return factory.createInputMatcherFactoryCb(*message, server_factory_context_);
+          common_factory_context_.messageValidationVisitor(), factory);
+      return factory.createInputMatcherFactoryCb(*message, common_factory_context_);
     }
     case SinglePredicateType::MATCHER_NOT_SET:
       PANIC_DUE_TO_PROTO_UNSET;
@@ -358,7 +358,7 @@ private:
 
   const std::string stats_prefix_;
   ActionFactoryContext& action_factory_context_;
-  Server::Configuration::ServerFactoryContext& server_factory_context_;
+  Server::Configuration::CommonFactoryContext& common_factory_context_;
   MatchInputFactory<DataType> match_input_factory_;
 };
 } // namespace Matcher

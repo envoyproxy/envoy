@@ -27,7 +27,7 @@ class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpec
 public:
   RoleBasedAccessControlRouteSpecificFilterConfig(
       const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config,
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::CommonFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   const Filters::Common::RBAC::RoleBasedAccessControlEngine*
@@ -50,7 +50,7 @@ public:
   RoleBasedAccessControlFilterConfig(
       const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
       const std::string& stats_prefix, Stats::Scope& scope,
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::CommonFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }

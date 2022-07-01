@@ -8,7 +8,7 @@ namespace IP {
 
 Envoy::Matcher::InputMatcherFactoryCb
 Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
-                                    Server::Configuration::ServerFactoryContext& factory_context) {
+                                    Server::Configuration::CommonFactoryContext& factory_context) {
   const auto& ip_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::matching::input_matchers::ip::v3::Ip&>(
       config, factory_context.messageValidationVisitor());

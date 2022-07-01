@@ -56,7 +56,7 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope,
-    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::CommonFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix,
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
@@ -81,7 +81,7 @@ RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr rou
 
 RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpecificFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config,
-    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::CommonFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   // Moved from member initializer to ctor body to overcome clang false warning about memory
   // leak (clang-analyzer-cplusplus.NewDeleteLeaks,-warnings-as-errors).

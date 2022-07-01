@@ -433,6 +433,10 @@ public:
 
   virtual void setUpstreamProtocol(Http::Protocol protocol) PURE;
   virtual absl::optional<Http::Protocol> upstreamProtocol() const PURE;
+
+  virtual void
+  setUpstreamConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
+  virtual const absl::optional<std::string>& upstreamConnectionTerminationDetails() const PURE;
 };
 
 /**

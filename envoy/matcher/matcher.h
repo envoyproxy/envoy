@@ -17,7 +17,7 @@ namespace Envoy {
 
 namespace Server {
 namespace Configuration {
-class ServerFactoryContext;
+class CommonFactoryContext;
 }
 } // namespace Server
 
@@ -174,7 +174,7 @@ class InputMatcherFactory : public Config::TypedFactory {
 public:
   virtual InputMatcherFactoryCb
   createInputMatcherFactoryCb(const Protobuf::Message& config,
-                              Server::Configuration::ServerFactoryContext& factory_context) PURE;
+                              Server::Configuration::CommonFactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.input_matchers"; }
 };
@@ -293,7 +293,7 @@ template <class DataType> class CustomMatcherFactory : public Config::TypedFacto
 public:
   virtual MatchTreeFactoryCb<DataType>
   createCustomMatcherFactoryCb(const Protobuf::Message& config,
-                               Server::Configuration::ServerFactoryContext& factory_context,
+                               Server::Configuration::CommonFactoryContext& factory_context,
                                DataInputFactoryCb<DataType> data_input,
                                absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
                                OnMatchFactory<DataType>& on_match_factory) PURE;

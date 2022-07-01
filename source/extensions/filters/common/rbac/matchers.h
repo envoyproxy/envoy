@@ -142,7 +142,13 @@ private:
  */
 class IPMatcher : public Matcher {
 public:
-  enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
+  enum Type {
+    ConnectionRemote = 0,
+    DownstreamLocal,
+    DownstreamDirectRemote,
+    DownstreamRemote,
+    UpstreamRemote
+  };
 
   IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type)
       : range_(Network::Address::CidrRange::create(range)), type_(type) {}
@@ -160,18 +166,23 @@ private:
  */
 class PortMatcher : public Matcher {
 public:
-  PortMatcher(const uint32_t port) : port_(port) {}
+  enum Type { DownstreamPort = 0, UpstreamPort };
+
+  PortMatcher(const uint32_t port, Type type) : port_(port), type_(type) {}
 
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo& info) const override;
 
 private:
   const uint32_t port_;
+  const Type type_;
 };
 
 class PortRangeMatcher : public Matcher {
 public:
-  PortRangeMatcher(const ::envoy::type::v3::Int32Range& range);
+  enum Type { DownstreamPort = 0, UpstreamPort };
+
+  PortRangeMatcher(const ::envoy::type::v3::Int32Range& range, Type type);
 
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo& info) const override;
@@ -179,6 +190,7 @@ public:
 private:
   const uint32_t start_;
   const uint32_t end_;
+  const Type type_;
 };
 
 /**

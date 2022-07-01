@@ -192,6 +192,7 @@ private:
   bool had_upstream_ : 1;
   Http::ConnectionPool::Instance::StreamOptions stream_options_;
   Event::TimerPtr max_stream_duration_timer_;
+  std::shared_ptr<StreamInfo::UpstreamInfo> upstream_info_;
 };
 
 } // namespace Router
