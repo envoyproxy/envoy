@@ -23,9 +23,9 @@ trap_errors () {
     set +v
     while read -r line sub file < <(caller "$frame"); do
         if [[ "$frame" -ne "0" ]]; then
-            FAILED+=("  > ${sub}@ ${file} :${line}")
+            FAILED+=("  > ${sub}@ ${file} :L${line}")
         else
-            FAILED+=("${sub}@ ${file} :${line}${command}")
+            FAILED+=("${sub}@ ${file}:L${line} command: ${command}")
             if [[ "$CURRENT" == "check" ]]; then
                 # shellcheck disable=SC2016
                 FAILED+=(
