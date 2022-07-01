@@ -737,6 +737,40 @@ The following command operators are supported:
 
    CLUSTER_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
+.. _config_access_log_format_upstream_host_metadata:
+
+%UPSTREAM_METADATA(NAMESPACE:KEY*):Z%
+  HTTP/TCP
+    :ref:`Upstream host Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
+    lookup key in the namespace with the option of specifying nested keys separated by ':',
+    and Z is an optional parameter denoting string truncation up to Z characters long. The data
+    will be logged as a JSON string. For example, for the following upstream host metadata:
+
+    ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+
+    * %UPSTREAM_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_key)% will log: ``foo``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``bar``
+    * %UPSTREAM_METADATA(com.unknown_filter)% will log: ``-``
+    * %UPSTREAM_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
+    * %UPSTREAM_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
+
+  UDP/THRIFT
+    Not implemented ("-").
+
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored.
+
+  .. note::
+
+   UPSTREAM_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
+
 .. _config_access_log_format_filter_state:
 
 %FILTER_STATE(KEY:F):Z%

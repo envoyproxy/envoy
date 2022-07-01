@@ -88,7 +88,7 @@ typed_config:
   void createUpstreams() override {
     addFakeUpstream(
         Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_, factory_context_),
-        Http::CodecType::HTTP1);
+        Http::CodecType::HTTP1, /*autonomous_upstream=*/false);
   }
 
   Network::ClientConnectionPtr

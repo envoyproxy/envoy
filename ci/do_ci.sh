@@ -366,6 +366,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
   COMPILE_TIME_OPTIONS=(
+    "--define" "admin_html=disabled"
     "--define" "signal_trace=disabled"
     "--define" "hot_restart=disabled"
     "--define" "google_grpc=disabled"
@@ -449,23 +450,6 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@"
   exit 0
-elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
-  # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
-  # build when compiled with Clang 5. Revisit when Coverity Scan explicitly
-  # supports Clang 5. Until this issue is resolved, run Coverity Scan with
-  # the GCC toolchain.
-  setup_gcc_toolchain
-  echo "bazel Coverity Scan build"
-  echo "Building..."
-  /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel build --action_env=LD_PRELOAD "${BAZEL_BUILD_OPTIONS[@]}" \
-    -c opt "${ENVOY_BUILD_TARGET}"
-  # tar up the coverity results
-  tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz -C "${ENVOY_BUILD_DIR}" cov-int
-  # Copy the Coverity results somewhere that we can access outside of the container.
-  cp -f \
-     "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
-     "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   setup_clang_toolchain
   FUZZ_TEST_TARGETS=("$(bazel query "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
@@ -474,6 +458,7 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=asan-fuzzer "${FUZZ_TEST_TARGETS[@]}" --test_arg="-runs=10"
   exit 0
 elif [[ "$CI_TARGET" == "format" ]]; then
+  setup_clang_toolchain
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/ci/format_pre.sh
 elif [[ "$CI_TARGET" == "fix_proto_format" ]]; then
   # proto_format.sh needs to build protobuf.
@@ -484,15 +469,21 @@ elif [[ "$CI_TARGET" == "check_proto_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
   echo "Run protoxform test"
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
+        //tools/protoprint:protoprint_test
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
+  setup_clang_toolchain
+
   echo "generating docs..."
   # Build docs.
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "deps" ]]; then
+  setup_clang_toolchain
 
   echo "dependency validate_test..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:validate_test
