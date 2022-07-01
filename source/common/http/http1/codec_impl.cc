@@ -439,6 +439,10 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   }
   if (Utility::isUpgrade(headers)) {
     upgrade_request_ = true;
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade")) {
+      disableChunkEncoding();
+    }
   }
 
   if (connection_.sendFullyQualifiedUrl() && !is_connect) {

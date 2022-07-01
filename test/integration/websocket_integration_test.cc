@@ -406,12 +406,57 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
   }
 }
 
-TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
+TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding) {
   if (downstreamProtocol() == Http::CodecType::HTTP2 ||
       upstreamProtocol() == Http::CodecType::HTTP2) {
     return;
   }
 
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  auto request_headers = upgradeRequestHeaders();
+  request_headers.removeContentLength();
+  auto response_headers = upgradeResponseHeaders();
+  response_headers.removeContentLength();
+  performUpgrade(request_headers, response_headers);
+
+  // Client codec should not add TE or CL:0 headers to UPGRADE requests without content-length
+  ASSERT_TRUE(upstream_request_->headers().TransferEncoding() == nullptr);
+  ASSERT_TRUE(upstream_request_->headers().ContentLength() == nullptr);
+
+  // Send both a chunked request body and "websocket" payload. This payload is not
+  // a valid websocket protocol, but should be proxied to the upstream server unchanged.
+  std::string request_payload = "3\r\n123\r\n0\r\n\r\nSomeWebsocketRequestPayload";
+  codec_client_->sendData(*request_encoder_, request_payload, false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload));
+
+  // Send both a chunked response body and "websocket" payload.
+  std::string response_payload = "4\r\nabcd\r\n0\r\n\r\nSomeWebsocketResponsePayload";
+  upstream_request_->encodeData(response_payload, false);
+  response_->waitForBodyData(response_payload.size());
+  EXPECT_EQ(response_payload, response_->body());
+
+  // Verify follow-up bidirectional data still works.
+  codec_client_->sendData(*request_encoder_, "FinalClientPayload", false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload + "FinalClientPayload"));
+  upstream_request_->encodeData("FinalServerPayload", false);
+  response_->waitForBodyData(response_->body().size() + 5);
+  EXPECT_EQ(response_payload + "FinalServerPayload", response_->body());
+
+  // Clean up.
+  codec_client_->close();
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
+}
+
+TEST_P(WebsocketIntegrationTest, BidirectionalChunkedDataLegacyAddTE) {
+  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
+      upstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade", "false");
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 

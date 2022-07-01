@@ -87,9 +87,13 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // content-length both do not exist this means there is no request body. After transfer-encoding
     // is stripped here, the upstream request becomes invalid. We can fix it by explicitly adding a
     // "content-length: 0" request header here.
-    const bool no_body = (!request_headers.TransferEncoding() && !request_headers.ContentLength());
-    if (no_body) {
-      request_headers.setContentLength(uint64_t(0));
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade")) {
+      const bool no_body =
+          (!request_headers.TransferEncoding() && !request_headers.ContentLength());
+      if (no_body) {
+        request_headers.setContentLength(uint64_t(0));
+      }
     }
   } else {
     request_headers.removeConnection();
