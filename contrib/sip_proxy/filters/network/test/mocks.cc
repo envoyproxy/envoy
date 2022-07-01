@@ -97,9 +97,9 @@ MockTrafficRoutingAssistantHandler::MockTrafficRoutingAssistantHandler(
     const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
     Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
     : TrafficRoutingAssistantHandler(parent, dispatcher, config, context, stream_info) {
-  ON_CALL(*this, retrieveTrafficRoutingAssistant(_, _, _, _))
+  ON_CALL(*this, retrieveTrafficRoutingAssistant(_, _, _, _,_))
       .WillByDefault(
-          Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
+          Invoke([&](const std::string&, const std::string&, const tra_context_map&, SipFilters::DecoderFilterCallbacks&,
                      std::string& host) -> QueryStatus {
             host = "10.0.0.11";
             return QueryStatus::Continue;
