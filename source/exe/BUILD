@@ -142,10 +142,10 @@ envoy_cc_library(
     srcs = ["process_wide.cc"],
     hdrs = ["process_wide.h"],
     deps = [
-        "//envoy/network:dns_resolver_interface",
         "//source/common/common:assert_lib",
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:nghttp2_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/server:proto_descriptors_lib",
     ],
 )

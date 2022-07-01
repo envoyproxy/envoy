@@ -42,17 +42,17 @@ public:
   virtual void terminate() {}
 
   /**
-   * Find the DNS resolver factory based on the typed config and initialize it.
+   * Create the DNS resolver factory based on the typed config and initialize it.
    * @returns the DNS Resolver factory.
    * @param typed_dns_resolver_config: the typed DNS resolver config
    */
-  static Network::DnsResolverFactory& initializeDnsResolverFactory(
+  static Network::DnsResolverFactory& createFactory(
       const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
   /**
-   * Terminate the DNS resolver factories.
+   * Terminate the DNS resolver factory.
    */
-  static void terminateDnsResolverFactories();
+  static void terminateFactory();
 };
 
 } // namespace Network
