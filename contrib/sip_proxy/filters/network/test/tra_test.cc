@@ -100,7 +100,6 @@ TEST_F(SipTraTest, TraRetrieveContinue) {
 TEST_F(SipTraTest, TraRetrievePending) {
   auto tra_handler = initTraHandler();
   NiceMock<SipFilters::MockDecoderFilterCallbacks> callbacks;
-  absl::flat_hash_map<std::string, std::string> tra_context = absl::flat_hash_map<std::string, std::string>{};
 
   MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>("");
   metadata->setMethodType(MethodType::Register);
@@ -117,7 +116,6 @@ TEST_F(SipTraTest, TraRetrievePending) {
 TEST_F(SipTraTest, TraRetrieveStop) {
   auto tra_handler = initTraHandler();
   NiceMock<SipFilters::MockDecoderFilterCallbacks> callbacks;
-  absl::flat_hash_map<std::string, std::string> tra_context = absl::flat_hash_map<std::string, std::string>{};
 
   MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>("");
   metadata->setMethodType(MethodType::Register);
