@@ -18,7 +18,7 @@ public:
 
   /**
    * Initialize the passthrough state from the downstream. This should be
-   * called exactly once before `mergeInto`.
+   * called at most once before `mergeInto`.
    */
   virtual void initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
                           const StreamInfo::FilterState::Objects& filter_state_objects) PURE;

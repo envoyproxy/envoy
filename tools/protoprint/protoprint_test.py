@@ -5,10 +5,11 @@ import logging
 import os
 import pathlib
 import re
-import subprocess
 import sys
 import tarfile
 import tempfile
+
+sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
 from tools.protoprint.test_data import data as test_data
 from tools.run_command import run_command
@@ -53,19 +54,7 @@ def golden_proto_file(tmp, path, filename, version):
     return tmp.joinpath("golden").joinpath(f"{filename}.{version}.gold").absolute()
 
 
-def proto_print(protoprint, descriptor, src, dst):
-    """Pretty-print FileDescriptorProto to a destination file.
-
-    Args:
-        src: source path for FileDescriptorProto.
-        dst: destination path for formatted proto.
-    """
-    print('proto_print %s -> %s' % (src, dst))
-    subprocess.check_call(
-        [protoprint, src, dst, descriptor, './tools/testdata/protoxform/TEST_API_VERSION'])
-
-
-def result_proto_file(tmp, protoprint, descriptor, path, filename, version):
+def result_proto_file(tmp, path, filename, version):
     """Retrieve result proto file path. In general, those are placed in bazel artifacts.
 
     Args:
@@ -79,11 +68,9 @@ def result_proto_file(tmp, protoprint, descriptor, path, filename, version):
         actual result proto absolute path
     """
 
-    pkg_dir = tmp.joinpath("xformed")
-    base = pkg_dir.joinpath("fix_protos").joinpath(path).joinpath(f"{filename}.{version}.proto")
-    dst = pathlib.Path(filename).absolute()
-    proto_print(protoprint, descriptor, str(base.absolute()), str(dst))
-    return dst
+    target_filename = f"{filename}.{version}.proto"
+    pkg_dir = tmp.joinpath("formatted")
+    return pkg_dir.joinpath("fix_protos").joinpath(path).joinpath(f"{filename}.proto").absolute()
 
 
 def diff(result_file, golden_file):
@@ -99,7 +86,7 @@ def diff(result_file, golden_file):
     return run_command(f"diff -u {result_file} {golden_file}")
 
 
-def run(tmp, protoprint, descriptor, target, version):
+def run(tmp, target, version):
     """Run main execution for protoxform test
 
     Args:
@@ -116,7 +103,7 @@ def run(tmp, protoprint, descriptor, target, version):
 
     path, filename = path_and_filename(target)
     golden_path = golden_proto_file(tmp, path, filename, version)
-    test_path = result_proto_file(tmp, protoprint, descriptor, path, filename, version)
+    test_path = result_proto_file(tmp, path, filename, version)
 
     if os.stat(golden_path).st_size == 0 and not os.path.exists(test_path):
         return message
@@ -131,22 +118,19 @@ def run(tmp, protoprint, descriptor, target, version):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("protoprint")
-    parser.add_argument("descriptor")
-    parser.add_argument("xformed")
-    parser.add_argument("golden")
+    parser.add_argument("--formatted")
+    parser.add_argument("--golden")
     parsed = parser.parse_args(sys.argv[1:])
 
-    protoprint = str(pathlib.Path(parsed.protoprint).absolute())
-    descriptor = str(pathlib.Path(parsed.descriptor).absolute())
+    formatted = str(pathlib.Path(parsed.formatted).absolute())
 
     with tempfile.TemporaryDirectory() as _tmp:
         tmp = pathlib.Path(_tmp)
-        xformed = tmp.joinpath("xformed")
+        formatted = tmp.joinpath("formatted")
         golden = tmp.joinpath("golden")
 
-        with tarfile.open(parsed.xformed) as tar:
-            tar.extractall(xformed)
+        with tarfile.open(parsed.formatted) as tar:
+            tar.extractall(formatted)
         with tarfile.open(parsed.golden) as tar:
             tar.extractall(golden)
 
@@ -155,7 +139,7 @@ def main():
         messages = ""
         logging.basicConfig(format='%(message)s')
         for target in test_data:
-            messages += run(tmp, protoprint, descriptor, target, 'active_or_frozen')
+            messages += run(tmp, target, 'active_or_frozen')
 
         if len(messages) == 0:
             logging.warning("PASS")
