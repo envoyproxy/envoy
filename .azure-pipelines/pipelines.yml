@@ -27,6 +27,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -53,6 +55,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -80,6 +84,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
@@ -109,6 +115,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -430,6 +438,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
