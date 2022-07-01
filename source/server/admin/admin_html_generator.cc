@@ -143,10 +143,6 @@ void AdminHtmlGenerator::renderInput(absl::string_view id, absl::string_view pat
     response_.addFragments({"<input type='text' name='", id, "' id='", id, "' form='", path, "'",
                             on_change, value_tag(value), "/>"});
     break;
-  case Admin::ParamDescriptor::Type::Hidden:
-    response_.addFragments({"<input type='hidden' name='", id, "' id='", id, "' form='", path, "'",
-                            on_change, value_tag(value), "/>"});
-    break;
   case Admin::ParamDescriptor::Type::Enum:
     response_.addFragments(
         {"\n    <select name='", id, "' id='", id, "' form='", path, "'", on_change, ">\n"});

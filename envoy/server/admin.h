@@ -97,7 +97,7 @@ public:
   // an HTML form to enable a visitor to the admin console to intuitively
   // specify query-parameters for each endpoint.
   struct ParamDescriptor {
-    enum class Type { Boolean, String, Enum, Hidden };
+    enum class Type { Boolean, String, Enum };
     const Type type_;
     const std::string id_;   // HTML form ID and query-param name (JS var name rules).
     const std::string help_; // Help text rendered into UI.

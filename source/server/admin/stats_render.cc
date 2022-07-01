@@ -274,7 +274,6 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
   response.add("<body>\n");
   html_.renderTableBegin();
   html_.renderUrlHandler(url_handler, params.query_);
-  html_.renderInput("scope", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
   html_.renderTableEnd();
   response.add("<pre>\n");
 }

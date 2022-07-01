@@ -80,11 +80,5 @@ TEST_F(AdminHtmlGeneratorTest, RenderUrlHandlerSubmitOnChange) {
   EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
 }
 
-TEST_F(AdminHtmlGeneratorTest, RenderUrlHandlerHiddenParam) {
-  generator_.renderInput("scope", "stats", Admin::ParamDescriptor::Type::Hidden, query_params_, {});
-  std::string out = data_.toString();
-  EXPECT_THAT(out, HasSubstr(" type='hidden' "));
-}
-
 } // namespace Server
 } // namespace Envoy

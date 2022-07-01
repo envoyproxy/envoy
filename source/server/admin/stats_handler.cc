@@ -181,7 +181,7 @@ Admin::UrlHandler StatsHandler::statsHandler() {
         "Regular expression (ecmascript) for filtering stats"},
        {Admin::ParamDescriptor::Type::Enum,
         "format",
-        "File format to use.",
+        "Format to use",
         {"html", "text", "json"}},
        {Admin::ParamDescriptor::Type::Enum,
         "type",
