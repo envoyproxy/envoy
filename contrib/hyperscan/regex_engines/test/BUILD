@@ -13,6 +13,25 @@ envoy_cc_test(
     srcs = ["config_test.cc"],
     deps = [
         "//contrib/hyperscan/regex_engines/source:config",
+        "//test/mocks/server:factory_context_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "regex_test",
+    srcs = ["regex_test.cc"],
+    deps = [
+        "//contrib/hyperscan/regex_engines/source:regex_lib",
+        "//source/common/thread_local:thread_local_lib",
+        "//test/mocks/server:factory_context_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    deps = [
+        "//contrib/hyperscan/regex_engines/source:config",
         "//test/integration:integration_lib",
     ],
 )

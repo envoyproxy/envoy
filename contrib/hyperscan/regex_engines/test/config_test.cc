@@ -1,5 +1,4 @@
-#include "test/integration/base_integration_test.h"
-#include "test/test_common/utility.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "contrib/hyperscan/regex_engines/source/config.h"
 #include "gtest/gtest.h"
@@ -9,69 +8,53 @@ namespace Extensions {
 namespace Regex {
 namespace Hyperscan {
 
-class HyperscanIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                 public BaseIntegrationTest {
-public:
-  HyperscanIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfigNoListeners()) {}
+constexpr absl::string_view yaml_string = R"EOF(
+{}
+)EOF";
 
-  void initializeConfig(bool caseless) {
-    config_helper_.addConfigModifier(
-        [caseless](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          envoy::extensions::regex_engines::hyperscan::v3alpha::Hyperscan hyperscan;
-          if (caseless) {
-            hyperscan.set_caseless(true);
-          }
-          bootstrap.mutable_default_regex_engine()->set_name("envoy.regex_engines.hyperscan");
-          bootstrap.mutable_default_regex_engine()->mutable_typed_config()->PackFrom(hyperscan);
-        });
+class ConfigTest : public ::testing::Test {
+protected:
+  void setup(const std::string& param = "") {
+    envoy::extensions::regex_engines::hyperscan::v3alpha::Hyperscan config;
+    if (!param.empty()) {
+      TestUtility::loadFromYaml(fmt::format(std::string(yaml_string), param), config);
+    }
+
+    Config factory;
+    engine_ = factory.createEngine(config, context_);
   }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Envoy::Regex::EnginePtr engine_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, HyperscanIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
+#ifdef HYPERSCAN_DISABLED
+// Verify that incompatible architecture will cause a throw.
+TEST_F(ConfigTest, IncompatibleArchitecture) {
+  EXPECT_THROW_WITH_MESSAGE(setup(""), EnvoyException,
+                            "X86_64 architecture is required for Hyperscan.");
+}
+#else
 // Verify that matching will be performed successfully.
-TEST_P(HyperscanIntegrationTest, Hyperscan) {
-  initializeConfig(false);
-  initialize();
+TEST_F(ConfigTest, Regex) {
+  setup();
 
-  envoy::type::matcher::v3::RegexMatcher matcher;
-  *matcher.mutable_regex() = "^/asdf/.+";
+  Envoy::Regex::CompiledMatcherPtr matcher = engine_->matcher("^/asdf/.+");
 
-  Envoy::Regex::CompiledMatcherPtr regex_matcher = Envoy::Regex::Utility::parseRegex(matcher);
-
-  EXPECT_TRUE(regex_matcher->match("/asdf/1"));
-  EXPECT_FALSE(regex_matcher->match("/ASDF/1"));
+  EXPECT_TRUE(matcher->match("/asdf/1"));
+  EXPECT_FALSE(matcher->match("/ASDF/1"));
 };
 
 // Verify that matching will be performed case-insensitively.
-TEST_P(HyperscanIntegrationTest, HyperscanWithParam) {
-  initializeConfig(true);
-  initialize();
+TEST_F(ConfigTest, RegexWithParam) {
+  setup("caseless: true");
 
-  envoy::type::matcher::v3::RegexMatcher matcher;
-  *matcher.mutable_regex() = "^/asdf/.+";
+  Envoy::Regex::CompiledMatcherPtr matcher = engine_->matcher("^/asdf/.+");
 
-  Envoy::Regex::CompiledMatcherPtr regex_matcher = Envoy::Regex::Utility::parseRegex(matcher);
-
-  EXPECT_TRUE(regex_matcher->match("/asdf/1"));
-  EXPECT_TRUE(regex_matcher->match("/ASDF/1"));
+  EXPECT_TRUE(matcher->match("/asdf/1"));
+  EXPECT_TRUE(matcher->match("/ASDF/1"));
 };
-
-// Verify that matching will be performed successfully.
-TEST_P(HyperscanIntegrationTest, ReplaceAll) {
-  initializeConfig("");
-  initialize();
-
-  envoy::type::matcher::v3::RegexMatcher matcher;
-  *matcher.mutable_regex() = "b+";
-
-  Envoy::Regex::CompiledMatcherPtr regex_matcher = Envoy::Regex::Utility::parseRegex(matcher);
-
-  EXPECT_EQ(regex_matcher->replaceAll("yabba dabba doo", "d"), "yada dada doo");
-};
+#endif
 
 } // namespace Hyperscan
 } // namespace Regex
