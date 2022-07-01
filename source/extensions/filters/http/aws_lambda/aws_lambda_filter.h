@@ -20,11 +20,11 @@ namespace AwsLambdaFilter {
 
 class Arn {
 public:
-  Arn(absl::string_view arn, absl::string_view partition, absl::string_view service, absl::string_view region,
-      absl::string_view account_id, absl::string_view resource_type,
+  Arn(absl::string_view arn, absl::string_view partition, absl::string_view service,
+      absl::string_view region, absl::string_view account_id, absl::string_view resource_type,
       absl::string_view function_name)
-      : arn_(arn), partition_(partition), service_(service), region_(region), account_id_(account_id),
-        resource_type_(resource_type), function_name_(function_name) {}
+      : arn_(arn), partition_(partition), service_(service), region_(region),
+        account_id_(account_id), resource_type_(resource_type), function_name_(function_name) {}
 
   const std::string& arn() const { return arn_; }
   const std::string& partition() const { return partition_; }
