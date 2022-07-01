@@ -57,7 +57,7 @@ ProcessWide::~ProcessWide() {
 
   ASSERT(init_data.count_ > 0);
   if (--init_data.count_ == 0) {
-    Network::terminateDnsResolverFactories();
+    Network::DnsResolverFactory::terminateDnsResolverFactories();
   }
 }
 

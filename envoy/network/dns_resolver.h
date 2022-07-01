@@ -40,16 +40,20 @@ public:
    * needs to be cleaned up before terminates Envoy.
    */
   virtual void terminate() {}
-};
 
-/**
- * Terminate the DNS resolver factories.
- */
-static inline void terminateDnsResolverFactories() {
-  auto& factories = Registry::FactoryRegistry<Network::DnsResolverFactory>::factories();
-  std::for_each(factories.begin(), factories.end(),
-                [](auto& factory_it) { factory_it.second->terminate(); });
-}
+  /**
+   * Find the DNS resolver factory based on the typed config and initialize it.
+   * @returns the DNS Resolver factory.
+   * @param typed_dns_resolver_config: the typed DNS resolver config
+   */
+  static Network::DnsResolverFactory& initializeDnsResolverFactory(
+      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
+
+  /**
+   * Terminate the DNS resolver factories.
+   */
+  static void terminateDnsResolverFactories();
+};
 
 } // namespace Network
 } // namespace Envoy

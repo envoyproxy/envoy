@@ -494,7 +494,7 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 
 // c-ares DNS resolver factory
 class CaresDnsResolverFactory : public DnsResolverFactory,
-                                public Logger::Loggable<Logger::Id::dns>{
+                                public Logger::Loggable<Logger::Id::dns> {
 public:
   std::string name() const override { return std::string(CaresDnsResolver); }
 
