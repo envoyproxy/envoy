@@ -264,7 +264,7 @@ public:
    */
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, uint32_t concurrency);
+               bool workers_started, uint64_t hash);
   ~ListenerImpl() override;
 
   // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
@@ -387,15 +387,18 @@ private:
     // Network::UdpListenerConfig
     Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
     Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
-    Network::UdpListenerWorkerRouter& listenerWorkerRouter() override {
-      return *listener_worker_router_;
+    Network::UdpListenerWorkerRouter&
+    listenerWorkerRouter(const Network::Address::Instance& address) override {
+      auto iter = listener_worker_routers_.find(address.asString());
+      ASSERT(iter != listener_worker_routers_.end());
+      return *iter->second;
     }
     const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
 
     const envoy::config::listener::v3::UdpListenerConfig config_;
     Network::ActiveUdpListenerFactoryPtr listener_factory_;
     Network::UdpPacketWriterFactoryPtr writer_factory_;
-    Network::UdpListenerWorkerRouterPtr listener_worker_router_;
+    absl::flat_hash_map<std::string, Network::UdpListenerWorkerRouterPtr> listener_worker_routers_;
   };
 
   class InternalListenerConfigImpl : public Network::InternalListenerConfig {
@@ -422,6 +425,8 @@ private:
   void buildAccessLog();
   void buildInternalListener();
   void validateConfig();
+  void buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
+                                    uint32_t concurrency);
   void buildUdpListenerFactory(uint32_t concurrency);
   void buildListenSocketOptions();
   void createListenerFilterFactories();
