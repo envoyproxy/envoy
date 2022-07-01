@@ -99,7 +99,7 @@ Network::DnsResolverFactory& DnsResolverFactory::createFactory(
   return factory;
 }
 
-void DnsResolverFactory::terminateFactory() {
+void DnsResolverFactory::terminateFactories() {
   auto& factories = Registry::FactoryRegistry<Network::DnsResolverFactory>::factories();
   std::for_each(factories.begin(), factories.end(),
                 [](auto& factory_it) { factory_it.second->terminate(); });

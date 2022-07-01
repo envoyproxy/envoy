@@ -50,9 +50,9 @@ public:
   createFactory(const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
   /**
-   * Terminate the DNS resolver factory.
+   * Call the terminate method on all the registered DNS resolver factories.
    */
-  static void terminateFactory();
+  static void terminateFactories();
 };
 
 } // namespace Network
