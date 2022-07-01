@@ -178,7 +178,6 @@ TEST_P(AdminInstanceTest, Help) {
   EXPECT_EQ(expected, response.toString());
 }
 
-
 class ChunkedHandler : public Admin::Request {
 public:
   Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
