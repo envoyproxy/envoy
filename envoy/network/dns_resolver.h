@@ -42,5 +42,14 @@ public:
   virtual void terminate() {}
 };
 
+/**
+ * Terminate the DNS resolver factories.
+ */
+static inline void terminateDnsResolverFactories() {
+  auto& factories = Registry::FactoryRegistry<Network::DnsResolverFactory>::factories();
+  std::for_each(factories.begin(), factories.end(),
+                [](auto& factory_it) { factory_it.second->terminate(); });
+}
+
 } // namespace Network
 } // namespace Envoy

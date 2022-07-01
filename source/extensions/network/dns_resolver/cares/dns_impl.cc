@@ -493,7 +493,8 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 }
 
 // c-ares DNS resolver factory
-class CaresDnsResolverFactory : public DnsResolverFactory {
+class CaresDnsResolverFactory : public DnsResolverFactory,
+                                public Logger::Loggable<Logger::Id::dns>{
 public:
   std::string name() const override { return std::string(CaresDnsResolver); }
 
@@ -527,6 +528,7 @@ public:
     absl::MutexLock lock(&mutex_);
     if (!ares_library_initialized_) {
       ares_library_initialized_ = true;
+      ENVOY_LOG(info, "c-ares library initialized.");
       ares_library_init(ARES_LIB_INIT_ALL);
     }
   }
@@ -535,6 +537,7 @@ public:
     absl::MutexLock lock(&mutex_);
     if (ares_library_initialized_) {
       ares_library_initialized_ = false;
+      ENVOY_LOG(info, "c-ares library cleaned up.");
       ares_library_cleanup();
     }
   }

@@ -241,17 +241,6 @@ public:
                                    POOL_HISTOGRAM(scope))};
   }
 
-
-
-  /**
-   * Get the hash map for this factory.
-   */
-  template <class Factory>
-  static absl::flat_hash_map<std::string, Factory*>&  getFactoryMap() {
-    return Registry::FactoryRegistry<Factory>::factories();
-  }
-
-
   /**
    * Get a Factory from the registry with a particular name (and templated type) with error checking
    * to ensure the name and factory are valid.

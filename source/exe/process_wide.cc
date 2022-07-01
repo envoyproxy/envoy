@@ -57,10 +57,7 @@ ProcessWide::~ProcessWide() {
 
   ASSERT(init_data.count_ > 0);
   if (--init_data.count_ == 0) {
-    for (const auto& dns_factory :
-         Config::Utility::getFactoryMap<Network::DnsResolverFactory>()) {
-      dns_factory.second->terminate();
-    }
+    Network::terminateDnsResolverFactories();
   }
 }
 
