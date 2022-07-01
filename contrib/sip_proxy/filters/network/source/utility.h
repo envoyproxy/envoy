@@ -10,6 +10,7 @@
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/sip_proxy/filters/network/source/decoder_events.h"
 #include "contrib/sip_proxy/filters/network/source/metadata.h"
+#include <cstddef>
 
 namespace Envoy {
 namespace Extensions {
@@ -158,6 +159,10 @@ public:
         .address()
         ->ip()
         ->addressAsString();
+  }
+  static void trimStringView(absl::string_view& string) {
+    string.remove_prefix(std::min(string.find_first_not_of(' '), string.size()));
+    string.remove_suffix(std::max(string.size() - string.find_last_not_of(' ') - 1, 0ul));
   }
 };
 
