@@ -358,6 +358,18 @@ public:
   static void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
 
   /**
+   * Convert from google.protobuf.Any to a typed message. This should be used
+   * instead of the inbuilt UnpackTo as it performs validation of results.
+   *
+   * @param any_message source google.protobuf.Any message.
+   * @param message destination to unpack to.
+   *
+   * @return erro message if the message does not unpack.
+   */
+  static absl::optional<std::string> unpackToNoThrow(const ProtobufWkt::Any& any_message,
+                                                     Protobuf::Message& message);
+
+  /**
    * Convert from google.protobuf.Any to bytes as std::string
    * @param any source google.protobuf.Any message.
    *

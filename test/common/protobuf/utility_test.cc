@@ -1453,6 +1453,34 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
   }
 }
 
+// MessageUtility::unpackToNoThrow() with the right type.
+TEST_F(ProtobufUtilityTest, unpackToNoThrowRightType) {
+  ProtobufWkt::Duration src_duration;
+  src_duration.set_seconds(42);
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(src_duration);
+  ProtobufWkt::Duration dst_duration;
+  auto error_msg = MessageUtil::unpackToNoThrow(source_any, dst_duration);
+  // No error message was returned.
+  EXPECT_FALSE(error_msg.has_value());
+  // source and destination are equal.
+  EXPECT_EQ(src_duration, dst_duration);
+}
+
+// MessageUtility::unpackToNoThrow() with the wrong type.
+TEST_F(ProtobufUtilityTest, unpackToNoThrowWrongType) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(source_duration);
+  ProtobufWkt::Timestamp dst;
+  auto error_msg = MessageUtil::unpackToNoThrow(source_any, dst);
+  ASSERT_TRUE(error_msg.has_value());
+  EXPECT_THAT(error_msg.value(),
+              testing::MatchesRegex("Unable to unpack as google.protobuf.Timestamp: "
+                                    "\\[type.googleapis.com/google.protobuf.Duration\\].*"));
+}
+
 // MessageUtility::loadFromJson() throws on garbage JSON.
 TEST_F(ProtobufUtilityTest, LoadFromJsonGarbage) {
   envoy::config::cluster::v3::Cluster dst;
