@@ -39,6 +39,9 @@ private:
   hs_database_t* database_{};
   hs_database_t* som_database_{};
   ThreadLocal::TypedSlotPtr<ScratchThreadLocal> tls_;
+
+  void compile(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
+               const std::vector<unsigned int>& ids, hs_database_t** database);
 };
 
 } // namespace Hyperscan

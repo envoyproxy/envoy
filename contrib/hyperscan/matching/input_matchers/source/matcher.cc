@@ -29,23 +29,7 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
   ASSERT(expressions.size() == ids.size());
 
   // Compile database.
-  hs_compile_error_t* compile_err;
-  hs_error_t err =
-      hs_compile_multi(expressions.data(), flags.data(), ids.data(), expressions.size(),
-                       HS_MODE_BLOCK, nullptr, &database_, &compile_err);
-  if (err != HS_SUCCESS) {
-    std::string compile_err_message(compile_err->message);
-    int compile_err_expression = compile_err->expression;
-    hs_free_compile_error(compile_err);
-
-    if (compile_err_expression < 0) {
-      throw EnvoyException(fmt::format("unable to compile database: {}", compile_err_message));
-    } else {
-      throw EnvoyException(fmt::format("unable to compile pattern '{}': {}",
-                                       expressions.at(compile_err_expression),
-                                       compile_err_message));
-    }
-  }
+  compile(expressions, flags, ids, &database_);
 
   // Compile SOM database. The SOM database will report start of matching, works for replaceAll.
   if (som) {
@@ -53,24 +37,9 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
     for (unsigned int& som_flag : som_flags) {
       som_flag = som_flag | HS_FLAG_SOM_LEFTMOST;
     }
-    err = hs_compile_multi(expressions.data(), som_flags.data(), ids.data(), expressions.size(),
-                           HS_MODE_BLOCK, nullptr, &som_database_, &compile_err);
-    if (err != HS_SUCCESS) {
-      std::string compile_err_message(compile_err->message);
-      int compile_err_expression = compile_err->expression;
-
-      if (compile_err_expression < 0) {
-        throw EnvoyException(
-            fmt::format("unable to compile SOM database: {}", compile_err_message));
-      } else {
-        throw EnvoyException(fmt::format("unable to compile SOM pattern '{}': {}",
-                                         expressions.at(compile_err_expression),
-                                         compile_err_message));
-      }
-    }
+    compile(expressions, som_flags, ids, &som_database_);
   }
 
-  hs_free_compile_error(compile_err);
   tls_->set([this](Event::Dispatcher&) {
     return std::make_shared<ScratchThreadLocal>(this->database_, this->som_database_);
   });
@@ -147,6 +116,29 @@ bool Matcher::match(absl::optional<absl::string_view> input) {
   }
 
   return static_cast<Envoy::Regex::CompiledMatcher*>(this)->match(*input);
+}
+
+void Matcher::compile(const std::vector<const char*>& expressions,
+                      const std::vector<unsigned int>& flags, const std::vector<unsigned int>& ids,
+                      hs_database_t** database) {
+  hs_compile_error_t* compile_err;
+  hs_error_t err =
+      hs_compile_multi(expressions.data(), flags.data(), ids.data(), expressions.size(),
+                       HS_MODE_BLOCK, nullptr, database, &compile_err);
+  if (err != HS_SUCCESS) {
+    std::string compile_err_message(compile_err->message);
+    int compile_err_expression = compile_err->expression;
+    hs_free_compile_error(compile_err);
+
+    if (compile_err_expression < 0) {
+      throw EnvoyException(fmt::format("unable to compile database: {}", compile_err_message));
+    } else {
+      throw EnvoyException(fmt::format("unable to compile pattern '{}': {}",
+                                       expressions.at(compile_err_expression),
+                                       compile_err_message));
+    }
+  }
+  hs_free_compile_error(compile_err);
 }
 
 } // namespace Hyperscan
