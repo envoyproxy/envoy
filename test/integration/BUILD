@@ -557,6 +557,7 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/buffer:config",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:add_invalid_data_filter_lib",
+        "//test/integration/filters:async_inject_body_at_end_stream_filter_lib",
         "//test/integration/filters:buffer_continue_filter_lib",
         "//test/integration/filters:continue_after_local_reply_filter_lib",
         "//test/integration/filters:continue_headers_only_inject_body",
