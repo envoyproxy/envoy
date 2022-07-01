@@ -38,7 +38,9 @@ class PreserveCaseFormatterFactoryConfig
     : public Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig {
 public:
   // Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig
-  std::string name() const override { return "preserve_case"; }
+  std::string name() const override {
+    return "envoy.http.stateful_header_formatters.preserve_case";
+  }
 
   Envoy::Http::StatefulHeaderKeyFormatterFactorySharedPtr
   createFromProto(const Protobuf::Message& message) override;

@@ -125,6 +125,17 @@ envoy_cc_library(
     deps = [
         ":connection_base_lib",
         ":connection_lib",
+        ":multi_connection_base_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "multi_connection_base_impl_lib",
+    srcs = ["multi_connection_base_impl.cc"],
+    hdrs = ["multi_connection_base_impl.h"],
+    deps = [
+        ":connection_base_lib",
+        ":connection_lib",
     ],
 )
 

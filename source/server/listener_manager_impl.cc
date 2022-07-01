@@ -472,9 +472,8 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     stats_.listener_in_place_updated_.inc();
   } else {
     ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
-    new_listener =
-        std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
-                                       workers_started_, hash, server_.options().concurrency());
+    new_listener = std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
+                                                  workers_started_, hash);
   }
 
   ListenerImpl& new_listener_ref = *new_listener;

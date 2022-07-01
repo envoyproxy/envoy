@@ -11,6 +11,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/reg
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Google RE2]
+// [#extension: envoy.regex_engines.google_re2]
 
 // Google's `RE2 <https://github.com/google/re2>`_ regex engine. The regex string must adhere to
 // the documented `syntax <https://github.com/google/re2/wiki/Syntax>`_. The engine is designed
