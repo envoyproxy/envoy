@@ -42,7 +42,7 @@ def envoy_entry_point(
     native.genrule(
         name = entry_point_wrapper,
         cmd = """
-        sed s#_ENTRY_POINT_ALIAS_#%s# %s > \"$@\"
+        sed s#_ENTRY_POINT_ALIAS_#$$(realpath %s)# %s > \"$@\"
         """ % (entry_point_alias, entry_point_path),
         tools = [
             actual_entry_point,

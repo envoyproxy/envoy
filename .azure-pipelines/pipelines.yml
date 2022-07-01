@@ -13,6 +13,26 @@ pr: none
 stages:
 - stage: precheck
   jobs:
+  - job: verify_testing
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+    - task: Cache@2
+      inputs:
+        key: "verify_testing | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify2'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Verification testing"
+
   - job: format
     dependsOn: []
     pool:

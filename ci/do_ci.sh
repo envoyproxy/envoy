@@ -8,7 +8,7 @@ set -e
 build_setup_args=""
 if [[ "$1" == "format" || "$1" == "fix_proto_format" || "$1" == "check_proto_format" || "$1" == "docs" ||  \
           "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" \
-          || "$1" == "deps" || "$1" == "verify_examples" \
+          || "$1" == "deps" || "$1" == "verify_examples"  || "$1" == "verify2" \
           || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
 fi
@@ -512,6 +512,9 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" "win32-front-proxy|shared"
   exit 0
+elif [[ "$CI_TARGET" == "verify2" ]]; then
+   bazel build "${BUILD_OPTIONS[@]}" //examples:verification --verbose_failures
+   exit 0
 elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
         PACKAGE_BUILD=/build/bazel.distribution/packages.x64.tar.gz
