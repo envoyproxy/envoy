@@ -31,7 +31,9 @@ static_resources:
               timeout:
                 seconds: 10
           http_filters:
-          - name: "envoy.filters.http.router"
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           access_log:
           - name: envoy.access_loggers.stdout
             typed_config:
