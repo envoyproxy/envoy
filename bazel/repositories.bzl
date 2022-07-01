@@ -405,6 +405,7 @@ def _com_github_intel_qatlib():
         patches = [
             "@envoy//bazel/foreign_cc:qatlib-0001-qat-Enable-disable-systemd-support-with-configure.ac.patch",
             "@envoy//bazel/foreign_cc:qatlib-0002-qatlib-Remove-remaining-shared-flags.patch",
+            "@envoy//bazel/foreign_cc:qatlib-0003-configure-Check-if-pkg-config-is-installed-before-us.patch",
         ],
     )
 

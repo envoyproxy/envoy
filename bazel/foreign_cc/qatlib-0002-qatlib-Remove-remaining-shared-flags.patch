@@ -1,8 +1,7 @@
-From ef572bbe0b1da7aab3b2967b1cc2d279787cca69 Mon Sep 17 00:00:00 2001
+From 62743c6c759d137ff324187ec53c40cf7aaf70d4 Mon Sep 17 00:00:00 2001
 From: Patrik Flykt <patrik.flykt@intel.com>
 Date: Wed, 6 Oct 2021 16:36:21 +0300
-Subject: [PATCH 2/2] qatlib: Remove remaining -shared flags
-Organization: Intel Finland Oy - BIC 0357606-4 - PL 281, 00181 Helsinki
+Subject: [PATCH 2/3] qatlib: Remove remaining -shared flags
 
 Remove remaining -shared flags from the build so that static
 libraries are also built.
@@ -33,5 +32,5 @@ index 4565d85..24ade3a 100644
  lib@LIBQATNAME@_la_LIBADD = libosal.la libadf.la lib@LIBUSDMNAME@.la -lcrypto
  lib@LIBQATNAME@_la_LDFLAGS = -version-info $(LIBQAT_VERSION) \
 -- 
-2.30.2
+2.36.1
 
