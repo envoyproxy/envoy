@@ -3576,8 +3576,6 @@ private:
 
 class CustomHeaderValidatorFactory : public Http::HeaderValidatorFactory {
 public:
-  CustomHeaderValidatorFactory() {}
-
   ::Envoy::Http::HeaderValidatorPtr create(::Envoy::Http::HeaderValidatorFactory::Protocol,
                                            StreamInfo::StreamInfo& stream_info) override {
     return std::make_unique<CustomHeaderValidator>(

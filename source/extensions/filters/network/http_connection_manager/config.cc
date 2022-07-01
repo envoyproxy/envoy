@@ -149,6 +149,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
     Server::Configuration::FactoryContext& context) {
 
   Http::HeaderValidatorFactoryPtr header_validator_factory;
+#ifdef ENVOY_ENABLE_UHV
   if (config.has_typed_header_validation_config()) {
     auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(
         config.typed_header_validation_config());
@@ -164,6 +165,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
                                        config.typed_header_validation_config().name()));
     }
   }
+#endif
   return header_validator_factory;
 }
 
