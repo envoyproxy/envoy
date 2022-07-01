@@ -445,6 +445,23 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
               absl::StrJoin(info.registered_headers_, ","));
   }
 
+  // Initialize the regex engine and inject to singleton.
+  // Needs to happen before stats store initialization because the stats
+  // matcher config can include regexes.
+  if (bootstrap_.has_default_regex_engine()) {
+    const auto& default_regex_engine = bootstrap_.default_regex_engine();
+    Regex::EngineFactory& factory =
+        Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    regex_engine_ = factory.createEngine(*config, serverFactoryContext());
+  } else {
+    regex_engine_ = std::make_shared<Regex::GoogleReEngine>();
+  }
+  Regex::EngineSingleton::clear();
+  Regex::EngineSingleton::initialize(regex_engine_.get());
+
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
@@ -591,21 +608,6 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       Network::SocketInterfaceSingleton::initialize(sock);
     }
   }
-
-  // Initialize the regex engine and inject to singleton.
-  if (bootstrap_.has_default_regex_engine()) {
-    const auto& default_regex_engine = bootstrap_.default_regex_engine();
-    Regex::EngineFactory& factory =
-        Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
-    auto config = Config::Utility::translateAnyToFactoryConfig(
-        default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
-        factory);
-    regex_engine_ = factory.createEngine(*config, serverFactoryContext());
-  } else {
-    regex_engine_ = std::make_shared<Regex::GoogleReEngine>();
-  }
-  Regex::EngineSingleton::clear();
-  Regex::EngineSingleton::initialize(regex_engine_.get());
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
