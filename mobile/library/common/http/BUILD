@@ -19,7 +19,7 @@ envoy_cc_library(
         "//library/common/extensions/filters/http/network_configuration:network_configuration_filter_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/jni:android_jni_utility_lib",
-        "//library/common/network:configurator_lib",
+        "//library/common/network:connectivity_manager_lib",
         "//library/common/network:synthetic_address_lib",
         "//library/common/stream_info:extra_stream_info_lib",
         "//library/common/types:c_types_lib",

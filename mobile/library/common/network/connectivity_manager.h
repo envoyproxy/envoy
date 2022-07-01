@@ -21,14 +21,14 @@
  * 1. When network type changes, a refreshDNS call will be scheduled on the event dispatcher, along
  * with a configuration key of this type. If network type changes again before that refresh
  * executes, the refresh is now stale, another refresh task will have been queued, and it should no
- * longer execute. The configuration key allows the configurator to determine if the refreshDNS call
- * is representative of current configuration.
+ * longer execute. The configuration key allows the connectivity_manager to determine if the
+ * refreshDNS call is representative of current configuration.
  * 2. When a request is configured with a certain set of socket options and begins, it is given a
  * configuration key. The heuristic in reportNetworkUsage relies on characteristics of the
  * request/response to make future decisions about socket options, but needs to be able to correctly
  * associate these metrics with their original configuration. If network state changes while the
- * request/response are in-flight, the configurator can determine the relevance of associated
- * metrics through the configuration key.
+ * request/response are in-flight, the connectivity_manager can determine the relevance of
+ * associated metrics through the configuration key.
  *
  * Additionally, in the future, more advanced heuristics may maintain multiple parallel
  * configurations across different interfaces/network types. In these more complicated scenarios, a
@@ -38,14 +38,16 @@
 typedef uint16_t envoy_netconf_t;
 
 /**
- * These values specify the behavior of the network configurator with respect to the upstream
- * socket options it supplies.
+ * These values specify the behavior of the network connectivity_manager with respect to the
+ * upstream socket options it supplies.
  */
 typedef enum {
-  // In this mode, the configurator will provide socket options that result in the creation of a
+  // In this mode, the connectivity_manager will provide socket options that result in the creation
+  // of a
   // distinct connection pool for a given value of preferred network.
   DefaultPreferredNetworkMode = 0,
-  // In this mode, the configurator will provide socket options that intentionally attempt to
+  // In this mode, the connectivity_manager will provide socket options that intentionally attempt
+  // to
   // override the current preferred network type with an alternative, via interface-binding socket
   // options. Note this mode is experimental, and it will not be enabled at all unless
   // enable_interface_binding_ is set to true.
@@ -74,12 +76,13 @@ using InterfacePair = std::pair<const std::string, Address::InstanceConstSharedP
  * if that cache is missing either due to alternate configurations, or lifecycle-related timing.
  *
  */
-class Configurator : public Logger::Loggable<Logger::Id::upstream>,
-                     public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks,
-                     public Singleton::Instance {
+class ConnectivityManager
+    : public Logger::Loggable<Logger::Id::upstream>,
+      public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks,
+      public Singleton::Instance {
 public:
-  Configurator(Upstream::ClusterManager& cluster_manager,
-               DnsCacheManagerSharedPtr dns_cache_manager)
+  ConnectivityManager(Upstream::ClusterManager& cluster_manager,
+                      DnsCacheManagerSharedPtr dns_cache_manager)
       : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {}
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
@@ -211,36 +214,37 @@ private:
   static NetworkState network_state_;
 };
 
-using ConfiguratorSharedPtr = std::shared_ptr<Configurator>;
+using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;
 
 /**
- * Provides access to the singleton Configurator.
+ * Provides access to the singleton ConnectivityManager.
  */
-class ConfiguratorFactory {
+class ConnectivityManagerFactory {
 public:
-  ConfiguratorFactory(Server::Configuration::CommonFactoryContext& context) : context_(context) {}
+  ConnectivityManagerFactory(Server::Configuration::CommonFactoryContext& context)
+      : context_(context) {}
 
   /**
-   * @returns singleton Configurator instance.
+   * @returns singleton ConnectivityManager instance.
    */
-  ConfiguratorSharedPtr get();
+  ConnectivityManagerSharedPtr get();
 
 private:
   Server::Configuration::CommonFactoryContext& context_;
 };
 
 /**
- * Provides nullable access to the singleton Configurator.
+ * Provides nullable access to the singleton ConnectivityManager.
  */
-class ConfiguratorHandle {
+class ConnectivityManagerHandle {
 public:
-  ConfiguratorHandle(Singleton::Manager& singleton_manager)
+  ConnectivityManagerHandle(Singleton::Manager& singleton_manager)
       : singleton_manager_(singleton_manager) {}
 
   /**
-   * @returns singleton Configurator instance. Can be nullptr if it hasn't been created.
+   * @returns singleton ConnectivityManager instance. Can be nullptr if it hasn't been created.
    */
-  ConfiguratorSharedPtr get();
+  ConnectivityManagerSharedPtr get();
 
 private:
   Singleton::Manager& singleton_manager_;

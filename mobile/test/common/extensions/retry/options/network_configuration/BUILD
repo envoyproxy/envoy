@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     repository = "@envoy",
     deps = [
         "//library/common/extensions/retry/options/network_configuration:config",
-        "//library/common/network:configurator_lib",
+        "//library/common/network:connectivity_manager_lib",
         "@envoy//source/common/upstream:retry_factory_lib",
         "@envoy//test/mocks/server:factory_context_mocks",
         "@envoy//test/mocks/stream_info:stream_info_mocks",

@@ -9,7 +9,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
-#include "library/common/network/configurator.h"
+#include "library/common/network/connectivity_manager.h"
 
 using namespace testing;
 
@@ -25,8 +25,8 @@ TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTest) {
   Upstream::RetryExtensionFactoryContextImpl retry_extension_factory_context{
       *mock_factory_context.singleton_manager_};
 
-  auto configurator = Network::ConfiguratorFactory(mock_factory_context).get();
-  ASSERT_NE(nullptr, configurator);
+  auto connectivity_manager = Network::ConnectivityManagerFactory(mock_factory_context).get();
+  ASSERT_NE(nullptr, connectivity_manager);
 
   auto factory = Registry::FactoryRegistry<Upstream::RetryOptionsPredicateFactory>::getFactory(
       "envoy.retry_options_predicates.network_configuration");
@@ -39,7 +39,7 @@ TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTest) {
             predicate->updateOptions({mock_stream_info, nullptr}).new_upstream_socket_options_);
 }
 
-TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTestWithoutConfigurator) {
+TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTestWithoutConnectivityManager) {
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
   Upstream::RetryExtensionFactoryContextImpl retry_extension_factory_context{
       *mock_factory_context.singleton_manager_};
@@ -50,7 +50,7 @@ TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTestWithoutConfigur
 
   auto proto_config = factory->createEmptyConfigProto();
   EXPECT_DEATH(factory->createOptionsPredicate(*proto_config, retry_extension_factory_context),
-               "unexpected nullptr network configurator");
+               "unexpected nullptr network connectivity_manager");
 }
 
 } // namespace
