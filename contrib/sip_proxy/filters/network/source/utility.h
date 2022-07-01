@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/transport_socket_config.h"
@@ -10,7 +12,6 @@
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/sip_proxy/filters/network/source/decoder_events.h"
 #include "contrib/sip_proxy/filters/network/source/metadata.h"
-#include <cstddef>
 
 namespace Envoy {
 namespace Extensions {

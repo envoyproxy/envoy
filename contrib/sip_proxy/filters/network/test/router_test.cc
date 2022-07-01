@@ -247,8 +247,8 @@ public:
 
     EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
         .WillRepeatedly(
-            Invoke([&](const std::string&, const std::string&, const tra_context_map&, SipFilters::DecoderFilterCallbacks&,
-                       std::string& host) -> QueryStatus {
+            Invoke([&](const std::string&, const std::string&, const tra_context_map&,
+                       SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
               host = "10.0.0.11";
               return QueryStatus::Pending;
             }));
@@ -456,8 +456,8 @@ TEST_F(SipRouterTest, QueryPending) {
   metadata_->resetAffinityIteration();
   EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
       .WillRepeatedly(
-          Invoke([&](const std::string&, const std::string&, const tra_context_map&, SipFilters::DecoderFilterCallbacks&,
-                     std::string& host) -> QueryStatus {
+          Invoke([&](const std::string&, const std::string&, const tra_context_map&,
+                     SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
             host = "10.0.0.11";
             return QueryStatus::Pending;
           }));
@@ -474,8 +474,8 @@ TEST_F(SipRouterTest, QueryStop) {
   metadata_->resetAffinityIteration();
   EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
       .WillRepeatedly(
-          Invoke([&](const std::string&, const std::string&, const tra_context_map&, SipFilters::DecoderFilterCallbacks&,
-                     std::string& host) -> QueryStatus {
+          Invoke([&](const std::string&, const std::string&, const tra_context_map&,
+                     SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
             host = "10.0.0.11";
             return QueryStatus::Stop;
           }));

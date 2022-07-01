@@ -90,10 +90,11 @@ TEST_F(SipTraTest, TraRetrieveContinue) {
   tra_handler->updateTrafficRoutingAssistant("lskpmc", "S1F1", "10.0.0.1");
 
   NiceMock<SipFilters::MockDecoderFilterCallbacks> callbacks;
-  absl::flat_hash_map<std::string, std::string> tra_context = absl::flat_hash_map<std::string, std::string>{};
+  absl::flat_hash_map<std::string, std::string> tra_context =
+      absl::flat_hash_map<std::string, std::string>{};
   std::string host = "";
-  EXPECT_EQ(QueryStatus::Continue,
-            tra_handler->retrieveTrafficRoutingAssistant("lskpmc", "S1F1", tra_context, callbacks, host));
+  EXPECT_EQ(QueryStatus::Continue, tra_handler->retrieveTrafficRoutingAssistant(
+                                       "lskpmc", "S1F1", tra_context, callbacks, host));
   EXPECT_EQ(host, "10.0.0.1");
 }
 
@@ -108,8 +109,8 @@ TEST_F(SipTraTest, TraRetrievePending) {
   metadata->resetAffinityIteration();
   EXPECT_CALL(callbacks, metadata()).WillRepeatedly(Return(metadata));
   std::string host = "";
-  EXPECT_EQ(QueryStatus::Pending,
-            tra_handler->retrieveTrafficRoutingAssistant("lskpmc", "S1F1", metadata->traContext(), callbacks, host));
+  EXPECT_EQ(QueryStatus::Pending, tra_handler->retrieveTrafficRoutingAssistant(
+                                      "lskpmc", "S1F1", metadata->traContext(), callbacks, host));
   EXPECT_EQ(host, "");
 }
 
@@ -124,8 +125,8 @@ TEST_F(SipTraTest, TraRetrieveStop) {
   metadata->resetAffinityIteration();
   EXPECT_CALL(callbacks, metadata()).WillRepeatedly(Return(metadata));
   std::string host = "10.0.0.1";
-  EXPECT_EQ(QueryStatus::Stop,
-            tra_handler->retrieveTrafficRoutingAssistant("lskpmc", "S1F1", metadata->traContext(), callbacks, host));
+  EXPECT_EQ(QueryStatus::Stop, tra_handler->retrieveTrafficRoutingAssistant(
+                                   "lskpmc", "S1F1", metadata->traContext(), callbacks, host));
 }
 
 TEST_F(SipTraTest, TraCompleteUpdateRsp) {

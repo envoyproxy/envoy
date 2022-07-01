@@ -53,8 +53,8 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
   if (activetrans.metadata()->affinityIteration()->query()) {
     parent_.pushIntoPendingList(type, key, activetrans, [&]() {
       if (traClient()) {
-        traClient()->retrieveTrafficRoutingAssistant(type, key, context, Tracing::NullSpan::instance(),
-                                                     stream_info_);
+        traClient()->retrieveTrafficRoutingAssistant(type, key, context,
+                                                     Tracing::NullSpan::instance(), stream_info_);
       }
     });
     host = "";

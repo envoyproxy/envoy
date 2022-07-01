@@ -197,7 +197,8 @@ public:
   MOCK_METHOD(void, updateTrafficRoutingAssistant,
               (const std::string&, const std::string&, const std::string&), ());
   MOCK_METHOD(QueryStatus, retrieveTrafficRoutingAssistant,
-              (const std::string&, const std::string&, const tra_context_map&, SipFilters::DecoderFilterCallbacks&, std::string&),
+              (const std::string&, const std::string&, const tra_context_map&,
+               SipFilters::DecoderFilterCallbacks&, std::string&),
               ());
   MOCK_METHOD(void, deleteTrafficRoutingAssistant, (const std::string&, const std::string&), ());
   MOCK_METHOD(void, subscribeTrafficRoutingAssistant, (const std::string&), ());

@@ -275,7 +275,6 @@ TEST_F(SipDecoderTest, DecodeOK200) {
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
-
 TEST_F(SipDecoderTest, DecodeOK200EmptyHeader) {
   initializeFilter(yaml);
 

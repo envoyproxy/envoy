@@ -1,6 +1,5 @@
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
 
-#include <cstdio>
 #include <utility>
 
 #include "envoy/buffer/buffer.h"
@@ -185,9 +184,8 @@ auto Decoder::sipHeaderType(absl::string_view sip_line) {
   auto header_value = sip_line.substr(sip_line.find_first_of(':') + strlen(":"));
   Utility::trimStringView(header_type_str);
   Utility::trimStringView(header_value);
-  return std::tuple<HeaderType, absl::string_view>{
-      HeaderTypes::get().str2Header(header_type_str),
-      header_value};
+  return std::tuple<HeaderType, absl::string_view>{HeaderTypes::get().str2Header(header_type_str),
+                                                   header_value};
 }
 
 MsgType Decoder::sipMsgType(absl::string_view top_line) {
