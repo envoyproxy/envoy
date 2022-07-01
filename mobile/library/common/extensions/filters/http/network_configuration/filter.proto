@@ -3,11 +3,11 @@ syntax = "proto3";
 package envoymobile.extensions.filters.http.network_configuration;
 
 message NetworkConfiguration {
-  // If set to true, the filter will permit the NetworkConfigurator to provide upstream
+  // If set to true, the filter will permit the NetworkConnectivityManager to provide upstream
   // socket option that MAY bind a connection to a specific network interface.
   bool enable_interface_binding = 1;
 
-  // If set to true, the filter will permit the NetworkConfigurator to drain connections
+  // If set to true, the filter will permit the NetworkConnectivityManager to drain connections
   // when a DNS refresh is externally triggered.
   bool enable_drain_post_dns_refresh = 2;
 }

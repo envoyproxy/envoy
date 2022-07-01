@@ -110,11 +110,11 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
           ASSERT(Thread::MainThread::isMainOrTestThread());
 
-          network_configurator_ =
-              Network::ConfiguratorFactory{server_->serverFactoryContext()}.get();
+          connectivity_manager_ =
+              Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
           Envoy::Network::Android::Utility::setAlternateGetifaddrs();
-          auto v4_interfaces = network_configurator_->enumerateV4Interfaces();
-          auto v6_interfaces = network_configurator_->enumerateV6Interfaces();
+          auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
+          auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
           logInterfaces("netconf_get_v6_interfaces", v6_interfaces);
           client_scope_ = server_->serverFactoryContext().scope().createScope("pulse.");
@@ -140,7 +140,7 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
 
   // Ensure destructors run on Envoy's main thread.
   postinit_callback_handler_.reset(nullptr);
-  network_configurator_.reset();
+  connectivity_manager_.reset();
   client_scope_.reset();
   stat_name_set_.reset();
   log_delegate_ptr_.reset(nullptr);
@@ -295,10 +295,10 @@ Http::Client& Engine::httpClient() {
   return *http_client_;
 }
 
-Network::Configurator& Engine::networkConfigurator() {
+Network::ConnectivityManager& Engine::networkConnectivityManager() {
   RELEASE_ASSERT(dispatcher_->isThreadSafe(),
-                 "networkConfigurator must be accessed from dispatcher's context");
-  return *network_configurator_;
+                 "networkConnectivityManager must be accessed from dispatcher's context");
+  return *connectivity_manager_;
 }
 
 void Engine::flushStats() {

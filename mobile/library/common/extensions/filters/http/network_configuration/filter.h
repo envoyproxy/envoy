@@ -6,7 +6,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
-#include "library/common/network/configurator.h"
+#include "library/common/network/connectivity_manager.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/types/c_types.h"
 
@@ -21,9 +21,9 @@ namespace NetworkConfiguration {
 class NetworkConfigurationFilter final : public Http::PassThroughFilter,
                                          public Logger::Loggable<Logger::Id::filter> {
 public:
-  NetworkConfigurationFilter(Network::ConfiguratorSharedPtr network_configurator,
+  NetworkConfigurationFilter(Network::ConnectivityManagerSharedPtr connectivity_manager,
                              bool enable_drain_post_dns_refresh, bool enable_interface_binding)
-      : network_configurator_(network_configurator),
+      : connectivity_manager_(connectivity_manager),
         extra_stream_info_(nullptr), // always set in setDecoderFilterCallbacks
         enable_drain_post_dns_refresh_(enable_drain_post_dns_refresh),
         enable_interface_binding_(enable_interface_binding) {}
@@ -36,7 +36,7 @@ public:
   Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override;
 
 private:
-  Network::ConfiguratorSharedPtr network_configurator_;
+  Network::ConnectivityManagerSharedPtr connectivity_manager_;
   StreamInfo::ExtraStreamInfo* extra_stream_info_;
   bool enable_drain_post_dns_refresh_;
   bool enable_interface_binding_;

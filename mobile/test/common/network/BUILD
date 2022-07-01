@@ -5,11 +5,11 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "configurator_test",
-    srcs = ["configurator_test.cc"],
+    name = "connectivity_manager_test",
+    srcs = ["connectivity_manager_test.cc"],
     repository = "@envoy",
     deps = [
-        "//library/common/network:configurator_lib",
+        "//library/common/network:connectivity_manager_lib",
         "@envoy//test/extensions/common/dynamic_forward_proxy:mocks",
         "@envoy//test/mocks/upstream:cluster_manager_mocks",
     ],

@@ -5,9 +5,9 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "configurator_lib",
+    name = "connectivity_manager_lib",
     srcs = [
-        "configurator.cc",
+        "connectivity_manager.cc",
         "android.cc",
     ] + select({
         "//bazel:include_ifaddrs": [
@@ -19,7 +19,7 @@ envoy_cc_library(
     }),
     hdrs = [
         "android.h",
-        "configurator.h",
+        "connectivity_manager.h",
     ],
     copts = select({
         "//bazel:include_ifaddrs": ["-DINCLUDE_IFADDRS"],

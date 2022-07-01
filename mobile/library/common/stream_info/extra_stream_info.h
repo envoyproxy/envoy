@@ -4,7 +4,7 @@
 
 #include "source/common/stream_info/utility.h"
 
-#include "library/common/network/configurator.h"
+#include "library/common/network/connectivity_manager.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
