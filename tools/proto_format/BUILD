@@ -90,6 +90,8 @@ genrule(
         --xformed=$(location :xformed) \
         --protoprinted=$(location //tools/protoprint:protoprinted) \
     """ % PATH,
+    # TODO(phlax): make protoprint work without repo `PATH`
+    tags = ["no-remote"],
     tools = [
         ":format_api",
         ":xformed",
