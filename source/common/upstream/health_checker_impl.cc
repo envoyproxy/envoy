@@ -134,6 +134,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
+      method_(envoy::config::core::v3::HealthCheck_HttpHealthCheck_Method_Name(config.http_health_check().method())),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
@@ -285,7 +286,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   request_in_flight_ = true;
 
   const auto request_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
-      {{Http::Headers::get().Method, "GET"},
+      {{Http::Headers::get().Method, parent_.method_},
        {Http::Headers::get().Host, hostname_},
        {Http::Headers::get().Path, parent_.path_},
        {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}});
