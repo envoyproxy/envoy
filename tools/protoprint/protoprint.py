@@ -14,6 +14,7 @@ import io
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 from collections import deque
@@ -92,7 +93,11 @@ def clang_format(contents):
     Returns:
         clang-formatted string
     """
-    clang_format_path = os.getenv("CLANG_FORMAT", "clang-format")
+    clang_format_path = os.getenv("CLANG_FORMAT", shutil.which("clang-format"))
+    if not clang_format_path:
+        if not os.path.exists("/opt/llvm/bin/clang-format"):
+            raise RuntimeError("Unable to find clang-format, sorry")
+        clang_format_path = "/opt/llvm/bin/clang-format"
     return subprocess.run(
         [clang_format_path,
          '--style=%s' % CLANG_FORMAT_STYLE, '--assume-filename=.proto'],

@@ -315,10 +315,11 @@ def envoy_py_data(name, src, format = None, entry_point = base_entry_point):
     native.genrule(
         name = name_env,
         cmd = """
-        PICKLE_PATH=$$(realpath %s) \
+        PICKLE_DATA=$$(cat %s | base64) \
         && echo -n "\
-               \nfrom envoy.base.utils.data_env import DataEnvironment \
-               \ndata = DataEnvironment.load(\\"$$PICKLE_PATH\\")" \
+               \nimport base64 \
+               \nimport pickle \
+               \ndata = pickle.loads(base64.b64decode(\\"\\"\\"$$PICKLE_DATA\\"\\"\\"))\n" \
                > $@
         """ % pickle_arg,
         outs = [name_env_py],
