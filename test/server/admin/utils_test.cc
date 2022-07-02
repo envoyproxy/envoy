@@ -1,10 +1,8 @@
-#include "source/server/admin/utils.h"
-
-#include "test/test_common/utility.h"
-
 #include "envoy/http/query_params.h"
 
 #include "source/server/admin/utils.h"
+
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -44,8 +42,8 @@ TEST_F(UtilsTest, HistogramMode) {
   query_["histogram_buckets"] = "garbage";
   absl::Status status = Utility::histogramBucketsParam(query_, histogram_buckets_mode);
   EXPECT_FALSE(status.ok());
-  EXPECT_THAT(status.ToString(), HasSubstr(
-      "usage: /stats?histogram_buckets=(cumulative|disjoint|none)"));
+  EXPECT_THAT(status.ToString(),
+              HasSubstr("usage: /stats?histogram_buckets=(cumulative|disjoint|none)"));
 }
 
 } // namespace Server

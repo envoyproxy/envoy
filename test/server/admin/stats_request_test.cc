@@ -157,8 +157,8 @@ TEST_F(StatsRequestTest, OneStatPrometheus) {
   // point, to make Prometheus consume less resource, and when that occurs this
   // test can exercise that.
   store_.counterFromStatName(makeStatName("foo"));
-  EXPECT_ENVOY_BUG(iterateChunks(*makeRequest(false, StatsFormat::Prometheus, StatsType::All),
-                                 true, Http::Code::BadRequest),
+  EXPECT_ENVOY_BUG(iterateChunks(*makeRequest(false, StatsFormat::Prometheus, StatsType::All), true,
+                                 Http::Code::BadRequest),
                    "reached Prometheus case in switch unexpectedly");
 }
 
