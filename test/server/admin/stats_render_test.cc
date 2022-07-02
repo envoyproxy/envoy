@@ -349,26 +349,26 @@ TEST_F(StatsRenderTest, JsonHistogramDisjoint) {
 }
 
 #ifdef ENVOY_ADMIN_HTML
-class StatsHistogramRenderTest : public StatsRenderTest {
+class StatsHtmlRenderTest : public StatsRenderTest {
 protected:
   const Admin::UrlHandler url_handler_{
       "/foo", "help", [](absl::string_view, AdminStream&) -> Admin::RequestPtr { return nullptr; },
       false, false};
+  StatsHtmlRender renderer_{response_headers_, response_, url_handler_, params_};
 };
 
-TEST_F(StatsRenderTest, String) {
-  StatsHtmlRender renderer(response_headers_, response_, url_handler_, params_);
-  EXPECT_THAT(render<std::string>(renderer, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"),
+TEST_F(StatsHtmlRenderTest, String) {
+  EXPECT_THAT(render<std::string>(renderer_, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"),
               HasSubstr("name: \"abc 123 ~!@#$%^&amp;*()-_=+;:&#39;&quot;,&lt;.&gt;/?\"\n"));
 }
 
-TEST_F(StatsRenderTest, HistogramNoBuckets) {
-  StatsHtmlRender renderer(response_headers_, response_, url_handler_, params_);
+TEST_F(StatsHtmlRenderTest, HistogramNoBuckets) {
   constexpr absl::string_view expected =
       "h1: P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) "
       "P90(308.5,308.5) P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) "
       "P99.9(309.985,309.985) P100(310,310)\n";
-  EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
+  EXPECT_THAT(render<>(renderer_, "h1", populateHistogram("h1", {200, 300, 300})),
+              HasSubstr(expected));
 }
 #endif
 
