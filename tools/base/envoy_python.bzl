@@ -175,14 +175,15 @@ def envoy_jinja_env(
     native.genrule(
         name = name_env,
         cmd = """
-        TEMPLATE_PATH=$$(realpath %s) \
-        && echo -n "\
+        echo -n "\
+               \nimport pathlib \
                \nfrom envoy.base.utils.jinja_env import JinjaEnvironment \
-               \nenv = JinjaEnvironment.load(\\"$$TEMPLATE_PATH\\", %s)" \
+               \npath=pathlib.Path(__file__).parent.joinpath(pathlib.Path(\\"%s\\").name) \
+               \nenv = JinjaEnvironment.load(str(path), %s)" \
                > $@
         """ % (template_arg, load_args),
         outs = [name_env_py],
-        tools = [name_templates],
+        exec_tools = [name_templates],
     )
 
     py_library(
