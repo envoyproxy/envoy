@@ -11,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -64,9 +65,19 @@ TEST_F(StatsRenderTest, TextInt) {
 
 TEST_F(StatsRenderTest, TextString) {
   StatsTextRender renderer(params_);
-  EXPECT_EQ("name: \"abc 123 ~!@#$%^&amp;*()-_=+;:&#39;&quot;,&lt;.&gt;/?\"\n",
+  EXPECT_EQ("name: \"abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?\"\n",
             render<std::string>(renderer, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"));
 }
+
+#ifdef ENVOY_ADMIN_HTML
+TEST_F(StatsRenderTest, HtmlString) {
+  Admin::UrlHandler url_handler{"/foo", "help",
+    [](absl::string_view, AdminStream&) -> Admin::RequestPtr { return nullptr; }, false, false};
+  StatsHtmlRender renderer(response_headers_, response_, url_handler, params_);
+  EXPECT_THAT(render<std::string>(renderer, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"),
+              HasSubstr("name: \"abc 123 ~!@#$%^&amp;*()-_=+;:&#39;&quot;,&lt;.&gt;/?\"\n"));
+}
+#endif
 
 TEST_F(StatsRenderTest, TextHistogramNoBuckets) {
   StatsTextRender renderer(params_);

@@ -107,6 +107,8 @@ public:
 
   void noStats(Buffer::Instance&, absl::string_view types) override;
   void finalize(Buffer::Instance&) override;
+  void generate(Buffer::Instance& response, const std::string& name,
+                const std::string& value) override;
 
 private:
   AdminHtmlGenerator html_;
