@@ -109,6 +109,13 @@ public:
   void finalize(Buffer::Instance&) override;
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override;
+  void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
+    StatsTextRender::generate(response, name, value);
+  }
+  void generate(Buffer::Instance& response, const std::string& name,
+                const Stats::ParentHistogram& histogram) override {
+    StatsTextRender::generate(response, name, histogram);
+  }
 
 private:
   AdminHtmlGenerator html_;
