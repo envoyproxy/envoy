@@ -30,9 +30,11 @@ protected:
     tls_.shutdownThread();
   }
 
-  std::unique_ptr<StatsRequest> makeRequest(bool used_only, bool json) {
+  std::unique_ptr<StatsRequest> makeRequest(bool used_only, bool json,
+                                            StatsType type = StatsType::All) {
     StatsParams params;
     params.used_only_ = used_only;
+    params.type_ = type;
     if (json) {
       params.format_ = StatsFormat::Json;
     }
@@ -90,9 +92,24 @@ TEST_F(StatsRequestTest, OneCounter) {
   EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
 }
 
+TEST_F(StatsRequestTest, OneCounterTyped) {
+  store_.counterFromStatName(makeStatName("foo"));
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, false, StatsType::Counters)));
+}
+
+TEST_F(StatsRequestTest, OneCounterWrongType) {
+  store_.counterFromStatName(makeStatName("foo"));
+  EXPECT_EQ(0, iterateChunks(*makeRequest(false, false, StatsType::Gauges)));
+}
+
 TEST_F(StatsRequestTest, OneGauge) {
   store_.gaugeFromStatName(makeStatName("foo"), Stats::Gauge::ImportMode::Accumulate);
   EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
+}
+
+TEST_F(StatsRequestTest, OneGaugeTyped) {
+  store_.gaugeFromStatName(makeStatName("foo"), Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, false, StatsType::Gauges)));
 }
 
 TEST_F(StatsRequestTest, OneHistogram) {
@@ -100,9 +117,19 @@ TEST_F(StatsRequestTest, OneHistogram) {
   EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
 }
 
+TEST_F(StatsRequestTest, OneHistogramTyped) {
+  store_.histogramFromStatName(makeStatName("foo"), Stats::Histogram::Unit::Milliseconds);
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, false, StatsType::Histograms)));
+}
+
 TEST_F(StatsRequestTest, OneTextReadout) {
   store_.textReadoutFromStatName(makeStatName("foo"));
   EXPECT_EQ(1, iterateChunks(*makeRequest(false, false)));
+}
+
+TEST_F(StatsRequestTest, OneTextReadoutTyped) {
+  store_.textReadoutFromStatName(makeStatName("foo"));
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, false, StatsType::TextReadouts)));
 }
 
 TEST_F(StatsRequestTest, OneScope) {
