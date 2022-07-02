@@ -387,7 +387,7 @@ void PassthroughStateImpl::initialize(std::unique_ptr<envoy::config::core::v3::M
 }
 void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata,
                                      StreamInfo::FilterState& filter_state) {
-  ASSERT(state_ == State::Initialized);
+  ASSERT(state_ == State::Created || state_ == State::Initialized);
   if (metadata_) {
     metadata.MergeFrom(*metadata_);
   }

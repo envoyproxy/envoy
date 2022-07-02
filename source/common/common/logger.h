@@ -64,6 +64,7 @@ namespace Logger {
   FUNCTION(matcher)                                                                                \
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
+  FUNCTION(multi_connection)                                                                       \
   FUNCTION(quic)                                                                                   \
   FUNCTION(quic_stream)                                                                            \
   FUNCTION(pool)                                                                                   \
