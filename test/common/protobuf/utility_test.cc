@@ -1454,7 +1454,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
 }
 
 // MessageUtility::unpackToNoThrow() with the right type.
-TEST_F(ProtobufUtilityTest, unpackToNoThrowRightType) {
+TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
   ProtobufWkt::Duration src_duration;
   src_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
@@ -1468,7 +1468,7 @@ TEST_F(ProtobufUtilityTest, unpackToNoThrowRightType) {
 }
 
 // MessageUtility::unpackToNoThrow() with the wrong type.
-TEST_F(ProtobufUtilityTest, unpackToNoThrowWrongType) {
+TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
