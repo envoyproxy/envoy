@@ -282,7 +282,7 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
 }
 
 static Upstream::Outlier::Result
-PoolFailureReasonToResult(ConnectionPool::PoolFailureReason reason) {
+poolFailureReasonToResult(ConnectionPool::PoolFailureReason reason) {
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
     FALLTHRU;
@@ -314,7 +314,7 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     FALLTHRU;
   case ConnectionPool::PoolFailureReason::Timeout:
-    upstream_host_->outlierDetector().putResult(PoolFailureReasonToResult(reason));
+    upstream_host_->outlierDetector().putResult(poolFailureReasonToResult(reason));
 
     // Error occurred after a partial or underflow response, propagate the reset to the
     // downstream.
@@ -339,8 +339,9 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
   ENVOY_LOG(debug,
             "upstream reset complete. reason={}, close_downstream={}, response_started={}, "
             "response_complete={}, draining={}, response_underflow={}",
-            PoolFailureReasonNames::get().fromReason(reason), close_downstream, !!response_started_,
-            !!response_complete_, !!draining_, !!response_underflow_);
+            PoolFailureReasonNames::get().fromReason(reason), close_downstream,
+            static_cast<bool>(response_started_), static_cast<bool>(response_complete_),
+            static_cast<bool>(draining_), static_cast<bool>(response_underflow_));
   return close_downstream;
 }
 

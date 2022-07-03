@@ -233,25 +233,25 @@ enum class AppExceptionType {
 };
 
 /**
- * Names of available reply types.
+ * Names of pool failure reason.
  */
 class PoolFailureReasonNameValues {
 public:
-  const std::string OVERFLOW = "overflow";
-  const std::string LOCAL_CONNECTION_FAILURE = "local connection failure";
-  const std::string REMOTE_CONNECTION_FAILURE = "remote connection failure";
-  const std::string TIMEOUT = "timeout";
+  const std::string OVERFLOW_NAME = "overflow";
+  const std::string LOCAL_CONNECTION_FAILURE_NAME = "local connection failure";
+  const std::string REMOTE_CONNECTION_FAILURE_NAME = "remote connection failure";
+  const std::string TIMEOUT_NAME = "timeout";
 
   const std::string& fromReason(ConnectionPool::PoolFailureReason reason) const {
     switch (reason) {
     case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-      return LOCAL_CONNECTION_FAILURE;
+      return LOCAL_CONNECTION_FAILURE_NAME;
     case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-      return REMOTE_CONNECTION_FAILURE;
+      return REMOTE_CONNECTION_FAILURE_NAME;
     case ConnectionPool::PoolFailureReason::Timeout:
-      return TIMEOUT;
+      return TIMEOUT_NAME;
     case ConnectionPool::PoolFailureReason::Overflow:
-      return OVERFLOW;
+      return OVERFLOW_NAME;
     }
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
