@@ -5463,7 +5463,7 @@ virtual_hosts:
         genRedirectHeaders("redirect.lyft.com", "/https", false, false);
     EXPECT_EQ("https://redirect.lyft.com/https",
               config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    EXPECT_EQ(nullptr, config.route(headers, 0)->mostSpecificPerFilterConfig("bar"));
+    EXPECT_EQ(nullptr, config.route(headers, 0)->mostSpecificPerFilterConfig(_));
   }
   {
     Http::TestRequestHeaderMapImpl headers =
@@ -8981,14 +8981,12 @@ public:
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     absl::InlinedVector<uint32_t, 3> traveled_cfg;
 
-    check(dynamic_cast<const DerivedFilterConfig*>(
-              route->mostSpecificPerFilterConfig(route_config_name)),
+    check(dynamic_cast<const DerivedFilterConfig*>(route->mostSpecificPerFilterConfig(_)),
           expected_most_specific_config, "most specific config");
-    route->traversePerFilterConfig(
-        route_config_name, [&](const Router::RouteSpecificFilterConfig& cfg) {
-          auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
-          traveled_cfg.push_back(typed_cfg->config_.seconds());
-        });
+    route->traversePerFilterConfig(_, [&](const Router::RouteSpecificFilterConfig& cfg) {
+      auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
+      traveled_cfg.push_back(typed_cfg->config_.seconds());
+    });
     ASSERT_EQ(expected_traveled_config, traveled_cfg);
   }
 

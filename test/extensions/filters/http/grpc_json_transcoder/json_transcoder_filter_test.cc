@@ -491,8 +491,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
   route_cfg.set_proto_descriptor_bin("");
   JsonTranscoderConfig route_config(route_cfg, *api_);
 
-  ON_CALL(*decoder_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.grpc_json_transcoder"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&route_config));
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
@@ -1617,8 +1616,7 @@ TEST_F(GrpcJsonTranscoderDisabledFilterTest, PerRouteEnabledOverride) {
       bookstoreProtoConfig();
   JsonTranscoderConfig route_config(route_cfg, *api_);
 
-  ON_CALL(*decoder_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.grpc_json_transcoder"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&route_config));
 
   Http::TestRequestHeaderMapImpl request_headers{
