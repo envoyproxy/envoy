@@ -66,6 +66,12 @@ MockUpstreamInfo::MockUpstreamInfo()
     upstream_protocol_ = protocol;
   }));
   ON_CALL(*this, upstreamProtocol()).WillByDefault(ReturnPointee(&upstream_protocol_));
+  ON_CALL(*this, setUpstreamConnectionTerminationDetails(_))
+      .WillByDefault(Invoke([this](absl::string_view connection_termination_details) {
+        upstream_connection_termination_details_ = std::string(connection_termination_details);
+      }));
+  ON_CALL(*this, upstreamConnectionTerminationDetails())
+      .WillByDefault(ReturnPointee(&upstream_connection_termination_details_));
 }
 
 MockUpstreamInfo::~MockUpstreamInfo() = default;

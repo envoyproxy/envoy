@@ -44,6 +44,10 @@ public:
   MOCK_METHOD(uint64_t, upstreamNumStreams, (), (const));
   MOCK_METHOD(void, setUpstreamProtocol, (Http::Protocol protocol));
   MOCK_METHOD(absl::optional<Http::Protocol>, upstreamProtocol, (), (const));
+  MOCK_METHOD(void, setUpstreamConnectionTerminationDetails,
+              (absl::string_view connection_termination_details));
+  MOCK_METHOD(const absl::optional<std::string>&, upstreamConnectionTerminationDetails, (),
+              (const));
 
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<absl::string_view> interface_name_;
@@ -55,6 +59,7 @@ public:
   FilterStateSharedPtr filter_state_;
   uint64_t num_streams_;
   absl::optional<Http::Protocol> upstream_protocol_;
+  absl::optional<std::string> upstream_connection_termination_details_;
 };
 
 class MockStreamInfo : public StreamInfo {
