@@ -1083,19 +1083,19 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
 
   // Test when there's nothing on the route
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         filter_name, filter_callbacks.route()));
+                         &filter_callbacks));
 
   // Testing in reverse order, so that the method always returns the last object.
   // Testing per-virtualhost typed filter config
   ON_CALL(*filter_callbacks.route_, mostSpecificPerFilterConfig(_)).WillByDefault(Return(&config));
   EXPECT_EQ(&config, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         filter_name, filter_callbacks.route()));
+                         &filter_callbacks));
 
   // Cover the case of no route entry
   ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
   ON_CALL(*filter_callbacks.route_, mostSpecificPerFilterConfig(_)).WillByDefault(Return(&config));
   EXPECT_EQ(&config, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         filter_name, filter_callbacks.route()));
+                         &filter_callbacks));
 }
 
 // Verify that merging works as expected and we get back the merged result.
