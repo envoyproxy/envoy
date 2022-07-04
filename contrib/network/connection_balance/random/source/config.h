@@ -19,9 +19,7 @@ public:
 
   Envoy::Network::ConnectionBalancerSharedPtr
   createConnectionBalancerFromProto(const Protobuf::Message&,
-                                    Server::Configuration::FactoryContext&) override {
-    return std::make_shared<RandomConnectionBalancerImpl>();
-  }
+                                    Server::Configuration::FactoryContext&) override;
 
   std::string name() const override { return "envoy.network.connection_balance.random"; }
 };
