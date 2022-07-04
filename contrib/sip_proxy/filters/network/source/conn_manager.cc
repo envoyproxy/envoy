@@ -723,9 +723,10 @@ SipFilters::ResponseStatus ConnectionManager::DownstreamConnectionInfoItem::upst
 
   parent_.upstream_transactions_.emplace(k, active_trans);
 
-  // TODO Set the Route and upstream Host into the activeTrans!!
+  // keep the counter happy to avoid crashes when the UpstreamActiveTrans decrements 
+  // Todo decide what if this should be a different stat..
+  parent_.stats_.request_active_.inc();
   
-
   return active_trans->upstreamData(metadata, return_route, return_destination);
 }
 

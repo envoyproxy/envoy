@@ -279,6 +279,7 @@ private:
       parent.stats_.request_active_.inc();
     }
     ~ActiveTrans() override {
+      ENVOY_LOG(info, "ActiveTrans Dtor");
       request_timer_->complete();
       parent_.stats_.request_active_.dec();
 
@@ -379,19 +380,14 @@ private:
   struct UpstreamActiveTrans : public ActiveTrans {
     UpstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
         : ActiveTrans(parent, metadata) {}
-    ~UpstreamActiveTrans() override {
-      // request_timer_->complete();
-      // parent_.stats_.request_active_.dec();
 
-      //parent_.eraseActiveTransFromPendingList(transaction_id_);
-      for (auto& filter : decoder_filters_) {
-        filter->handle_->onDestroy();
-      }
+    ~UpstreamActiveTrans() override {
+       ENVOY_LOG(info, "UpstreamActiveTrans Dtor");
     }
 
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
-      ENVOY_LOG(info, "Setting destination for response recvd from downstream: {}", destination_);
+      ENVOY_LOG(debug, "Setting destination for response recvd from downstream: {}", destination_);
       metadata->setDestination(destination_); // response should have affinity to the upstream request
       return ActiveTrans::transportBegin(metadata);
     }
@@ -404,7 +400,6 @@ private:
       UNREFERENCED_PARAMETER(key);
       UNREFERENCED_PARAMETER(activetrans);
       UNREFERENCED_PARAMETER(func);   
-      //return parent_.pushIntoPendingList(type, key, activetrans, func);
     }
     void onResponseHandleForPendingList(
         const std::string& type, const std::string& key,
@@ -413,11 +408,9 @@ private:
       UNREFERENCED_PARAMETER(type);
       UNREFERENCED_PARAMETER(key);
       UNREFERENCED_PARAMETER(func);
-      //return parent_.onResponseHandleForPendingList(type, key, func);
     }
     void eraseActiveTransFromPendingList(std::string& transaction_id) override {
       UNREFERENCED_PARAMETER(transaction_id);
-      //return parent_.eraseActiveTransFromPendingList(transaction_id);
     }
 
     // SipFilters::DecoderFilterCallbacks
@@ -438,15 +431,9 @@ private:
     void continueHandling(const std::string& key, bool try_next_affinity) override {
       UNREFERENCED_PARAMETER(key);
       UNREFERENCED_PARAMETER(try_next_affinity);
-      //return parent_.continueHandling(key, try_next_affinity);
     }
 
     void onError(const std::string& what);
-    // MessageMetadataSharedPtr metadata() override { return metadata_; }
-    // bool localResponseSent() { return local_response_sent_; }
-    // void setLocalResponseSent(bool local_response_sent) {
-    //   local_response_sent_ = local_response_sent;
-    // }
 
     Router::RouteConstSharedPtr route_;
     std::string destination_;
