@@ -1476,9 +1476,10 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   ProtobufWkt::Timestamp dst;
   auto error_msg = MessageUtil::unpackToNoThrow(source_any, dst);
   ASSERT_TRUE(error_msg.has_value());
-  EXPECT_THAT(error_msg.value(),
-              testing::MatchesRegex("Unable to unpack as google.protobuf.Timestamp: "
-                                    "\\[type.googleapis.com/google.protobuf.Duration\\].*"));
+  EXPECT_THAT(
+      error_msg.value(),
+      testing::MatchesRegex(
+          R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\].*)"));
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.
