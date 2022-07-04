@@ -4,7 +4,9 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/private_key/private_key_config.h"
 
+#ifndef QAT_DISABLED
 #include "contrib/qat/private_key_providers/source/qat_private_key_provider.h"
+#endif
 
 namespace Envoy {
 namespace Extensions {

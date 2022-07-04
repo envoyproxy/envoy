@@ -54,8 +54,13 @@ envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    defines = select({
+        "//bazel:linux_x86_64": [],
+        "//conditions:default": [
+            "QAT_DISABLED=1",
+        ],
+    }),
     deps = [
-        ":qat_private_key_provider_lib",
         "//envoy/protobuf:message_validator_interface",
         "//envoy/registry",
         "//envoy/ssl/private_key:private_key_config_interface",
@@ -64,5 +69,10 @@ envoy_cc_contrib_extension(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//contrib/envoy/extensions/private_key_providers/qat/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:linux_x86_64": [
+            ":qat_private_key_provider_lib",
+        ],
+        "//conditions:default": [],
+    }),
 )
