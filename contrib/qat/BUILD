@@ -1,3 +1,4 @@
+load("//bazel:envoy_build_system.bzl", "envoy_contrib_package")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load(
     "//contrib:all_contrib_extensions.bzl",
@@ -5,6 +6,12 @@ load(
 )
 
 licenses(["notice"])  # Apache 2
+
+envoy_contrib_package()
+
+# Have qatlib outside of any extensions because it may be used by both
+# QAT compression library extension and QAT private key provider
+# extension.
 
 configure_make(
     name = "qatlib",
