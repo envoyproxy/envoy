@@ -21,7 +21,7 @@ from functools import cached_property
 
 from packaging import version
 
-from tools.api_proto_plugin import annotations, plugin, traverse, visitor
+from tools.api_proto_plugin import annotations, constants, plugin, traverse, visitor
 from tools.api_versioning import utils as api_version_utils
 from tools.protoxform import options as protoxform_options, utils
 from tools.type_whisperer import type_whisperer, types_pb2
@@ -435,25 +435,8 @@ def format_field_type(type_context, field):
     elif field.type_name:
         return type_name
 
-    pretty_type_names = {
-        field.TYPE_DOUBLE: 'double',
-        field.TYPE_FLOAT: 'float',
-        field.TYPE_INT32: 'int32',
-        field.TYPE_SFIXED32: 'int32',
-        field.TYPE_SINT32: 'int32',
-        field.TYPE_FIXED32: 'uint32',
-        field.TYPE_UINT32: 'uint32',
-        field.TYPE_INT64: 'int64',
-        field.TYPE_SFIXED64: 'int64',
-        field.TYPE_SINT64: 'int64',
-        field.TYPE_FIXED64: 'uint64',
-        field.TYPE_UINT64: 'uint64',
-        field.TYPE_BOOL: 'bool',
-        field.TYPE_STRING: 'string',
-        field.TYPE_BYTES: 'bytes',
-    }
-    if field.type in pretty_type_names:
-        return label + pretty_type_names[field.type]
+    if field.type in constants.FIELD_TYPE_NAMES:
+        return label + constants.FIELD_TYPE_NAMES[field.type]
     raise ProtoPrintError('Unknown field type ' + str(field.type))
 
 
