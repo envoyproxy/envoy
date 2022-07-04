@@ -23,7 +23,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The private key provider provides RSA sign and decrypt operation
 // hardware acceleration.
 
-// [#extension-category: envoy.tls.key_providers]
 message QatPrivateKeyMethodConfig {
   // Private key to use in the private key provider. If set to inline_bytes or
   // inline_string, the value needs to be the private key in PEM format.
