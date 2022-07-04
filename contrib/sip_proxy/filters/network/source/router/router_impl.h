@@ -405,6 +405,10 @@ public:
   RouteConstSharedPtr route() {
     return route_;
   }
+
+  SipFilterStats* stats() {
+    return stats_;
+  }
 private:
   std::shared_ptr<Upstream::TcpPoolData> conn_pool_;
 
@@ -417,6 +421,7 @@ private:
   std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_info_;
   RouteConstSharedPtr route_;
   std::shared_ptr<SipSettings> settings_;
+  SipFilterStats* stats_;
   SipFilters::DecoderFilterCallbacks* callbacks_{};
   MessageMetadataSharedPtr metadata_;
   Buffer::OwnedImpl upstream_buffer_;

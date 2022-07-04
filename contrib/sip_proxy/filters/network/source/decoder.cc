@@ -314,7 +314,7 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
   auto downstream_conn_id = header.substr(header.find("=")+1, header.length()-header.find("="-1));
   auto ingress_id = std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
 
-  ENVOY_LOG(info, "Parsed IngressID worker_thread_id={}, downstream_connection={}", worker_thread_id, downstream_conn_id);
+  ENVOY_LOG(trace, "IngressID thread-id={}, downstream-connection={}", worker_thread_id, downstream_conn_id);
 
   metadata()->setIngressId(std::move(ingress_id));
 

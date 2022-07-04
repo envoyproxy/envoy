@@ -643,20 +643,16 @@ SipFilters::ResponseStatus
 ConnectionManager::UpstreamActiveTrans::upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination) {
   route_ = return_route;
   destination_ = return_destination;
-  UNREFERENCED_PARAMETER(return_route);
-  UNREFERENCED_PARAMETER(return_destination);
 
   if (parent_.read_callbacks_->connection().state() == Network::Connection::State::Closed) {
     throw EnvoyException("downstream connection is closed");
   }
 
-  ENVOY_LOG(info, "Destination and route for response affinity: {} {}", destination_, route_->routeEntry()->clusterName());
-
   Buffer::OwnedImpl buffer;
   std::unique_ptr<Encoder> encoder = std::make_unique<EncoderImpl>();
   encoder->encode(metadata, buffer);
 
-  ENVOY_LOG(info, "send upstream request downstream {}\n{}", parent_.local_ingress_id_->getDownstreamConnectionID(), buffer.length(), buffer.toString());
+  ENVOY_LOG(debug, "sending upstream request downstream to {}. {} bytes \n{}", parent_.local_ingress_id_->getDownstreamConnectionID(), buffer.length(), buffer.toString());
   parent_.read_callbacks_->connection().write(buffer, false);
 
   return SipFilters::ResponseStatus::Complete;

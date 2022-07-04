@@ -293,8 +293,6 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   // - move this somewhere more appropriate??
   // - only add the header if does not already exist - / need to revisit this - see security considerations
   // - only add the header if the outbound-transactions feature is enabled for the cluster (may need to move this to the router where we have the route config)
-  // todo
-  // - add cache of conn-id to -> downstream, and cache of upstream_transaction for mapping responses from downstream to upstream
   if (metadata->msgType() == MsgType::Request)  {
     metadata->addXEnvoyOriginIngressHeader(callbacks_->ingressID());
   }
@@ -377,12 +375,6 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
     upstream_request_->setMetadata(metadata);
     ENVOY_STREAM_LOG(debug, "reuse upstream request for {}", *callbacks_,
                      host->address()->ip()->addressAsString());
-
-    if (metadata->msgType() == MsgType::Request) {
-      // jonah todo
-      transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
-                                          upstream_request_);
-    }
   } else {
     upstream_request_ = std::make_shared<UpstreamRequest>(
         std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info);
@@ -392,11 +384,11 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
                                             upstream_request_);
     ENVOY_STREAM_LOG(debug, "create new upstream request {}", *callbacks_,
                      host->address()->ip()->addressAsString());
-    if (metadata->msgType() == MsgType::Request) {
-      // jonah todo
-      transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
+  }
+
+  if (metadata->msgType() == MsgType::Request) {
+     transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
                                           upstream_request_);
-    }
   }
 
   lb_ret = true;
@@ -415,30 +407,30 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
   if (!metadata->destination().empty() && metadata->msgType() == MsgType::Response) {
-      ENVOY_LOG(info, "Using preset destination");
+      ENVOY_LOG(info, "Using preset destination for response from downstream");
       std::string host = metadata->destination();
       metadata->setStopLoadBalance(true);
 
-      if (auto upstream_request = transaction_info->getUpstreamRequest(std::string(host));
-        upstream_request != nullptr) {
-        // There is action connection, reuse it.
-        ENVOY_STREAM_LOG(trace, "reuse upstream request from {}", *callbacks_, host);
-        upstream_request_ = upstream_request;
-        upstream_request_->setMetadata(metadata);
-        upstream_request_->setDecoderFilterCallbacks(*callbacks_);
+    if (auto upstream_request = transaction_info->getUpstreamRequest(std::string(host));
+      upstream_request != nullptr) {
+      // There is action connection, reuse it.
+      ENVOY_STREAM_LOG(trace, "reuse upstream request from {}", *callbacks_, host);
+      upstream_request_ = upstream_request;
+      upstream_request_->setMetadata(metadata);
+      upstream_request_->setDecoderFilterCallbacks(*callbacks_);
 
-        transaction_info->insertUpstreamRequest(host, upstream_request_);
-        ENVOY_STREAM_LOG(trace, "call upstream_request_->start()", *callbacks_);
-        // Continue: continue to messageEnd, StopIteration: continue to next affinity
-        if (FilterStatus::StopIteration == upstream_request_->start()) {
-          // Defer to handle in upstream request onPoolReady or onPoolFailure
-          ENVOY_LOG(trace, "sip: state {}", StateNameValues::name(metadata_->state()));
-          return FilterStatus::StopIteration;
-        }
-        return FilterStatus::Continue;
+      transaction_info->insertUpstreamRequest(host, upstream_request_);
+      ENVOY_STREAM_LOG(trace, "call upstream_request_->start()", *callbacks_);
+      // Continue: continue to messageEnd, StopIteration: continue to next affinity
+      if (FilterStatus::StopIteration == upstream_request_->start()) {
+        // Defer to handle in upstream request onPoolReady or onPoolFailure
+        ENVOY_LOG(trace, "sip: state {}", StateNameValues::name(metadata_->state()));
+        return FilterStatus::StopIteration;
+      }
+      return FilterStatus::Continue;
     }
 
-    ENVOY_STREAM_LOG(trace, "no destination preset select with load balancer host= {}", *callbacks_, host);
+    ENVOY_STREAM_LOG(trace, "no pre-existing upstream connection, select with load balancer host= {}", *callbacks_, host);
 
     upstream_request_started = false;
     auto ret =
@@ -760,6 +752,7 @@ void UpstreamRequest::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbac
   downstream_connection_info_ = callbacks_->downstreamConnectionInfos();
   route_ = callbacks_->route();
   settings_ = callbacks_->settings();
+  stats_ = &callbacks_->stats();
 }
 
 void UpstreamRequest::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
@@ -777,33 +770,24 @@ bool ResponseDecoder::onData(Buffer::Instance& data) {
 FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) {
   ENVOY_LOG(trace, "ResponseDecoder\n{}", metadata->rawMsg());
 
-  if (metadata->msgType() == MsgType::Request) {
-    ENVOY_LOG(info, "Got Request!");
-
-    // JONAH reminder
-    //auto upstream_host = parent_.getUpstreamHost();
-    ENVOY_LOG(info, "parent_.getUpstreamHost() {}", parent_.getUpstreamHost()->hostname());
-
-    // Todo pass in the route
-    ENVOY_LOG(info, "parent_.decoderFilterCallbacks().route(), {}", parent_.route()->routeEntry()->clusterName());
-
-    // todo - create and save an UpstreamTransaction if this is a new Transaction
-    // route to the downstream connection
+  if (metadata->msgType() == MsgType::Request) {  
     auto ingress_id = metadata->ingressId();
     if (ingress_id == nullptr) {
       ENVOY_LOG(debug, "dropping upstream request with no X-Envoy-Origin-Ingress header: \n{}", metadata->rawMsg());
       return FilterStatus::StopIteration;
     }
 
-    auto downstream_conn_id = ingress_id->getDownstreamConnectionID();
-
-    ENVOY_LOG(info, "Got downstream conn-id: {}", downstream_conn_id);
+    auto downstream_conn_id = ingress_id->getDownstreamConnectionID();  
     auto downstream_conn = parent_.getDownstreamConnection(downstream_conn_id);
     if (downstream_conn == nullptr) {
-      ENVOY_LOG(debug, "no downstream connection selected {}\n{}", downstream_conn_id, metadata->rawMsg());
+      ENVOY_LOG(debug, "no downstream connection found for: {}\n{}", downstream_conn_id, metadata->rawMsg());
       return FilterStatus::StopIteration;
     }
-    // set the destination and route, so responses to this request have affinity 
+
+    ENVOY_LOG(debug, "Got upstream request from host={},cluster={}. For downstream-connection={}",
+              parent_.getUpstreamHost()->hostname(),  parent_.route()->routeEntry()->clusterName(), downstream_conn_id);
+
+    // pass the destination and route, so responses to this request have affinity 
     // to upstream host where we recvd this request from
     downstream_conn->upstreamData(metadata, parent_.route(), parent_.getUpstreamHost()->hostname());
 
