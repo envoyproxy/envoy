@@ -10,25 +10,19 @@ envoy_package()
 py_binary(
     name = "generate_extensions_security_rst",
     srcs = ["generate_extensions_security_rst.py"],
-    deps = [
-        requirement("envoy.base.utils"),
-    ],
+    deps = [requirement("envoy.base.utils")],
 )
 
 py_binary(
     name = "generate_external_deps_rst",
-    srcs = [
-        "generate_external_deps_rst.py",
-    ],
+    srcs = ["generate_external_deps_rst.py"],
     args = ["$(location //bazel:all_repository_locations)"],
     data = ["//bazel:all_repository_locations"],
 )
 
 py_binary(
     name = "generate_api_rst",
-    srcs = [
-        "generate_api_rst.py",
-    ],
+    srcs = ["generate_api_rst.py"],
 )
 
 # The upstream lib is maintained here:
@@ -46,9 +40,7 @@ envoy_entry_point(
 
 py_binary(
     name = "generate_version_histories",
-    srcs = [
-        "generate_version_histories.py",
-    ],
+    srcs = ["generate_version_histories.py"],
     deps = [
         requirement("aio.run.runner"),
         requirement("envoy.base.utils"),

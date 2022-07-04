@@ -9,4 +9,7 @@ def _type_whisperer_impl(target, ctx):
 #
 #   bazel build //api --aspects tools/type_whisperer/protoxform.bzl%protoxform_aspect \
 #       --output_groups=types_pb_text
-type_whisperer_aspect = api_proto_plugin_aspect("//tools/type_whisperer", _type_whisperer_impl)
+type_whisperer_aspect = api_proto_plugin_aspect(
+    "//tools/type_whisperer",
+    _type_whisperer_impl,
+)

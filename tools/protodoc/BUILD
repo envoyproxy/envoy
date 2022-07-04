@@ -44,7 +44,7 @@ genrule(
     name = "manifest",
     outs = ["manifest.json"],
     cmd = """$(location :manifest_to_json) $(location @envoy_api//:v3_proto_set) $@""",
-    tools = [
+    exec_tools = [
         ":manifest_to_json",
         "@envoy_api//:v3_proto_set",
     ],
@@ -137,7 +137,5 @@ envoy_jinja_env(
         "templates/extension.rst.tpl",
         "templates/extension_category.rst.tpl",
     ],
-    deps = [
-        ":rst_filters",
-    ],
+    deps = [":rst_filters"],
 )

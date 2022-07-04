@@ -40,7 +40,7 @@ genrule(
     cmd = (
         "$(location //configs:configgen.sh) NO_CONFIGGEN $(@D) $(SRCS)"
     ),
-    tools = [
+    exec_tools = [
         "//configs:configgen.sh",
     ],
 )

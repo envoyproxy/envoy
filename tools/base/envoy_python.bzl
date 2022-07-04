@@ -44,7 +44,7 @@ def envoy_entry_point(
         cmd = """
         sed s#_ENTRY_POINT_ALIAS_#%s# %s > \"$@\"
         """ % (entry_point_alias, entry_point_path),
-        tools = [
+        exec_tools = [
             actual_entry_point,
             entry_point_script,
         ],
@@ -168,7 +168,7 @@ def envoy_jinja_env(
             -t $(SRCS)
         """ % (name_entry_point, filter_args),
         outs = [name_templates_py],
-        tools = [name_entry_point],
+        exec_tools = [name_entry_point],
         srcs = templates,
     )
 
@@ -309,7 +309,7 @@ def envoy_py_data(name, src, format = None, entry_point = base_entry_point):
         $(location %s) $(location %s) -f %s $@
         """ % (name_entry_point, src, format),
         outs = [name_pickle_p],
-        tools = [name_entry_point],
+        exec_tools = [name_entry_point],
         srcs = [src],
     )
 
@@ -324,7 +324,7 @@ def envoy_py_data(name, src, format = None, entry_point = base_entry_point):
                > $@
         """ % pickle_arg,
         outs = [name_env_py],
-        tools = [name_pickle],
+        exec_tools = [name_pickle],
     )
 
     py_library(

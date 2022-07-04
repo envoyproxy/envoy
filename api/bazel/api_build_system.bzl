@@ -121,6 +121,7 @@ def api_cc_py_proto_library(
         deps = deps + _COMMON_PROTO_DEPS,
         visibility = visibility,
     )
+
     cc_proto_library_name = name + _CC_PROTO_SUFFIX
     pgv_cc_proto_library(
         name = cc_proto_library_name,

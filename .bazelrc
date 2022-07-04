@@ -31,6 +31,8 @@ build --action_env=PATH --host_action_env=PATH
 build --enable_platform_specific_config
 build --test_summary=terse
 
+ build --experimental_proto_descriptor_sets_include_source_info
+
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 

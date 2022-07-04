@@ -5,6 +5,7 @@ load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("//tools/base:envoy_python.bzl", "envoy_py_data")
 load("//tools/protoprint:protoprint.bzl", "protoprint_rule")
+load("@rules_proto//proto:defs.bzl", "proto_descriptor_set", "proto_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -105,4 +106,14 @@ py_binary(
         "//tools:run_command",
         "@envoy_repo",
     ],
+)
+
+proto_library(
+    name = "protoprinted_library",
+    srcs = [":protoprinted_files"],
+)
+
+proto_descriptor_set(
+    name = "protoprinted_set",
+    deps = [":protoprinted"],
 )
