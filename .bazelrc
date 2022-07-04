@@ -243,7 +243,8 @@ build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --remote_timeout=7200
 build:remote --google_default_credentials=true
-build:remote --remote_download_toplevel
+build:remote --remote_download_minimal
+run:remote --remote_download_outputs=toplevel
 
 # Windows bazel does not allow sandboxed as a spawn strategy
 build:remote-windows --spawn_strategy=remote,local
@@ -252,7 +253,8 @@ build:remote-windows --strategy=Closure=remote,local
 build:remote-windows --strategy=Genrule=remote,local
 build:remote-windows --remote_timeout=7200
 build:remote-windows --google_default_credentials=true
-build:remote-windows --remote_download_toplevel
+build:remote-windows --remote_download_minimal
+run:remote-windows --remote_download_outputs=toplevel
 
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang

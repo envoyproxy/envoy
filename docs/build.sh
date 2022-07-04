@@ -37,6 +37,7 @@ fi
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
 IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 BAZEL_BUILD_OPTIONS+=(
+    "--remote_download_outputs=toplevel"
     "--action_env=DOCS_TAG"
     "--action_env=BUILD_SHA"
     "--action_env=SPHINX_RUNNER_ARGS"

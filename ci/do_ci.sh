@@ -126,7 +126,11 @@ function bazel_binary_build() {
   echo "ENVOY_BIN=${ENVOY_BIN}"
 
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
-  [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
+  [[ -n "${ENVOY_RBE}" ]] && {
+      rm -rf bazel-bin/"${ENVOY_BIN}"*
+      # Seemingly due to above bug, `download_minimal` doesnt download the target
+      BAZEL_BUILD_OPTIONS+=("--remote_download_outputs=toplevel")
+  }
 
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${BUILD_TARGET}" ${CONFIG_ARGS}
   collect_build_profile "${BINARY_TYPE}"_build
@@ -235,6 +239,8 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
   echo "Building distro packages..."
 
   setup_clang_toolchain
+
+  BAZEL_BUILD_OPTIONS+=("--remote_download_outputs=toplevel")
 
   # By default the packages will be signed by the first available key.
   # If there is no key available, a throwaway key is created

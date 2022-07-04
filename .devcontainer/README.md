@@ -28,8 +28,8 @@ BAZEL_REMOTE_CACHE=grpcs://remotebuildexecution.googleapis.com
 BAZEL_BUILD_EXTRA_OPTIONS=--config=remote-ci --config=remote --jobs=<Number of jobs>
 ```
 
-By default the `--config=remote` implies [`--remote_download_toplevel`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--remote_download_toplevel),
-change this to `minimal` or `all` depending on where you're running the container by adding them to `BAZEL_BUILD_EXTRA_OPTIONS`.
+By default the `--config=remote` implies [`--remote_download_minimal`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--remote_download_minimal),
+change this to `toplevel` or `all` depending on where you're running the container by adding them to `BAZEL_BUILD_EXTRA_OPTIONS`.
 
 ### Disk performance
 
