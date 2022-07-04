@@ -19,6 +19,7 @@ namespace HttpFilters {
 class UberFilterFuzzer : public HttpFilterFuzzer {
 public:
   UberFilterFuzzer();
+  virtual ~UberFilterFuzzer() = default;
 
   // This creates the filter config and runs the fuzzed data against the filter.
   void fuzz(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
@@ -35,6 +36,8 @@ protected:
   void perFilterSetup();
   // Filter specific input cleanup.
   void cleanFuzzedConfig(absl::string_view filter_name, Protobuf::Message* message);
+
+  MOCK_METHOD(Event::Dispatcher&, dispatcher_, (bool));
 
 private:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;

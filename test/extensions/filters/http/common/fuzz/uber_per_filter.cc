@@ -177,6 +177,15 @@ void UberFilterFuzzer::perFilterSetup() {
   ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault([this]() -> const Buffer::Instance* {
     return decoding_buffer_;
   });
+
+  // For filters that need main event loop.
+  ON_CALL(encoder_callbacks_, dispatcher()).WillByDefault([this]() -> Event::Dispatcher& {
+    return dispatcher_(with_main_event_loop_);
+  });
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault([this]() -> Event::Dispatcher& {
+    return dispatcher_(with_main_event_loop_);
+  });
+  ON_CALL(*this, dispatcher_(true)).WillByDefault(testing::ReturnRef(*worker_thread_dispatcher_));
 }
 
 } // namespace HttpFilters

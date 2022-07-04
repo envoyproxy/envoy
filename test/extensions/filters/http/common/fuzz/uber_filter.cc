@@ -73,13 +73,6 @@ void UberFilterFuzzer::fuzz(
         proto_config, factory_context_.messageValidationVisitor(), factory);
     // Clean-up config with filter-specific logic before it runs through validations.
     cleanFuzzedConfig(proto_config.name(), message.get());
-    if (with_main_event_loop_) {
-      // For filters that need main event loop.
-      ON_CALL(encoder_callbacks_, dispatcher())
-          .WillByDefault(testing::ReturnRef(*worker_thread_dispatcher_));
-      ON_CALL(decoder_callbacks_, dispatcher())
-          .WillByDefault(testing::ReturnRef(*worker_thread_dispatcher_));
-    }
     cb_ = factory.createFilterFactoryFromProto(*message, "stats", factory_context_);
     cb_(filter_callback_);
   } catch (const EnvoyException& e) {
