@@ -243,6 +243,7 @@ TEST_F(QatProviderRsaTest, TestQatDeviceInit) {
   EXPECT_THROW_WITH_REGEX(
       std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_),
       EnvoyException, "Failed to start QAT device.");
+  delete private_key;
 }
 
 TEST_F(QatProviderRsaTest, TestQatDeviceSetup) {
@@ -287,6 +288,7 @@ TEST_F(QatProviderRsaTest, TestQatDeviceSetup) {
       std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_),
       EnvoyException, "Failed to start QAT.");
   libqat_->resetReturnValues();
+  delete private_key;
 }
 
 } // namespace
