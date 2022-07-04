@@ -83,10 +83,6 @@ FilterStatus ActiveResponseDecoder::applyMessageEncodedFilters(MessageMetadataSh
   switch (status) {
   case FilterStatus::StopIteration:
     break;
-  case FilterStatus::Retry:
-    response_status_ = DubboFilters::UpstreamResponseStatus::Retry;
-    decoder_->reset();
-    break;
   default:
     ASSERT(FilterStatus::Continue == status);
     break;
