@@ -8,16 +8,12 @@ configure_make(
     configure_in_place = True,
     configure_options = [
         "--disable-systemd",
+        "--disable-shared",
         "--with-pic",
         "--enable-static",
-        "--enable-shared",
         "--enable-samples=no",
     ],
     lib_source = "@com_github_intel_qatlib//:all",
-    out_shared_libs = [
-        "libqat.so",
-        "libusdm.so",
-    ],
     out_static_libs = [
         "libqat.a",
         "libusdm.a",
