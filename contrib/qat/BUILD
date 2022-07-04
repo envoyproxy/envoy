@@ -22,8 +22,8 @@ configure_make(
         "libqat.a",
         "libusdm.a",
     ],
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:public"],
     deps = ["@boringssl//:ssl"],
     alwayslink = True,
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
 )
