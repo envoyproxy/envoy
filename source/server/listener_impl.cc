@@ -1029,8 +1029,7 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
   }();
 
 #ifndef __linux__
-  const auto socket_type = Network::Utility::protobufAddressSocketType(
-      config.has_address() ? config.address() : config.addresses(0));
+  const auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   if (initial_reuse_port_value && socket_type == Network::Socket::Type::Stream) {
     // reuse_port is the default on Linux for TCP. On other platforms even if set it is disabled
     // and the user is warned. For UDP it's always the default even if not effective.
