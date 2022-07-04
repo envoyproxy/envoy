@@ -199,6 +199,11 @@ FilterStatus Router::handleAffinity() {
       cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
           SipFilters::SipFilterNames::get().SipProxy);
 
+  if (!metadata->destination().empty()) {
+    ENVOY_LOG(info, "Got message with pre-set destination: {}", metadata->destination() );
+    return FilterStatus::Continue;
+  }
+
   if (options == nullptr || metadata->msgType() == MsgType::Response) {
     return FilterStatus::Continue;
   }
@@ -290,8 +295,9 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   // - only add the header if the outbound-transactions feature is enabled for the cluster (may need to move this to the router where we have the route config)
   // todo
   // - add cache of conn-id to -> downstream, and cache of upstream_transaction for mapping responses from downstream to upstream
-  metadata->addXEnvoyOriginIngressHeader(callbacks_->ingressID());
-
+  if (metadata->msgType() == MsgType::Request)  {
+    metadata->addXEnvoyOriginIngressHeader(callbacks_->ingressID());
+  }
   
   if (upstream_request_ != nullptr) {
     return FilterStatus::Continue;
@@ -372,8 +378,11 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
     ENVOY_STREAM_LOG(debug, "reuse upstream request for {}", *callbacks_,
                      host->address()->ip()->addressAsString());
 
-    transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
-                                        upstream_request_);
+    if (metadata->msgType() == MsgType::Request) {
+      // jonah todo
+      transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
+                                          upstream_request_);
+    }
   } else {
     upstream_request_ = std::make_shared<UpstreamRequest>(
         std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info);
@@ -383,9 +392,11 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
                                             upstream_request_);
     ENVOY_STREAM_LOG(debug, "create new upstream request {}", *callbacks_,
                      host->address()->ip()->addressAsString());
-
-    transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
-                                        upstream_request_);
+    if (metadata->msgType() == MsgType::Request) {
+      // jonah todo
+      transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
+                                          upstream_request_);
+    }
   }
 
   lb_ret = true;
@@ -403,17 +414,54 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
-  if (!metadata->affinity().empty() &&
+  if (!metadata->destination().empty() && metadata->msgType() == MsgType::Response) {
+      ENVOY_LOG(info, "Using preset destination");
+      std::string host = metadata->destination();
+      metadata->setStopLoadBalance(true);
+
+      if (auto upstream_request = transaction_info->getUpstreamRequest(std::string(host));
+        upstream_request != nullptr) {
+        // There is action connection, reuse it.
+        ENVOY_STREAM_LOG(trace, "reuse upstream request from {}", *callbacks_, host);
+        upstream_request_ = upstream_request;
+        upstream_request_->setMetadata(metadata);
+        upstream_request_->setDecoderFilterCallbacks(*callbacks_);
+
+        transaction_info->insertUpstreamRequest(host, upstream_request_);
+        ENVOY_STREAM_LOG(trace, "call upstream_request_->start()", *callbacks_);
+        // Continue: continue to messageEnd, StopIteration: continue to next affinity
+        if (FilterStatus::StopIteration == upstream_request_->start()) {
+          // Defer to handle in upstream request onPoolReady or onPoolFailure
+          ENVOY_LOG(trace, "sip: state {}", StateNameValues::name(metadata_->state()));
+          return FilterStatus::StopIteration;
+        }
+        return FilterStatus::Continue;
+    }
+
+    ENVOY_STREAM_LOG(trace, "no destination preset select with load balancer host= {}", *callbacks_, host);
+
+    upstream_request_started = false;
+    auto ret =
+        messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_request_started);
+    if (upstream_request_started && ret == FilterStatus::StopIteration) {
+      // Defer to handle in upstream request onPoolReady or onPoolFailure
+      return FilterStatus::StopIteration;
+    } else {
+      return FilterStatus::Continue;
+    }
+
+  } else if (!metadata->affinity().empty() &&
       metadata->affinityIteration() != metadata->affinity().end()) {
     std::string host;
+
     metadata->resetDestination();
 
     ENVOY_STREAM_LOG(debug, "handle affinity of header:{} type:{} key:{}", *callbacks_,
-                     metadata->affinityIteration()->header(), metadata->affinityIteration()->type(),
-                     metadata->affinityIteration()->key());
+                    metadata->affinityIteration()->header(), metadata->affinityIteration()->type(),
+                    metadata->affinityIteration()->key());
     auto handle_ret = handleCustomizedAffinity(metadata->affinityIteration()->header(),
-                                               metadata->affinityIteration()->type(),
-                                               metadata->affinityIteration()->key(), metadata);
+                                              metadata->affinityIteration()->type(),
+                                              metadata->affinityIteration()->key(), metadata);
 
     if (QueryStatus::Continue == handle_ret) {
       // has already get the destination from affinity
@@ -421,14 +469,14 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       ENVOY_STREAM_LOG(debug, "has already get destination {} from affinity", *callbacks_, host);
     } else if (QueryStatus::Pending == handle_ret) {
       ENVOY_STREAM_LOG(debug, "do remote query for {}", *callbacks_,
-                       metadata->affinityIteration()->key());
+                      metadata->affinityIteration()->key());
       // Need to wait remote query response,
       // after response back, still back with current affinity
       metadata->setState(State::HandleAffinity);
       return FilterStatus::StopIteration;
     } else {
       ENVOY_STREAM_LOG(debug, "no existing destintion for {}", *callbacks_,
-                       metadata->affinityIteration()->key());
+                      metadata->affinityIteration()->key());
       // Need to try next affinity
       metadata->nextAffinityIteration();
       metadata->setState(State::HandleAffinity);
@@ -734,10 +782,10 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
     // JONAH reminder
     //auto upstream_host = parent_.getUpstreamHost();
-    ENVOY_LOG(info, "parent_.getUpstreamHost() {}", parent_.getUpstreamHost());
+    ENVOY_LOG(info, "parent_.getUpstreamHost() {}", parent_.getUpstreamHost()->hostname());
 
     // Todo pass in the route
-    ENVOY_LOG(info, "parent_.decoderFilterCallbacks().route(), {}", parent_.route());
+    ENVOY_LOG(info, "parent_.decoderFilterCallbacks().route(), {}", parent_.route()->routeEntry()->clusterName());
 
     // todo - create and save an UpstreamTransaction if this is a new Transaction
     // route to the downstream connection
@@ -755,8 +803,10 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       ENVOY_LOG(debug, "no downstream connection selected {}\n{}", downstream_conn_id, metadata->rawMsg());
       return FilterStatus::StopIteration;
     }
-    downstream_conn->startUpstreamResponse();
-    downstream_conn->upstreamData(metadata);
+    // set the destination and route, so responses to this request have affinity 
+    // to upstream host where we recvd this request from
+    downstream_conn->upstreamData(metadata, parent_.route(), parent_.getUpstreamHost()->hostname());
+
     return FilterStatus::Continue;
   }
 
@@ -774,7 +824,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       }
 
       active_trans->startUpstreamResponse();
-      active_trans->upstreamData(metadata);
+      active_trans->upstreamData(metadata, nullptr, "");
     } else {
       ENVOY_LOG(debug, "no active trans selected {}\n{}", transaction_id, metadata->rawMsg());
       return FilterStatus::StopIteration;

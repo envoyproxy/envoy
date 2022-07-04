@@ -229,7 +229,6 @@ private:
 
   absl::optional<absl::string_view> transaction_id_{};
   std::unique_ptr<IngressID> ingress_id_;
-
   std::string destination_{};
 
   std::vector<AffinityEntry> affinity_{};

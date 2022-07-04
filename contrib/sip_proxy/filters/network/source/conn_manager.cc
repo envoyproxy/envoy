@@ -355,17 +355,20 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  // add response handling here
-  // if (metadata->msgType() == MsgType::Response) {
-      // lookup transaction which has been saved off by the DownstreamConnectionInfoItem
-  // }
+  std::string&& k = std::string(metadata->transactionId().value());
+
+  if (metadata->msgType() == MsgType::Response) {
+    if (upstream_transactions_.find(k) != upstream_transactions_.end()) {
+      return *upstream_transactions_.at(k);
+    }
+  }
 
   // request handling
   stats_.request_active_.inc();
   
   stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
 
-  std::string&& k = std::string(metadata->transactionId().value());
+  
   // if (metadata->methodType() == MethodType::Ack) {
   if (transactions_.find(k) != transactions_.end()) {
     // ACK_4XX metadata will updated later.
@@ -537,21 +540,14 @@ const Network::Connection* ConnectionManager::ActiveTrans::connection() const {
 }
 
 Router::RouteConstSharedPtr ConnectionManager::ActiveTrans::route() {
-  ENVOY_LOG(info, "activrTrans::route()");
-
   if (!cached_route_) {
-    ENVOY_LOG(info, "activrTrans::route() not cached");
     if (metadata_ != nullptr) {
-      ENVOY_LOG(info, "activrTrans::route() metadata not null");
       Router::RouteConstSharedPtr route = parent_.config_.routerConfig().route(*metadata_);
       cached_route_ = std::move(route);
     } else {
-      ENVOY_LOG(info, "activrTrans::route() set cachd to null");
       cached_route_ = nullptr;
     }
   }
-
-  ENVOY_LOG(info, "activeTrans::route() return {}", cached_route_.value()->routeEntry()->clusterName());
   return cached_route_.value();
 }
 
@@ -572,8 +568,10 @@ void ConnectionManager::ActiveTrans::startUpstreamResponse() {
 }
 
 SipFilters::ResponseStatus
-ConnectionManager::ActiveTrans::upstreamData(MessageMetadataSharedPtr metadata) {
+ConnectionManager::ActiveTrans::upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination) {
   ASSERT(response_decoder_ != nullptr);
+  UNREFERENCED_PARAMETER(return_route);
+  UNREFERENCED_PARAMETER(return_destination);
 
   try {
     if (response_decoder_->onData(metadata)) {
@@ -600,38 +598,59 @@ void ConnectionManager::ActiveTrans::resetDownstreamConnection() {
   parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
-ConnectionManager::DownstreamConnectionInfoItem::DownstreamConnectionInfoItem(ConnectionManager& parent)
-    : parent_(parent), stream_info_(parent.time_source_, parent.read_callbacks_->connection().connectionInfoProviderSharedPtr())  {}
+// start of upstreamActiveTrans
 
-// // // SipFilters::DecoderFilterCallbacks
-const Network::Connection* 
-ConnectionManager::DownstreamConnectionInfoItem::connection() const   { 
+void ConnectionManager::UpstreamActiveTrans::onReset() {
+   //parent_.doDeferredTransDestroy(*this); 
+   ASSERT(false, "Not implemented. Unexpected Call to onReset");
+}
+
+void ConnectionManager::UpstreamActiveTrans::onError(const std::string& what) {
+  if (metadata_) {
+    sendLocalReply(AppException(AppExceptionType::ProtocolError, what), false);
+    return;
+  }
+  // parent_.doDeferredTransDestroy(*this);
+  // parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+const Network::Connection* ConnectionManager::UpstreamActiveTrans::connection() const {
   return &parent_.read_callbacks_->connection();
 }
 
-SipFilterStats& ConnectionManager::DownstreamConnectionInfoItem::stats() { return parent_.config_.stats(); }
+void ConnectionManager::UpstreamActiveTrans::sendLocalReply(const DirectResponse& response,
+                                                    bool end_stream) {
+  UNREFERENCED_PARAMETER(response);
+  UNREFERENCED_PARAMETER(end_stream);
+  ASSERT(false, "Need to implemented. sendLocalReply");    
+  // local reply should be sent upstream..                                                
+  // parent_.sendLocalReply(*metadata_, response, end_stream);
 
-std::shared_ptr<SipSettings> ConnectionManager::DownstreamConnectionInfoItem::settings() const  { 
-  return parent_.config_.settings(); 
+  // if (end_stream) {
+  //   return;
+  // }
+
+  // // Consume any remaining request data from the downstream.
+  // local_response_sent_ = true;
 }
 
-void ConnectionManager::DownstreamConnectionInfoItem::startUpstreamResponse() {
-    // message_decoder_ = std::make_unique<ResponseDecoder>(*this);
+void ConnectionManager::UpstreamActiveTrans::startUpstreamResponse() {
+  ASSERT(false, "startUpstreamResponse() Not implemented");    
+  //response_decoder_ = std::make_unique<ResponseDecoder>(*this);
 }
 
-SipFilters::ResponseStatus ConnectionManager::DownstreamConnectionInfoItem::upstreamData(MessageMetadataSharedPtr metadata) { 
-
-  // Create some sort of Filter chain / and Transaction here
-  // save of the transaction into a new map, which can be queried when a response is received from a downstream connection
-  // Question
-  //  - what should the filter chain look like!
-  //       - look at what the current activeTrans filter chain does
-  //  - and does it write the request, or just handle the response
-  //  - whatever it does it needs to provide affinity to the host which initiated the request
+SipFilters::ResponseStatus
+ConnectionManager::UpstreamActiveTrans::upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination) {
+  route_ = return_route;
+  destination_ = return_destination;
+  UNREFERENCED_PARAMETER(return_route);
+  UNREFERENCED_PARAMETER(return_destination);
 
   if (parent_.read_callbacks_->connection().state() == Network::Connection::State::Closed) {
     throw EnvoyException("downstream connection is closed");
   }
+
+  ENVOY_LOG(info, "Destination and route for response affinity: {} {}", destination_, route_->routeEntry()->clusterName());
 
   Buffer::OwnedImpl buffer;
   std::unique_ptr<Encoder> encoder = std::make_unique<EncoderImpl>();
@@ -640,8 +659,10 @@ SipFilters::ResponseStatus ConnectionManager::DownstreamConnectionInfoItem::upst
   ENVOY_LOG(info, "send upstream request downstream {}\n{}", parent_.local_ingress_id_->getDownstreamConnectionID(), buffer.length(), buffer.toString());
   parent_.read_callbacks_->connection().write(buffer, false);
 
+  return SipFilters::ResponseStatus::Complete;
+
   // try {
-  //   if (message_decoder_->onData(metadata)) {
+  //   if (response_decoder_->onData(metadata)) {
   //     // Completed upstream response.
   //     // parent_.doDeferredRpcDestroy(*this);
   //     return SipFilters::ResponseStatus::Complete;
@@ -661,7 +682,51 @@ SipFilters::ResponseStatus ConnectionManager::DownstreamConnectionInfoItem::upst
   //   onError(ex.what());
   //   return SipFilters::ResponseStatus::Reset;
   // }
-  return SipFilters::ResponseStatus::Complete;
+}
+
+void ConnectionManager::UpstreamActiveTrans::resetDownstreamConnection() {
+  ENVOY_LOG(info, "JONAH = Unexpected call to UpstreamActiveTrans::resetDownstreamConnection");
+  parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+// end of upstreamActiveTrans
+
+ConnectionManager::DownstreamConnectionInfoItem::DownstreamConnectionInfoItem(ConnectionManager& parent)
+    : parent_(parent), stream_info_(parent.time_source_, parent.read_callbacks_->connection().connectionInfoProviderSharedPtr())  {}
+
+// // // SipFilters::DecoderFilterCallbacks
+const Network::Connection* 
+ConnectionManager::DownstreamConnectionInfoItem::connection() const   { 
+  return &parent_.read_callbacks_->connection();
+}
+
+SipFilterStats& ConnectionManager::DownstreamConnectionInfoItem::stats() { return parent_.config_.stats(); }
+
+std::shared_ptr<SipSettings> ConnectionManager::DownstreamConnectionInfoItem::settings() const  { 
+  return parent_.config_.settings(); 
+}
+
+void ConnectionManager::DownstreamConnectionInfoItem::startUpstreamResponse() {
+    // message_decoder_ = std::make_unique<ResponseDecoder>(*this);
+}
+
+SipFilters::ResponseStatus ConnectionManager::DownstreamConnectionInfoItem::upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination) { 
+  std::string&& k = std::string(metadata->transactionId().value());
+
+  if (parent_.upstream_transactions_.find(k) != parent_.upstream_transactions_.end()) {
+    auto active_trans = parent_.upstream_transactions_.at(k);
+    return active_trans->upstreamData(metadata, return_route, return_destination);
+  }
+  
+  auto active_trans = std::make_shared<UpstreamActiveTrans>(parent_, metadata);
+  active_trans->createFilterChain();
+
+  parent_.upstream_transactions_.emplace(k, active_trans);
+
+  // TODO Set the Route and upstream Host into the activeTrans!!
+  
+
+  return active_trans->upstreamData(metadata, return_route, return_destination);
 }
 
 void DownstreamConnectionInfos::init()  {
