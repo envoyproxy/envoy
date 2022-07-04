@@ -370,6 +370,16 @@ target from [`cc_binary`](https://docs.bazel.build/versions/master/be/c-cpp.html
 or pass [`--strip=always`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--strip)
 instead.
 
+# Running the built Envoy binary on the host system
+
+After Envoy is built, it can be executed via CLI.
+
+For example, if Envoy was built using the `bazel build -c opt //source/exe:envoy-static` command, then it can be executed from the project's root directory by running:
+
+```console
+$(bazel info bazel-genfiles)/source/exe/envoy-static --config-path /path/to/your/envoy/config.yaml
+```
+
 # Testing Envoy with Bazel
 
 All the Envoy tests can be built and run with:

@@ -29,9 +29,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config, Runtime::Loader& runtime) {
-  const bool support_udp_in_place_filter_chain_update = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place");
-  if (support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
+  if (overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());
     ASSERT(listener_detail.has_value());
@@ -71,17 +69,6 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
                                listener_reject_fraction_, disable_listeners_,
                                std::move(internal_listener));
   } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
-    if (!support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
-      if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
-          iter != listener_map_by_tag_.end()) {
-        iter->second->invokeListenerMethod(
-            [&config](Network::ConnectionHandler::ActiveListener& listener) {
-              listener.updateListenerConfig(config);
-            });
-        return;
-      }
-      IS_ENVOY_BUG("unexpected");
-    }
     for (auto& socket_factory : config.listenSocketFactories()) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
@@ -100,9 +87,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       details->addActiveListener(
           config, address, listener_reject_fraction_, disable_listeners_,
           config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
-              runtime, *worker_index_, *this,
-              config.listenSocketFactories()[0]->getListenSocket(*worker_index_), dispatcher_,
-              config));
+              runtime, *worker_index_, *this, socket_factory->getListenSocket(*worker_index_),
+              dispatcher_, config));
     }
   }
 
@@ -200,15 +186,18 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 }
 
 Network::UdpListenerCallbacksOptRef
-ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag) {
+ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag,
+                                               const Network::Address::Instance& address) {
   auto listener = findActiveListenerByTag(listener_tag);
   if (listener.has_value()) {
     // If the tag matches this must be a UDP listener.
-    // TODO(soulxu): return first listener here, this will be changed
-    // when UdpWorkerRouter supports the multiple addresses.
-    auto udp_listener = listener->get().per_address_details_list_[0]->udpListener();
-    ASSERT(udp_listener.has_value());
-    return udp_listener;
+    for (auto& details : listener->get().per_address_details_list_) {
+      if (*details->address_ == address) {
+        auto udp_listener = details->udpListener();
+        ASSERT(udp_listener.has_value());
+        return details->udpListener();
+      }
+    }
   }
 
   return absl::nullopt;
