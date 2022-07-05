@@ -14,9 +14,9 @@ namespace Http11Connect {
 class UpstreamHttp11ConnectSocketConfigFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
-  std::string name() const override { return "envoy.transport_sockets.upstream_http_11_proxy"; }
+  std::string name() const override { return "envoy.transport_sockets.http_11_proxy"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
 };

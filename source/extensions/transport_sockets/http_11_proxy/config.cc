@@ -12,7 +12,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {

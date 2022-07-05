@@ -50,8 +50,10 @@ public:
     });
     BaseIntegrationTest::initialize();
     if (upstream_tls_) {
-      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), Http::CodecType::HTTP1);
-      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), Http::CodecType::HTTP1);
+      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), Http::CodecType::HTTP1,
+                      false);
+      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), Http::CodecType::HTTP1,
+                      false);
       // Read disable the fake upstreams, so we can rawRead rather than read data and decrypt.
       fake_upstreams_[1]->setDisableAllAndDoNotEnable(true);
       fake_upstreams_[2]->setDisableAllAndDoNotEnable(true);

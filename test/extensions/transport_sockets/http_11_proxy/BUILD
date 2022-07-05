@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "connect_test",
     srcs = ["connect_test.cc"],
-    extension_names = ["envoy.transport_sockets.upstream_http_11_proxy"],
+    extension_names = ["envoy.transport_sockets.http_11_proxy"],
     deps = [
         "//source/extensions/transport_sockets/http_11_proxy:connect",
         "//test/mocks/buffer:buffer_mocks",
@@ -27,7 +27,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "connect_integration_test",
     srcs = ["connect_integration_test.cc"],
-    extension_names = ["envoy.transport_sockets.upstream_http_11_proxy"],
+    extension_names = ["envoy.transport_sockets.http_11_proxy"],
     deps = [
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
