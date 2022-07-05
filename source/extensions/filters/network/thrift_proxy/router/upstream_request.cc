@@ -169,8 +169,8 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
       // ResetStream triggers a local connection failure. However, we want to
       // keep the downstream connection after the upstream connection, i.e.,
       // `conn_data->connection()`, is closed. Therefore, introduce a new flag
-      // `drainging_` to hint that we got a draining signal and not to close
-      // the downstream connection.
+      // `draining_` to hint that we got a draining signal and not to close the
+      //  downstream connection.
       draining_ = true;
       resetStream();
     }
