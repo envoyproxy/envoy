@@ -96,12 +96,10 @@ def swift_repos():
         url = "https://github.com/realm/SwiftLint/releases/download/0.47.1/portable_swiftlint.zip",
     )
 
-    # https://github.com/buildbuddy-io/rules_xcodeproj/pull/552
     http_archive(
         name = "com_github_buildbuddy_io_rules_xcodeproj",
-        sha256 = "23c0b0a4a76725350deaaa70e0dedd27f3a2f449ef05ab7959577bc9eafe27ad",
-        strip_prefix = "rules_xcodeproj-0f6e85cf892f6739ee489b931699595559f5d805",
-        url = "https://github.com/buildbuddy-io/rules_xcodeproj/archive/0f6e85cf892f6739ee489b931699595559f5d805.tar.gz",
+        sha256 = "728cb6089ad2f4c4de2003ce23462be662bfdd250a8735dc590e61fb7401e7d2",
+        url = "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/0.5.0/release.tar.gz",
     )
 
 def kotlin_repos():
