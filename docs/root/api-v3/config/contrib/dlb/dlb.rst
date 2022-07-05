@@ -1,3 +1,4 @@
+.. _connection_balance_dlb:
 .. toctree::
   :glob:
   :maxdepth: 2
