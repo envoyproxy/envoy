@@ -100,6 +100,7 @@ BAZEL_BUILD_OPTIONS=(
   "--repository_cache=${BUILD_DIR}/repository_cache"
   "--experimental_repository_cache_hardlinks"
   "--action_env=CLANG_FORMAT"
+  "--jobs=${NUM_CPUS}"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
