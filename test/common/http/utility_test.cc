@@ -1074,30 +1074,6 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<TestConfig>(&filter_callbacks));
 }
 
-// Verify that resolveMostSpecificPerFilterConfig indeed returns the most specific per
-// filter config.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
-
-  const Router::RouteSpecificFilterConfig config;
-
-  // Test when there's nothing on the route
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         &filter_callbacks));
-
-  // Testing in reverse order, so that the method always returns the last object.
-  // Testing per-virtualhost typed filter config
-  ON_CALL(*filter_callbacks.route_, mostSpecificPerFilterConfig(_)).WillByDefault(Return(&config));
-  EXPECT_EQ(&config, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         &filter_callbacks));
-
-  // Cover the case of no route entry
-  ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  ON_CALL(*filter_callbacks.route_, mostSpecificPerFilterConfig(_)).WillByDefault(Return(&config));
-  EXPECT_EQ(&config, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         &filter_callbacks));
-}
-
 // Verify that merging works as expected and we get back the merged result.
 TEST(HttpUtility, GetMergedPerFilterConfig) {
   TestConfig baseTestConfig, routeTestConfig;
