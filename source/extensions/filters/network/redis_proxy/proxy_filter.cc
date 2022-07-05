@@ -37,7 +37,9 @@ ProxyFilterConfig::ProxyFilterConfig(
                                        config.extra_downstream_auth_passwords().size());
     for (const auto& source : config.extra_downstream_auth_passwords()) {
       const auto p = Config::DataSource::read(source, true, api);
-      downstream_auth_passwords_.emplace_back(p);
+      if (!p.empty()) {
+        downstream_auth_passwords_.emplace_back(p);
+      }
     }
   }
 }
