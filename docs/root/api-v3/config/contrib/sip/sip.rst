@@ -1,3 +1,6 @@
+Sip Filiter
+===========
+
 .. toctree::
   :glob:
   :maxdepth: 2

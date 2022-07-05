@@ -1,3 +1,6 @@
+Cryptomb Private Key Providers
+==============================
+
 .. toctree::
   :glob:
   :maxdepth: 2
