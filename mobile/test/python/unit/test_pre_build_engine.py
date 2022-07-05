@@ -1,5 +1,5 @@
 # This module can't be tested normally
-# becuse it needs the Engine not to exist in the process
+# because it needs the Engine not to exist in the process
 # so each of the tests here are marked to be run
 # only in a particular instance of the test runner
 # and targets are specified in //library/python/...

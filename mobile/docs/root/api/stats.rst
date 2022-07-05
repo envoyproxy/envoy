@@ -76,7 +76,7 @@ The count argument of ``increment`` is defaulted with a value of ``1``.
   // Swift
   counter.increment(count: 5)
 
-A ``Counter`` can be incremented with custom tags. To be concise, this doc shows examples of attching custom tagging for ``Counter`` on increment. Similar APIs are available for all metrics types to attach tags on metrics reporting.
+A ``Counter`` can be incremented with custom tags. To be concise, this doc shows examples of attaching custom tagging for ``Counter`` on increment. Similar APIs are available for all metrics types to attach tags on metrics reporting.
 
 **Example**::
 
