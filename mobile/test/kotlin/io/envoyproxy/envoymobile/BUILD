@@ -99,3 +99,13 @@ envoy_mobile_kt_test(
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
+
+envoy_mobile_kt_test(
+    name = "headers_container_test",
+    srcs = [
+        "HeadersContainerTest.kt",
+    ],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)

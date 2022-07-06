@@ -60,7 +60,7 @@ public class HeadersBuilder: NSObject {
       return self
     }
 
-    self.container.set(name: name, value: nil)
+    self.container.remove(name: name)
     return self
   }
 
@@ -78,8 +78,12 @@ public class HeadersBuilder: NSObject {
     return self
   }
 
-  func allHeaders() -> [String: [String]] {
-    return self.container.allHeaders()
+  /// Accessor for all underlying case-sensitive headers. When possible,
+  /// use case-insensitive accessors instead.
+  ///
+  /// - returns: The underlying case-sensitive headers.
+  func caseSensitiveHeaders() -> [String: [String]] {
+    return self.container.caseSensitiveHeaders()
   }
 
   // Only explicitly implemented to work around a swiftinterface issue in Swift 5.1. This can be

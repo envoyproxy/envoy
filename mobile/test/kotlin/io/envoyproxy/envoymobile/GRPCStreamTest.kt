@@ -104,7 +104,7 @@ class GRPCStreamTest {
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
       .setOnResponseHeaders { headers, endStream, _ ->
-        assertThat(headers.allHeaders()).isEqualTo(expectedHeaders.allHeaders())
+        assertThat(headers.caseSensitiveHeaders()).isEqualTo(expectedHeaders.caseSensitiveHeaders())
         assertThat(endStream).isTrue()
         countDownLatch.countDown()
       }
@@ -124,7 +124,7 @@ class GRPCStreamTest {
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
       .setOnResponseTrailers { trailers, _ ->
-        assertThat(trailers.allHeaders()).isEqualTo(expectedTrailers.allHeaders())
+        assertThat(trailers.caseSensitiveHeaders()).isEqualTo(expectedTrailers.caseSensitiveHeaders())
         countDownLatch.countDown()
       }
       .start(Executor {})

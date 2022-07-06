@@ -4,18 +4,26 @@ package io.envoyproxy.envoymobile
  * Builder used for constructing instances of `RequestTrailers`.
  */
 class RequestTrailersBuilder : HeadersBuilder {
-  /**
-   * Initialize a new instance of the builder.
+  /*
+   * Instantiate a new builder.
    */
-  constructor() : super(mutableMapOf())
+  internal constructor() : super(HeadersContainer(mapOf()))
 
-  /**
+  /*
+   * Instantiate a new instance of the builder.
+   *
+   * @param container: The headers container to start with.
+   */
+  internal constructor(container: HeadersContainer) : super(container)
+
+  /*
    * Instantiate a new builder. Used only by RequestTrailers to convert back to
    * RequestTrailersBuilder.
    *
    * @param trailers: The trailers to start with.
    */
-  internal constructor(trailers: MutableMap<String, MutableList<String>>) : super(trailers)
+  internal constructor(trailers: MutableMap<String, MutableList<String>>)
+    : super(HeadersContainer(trailers))
 
   override fun add(name: String, value: String): RequestTrailersBuilder {
     super.add(name, value)
@@ -43,6 +51,6 @@ class RequestTrailersBuilder : HeadersBuilder {
    * @return RequestTrailers, New instance of request trailers.
    */
   fun build(): RequestTrailers {
-    return RequestTrailers(headers)
+    return RequestTrailers(container)
   }
 }

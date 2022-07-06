@@ -44,6 +44,7 @@ envoy_mobile_kt_library(
         "EnvoyError.kt",
         "Headers.kt",
         "HeadersBuilder.kt",
+        "HeadersContainer.kt",
         "KeyValueStore.kt",
         "LogLevel.kt",
         "PulseClient.kt",

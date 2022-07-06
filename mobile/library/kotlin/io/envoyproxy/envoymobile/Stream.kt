@@ -20,7 +20,7 @@ open class Stream(
    * @return This stream, for chaining syntax.
    */
   open fun sendHeaders(headers: RequestHeaders, endStream: Boolean): Stream {
-    underlyingStream.sendHeaders(headers.allHeaders(), endStream)
+    underlyingStream.sendHeaders(headers.caseSensitiveHeaders(), endStream)
     return this
   }
 
@@ -58,7 +58,7 @@ open class Stream(
    * @param trailers Trailers with which to close the stream.
    */
   open fun close(trailers: RequestTrailers) {
-    underlyingStream.sendTrailers(trailers.allHeaders())
+    underlyingStream.sendTrailers(trailers.caseSensitiveHeaders())
   }
 
   /**

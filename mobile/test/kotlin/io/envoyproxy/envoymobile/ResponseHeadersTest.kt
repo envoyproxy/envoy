@@ -43,4 +43,11 @@ class ResponseHeadersTest {
       .build()
     assertThat(headers.value(":status")).isNull()
   }
+
+  @Test
+  fun `header lookup is a case-insensitive operation`() {
+    val headers = ResponseHeaders(mapOf("FoO" to listOf("123")))
+    assertThat(headers.value("FoO")).isEqualTo(listOf("123"))
+    assertThat(headers.value("foo")).isEqualTo(listOf("123"))
+  }
 }

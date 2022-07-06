@@ -9,7 +9,9 @@ open class RequestHeaders : Headers {
    *
    * @param headers: Headers to set.
    */
-  internal constructor(headers: Map<String, List<String>>) : super(headers)
+  internal constructor(headers: Map<String, List<String>>) : super(HeadersContainer.create(headers))
+
+  internal constructor(container: HeadersContainer): super(container)
 
   /**
    * Method for the request.
@@ -49,9 +51,5 @@ open class RequestHeaders : Headers {
    *
    * @return RequestHeadersBuilder, The new builder.
    */
-  fun toRequestHeadersBuilder() = RequestHeadersBuilder(
-    headers.mapValues {
-      it.value.toMutableList()
-    }.toMutableMap()
-  )
+  fun toRequestHeadersBuilder() = RequestHeadersBuilder(container)
 }

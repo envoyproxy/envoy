@@ -27,7 +27,7 @@ public class Headers: NSObject {
   ///
   /// - returns: The underlying case-sensitive headers.
   public func caseSensitiveHeaders() -> [String: [String]] {
-    return self.container.allHeaders()
+    return self.container.caseSensitiveHeaders()
   }
 
   /// Internal initializer used by builders.

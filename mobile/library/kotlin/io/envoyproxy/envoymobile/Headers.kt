@@ -5,35 +5,37 @@ package io.envoyproxy.envoymobile
  * To instantiate new instances, see `{Request|Response}HeadersBuilder`.
  */
 open class Headers {
-  @Suppress("MemberNameEqualsClassName")
-  val headers: Map<String, List<String>>
+  val container: HeadersContainer
 
   /**
    * Internal constructor used by builders.
    *
-   * @param headers: Headers to set.
+   * @param container: The headers container to set.
    */
-  protected constructor(headers: Map<String, List<String>>) {
-    this.headers = headers
+  internal constructor(container: HeadersContainer) {
+    this.container = container
   }
 
   /**
-   * Get the value for the provided header name.
+   * Get the value for the provided header name. It's discouraged
+   * to use this dictionary for equality key-based lookups as this
+   * may lead to issues with headers that do not follow expected
+   * casing i.e., "Content-Length" instead of "content-length".
    *
    * @param name: Header name for which to get the current value.
    *
-   * @return List<String>?, The current headers specified for the provided name.
+   * @return The current headers specified for the provided name.
    */
   fun value(name: String): List<String>? {
-    return headers[name]
+    return container.value(name)
   }
 
   /**
    * Accessor for all underlying headers as a map.
    *
-   * @return Map<String, List<String>>, The underlying headers.
+   * @return The underlying headers.
    */
-  fun allHeaders(): Map<String, List<String>> {
-    return headers
+  fun caseSensitiveHeaders(): Map<String, List<String>> {
+    return container.caseSensitiveHeaders()
   }
 }

@@ -7,7 +7,7 @@ class ResponseTrailersBuilder : HeadersBuilder {
   /**
    * Initialize a new instance of the builder.
    */
-  constructor() : super(mutableMapOf())
+  constructor() : super(HeadersContainer(mapOf()))
 
   /**
    * Instantiate a new builder. Used only by ResponseTrailers to convert back to
@@ -15,7 +15,10 @@ class ResponseTrailersBuilder : HeadersBuilder {
    *
    * @param trailers: The trailers to start with.
    */
-  internal constructor(trailers: MutableMap<String, MutableList<String>>) : super(trailers)
+  internal constructor(trailers: MutableMap<String, MutableList<String>>)
+    : super(HeadersContainer(trailers))
+
+  internal constructor(container: HeadersContainer) : super(container)
 
   override fun add(name: String, value: String): ResponseTrailersBuilder {
     super.add(name, value)
@@ -43,6 +46,6 @@ class ResponseTrailersBuilder : HeadersBuilder {
    * @return ResponseTrailers, New instance of response trailers.
    */
   fun build(): ResponseTrailers {
-    return ResponseTrailers(headers)
+    return ResponseTrailers(container)
   }
 }
