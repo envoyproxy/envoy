@@ -3484,6 +3484,7 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAlloc
 // this test. Http1Settings members like `allow_absolute_url` do not matter as
 // they are not passed on to the Parser.
 
+// SPELLCHECKER(off)
 const char* kValidFirstLines[] = {
     "GET http://www.somewhere.com HTTP/1.1\r\n",
     "GET scheme://$,www]][-_..!~\'(&=+.com/path HTTP/1.1\r\n",
@@ -3523,6 +3524,7 @@ const char* kInvalidFirstLines[] = {
     "GET ?#query#@@ HTTP/1.1\r\n",
     "GET @ HTTP/1.1\r\n",
 };
+// SPELLCHECKER(on)
 
 TEST_F(Http1ServerConnectionImplTest, ParseUrl) {
   for (const char* valid_first_line : kValidFirstLines) {
