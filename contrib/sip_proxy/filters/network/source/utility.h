@@ -161,10 +161,6 @@ public:
         ->ip()
         ->addressAsString();
   }
-  static void trimStringView(absl::string_view& string) {
-    string.remove_prefix(std::min(string.find_first_not_of(' '), string.size()));
-    string.remove_suffix(std::max(string.size() - string.find_last_not_of(' ') - 1, 0ul));
-  }
 };
 
 /**

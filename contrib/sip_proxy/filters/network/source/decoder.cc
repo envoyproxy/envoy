@@ -180,10 +180,8 @@ FilterStatus Decoder::onDataReady(Buffer::Instance& data) {
 }
 
 auto Decoder::sipHeaderType(absl::string_view sip_line) {
-  auto header_type_str = sip_line.substr(0, sip_line.find_first_of(':'));
-  auto header_value = sip_line.substr(sip_line.find_first_of(':') + strlen(":"));
-  Utility::trimStringView(header_type_str);
-  Utility::trimStringView(header_value);
+  auto header_type_str = StringUtil::trim(sip_line.substr(0, sip_line.find_first_of(':')));
+  auto header_value = StringUtil::trim(sip_line.substr(sip_line.find_first_of(':') + strlen(":")));
   return std::tuple<HeaderType, absl::string_view>{HeaderTypes::get().str2Header(header_type_str),
                                                    header_value};
 }
