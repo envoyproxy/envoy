@@ -46,7 +46,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "format | ./WORKSPACE | **/*.bzl"
+        key: "proto_format | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
@@ -100,6 +100,12 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+    - task: Cache@2
+      inputs:
+        key: "dependencies | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
       workingDirectory: $(Build.SourcesDirectory)
       env:

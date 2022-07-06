@@ -8,7 +8,6 @@
 # Usage: protoprint.py <source file path> <type database path> <load type db path>
 #                      <api version file path>
 
-from collections import deque
 import copy
 import functools
 import io
@@ -17,8 +16,21 @@ import pathlib
 import re
 import subprocess
 import sys
+from collections import deque
+from functools import cached_property
 
-from tools.api_proto_plugin import annotations, traverse, visitor
+from packaging import version
+
+from bazel_tools.tools.python.runfiles import runfiles
+
+# We have to do some evil things to sys.path due to the way that Python module
+# resolution works; we have both tools/ trees in bazel_tools and envoy. By
+# default, Bazel leaves us with a sys.path in which the @bazel_tools repository
+# takes precedence. Now that we're done with importing runfiles above, we can
+# just remove it from the sys.path.
+sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
+
+from tools.api_proto_plugin import annotations, plugin, traverse, visitor
 from tools.api_versioning import utils as api_version_utils
 from tools.protoxform import options as protoxform_options, utils
 from tools.type_whisperer import type_whisperer, types_pb2
@@ -29,6 +41,8 @@ from google.protobuf import text_format
 from envoy.annotations import deprecation_pb2
 from udpa.annotations import migrate_pb2, status_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
+
+import envoy_repo
 
 NEXT_FREE_FIELD_MIN = 5
 
@@ -65,8 +79,8 @@ def extract_clang_proto_style(clang_format_text):
     return str(format_dict)
 
 
-# Ensure we are using the canonical clang-format proto style.
-CLANG_FORMAT_STYLE = extract_clang_proto_style(pathlib.Path('.clang-format').read_text())
+CLANG_FORMAT_STYLE = extract_clang_proto_style(
+    pathlib.Path(runfiles.Create().Rlocation("envoy/.clang-format")).read_text())
 
 
 def clang_format(contents):
@@ -593,13 +607,24 @@ class ProtoFormatVisitor(visitor.Visitor):
 
     See visitor.Visitor for visitor method docs comments.
     """
+    _api_version = None
+    _requires_deprecation_annotation_import = False
 
-    def __init__(self, api_version_file_path, frozen_proto):
-        current_api_version = api_version_utils.get_api_version(api_version_file_path)
-        self._deprecated_annotation_version_value = '{}.{}'.format(
-            current_api_version.major, current_api_version.minor)
-        self._requires_deprecation_annotation_import = False
-        self._frozen_proto = frozen_proto
+    def __init__(self, params):
+        if params['type_db_path']:
+            utils.load_type_db(params['type_db_path'])
+
+        if extra_args := params.get("extra_args"):
+            if extra_args.startswith("api_version:"):
+                self._api_version = extra_args.split(":")[1]
+
+    @cached_property
+    def current_api_version(self):
+        return version.Version(self._api_version or envoy_repo.API_VERSION)
+
+    @cached_property
+    def _deprecated_annotation_version_value(self):
+        return f"{self.current_api_version.major}.{self.current_api_version.minor}"
 
     def _add_deprecation_version(self, field_or_evalue, deprecation_tag, disallowed_tag):
         """Adds a deprecation version annotation if needed to the given field or enum value.
@@ -652,6 +677,7 @@ class ProtoFormatVisitor(visitor.Visitor):
             return ''
         # Verify that not hidden deprecated enum values of non-frozen protos have valid version
         # annotations.
+
         for v in enum_proto.value:
             self._add_deprecation_version(
                 v, deprecation_pb2.deprecated_at_minor_version_enum,
@@ -726,20 +752,23 @@ class ProtoFormatVisitor(visitor.Visitor):
         return clang_format(header + formatted_services + formatted_enums + formatted_msgs)
 
 
-if __name__ == '__main__':
-    proto_desc_path = sys.argv[1]
+class ProtoprintTraverser:
 
+    def traverse_file(self, file_proto, visitor):
+        # TODO(phlax): Figure out how to pass this to visitors
+        #   This currently breaks the Visitor contract, ie class props should not be set on individual visitation.
+        visitor._frozen_proto = (
+            file_proto.options.Extensions[status_pb2.file_status].package_version_status ==
+            status_pb2.FROZEN)
+        return traverse.traverse_file(file_proto, visitor)
+
+
+def main(data=None):
     utils.load_protos()
 
-    file_proto = descriptor_pb2.FileDescriptorProto()
-    input_text = pathlib.Path(proto_desc_path).read_text()
-    if not input_text:
-        sys.exit(0)
-    text_format.Merge(input_text, file_proto)
-    dst_path = pathlib.Path(sys.argv[2])
-    utils.load_type_db(sys.argv[3])
-    api_version_file_path = pathlib.Path(sys.argv[4])
-    frozen_proto = file_proto.options.Extensions[
-        status_pb2.file_status].package_version_status == status_pb2.FROZEN
-    dst_path.write_bytes(
-        traverse.traverse_file(file_proto, ProtoFormatVisitor(api_version_file_path, frozen_proto)))
+    plugin.plugin([plugin.direct_output_descriptor('.proto', ProtoFormatVisitor, want_params=True)],
+                  traverser=ProtoprintTraverser().traverse_file)
+
+
+if __name__ == '__main__':
+    main()
