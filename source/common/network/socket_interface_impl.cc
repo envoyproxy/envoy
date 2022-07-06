@@ -6,18 +6,43 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
+#include "source/common/io/io_uring_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/io_uring_socket_handle_impl.h"
 #include "source/common/network/win32_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Network {
 
-IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
-                                                            absl::optional<int> domain) {
+namespace {
+
+// TODO (soulxu): making those configurable if needed.
+constexpr uint32_t DefaultIoUringSize = 300;
+constexpr uint32_t DefaultReadBufferSize = 8192;
+constexpr bool UseSubmissionQueuePolling = false;
+
+} // namespace
+
+void DefaultSocketInterfaceExtension::onServerInitialized() {
+  if (io_uring_factory_ != nullptr) {
+    io_uring_factory_->onServerInitialized();
+  }
+}
+
+IoHandlePtr
+SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
+                                                absl::optional<int> domain,
+                                                const Io::IoUringFactory* io_uring_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
-  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+
+  if (io_uring_factory == nullptr) {
+    return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+  } else {
+    return std::make_unique<IoUringSocketHandleImpl>(DefaultReadBufferSize, *io_uring_factory,
+                                                     socket_fd, socket_v6only, domain);
+  }
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
@@ -112,10 +137,14 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   return SOCKET_VALID(result.return_value_);
 }
 
-Server::BootstrapExtensionPtr
-SocketInterfaceImpl::createBootstrapExtension(const Protobuf::Message&,
-                                              Server::Configuration::ServerFactoryContext&) {
-  return std::make_unique<SocketInterfaceExtension>(*this);
+Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
+    const Protobuf::Message&, Server::Configuration::ServerFactoryContext& context) {
+  // TODO (soulxu): Add runtime flag here.
+  if (Io::isIoUringSupported()) {
+    io_uring_factory_ = std::make_unique<Io::IoUringFactoryImpl>(
+        DefaultIoUringSize, UseSubmissionQueuePolling, context.threadLocal());
+  }
+  return std::make_unique<DefaultSocketInterfaceExtension>(*this, io_uring_factory_);
 }
 
 ProtobufTypes::MessagePtr SocketInterfaceImpl::createEmptyConfigProto() {

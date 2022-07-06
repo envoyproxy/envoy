@@ -2,10 +2,24 @@
 
 #include "envoy/network/socket.h"
 
+#include "source/common/io/io_uring.h"
 #include "source/common/network/socket_interface.h"
 
 namespace Envoy {
 namespace Network {
+
+class DefaultSocketInterfaceExtension : public Network::SocketInterfaceExtension {
+public:
+  DefaultSocketInterfaceExtension(Network::SocketInterface& sock_interface,
+                                  std::unique_ptr<Io::IoUringFactory>& io_uring_factory)
+      : Network::SocketInterfaceExtension(sock_interface), io_uring_factory_(io_uring_factory) {}
+
+  // Server::BootstrapExtension
+  void onServerInitialized() override;
+
+protected:
+  std::unique_ptr<Io::IoUringFactory>& io_uring_factory_;
+};
 
 class SocketInterfaceImpl : public SocketInterfaceBase {
 public:
@@ -26,12 +40,16 @@ public:
     return "envoy.extensions.network.socket_interface.default_socket_interface";
   };
 
-  static IoHandlePtr makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
-                                                absl::optional<int> domain);
+  static IoHandlePtr
+  makePlatformSpecificSocket(int socket_fd, bool socket_v6only, absl::optional<int> domain,
+                             const Io::IoUringFactory* io_uring_factory = nullptr);
 
 protected:
   virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
                                  absl::optional<int> domain) const;
+
+private:
+  std::unique_ptr<Io::IoUringFactory> io_uring_factory_;
 };
 
 DECLARE_FACTORY(SocketInterfaceImpl);

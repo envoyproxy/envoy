@@ -234,11 +234,13 @@ envoy_cc_library(
     name = "default_socket_interface_lib",
     srcs = [
         "io_socket_handle_impl.cc",
+        "io_uring_socket_handle_impl.cc",
         "socket_interface_impl.cc",
         "win32_socket_handle_impl.cc",
     ],
     hdrs = [
         "io_socket_handle_impl.h",
+        "io_uring_socket_handle_impl.h",
         "socket_interface_impl.h",
         "win32_socket_handle_impl.h",
     ],
@@ -252,6 +254,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
+        "//source/common/io:io_uring_impl_lib",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )
