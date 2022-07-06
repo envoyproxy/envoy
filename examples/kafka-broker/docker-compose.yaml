@@ -7,20 +7,20 @@ services:
       dockerfile: Dockerfile-proxy
     container_name: proxy
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - 19092:19092
-      - 8001:8001
+    - 19092:19092
+    - 8001:8001
 
   kafka:
     image: confluentinc/cp-kafka:latest
     container_name: kafka
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - 9092:9092
+    - 9092:9092
     depends_on:
-      - zookeeper
+    - zookeeper
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -38,9 +38,9 @@ services:
     image: confluentinc/cp-zookeeper:latest
     container_name: zookeeper
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - 22181:2181
+    - 22181:2181
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
