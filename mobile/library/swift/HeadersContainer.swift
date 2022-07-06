@@ -16,8 +16,8 @@ struct HeadersContainer: Equatable {
       self.value = value
     }
 
-    mutating func addValue(_ value: [String]) {
-      self.value.append(contentsOf: value)
+    mutating func addValues(_ values: [String]) {
+      self.value.append(contentsOf: values)
     }
 
     mutating func addValue(_ value: String) {
@@ -50,7 +50,7 @@ struct HeadersContainer: Equatable {
         underlyingHeaders[lowercasedName] =
           Header(name: name, value: value + existingHeader.value)
       } else {
-        underlyingHeaders[lowercasedName]?.addValue(value)
+        underlyingHeaders[lowercasedName]?.addValues(value)
       }
     }
     self.headers = underlyingHeaders

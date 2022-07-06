@@ -10,9 +10,21 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
 import java.util.UUID
 
+/**
+ * Envoy engine configuration.
+ */
 sealed class BaseConfiguration
 
+/**
+ * The standard configuration.
+ */
 class Standard : BaseConfiguration()
+
+/**
+ * The configuration based off a custom yaml.
+ *
+ * @param yaml the custom config.
+ */
 class Custom(val yaml: String) : BaseConfiguration()
 
 /**
@@ -304,7 +316,7 @@ open class EngineBuilder(
    * and results in a connection ping on every new stream creation. Set it to
    * 100000000 milliseconds to effectively disable the ping.
    *
-   * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds.
+   * @param idleIntervalMs rate in milliseconds.
    *
    * @return this builder.
    */
@@ -316,7 +328,7 @@ open class EngineBuilder(
   /**
    * Add a rate at which to timeout h2 pings.
    *
-   * @param h2ConnectionKeepaliveTimeoutSeconds rate in seconds to timeout h2 pings.
+   * @param timeoutSeconds rate in seconds to timeout h2 pings.
    *
    * @return this builder.
    */

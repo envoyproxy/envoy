@@ -1,6 +1,6 @@
 package io.envoyproxy.envoymobile
 
-/*
+/**
  * Builder used for constructing instances of `ResponseTrailers`.
  */
 class ResponseTrailersBuilder : HeadersBuilder {

@@ -1,6 +1,6 @@
 package io.envoyproxy.envoymobile
 
-/*
+/**
  * Base builder class used to construct `Headers` instances.
  * See `{Request|Response}HeadersBuilder` for usage.
  */

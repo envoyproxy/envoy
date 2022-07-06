@@ -1,6 +1,6 @@
 package io.envoyproxy.envoymobile
 
-/*
+/**
  * Builder used for constructing instances of RequestHeaders`.
  */
 class RequestHeadersBuilder : HeadersBuilder {
