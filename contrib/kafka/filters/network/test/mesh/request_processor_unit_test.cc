@@ -31,6 +31,12 @@ public:
   MOCK_METHOD(KafkaProducer&, getProducerForTopic, (const std::string&));
 };
 
+class MockRecordCallbackProcessor : public RecordCallbackProcessor {
+public:
+  MOCK_METHOD(void, processCallback, (const RecordCbSharedPtr&));
+  MOCK_METHOD(void, removeCallback, (const RecordCbSharedPtr&));
+};
+
 class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
   MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
@@ -43,7 +49,9 @@ protected:
   MockAbstractRequestListener listener_;
   MockUpstreamKafkaConfiguration configuration_;
   MockUpstreamKafkaFacade upstream_kafka_facade_;
-  RequestProcessor testee_ = {listener_, configuration_, upstream_kafka_facade_};
+  MockRecordCallbackProcessor record_callback_processor_;
+  RequestProcessor testee_ = {listener_, configuration_, upstream_kafka_facade_,
+                              record_callback_processor_};
 };
 
 TEST_F(RequestProcessorTest, ShouldProcessProduceRequest) {
