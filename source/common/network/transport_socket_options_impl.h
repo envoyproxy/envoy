@@ -33,8 +33,8 @@ public:
   OptRef<const Http11ProxyInfo> http11ProxyInfo() const override {
     return inner_options_->http11ProxyInfo();
   }
-  const StreamInfo::FilterStateSharedPtr& filterState() const override {
-    return inner_options_->filterState();
+  const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
+    return inner_options_->downstreamSharedFilterStateObjects();
   }
 
 private:
@@ -49,15 +49,17 @@ public:
       std::vector<std::string>&& override_verify_san_list = {},
       std::vector<std::string>&& override_alpn = {}, std::vector<std::string>&& fallback_alpn = {},
       absl::optional<Network::ProxyProtocolData> proxy_proto_options = absl::nullopt,
-      const StreamInfo::FilterStateSharedPtr filter_state = nullptr,
+      StreamInfo::FilterState::ObjectsPtr filter_state_objects =
+          std::make_unique<StreamInfo::FilterState::Objects>(),
       std::unique_ptr<const Http11ProxyInfo>&& proxy_info = nullptr)
       : override_server_name_(override_server_name.empty()
                                   ? absl::nullopt
                                   : absl::optional<std::string>(override_server_name)),
         override_verify_san_list_{std::move(override_verify_san_list)},
         override_alpn_list_{std::move(override_alpn)}, alpn_fallback_{std::move(fallback_alpn)},
-        proxy_protocol_options_(proxy_proto_options), filter_state_(filter_state),
-        proxy_info_(std::move(proxy_info)) {}
+        proxy_protocol_options_(proxy_proto_options),
+        filter_state_objects_(std::move(filter_state_objects)), proxy_info_(std::move(proxy_info)) {
+  }
 
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
@@ -81,7 +83,9 @@ public:
     }
     return {*proxy_info_};
   }
-  const StreamInfo::FilterStateSharedPtr& filterState() const override { return filter_state_; }
+  const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
+    return *filter_state_objects_;
+  }
 
 private:
   const absl::optional<std::string> override_server_name_;
@@ -89,6 +93,7 @@ private:
   const std::vector<std::string> override_alpn_list_;
   const std::vector<std::string> alpn_fallback_;
   const absl::optional<Network::ProxyProtocolData> proxy_protocol_options_;
+  const StreamInfo::FilterState::ObjectsPtr filter_state_objects_;
   const StreamInfo::FilterStateSharedPtr filter_state_;
   std::unique_ptr<const Http11ProxyInfo> proxy_info_;
 };
@@ -102,7 +107,7 @@ public:
    * nullptr if nothing is in the filter state.
    */
   static TransportSocketOptionsConstSharedPtr
-  fromFilterState(const StreamInfo::FilterStateSharedPtr& stream_info);
+  fromFilterState(const StreamInfo::FilterState& stream_info);
 };
 
 class CommonUpstreamTransportSocketFactory : public UpstreamTransportSocketFactory {

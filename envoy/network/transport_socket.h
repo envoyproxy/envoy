@@ -252,9 +252,10 @@ public:
   virtual OptRef<const Http11ProxyInfo> http11ProxyInfo() const PURE;
 
   /**
-   * @return filter state from the downstream request or connection.
+   * @return filter state objects from the downstream request or connection
+   * that are marked as shared with the upstream connection.
    */
-  virtual const StreamInfo::FilterStateSharedPtr& filterState() const PURE;
+  virtual const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;

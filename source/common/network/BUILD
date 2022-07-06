@@ -125,6 +125,17 @@ envoy_cc_library(
     deps = [
         ":connection_base_lib",
         ":connection_lib",
+        ":multi_connection_base_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "multi_connection_base_impl_lib",
+    srcs = ["multi_connection_base_impl.cc"],
+    hdrs = ["multi_connection_base_impl.h"],
+    deps = [
+        ":connection_base_lib",
+        ":connection_lib",
     ],
 )
 
@@ -446,6 +457,7 @@ envoy_cc_library(
         ":proxy_protocol_filter_state_lib",
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
+        "//envoy/common:hashable_interface",
         "//envoy/network:proxy_protocol_options_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/stream_info:filter_state_interface",

@@ -661,9 +661,7 @@ void ListenerImpl::validateFilterChains() {
                                        "specified for connection oriented UDP listener",
                                        address_->asString()));
     }
-  } else if (Runtime::runtimeFeatureEnabled(
-                 "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place") &&
-             (!config_.filter_chains().empty() || config_.has_default_filter_chain()) &&
+  } else if ((!config_.filter_chains().empty() || config_.has_default_filter_chain()) &&
              udp_listener_config_ != nullptr &&
              udp_listener_config_->listener_factory_->isTransportConnectionless()) {
 
@@ -929,15 +927,6 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   // The in place update needs the active listener in worker thread. worker_started guarantees the
   // existence of that active listener.
   if (!worker_started) {
-    return false;
-  }
-
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place") &&
-      (Network::Utility::protobufAddressSocketType(config_.address()) !=
-           Network::Socket::Type::Stream ||
-       Network::Utility::protobufAddressSocketType(config.address()) !=
-           Network::Socket::Type::Stream)) {
     return false;
   }
 

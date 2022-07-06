@@ -204,7 +204,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     Http::CodecClientProd client(
         type,
         dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
-                                           Network::Test::createRawBufferSocket(), nullptr),
+                                           Network::Test::createRawBufferSocket(), nullptr, nullptr),
         host_description, *dispatcher, random, options);
     return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type,
                                          client);
@@ -285,7 +285,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   client_ = dispatcher_.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr, nullptr);
   // ConnectionCallbacks will call write_request_callback from the connect and low-watermark
   // callbacks. Set a small buffer limit so high-watermark is triggered after every write and
   // low-watermark is triggered every time the buffer is drained.
