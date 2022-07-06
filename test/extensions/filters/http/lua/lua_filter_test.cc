@@ -1475,6 +1475,11 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   const uint64_t mem_use_at_start = script_config->runtimeBytesUsed();
 
   uint64_t num_loops = 2000;
+#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) &&                                    \
+    __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+  // envoy starts crashing on s390x when the number is >= 1300
+  num_loops = 1200;
+#endif
 #if defined(__has_feature) && (__has_feature(thread_sanitizer))
   // per https://github.com/envoyproxy/envoy/issues/7374 this test is causing
   // problems on tsan
