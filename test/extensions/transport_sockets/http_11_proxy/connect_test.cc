@@ -353,12 +353,10 @@ TEST_P(Http11ConnectTest, InvalidResponse) {
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
   Buffer::OwnedImpl buffer("");
-  EXPECT_LOG_CONTAINS("trace",
-                      "Response does not match strict connect checks",
-                      {
-                      auto result = connect_socket_->doRead(buffer);
-                      EXPECT_EQ(Network::PostIoAction::Close, result.action_);
-                      });
+  EXPECT_LOG_CONTAINS("trace", "Response does not match strict connect checks", {
+    auto result = connect_socket_->doRead(buffer);
+    EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  });
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http11ConnectTest,
