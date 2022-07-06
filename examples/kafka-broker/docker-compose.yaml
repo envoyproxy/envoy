@@ -6,7 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     container_name: proxy
-    platform: linux/x86_64
     networks:
       - envoymesh
     ports:
@@ -16,7 +15,6 @@ services:
   kafka:
     image: confluentinc/cp-kafka:latest
     container_name: kafka
-    platform: linux/x86_64
     networks:
       - envoymesh
     ports:
@@ -39,7 +37,6 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     container_name: zookeeper
-    platform: linux/x86_64
     networks:
       - envoymesh
     ports:
