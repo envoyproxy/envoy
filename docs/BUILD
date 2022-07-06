@@ -148,7 +148,7 @@ pkg_files(
 
 genrule(
     name = "version_histories",
-    outs = ["version_histories.tar"],
+    outs = ["version_histories.tar.gz"],
     cmd = """
     $(location //tools/docs:generate_version_histories) $@
     """,

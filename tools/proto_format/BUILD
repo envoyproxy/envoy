@@ -65,6 +65,7 @@ pkg_files(
 pkg_tar(
     name = "xformed",
     srcs = [":xformed_files"],
+    extension = "tar.gz",
 )
 
 py_binary(
@@ -82,7 +83,7 @@ py_binary(
 
 genrule(
     name = "formatted_api",
-    outs = ["formatted_api.tar"],
+    outs = ["formatted_api.tar.gz"],
     cmd = """
     $(location :format_api) \
         --api_root=%s/api \

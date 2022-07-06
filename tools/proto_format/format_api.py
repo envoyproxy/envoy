@@ -281,7 +281,7 @@ def format_api(api_root, mode, outfile, xformed, printed):
 
         shutil.rmtree(str(printed_dir))
         shutil.rmtree(str(xformed_dir))
-        with tarfile.open(outfile, "w") as tar:
+        with tarfile.open(outfile, "w:gz") as tar:
             tar.add(dst_dir, arcname=".")
 
 
