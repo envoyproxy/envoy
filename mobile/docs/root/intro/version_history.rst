@@ -15,6 +15,9 @@ Breaking changes:
 - iOS: enable usage of ``NWPathMonitor`` by default (:issue:`#2329 <2329>`)
 - iOS: replace ``enableNetworkPathMonitor`` with a new ``setNetworkMonitoringMode`` API to allow disabling monitoring (:issue:`#2345 <2345>`)
 - iOS: release artifacts no longer embed bitcode
+- api: engines are no longer a singleton, you may need to update your code to only create engines once and hold on to them.
+  You also cannot assume that an `envoy_engine_t` value of `1` will return the default engine.
+  Support for using multiple engines concurrently is coming later. (:issue:`#2129 <2129>`)
 
 Bugfixes:
 
