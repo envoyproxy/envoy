@@ -35,7 +35,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
                                             fmt::format("dubbo router: no route for interface '{}'",
                                                         invocation.serviceName())),
                                false);
-    return FilterStatus::StopIteration;
+    return FilterStatus::AbortIteration;
   }
 
   route_entry_ = route_->routeEntry();
@@ -49,7 +49,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
         AppException(ResponseStatus::ServerError, fmt::format("dubbo router: unknown cluster '{}'",
                                                               route_entry_->clusterName())),
         false);
-    return FilterStatus::StopIteration;
+    return FilterStatus::AbortIteration;
   }
 
   cluster_ = cluster->info();
@@ -62,7 +62,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
                      fmt::format("dubbo router: maintenance mode for cluster '{}'",
                                  route_entry_->clusterName())),
         false);
-    return FilterStatus::StopIteration;
+    return FilterStatus::AbortIteration;
   }
 
   auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
@@ -72,7 +72,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
             ResponseStatus::ServerError,
             fmt::format("dubbo router: no healthy upstream for '{}'", route_entry_->clusterName())),
         false);
-    return FilterStatus::StopIteration;
+    return FilterStatus::AbortIteration;
   }
 
   ENVOY_STREAM_LOG(debug, "dubbo router: decoding request", *callbacks_);
