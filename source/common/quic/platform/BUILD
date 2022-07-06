@@ -86,11 +86,8 @@ envoy_quiche_platform_impl_cc_library(
     tags = ["nofips"],
     deps = [
         ":quiche_flags_impl_lib",
-        "//envoy/api:io_error_interface",
         "//source/common/common:assert_lib",
-        "//source/server:backtrace_lib",
         "@com_github_google_quiche//:quic_platform_export",
-        "@com_github_google_quiche//:quic_platform_ip_address_family",
         "@com_google_absl//absl/container:btree",
     ],
 )
