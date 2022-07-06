@@ -3272,13 +3272,17 @@ envoy_cc_library(
     ],
 )
 
-cc_library(
+envoy_cc_library(
     name = "quic_core_io_socket_lib",
     srcs = select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": ["quiche/quic/core/io/socket_posix.cc"],
     }),
     hdrs = ["quiche/quic/core/io/socket.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_platform_ip_address_family",
