@@ -32,7 +32,7 @@ Resouce configuration example:
    :lineno-start: 39
    :caption: :download:`gcp-authn-filter-configuration.yaml <_include/gcp-authn-filter-configuration.yaml>`
 
-Http filter configuration example in the filter chain:
+Http filter configuration example:
 
 .. literalinclude:: _include/gcp-authn-filter-configuration.yaml
    :language: yaml
