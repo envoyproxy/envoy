@@ -23,26 +23,18 @@ public:
                                               std::function<void(Envoy::Engine&)> func);
 
 private:
-  static std::shared_ptr<Envoy::Engine> engine() {
-    // TODO(goaway): enable configurable heap-based allocation
-    return engine_.lock();
-  }
-
   static envoy_engine_t initEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
                                    envoy_event_tracker event_tracker);
   static envoy_status_t runEngine(envoy_engine_t, const char* config, const char* log_level,
                                   const char* admin_address_path);
-  static void terminateEngine(envoy_engine_t);
-
-  static EngineSharedPtr strong_engine_;
-  static EngineWeakPtr engine_;
+  static void terminateEngine(envoy_engine_t handle, bool release);
 
   // Allow a specific list of functions to access the internal setup/teardown functionality.
   friend envoy_engine_t(::init_engine)(envoy_engine_callbacks callbacks, envoy_logger logger,
                                        envoy_event_tracker event_tracker);
   friend envoy_status_t(::run_engine)(envoy_engine_t, const char* config, const char* log_level,
                                       const char* admin_address_path);
-  friend void ::terminate_engine(envoy_engine_t engine);
+  friend void ::terminate_engine(envoy_engine_t engine, bool release);
 };
 
 } // namespace Envoy

@@ -125,7 +125,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_terminateEngine(
     JNIEnv* env, jclass, jlong engine_handle) {
-  terminate_engine(static_cast<envoy_engine_t>(engine_handle));
+  terminate_engine(static_cast<envoy_engine_t>(engine_handle), /* release */ false);
 }
 
 extern "C" JNIEXPORT jstring JNICALL

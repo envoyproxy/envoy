@@ -22,7 +22,7 @@ void Engine::terminate() {
   if (terminated_) {
     throw std::runtime_error("attempting to double terminate Engine");
   }
-  terminate_engine(engine_);
+  terminate_engine(engine_, /* release */ false);
   terminated_ = true;
 }
 

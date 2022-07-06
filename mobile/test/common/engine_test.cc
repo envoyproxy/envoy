@@ -53,7 +53,9 @@ struct TestEngineHandle {
     run_engine(handle_, MINIMAL_TEST_CONFIG.c_str(), level.c_str(), "");
   }
 
-  void terminate() { terminate_engine(handle_); }
+  void terminate() { terminate_engine(handle_, /* release */ false); }
+
+  ~TestEngineHandle() { terminate_engine(handle_, /* release */ true); }
 };
 
 class EngineTest : public testing::Test {
