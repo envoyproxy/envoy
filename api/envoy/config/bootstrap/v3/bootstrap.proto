@@ -333,6 +333,7 @@ message Bootstrap {
 
   // Optional overriding of default regex engine.
   // If the value is not specified, Google RE2 will be used by default.
+  // [#extension-category: envoy.regex_engines]
   core.v3.TypedExtensionConfig default_regex_engine = 34;
 }
 

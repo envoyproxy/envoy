@@ -71,7 +71,7 @@ message StreamConfig {
 
   // The amount stored in the memory buffer before buffering to disk.
   // If unset in route, vhost and listener config, defaults to a hardcoded value of 1MiB
-  google.protobuf.UInt64Value memory_buffer_bytes_limit = 2;
+  google.protobuf.UInt64Value memory_buffer_bytes_limit = 2 [(validate.rules).uint64 = {gt: 0}];
 
   // The maximum storage (excluding memory) to be buffered in this filter.
   // If unset in route, vhost and listener config, defaults to a hardcoded value of 32MiB
@@ -110,7 +110,8 @@ message StreamConfig {
 message FileSystemBufferFilterConfig {
   // A configuration for an AsyncFileManager.
   //
-  // If unset in route, vhost and listener, an exception will be thrown.
+  // If unset in route, vhost and listener, and the behavior is not ``bypass``
+  // in both directions, an Internal Server Error response will be sent.
   common.async_files.v3.AsyncFileManagerConfig manager_config = 1;
 
   // An optional path to which the unlinked files should be written - this may

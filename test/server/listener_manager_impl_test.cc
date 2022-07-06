@@ -744,7 +744,7 @@ TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
     auto new_listener = listener;
     f(new_listener);
     EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(new_listener, "version", *manager_, "foo", true,
-                                               false, /*hash=*/static_cast<uint64_t>(0), 1),
+                                               false, /*hash=*/static_cast<uint64_t>(0)),
                               EnvoyException,
                               "error adding listener 'envoy://test_internal_listener_name': has "
                               "unsupported tcp listener feature");
@@ -6711,7 +6711,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
       "type.googleapis.com/google.protobuf.test");
 
   auto listener_impl = ListenerImpl(listener, "version", *manager_, "foo", true, false,
-                                    /*hash=*/static_cast<uint64_t>(0), 1);
+                                    /*hash=*/static_cast<uint64_t>(0));
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -6729,7 +6729,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
   listener.mutable_connection_balance_config();
 
   auto listener_impl = ListenerImpl(listener, "version", *manager_, "foo", true, false,
-                                    /*hash=*/static_cast<uint64_t>(0), 1);
+                                    /*hash=*/static_cast<uint64_t>(0));
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
