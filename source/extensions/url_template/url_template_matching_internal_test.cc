@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "source/common/common/assert.h"
-#include "source/common/common/matching/url_template_matching_internal.h"
+#include "source/extensions/url_template/url_template_matching_internal.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/test_common/logging.h"

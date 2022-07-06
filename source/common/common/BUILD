@@ -297,7 +297,6 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/common:matchers_interface",
         "//source/common/common:regex_lib",
-        "//source/common/common/matching:url_template_matching",
         "//source/common/config:metadata_lib",
         "//source/common/http:path_utility_lib",
         "//source/common/protobuf",

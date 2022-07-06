@@ -1,13 +1,13 @@
-#include "source/common/common/matching/url_template_matching.h"
+#include "source/extensions/url_template/url_template_matching.h"
 
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/url_template/v3/route_url_rewrite_pattern.pb.h"
 
-#include "source/common/common/matching/url_template_matching_internal.h"
+#include "source/extensions/url_template/url_template_matching_internal.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
@@ -86,9 +86,9 @@ parseRewritePatternHelper(absl::string_view pattern) {
   return result;
 }
 
-absl::StatusOr<envoy::config::route::v3::RouteUrlRewritePattern>
+absl::StatusOr<envoy::extensions::url_template::v3::RouteUrlRewritePattern>
 parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) {
-  envoy::config::route::v3::RouteUrlRewritePattern parsed_pattern;
+  envoy::extensions::url_template::v3::RouteUrlRewritePattern parsed_pattern;
   RE2 regex = RE2(ToStringPiece(capture_regex));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
@@ -122,7 +122,7 @@ parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) 
 
 absl::StatusOr<std::string>
 RewriteURLTemplatePattern(absl::string_view url, absl::string_view capture_regex,
-                          const envoy::config::route::v3::RouteUrlRewritePattern& rewrite_pattern) {
+                          const envoy::extensions::url_template::v3::RouteUrlRewritePattern& rewrite_pattern) {
   RE2 regex = RE2(ToStringPiece(capture_regex));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
@@ -137,7 +137,7 @@ RewriteURLTemplatePattern(absl::string_view url, absl::string_view capture_regex
 
   std::string rewritten_url;
 
-  for (const envoy::config::route::v3::RouteUrlRewritePattern::RewriteSegment& segment :
+  for (const envoy::extensions::url_template::v3::RouteUrlRewritePattern::RewriteSegment& segment :
        rewrite_pattern.segments()) {
     if (segment.has_literal()) {
       absl::StrAppend(&rewritten_url, segment.literal());

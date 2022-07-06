@@ -1,5 +1,5 @@
-#ifndef SOURCE_COMMON_COMMON_MATCHING_URL_TEMPLATE_MATCHING_INTERNAL_H
-#define SOURCE_COMMON_COMMON_MATCHING_URL_TEMPLATE_MATCHING_INTERNAL_H
+#ifndef SOURCE_EXTENSIONS_URL_TEMPLATE_MATCHING_URL_TEMPLATE_MATCHING_INTERNAL_H
+#define SOURCE_EXTENSIONS_URL_TEMPLATE_MATCHING_URL_TEMPLATE_MATCHING_INTERNAL_H
 
 #include <optional>
 #include <string>
@@ -20,6 +20,17 @@ namespace url_template_matching_internal {
 
 using Literal = absl::string_view;
 enum class Operator { kPathGlob, kTextGlob };
+
+struct RewriteSegment {
+  // Represents a segment of the rewritten URL, including any path segments,
+  // slash and prefix.
+  absl::string_view literal;
+
+  // Represents an index into the RE2 capture which value should be used
+  // to construct the rewritten URL. Note that the index should be greater
+  // than 0 as 0 index into the whole match RE2 pattern.
+  int var_index;
+};
 
 struct Variable {
   absl::string_view var_name;
@@ -81,4 +92,4 @@ inline re2::StringPiece toStringPiece(absl::string_view text) { return {text.dat
 } // namespace matching
 } // namespace Envoy
 
-#endif // SOURCE_COMMON_COMMON_MATCHING_URL_TEMPLATE_MATCHING_INTERNAL_H
+#endif // SOURCE_EXTENSIONS_URL_TEMPLATE_MATCHING_URL_TEMPLATE_MATCHING_INTERNAL_H

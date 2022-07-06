@@ -734,6 +734,11 @@ envoy.matching.input_matchers.ip:
   - envoy.matching.input_matchers
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.url_template:
+    categories:
+    - envoy.url_template
+    security_posture: robust_to_untrusted_downstream_and_upstream
+    status: stable
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source

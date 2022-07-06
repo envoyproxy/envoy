@@ -1,4 +1,4 @@
-#include "source/common/common/matching/url_template_matching_internal.h"
+#include "source/extensions/url_template/url_template_matching_internal.h"
 
 #include <optional>
 #include <string>

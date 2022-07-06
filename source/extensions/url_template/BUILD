@@ -1,23 +1,24 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_cc_test",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 # Wildcard & Pattern Matching
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "url_template_matching",
     srcs = ["url_template_matching.cc"],
     hdrs = ["url_template_matching.h"],
     visibility = [
-        "//source/common/common:__subpackages__",
-        "//test/common/common:__subpackages__",
+        "//source/extensions/url_template:__subpackages__",
+        "//test/extensions/url_template:__subpackages__",
     ],
     deps = [
         ":url_template_matching_internal_cc",
@@ -25,7 +26,7 @@ envoy_cc_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
-        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/url_template/v3:pkg_cc_proto",
     ],
 )
 

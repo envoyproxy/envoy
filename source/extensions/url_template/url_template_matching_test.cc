@@ -3,8 +3,8 @@
 #include <vector>
 
 #include "source/common/common/assert.h"
-#include "source/common/common/matching/url_template_matching.h"
-#include "source/common/common/matching/url_template_matching_internal.h"
+#include "source/extensions/url_template/url_template_matching.h"
+#include "source/extensions/url_template/url_template_matching_internal.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/test_common/logging.h"
@@ -84,8 +84,8 @@ TEST_P(ParseRewriteHelperFailure, ParseRewriteHelperFailureTest) {
 class ParseRewriteSuccess : public testing::TestWithParam<std::pair<std::string, std::string>> {
 protected:
   const std::string& rewrite_pattern() const { return std::get<0>(GetParam()); }
-  envoy::config::route::v3::RouteUrlRewritePattern expected_proto() const {
-    envoy::config::route::v3::RouteUrlRewritePattern expected_proto;
+  envoy::extensions::url_template::v3::RouteUrlRewritePattern expected_proto() const {
+    envoy::extensions::url_template::v3::RouteUrlRewritePattern expected_proto;
     Envoy::TestUtility::loadFromYaml(std::get<1>(GetParam()), expected_proto);
     return expected_proto;
   }
@@ -145,7 +145,7 @@ INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
                          })));
 
 TEST_P(ParseRewriteSuccess, ParseRewriteSuccessTest) {
-  absl::StatusOr<envoy::config::route::v3::RouteUrlRewritePattern> rewrite =
+  absl::StatusOr<envoy::extensions::url_template::v3::RouteUrlRewritePattern> rewrite =
       parseRewritePattern(rewrite_pattern(), kCaptureRegex);
   ASSERT_OK(rewrite);
   // EXPECT_THAT(rewrite.value(), testing::EqualsProto(expected_proto()));
@@ -168,8 +168,8 @@ TEST_P(ParseRewriteFailure, ParseRewriteFailureTest) {
 class RewriteUrlTemplateSuccess
     : public testing::TestWithParam<std::pair<std::string, std::string>> {
 protected:
-  envoy::config::route::v3::RouteUrlRewritePattern rewrite_proto() const {
-    envoy::config::route::v3::RouteUrlRewritePattern proto;
+  envoy::extensions::url_template::v3::RouteUrlRewritePattern rewrite_proto() const {
+    envoy::extensions::url_template::v3::RouteUrlRewritePattern proto;
     Envoy::TestUtility::loadFromYaml(std::get<0>(GetParam()), proto);
     return proto;
   }
@@ -233,7 +233,7 @@ TEST_P(RewriteUrlTemplateSuccess, RewriteUrlTemplateSuccessTest) {
 }
 
 TEST(RewriteUrlTemplateFailure, BadRegex) {
-  envoy::config::route::v3::RouteUrlRewritePattern rewrite_proto;
+  envoy::extensions::url_template::v3::RouteUrlRewritePattern rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -248,7 +248,7 @@ segments:
 }
 
 TEST(RewriteUrlTemplateFailure, RegexNoMatch) {
-  envoy::config::route::v3::RouteUrlRewritePattern rewrite_proto;
+  envoy::extensions::url_template::v3::RouteUrlRewritePattern rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -263,7 +263,7 @@ segments:
 }
 
 TEST(RewriteUrlTemplateFailure, RegexCaptureIndexZero) {
-  envoy::config::route::v3::RouteUrlRewritePattern rewrite_proto;
+  envoy::extensions::url_template::v3::RouteUrlRewritePattern rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -277,7 +277,7 @@ segments:
 }
 
 TEST(RewriteUrlTemplateFailure, RegexCaptureIndexAboveMaxCapture) {
-  envoy::config::route::v3::RouteUrlRewritePattern rewrite_proto;
+  envoy::extensions::url_template::v3::RouteUrlRewritePattern rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -318,7 +318,7 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
   absl::StatusOr<std::string> regex = convertURLPatternSyntaxToRegex(url_pattern());
   ASSERT_OK(regex);
 
-  absl::StatusOr<envoy::config::route::v3::RouteUrlRewritePattern> rewrite_proto =
+  absl::StatusOr<envoy::extensions::url_template::v3::RouteUrlRewritePattern> rewrite_proto =
       parseRewritePattern(rewrite_pattern(), regex.value());
   ASSERT_OK(rewrite_proto);
 
