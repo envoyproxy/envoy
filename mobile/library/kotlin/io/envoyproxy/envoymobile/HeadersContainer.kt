@@ -12,14 +12,27 @@ open class HeadersContainer {
   /**
    * Represents a header name together with all of its values.
    * It preserves the original casing of the header name.
+   *
+   * @param name  The name of the header. Its casing is preserved.
+   * @param value The value associated with a given header.
    */
   data class Header(val name: String, var value: MutableList<String>) {
     constructor(name: String) : this(name, mutableListOf())
 
-    fun add(value: List<String>) {
-      this.value.addAll(value)
+    /**
+     * Add values.
+     *
+     * @param values The list of values to add.
+     */
+    fun add(values: List<String>) {
+      this.value.addAll(values)
     }
 
+    /**
+     * Add a value.
+     *
+     * @param value The value to add.
+     */
     fun add(value: String) {
       this.value.add(value)
     }
@@ -28,7 +41,7 @@ open class HeadersContainer {
   /**
    * Instantiate a new instance of the receiver using the provided headers map
    *
-   * @param headers: The headers to start with.
+   * @param headers The headers to start with.
    */
   internal constructor(headers: Map<String, MutableList<String>>) {
     var underlyingHeaders = mutableMapOf<String, Header>()
@@ -65,7 +78,7 @@ open class HeadersContainer {
      * Not implemented as a constructor due to conflicting JVM signatures with
      * other constructors.
      *
-     * @param headers: The headers to create the container with.
+     * @param headers The headers to create the container with.
      */
     fun create(headers: Map<String, List<String>>) : HeadersContainer {
       return HeadersContainer(headers.mapValues { it.value.toMutableList() })

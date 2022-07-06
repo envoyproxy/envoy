@@ -1,6 +1,6 @@
 package io.envoyproxy.envoymobile
 
-/*
+/**
  * Headers representing an inbound response.
  */
 class ResponseHeaders : Headers {

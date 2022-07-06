@@ -1,11 +1,11 @@
 package io.envoyproxy.envoymobile
 
-/*
+/**
  * Base class that is used to represent header/trailer data structures.
  * To instantiate new instances, see `{Request|Response}HeadersBuilder`.
  */
 open class Headers {
-  val container: HeadersContainer
+  internal val container: HeadersContainer
 
   /**
    * Internal constructor used by builders.

@@ -12,6 +12,9 @@ import io.envoyproxy.envoymobile.ResponseTrailers
 import io.envoyproxy.envoymobile.StreamIntel
 import java.nio.ByteBuffer
 
+/**
+ * A filter implemented as a simple example of Envoy response filter.
+ */
 class DemoFilter : ResponseFilter {
   override fun onResponseHeaders(
     headers: ResponseHeaders,

@@ -34,6 +34,9 @@ private val FILTERED_HEADERS = setOf(
   "x-envoy-upstream-service-time"
 )
 
+/**
+ * The main activity of the app.
+ */
 class MainActivity : Activity() {
   private val thread = HandlerThread(REQUEST_HANDLER_THREAD_NAME)
   private lateinit var recyclerView: RecyclerView

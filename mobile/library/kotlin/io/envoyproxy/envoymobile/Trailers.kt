@@ -1,6 +1,6 @@
 package io.envoyproxy.envoymobile
 
-/*
+/**
  * Base class representing trailers data structures.
  * To instantiate new instances see `{Request|Response}TrailersBuilder`.
  */
