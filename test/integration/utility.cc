@@ -201,11 +201,11 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       time_system)};
 
   if (type <= Http::CodecType::HTTP2) {
-    Http::CodecClientProd client(
-        type,
-        dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
-                                           Network::Test::createRawBufferSocket(), nullptr, nullptr),
-        host_description, *dispatcher, random, options);
+    Http::CodecClientProd client(type,
+                                 dispatcher->createClientConnection(
+                                     addr, Network::Address::InstanceConstSharedPtr(),
+                                     Network::Test::createRawBufferSocket(), nullptr, nullptr),
+                                 host_description, *dispatcher, random, options);
     return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type,
                                          client);
   }

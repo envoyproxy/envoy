@@ -348,13 +348,17 @@ TEST_P(Http11ConnectTest, InvalidResponse) {
   absl::optional<uint64_t> expected_bytes(connect.length());
   EXPECT_CALL(io_handle_, read(_, expected_bytes))
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          connect.length() - 1, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+          connect.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
 
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
   Buffer::OwnedImpl buffer("");
-  auto result = connect_socket_->doRead(buffer);
-  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_LOG_CONTAINS("trace",
+                      "Response does not match strict connect checks",
+                      {
+                      auto result = connect_socket_->doRead(buffer);
+                      EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+                      });
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http11ConnectTest,

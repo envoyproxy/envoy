@@ -106,7 +106,8 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   if (needs_transport_socket_options) {
     return std::make_shared<Network::TransportSocketOptionsImpl>(
         server_name, std::move(subject_alt_names), std::move(application_protocols),
-        std::move(alpn_fallback), proxy_protocol_options, std::move(objects), std::move(proxy_info));
+        std::move(alpn_fallback), proxy_protocol_options, std::move(objects),
+        std::move(proxy_info));
   } else {
     return nullptr;
   }
