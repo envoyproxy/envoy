@@ -70,7 +70,6 @@ RUNTIME_GUARD(envoy_reloadable_features_strict_check_on_ipv4_compat);
 RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_top_level_ecds_stats);
-RUNTIME_GUARD(envoy_reloadable_features_udp_listener_updates_filter_chain_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_update_expected_rq_timeout_on_retry);
 RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
 RUNTIME_GUARD(envoy_reloadable_features_use_rfc_connect);
@@ -95,8 +94,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(mattklein123): Flip this to true and/or remove completely once verified by Envoy Mobile.
-// TODO(mattklein123): Also unit test this if this sticks and this becomes the default for Android.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_android_always_use_v6);
+// TODO(mattklein123): Also unit test this if this sticks and this becomes the default for Apple &
+// Android.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT

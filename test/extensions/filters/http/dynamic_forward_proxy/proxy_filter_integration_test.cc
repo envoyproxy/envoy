@@ -130,7 +130,7 @@ typed_config:
     if (upstream_tls_) {
       addFakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
                                                         factory_context_),
-                      Http::CodecType::HTTP1);
+                      Http::CodecType::HTTP1, /*autonomous_upstream=*/false);
     } else {
       HttpIntegrationTest::createUpstreams();
     }
