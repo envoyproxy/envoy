@@ -55,6 +55,10 @@ private:
 
 class ProcessorState : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
+  enum class ProcessorType {
+    EncodingProcessor,
+    DecodingProcessor,
+  };
   // This describes whether the filter is waiting for a response to a gRPC message.
   // We use it to determine how to respond to stream messages send back from
   // the external processor.
@@ -86,6 +90,7 @@ public:
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
 
+  ProcessorType processorType() const { return processor_type_; }
   CallbackState callbackState() const { return callback_state_; }
   void setPaused(bool paused) { paused_ = paused; }
 
@@ -109,7 +114,7 @@ public:
 
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                             CallbackState callback_state);
-  void onFinishProcessorCall(absl::Status call_status,
+  void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
 
   // Idempotent methods for watermarking the body
@@ -161,6 +166,7 @@ protected:
   Filter& filter_;
   Http::StreamFilterCallbacks* filter_callbacks_;
   CallbackState callback_state_ = CallbackState::Idle;
+  ProcessorType processor_type_;
 
   // Keep track of whether we requested a watermark.
   bool watermark_requested_ : 1;
@@ -201,6 +207,7 @@ public:
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
       : ProcessorState(filter) {
     setProcessingModeInternal(mode);
+    processor_type_ = ProcessorType::DecodingProcessor;
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
   DecodingProcessorState& operator=(const DecodingProcessorState&) = delete;
@@ -271,6 +278,7 @@ public:
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
       : ProcessorState(filter) {
     setProcessingModeInternal(mode);
+    processor_type_ = ProcessorType::EncodingProcessor;
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;
   EncodingProcessorState& operator=(const EncodingProcessorState&) = delete;

@@ -28,14 +28,17 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
   call_start_time_ = filter_callbacks_->dispatcher().timeSource().monotonicTime();
 }
 
-void ProcessorState::onFinishProcessorCall(absl::Status call_status, CallbackState next_state) {
+void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
+                                           CallbackState next_state) {
   if (message_timer_) {
     message_timer_->disableTimer();
   }
   if (call_start_time_.has_value()) {
+    ASSERT(callback_state_ != CallbackState::Idle);
     std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
         filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
-    filter_.grpcStats().record(duration, callback_state_, call_status);
+    filter_.grpcStats().recordGrpcCallStats(duration, callback_state_, call_status,
+                                            processorType());
     call_start_time_ = absl::nullopt;
   }
   callback_state_ = next_state;
@@ -58,7 +61,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     if (common_response.clear_route_cache()) {
       filter_callbacks_->clearRouteCache();
     }
-    onFinishProcessorCall(absl::OkStatus());
+    onFinishProcessorCall(Grpc::Status::Ok);
 
     if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
       ENVOY_LOG(debug, "Replacing complete message");
@@ -195,7 +198,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         });
       }
       clearWatermark();
-      onFinishProcessorCall(absl::OkStatus());
+      onFinishProcessorCall(Grpc::Status::Ok);
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback ||
                callback_state_ == CallbackState::StreamedBodyCallbackFinishing) {
@@ -224,9 +227,9 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         clearWatermark();
       }
       if (chunk_queue_.empty()) {
-        onFinishProcessorCall(absl::OkStatus());
+        onFinishProcessorCall(Grpc::Status::Ok);
       } else {
-        onFinishProcessorCall(absl::OkStatus(), callback_state_);
+        onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
       }
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
       // Apply changes to the buffer that we sent to the server
@@ -243,7 +246,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       }
       should_continue = true;
       clearWatermark();
-      onFinishProcessorCall(absl::OkStatus());
+      onFinishProcessorCall(Grpc::Status::Ok);
       partial_body_processed_ = true;
 
       // If anything else is left on the queue, inject it too
@@ -256,7 +259,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         }
       }
     } else {
-      onFinishProcessorCall(absl::UnknownError(""));
+      onFinishProcessorCall(Grpc::Status::FailedPrecondition);
     }
 
     if (response.response().clear_route_cache()) {
@@ -292,7 +295,7 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
       }
     }
     trailers_ = nullptr;
-    onFinishProcessorCall(absl::OkStatus());
+    onFinishProcessorCall(Grpc::Status::Ok);
     continueIfNecessary();
     return absl::OkStatus();
   }
@@ -308,7 +311,7 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 }
 
 void ProcessorState::clearAsyncState() {
-  onFinishProcessorCall(absl::UnknownError(""));
+  onFinishProcessorCall(Grpc::Status::Aborted);
   while (auto queued_chunk = dequeueStreamingChunk(false)) {
     auto chunk = std::move(*queued_chunk);
     ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk->data.length());

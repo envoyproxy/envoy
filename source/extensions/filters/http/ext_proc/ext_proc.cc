@@ -56,6 +56,30 @@ private:
   std::unique_ptr<Checker> rule_checker_;
 };
 
+void ExtProcStreamStats::recordGrpcCallStats(std::chrono::microseconds latency,
+                                             ProcessorState::CallbackState callback_state,
+                                             Grpc::Status::GrpcStatus call_status,
+                                             ProcessorState::ProcessorType processor_type) {
+  ProcessorGrpcStats& grpc_stats = processorGrpcStats(processor_type);
+  switch (callback_state) {
+  case ProcessorState::CallbackState::HeadersCallback:
+    grpc_stats.header_call_stats_.emplace_back(latency, call_status);
+    break;
+  case ProcessorState::CallbackState::TrailersCallback:
+    grpc_stats.trailer_call_stats_.emplace_back(latency, call_status);
+    break;
+  default:
+    grpc_stats.body_call_stats_.emplace_back(latency, call_status);
+  }
+}
+
+ExtProcStreamStats::ProcessorGrpcStats&
+ExtProcStreamStats::processorGrpcStats(ProcessorState::ProcessorType processor_type) {
+  return processor_type == ProcessorState::ProcessorType::DecodingProcessor
+             ? decoding_processor_grpc_stats_
+             : encoding_processor_grpc_stats_;
+}
+
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()) {
   if (config.has_overrides()) {
@@ -79,12 +103,12 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoding_state_.setDecoderFilterCallbacks(callbacks);
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
-  if (!filter_state->hasData<ExtProcGrpcStats>(ExtProcGrpcStatsName)) {
-    filter_state->setData(ExtProcGrpcStatsName, std::make_shared<ExtProcGrpcStats>(),
+  if (!filter_state->hasData<ExtProcStreamStats>(ExtProcStreamStatsName)) {
+    filter_state->setData(ExtProcStreamStatsName, std::make_shared<ExtProcStreamStats>(),
                           Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }
-  grpc_stats_ = filter_state->getDataMutable<ExtProcGrpcStats>(ExtProcGrpcStatsName);
+  grpc_stats_ = filter_state->getDataMutable<ExtProcStreamStats>(ExtProcStreamStatsName);
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
@@ -561,7 +585,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_LOG(debug, "Sending immediate response");
     processing_complete_ = true;
     closeStream();
-    onFinishProcessorCalls(absl::OkStatus());
+    onFinishProcessorCalls(Grpc::Status::Ok);
     sendImmediateResponse(response->immediate_response());
     processing_status = absl::OkStatus();
     break;
@@ -594,7 +618,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     stats_.stream_msgs_received_.inc();
     processing_complete_ = true;
     closeStream();
-    onFinishProcessorCalls(absl::UnknownError(""));
+    onFinishProcessorCalls(processing_status.raw_code());
     ImmediateResponse invalid_mutation_response;
     invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
     invalid_mutation_response.set_details(std::string(processing_status.message()));
@@ -620,7 +644,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     closeStream();
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
-    onFinishProcessorCalls(absl::UnknownError(""));
+    onFinishProcessorCalls(status);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
@@ -655,8 +679,8 @@ void Filter::onMessageTimeout() {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
     closeStream();
-    decoding_state_.onFinishProcessorCall(absl::UnknownError(""));
-    encoding_state_.onFinishProcessorCall(absl::UnknownError(""));
+    decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
+    encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
@@ -673,7 +697,7 @@ void Filter::clearAsyncState() {
 
 // Regardless of the current state, ensure that the timers won't fire
 // again.
-void Filter::onFinishProcessorCalls(absl::Status call_status) {
+void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
   decoding_state_.onFinishProcessorCall(call_status);
   encoding_state_.onFinishProcessorCall(call_status);
 }
