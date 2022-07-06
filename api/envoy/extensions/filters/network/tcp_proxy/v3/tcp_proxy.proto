@@ -69,6 +69,22 @@ message TcpProxy {
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
 
     // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
+    // This field evaluates command operators if set, otherwise returns hostname as is.
+    //
+    // Example: dynamically set hostname using downstream SNI
+    //
+    // .. code-block:: yaml
+    //
+    //    tunneling_config:
+    //      hostname: "%REQUESTED_SERVER_NAME%:443"
+    //
+    // Example: dynamically set hostname using dynamic metadata
+    //
+    // .. code-block: yaml
+    //
+    //    tunneling_config:
+    //      hostname: "%DYNAMIC_METADATA(tunnel:address)%"
+    //
     string hostname = 1 [(validate.rules).string = {min_len: 1}];
 
     // Use POST method instead of CONNECT method to tunnel the TCP stream.

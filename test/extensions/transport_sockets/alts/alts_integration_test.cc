@@ -185,7 +185,7 @@ public:
   }
 
   Network::TransportSocketPtr makeAltsTransportSocket() {
-    auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
+    auto client_transport_socket = client_alts_->createTransportSocket(nullptr, nullptr);
     client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
     client_tsi_socket_->setActualFrameSizeToUse(16384);
     client_tsi_socket_->setFrameOverheadSize(4);
@@ -196,7 +196,8 @@ public:
     auto client_transport_socket = makeAltsTransportSocket();
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               std::move(client_transport_socket), nullptr);
+                                               std::move(client_transport_socket), nullptr,
+                                               nullptr);
   }
 
   std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {

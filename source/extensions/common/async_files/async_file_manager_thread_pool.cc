@@ -235,20 +235,19 @@ private:
 
 } // namespace
 
-std::function<void()> AsyncFileManagerThreadPool::createAnonymousFile(
+CancelFunction AsyncFileManagerThreadPool::createAnonymousFile(
     absl::string_view path, std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
   return enqueue(std::make_shared<ActionCreateAnonymousFile>(*this, path, on_complete));
 }
 
-std::function<void()> AsyncFileManagerThreadPool::openExistingFile(
+CancelFunction AsyncFileManagerThreadPool::openExistingFile(
     absl::string_view filename, Mode mode,
     std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
   return enqueue(std::make_shared<ActionOpenExistingFile>(*this, filename, mode, on_complete));
 }
 
-std::function<void()>
-AsyncFileManagerThreadPool::unlink(absl::string_view filename,
-                                   std::function<void(absl::Status)> on_complete) {
+CancelFunction AsyncFileManagerThreadPool::unlink(absl::string_view filename,
+                                                  std::function<void(absl::Status)> on_complete) {
   return enqueue(std::make_shared<ActionUnlink>(posix(), filename, on_complete));
 }
 

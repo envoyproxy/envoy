@@ -77,8 +77,9 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
           Network::Test::getLoopbackAddressUrlString(Network::Address::IpVersion::v4),
           lookupPort("listener_0"), sock_interface);
 
-  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                                Network::Test::createRawBufferSocket(), nullptr);
+  client_ =
+      dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                          Network::Test::createRawBufferSocket(), nullptr, nullptr);
 
   client_->addConnectionCallbacks(connect_callbacks_);
   client_->connect();
@@ -103,7 +104,7 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
 
   ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
                    address, Network::Address::InstanceConstSharedPtr(),
-                   Network::Test::createRawBufferSocket(), nullptr),
+                   Network::Test::createRawBufferSocket(), nullptr, nullptr),
                "" /* Nullptr dereference */);
 }
 

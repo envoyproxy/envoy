@@ -102,8 +102,9 @@ filter_disabled:
     if (ssl_client) {
       transport_socket =
           context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-              absl::string_view(""), std::vector<std::string>(),
-              std::vector<std::string>{"envoyalpn"}));
+                                              absl::string_view(""), std::vector<std::string>(),
+                                              std::vector<std::string>{"envoyalpn"}),
+                                          nullptr);
 
       if (!curves_list.empty()) {
         auto ssl_socket =
@@ -113,10 +114,11 @@ filter_disabled:
       }
     } else {
       auto transport_socket_factory = std::make_unique<Network::RawBufferSocketFactory>();
-      transport_socket = transport_socket_factory->createTransportSocket(nullptr);
+      transport_socket = transport_socket_factory->createTransportSocket(nullptr, nullptr);
     }
-    client_ = dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+    client_ =
+        dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                            std::move(transport_socket), nullptr, nullptr);
     client_->addConnectionCallbacks(connect_callbacks_);
     client_->connect();
     while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {

@@ -63,6 +63,9 @@ envoy_cc_library(
     hdrs = ["connection_balancer_impl.h"],
     deps = [
         "//envoy/network:connection_balancer_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -119,6 +122,17 @@ envoy_cc_library(
     name = "happy_eyeballs_connection_impl_lib",
     srcs = ["happy_eyeballs_connection_impl.cc"],
     hdrs = ["happy_eyeballs_connection_impl.h"],
+    deps = [
+        ":connection_base_lib",
+        ":connection_lib",
+        ":multi_connection_base_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "multi_connection_base_impl_lib",
+    srcs = ["multi_connection_base_impl.cc"],
+    hdrs = ["multi_connection_base_impl.h"],
     deps = [
         ":connection_base_lib",
         ":connection_lib",
@@ -442,6 +456,7 @@ envoy_cc_library(
         ":proxy_protocol_filter_state_lib",
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
+        "//envoy/common:hashable_interface",
         "//envoy/network:proxy_protocol_options_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/stream_info:filter_state_interface",

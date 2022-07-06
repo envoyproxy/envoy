@@ -472,9 +472,8 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     stats_.listener_in_place_updated_.inc();
   } else {
     ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
-    new_listener =
-        std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
-                                       workers_started_, hash, server_.options().concurrency());
+    new_listener = std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
+                                                  workers_started_, hash);
   }
 
   ListenerImpl& new_listener_ref = *new_listener;
@@ -487,7 +486,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
-      new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
+      new_listener->addSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
     }
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
@@ -496,7 +495,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
-      new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory().clone());
+      new_listener->addSocketFactory((*existing_active_listener)->getSocketFactory().clone());
     }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
@@ -1054,7 +1053,7 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     }
   }
 
-  listener.setSocketFactory(draining_listen_socket_factory != nullptr
+  listener.addSocketFactory(draining_listen_socket_factory != nullptr
                                 ? draining_listen_socket_factory->clone()
                                 : createListenSocketFactory(proto_address, listener));
 }

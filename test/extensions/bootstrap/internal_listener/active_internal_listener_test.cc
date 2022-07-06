@@ -267,6 +267,7 @@ public:
                                    : connection_balancer),
           access_logs_({access_log}), inline_filter_chain_manager_(filter_chain_manager),
           init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit) {
+      socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }
 
@@ -292,7 +293,10 @@ public:
                                                      : *inline_filter_chain_manager_;
     }
     Network::FilterChainFactory& filterChainFactory() override { return parent_.factory_; }
-    Network::ListenSocketFactory& listenSocketFactory() override { return socket_factory_; }
+    Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
+    std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
+      return socket_factories_;
+    }
     bool bindToPort() override { return bind_to_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
@@ -319,7 +323,9 @@ public:
     void setDirection(envoy::config::core::v3::TrafficDirection direction) {
       direction_ = direction;
     }
-    Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
+    Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
+      return *connection_balancer_;
+    }
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return access_logs_;
     }
@@ -334,7 +340,7 @@ public:
 
     ConnectionHandlerTest& parent_;
     std::shared_ptr<NiceMock<Network::MockListenSocket>> socket_;
-    Network::MockListenSocketFactory socket_factory_;
+    std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
     uint64_t tag_;
     bool bind_to_port_;
     const uint32_t tcp_backlog_size_;
@@ -393,7 +399,9 @@ TEST_F(ConnectionHandlerTest, DisableInternalListener) {
 
   TestListener* internal_listener =
       addInternalListener(1, "test_internal_listener", std::chrono::milliseconds(), false, nullptr);
-  EXPECT_CALL(internal_listener->socket_factory_, localAddress())
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  internal_listener->socket_factories_[0].get()),
+              localAddress())
       .WillRepeatedly(ReturnRef(local_address));
   handler_->addListener(absl::nullopt, *internal_listener, runtime_);
   auto internal_listener_cb = handler_->findByAddress(local_address);
@@ -419,7 +427,9 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
 
   TestListener* internal_listener = addInternalListener(
       old_listener_tag, "test_internal_listener", std::chrono::milliseconds(), false, nullptr);
-  EXPECT_CALL(internal_listener->socket_factory_, localAddress())
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  internal_listener->socket_factories_[0].get()),
+              localAddress())
       .WillRepeatedly(ReturnRef(local_address));
   handler_->addListener(absl::nullopt, *internal_listener, runtime_);
 

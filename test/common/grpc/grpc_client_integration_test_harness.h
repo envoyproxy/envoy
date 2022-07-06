@@ -294,7 +294,7 @@ public:
   RawAsyncClientPtr createAsyncClientImpl() {
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
-        std::move(async_client_transport_socket_), nullptr);
+        std::move(async_client_transport_socket_), nullptr, nullptr);
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(10000)));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
@@ -529,7 +529,7 @@ public:
         std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
             std::move(cfg), context_manager_, *stats_store_);
     async_client_transport_socket_ =
-        mock_host_description_->socket_factory_->createTransportSocket(nullptr);
+        mock_host_description_->socket_factory_->createTransportSocket(nullptr, nullptr);
     FakeUpstreamConfig config(test_time_.timeSystem());
     config.upstream_protocol_ = Http::CodecType::HTTP2;
     fake_upstream_ =

@@ -88,6 +88,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     ENVOY_CONN_LOG(debug, "connected", *connection_);
     connected_ = true;
+    return;
   }
 
   if (event == Network::ConnectionEvent::RemoteClose) {
