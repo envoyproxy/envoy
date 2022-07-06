@@ -18,7 +18,7 @@ static_resources:
   clusters:
   - name: localkafka
     connect_timeout: 0.25s
-    type: strict_dns
+    type: STRICT_DNS
     lb_policy: round_robin
     load_assignment:
       cluster_name: localkafka
