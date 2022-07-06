@@ -6,10 +6,10 @@ export NAME=kafka-broker
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
 run_log "Waiting for Kafka on 9092."
-while true; do if docker-compose logs -f kafka | grep -q 'started (kafka.server.KafkaServer)'; then 
-    break; 
-else 
-    echo waiting ...; sleep 1; 
+while true; do if docker-compose logs -f kafka | grep -q 'started (kafka.server.KafkaServer)'; then
+    break;
+else
+    echo waiting ...; sleep 1;
 fi; done
 run_log "Kafka launched."
 
@@ -40,9 +40,9 @@ run_log "Sent messages succesfully."
 run_log "Create Consumer."
 # `--timeout-ms 10000` lets the consumer exit after receiving the message. And
 # ```
-#   ERROR Error processing message, terminating consumer process:  (kafka.tools.ConsoleConsumer$)
-#   org.apache.kafka.common.errors.TimeoutException
-#   Processed a total of 1 messages
+# ERROR Error processing message, terminating consumer process:  (kafka.tools.ConsoleConsumer$)
+# org.apache.kafka.common.errors.TimeoutException
+# Processed a total of 1 messages
 # ```
 # is the expected error
 message_received=$(docker-compose exec kafka kafka-console-consumer --bootstrap-server localhost:19092 --topic $TOPIC --from-beginning --timeout-ms 10000)
