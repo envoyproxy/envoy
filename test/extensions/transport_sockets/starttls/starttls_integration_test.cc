@@ -136,7 +136,7 @@ public:
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options)
       : ClientConnectionImpl(dispatcher, remote_address, source_address,
-                             std::move(transport_socket), options) {}
+                             std::move(transport_socket), options, nullptr) {}
 
   void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
     transport_socket_ = std::move(transport_socket);

@@ -23,6 +23,12 @@ def _path_ignoring_repository(f):
 def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     # Compute output files from the current proto_library node's dependencies.
     transitive_outputs = depset(transitive = [dep.output_groups[output_group] for dep in ctx.rule.attr.deps])
+
+    # TODO(phlax): Return `ProtoInfo` from `proto` aspects, and this should
+    #    not be necessary.
+    if ProtoInfo not in target:
+        return [OutputGroupInfo(**{output_group: transitive_outputs})]
+
     proto_sources = [
         f
         for f in target[ProtoInfo].direct_sources
@@ -55,22 +61,24 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     inputs = target[ProtoInfo].transitive_sources
     ctx_path = ctx.label.package + "/" + ctx.label.name
     output_path = outputs[0].root.path + "/" + outputs[0].owner.workspace_root + "/" + ctx_path
-    args = ["-I./" + ctx.label.workspace_root]
-    args += ["-I" + import_path for import_path in import_paths]
-    args += ["--plugin=protoc-gen-api_proto_plugin=" + ctx.executable._api_proto_plugin.path, "--api_proto_plugin_out=" + output_path]
+    args = ctx.actions.args()
+    args.add(ctx.label.workspace_root, format = "-I./%s")
+    args.add_all(import_paths, format_each = "-I%s")
+    args.add(ctx.executable._api_proto_plugin, format = "--plugin=protoc-gen-api_proto_plugin=%s")
+    args.add(output_path, format = "--api_proto_plugin_out=%s")
     if hasattr(ctx.attr, "_type_db"):
         inputs = depset(transitive = [inputs] + [ctx.attr._type_db.files])
         if len(ctx.attr._type_db.files.to_list()) != 1:
             fail("{} must have one type database file".format(ctx.attr._type_db))
-        args.append("--api_proto_plugin_opt=type_db_path=" + ctx.attr._type_db.files.to_list()[0].path)
-    if hasattr(ctx.attr, "_extra_args"):
-        args.append("--api_proto_plugin_opt=extra_args=" + ctx.attr._extra_args[BuildSettingInfo].value)
-    args += [src.path for src in target[ProtoInfo].direct_sources]
+        args.add(ctx.attr._type_db.files.to_list()[0], format = "--api_proto_plugin_opt=type_db_path=%s")
+    if hasattr(ctx.attr, "_extra_args") and ctx.attr._extra_args[BuildSettingInfo].value:
+        args.add(ctx.attr._extra_args[BuildSettingInfo].value, format = "--api_proto_plugin_opt=extra_args=%s")
+    args.add_all(target[ProtoInfo].direct_sources)
     env = {}
 
     ctx.actions.run(
         executable = ctx.executable._protoc,
-        arguments = args,
+        arguments = [args],
         inputs = inputs,
         tools = [ctx.executable._api_proto_plugin],
         outputs = outputs,

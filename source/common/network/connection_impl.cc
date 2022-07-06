@@ -855,15 +855,18 @@ ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options)
     : ClientConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
-                           source_address, std::move(transport_socket), options) {}
+                           source_address, std::move(transport_socket), options,
+                           transport_options) {}
 
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
     const Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
@@ -903,6 +906,15 @@ ClientConnectionImpl::ClientConnectionImpl(
 
       // Trigger a write event to close this connection out-of-band.
       ioHandle().activateFileEvents(Event::FileReadyType::Write);
+    }
+  }
+
+  if (transport_options) {
+    for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
+      // This does not throw as all objects are distinctly named and the stream info is empty.
+      stream_info_.filterState()->setData(object.name_, object.data_, object.state_type_,
+                                          StreamInfo::FilterState::LifeSpan::Connection,
+                                          object.stream_sharing_);
     }
   }
 }

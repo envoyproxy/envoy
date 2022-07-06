@@ -132,11 +132,13 @@ envoy.compression.zstd.decompressor:
   status: stable
   type_urls:
   - envoy.extensions.compression.zstd.decompressor.v3.Zstd
-envoy.config.validators.minimum_clusters:
+envoy.config.validators.minimum_clusters_validator:
   categories:
   - envoy.config.validators
   security_posture: unknown
   status: stable
+  type_urls:
+  - envoy.extensions.config.validators.minimum_clusters.v3.MinimumClustersValidator
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
@@ -609,11 +611,13 @@ envoy.filters.thrift.header_to_metadata:
   status: alpha
   type_urls:
   - envoy.extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata
-envoy.filters.thrift.ratelimit:
+envoy.filters.thrift.rate_limit:
   categories:
   - envoy.thrift_proxy.filters
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.thrift_proxy.filters.ratelimit.v3.RateLimit
 envoy.filters.thrift.router:
   categories:
   - envoy.thrift_proxy.filters
@@ -621,11 +625,13 @@ envoy.filters.thrift.router:
   status: stable
   type_urls:
   - envoy.extensions.filters.network.thrift_proxy.router.v3.Router
-envoy.filters.udp_listener.dns_filter:
+envoy.filters.udp.dns_filter:
   categories:
   - envoy.filters.udp_listener
   security_posture: robust_to_untrusted_downstream
   status: alpha
+  type_urls:
+  - envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig
 envoy.filters.udp_listener.udp_proxy:
   categories:
   - envoy.filters.udp_listener
@@ -683,6 +689,8 @@ envoy.http.stateful_header_formatters.preserve_case:
   - envoy.http.stateful_header_formatters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+  type_urls:
+  - envoy.extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig
 envoy.http.header_validators.envoy_default:
   categories:
   - envoy.http.header_validators
@@ -724,16 +732,20 @@ envoy.matching.common_inputs.environment_variable:
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.environment_variable.v3.Config
-envoy.matching.input_matchers.consistent_hashing:
+envoy.matching.matchers.consistent_hashing:
   categories:
   - envoy.matching.input_matchers
   security_posture: robust_to_untrusted_downstream
   status: stable
-envoy.matching.input_matchers.ip:
+  type_urls:
+  - envoy.extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing
+envoy.matching.matchers.ip:
   categories:
   - envoy.matching.input_matchers
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+  type_urls:
+  - envoy.extensions.matching.input_matchers.ip.v3.Ip
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
@@ -1075,6 +1087,8 @@ envoy.network.dns_resolver.apple:
   - envoy.network.dns_resolver
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+  type_urls:
+  - envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig
 envoy.rbac.matchers.upstream_ip_port:
   categories:
   - envoy.rbac.matchers
