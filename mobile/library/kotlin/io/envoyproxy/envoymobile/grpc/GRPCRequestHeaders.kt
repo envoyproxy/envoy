@@ -9,16 +9,14 @@ class GRPCRequestHeaders : RequestHeaders {
    *
    * @param headers: Headers to set.
    */
-  internal constructor(headers: Map<String, List<String>>) : super(headers)
+  internal constructor(headers: Map<String, MutableList<String>>) : super(HeadersContainer(headers))
+
+  internal constructor(container: HeadersContainer) : super(container)
 
   /**
    * Convert the headers back to a builder for mutation.
    *
    * @return GRPCRequestHeadersBuilder, The new builder.
    */
-  fun toGRPCRequestHeadersBuilder() = GRPCRequestHeadersBuilder(
-    headers.mapValues {
-      it.value.toMutableList()
-    }.toMutableMap()
-  )
+  fun toGRPCRequestHeadersBuilder() = GRPCRequestHeadersBuilder(container)
 }

@@ -116,7 +116,7 @@ class MainActivity : Activity() {
         val message = "received headers with status $status"
 
         val sb = StringBuilder()
-        for ((name, value) in responseHeaders.headers) {
+        for ((name, value) in responseHeaders.caseSensitiveHeaders()) {
           if (name in FILTERED_HEADERS) {
             sb.append(name).append(": ").append(value.joinToString()).append("\n")
           }

@@ -103,9 +103,9 @@ class RequestHeadersBuilderTest {
       .add("hostWithSuffix", "foo.bar")
       .build()
 
-    assertThat(headers.allHeaders()).doesNotContainKey(":x-foo")
-    assertThat(headers.allHeaders()).doesNotContainKey("x-envoy-mobile-foo")
-    assertThat(headers.allHeaders()).doesNotContainKey("host")
+    assertThat(headers.caseSensitiveHeaders()).doesNotContainKey(":x-foo")
+    assertThat(headers.caseSensitiveHeaders()).doesNotContainKey("x-envoy-mobile-foo")
+    assertThat(headers.caseSensitiveHeaders()).doesNotContainKey("host")
     assertThat(headers.value("hostWithSuffix")).containsExactly("foo.bar")
   }
 
@@ -119,8 +119,8 @@ class RequestHeadersBuilderTest {
       .set("x-envoy-mobile-foo", mutableListOf("abc"))
       .build()
 
-    assertThat(headers.allHeaders()).doesNotContainKey(":x-foo")
-    assertThat(headers.allHeaders()).doesNotContainKey("x-envoy-mobile-foo")
+    assertThat(headers.caseSensitiveHeaders()).doesNotContainKey(":x-foo")
+    assertThat(headers.caseSensitiveHeaders()).doesNotContainKey("x-envoy-mobile-foo")
   }
 
   @Test
@@ -168,7 +168,7 @@ class RequestHeadersBuilderTest {
       .addRetryPolicy(retryPolicy)
       .build()
 
-    assertThat(headers.allHeaders()).containsAllEntriesOf(retryPolicyHeaders)
+    assertThat(headers.caseSensitiveHeaders()).containsAllEntriesOf(retryPolicyHeaders)
   }
 
   @Test
@@ -199,7 +199,7 @@ class RequestHeadersBuilderTest {
       .build()
     val headers2 = headers1.toRequestHeadersBuilder().build()
 
-    assertThat(headers1.allHeaders()).isEqualTo(headers2.allHeaders())
+    assertThat(headers1.caseSensitiveHeaders()).isEqualTo(headers2.caseSensitiveHeaders())
   }
 
   @Test

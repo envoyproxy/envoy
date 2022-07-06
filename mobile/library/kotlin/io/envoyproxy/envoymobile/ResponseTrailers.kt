@@ -13,13 +13,16 @@ class ResponseTrailers : Trailers {
   internal constructor(trailers: Map<String, List<String>>) : super(trailers)
 
   /**
+   * Instantiate a new builder.
+   *
+   * @param container: The headers container to start with.
+   */
+  internal constructor(container: HeadersContainer) : super(container)
+
+  /**
    * Convert the trailers back to a builder for mutation.
    *
    * @return ResponseTrailersBuilder, The new builder.
    */
-  fun toResponseTrailersBuilder() = ResponseTrailersBuilder(
-    headers.mapValues {
-      it.value.toMutableList()
-    }.toMutableMap()
-  )
+  fun toResponseTrailersBuilder() = ResponseTrailersBuilder(container)
 }

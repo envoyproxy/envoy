@@ -1,11 +1,11 @@
-/// The container which manages the underlying headers map.
+/// The container that manages the underlying headers map.
 /// It maintains the original casing of passed header names.
 /// It treats headers names as case-insensitive for the purpose
 /// of header lookups and header name conflict resolutions.
 struct HeadersContainer: Equatable {
   private var headers: [String: Header]
 
-  /// Represents a headers name together with all of its values.
+  /// Represents a header name together with all of its values.
   /// It preserves the original casing of the header name.
   struct Header: Equatable {
     private(set) var name: String
@@ -32,10 +32,10 @@ struct HeadersContainer: Equatable {
     var underlyingHeaders = [String: Header]()
     for (name, value) in headers {
       let lowercasedName = name.lowercased()
-      /// Dictionaries in Swift are unordered collections. Process headers with names
+      /// Dictionaries are unordered collections. Process headers with names
       /// that are the same when lowercased in an alphabetical order to avoid a situation
       /// in which the result of the initialization is non-derministic i.e., we want
-      /// "[A: ["1"]", "a: ["2"]]" headers to be always converted to ["A": ["1", "2"]] and
+      /// ["A": ["1"], "a": ["2"]] headers to be always converted to ["A": ["1", "2"]] and
       /// never to "a": ["2", "1"].
       ///
       /// If a given header name already exists in the processed headers map, check
@@ -75,12 +75,15 @@ struct HeadersContainer: Equatable {
   ///
   /// - parameter name:  The name of the header.
   /// - parameter value: The value to set the header value to.
-  mutating func set(name: String, value: [String]?) {
-    guard let value = value else {
-      self.headers[name.lowercased()] = nil
-      return
-    }
+  mutating func set(name: String, value: [String]) {
     self.headers[name.lowercased()] = Header(name: name, value: value)
+  }
+
+  /// Remove a given header.
+  ///
+  /// - parameter name: The name of the header to remove.
+  mutating func remove(name: String) {
+    self.headers[name.lowercased()] = nil
   }
 
   /// Get the value for the provided header name.
@@ -93,10 +96,11 @@ struct HeadersContainer: Equatable {
     return self.headers[name.lowercased()]?.value
   }
 
-  /// Return all underlying headers.
+  /// Accessor for all underlying case-sensitive headers. When possible,
+  /// use case-insensitive accessors instead.
   ///
   /// - returns: The underlying headers.
-  func allHeaders() -> [String: [String]] {
+  func caseSensitiveHeaders() -> [String: [String]] {
     return Dictionary(uniqueKeysWithValues: self.headers.map { _, value in
       return (value.name, value.value)
     })

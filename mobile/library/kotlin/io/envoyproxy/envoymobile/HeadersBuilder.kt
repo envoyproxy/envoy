@@ -5,15 +5,15 @@ package io.envoyproxy.envoymobile
  * See `{Request|Response}HeadersBuilder` for usage.
  */
 open class HeadersBuilder {
-  protected val headers: MutableMap<String, MutableList<String>>
+  protected val container: HeadersContainer
 
   /**
    * Instantiate a new builder, only used by child classes.
    *
-   * @param headers: The headers to start with.
+   * @param container: The headers container to start with.
    */
-  protected constructor(headers: MutableMap<String, MutableList<String>>) {
-    this.headers = headers
+  internal constructor(container: HeadersContainer) {
+    this.container = container
   }
 
   /**
@@ -28,7 +28,7 @@ open class HeadersBuilder {
     if (isRestrictedHeader(name)) {
       return this
     }
-    headers.getOrPut(name) { mutableListOf<String>() }.add(value)
+    container.add(name, value)
     return this
   }
 
@@ -44,7 +44,7 @@ open class HeadersBuilder {
     if (isRestrictedHeader(name)) {
       return this
     }
-    headers[name] = value
+    container.set(name, value)
     return this
   }
 
@@ -59,7 +59,7 @@ open class HeadersBuilder {
     if (isRestrictedHeader(name)) {
       return this
     }
-    headers.remove(name)
+    container.remove(name)
     return this
   }
 
@@ -72,10 +72,10 @@ open class HeadersBuilder {
    * @return HeadersBuilder, This builder.
    */
   internal open fun internalSet(name: String, value: MutableList<String>): HeadersBuilder {
-    headers[name] = value
+    container.set(name, value)
     return this
   }
 
   private fun isRestrictedHeader(name: String) = name.startsWith(":") ||
-    name.startsWith("x-envoy-mobile") || name == "host"
+    name.startsWith("x-envoy-mobile", ignoreCase = true) || name.equals("host", ignoreCase = true)
 }

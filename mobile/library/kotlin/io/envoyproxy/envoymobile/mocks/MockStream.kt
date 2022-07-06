@@ -81,7 +81,7 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
    * @param endStream Whether this is a headers-only response.
    */
   fun receiveHeaders(headers: ResponseHeaders, endStream: Boolean) {
-    mockStream.callbacks.onHeaders(headers.allHeaders(), endStream, mockStreamIntel)
+    mockStream.callbacks.onHeaders(headers.caseSensitiveHeaders(), endStream, mockStreamIntel)
   }
 
   /**
@@ -100,7 +100,7 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
    * @param trailers Response trailers to receive.
    */
   fun receiveTrailers(trailers: ResponseTrailers) {
-    mockStream.callbacks.onTrailers(trailers.allHeaders(), mockStreamIntel)
+    mockStream.callbacks.onTrailers(trailers.caseSensitiveHeaders(), mockStreamIntel)
   }
 
   /**

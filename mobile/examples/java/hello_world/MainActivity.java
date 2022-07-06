@@ -108,7 +108,8 @@ public class MainActivity extends Activity {
           String message = "received headers with status " + status;
 
           StringBuilder sb = new StringBuilder();
-          for (Map.Entry<String, List<String>> entry : responseHeaders.getHeaders().entrySet()) {
+          for (Map.Entry<String, List<String>> entry :
+               responseHeaders.caseSensitiveHeaders().entrySet()) {
             String name = entry.getKey();
             if (FILTERED_HEADERS.contains(name)) {
               sb.append(name).append(": ").append(String.join(", ", entry.getValue())).append("\n");
