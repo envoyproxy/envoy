@@ -46,8 +46,9 @@ SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6onl
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
-                                            absl::optional<int> domain) const {
-  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain);
+                                            absl::optional<int> domain,
+                                            const Io::IoUringFactory* io_uring_factory) const {
+  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain, io_uring_factory);
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
@@ -94,7 +95,8 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
       Api::OsSysCallsSingleton::get().socket(domain, flags, protocol);
   RELEASE_ASSERT(SOCKET_VALID(result.return_value_),
                  fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-  IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain);
+  IoHandlePtr io_handle =
+      makeSocket(result.return_value_, socket_v6only, domain, io_uring_factory_.get());
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
