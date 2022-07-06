@@ -229,11 +229,17 @@ void UpstreamRequest::copyDynamicMetaDataFromL4Downstream(StreamInfo::StreamInfo
     const StreamInfo::StreamInfo& downstream_streamInfo =
         parent_.callbacks()->connection()->streamInfo();
     const auto& dynamic_metadata = downstream_streamInfo.dynamicMetadata();
-    auto name = Envoy::Extensions::NetworkFilters::NetworkFilterNames::get().DownToUp;
+    auto name = Envoy::Extensions::NetworkFilters::NetworkFilterNames::get().SharedWithUpstream;
     auto filter_it = dynamic_metadata.filter_metadata().find(name);
+
     if (filter_it != dynamic_metadata.filter_metadata().end()) {
-      ProtobufWkt::Struct metadata(filter_it->second);
-      l4_stream_info.setDynamicMetadata(name, metadata);
+      auto downstream_connection_id = parent_.callbacks()->connection()->id();
+      ProtobufWkt::Struct upstream_metadata1;
+      auto& fields = *upstream_metadata1.mutable_fields();
+      ProtobufWkt::Value val;
+      val = ValueUtil::structValue(filter_it->second);
+      fields.insert({std::to_string(downstream_connection_id), val});
+      l4_stream_info.setDynamicMetadata(name, upstream_metadata1);
     }
   }
 }

@@ -129,9 +129,9 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const BytesMeterSharedPtr& downstream_bytes_meter) {
         downstream_bytes_meter_ = downstream_bytes_meter;
       }));
-  ON_CALL(*this, setDynamicMetadata("envoy.common.down_up", _))
+  ON_CALL(*this, setDynamicMetadata("envoy.common.shared_with_upstream", _))
       .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
-        (*metadata_.mutable_filter_metadata())["envoy.common.down_up"].MergeFrom(obj);
+        (*metadata_.mutable_filter_metadata())["envoy.common.shared_with_upstream"].MergeFrom(obj);
       }));
 }
 

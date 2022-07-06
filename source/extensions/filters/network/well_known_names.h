@@ -61,7 +61,7 @@ public:
   const std::string Wasm = "envoy.filters.network.wasm";
   // A common namespace which will propagated the dynamic metadata from
   // downstream to upstream
-  const std::string DownToUp = "envoy.common.down_up";
+  const std::string SharedWithUpstream = "envoy.common.shared_with_upstream";
 };
 
 using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;
