@@ -33,6 +33,7 @@ namespace {
 
 class Http11ConnectTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
+  Http11ConnectTest() = default;
   void initialize(bool no_proxy_protocol = false) {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
