@@ -115,6 +115,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     tags = ["nofips"],
     deps = [
+        "//source/server:backtrace_lib",
         "@com_github_google_quiche//:quiche_common_platform_export",
     ],
 )
