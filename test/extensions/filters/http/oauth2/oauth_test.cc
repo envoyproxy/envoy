@@ -11,7 +11,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -20,6 +19,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 
+using namespace std::chrono_literals;
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -42,7 +42,7 @@ public:
     uri.set_uri("auth.com/oauth/token");
     uri.mutable_timeout()->set_seconds(1);
     cm_.initializeThreadLocalClusters({"auth"});
-    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri);
+    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, 0s);
   }
 
   ABSL_MUST_USE_RESULT
@@ -99,6 +99,73 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess(_, _, _, _));
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+}
+
+TEST_F(OAuth2ClientTest, RequestAccessTokenMissingExpiresIn) {
+  std::string json = R"EOF(
+    {
+      "access_token": "golden ticket"
+    }
+    )EOF";
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "200"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+  mock_response->body().add(json);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
+  EXPECT_EQ(1, callbacks_.size());
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+}
+
+TEST_F(OAuth2ClientTest, RequestAccessTokenDefaultExpiresIn) {
+  std::string json = R"EOF(
+    {
+      "access_token": "golden ticket"
+    }
+    )EOF";
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "200"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+  mock_response->body().add(json);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  envoy::config::core::v3::HttpUri uri;
+  uri.set_cluster("auth");
+  uri.set_uri("auth.com/oauth/token");
+  uri.mutable_timeout()->set_seconds(1);
+  client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, 2000s);
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
+  EXPECT_EQ(1, callbacks_.size());
+  EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess("golden ticket", _, _, 2000s));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));

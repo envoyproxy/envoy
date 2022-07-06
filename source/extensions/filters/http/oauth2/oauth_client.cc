@@ -15,6 +15,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
 
+using namespace std::chrono_literals;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -87,8 +89,8 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
   // TODO(snowp): Should this be a pgv validation instead? A more readable log
   // message might be good enough reason to do this manually?
-  if (!response.has_access_token() || !response.has_expires_in()) {
-    ENVOY_LOG(debug, "No access token or expiration after asyncGetAccessToken");
+  if (!response.has_access_token()) {
+    ENVOY_LOG(debug, "No access token after asyncGetAccessToken");
     parent_->sendUnauthorizedResponse();
     return;
   }
@@ -97,7 +99,16 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   const std::string id_token{PROTOBUF_GET_WRAPPED_OR_DEFAULT(response, id_token, EMPTY_STRING)};
   const std::string refresh_token{
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(response, refresh_token, EMPTY_STRING)};
-  const std::chrono::seconds expires_in{PROTOBUF_GET_WRAPPED_REQUIRED(response, expires_in)};
+
+  std::chrono::seconds expires_in = default_expires_in_;
+  if (response.has_expires_in()) {
+    expires_in = std::chrono::seconds{response.expires_in().value()};
+  }
+  if (expires_in <= 0s) {
+    ENVOY_LOG(debug, "No default or explicit access token expiration value found after asyncGetAccessToken");
+    parent_->sendUnauthorizedResponse();
+    return;
+  }
 
   parent_->onGetAccessTokenSuccess(access_token, id_token, refresh_token, expires_in);
 }

@@ -130,6 +130,7 @@ public:
   const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
+  const std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
 
   const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
     return oauth_token_endpoint_;
@@ -161,6 +162,7 @@ private:
   const bool forward_bearer_token_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
   const CookieNames cookie_names_;
+  const std::chrono::seconds default_expires_in_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

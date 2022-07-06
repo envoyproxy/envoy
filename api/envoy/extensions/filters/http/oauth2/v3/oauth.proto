@@ -7,6 +7,8 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 import "envoy/type/matcher/v3/path.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -62,7 +64,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message OAuth2Config {
   // Endpoint on the authorization server to retrieve the access token from.
   config.core.v3.HttpUri token_endpoint = 1;
@@ -101,6 +103,9 @@ message OAuth2Config {
   // Optional resource parameter for authorization request
   // RFC: https://tools.ietf.org/html/rfc8707
   repeated string resources = 10;
+
+  // The default lifetime in seconds of the access token, if omitted by the authorization server.
+  google.protobuf.Duration default_expires_in = 11;
 }
 
 // Filter config.
