@@ -1,0 +1,53 @@
+version: "3.7"
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    container_name: proxy
+    platform: linux/x86_64
+    networks:
+      - envoymesh
+    ports:
+      - 19092:19092
+      - 8001:8001
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    platform: linux/x86_64
+    networks:
+      - envoymesh
+    ports:
+      - 9092:9092
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Listener value needs to be equal to cluster value in Envoy config
+      # (will receive payloads from Envoy).
+      KAFKA_LISTENER: PLAINTEXT://kafka:9092
+      # Advertised listener value needs to be equal to Envoy's listener
+      # (will make clients discovering this broker talk to it through Envoy).
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    platform: linux/x86_64
+    networks:
+      - envoymesh
+    ports:
+      - 22181:2181
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+networks:
+  envoymesh:
+    name: envoymesh
