@@ -31,7 +31,6 @@ UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
 ProtobufTypes::MessagePtr UpstreamHttp11ConnectSocketConfigFactory::createEmptyConfigProto() {
   return std::make_unique<
       envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport>();
-  ;
 }
 
 REGISTER_FACTORY(UpstreamHttp11ConnectSocketConfigFactory,

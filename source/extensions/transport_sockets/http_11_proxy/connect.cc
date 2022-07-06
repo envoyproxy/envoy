@@ -14,10 +14,6 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
 
-const std::string& UpstreamHttp11ConnectSocket::key() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.network.transport_socket.http_11_proxy.address");
-}
-
 UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
     Network::TransportSocketOptionsConstSharedPtr options)

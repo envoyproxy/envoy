@@ -23,7 +23,6 @@ using testing::Const;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnNull;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -34,7 +33,6 @@ namespace {
 
 class Http11ConnectTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  Http11ConnectTest() {}
   void initialize(bool no_proxy_protocol = false) {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
@@ -89,7 +87,7 @@ TEST_P(Http11ConnectTest, InjectesHeaderOnlyOnce) {
   initialize();
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
         auto length = buffer.length();
         buffer.drain(length);
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
@@ -178,13 +176,13 @@ TEST_P(Http11ConnectTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
   {
     InSequence s;
     EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
-        .WillOnce(Invoke([&](Buffer::Instance&) -> Api::IoCallUint64Result {
+        .WillOnce(Invoke([&](Buffer::Instance&) {
           return Api::IoCallUint64Result(
               0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                  Network::IoSocketError::deleteIoError));
         }));
     EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
-        .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        .WillOnce(Invoke([&](Buffer::Instance& buffer) {
           auto length = buffer.length();
           buffer.drain(length);
           return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
@@ -204,12 +202,10 @@ TEST_P(Http11ConnectTest, ReturnsCloseWhenWriteErrorIsNotAgain) {
   Buffer::OwnedImpl msg("initial data");
   {
     InSequence s;
-    EXPECT_CALL(io_handle_, write(_))
-        .WillOnce(Invoke([&](Buffer::Instance&) -> Api::IoCallUint64Result {
-          return Api::IoCallUint64Result(0,
-                                         Api::IoErrorPtr(new Network::IoSocketError(EADDRNOTAVAIL),
-                                                         Network::IoSocketError::deleteIoError));
-        }));
+    EXPECT_CALL(io_handle_, write(_)).WillOnce(Invoke([&](Buffer::Instance&) {
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EADDRNOTAVAIL),
+                                                        Network::IoSocketError::deleteIoError));
+    }));
   }
 
   Network::IoResult rc = connect_socket_->doWrite(msg, false);
@@ -223,7 +219,7 @@ TEST_P(Http11ConnectTest, StipsHeaderOnce) {
   std::string connect("HTTP/1.1 200 OK\r\n\r\n");
   std::string initial_data(connect + "follow up data");
   EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
-      .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) -> Api::IoCallUint64Result {
+      .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(),
                                        Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
@@ -234,6 +230,23 @@ TEST_P(Http11ConnectTest, StipsHeaderOnce) {
           connect.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
   EXPECT_CALL(*inner_socket_, doRead(_))
       .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 1, false}));
+  Buffer::OwnedImpl buffer("");
+  auto result = connect_socket_->doRead(buffer);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
+}
+
+TEST_P(Http11ConnectTest, InsufficientData) {
+  initialize();
+
+  std::string connect("HTTP/1.1 200 OK\r\n\r");
+  std::string initial_data(connect + "follow up data");
+  EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
+      .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
+        memcpy(buffer, initial_data.data(), initial_data.length());
+        return Api::IoCallUint64Result(initial_data.length(),
+                                       Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
+  absl::optional<uint64_t> expected_bytes(connect.length());
   Buffer::OwnedImpl buffer("");
   auto result = connect_socket_->doRead(buffer);
   EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
@@ -263,7 +276,7 @@ TEST_P(Http11ConnectTest, ReadFail) {
   std::string connect("HTTP/1.1 200 OK\r\n\r\n");
   std::string initial_data(connect + "follow up data");
   EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
-      .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) -> Api::IoCallUint64Result {
+      .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(),
                                        Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
@@ -287,7 +300,7 @@ TEST_P(Http11ConnectTest, ShortRead) {
   std::string connect("HTTP/1.1 200 OK\r\n\r\n");
   std::string initial_data(connect + "follow up data");
   EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
-      .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) -> Api::IoCallUint64Result {
+      .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(),
                                        Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
@@ -307,11 +320,10 @@ TEST_P(Http11ConnectTest, ShortRead) {
 TEST_P(Http11ConnectTest, LongHeaders) {
   initialize();
 
-  EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
-      .WillOnce(Invoke([](void* buffer, size_t, int) -> Api::IoCallUint64Result {
-        memset(buffer, 0, 200);
-        return Api::IoCallUint64Result(200, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
-      }));
+  EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK)).WillOnce(Invoke([](void* buffer, size_t, int) {
+    memset(buffer, 0, 200);
+    return Api::IoCallUint64Result(200, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+  }));
   EXPECT_CALL(io_handle_, read(_, _)).Times(0);
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
@@ -327,7 +339,7 @@ TEST_P(Http11ConnectTest, InvalidResponse) {
   std::string connect("HTTP/1.1 404 Not Found\r\n\r\n");
   std::string initial_data(connect + "follow up data");
   EXPECT_CALL(io_handle_, recv(_, 200, MSG_PEEK))
-      .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) -> Api::IoCallUint64Result {
+      .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
         return Api::IoCallUint64Result(initial_data.length(),
                                        Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
@@ -336,6 +348,7 @@ TEST_P(Http11ConnectTest, InvalidResponse) {
   EXPECT_CALL(io_handle_, read(_, expected_bytes))
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(
           connect.length() - 1, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
   Buffer::OwnedImpl buffer("");
@@ -346,6 +359,25 @@ TEST_P(Http11ConnectTest, InvalidResponse) {
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http11ConnectTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+class SocketFactoryTest : public testing::Test {
+public:
+  void initialize() {
+    auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+    inner_factory_ = inner_factory.get();
+    factory_ = std::make_unique<UpstreamHttp11ConnectSocketFactory>(std::move(inner_factory));
+  }
+
+  NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
+  std::unique_ptr<UpstreamHttp11ConnectSocketFactory> factory_;
+};
+
+// Test createTransportSocket returns nullptr if inner call returns nullptr
+TEST_F(SocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
+  initialize();
+  EXPECT_CALL(*inner_factory_, createTransportSocket(_, _)).WillOnce(testing::ReturnNull());
+  ASSERT_EQ(nullptr, factory_->createTransportSocket(nullptr, nullptr));
+}
 
 } // namespace
 } // namespace Http11Connect

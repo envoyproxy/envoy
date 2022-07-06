@@ -18,8 +18,6 @@ namespace Http11Connect {
 class UpstreamHttp11ConnectSocket : public TransportSockets::PassthroughSocket,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
-  static const std::string& key();
-
   UpstreamHttp11ConnectSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options);
 
