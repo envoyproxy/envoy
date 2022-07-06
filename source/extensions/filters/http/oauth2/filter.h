@@ -48,29 +48,43 @@ class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr token_secret_provider, Api::Api& api)
-      : update_callback_client_(readAndWatchSecret(client_secret_, client_secret_provider, api)),
-        update_callback_token_(readAndWatchSecret(token_secret_, token_secret_provider, api)) {}
+      : update_callback_client_(
+            readAndWatchSecret(client_secret_, client_secret_provider, api, mutex_client_secret_)),
+        update_callback_token_(
+            readAndWatchSecret(token_secret_, token_secret_provider, api, mutex_token_secret_)) {}
 
-  const std::string& clientSecret() const override { return client_secret_; }
+  const std::string& clientSecret() const override {
+    std::lock_guard<std::mutex> lock(mutex_client_secret_);
+    return client_secret_;
+  }
 
-  const std::string& tokenSecret() const override { return token_secret_; }
+  const std::string& tokenSecret() const override {
+    std::lock_guard<std::mutex> lock(mutex_token_secret_);
+    return token_secret_;
+  }
 
 private:
   Envoy::Common::CallbackHandlePtr
   readAndWatchSecret(std::string& value,
-                     Secret::GenericSecretConfigProviderSharedPtr& secret_provider, Api::Api& api) {
+                     Secret::GenericSecretConfigProviderSharedPtr& secret_provider, Api::Api& api,
+                     std::mutex& mutex) {
     const auto* secret = secret_provider->secret();
     if (secret != nullptr) {
+      std::lock_guard<std::mutex> lock(mutex);
       value = Config::DataSource::read(secret->secret(), true, api);
     }
 
-    return secret_provider->addUpdateCallback([secret_provider, &api, &value]() {
+    return secret_provider->addUpdateCallback([secret_provider, &api, &value, &mutex]() {
       const auto* secret = secret_provider->secret();
       if (secret != nullptr) {
+        std::lock_guard<std::mutex> lock(mutex);
         value = Config::DataSource::read(secret->secret(), true, api);
       }
     });
   }
+
+  mutable std::mutex mutex_client_secret_;
+  mutable std::mutex mutex_token_secret_;
 
   std::string client_secret_;
   std::string token_secret_;
