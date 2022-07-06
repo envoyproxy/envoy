@@ -25,7 +25,8 @@ ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const 
                   address_list_[next_address_]);
   return dispatcher_.createClientConnection(
       address_list_[next_address_++], source_address_,
-      socket_factory_.createTransportSocket(transport_socket_options_, host_), options_);
+      socket_factory_.createTransportSocket(transport_socket_options_, host_), options_,
+      transport_socket_options_);
 }
 
 size_t HappyEyeballsConnectionProvider::nextConnection() { return next_address_; }
