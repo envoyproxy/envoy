@@ -1,4 +1,3 @@
-
 config {
   clear_route_cache: true
   include_peer_certificate: true
