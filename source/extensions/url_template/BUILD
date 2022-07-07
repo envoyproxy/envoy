@@ -17,11 +17,14 @@ envoy_cc_library(
     srcs = ["url_template_matching.cc"],
     hdrs = ["url_template_matching.h"],
     visibility = [
+        "//source/common/router:__subpackages__",
         "//source/extensions/url_template:__subpackages__",
         "//test/extensions/url_template:__subpackages__",
     ],
     deps = [
         ":url_template_matching_internal_cc",
+        "//envoy/router:router_url_template_interface",
+        "//source/common/http:path_utility_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -69,5 +72,17 @@ envoy_cc_test(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
+    ],
+)
+
+envoy_cc_extension(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        ":url_template_matching",
+        "//envoy/registry",
+        "//envoy/router:router_url_template_interface",
+        "@envoy_api//envoy/extensions/url_template/v3:pkg_cc_proto",
     ],
 )
