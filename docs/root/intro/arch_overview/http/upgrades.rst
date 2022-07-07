@@ -106,13 +106,6 @@ and encrypt previously unencrypted payload in one hop. To send CONNECT in plaint
 one must first forward the HTTP payload over an "upstream" TLS loopback connection to encrypt it, then have
 a TCP listener take the encrypted payload and send the CONNECT upstream.
 
-A frequently asked question is how to do both L7 processing of a request and then encapsulate it. The current
-recommended best practice for this is to do standard L7 processing with a filter chain, but set the upstream
-cluster to a loopback address of a TCP listener. This TCP listener can then do the CONNECT encapsulation
-and forward the encapsulated payload upstream. There is now also alpha support for doing this inline for
-limited use cases (HTTP/1.1 CONNECT encapsulation, TLS payload) using the
-:ref:`upstream proxy transport socket <envoy_v3_api_msg_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport>`.
-
 .. _tunneling-tcp-over-http:
 
 Tunneling TCP over HTTP

@@ -227,8 +227,6 @@ new_features:
 - area: http
   change: |
     preserve case header formatter support innner formatter on Envoy headers in :ref:`formatter_type_on_envoy_headers <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.formatter_type_on_envoy_headers>`.
-  change: |
-    added alpha proxy support via the :ref:`upstream proxy transport socket <envoy_v3_api_msg_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport>`.
 - area: http3
   change: |
     added :ref:`early_data_policy <envoy_v3_api_field_config.route.v3.RouteAction.early_data_policy>` extension to allow upstream HTTP/3 sending requests over early data. If no extension is configured, HTTP/3 pool will send safe requests as early data to the host if the pool already cached 0-RTT credentials of that host. If those requests fail and the underlying connection pool supports TCP fallback, the request may be retried automatically. If the :ref:`default extension <envoy_v3_api_msg_extensions.early_data.v3.DefaultEarlyDataPolicy>` is configured, no requests are allowed to be sent as early data. Note that if any customized extension configures non-safe requests to be allowed over early data, the Envoy will not automatically retry them. If desired, explicitly config their :ref:`retry_policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>`. This feature requires both ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3`` and ``envoy.reloadable_features.http3_sends_early_data`` to be turned on.

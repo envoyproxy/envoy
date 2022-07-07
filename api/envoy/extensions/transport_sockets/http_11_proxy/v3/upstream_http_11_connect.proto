@@ -17,8 +17,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.transport_sockets.http_11_proxy]
 
 // Configuration for HTTP/1.1 proxy transport sockets.
-// If this is configured and an intermediate filter adds the data necessary for
-// proxying to the stream info then
+// This is intended for use in Envoy Mobile, though may eventually be extended
+// for upstream Envoy use.
+// If this transport socket is configured, and an intermediate filter adds the
+// stream info necessary for proxying to the stream info (as the test filter
+// does :repo:`here <test/integration/filters/header_to_proxy_filter.cc>`) then
 //
 // * Upstream connections will be directed to the specified proxy address rather
 //   than the host's address
