@@ -37,7 +37,7 @@ protected:
 
 private:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   Http::FilterFactoryCb cb_;

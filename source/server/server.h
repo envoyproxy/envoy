@@ -196,6 +196,10 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
+  Http::Context& httpContext() override { return server_.httpContext(); }
+  bool healthCheckFailed() override { return server_.healthCheckFailed(); }
+  ProcessContextOptRef processContext() override { return server_.processContext(); }
+  OptRef<Configuration::DownstreamFactoryContext> downstreamContext() override { return {}; }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }

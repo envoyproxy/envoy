@@ -21,7 +21,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) override;
 };
 
 } // namespace IpTagging

@@ -42,7 +42,7 @@ public:
 
   Http::FilterFactoryCb
   createFilter(const std::string&,
-               Server::Configuration::FactoryContext& factory_context) override {
+               Server::Configuration::ServerFactoryContext& factory_context) override {
     return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
       callbacks.addStreamFilter(
           std::make_shared<ProcessContextFilter>(*factory_context.processContext()));

@@ -40,7 +40,7 @@ TEST(Registration, GetFactory) {
       "envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig");
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3::CacheConfig config;
-  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
   EXPECT_EQ(factory->getCache(config, factory_context)->cacheInfo().name_,
             "envoy.extensions.http.cache.simple");

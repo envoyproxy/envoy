@@ -51,7 +51,7 @@ public:
 private:
   Envoy::Compression::Decompressor::DecompressorFactoryPtr createDecompressorFactoryFromProtoTyped(
       const envoy::extensions::compression::brotli::decompressor::v3::Brotli& proto_config,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(BrotliDecompressorLibraryFactory);

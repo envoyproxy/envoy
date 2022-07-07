@@ -270,7 +270,7 @@ public:
   // etc.
   virtual std::shared_ptr<HttpCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-           Server::Configuration::FactoryContext& context) PURE;
+           Server::Configuration::ServerFactoryContext& context) PURE;
   ~HttpCacheFactory() override = default;
 
 private:

@@ -24,6 +24,7 @@
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/filter_chain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
+#include "source/server/server_factory_context_wrapper.h"
 
 namespace Envoy {
 namespace Server {
@@ -173,6 +174,7 @@ private:
   Stats::ScopeSharedPtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
+  mutable ServerFactoryContextWrapper server_context_;
   bool is_quic_;
 };
 

@@ -19,7 +19,7 @@ namespace RateLimitFilter {
 namespace {
 
 TEST(RateLimitFilterConfigTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::extensions::filters::http::ratelimit::v3::RateLimit config;
   config.mutable_rate_limit_service()->set_transport_api_version(
       envoy::config::core::v3::ApiVersion::V3);
@@ -41,7 +41,7 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
   envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
       .WillOnce(Invoke(
@@ -57,7 +57,7 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
 }
 
 TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Server::MockInstance> instance;
 
   RateLimitFilterConfig factory;

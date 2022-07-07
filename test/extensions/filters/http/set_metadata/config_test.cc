@@ -33,7 +33,7 @@ value:
   SetMetadataProtoConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SetMetadataConfig factory;
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);

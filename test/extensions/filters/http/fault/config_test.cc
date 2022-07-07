@@ -19,7 +19,7 @@ namespace Fault {
 namespace {
 
 TEST(FaultFilterConfigTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
   fault.mutable_abort();
   EXPECT_THROW(FaultFilterFactory().createFilterFactoryFromProto(fault, "stats", context),
@@ -36,7 +36,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
   )EOF";
 
   const auto proto_config = convertYamlStrToProtoConfig(yaml_string);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FaultFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -51,7 +51,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
       envoy::type::v3::FractionalPercent::HUNDRED);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FaultFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -60,7 +60,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
 }
 
 TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FaultFilterFactory factory;
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);

@@ -245,7 +245,7 @@ void DelegatingStreamFilter::setEncoderFilterCallbacks(
 
 Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
-    const std::string& prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& prefix, Server::Configuration::ServerFactoryContext& context) {
 
   ASSERT(proto_config.has_extension_config());
   auto& factory =
@@ -261,7 +261,7 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
   Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context};
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
                             Envoy::Http::Matching::HttpFilterActionContext>
-      matcher_factory(action_context, context.getServerFactoryContext(), validation_visitor);
+      matcher_factory(action_context, context, validation_visitor);
   Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData> factory_cb;
   if (proto_config.has_xds_matcher()) {
     factory_cb = matcher_factory.create(proto_config.xds_matcher());

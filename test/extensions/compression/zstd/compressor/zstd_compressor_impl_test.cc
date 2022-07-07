@@ -108,7 +108,7 @@ TEST_F(ZstdCompressorImplTest, CompressWitHugeBuffer) {
 TEST_F(ZstdCompressorImplTest, IllegalConfig) {
   envoy::extensions::compression::zstd::compressor::v3::Zstd zstd;
   Zstd::Compressor::ZstdCompressorLibraryFactory lib_factory;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> mock_context;
   std::string json;
 
   json = R"EOF({

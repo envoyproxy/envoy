@@ -179,7 +179,7 @@ public:
    */
   virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                              const std::string& stat_prefix,
-                                                             FactoryContext& context) PURE;
+                                                             ServerFactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted
@@ -207,7 +207,7 @@ public:
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
-  virtual bool isTerminalFilterByProto(const Protobuf::Message&, FactoryContext&) { return false; }
+  virtual bool isTerminalFilterByProto(const Protobuf::Message&, ServerFactoryContext&) { return false; }
 
   /**
    * @return FilterDependenciesPtr specification of dependencies required or

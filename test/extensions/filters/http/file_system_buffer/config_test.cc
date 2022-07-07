@@ -50,7 +50,7 @@ public:
 
   std::shared_ptr<const FileSystemBufferFilterConfig>
   captureConfigFromProto(const ProtoFileSystemBufferFilterConfig& proto_config) {
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     Http::FilterFactoryCb cb =
         factory()->createFilterFactoryFromProto(proto_config, "stats", context);
     Http::MockFilterChainFactoryCallbacks filter_callback;

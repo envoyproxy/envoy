@@ -15,7 +15,7 @@ namespace GrpcJsonTranscoder {
 namespace {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW(GrpcJsonTranscoderFilterConfig().createFilterFactoryFromProto(
                    envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder(),
                    "stats", context),

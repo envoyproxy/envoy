@@ -24,7 +24,7 @@ using Envoy::Extensions::Common::Wasm::Wasm;
 class FilterConfig : Logger::Loggable<Logger::Id::wasm> {
 public:
   FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
-               Server::Configuration::FactoryContext& context);
+               Server::Configuration::ServerFactoryContext& context);
 
   std::shared_ptr<Context> createFilter() {
     Wasm* wasm = nullptr;

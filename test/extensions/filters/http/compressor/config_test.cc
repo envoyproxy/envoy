@@ -26,7 +26,7 @@ TEST(CompressorFilterFactoryTests, UnregisteredCompressorLibraryConfig) {
   envoy::extensions::filters::http::compressor::v3::Compressor proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   CompressorFilterFactory factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
                             EnvoyException,
                             "Didn't find a registered implementation for type: "

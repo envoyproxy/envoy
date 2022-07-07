@@ -24,7 +24,7 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
   }
   Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::FactoryContext&) override {
+                               Server::Configuration::ServerFactoryContext&) override {
     return [](auto& callbacks) {
       callbacks.addStreamDecoderFilter(nullptr);
       callbacks.addStreamEncoderFilter(nullptr);
@@ -50,7 +50,7 @@ TEST(MatchWrapper, WithMatcher) {
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
       inject_factory(test_factory);
 
-  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> factory_context;
 
   const auto config =
       TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
@@ -102,7 +102,7 @@ TEST(MatchWrapper, DEPRECATED_FEATURE_TEST(WithDeprecatedMatcher)) {
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
       inject_factory(test_factory);
 
-  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> factory_context;
 
   const auto config =
       TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
@@ -154,7 +154,7 @@ TEST(MatchWrapper, WithNoMatcher) {
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
       inject_factory(test_factory);
 
-  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> factory_context;
 
   const auto config =
       TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
@@ -175,7 +175,7 @@ TEST(MatchWrapper, WithMatcherInvalidDataInput) {
   Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
       inject_factory(test_factory);
 
-  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> factory_context;
 
   const auto config =
       TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(

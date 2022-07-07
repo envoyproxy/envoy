@@ -49,7 +49,7 @@ public:
   RandomPauseFilterConfig() : EmptyHttpFilterConfig("random-pause-filter") {}
 
   Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+                                     Server::Configuration::ServerFactoryContext&) override {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       absl::WriterMutexLock m(&rand_lock_);
       if (rng_ == nullptr) {

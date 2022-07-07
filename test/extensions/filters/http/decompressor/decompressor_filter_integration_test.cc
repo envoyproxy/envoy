@@ -18,7 +18,7 @@ public:
     Extensions::Compression::Gzip::Compressor::GzipCompressorLibraryFactory
         compressor_library_factory;
     envoy::extensions::compression::gzip::compressor::v3::Gzip factory_config;
-    testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+    testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
     auto compressor_factory =
         compressor_library_factory.createCompressorFactoryFromProto(factory_config, context);

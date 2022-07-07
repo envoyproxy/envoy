@@ -38,7 +38,7 @@ rules:
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -72,7 +72,7 @@ rules:
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -102,7 +102,7 @@ requirement_map:
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
                             "Wrong requirement_name: rr. It should be one of [r1]");
 }
@@ -135,7 +135,7 @@ requirement_map:
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
 
@@ -171,7 +171,7 @@ rules:
   {
     // Scope in all the things that the filter depends on, so they are destroyed as we leave the
     // scope.
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     // The threadLocal, dispatcher and api that are used by the filter config, actually belong to
     // the server factory context that who's lifetime is longer. We simulate that by returning
     // their instances from outside the scope.
@@ -221,7 +221,7 @@ filter_state_rules:
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
 
   // Empty filter_state
@@ -275,7 +275,7 @@ requirement_map:
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
 
   PerRouteConfig per_route;

@@ -13,7 +13,7 @@ namespace DynamicForwardProxy {
 
 Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context);
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(

@@ -247,7 +247,7 @@ public:
 
   std::vector<std::string> output_;
 
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 
   envoy::config::core::v3::Locality upstream_locality_;
   Network::Address::InstanceConstSharedPtr host_address_{

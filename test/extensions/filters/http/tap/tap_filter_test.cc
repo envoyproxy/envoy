@@ -141,7 +141,7 @@ TEST(TapFilterConfigTest, InvalidProto) {
 
   envoy::extensions::filters::http::tap::v3::Tap config;
   TestUtility::loadFromYaml(filter_config, config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   TapFilterFactory factory;
   EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
                             EnvoyException,
@@ -162,7 +162,7 @@ TEST(TapFilterConfigTest, NeitherMatchNorMatchConfig) {
 
   envoy::extensions::filters::http::tap::v3::Tap config;
   TestUtility::loadFromYaml(filter_config, config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   TapFilterFactory factory;
 
   EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),

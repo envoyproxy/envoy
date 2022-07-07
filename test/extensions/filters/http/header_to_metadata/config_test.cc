@@ -25,7 +25,7 @@ void testForbiddenConfig(const std::string& yaml) {
   HeaderToMetadataProtoConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   HeaderToMetadataConfig factory;
 
   EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
@@ -81,7 +81,7 @@ request_rules:
   HeaderToMetadataProtoConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   HeaderToMetadataConfig factory;
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
@@ -109,7 +109,7 @@ request_rules:
   HeaderToMetadataProtoConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   HeaderToMetadataConfig factory;
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);

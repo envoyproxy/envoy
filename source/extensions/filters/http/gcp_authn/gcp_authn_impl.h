@@ -36,7 +36,7 @@ class GcpAuthnClient : public Http::AsyncClient::Callbacks,
 public:
   GcpAuthnClient(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
-      Server::Configuration::FactoryContext& context)
+      Server::Configuration::ServerFactoryContext& context)
       : config_(config), context_(context) {}
 
   ~GcpAuthnClient() override { cancel(); }
@@ -54,7 +54,7 @@ public:
 private:
   void onError();
   envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig config_;
-  Server::Configuration::FactoryContext& context_;
+  Server::Configuration::ServerFactoryContext& context_;
   Http::AsyncClient::Request* active_request_{};
   RequestCallbacks* callbacks_{};
 };

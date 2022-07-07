@@ -61,7 +61,6 @@ public:
   Http::FilterFactoryCb createFilterFactory(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& ext_authz_config) {
     // Delegate call to mock async client manager to real async client manager.
-    ON_CALL(context_, getServerFactoryContext()).WillByDefault(testing::ReturnRef(server_context_));
     ON_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService& config,
                                   Stats::Scope& scope, bool skip_cluster_check,
@@ -88,7 +87,7 @@ private:
   Grpc::StatNames stat_names_;
 
 protected:
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::unique_ptr<TestAsyncClientManagerImpl> async_client_manager_;
 };
 

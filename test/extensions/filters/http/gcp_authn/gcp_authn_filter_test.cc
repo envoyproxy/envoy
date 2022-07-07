@@ -21,7 +21,7 @@ namespace GcpAuthn {
 namespace {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
-using Server::Configuration::MockFactoryContext;
+using Server::Configuration::MockServerFactoryContext;
 using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NiceMock;
@@ -85,7 +85,7 @@ public:
     client_ = std::make_unique<GcpAuthnClient>(config, context_);
   }
 
-  NiceMock<MockFactoryContext> context_;
+  NiceMock<MockServerFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

@@ -20,7 +20,7 @@ namespace Lua {
 namespace {
 
 TEST(LuaFilterConfigTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW(LuaFilterConfig().createFilterFactoryFromProto(
                    envoy::extensions::filters::http::lua::v3::Lua(), "stats", context),
                ProtoValidationException);
@@ -33,7 +33,7 @@ TEST(LuaFilterConfigTest, LuaFilterInJson) {
 
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   LuaFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;

@@ -146,6 +146,12 @@ public:
   MOCK_METHOD(const Stats::SinkPredicates*, sinkPredicates, (), (const));
 };
 
+class MockDownstreamFactoryContext : public DownstreamFactoryContext {
+  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
+  MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));
+};
+
 class MockServerFactoryContext : public virtual ServerFactoryContext {
 public:
   MockServerFactoryContext();
@@ -175,7 +181,12 @@ public:
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
+  MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(bool, healthCheckFailed, ());
+  MOCK_METHOD(Http::Context&, httpContext, ());
+  MOCK_METHOD(OptRef<DownstreamFactoryContext>, downstreamContext, ());
 
+  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
@@ -196,6 +207,7 @@ public:
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
+  Http::ContextImpl http_context_;
 };
 
 } // namespace Configuration

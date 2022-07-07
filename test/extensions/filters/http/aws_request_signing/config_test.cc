@@ -42,7 +42,7 @@ match_excluded_headers:
   differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
   EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsRequestSigningFilterFactory factory;
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);

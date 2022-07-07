@@ -11,7 +11,7 @@ namespace OnDemand {
 
 Http::FilterFactoryCb OnDemandFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
   OnDemandFilterConfigSharedPtr config = std::make_shared<OnDemandFilterConfig>(
       proto_config, context.clusterManager(), context.messageValidationVisitor());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

@@ -25,7 +25,7 @@ public:
    * @param context general filter context through which persistent resources can be accessed.
    */
   virtual Http::RequestIDExtensionSharedPtr createExtensionInstance(const Protobuf::Message& config,
-                                                                    FactoryContext& context) PURE;
+                                                                    ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.request_id"; }
 };

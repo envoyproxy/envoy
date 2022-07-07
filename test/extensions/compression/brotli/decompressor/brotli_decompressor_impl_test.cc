@@ -92,7 +92,7 @@ TEST_F(BrotliDecompressorImplTest, CompressAndDecompress) {
   TestUtility::loadFromJson(json, brotli);
 
   BrotliDecompressorLibraryFactory lib_factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Compression::Decompressor::DecompressorFactoryPtr factory =
       lib_factory.createDecompressorFactoryFromProto(brotli, context);
   EXPECT_EQ("brotli.", factory->statsPrefix());

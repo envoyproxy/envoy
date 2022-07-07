@@ -23,7 +23,7 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning&
           proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) override;
 };
 
 } // namespace AwsRequestSigningFilter

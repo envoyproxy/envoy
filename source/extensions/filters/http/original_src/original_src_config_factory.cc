@@ -14,7 +14,7 @@ namespace OriginalSrc {
 
 Http::FilterFactoryCb OriginalSrcConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::original_src::v3::OriginalSrc& proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    const std::string&, Server::Configuration::ServerFactoryContext&) {
   Config config(proto_config);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<OriginalSrcFilter>(config));

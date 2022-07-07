@@ -28,7 +28,7 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
   envoy::extensions::filters::http::rbac::v3::RBAC config;
   (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   RoleBasedAccessControlFilterConfigFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
@@ -48,7 +48,7 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidMatcherProto) {
   envoy::extensions::filters::http::rbac::v3::RBAC config;
   *config.mutable_matcher() = matcher;
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   RoleBasedAccessControlFilterConfigFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callbacks;

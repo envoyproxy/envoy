@@ -100,7 +100,7 @@ public:
 private:
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
-      const std::string&, Server::Configuration::FactoryContext& context) override;
+      const std::string&, Server::Configuration::ServerFactoryContext& context) override;
 };
 
 } // namespace MatchDelegate

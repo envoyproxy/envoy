@@ -10,7 +10,7 @@ namespace ExternalProcessing {
 
 Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
   const uint32_t message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const auto filter_config = std::make_shared<FilterConfig>(

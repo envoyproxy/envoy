@@ -32,7 +32,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilter) {
 
   envoy::extensions::filters::http::health_check::v3::HealthCheck proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   HealthCheckFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -69,7 +69,7 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
 
   HealthCheckFilterConfig factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context),
                EnvoyException);
@@ -89,7 +89,7 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) 
   TestUtility::loadFromYaml(yaml_string, proto_config);
 
   HealthCheckFilterConfig factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_NO_THROW(
       factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context));
@@ -98,7 +98,7 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   envoy::extensions::filters::http::health_check::v3::HealthCheck config{};
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
   config.mutable_cache_time()->set_seconds(10);
@@ -114,7 +114,7 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   envoy::extensions::filters::http::health_check::v3::HealthCheck config{};
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
@@ -125,7 +125,7 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto)
 
 TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::extensions::filters::http::health_check::v3::HealthCheck config =
       *dynamic_cast<envoy::extensions::filters::http::health_check::v3::HealthCheck*>(
           healthCheckFilterConfig.createEmptyConfigProto().get());
@@ -141,7 +141,7 @@ void testHealthCheckHeaderMatch(
     const envoy::extensions::filters::http::health_check::v3::HealthCheck& input_config,
     Http::TestRequestHeaderMapImpl& input_headers, bool expect_health_check_response) {
   HealthCheckFilterConfig healthCheckFilterConfig;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   ProtobufTypes::MessagePtr config_msg = healthCheckFilterConfig.createEmptyConfigProto();
   auto config = dynamic_cast<envoy::extensions::filters::http::health_check::v3::HealthCheck*>(
       config_msg.get());

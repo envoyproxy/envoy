@@ -46,7 +46,7 @@ public:
 
   GcpAuthnFilter(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
-      Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix,
       TokenCacheImpl<JwtToken>* token_cache)
       : filter_config_(
             std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
@@ -71,7 +71,7 @@ private:
   }
 
   FilterConfigProtoSharedPtr filter_config_;
-  Server::Configuration::FactoryContext& context_;
+  Server::Configuration::ServerFactoryContext& context_;
   std::unique_ptr<GcpAuthnClient> client_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   // The pointer to request headers for header manipulation later.

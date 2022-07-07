@@ -17,7 +17,7 @@ namespace HealthCheck {
 
 Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
   ASSERT(proto_config.has_pass_through_mode());
 
   const bool pass_through_mode = proto_config.pass_through_mode().value();

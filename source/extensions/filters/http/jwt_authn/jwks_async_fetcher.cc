@@ -17,7 +17,7 @@ constexpr int PubkeyCacheExpirationSec = 600;
 } // namespace
 
 JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
-                                   Server::Configuration::FactoryContext& context,
+                                   Server::Configuration::ServerFactoryContext& context,
                                    CreateJwksFetcherCb create_fetcher_fn,
                                    JwtAuthnFilterStats& stats, JwksDoneFetched done_fn)
     : remote_jwks_(remote_jwks), context_(context), create_fetcher_fn_(create_fetcher_fn),

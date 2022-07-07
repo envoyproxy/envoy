@@ -8939,7 +8939,7 @@ public:
     TestFilterConfig() : EmptyHttpFilterConfig("test.filter") {}
 
     Http::FilterFactoryCb createFilter(const std::string&,
-                                       Server::Configuration::FactoryContext&) override {
+                                       Server::Configuration::ServerFactoryContext&) override {
       PANIC("not implemented");
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
@@ -8964,7 +8964,7 @@ public:
     DefaultTestFilterConfig() : EmptyHttpFilterConfig("test.default.filter") {}
 
     Http::FilterFactoryCb createFilter(const std::string&,
-                                       Server::Configuration::FactoryContext&) override {
+                                       Server::Configuration::ServerFactoryContext&) override {
       PANIC("not implemented");
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {

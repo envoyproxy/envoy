@@ -20,7 +20,7 @@ stat_prefix: test
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
   auto callback = factory.createFilterFactoryFromProto(*proto_config, "stats", context);

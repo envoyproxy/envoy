@@ -83,7 +83,7 @@ public:
   }
 
   JwtAuthentication proto_config_;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> mock_factory_ctx_;
   std::shared_ptr<FilterConfigImpl> filter_config_;
   VerifierConstPtr verifier_;
   ContextSharedPtr context_;

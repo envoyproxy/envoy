@@ -79,7 +79,7 @@ public:
 
   RemoteJwks config_;
   JwksAsyncFetcherPtr async_fetcher_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   JwtAuthnFilterStats stats_;
   std::vector<Common::JwksFetcher::JwksReceiver*> fetch_receiver_array_;
   std::vector<google::jwt_verify::JwksPtr> out_jwks_array_;

@@ -13,7 +13,7 @@ namespace KillRequest {
 
 Http::FilterFactoryCb KillRequestFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
   return [proto_config, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
         std::make_shared<KillRequestFilter>(proto_config, context.api().randomGenerator()));

@@ -69,17 +69,18 @@ public:
 
   Http::FilterFactoryCb
   createFilter(const std::string&,
-               Server::Configuration::FactoryContext& factory_context) override {
+               Server::Configuration::ServerFactoryContext& context) override {
+  Server::Configuration::DownstreamFactoryContext& factory_context = *context.downstreamContext();
     auto secret_provider =
-        factory_context.clusterManager()
+        context.clusterManager()
             .clusterManagerFactory()
             .secretManager()
             .findOrCreateGenericSecretProvider(config_source_, "encryption_key",
                                                factory_context.getTransportSocketFactoryContext());
     return
-        [&factory_context, secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+        [&context, secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {
           callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::SdsGenericSecretTestFilter>(
-              factory_context.api(), secret_provider));
+              context.api(), secret_provider));
         };
   }
 

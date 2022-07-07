@@ -121,7 +121,7 @@ TEST_F(ZstdDecompressorImplTest, CompressDecompressOfMultipleSlices) {
 TEST_F(ZstdDecompressorImplTest, IllegalConfig) {
   envoy::extensions::compression::zstd::decompressor::v3::Zstd zstd;
   Zstd::Decompressor::ZstdDecompressorLibraryFactory lib_factory;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> mock_context;
   std::string json;
 
   json = R"EOF({

@@ -21,7 +21,7 @@ public:
 
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::FactoryContext&) override {
+                               Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<Http::PassThroughDecoderFilter>());
     };
@@ -45,7 +45,7 @@ public:
 TEST(NamedHttpFilterConfigFactoryTest, CreateFilterFactory) {
   TestHttpFilterConfigFactory factory;
   const std::string stats_prefix = "foo";
-  Server::Configuration::MockFactoryContext context;
+  Server::Configuration::MockServerFactoryContext context;
   ProtobufTypes::MessagePtr message{new Envoy::ProtobufWkt::Struct()};
 
   factory.createFilterFactoryFromProto(*message, stats_prefix, context);
@@ -54,7 +54,7 @@ TEST(NamedHttpFilterConfigFactoryTest, CreateFilterFactory) {
 TEST(NamedHttpFilterConfigFactoryTest, Dependencies) {
   TestHttpFilterConfigFactory factory;
   const std::string stats_prefix = "foo";
-  Server::Configuration::MockFactoryContext context;
+  Server::Configuration::MockServerFactoryContext context;
   ProtobufTypes::MessagePtr message{new Envoy::ProtobufWkt::Struct()};
 
   factory.createFilterFactoryFromProto(*message, stats_prefix, context);

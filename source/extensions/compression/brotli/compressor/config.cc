@@ -53,7 +53,7 @@ BrotliCompressorImpl::EncoderMode BrotliCompressorFactory::encoderModeEnum(
 Envoy::Compression::Compressor::CompressorFactoryPtr
 BrotliCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(
     const envoy::extensions::compression::brotli::compressor::v3::Brotli& proto_config,
-    Server::Configuration::FactoryContext&) {
+    Server::Configuration::ServerFactoryContext&) {
   return std::make_unique<BrotliCompressorFactory>(proto_config);
 }
 

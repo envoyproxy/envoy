@@ -26,7 +26,7 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectYaml) {
 
   envoy::extensions::filters::http::buffer::v3::Buffer proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   BufferFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -38,7 +38,7 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
   envoy::extensions::filters::http::buffer::v3::Buffer config;
   config.mutable_max_request_bytes()->set_value(1028);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   BufferFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -54,7 +54,7 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
 
   config.mutable_max_request_bytes()->set_value(1028);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -67,7 +67,7 @@ TEST(BufferFilterFactoryTest, BufferFilterNoMaxRequestBytes) {
   envoy::extensions::filters::http::buffer::v3::Buffer config =
       *dynamic_cast<envoy::extensions::filters::http::buffer::v3::Buffer*>(empty_proto.get());
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, "stats", context),
                           EnvoyException, "Proto constraint validation failed");
 }

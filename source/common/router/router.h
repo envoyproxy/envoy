@@ -221,7 +221,7 @@ public:
     }
   }
 
-  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::ServerFactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config)
       : FilterConfig(

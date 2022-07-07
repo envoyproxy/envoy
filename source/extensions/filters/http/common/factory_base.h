@@ -17,7 +17,7 @@ public:
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
-                               Server::Configuration::FactoryContext& context) override {
+                               Server::Configuration::ServerFactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
                                              stats_prefix, context);
@@ -43,7 +43,7 @@ public:
   std::string name() const override { return name_; }
 
   bool isTerminalFilterByProto(const Protobuf::Message& proto_config,
-                               Server::Configuration::FactoryContext& context) override {
+                               Server::Configuration::ServerFactoryContext& context) override {
     return isTerminalFilterByProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                             proto_config, context.messageValidationVisitor()),
                                         context);
@@ -54,13 +54,13 @@ protected:
 
 private:
   virtual bool isTerminalFilterByProtoTyped(const ConfigProto&,
-                                            Server::Configuration::FactoryContext&) {
+                                            Server::Configuration::ServerFactoryContext&) {
     return false;
   }
   virtual Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) PURE;
+                                    Server::Configuration::ServerFactoryContext& context) PURE;
 
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,

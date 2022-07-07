@@ -41,7 +41,7 @@ void validateJwtConfig(const JwtAuthentication& proto_config, Api::Api& api) {
 Http::FilterFactoryCb
 FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_config,
                                                  const std::string& prefix,
-                                                 Server::Configuration::FactoryContext& context) {
+                                                 Server::Configuration::ServerFactoryContext& context) {
   validateJwtConfig(proto_config, context.api());
   auto filter_config = std::make_shared<FilterConfigImpl>(proto_config, prefix, context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

@@ -18,7 +18,7 @@ namespace CdnLoop {
 using testing::HasSubstr;
 
 TEST(CdnLoopFilterFactoryTest, ValidValuesWork) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Http::StreamDecoderFilterSharedPtr filter;
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
@@ -34,7 +34,7 @@ TEST(CdnLoopFilterFactoryTest, ValidValuesWork) {
 }
 
 TEST(CdnLoopFilterFactoryTest, BlankCdnIdThrows) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   CdnLoopFilterFactory factory;
@@ -44,7 +44,7 @@ TEST(CdnLoopFilterFactoryTest, BlankCdnIdThrows) {
 }
 
 TEST(CdnLoopFilterFactoryTest, InvalidCdnId) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   config.set_cdn_id("[not-token-or-ip");
@@ -55,7 +55,7 @@ TEST(CdnLoopFilterFactoryTest, InvalidCdnId) {
 }
 
 TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   config.set_cdn_id("\r\n");
@@ -66,7 +66,7 @@ TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
 }
 
 TEST(CdnLoopFilterFactoryTest, InvalidParsedCdnIdNotInput) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   config.set_cdn_id("cdn,cdn");

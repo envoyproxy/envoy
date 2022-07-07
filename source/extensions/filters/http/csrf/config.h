@@ -21,7 +21,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) override;
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
       Server::Configuration::ServerFactoryContext& context,

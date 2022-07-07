@@ -14,7 +14,7 @@ namespace GrpcHttp1Bridge {
 namespace {
 
 TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilter) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   GrpcHttp1BridgeFilterConfig factory;
   envoy::extensions::filters::http::grpc_http1_bridge::v3::Config config;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);

@@ -68,7 +68,7 @@ public:
   TestPauseFilterConfigForQuic() : EmptyHttpFilterConfig("pause-filter-for-quic") {}
 
   Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+                                     Server::Configuration::ServerFactoryContext&) override {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       // ABSL_GUARDED_BY insists the lock be held when the guarded variables are passed by
       // reference.

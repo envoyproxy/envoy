@@ -14,7 +14,7 @@ namespace GrpcWeb {
 namespace {
 
 TEST(GrpcWebFilterConfigTest, GrpcWebFilter) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   GrpcWebFilterConfig factory;
   envoy::extensions::filters::http::grpc_web::v3::GrpcWeb config;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);

@@ -16,7 +16,7 @@ namespace AwsRequestSigningFilter {
 
 Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(

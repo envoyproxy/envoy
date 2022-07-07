@@ -14,7 +14,7 @@ class DecompressorLibraryFactoryBase
 public:
   Envoy::Compression::Decompressor::DecompressorFactoryPtr
   createDecompressorFactoryFromProto(const Protobuf::Message& proto_config,
-                                     Server::Configuration::FactoryContext& context) override {
+                                     Server::Configuration::ServerFactoryContext& context) override {
     return createDecompressorFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
                                                              context.messageValidationVisitor()),
@@ -33,7 +33,7 @@ protected:
 private:
   virtual Envoy::Compression::Decompressor::DecompressorFactoryPtr
   createDecompressorFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                          Server::Configuration::FactoryContext& context) PURE;
+                                          Server::Configuration::ServerFactoryContext& context) PURE;
 
   const std::string name_;
 };

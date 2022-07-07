@@ -59,10 +59,10 @@ public:
 
 private:
   Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext& context) override {
+                                     Server::Configuration::ServerFactoryContext& context) override {
 
     // Main assertions to ensure the metadata from the listener was parsed correctly.
-    const auto& typed_metadata = context.listenerTypedMetadata();
+    const auto& typed_metadata = context.downstreamContext()->listenerTypedMetadata();
     const Baz* value = typed_metadata.get<Baz>(std::string(kMetadataKey));
     EXPECT_NE(value, nullptr);
     EXPECT_EQ(value->item_, kExpectedMetadataValue);

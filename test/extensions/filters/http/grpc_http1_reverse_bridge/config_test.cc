@@ -26,7 +26,7 @@ withhold_grpc_frames: true
 
   envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Config config_factory;
   Http::FilterFactoryCb cb =
       config_factory.createFilterFactoryFromProto(proto_config, "stats", context);

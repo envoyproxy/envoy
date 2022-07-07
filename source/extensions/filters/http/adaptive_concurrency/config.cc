@@ -14,7 +14,7 @@ namespace AdaptiveConcurrency {
 
 Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency& config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
 
   auto acc_stats_prefix = stats_prefix + "adaptive_concurrency.";
 

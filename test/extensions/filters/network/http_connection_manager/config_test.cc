@@ -1929,7 +1929,7 @@ public:
 
   Http::RequestIDExtensionSharedPtr
   createExtensionInstance(const Protobuf::Message& config,
-                          Server::Configuration::FactoryContext& context) override {
+                          Server::Configuration::ServerFactoryContext& context) override {
     const auto& custom_config = MessageUtil::downcastAndValidate<
         const test::http_connection_manager::CustomRequestIDExtension&>(
         config, context.messageValidationVisitor());

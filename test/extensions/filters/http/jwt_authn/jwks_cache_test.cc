@@ -43,7 +43,7 @@ protected:
   }
 
   JwtAuthentication config_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   JwksCachePtr cache_;
   google::jwt_verify::JwksPtr jwks_;
   MockFunction<Common::JwksFetcherPtr(Upstream::ClusterManager&, const RemoteJwks&)> mock_fetcher_;

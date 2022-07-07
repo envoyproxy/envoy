@@ -3378,7 +3378,7 @@ public:
   // NamedNetworkFilterConfigFactory
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::FactoryContext&) override {
+                               Server::Configuration::ServerFactoryContext&) override {
     PANIC("not implemented");
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }

@@ -371,7 +371,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     final_rid_config.mutable_typed_config()->PackFrom(
         envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
-  request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
+  request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_.getServerFactoryContext());
 
   // Check if IP detection extensions were configured, otherwise fall back to XFF.
   auto ip_detection_extensions = config.original_ip_detection_extensions();
@@ -651,9 +651,9 @@ void HttpConnectionManagerConfig::processFilter(
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       proto_config, context_.messageValidationVisitor(), *factory);
   Http::FilterFactoryCb callback =
-      factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
+      factory->createFilterFactoryFromProto(*message, stats_prefix_, context_.getServerFactoryContext());
   dependency_manager.registerFilter(factory->name(), *factory->dependencies());
-  bool is_terminal = factory->isTerminalFilterByProto(*message, context_);
+  bool is_terminal = factory->isTerminalFilterByProto(*message, context_.getServerFactoryContext());
   Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(

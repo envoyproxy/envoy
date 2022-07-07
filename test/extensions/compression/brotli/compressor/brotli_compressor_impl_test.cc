@@ -124,7 +124,7 @@ TEST_P(ConfigTest, LoadConfig) {
   TestUtility::loadFromJson(json, brotli);
 
   BrotliCompressorLibraryFactory lib_factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Compression::Compressor::CompressorFactoryPtr factory =
       lib_factory.createCompressorFactoryFromProto(brotli, context);
   EXPECT_EQ("brotli.", factory->statsPrefix());

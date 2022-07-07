@@ -20,11 +20,11 @@ namespace Common {
 class EmptyHttpFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
   virtual Http::FilterFactoryCb createFilter(const std::string& stat_prefix,
-                                             Server::Configuration::FactoryContext& context) PURE;
+                                             Server::Configuration::ServerFactoryContext& context) PURE;
 
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
-                               Server::Configuration::FactoryContext& context) override {
+                               Server::Configuration::ServerFactoryContext& context) override {
     return createFilter(stat_prefix, context);
   }
 

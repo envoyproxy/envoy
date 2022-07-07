@@ -32,7 +32,7 @@ invocation_mode: asynchronous
   LambdaConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
@@ -60,7 +60,7 @@ arn: "arn:aws:lambda:region:424242:function:fun"
   LambdaConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
@@ -107,7 +107,7 @@ arn: "arn:aws:lambda:region:424242:fun"
   LambdaConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
   EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),

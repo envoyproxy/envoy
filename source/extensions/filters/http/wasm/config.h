@@ -21,7 +21,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config, const std::string&,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 } // namespace Wasm

@@ -19,7 +19,7 @@ static constexpr std::chrono::seconds defaultSamplingWindow{30};
 
 Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
 
   if (config.has_sr_threshold() && config.sr_threshold().default_value().value() < 1.0) {
     throw EnvoyException("Success rate threshold cannot be less than 1.0%.");

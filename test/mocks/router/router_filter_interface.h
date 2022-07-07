@@ -59,7 +59,7 @@ public:
   NiceMock<Network::MockConnection> client_connection_;
 
   envoy::extensions::filters::http::router::v3::Router router_proto;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool_;
   FilterConfig config_;

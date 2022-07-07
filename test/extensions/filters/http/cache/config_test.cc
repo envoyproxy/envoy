@@ -17,7 +17,7 @@ namespace {
 class CacheFilterFactoryTest : public ::testing::Test {
 protected:
   envoy::extensions::filters::http::cache::v3::CacheConfig config_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   CacheFilterFactory factory_;
   Http::MockFilterChainFactoryCallbacks filter_callback_;
 };

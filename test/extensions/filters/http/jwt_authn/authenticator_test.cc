@@ -86,7 +86,7 @@ public:
   }
 
   JwtAuthentication proto_config_;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> mock_factory_ctx_;
   ExtractorConstPtr extractor_;
   std::shared_ptr<FilterConfigImpl> filter_config_;
   MockJwksFetcher* raw_fetcher_;

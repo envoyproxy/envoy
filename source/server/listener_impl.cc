@@ -224,6 +224,7 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
                           ? config.stat_prefix()
                           : Network::Address::resolveProtoAddress(config.address())->asString()))),
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
+      server_context_(server_.serverFactoryContext(), *this),
       is_quic_(config.udp_listener_config().has_quic_options()) {}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
@@ -280,7 +281,7 @@ ProcessContextOptRef ListenerFactoryContextBaseImpl::processContext() {
 }
 Configuration::ServerFactoryContext&
 ListenerFactoryContextBaseImpl::getServerFactoryContext() const {
-  return server_.serverFactoryContext();
+  return server_context_;
 }
 Configuration::TransportSocketFactoryContext&
 ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {

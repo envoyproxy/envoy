@@ -11,7 +11,7 @@ namespace StatefulSession {
 
 Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProtoTyped(
     const ProtoConfig& proto_config, const std::string&,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context) {
   auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, context));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

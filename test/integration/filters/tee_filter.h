@@ -42,7 +42,7 @@ public:
   StreamTeeFilterConfig() : EmptyHttpFilterConfig("stream-tee-filter") {}
 
   Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override;
+                                     Server::Configuration::ServerFactoryContext&) override;
   bool inspectStreamTee(uint32_t stream_id, std::function<void(const StreamTee&)> inspector);
   bool setEncodeDataCallback(uint32_t stream_id,
                              std::function<Http::FilterDataStatus(

@@ -103,7 +103,7 @@ protected:
     EXPECT_EQ(is_success, original_text == decompressed_text);
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> mock_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> mock_context_;
   std::vector<Filesystem::Watcher::OnChangedCb> watch_cbs_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

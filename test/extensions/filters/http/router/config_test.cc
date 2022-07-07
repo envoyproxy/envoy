@@ -28,7 +28,7 @@ TEST(RouterFilterConfigTest, SimpleRouterFilterConfig) {
 
   envoy::extensions::filters::http::router::v3::Router proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   RouterFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -56,7 +56,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
   envoy::extensions::filters::http::router::v3::Router router_config;
   TestUtility::loadFromYaml(yaml, router_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   RouterFilterConfig factory;
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(router_config, "stats.", context),
@@ -68,7 +68,7 @@ TEST(RouterFilterConfigTest, RouterV2Filter) {
   envoy::extensions::filters::http::router::v3::Router router_config;
   router_config.mutable_dynamic_stats()->set_value(true);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   RouterFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(router_config, "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -77,7 +77,7 @@ TEST(RouterFilterConfigTest, RouterV2Filter) {
 }
 
 TEST(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   RouterFilterConfig factory;
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats.", context);

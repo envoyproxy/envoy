@@ -42,7 +42,7 @@ public:
 
 protected:
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::IsolatedStoreImpl scope_;
   NiceMock<Random::MockRandomGenerator> random_;
 };
@@ -71,7 +71,7 @@ success_criteria:
 
   AdmissionControlProto proto;
   TestUtility::loadFromYamlAndValidate(yaml, proto);
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(admission_control_filter_factory.createFilterFactoryFromProtoTyped(
                                 proto, "whatever", factory_context),
                             EnvoyException, "Success rate threshold cannot be less than 1.0%.");
@@ -98,7 +98,7 @@ success_criteria:
 
   AdmissionControlProto proto;
   TestUtility::loadFromYamlAndValidate(yaml, proto);
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(admission_control_filter_factory.createFilterFactoryFromProtoTyped(
                                 proto, "whatever", factory_context),
                             EnvoyException, "Success rate threshold cannot be less than 1.0%.");

@@ -59,7 +59,7 @@ config:
   OAuth2Config factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
   ON_CALL(secret_manager,
@@ -111,7 +111,7 @@ config:
   OAuth2Config factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
-  Server::Configuration::MockFactoryContext context;
+  Server::Configuration::MockServerFactoryContext context;
   context.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
@@ -125,7 +125,6 @@ config:
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context, timeSource());
   EXPECT_CALL(context, api());
-  EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -145,7 +144,7 @@ TEST(ConfigTest, CreateFilterMissingConfig) {
 
   envoy::extensions::filters::http::oauth2::v3::OAuth2 proto_config;
 
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
       config.createFilterFactoryFromProtoTyped(proto_config, "whatever", factory_context),
       EnvoyException, "config must be present for global config");
@@ -187,7 +186,7 @@ config:
   OAuth2Config factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
                           EnvoyException, "value does not match regex pattern");

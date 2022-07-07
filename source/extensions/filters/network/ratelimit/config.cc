@@ -33,7 +33,7 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
           filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Filter>(
         filter_config, Filters::Common::RateLimit::rateLimitClient(
-                           context, proto_config.rate_limit_service().grpc_service(), timeout)));
+                           context.getServerFactoryContext(), proto_config.rate_limit_service().grpc_service(), timeout)));
   };
 }
 

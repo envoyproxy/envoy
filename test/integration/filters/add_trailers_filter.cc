@@ -37,7 +37,7 @@ public:
   AddTrailersStreamFilterConfig() : EmptyHttpFilterConfig("add-trailers-filter") {}
 
   Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+                                     Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::AddTrailersStreamFilter>());
     };

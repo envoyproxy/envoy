@@ -25,7 +25,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, GoodRemoteJwks) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(ExampleConfig, *proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -39,7 +39,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, GoodLocalJwks) {
   provider.set_issuer("issuer");
   provider.mutable_local_jwks()->set_inline_string(PublicKey);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -53,7 +53,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, BadLocalJwks) {
   provider.set_issuer("issuer");
   provider.mutable_local_jwks()->set_inline_string("A bad jwks");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FilterFactory factory;
   EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
                EnvoyException);
@@ -65,7 +65,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, ProviderWithoutIssuer) {
   // This provider did not specify "issuer".
   provider.mutable_local_jwks()->set_inline_string(PublicKey);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;

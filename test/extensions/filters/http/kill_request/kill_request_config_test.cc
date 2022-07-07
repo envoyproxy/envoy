@@ -21,7 +21,7 @@ TEST(KillRequestConfigTest, KillRequestFilterWithCorrectProto) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(100);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   KillRequestFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(kill_request, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -30,7 +30,7 @@ TEST(KillRequestConfigTest, KillRequestFilterWithCorrectProto) {
 }
 
 TEST(KillRequestConfigTest, KillRequestFilterWithEmptyProto) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   KillRequestFilterFactory factory;
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);

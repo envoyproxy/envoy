@@ -144,9 +144,38 @@ public:
   virtual Init::Manager& initManager() PURE;
 };
 
+
+class DownstreamFactoryContext {
+public:
+  virtual ~DownstreamFactoryContext() = default;
+
+  /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
+
+  /**
+   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
+   * the local proxy.
+   */
+  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
+   * listener.
+   */
+  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this listener.
+   */
+  virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
+};
+
 /**
  * ServerFactoryContext is an specialization of common interface for downstream and upstream network
- * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
+ * and HTTP filters. The implementation guarantees the lifetime is no shorter than server. It could be used
  * across listeners.
  */
 class ServerFactoryContext : public virtual CommonFactoryContext {
@@ -177,14 +206,36 @@ public:
    * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
    */
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
+
+  /**
+   * @return Http::Context& a reference to the http context.
+   */
+  virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return whether external healthchecks are currently failed or not.
+   */
+  virtual bool healthCheckFailed() PURE;
+
+  /**
+   * @return ProcessContextOptRef an optional reference to the
+   * process context. Will be unset when running in validation mode.
+   */
+  virtual ProcessContextOptRef processContext() PURE;
+
+
+  /**
+   * @return the downstream factory context, for downstream filters.
+   */
+  virtual OptRef<DownstreamFactoryContext> downstreamContext() PURE;
 };
 
 /**
- * Context passed to network and HTTP filters to access server resources.
+ * Context passed to downstream network and HTTP filters to access server resources.
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
  * access the rest of the server via interfaces exposed here.
  */
-class FactoryContext : public virtual CommonFactoryContext {
+class FactoryContext : public virtual CommonFactoryContext, public virtual DownstreamFactoryContext {
 public:
   ~FactoryContext() override = default;
 
@@ -193,18 +244,7 @@ public:
    */
   virtual ServerFactoryContext& getServerFactoryContext() const PURE;
 
-  /**
-   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
-   */
-  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
-
-  /**
-   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
-   * the local proxy.
-   */
-  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
-
-  /**
+    /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
    *         they should be doing graceful closes on connections when possible.
    */
@@ -224,18 +264,6 @@ public:
    * @return bool if these filters are created under the scope of a Quic listener.
    */
   virtual bool isQuicListener() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
-   * listener.
-   */
-  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
-
-  /**
-   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
-   * for this listener.
-   */
-  virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.
