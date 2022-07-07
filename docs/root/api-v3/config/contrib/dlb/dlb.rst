@@ -1,5 +1,5 @@
-Dlb Connection Balance
-======================
+Dlb Connection Balancer
+=======================
 
 .. toctree::
   :glob:
