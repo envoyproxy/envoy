@@ -5,6 +5,8 @@
 namespace Envoy {
 namespace Server {
 
+// Wraps the global server context with a listener-local version, so that
+// downstream filters can access the downstream factory context.
 class ServerFactoryContextWrapper : public Configuration::ServerFactoryContext {
  public:
   ServerFactoryContextWrapper(Configuration::ServerFactoryContext& context,
