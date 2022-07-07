@@ -174,7 +174,9 @@ MockBidirectionalFilter::MockBidirectionalFilter() {
 }
 MockBidirectionalFilter::~MockBidirectionalFilter() = default;
 
-MockDecoderFilterConfigFactory::MockDecoderFilterConfigFactory() : name_("envoy.filters.thrift.mock_decoder_filter") {
+// MockDecoderFilterConfigFactory
+MockDecoderFilterConfigFactory::MockDecoderFilterConfigFactory()
+    : name_("envoy.filters.thrift.mock_decoder_filter") {
   mock_filter_ = std::make_shared<NiceMock<MockDecoderFilter>>();
 }
 
@@ -193,7 +195,28 @@ FilterFactoryCb MockDecoderFilterConfigFactory::createFilterFactoryFromProto(
   };
 }
 
-MockBidirectionalFilterConfigFactory::MockBidirectionalFilterConfigFactory() : name_("envoy.filters.thrift.mock_bidirectional_filter") {
+MockEncoderFilterConfigFactory::MockEncoderFilterConfigFactory()
+    : name_("envoy.filters.thrift.mock_encoder_filter") {
+  mock_filter_ = std::make_shared<NiceMock<MockEncoderFilter>>();
+}
+
+MockEncoderFilterConfigFactory::~MockEncoderFilterConfigFactory() = default;
+
+FilterFactoryCb MockEncoderFilterConfigFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& proto_config, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context) {
+  UNREFERENCED_PARAMETER(context);
+
+  config_struct_ = dynamic_cast<const ProtobufWkt::Struct&>(proto_config);
+  config_stat_prefix_ = stats_prefix;
+
+  return [this](FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addEncoderFilter(mock_filter_);
+  };
+}
+
+MockBidirectionalFilterConfigFactory::MockBidirectionalFilterConfigFactory()
+    : name_("envoy.filters.thrift.mock_bidirectional_filter") {
   mock_filter_ = std::make_shared<NiceMock<MockBidirectionalFilter>>();
 }
 

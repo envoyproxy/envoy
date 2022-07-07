@@ -204,6 +204,11 @@ thrift_filters:
       "@type": type.googleapis.com/google.protobuf.Struct
       value:
         key: value
+  - name: envoy.filters.thrift.mock_encoder_filter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        key: value
   - name: envoy.filters.thrift.mock_bidirectional_filter
     typed_config:
       "@type": type.googleapis.com/google.protobuf.Struct
