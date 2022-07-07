@@ -294,7 +294,7 @@ public:
   RawAsyncClientPtr createAsyncClientImpl() {
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
-        std::move(async_client_transport_socket_), nullptr);
+        std::move(async_client_transport_socket_), nullptr, nullptr);
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(10000)));
     cm_.initializeThreadLocalClusters({"fake_cluster"});

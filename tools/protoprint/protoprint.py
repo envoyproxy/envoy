@@ -14,21 +14,12 @@ import io
 import os
 import pathlib
 import re
+import shutil
 import subprocess
-import sys
 from collections import deque
 from functools import cached_property
 
 from packaging import version
-
-from bazel_tools.tools.python.runfiles import runfiles
-
-# We have to do some evil things to sys.path due to the way that Python module
-# resolution works; we have both tools/ trees in bazel_tools and envoy. By
-# default, Bazel leaves us with a sys.path in which the @bazel_tools repository
-# takes precedence. Now that we're done with importing runfiles above, we can
-# just remove it from the sys.path.
-sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
 from tools.api_proto_plugin import annotations, plugin, traverse, visitor
 from tools.api_versioning import utils as api_version_utils
@@ -79,11 +70,7 @@ def extract_clang_proto_style(clang_format_text):
     return str(format_dict)
 
 
-CLANG_FORMAT_STYLE = extract_clang_proto_style(
-    pathlib.Path(runfiles.Create().Rlocation("envoy/.clang-format")).read_text())
-
-
-def clang_format(contents):
+def clang_format(style, contents):
     """Run proto-style oriented clang-format over given string.
 
     Args:
@@ -92,10 +79,13 @@ def clang_format(contents):
     Returns:
         clang-formatted string
     """
-    clang_format_path = os.getenv("CLANG_FORMAT", "clang-format")
+    clang_format_path = os.getenv("CLANG_FORMAT", shutil.which("clang-format"))
+    if not clang_format_path:
+        if not os.path.exists("/opt/llvm/bin/clang-format"):
+            raise RuntimeError("Unable to find clang-format, sorry")
+        clang_format_path = "/opt/llvm/bin/clang-format"
     return subprocess.run(
-        [clang_format_path,
-         '--style=%s' % CLANG_FORMAT_STYLE, '--assume-filename=.proto'],
+        [clang_format_path, '--style=%s' % style, '--assume-filename=.proto'],
         input=contents.encode('utf-8'),
         stdout=subprocess.PIPE).stdout
 
@@ -614,6 +604,10 @@ class ProtoFormatVisitor(visitor.Visitor):
         if params['type_db_path']:
             utils.load_type_db(params['type_db_path'])
 
+        self.clang_format_config = pathlib.Path(params[".clang-format"])
+        if not self.clang_format_config.exists():
+            raise ProtoPrintError(f"Unable to find .clang-format file: {self.clang_format_config}")
+
         if extra_args := params.get("extra_args"):
             if extra_args.startswith("api_version:"):
                 self._api_version = extra_args.split(":")[1]
@@ -749,7 +743,9 @@ class ProtoFormatVisitor(visitor.Visitor):
         formatted_services = format_block('\n'.join(services))
         formatted_enums = format_block('\n'.join(enums))
         formatted_msgs = format_block('\n'.join(msgs))
-        return clang_format(header + formatted_services + formatted_enums + formatted_msgs)
+        return clang_format(
+            extract_clang_proto_style(self.clang_format_config.read_text()),
+            header + formatted_services + formatted_enums + formatted_msgs)
 
 
 class ProtoprintTraverser:
