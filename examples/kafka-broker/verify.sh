@@ -40,16 +40,15 @@ read_message() {
 }
 
 check_message() {
-    sleep 1; # wait for consumer.txt
     while true; do
     if [[ $(< consumer.txt) == "$MESSAGE" ]]; then
-        run_log "Received message succesfully.";
-        rm consumer.txt; # clean up consumer.txt
-        cleanup; # try to stop kafka-console-consumer & docker services
-        exit 1;
+        run_log "Received message succesfully."
+        rm consumer.txt # clean up consumer.txt
+        cleanup # try to stop kafka-console-consumer & docker services
+        exit 1
     else
-        run_log "Checking message.";
-        sleep 1;
+        run_log "Checking message."
+        sleep 1
     fi;
     done
 }
