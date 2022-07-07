@@ -102,7 +102,7 @@ void ActiveStreamFilterBase::commonContinue() {
   // trailers prior to calling doData(). If we do, then we continue them here, otherwise we rely
   // on doData() to do so.
   const bool had_trailers_before_data = hasTrailers();
-  if (bufferedData()) {
+  if (bufferedData() && !data_continued_via_inject_) {
     doData(complete() && !had_trailers_before_data);
   }
 
@@ -399,6 +399,7 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
     headers_continued_ = true;
     doHeaders(false);
   }
+  data_continued_via_inject_ = true;
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -1521,6 +1522,7 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
     headers_continued_ = true;
     doHeaders(false);
   }
+  data_continued_via_inject_ = true;
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }

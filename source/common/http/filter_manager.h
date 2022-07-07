@@ -46,7 +46,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
       : parent_(parent), iteration_state_(IterationState::Continue),
         filter_context_(std::move(filter_context)), iterate_from_current_filter_(false),
         headers_continued_(false), continued_1xx_headers_(false), end_stream_(false),
-        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false) {}
+        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false),
+        data_continued_via_inject_(false){}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -156,6 +157,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const bool dual_filter_ : 1;
   bool decode_headers_called_ : 1;
   bool encode_headers_called_ : 1;
+  bool data_continued_via_inject_ : 1;
 };
 
 /**

@@ -3,6 +3,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "source/common/http/utility.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -34,6 +35,7 @@ public:
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
+    ASSERT(Http::Utility::getResponseStatus(headers) == 200);
     headers.setContentLength(body_.length());
     encoder_callbacks_->dispatcher().post([this, end_stream]() -> void {
       response_injected_ = true;

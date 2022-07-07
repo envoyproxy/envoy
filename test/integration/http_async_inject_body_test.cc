@@ -4,7 +4,7 @@ namespace Envoy {
 namespace {
 
 class HttpAsyncBodyInjectionIntegrationTest : public HttpProtocolIntegrationTest {
- protected:
+protected:
   void testWithEndStreamAtBody() {
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -61,7 +61,6 @@ class HttpAsyncBodyInjectionIntegrationTest : public HttpProtocolIntegrationTest
     ASSERT_TRUE(response->trailers());
     EXPECT_EQ(response->trailers()->size(), 1);
   }
-
 };
 
 // Send request/response with NO trailers. Tests filter chain with single filter.
@@ -98,12 +97,10 @@ TEST_P(HttpAsyncBodyInjectionIntegrationTest, EndStreamAtTrailersSingleFilter) {
 }
 // Send request/response WITH trailers. Tests filter chain with multiple filters,
 // including one that buffers the whole body.
-// =================
-// FIXME(nareddyt): This is the buggy behavior. These tests fail.
-// Not sure what the root cause is, but my guess is HCM is not able to handle
-// buffering correctly (requested by later filters in the chain) when
-// `injectDecodedDataToFilterChain`/`injectDecodedDataToFilterChain` is called.
-// =================
+//
+// Previously, this test would result in
+// `upstream_reset_before_response_started{connection_termination}` because the
+// request body would be sent twice to the same filter by the filter manager.
 TEST_P(HttpAsyncBodyInjectionIntegrationTest, EndStreamAtTrailersRealisticFilters) {
   config_helper_.prependFilter(R"EOF(
   name: async-inject-body-at-end-stream-filter
@@ -122,5 +119,5 @@ INSTANTIATE_TEST_SUITE_P(Protocols, HttpAsyncBodyInjectionIntegrationTest,
                              /*upstream_protocols=*/{Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-}
-}
+} // namespace
+} // namespace Envoy

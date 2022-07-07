@@ -3,10 +3,12 @@
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+
 #include "source/common/buffer/buffer_impl.h"
-#include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "test/integration/filters/common.h"
 #include "source/common/http/utility.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+
+#include "test/integration/filters/common.h"
 
 namespace Envoy {
 
@@ -20,8 +22,7 @@ class AsyncInjectBodyAtEndStreamFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "async-inject-body-at-end-stream-filter";
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&,
-                                          bool end_stream) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override {
     ASSERT(!end_stream);
     return Http::FilterHeadersStatus::Continue;
   }
@@ -66,7 +67,8 @@ private:
       Envoy::Buffer::OwnedImpl split_request;
       split_request.move(request_buffer_, 1);
       decoder_callbacks_->injectDecodedDataToFilterChain(split_request, /*end_stream=*/false);
-      decoder_callbacks_->injectDecodedDataToFilterChain(request_buffer_, /*end_stream=*/!has_trailers);
+      decoder_callbacks_->injectDecodedDataToFilterChain(request_buffer_,
+                                                         /*end_stream=*/!has_trailers);
       if (has_trailers) {
         decoder_callbacks_->continueDecoding();
       }
@@ -79,7 +81,8 @@ private:
       Envoy::Buffer::OwnedImpl split_response;
       split_response.move(response_buffer_, 1);
       encoder_callbacks_->injectEncodedDataToFilterChain(split_response, /*end_stream=*/false);
-      encoder_callbacks_->injectEncodedDataToFilterChain(response_buffer_, /*end_stream=*/!has_trailers);
+      encoder_callbacks_->injectEncodedDataToFilterChain(response_buffer_,
+                                                         /*end_stream=*/!has_trailers);
       if (has_trailers) {
         encoder_callbacks_->continueEncoding();
       }
