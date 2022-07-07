@@ -95,19 +95,19 @@ message RedisProxy {
     uint32 max_buffer_size_before_flush = 4;
 
     // The encoded request buffer is flushed N milliseconds after the first request has been
-    // encoded, unless the buffer size has already exceeded `max_buffer_size_before_flush`.
-    // If `max_buffer_size_before_flush` is not set, this flush timer is not used. Otherwise,
+    // encoded, unless the buffer size has already exceeded ``max_buffer_size_before_flush``.
+    // If ``max_buffer_size_before_flush`` is not set, this flush timer is not used. Otherwise,
     // the timer should be set according to the number of clients, overall request rate and
     // desired maximum latency for a single command. For example, if there are many requests
     // being batched together at a high rate, the buffer will likely be filled before the timer
     // fires. Alternatively, if the request rate is lower the buffer will not be filled as often
     // before the timer fires.
-    // If `max_buffer_size_before_flush` is set, but `buffer_flush_timeout` is not, the latter
+    // If ``max_buffer_size_before_flush`` is set, but ``buffer_flush_timeout`` is not, the latter
     // defaults to 3ms.
     google.protobuf.Duration buffer_flush_timeout = 5;
 
-    // `max_upstream_unknown_connections` controls how many upstream connections to unknown hosts
-    // can be created at any given time by any given worker thread (see `enable_redirection` for
+    // ``max_upstream_unknown_connections`` controls how many upstream connections to unknown hosts
+    // can be created at any given time by any given worker thread (see ``enable_redirection`` for
     // more details). If the host is unknown and a connection cannot be created due to enforcing
     // this limit, then redirection will fail and the original redirection error will be passed
     // downstream unchanged. This limit defaults to 100.
@@ -305,16 +305,16 @@ message RedisProxy {
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
 // :ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
-// keyed by the name `envoy.filters.network.redis_proxy`.
+// keyed by the name ``envoy.filters.network.redis_proxy``.
 message RedisProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions";
 
-  // Upstream server password as defined by the `requirepass` directive
-  // <https://redis.io/topics/config>`_ in the server's configuration file.
+  // Upstream server password as defined by the ``requirepass`` directive
+  // `<https://redis.io/topics/config>`_ in the server's configuration file.
   config.core.v3.DataSource auth_password = 1 [(udpa.annotations.sensitive) = true];
 
-  // Upstream server username as defined by the `user` directive
-  // <https://redis.io/topics/acl>`_ in the server's configuration file.
+  // Upstream server username as defined by the ``user`` directive
+  // `<https://redis.io/topics/acl>`_ in the server's configuration file.
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 }

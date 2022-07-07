@@ -70,9 +70,6 @@ pkg_tar(
 py_binary(
     name = "format_api",
     srcs = ["format_api.py"],
-    args = [
-        "--api_root=%s/api" % PATH,
-    ],
     data = ["//:.clang-format"],
     deps = [
         ":data",
@@ -85,14 +82,11 @@ genrule(
     outs = ["formatted_api.tar"],
     cmd = """
     $(location :format_api) \
-        --api_root=%s/api \
         --outfile=$@ \
         --xformed=$(location :xformed) \
         --protoprinted=$(location //tools/protoprint:protoprinted) \
-    """ % PATH,
-    # TODO(phlax): make protoprint work without repo `PATH`
-    tags = ["no-remote"],
-    tools = [
+    """,
+    exec_tools = [
         ":format_api",
         ":xformed",
         "//tools/protoprint:protoprinted",

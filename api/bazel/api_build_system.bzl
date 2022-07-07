@@ -11,6 +11,8 @@ load(
     "EXTERNAL_PROTO_PY_BAZEL_DEP_MAP",
 )
 
+EnvoyProtoDepsInfo = provider(fields = ["deps"])
+
 _PY_PROTO_SUFFIX = "_py_proto"
 _CC_PROTO_SUFFIX = "_cc_proto"
 _CC_GRPC_SUFFIX = "_cc_grpc"

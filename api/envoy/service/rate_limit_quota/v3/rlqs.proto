@@ -19,6 +19,7 @@ option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
+// [#not-implemented-hide:]
 // [#protodoc-title: Rate Limit Quota Service (RLQS)]
 
 // The Rate Limit Quota Service (RLQS) is a Envoy global rate limiting service that allows to
