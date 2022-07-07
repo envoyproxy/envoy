@@ -1893,7 +1893,6 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
-    // TODO(alyssar) remove the origin check #21345
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_concurrency_for_alpn_pool") &&
         origin.has_value()) {
