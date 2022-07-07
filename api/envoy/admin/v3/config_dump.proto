@@ -62,7 +62,7 @@ message ConfigDump {
   // * *routes*:  :ref:`RoutesConfigDump <envoy_v3_api_msg_admin.v3.RoutesConfigDump>`
   // * *secrets*:  :ref:`SecretsConfigDump <envoy_v3_api_msg_admin.v3.SecretsConfigDump>`
   //
-  // EDS Configuration will only be dumped by using parameter `?include_eds`
+  // EDS Configuration will only be dumped by using parameter ``?include_eds``
   //
   // You can filter output with the resource and mask query parameters.
   // See :ref:`/config_dump?resource={} <operations_admin_interface_config_dump_by_resource>`,
