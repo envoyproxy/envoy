@@ -6,6 +6,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "test/integration/filters/common.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 
@@ -25,8 +26,9 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&,
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
+    ASSERT(Http::Utility::getResponseStatus(headers) == 200);
     ASSERT(!end_stream);
     return Http::FilterHeadersStatus::Continue;
   }

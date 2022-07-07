@@ -557,7 +557,6 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/buffer:config",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:add_invalid_data_filter_lib",
-        "//test/integration/filters:async_inject_body_at_end_stream_filter_lib",
         "//test/integration/filters:buffer_continue_filter_lib",
         "//test/integration/filters:continue_after_local_reply_filter_lib",
         "//test/integration/filters:continue_headers_only_inject_body",
@@ -1956,5 +1955,16 @@ envoy_cc_test(
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "http_async_inject_body_test",
+    srcs = ["http_async_inject_body_test.cc"],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/common/http:utility_lib",
+        "//source/extensions/filters/http/buffer:config",
+        "//test/integration/filters:async_inject_body_at_end_stream_filter_lib",
     ],
 )
