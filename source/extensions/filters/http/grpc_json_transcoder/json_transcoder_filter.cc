@@ -488,7 +488,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
           absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
       return Http::FilterHeadersStatus::StopIteration;
     }
-    if (checkIfTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
+    if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
@@ -511,7 +511,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   } else if (end_stream) {
     request_in_.finish();
 
-    if (checkIfTranscoderFailed(RcDetails::get().GrpcTranscodeFailedEarly)) {
+    if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailedEarly)) {
       return Http::FilterHeadersStatus::StopIteration;
     }
 
@@ -558,7 +558,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
     readToBuffer(*transcoder_->RequestOutput(), data);
   }
 
-  if (checkIfTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
+  if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
   return Http::FilterDataStatus::Continue;
@@ -656,7 +656,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   }
 
   readToBuffer(*transcoder_->ResponseOutput(), data);
-  if (checkIfResponseTranscoderFailed()) {
+  if (checkAndRejectIfResponseTranscoderFailed()) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -664,7 +664,6 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
-  // TODO(lizan): Check ResponseStatus
 
   return Http::FilterDataStatus::Continue;
 }
@@ -692,7 +691,7 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
   if (!method_->response_type_is_http_body_) {
     Buffer::OwnedImpl data;
     readToBuffer(*transcoder_->ResponseOutput(), data);
-    if (checkIfResponseTranscoderFailed()) {
+    if (checkAndRejectIfResponseTranscoderFailed()) {
       return;
     }
     if (data.length()) {
@@ -744,7 +743,7 @@ void JsonTranscoderFilter::setEncoderFilterCallbacks(
   encoder_callbacks_ = &callbacks;
 }
 
-bool JsonTranscoderFilter::checkIfTranscoderFailed(const std::string& details) {
+bool JsonTranscoderFilter::checkAndRejectIfRequestTranscoderFailed(const std::string& details) {
   const auto& request_status = transcoder_->RequestStatus();
   if (!request_status.ok()) {
     ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
@@ -763,7 +762,7 @@ bool JsonTranscoderFilter::checkIfTranscoderFailed(const std::string& details) {
   return false;
 }
 
-bool JsonTranscoderFilter::checkIfResponseTranscoderFailed() {
+bool JsonTranscoderFilter::checkAndRejectIfResponseTranscoderFailed() {
   const auto& response_status = transcoder_->ResponseStatus();
   if (!response_status.ok()) {
     ENVOY_LOG(debug, "Transcoding response error {}", response_status.ToString());
