@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Clusters]
 
-// Admin endpoint uses this wrapper for `/clusters` to display cluster status information.
+// Admin endpoint uses this wrapper for ``/clusters`` to display cluster status information.
 // See :ref:`/clusters <operations_admin_interface_clusters>` for more information.
 message Clusters {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.Clusters";

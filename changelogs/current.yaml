@@ -32,11 +32,17 @@ behavior_changes:
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.stat_prefix>`
     is properly extracted. This changes the Prometheus name from
     envoy_redis_myprefix_command_pttl_latency_sum{} to envoy_redis_command_pttl_latency_sum{envoy_redis_prefix="myprefix"}.
+- area: tcp_proxy
+  change: |
+    added support for command operators in :ref:`TunnelingConfig hostname <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.hostname>` to dynamically set upstream hostname.
 
 minor_behavior_changes:
 - area: thrift
   change: |
     add validate_clusters in :ref:`RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration>` to override the default behavior of cluster validation.
+- area: thrift
+  change: |
+    keep downstream connection if the response is completed without underflow.
 - area: tls
   change: |
     if both :ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>` and :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>` are specified, the former (deprecated) field is ignored. Previously, setting both fields would result in an error.
@@ -116,6 +122,10 @@ minor_behavior_changes:
 - area: logging
   change: |
     changed category name for access log filter extensions to ``envoy.access_loggers.extension_filters``.
+- area: filter state
+  change: |
+    revert to respecting the life time of the filter state objects to be bound to the original stream and make sharing
+    filter state objects with the upstream info explicit via an extra flag in ``setData``.
 - area: tracers
   change: |
     remove unnecessary "spawnChild" annotations in OpenCensus tracer.
