@@ -1,3 +1,6 @@
+Hyperscan regex engine configuration
+====================================
+
 .. toctree::
   :glob:
   :maxdepth: 2

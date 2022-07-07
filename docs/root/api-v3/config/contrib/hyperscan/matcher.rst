@@ -1,3 +1,6 @@
+Hyperscan matcher configuration
+===============================
+
 .. toctree::
   :glob:
   :maxdepth: 2
