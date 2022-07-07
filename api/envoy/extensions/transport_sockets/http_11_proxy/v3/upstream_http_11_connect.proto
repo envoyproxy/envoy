@@ -17,11 +17,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.transport_sockets.http_11_proxy]
 
 // Configuration for HTTP/1.1 proxy transport sockets.
-// If this is configured and an intermediate filter adds proxy metadata to the
-// stream info then
+// If this is configured and an intermediate filter adds the data necessary for
+// proxying to the stream info then
 //
-// *  Upstream connections will be directed to the specified proxy address rather
-//    than the host's address
+// * Upstream connections will be directed to the specified proxy address rather
+//   than the host's address
 // * Upstream TLS connections will have a raw HTTP/1.1 CONNECT header prefaced
 //   to the payload, and 200 response stripped (if less than 200 bytes)
 // * Plaintext HTTP/1.1 connections will be sent with a fully qualified URL.
