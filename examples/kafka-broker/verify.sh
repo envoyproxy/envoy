@@ -33,16 +33,27 @@ run_log "Sent messages succesfully."
 
 # Consumer
 run_log "Create Consumer."
-# `--timeout-ms 10000` lets the consumer exit after receiving the message. And
-# ```
-# ERROR Error processing message, terminating consumer process:  (kafka.tools.ConsoleConsumer$)
-# org.apache.kafka.common.errors.TimeoutException
-# Processed a total of 1 messages
-# ```
-# is the expected error
-message_received=$(docker-compose exec kafka kafka-console-consumer --bootstrap-server localhost:19092 --topic $TOPIC --from-beginning --timeout-ms 10000)
-if [[ "$message_received" == "$MESSAGE" ]]; then
-    run_log "Received message succesfully."
-else
-    run_log "Received message failed."
-fi
+
+read_message() {
+    run_log "Reading message."
+    docker-compose exec kafka kafka-console-consumer --bootstrap-server localhost:19092 --topic $TOPIC --from-beginning >> consumer.txt
+}
+
+check_message() {
+    sleep 1; # wait for consumer.txt
+    while true; do
+    if [[ $(< consumer.txt) == "$MESSAGE" ]]; then
+        run_log "Received message succesfully.";
+        rm consumer.txt; # clean up consumer.txt
+        cleanup; # try to stop kafka-console-consumer & docker services
+        exit 1;
+    else
+        run_log "Checking message.";
+        sleep 1;
+    fi;
+    done
+}
+
+read_message &
+check_message &
+wait
