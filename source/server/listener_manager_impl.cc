@@ -377,6 +377,8 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   if (!config.name().empty()) {
     name = config.name();
   } else {
+    // TODO (soulxu): The random uuid name is bad for logging. We can use listening addresses in
+    // the log to improve that.
     name = server_.api().randomGenerator().uuid();
   }
 

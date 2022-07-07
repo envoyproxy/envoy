@@ -1049,9 +1049,11 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
     return false;
   }
 
-  // Since there can be multiple zero port addresses, create a copy
-  // of other's addresses, remove it for any finding to avoid matching same zero port
-  // address to the same one.
+  // The listener support listening on the zero port address for test. Multiple zero
+  // port addresses are also supported. For comparing two listeners with multiple
+  // zero port addresses, only need to ensure there are the same number of zero
+  // port addresses. So create a copy of other's addresses here, remove it for any
+  // finding to avoid matching same zero port address to the same one.
   auto other_addresses = other.addresses();
   for (auto& addr : addresses()) {
     auto iter = std::find_if(other_addresses.begin(), other_addresses.end(),

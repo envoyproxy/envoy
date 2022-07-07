@@ -391,7 +391,7 @@ private:
 };
 
 /**
- * Log formatter for a list of addresses.
+ * Log formatter for an address.
  */
 struct AddressStrFormatter {
   void operator()(std::string* out, const Network::Address::InstanceConstSharedPtr& instance) {
