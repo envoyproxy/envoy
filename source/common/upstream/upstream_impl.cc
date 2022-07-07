@@ -354,7 +354,7 @@ Host::CreateConnectionData HostImpl::createConnection(
           : dispatcher.createClientConnection(
                 address, cluster.sourceAddress(),
                 socket_factory.createTransportSocket(transport_socket_options, host),
-                connection_options);
+                connection_options, transport_socket_options);
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
