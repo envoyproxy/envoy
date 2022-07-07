@@ -383,7 +383,6 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   }
 
   // TODO (soulxu): Support multiple internal addresses in the future.
-
   if ((config.address().has_envoy_internal_address() && config.additional_addresses_size() > 0) ||
       std::any_of(config.additional_addresses().begin(), config.additional_addresses().end(),
                   [](const envoy::config::listener::v3::AdditionalAddress& proto_address) {
