@@ -656,6 +656,9 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   }
 
   readToBuffer(*transcoder_->ResponseOutput(), data);
+  if (checkIfResponseTranscoderFailed()) {
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
 
   if (!method_->descriptor_->server_streaming() && !end_stream) {
     // Buffer until the response is complete.
@@ -689,6 +692,9 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
   if (!method_->response_type_is_http_body_) {
     Buffer::OwnedImpl data;
     readToBuffer(*transcoder_->ResponseOutput(), data);
+    if (checkIfResponseTranscoderFailed()) {
+      return;
+    }
     if (data.length()) {
       encoder_callbacks_->addEncodedData(data, true);
     }
@@ -750,6 +756,25 @@ bool JsonTranscoderFilter::checkIfTranscoderFailed(const std::string& details) {
         absl::StrCat(
             details, "{",
             StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(request_status.code())),
+            "}"));
+
+    return true;
+  }
+  return false;
+}
+
+bool JsonTranscoderFilter::checkIfResponseTranscoderFailed() {
+  const auto& response_status = transcoder_->ResponseStatus();
+  if (!response_status.ok()) {
+    ENVOY_LOG(debug, "Transcoding response error {}", response_status.ToString());
+    error_ = true;
+    encoder_callbacks_->sendLocalReply(
+        Http::Code::InternalServerError,
+        absl::string_view(response_status.message().data(), response_status.message().size()),
+        nullptr, absl::nullopt,
+        absl::StrCat(
+            RcDetails::get().GrpcTranscodeFailed, "{",
+            StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(response_status.code())),
             "}"));
 
     return true;

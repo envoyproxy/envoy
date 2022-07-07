@@ -170,6 +170,7 @@ public:
 
 private:
   bool checkIfTranscoderFailed(const std::string& details);
+  bool checkIfResponseTranscoderFailed();
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
   void maybeSendHttpBodyRequestMessage();
   /**
