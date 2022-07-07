@@ -18,7 +18,7 @@ services:
     networks:
     - envoymesh
     ports:
-    - 9092:9092
+    - 127.0.0.1:9092:9092
     depends_on:
     - zookeeper
     environment:

@@ -9,7 +9,7 @@ static_resources:
       - name: envoy.filters.network.kafka_broker
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
-          stat_prefix: broker
+          stat_prefix: exampleprefix
       - name: envoy.filters.network.tcp_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
@@ -21,13 +21,13 @@ static_resources:
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: localkafka
+      cluster_name: some_service
       endpoints:
         - lb_endpoints:
           - endpoint:
               address:
                 socket_address:
-                  address: kafka # Kafka broker's host
+                  address: 127.0.0.1 # Kafka broker's host
                   port_value: 9092 # Kafka broker's port.
 
 admin:

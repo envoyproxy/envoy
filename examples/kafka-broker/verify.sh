@@ -5,15 +5,8 @@ export NAME=kafka-broker
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
-run_log "Waiting for Kafka on 9092."
-while true; do
-if docker-compose logs -f kafka | grep -q 'started (kafka.server.KafkaServer)'; then
-    break;
-else
-    echo waiting ...;
-    sleep 1;
-fi;
-done
+run_log "Waiting for Kafka on port 9092."
+wait_for 120 sh -c "docker-compose logs -f kafka | grep -q 'started (kafka.server.KafkaServer)'"
 run_log "Kafka launched."
 
 # Topic
