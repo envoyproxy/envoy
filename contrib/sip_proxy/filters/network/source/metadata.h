@@ -26,6 +26,8 @@ namespace SipProxy {
   FUNCTION(HandleAffinity)                                                                         \
   FUNCTION(Done)
 
+using TraContextMap = absl::flat_hash_map<std::string, std::string>;
+
 /**
  * ProtocolState represents a set of states used in a state machine to decode
  * Sip requests and responses.
@@ -179,7 +181,7 @@ public:
   std::vector<SipHeader>& listHeader(HeaderType type) { return headers_[type]; }
 
   auto traContext() {
-    auto context = absl::flat_hash_map<std::string, std::string>{};
+    auto context = TraContextMap();
     auto fromHeader = listHeader(HeaderType::From).front().text();
     context.emplace(std::make_pair("method_type", methodStr[methodType()]));
     context.emplace(std::make_pair("from_header", fromHeader));

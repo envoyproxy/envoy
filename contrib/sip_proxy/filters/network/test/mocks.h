@@ -21,8 +21,6 @@
 
 using testing::NiceMock;
 
-using TraContextMap = absl::flat_hash_map<std::string, std::string>;
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

@@ -43,8 +43,8 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(const std::st
 
 QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
     const std::string& type, const std::string& key,
-    const absl::flat_hash_map<std::string, std::string>& context,
-    SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
+    const TraContextMap& context, SipFilters::DecoderFilterCallbacks& activetrans, 
+    std::string& host) {
   if (cache_manager_.contains(type, key)) {
     host = cache_manager_[type][key];
     return QueryStatus::Continue;

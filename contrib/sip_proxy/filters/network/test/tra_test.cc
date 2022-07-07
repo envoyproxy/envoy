@@ -90,8 +90,7 @@ TEST_F(SipTraTest, TraRetrieveContinue) {
   tra_handler->updateTrafficRoutingAssistant("lskpmc", "S1F1", "10.0.0.1");
 
   NiceMock<SipFilters::MockDecoderFilterCallbacks> callbacks;
-  absl::flat_hash_map<std::string, std::string> tra_context =
-      absl::flat_hash_map<std::string, std::string>{};
+  TraContextMap tra_context = TraContextMap();
   std::string host = "";
   EXPECT_EQ(QueryStatus::Continue, tra_handler->retrieveTrafficRoutingAssistant(
                                        "lskpmc", "S1F1", tra_context, callbacks, host));
