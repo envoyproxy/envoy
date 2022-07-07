@@ -80,7 +80,7 @@ getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostCons
   if (options && options->serverNameOverride().has_value()) {
     sni = options->serverNameOverride().value();
   }
-  if (sni.empty()) {
+  if (sni.empty() || !host->address() || !host->address()->ip()) {
     return absl::nullopt;
   }
   return {{"https", sni, host->address()->ip()->port()}};
