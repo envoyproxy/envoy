@@ -21,7 +21,8 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::decompressor::v3::Decompressor& config,
-      const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) override;
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(DecompressorFilterFactory);

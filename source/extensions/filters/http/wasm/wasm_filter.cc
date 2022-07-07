@@ -10,9 +10,11 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
     : tls_slot_(ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
           context.threadLocal())) {
   ASSERT(context.downstreamContext().has_value());
-  Server::Configuration::DownstreamFactoryContext& downstream_context = *context.downstreamContext();
+  Server::Configuration::DownstreamFactoryContext& downstream_context =
+      *context.downstreamContext();
   const auto plugin = std::make_shared<Common::Wasm::Plugin>(
-      config.config(), downstream_context.direction(), context.localInfo(), &downstream_context.listenerMetadata());
+      config.config(), downstream_context.direction(), context.localInfo(),
+      &downstream_context.listenerMetadata());
 
   auto callback = [plugin, this](const Common::Wasm::WasmHandleSharedPtr& base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.

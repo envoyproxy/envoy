@@ -192,7 +192,8 @@ public:
     auto* factory =
         Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
             factory_name);
-    const bool is_terminal_filter = factory->isTerminalFilterByProto(message, factory_context_.getServerFactoryContext());
+    const bool is_terminal_filter =
+        factory->isTerminalFilterByProto(message, factory_context_.getServerFactoryContext());
     Config::Utility::validateTerminalFilters(config_name, factory_name, filter_chain_type_,
                                              is_terminal_filter, last_filter_in_filter_chain_);
   }
@@ -203,7 +204,8 @@ private:
     auto* factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
         getFactoryByType(message.GetTypeName());
     return {factory->name(),
-            factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_.getServerFactoryContext())};
+            factory->createFilterFactoryFromProto(message, getStatPrefix(),
+                                                  factory_context_.getServerFactoryContext())};
   }
 
   Server::Configuration::FactoryContext& factory_context_;
@@ -514,7 +516,8 @@ protected:
   bool isTerminalFilter(Server::Configuration::NamedHttpFilterConfigFactory* default_factory,
                         Protobuf::Message& message,
                         Server::Configuration::FactoryContext& factory_context) const override {
-    return default_factory->isTerminalFilterByProto(message, factory_context.getServerFactoryContext());
+    return default_factory->isTerminalFilterByProto(message,
+                                                    factory_context.getServerFactoryContext());
   }
   void validateFilters(const std::string& filter_config_name, const std::string& filter_type,
                        const std::string& filter_chain_type, bool is_terminal_filter,

@@ -36,7 +36,7 @@ protected:
   WasmFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
     ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_store_));
-//    ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
+    //    ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
     EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));

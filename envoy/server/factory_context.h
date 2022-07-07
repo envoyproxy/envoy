@@ -144,7 +144,6 @@ public:
   virtual Init::Manager& initManager() PURE;
 };
 
-
 class DownstreamFactoryContext {
 public:
   virtual ~DownstreamFactoryContext() = default;
@@ -175,8 +174,8 @@ public:
 
 /**
  * ServerFactoryContext is an specialization of common interface for downstream and upstream network
- * and HTTP filters. The implementation guarantees the lifetime is no shorter than server. It could be used
- * across listeners.
+ * and HTTP filters. The implementation guarantees the lifetime is no shorter than server. It could
+ * be used across listeners.
  */
 class ServerFactoryContext : public virtual CommonFactoryContext {
 public:
@@ -223,7 +222,6 @@ public:
    */
   virtual ProcessContextOptRef processContext() PURE;
 
-
   /**
    * @return the downstream factory context, for downstream filters.
    */
@@ -235,7 +233,8 @@ public:
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
  * access the rest of the server via interfaces exposed here.
  */
-class FactoryContext : public virtual CommonFactoryContext, public virtual DownstreamFactoryContext {
+class FactoryContext : public virtual CommonFactoryContext,
+                       public virtual DownstreamFactoryContext {
 public:
   ~FactoryContext() override = default;
 
@@ -244,7 +243,7 @@ public:
    */
   virtual ServerFactoryContext& getServerFactoryContext() const PURE;
 
-    /**
+  /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
    *         they should be doing graceful closes on connections when possible.
    */

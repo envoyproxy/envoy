@@ -21,7 +21,8 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
-      const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) override;
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,

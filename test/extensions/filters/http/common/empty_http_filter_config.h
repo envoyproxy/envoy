@@ -19,8 +19,9 @@ namespace Common {
  */
 class EmptyHttpFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  virtual Http::FilterFactoryCb createFilter(const std::string& stat_prefix,
-                                             Server::Configuration::ServerFactoryContext& context) PURE;
+  virtual Http::FilterFactoryCb
+  createFilter(const std::string& stat_prefix,
+               Server::Configuration::ServerFactoryContext& context) PURE;
 
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,

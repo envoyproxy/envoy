@@ -65,24 +65,26 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   StatefulSessionFactoryConfig factory;
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", server_context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", server_context);
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);
 
-  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(proto_route_config, server_context,
-                                                          server_context.messageValidationVisitor()));
-  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(disabled_config, server_context,
-                                                          server_context.messageValidationVisitor()));
+  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(
+      proto_route_config, server_context, server_context.messageValidationVisitor()));
+  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(
+      disabled_config, server_context, server_context.messageValidationVisitor()));
   EXPECT_THROW_WITH_MESSAGE(
       factory.createRouteSpecificFilterConfig(not_exist_config, server_context,
                                               server_context.messageValidationVisitor()),
       EnvoyException,
       "Didn't find a registered implementation for name: 'envoy.http.stateful_session.not_exist'");
 
-  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", server_context));
-  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(empty_proto_route_config, server_context,
-                                                          server_context.messageValidationVisitor()));
+  EXPECT_NO_THROW(
+      factory.createFilterFactoryFromProto(empty_proto_config, "stats", server_context));
+  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(
+      empty_proto_route_config, server_context, server_context.messageValidationVisitor()));
 }
 
 } // namespace

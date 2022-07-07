@@ -165,7 +165,7 @@ void UberFilterFuzzer::perFilterSetup() {
   ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
 
   // Prepare expectations for WASM filter.
-  //ON_CALL(factory_context_, listenerMetadata())
+  // ON_CALL(factory_context_, listenerMetadata())
   //    .WillByDefault(testing::ReturnRef(listener_metadata_));
   ON_CALL(factory_context_.api_, customStatNamespaces())
       .WillByDefault(testing::ReturnRef(custom_stat_namespaces_));
