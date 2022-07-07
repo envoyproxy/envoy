@@ -7,7 +7,7 @@ class RequestTrailersBuilder : HeadersBuilder {
   /*
    * Instantiate a new builder.
    */
-  internal constructor() : super(HeadersContainer(mapOf()))
+  constructor() : super(HeadersContainer(mapOf()))
 
   /*
    * Instantiate a new instance of the builder.

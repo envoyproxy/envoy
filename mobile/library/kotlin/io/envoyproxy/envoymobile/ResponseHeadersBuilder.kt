@@ -8,7 +8,7 @@ class ResponseHeadersBuilder : HeadersBuilder {
   /*
    * Instantiate a new builder.
    */
-  internal constructor() : super(HeadersContainer(mapOf()))
+  constructor() : super(HeadersContainer(mapOf()))
 
   /*
    * Instantiate a new builder. Used only by ResponseHeaders to convert back to
