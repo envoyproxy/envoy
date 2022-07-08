@@ -180,12 +180,15 @@ public:
 
   std::vector<SipHeader>& listHeader(HeaderType type) { return headers_[type]; }
 
-  auto traContext() {
-    auto context = TraContextMap();
-    auto fromHeader = listHeader(HeaderType::From).front().text();
-    context.emplace(std::make_pair("method_type", methodStr[methodType()]));
-    context.emplace(std::make_pair("from_header", fromHeader));
-    return context;
+  absl::optional<TraContextMap> traContext() {
+    auto fromHeaderList = listHeader(HeaderType::From);
+    if (fromHeaderList.empty()) {
+      return absl::nullopt;
+    }
+    auto fromHeader = fromHeaderList.front().text();
+    tra_context_map_.emplace(std::make_pair("method_type", methodStr[methodType()]));
+    tra_context_map_.emplace(std::make_pair("from_header", fromHeader));
+    return tra_context_map_;
   }
 
 private:
@@ -209,6 +212,8 @@ private:
   std::string raw_msg_{};
   State state_{State::TransportBegin};
   bool stop_load_balance_{};
+
+  TraContextMap tra_context_map_{};
 
   bool isDomainMatched(
       absl::string_view& header,
