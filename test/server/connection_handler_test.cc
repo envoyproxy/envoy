@@ -42,6 +42,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::ReturnRefOfCopy;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -308,7 +309,7 @@ public:
       listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(local_address_);
     } else {
       EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
-          .WillRepeatedly(ReturnRef(address));
+          .WillRepeatedly(ReturnRefOfCopy(address));
       listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(address);
     }
     EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))
