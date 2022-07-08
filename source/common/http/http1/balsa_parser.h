@@ -65,7 +65,7 @@ private:
   quiche::BalsaHeaders trailers_;
 
   ParserCallbacks* connection_ = nullptr;
-  bool headers_processed_ = false;
+  bool headers_done_ = false;
   ParserStatus status_ = ParserStatus::Ok;
   absl::string_view error_message_;
 };

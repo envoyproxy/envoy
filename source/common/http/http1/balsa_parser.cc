@@ -38,7 +38,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
 size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
-  if (len == 0 && headers_processed_ && !isChunked() &&
+  if (len == 0 && headers_done_ && !isChunked() &&
       ((!framer_.is_request() && hasTransferEncoding()) || !headers_.content_length_valid())) {
     MessageDone();
   }
@@ -171,7 +171,7 @@ void BalsaParser::HeaderDone() {
   if (status_ == ParserStatus::Error) {
     return;
   }
-  headers_processed_ = true;
+  headers_done_ = true;
   status_ = convertResult(connection_->onHeadersComplete());
 }
 
