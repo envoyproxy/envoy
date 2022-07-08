@@ -201,7 +201,8 @@ const std::string CONFIG_WITH_MIRROR = CONFIG_WITH_ROUTES_BASE + R"EOF(
 )EOF";
 
 const std::string CONFIG_WITH_DOWNSTREAM_AUTH_PASSWORD_SET = CONFIG + R"EOF(
-          downstream_auth_password: { inline_string: somepassword }
+          downstream_auth_passwords:
+          - inline_string: somepassword
 )EOF";
 
 const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS = fmt::format(R"EOF(
