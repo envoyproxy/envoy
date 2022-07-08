@@ -116,8 +116,9 @@ filter_disabled:
       auto transport_socket_factory = std::make_unique<Network::RawBufferSocketFactory>();
       transport_socket = transport_socket_factory->createTransportSocket(nullptr, nullptr);
     }
-    client_ = dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+    client_ =
+        dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                            std::move(transport_socket), nullptr, nullptr);
     client_->addConnectionCallbacks(connect_callbacks_);
     client_->connect();
     while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {

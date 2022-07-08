@@ -10,7 +10,7 @@ envoy.dependency.pip_check>=0.1.2
 envoy.distribution.release>=0.0.7
 envoy.distribution.repo>=0.0.5
 envoy.distribution.verify>=0.0.8
-envoy.docs.sphinx-runner>=0.1.7
+envoy.docs.sphinx-runner>=0.1.8
 envoy.gpg.identity>=0.1.0
 envoy.gpg.sign>=0.1.0
 flake8

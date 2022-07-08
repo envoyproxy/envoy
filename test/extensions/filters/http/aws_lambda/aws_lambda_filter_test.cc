@@ -77,6 +77,8 @@ TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
   EXPECT_CALL(*signer_, signEmptyPayload(An<Http::RequestHeaderMap&>()));
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
+  EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
+            input_headers.getPathValue());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
 
   Http::TestResponseHeaderMapImpl response_headers;
@@ -180,6 +182,8 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
   EXPECT_CALL(*signer_, sign(An<Http::RequestHeaderMap&>(), An<const std::string&>()));
 
   const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
+  EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
+            headers.getPathValue());
   EXPECT_EQ(Http::FilterDataStatus::Continue, data_result);
 }
 
@@ -221,7 +225,8 @@ TEST_F(AwsLambdaFilterTest, DecodeHeadersOnlyRequestWithJsonOn) {
   headers.addCopy("x-custom-header", "unit");
   headers.addCopy("x-custom-header", "test");
   const auto header_result = filter_->decodeHeaders(headers, true /*end_stream*/);
-
+  EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
+            headers.getPathValue());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, header_result);
 
   // Assert it's not empty
