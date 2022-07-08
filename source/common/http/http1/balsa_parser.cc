@@ -19,14 +19,15 @@ using ::quiche::BalsaFrameEnums;
 using ::quiche::BalsaHeaders;
 
 bool isMethodValid(absl::string_view method) {
-  static const absl::flat_hash_set<absl::string_view> kValidMethods{
+  static constexpr absl::string_view kValidMethods[] = {
       "ACL",       "BIND",    "CHECKOUT", "CONNECT", "COPY",       "DELETE",     "GET",
       "HEAD",      "LINK",    "LOCK",     "MERGE",   "MKACTIVITY", "MKCALENDAR", "MKCOL",
       "MOVE",      "MSEARCH", "NOTIFY",   "OPTIONS", "PATCH",      "POST",       "PROPFIND",
       "PROPPATCH", "PURGE",   "PUT",      "REBIND",  "REPORT",     "SEARCH",     "SOURCE",
       "SUBSCRIBE", "TRACE",   "UNBIND",   "UNLINK",  "UNLOCK",     "UNSUBSCRIBE"};
 
-  return kValidMethods.count(method) == 1;
+  return std::binary_search(&kValidMethods[0], &kValidMethods[0] + ABSL_ARRAYSIZE(kValidMethods),
+                            method);
 }
 
 } // anonymous namespace
