@@ -970,6 +970,9 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  if (decoder_callbacks_) {
+    options.setParentSpan(decoder_callbacks_->activeSpan());
+  }
   auto http_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), handler, options);
   if (!http_request) {
@@ -1013,10 +1016,11 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
 
-  auto grpc_request =
-      grpc_client->sendRaw(toAbslStringView(service_name), toAbslStringView(method_name),
-                           std::make_unique<::Envoy::Buffer::OwnedImpl>(toAbslStringView(request)),
-                           handler, Tracing::NullSpan::instance(), options);
+  auto grpc_request = grpc_client->sendRaw(
+      toAbslStringView(service_name), toAbslStringView(method_name),
+      std::make_unique<::Envoy::Buffer::OwnedImpl>(toAbslStringView(request)), handler,
+      decoder_callbacks_ ? decoder_callbacks_->activeSpan() : Tracing::NullSpan::instance(),
+      options);
   if (!grpc_request) {
     grpc_call_request_.erase(token);
     return WasmResult::InternalFailure;
