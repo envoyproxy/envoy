@@ -52,17 +52,18 @@ public:
   virtual void setRequestCallbacks(RequestCallbacks& callbacks) PURE;
   virtual void createTrafficRoutingAssistant(
       const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
-      const absl::optional<TraContextMap> context, Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
+      const absl::optional<TraContextMap> context, Tracing::Span& parent_span,
+      const StreamInfo::StreamInfo& stream_info) PURE;
   virtual void updateTrafficRoutingAssistant(
       const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
-      const absl::optional<TraContextMap> context, Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
-  virtual void
-  retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                  const absl::optional<TraContextMap> context, 
-                                  Tracing::Span& parent_span,
-                                  const StreamInfo::StreamInfo& stream_info) PURE;
+      const absl::optional<TraContextMap> context, Tracing::Span& parent_span,
+      const StreamInfo::StreamInfo& stream_info) PURE;
+  virtual void retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                               const absl::optional<TraContextMap> context,
+                                               Tracing::Span& parent_span,
+                                               const StreamInfo::StreamInfo& stream_info) PURE;
   virtual void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                             const absl::optional<TraContextMap> context, 
+                                             const absl::optional<TraContextMap> context,
                                              Tracing::Span& parent_span,
                                              const StreamInfo::StreamInfo& stream_info) PURE;
   virtual void subscribeTrafficRoutingAssistant(const std::string& type, Tracing::Span& parent_span,

@@ -44,7 +44,7 @@ void GrpcClientImpl::setRequestCallbacks(RequestCallbacks& callbacks) {
 
 void GrpcClientImpl::createTrafficRoutingAssistant(
     const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
-    const absl::optional<TraContextMap> context, Tracing::Span& parent_span, 
+    const absl::optional<TraContextMap> context, Tracing::Span& parent_span,
     const StreamInfo::StreamInfo& stream_info) {
 
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest request;
@@ -73,7 +73,7 @@ void GrpcClientImpl::createTrafficRoutingAssistant(
 
 void GrpcClientImpl::updateTrafficRoutingAssistant(
     const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
-    const absl::optional<TraContextMap> context, Tracing::Span& parent_span, 
+    const absl::optional<TraContextMap> context, Tracing::Span& parent_span,
     const StreamInfo::StreamInfo& stream_info) {
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest request;
   request.set_type(type);
@@ -98,10 +98,11 @@ void GrpcClientImpl::updateTrafficRoutingAssistant(
   LinkedList::moveIntoList(std::move(callback), request_callbacks_);
 }
 
-void GrpcClientImpl::retrieveTrafficRoutingAssistant(
-    const std::string& type, const std::string& key,
-    const absl::optional<TraContextMap> context, Tracing::Span& parent_span,
-    const StreamInfo::StreamInfo& stream_info) {
+void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
+                                                     const std::string& key,
+                                                     const absl::optional<TraContextMap> context,
+                                                     Tracing::Span& parent_span,
+                                                     const StreamInfo::StreamInfo& stream_info) {
 
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest request;
   request.set_type(type);

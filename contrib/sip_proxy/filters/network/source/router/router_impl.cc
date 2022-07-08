@@ -696,7 +696,8 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       if (metadata->pCookieIpMap().has_value()) {
         auto [key, val] = metadata->pCookieIpMap().value();
         ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
-        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, absl::nullopt);
+        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val,
+                                                                  absl::nullopt);
       }
 
       active_trans->startUpstreamResponse();

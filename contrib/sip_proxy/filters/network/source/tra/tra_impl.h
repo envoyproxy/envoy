@@ -58,7 +58,7 @@ public:
                                      Tracing::Span& parent_span,
                                      const StreamInfo::StreamInfo& stream_info) override;
   void retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                     const absl::optional<TraContextMap> context,
+                                       const absl::optional<TraContextMap> context,
                                        Tracing::Span& parent_span,
                                        const StreamInfo::StreamInfo& stream_info) override;
   void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
