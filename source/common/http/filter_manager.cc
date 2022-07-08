@@ -102,7 +102,8 @@ void ActiveStreamFilterBase::commonContinue() {
   // trailers prior to calling doData(). If we do, then we continue them here, otherwise we rely
   // on doData() to do so.
   const bool had_trailers_before_data = hasTrailers();
-  if (bufferedData() && !data_continued_via_inject_) {
+  // Uncomment line below for my attempt at a fix.
+  if (bufferedData()/*&& !data_continued_via_inject_*/) {
     doData(complete() && !had_trailers_before_data);
   }
 
