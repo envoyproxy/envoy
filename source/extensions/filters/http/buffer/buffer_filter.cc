@@ -42,8 +42,8 @@ void BufferFilter::initConfig() {
   config_initialized_ = true;
   settings_ = config_->settings();
 
-  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<BufferFilterSettings>(
-      "envoy.filters.http.buffer", callbacks_->route());
+  const auto* route_local =
+      Http::Utility::resolveMostSpecificPerFilterConfig<BufferFilterSettings>(callbacks_);
   settings_ = route_local ? route_local : settings_;
 }
 
