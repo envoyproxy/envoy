@@ -182,7 +182,7 @@ FilterStatus Router::handleAffinity() {
   if (metadata->pCookieIpMap().has_value()) {
     auto [key, val] = metadata->pCookieIpMap().value();
     ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
-    callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val);
+    callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, absl::nullopt);
   }
 
   const std::shared_ptr<const ProtocolOptionsConfig> options =
@@ -696,7 +696,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       if (metadata->pCookieIpMap().has_value()) {
         auto [key, val] = metadata->pCookieIpMap().value();
         ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
-        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val);
+        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, absl::nullopt);
       }
 
       active_trans->startUpstreamResponse();
