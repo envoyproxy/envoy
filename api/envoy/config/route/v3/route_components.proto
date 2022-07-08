@@ -146,7 +146,7 @@ message VirtualHost {
   CorsPolicy cors = 8;
 
   // The per_filter_config field can be used to provide virtual host-specific configurations for filters.
-  // The key should match the `filter config name
+  // The key should match the :ref:`filter config name
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
   // The canonical filter name (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) can also
   // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
@@ -274,7 +274,7 @@ message Route {
   Decorator decorator = 5;
 
   // The per_filter_config field can be used to provide route-specific configurations for filters.
-  // The key should match the `filter config name
+  // The key should match the :ref:`filter config name
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
   // The canonical filter name (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) can also
   // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
@@ -433,7 +433,7 @@ message WeightedCluster {
 
     // The per_filter_config field can be used to provide weighted cluster-specific configurations
     // for filters.
-    // The key should match the `filter config name
+    // The key should match the :ref:`filter config name
     // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
     // The canonical filter name (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) can also
     // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
