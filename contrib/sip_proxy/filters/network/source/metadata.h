@@ -180,14 +180,12 @@ public:
 
   std::vector<SipHeader>& listHeader(HeaderType type) { return headers_[type]; }
 
-  absl::optional<TraContextMap> traContext() {
-    auto fromHeaderList = listHeader(HeaderType::From);
-    if (fromHeaderList.empty()) {
-      return absl::nullopt;
+  TraContextMap traContext() {
+    if (tra_context_map_.empty()) {
+      auto fromHeader = listHeader(HeaderType::From).front().text();
+      tra_context_map_.emplace(std::make_pair("method_type", methodStr[methodType()]));
+      tra_context_map_.emplace(std::make_pair("from_header", fromHeader));
     }
-    auto fromHeader = fromHeaderList.front().text();
-    tra_context_map_.emplace(std::make_pair("method_type", methodStr[methodType()]));
-    tra_context_map_.emplace(std::make_pair("from_header", fromHeader));
     return tra_context_map_;
   }
 

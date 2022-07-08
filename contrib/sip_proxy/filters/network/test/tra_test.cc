@@ -382,16 +382,11 @@ TEST_F(SipTraTest, TraGetTraContextFromMetadata) {
   metadata->addMsgHeader(HeaderType::From, "user@sip.com");
 
   auto context = metadata->traContext();
-  EXPECT_EQ(context.value()["from_header"], "user@sip.com");
-  EXPECT_EQ(context.value()["method_type"], "REGISTER");
-}
+  EXPECT_EQ(context["from_header"], "user@sip.com");
+  EXPECT_EQ(context["method_type"], "REGISTER");
 
-TEST_F(SipTraTest, TraGetTraContextFromMetadataNoFromHeaderSet) {
-  MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>("");
-  metadata->setMethodType(MethodType::Cancel);
-
-  auto context = metadata->traContext();
-  EXPECT_EQ(context.has_value(), false);
+  auto context2 = metadata->traContext();
+  EXPECT_EQ(context2, context);
 }
 
 } // namespace SipProxy
