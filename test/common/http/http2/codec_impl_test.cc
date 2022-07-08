@@ -620,6 +620,13 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
 
 // nghttp2 rejects trailers with :status.
 TEST_P(Http2CodecImplTest, TrailerStatus) {
+#ifdef ENVOY_ENABLE_UHV
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    initialize();
+    return;
+  }
+#endif
+
   expect_buffered_data_on_teardown_ = true;
   initialize();
 
@@ -693,6 +700,13 @@ TEST_P(Http2CodecImplTest, Unsupported1xxHeader) {
 
 // nghttp2 treats 101 inside an HTTP/2 stream as an invalid HTTP header field.
 TEST_P(Http2CodecImplTest, Invalid101SwitchingProtocols) {
+#ifdef ENVOY_ENABLE_UHV
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    initialize();
+    return;
+  }
+#endif
+
   expect_buffered_data_on_teardown_ = true;
   initialize();
 
@@ -827,6 +841,13 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
 };
 
 TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
+#ifdef ENVOY_ENABLE_UHV
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    initialize();
+    return;
+  }
+#endif
+
   expect_buffered_data_on_teardown_ = true;
   initialize();
 
@@ -861,6 +882,13 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
 };
 
 TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
+#ifdef ENVOY_ENABLE_UHV
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    initialize();
+    return;
+  }
+#endif
+
   stream_error_on_invalid_http_messaging_ = true;
   initialize();
 

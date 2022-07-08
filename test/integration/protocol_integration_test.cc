@@ -132,6 +132,13 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, TestHostWhitespacee) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
   auto host = config_helper_.createVirtualHost("foo.lyft.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
@@ -1648,6 +1655,13 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 }
 
 TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      upstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
 
@@ -1676,6 +1690,13 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
 }
 
 TEST_P(ProtocolIntegrationTest, MissingStatus) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      upstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   initialize();
 
   // HTTP1, uses a defined protocol which doesn't split up messages into raw byte frames
@@ -1782,6 +1803,13 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1806,6 +1834,13 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
@@ -1848,6 +1883,13 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1870,6 +1912,13 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
 
 // TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
@@ -2704,6 +2753,13 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -3650,6 +3706,13 @@ TEST_P(ProtocolIntegrationTest, BufferContinue) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
@@ -3677,6 +3740,13 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     // HTTP/1.x request rely on Content-Length header to determine payload length. So there is no
     // inconsistency but the request will hang there waiting for the rest bytes.
