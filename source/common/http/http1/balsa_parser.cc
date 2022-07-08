@@ -26,8 +26,9 @@ bool isMethodValid(absl::string_view method) {
       "PROPPATCH", "PURGE",   "PUT",      "REBIND",  "REPORT",     "SEARCH",     "SOURCE",
       "SUBSCRIBE", "TRACE",   "UNBIND",   "UNLINK",  "UNLOCK",     "UNSUBSCRIBE"};
 
-  return std::binary_search(&kValidMethods[0], &kValidMethods[0] + ABSL_ARRAYSIZE(kValidMethods),
-                            method);
+  const auto* begin = &kValidMethods[0];
+  const auto* end = &kValidMethods[ABSL_ARRAYSIZE(kValidMethods) - 1] + 1;
+  return std::binary_search(begin, end, method);
 }
 
 } // anonymous namespace
