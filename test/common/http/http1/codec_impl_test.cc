@@ -3496,8 +3496,8 @@ const char* kValidFirstLines[] = {
     "GET http://@ HTTP/1.1\r\n",
     "GET http://@www@]@[]@?#?# HTTP/1.1\r\n",
     "GET http://* HTTP/1.1\r\n",
-    "GET /path HTTP/1.1\r\n",       // "://" is the path
-    "GET /path?query HTTP/1.1\r\n", // "://" is the path
+    "GET /path HTTP/1.1\r\n",
+    "GET /path?query HTTP/1.1\r\n",
     "GET * HTTP/1.1\r\n",
     "GET ** HTTP/1.1\r\n",
     "GET *path@@/foo?# HTTP/1.1\r\n",
