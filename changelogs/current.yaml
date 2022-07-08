@@ -35,6 +35,13 @@ behavior_changes:
 - area: tcp_proxy
   change: |
     added support for command operators in :ref:`TunnelingConfig hostname <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.hostname>` to dynamically set upstream hostname.
+- area: router
+  change: |
+    Update all HTTP filters to get per-filter config by the :ref:`HTTP filter config name
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+    If there is no entry referred by the filter config name, the canonical filter name
+    (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) will be used for the backwards
+    compatibility.
 
 minor_behavior_changes:
 - area: thrift
@@ -175,6 +182,9 @@ bug_fixes:
 - area: upstream
   change: |
     Fixed the LOGICAL_DNS and STRICT_DNS clusters to work for IPv6.
+- area: aws_lambda
+  change: |
+    Fixed the AWS cross account lambda function invocation issue.
 
 removed_config_or_runtime:
 - area: compressor

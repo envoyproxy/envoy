@@ -51,7 +51,7 @@ Major releases are handled by the maintainer on-call and do not involve any back
 The details are outlined in the "Cutting a major release" section below.
 Security releases are handled by a Release Manager and a Fix Lead. The Release Manager is
 responsible for approving and merging backports, with responsibilties outlined
-[in this doc](https://docs.google.com/document/d/1AnIqmJlGlN0nZaxDme2uMjcO9VJxIokGDMYsq2IZM98/edit).
+in [BACKPORTS.md](BACKPORTS.md).
 The Fix Lead is a member of the security
 team and is responsible for coordinating the overall release. This includes identifying
 issues to be fixed in the release, communications with the Envoy community, and the

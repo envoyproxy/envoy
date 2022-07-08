@@ -421,6 +421,13 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
     EXPECT_EQ(true, proto_address.has_pipe());
     EXPECT_EQ("/hello", proto_address.pipe().path());
   }
+  {
+    envoy::config::core::v3::Address proto_address;
+    Address::EnvoyInternalInstance address("internal_address");
+    Utility::addressToProtobufAddress(address, proto_address);
+    EXPECT_TRUE(proto_address.has_envoy_internal_address());
+    EXPECT_EQ("internal_address", proto_address.envoy_internal_address().server_listener_name());
+  }
 }
 
 TEST(NetworkUtility, ProtobufAddressSocketType) {

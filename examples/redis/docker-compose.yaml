@@ -9,7 +9,7 @@ services:
     - envoymesh
     ports:
     - "1999:1999"
-    - "8001:8001"
+    - "${PORT_ADMIN:-8001}:8001"
 
   redis:
     build:

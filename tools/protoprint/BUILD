@@ -58,6 +58,7 @@ pkg_files(
 pkg_tar(
     name = "protoprinted",
     srcs = [":protoprinted_files_stripped"],
+    extension = "tar.gz",
 )
 
 protoprint_rule(
@@ -74,11 +75,13 @@ pkg_files(
 pkg_tar(
     name = "test_protoprinted",
     srcs = [":test_protoprinted_files_stripped"],
+    extension = "tar.gz",
 )
 
 pkg_tar(
     name = "golden_test_protos",
     srcs = ["//tools/testdata/protoxform/envoy/v2:golden_proto_files"],
+    extension = "tar.gz",
 )
 
 envoy_py_data(

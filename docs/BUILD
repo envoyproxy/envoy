@@ -56,7 +56,7 @@ genrule(
         $(location //source/extensions:extensions_metadata.yaml) \\
         $(location //contrib:extensions_metadata.yaml) $@
     """,
-    tools = ["//tools/docs:generate_extensions_security_rst"],
+    exec_tools = ["//tools/docs:generate_extensions_security_rst"],
 )
 
 genrule(
@@ -67,7 +67,7 @@ genrule(
         $(location //bazel:all_repository_locations) \
         $@
     """,
-    tools = [
+    exec_tools = [
         "//bazel:all_repository_locations",
         "//tools/docs:generate_external_deps_rst",
     ],
@@ -93,7 +93,7 @@ genrule(
     cmd = """
     cat $(location :v3_proto_srcs) $(location :xds_proto_srcs)  > $@
     """,
-    tools = [
+    exec_tools = [
         ":v3_proto_srcs",
         ":xds_proto_srcs",
     ],
@@ -107,7 +107,7 @@ genrule(
     $(location //tools/protodoc:generate_empty) \\
         $(location empty_extensions.json) $@
     """,
-    tools = ["//tools/protodoc:generate_empty"],
+    exec_tools = ["//tools/protodoc:generate_empty"],
 )
 
 genrule(
@@ -121,7 +121,7 @@ genrule(
     $(location //tools/docs:generate_api_rst) \\
         $(location proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
     """,
-    tools = ["//tools/docs:generate_api_rst"],
+    exec_tools = ["//tools/docs:generate_api_rst"],
 )
 
 pkg_files(
@@ -136,23 +136,34 @@ pkg_files(
 
 pkg_files(
     name = "sphinx_root",
-    srcs = glob(["root/**/*"]),
+    srcs = glob([
+        "root/**/*.css",
+        "root/**/*.ico",
+        "root/**/*.js",
+        "root/**/*.json",
+        "root/**/*.pb",
+        "root/**/*.png",
+        "root/**/*.proto",
+        "root/**/*.rst",
+        "root/**/*.svg",
+        "root/**/*.yaml",
+    ]),
     strip_prefix = "/docs/root",
 )
 
 pkg_files(
     name = "sphinx_inventories",
-    srcs = glob(["inventories/**/*"]),
+    srcs = glob(["inventories/**/*.inv"]),
     strip_prefix = "",
 )
 
 genrule(
     name = "version_histories",
-    outs = ["version_histories.tar"],
+    outs = ["version_histories.tar.gz"],
     cmd = """
     $(location //tools/docs:generate_version_histories) $@
     """,
-    tools = [
+    exec_tools = [
         ":versions.yaml",
         "//:VERSION.txt",
         "//changelogs",
