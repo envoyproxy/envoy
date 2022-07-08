@@ -104,7 +104,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamMultipleAuthPasswordsSet) {
     op_timeout: 0.01s
   downstream_auth_password:
     inline_string: somepassword
-  extra_downstream_auth_passwords:
+  downstream_auth_passwords:
   - inline_string: newpassword1
   - inline_string: newpassword2
   )EOF";
@@ -126,7 +126,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamOnlyExraAuthPasswordsSet) {
   stat_prefix: foo
   settings:
     op_timeout: 0.01s
-  extra_downstream_auth_passwords:
+  downstream_auth_passwords:
   - inline_string: newpassword1
   - inline_string: newpassword2
   )EOF";
@@ -173,7 +173,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithMultiplePasswords) {
     inline_string: someusername
   downstream_auth_password:
     inline_string: somepassword
-  extra_downstream_auth_passwords:
+  downstream_auth_passwords:
   - inline_string: newpassword1
   - inline_string: newpassword2
   )EOF";
@@ -198,7 +198,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithOnlyExtraPasswords) {
     op_timeout: 0.01s
   downstream_auth_username:
     inline_string: someusername
-  extra_downstream_auth_passwords:
+  downstream_auth_passwords:
   - inline_string: newpassword1
   - inline_string: newpassword2
   )EOF";
@@ -531,7 +531,7 @@ settings:
   op_timeout: 0.01s
 downstream_auth_password:
   inline_string: somepassword
-extra_downstream_auth_passwords:
+downstream_auth_passwords:
 -  inline_string: newpassword1
 -  inline_string: newpassword2
 )EOF";
@@ -760,7 +760,7 @@ downstream_auth_username:
   inline_string: someusername
 downstream_auth_password:
   inline_string: somepassword
-extra_downstream_auth_passwords:
+downstream_auth_passwords:
 -  inline_string: newpassword1
 -  inline_string: newpassword2
 )EOF";

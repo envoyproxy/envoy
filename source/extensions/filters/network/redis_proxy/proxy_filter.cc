@@ -32,10 +32,10 @@ ProxyFilterConfig::ProxyFilterConfig(
     downstream_auth_passwords_.emplace_back(downstream_auth_password);
   }
 
-  if (config.extra_downstream_auth_passwords_size() > 0) {
+  if (config.downstream_auth_passwords_size() > 0) {
     downstream_auth_passwords_.reserve(downstream_auth_passwords_.size() +
-                                       config.extra_downstream_auth_passwords().size());
-    for (const auto& source : config.extra_downstream_auth_passwords()) {
+                                       config.downstream_auth_passwords().size());
+    for (const auto& source : config.downstream_auth_passwords()) {
       const auto p = Config::DataSource::read(source, true, api);
       if (!p.empty()) {
         downstream_auth_passwords_.emplace_back(p);
