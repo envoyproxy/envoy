@@ -163,7 +163,8 @@ protected:
   Filter& filter_;
   Http::StreamFilterCallbacks* filter_callbacks_;
   CallbackState callback_state_ = CallbackState::Idle;
-  envoy::config::core::v3::TrafficDirection traffic_direction_;
+  envoy::config::core::v3::TrafficDirection traffic_direction_ =
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED;
 
   // Keep track of whether we requested a watermark.
   bool watermark_requested_ : 1;
