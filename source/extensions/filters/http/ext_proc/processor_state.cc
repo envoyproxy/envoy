@@ -34,11 +34,10 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
     message_timer_->disableTimer();
   }
   if (call_start_time_.has_value()) {
-    ASSERT(callback_state_ != CallbackState::Idle);
     std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
         filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
-    filter_.grpcStats().recordGrpcCallStats(duration, callback_state_, call_status,
-                                            processorType());
+    filter_.streamStats().recordGrpcCallStats(duration, call_status, callback_state_,
+                                              trafficDirection());
     call_start_time_ = absl::nullopt;
   }
   callback_state_ = next_state;

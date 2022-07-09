@@ -56,26 +56,17 @@ private:
   std::unique_ptr<Checker> rule_checker_;
 };
 
-void ExtProcStreamStats::recordGrpcCallStats(std::chrono::microseconds latency,
-                                             ProcessorState::CallbackState callback_state,
-                                             Grpc::Status::GrpcStatus call_status,
-                                             ProcessorState::ProcessorType processor_type) {
-  ProcessorGrpcStats& grpc_stats = processorGrpcStats(processor_type);
-  switch (callback_state) {
-  case ProcessorState::CallbackState::HeadersCallback:
-    grpc_stats.header_call_stats_.emplace_back(latency, call_status);
-    break;
-  case ProcessorState::CallbackState::TrailersCallback:
-    grpc_stats.trailer_call_stats_.emplace_back(latency, call_status);
-    break;
-  default:
-    grpc_stats.body_call_stats_.emplace_back(latency, call_status);
-  }
+void ExtProcStreamStats::recordGrpcCallStats(
+    std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
+    ProcessorState::CallbackState callback_state,
+    envoy::config::core::v3::TrafficDirection traffic_direction) {
+  ASSERT(callback_state != ProcessorState::CallbackState::Idle);
+  grpcStats(traffic_direction).stats_.emplace_back(latency, call_status, callback_state);
 }
 
-ExtProcStreamStats::ProcessorGrpcStats&
-ExtProcStreamStats::processorGrpcStats(ProcessorState::ProcessorType processor_type) {
-  return processor_type == ProcessorState::ProcessorType::DecodingProcessor
+ExtProcStreamStats::GrpcStats&
+ExtProcStreamStats::grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) {
+  return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
              ? decoding_processor_grpc_stats_
              : encoding_processor_grpc_stats_;
 }
@@ -108,7 +99,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
                           Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }
-  grpc_stats_ = filter_state->getDataMutable<ExtProcStreamStats>(ExtProcStreamStatsName);
+  stream_stats_ = filter_state->getDataMutable<ExtProcStreamStats>(ExtProcStreamStatsName);
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {

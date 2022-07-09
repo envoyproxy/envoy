@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 #include "envoy/http/filter.h"
@@ -90,7 +91,7 @@ public:
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
 
-  ProcessorType processorType() const { return processor_type_; }
+  envoy::config::core::v3::TrafficDirection trafficDirection() const { return traffic_direction_; }
   CallbackState callbackState() const { return callback_state_; }
   void setPaused(bool paused) { paused_ = paused; }
 
@@ -166,7 +167,7 @@ protected:
   Filter& filter_;
   Http::StreamFilterCallbacks* filter_callbacks_;
   CallbackState callback_state_ = CallbackState::Idle;
-  ProcessorType processor_type_;
+  envoy::config::core::v3::TrafficDirection traffic_direction_;
 
   // Keep track of whether we requested a watermark.
   bool watermark_requested_ : 1;
@@ -207,7 +208,7 @@ public:
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
       : ProcessorState(filter) {
     setProcessingModeInternal(mode);
-    processor_type_ = ProcessorType::DecodingProcessor;
+    traffic_direction_ = envoy::config::core::v3::TrafficDirection::INBOUND;
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
   DecodingProcessorState& operator=(const DecodingProcessorState&) = delete;
@@ -278,7 +279,7 @@ public:
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
       : ProcessorState(filter) {
     setProcessingModeInternal(mode);
-    processor_type_ = ProcessorType::EncodingProcessor;
+    traffic_direction_ = envoy::config::core::v3::TrafficDirection::OUTBOUND;
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;
   EncodingProcessorState& operator=(const EncodingProcessorState&) = delete;
