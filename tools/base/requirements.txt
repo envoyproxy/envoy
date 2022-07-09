@@ -328,9 +328,9 @@ envoy-code-check==0.2.2 \
     --hash=sha256:25b4fcee184e4b40ad68b26cbfd0614bbe0a5f980aefc95b5e3f9c6803e68bbb \
     --hash=sha256:3ad2dd3e01ff57bfcc21475c1268e79d065959911bc9fe8bf1d3ea3cb3f5adf1
     # via -r requirements.in
-envoy-dependency-check==0.1.2 \
-    --hash=sha256:77f277e7d46c8d392ad0226eb62e9672c036f61a4a4bee8fd7f694b93277e6d0 \
-    --hash=sha256:bfa8bc027c8f1dcb690f6b25913ab4649de808ff27cf0a8b305536c49b8af155
+envoy-dependency-check==0.1.3 \
+    --hash=sha256:4f703f718389ee68f97dd29e997a6508d7ce27a9f2f2f1fe26d27803a450e436 \
+    --hash=sha256:e243624375292a26410e1edecfcda239349f56799f8c5b6b4f30333d1541084c
     # via -r requirements.in
 envoy-dependency-pip-check==0.1.3 \
     --hash=sha256:b07ca0c1f2786b13b0dfcdfc82647afece3918d44dc7ddaca5739dfaadc9d0e8 \
