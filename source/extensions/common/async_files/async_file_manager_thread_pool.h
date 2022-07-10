@@ -30,14 +30,14 @@ public:
       const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
       Api::OsSysCalls& posix);
   ~AsyncFileManagerThreadPool() ABSL_LOCKS_EXCLUDED(queue_mutex_) override;
-  std::function<void()>
+  CancelFunction
   createAnonymousFile(absl::string_view path,
                       std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
-  std::function<void()>
+  CancelFunction
   openExistingFile(absl::string_view filename, Mode mode,
                    std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
-  std::function<void()> unlink(absl::string_view filename,
-                               std::function<void(absl::Status)> on_complete) override;
+  CancelFunction unlink(absl::string_view filename,
+                        std::function<void(absl::Status)> on_complete) override;
   std::string describe() const override;
   Api::OsSysCalls& posix() const { return posix_; }
 

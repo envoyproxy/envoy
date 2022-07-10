@@ -330,6 +330,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   }
 
   struct RequestInfo request_info;
+  request_info.reject_binding_body_field_collisions =
+      request_validation_options_.reject_binding_body_field_collisions();
   std::vector<VariableBinding> variable_bindings;
   method_info =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
@@ -416,8 +418,8 @@ JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& messa
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
 
 void JsonTranscoderFilter::initPerRouteConfig() {
-  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<JsonTranscoderConfig>(
-      "envoy.filters.http.grpc_json_transcoder", decoder_callbacks_->route());
+  const auto* route_local =
+      Http::Utility::resolveMostSpecificPerFilterConfig<JsonTranscoderConfig>(decoder_callbacks_);
 
   per_route_config_ = route_local ? route_local : &config_;
 }

@@ -61,13 +61,13 @@ message DnsCacheConfig {
   // The refresh rate is rounded to the closest millisecond, and must be at least 1ms.
   //
   // Once a host has been resolved, the refresh rate will be the DNS TTL, capped
-  // at a minimum of `dns_min_refresh_rate`.
+  // at a minimum of ``dns_min_refresh_rate``.
   google.protobuf.Duration dns_refresh_rate = 3
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-  // The minimum rate that DNS resolution will occur. Per `dns_refresh_rate`, once a host is
-  // resolved, the DNS TTL will be used, with a minimum set by `dns_min_refresh_rate`.
-  // `dns_min_refresh_rate` defaults to 5s and must also be >= 5s.
+  // The minimum rate that DNS resolution will occur. Per ``dns_refresh_rate``, once a host is
+  // resolved, the DNS TTL will be used, with a minimum set by ``dns_min_refresh_rate``.
+  // ``dns_min_refresh_rate`` defaults to 5s and must also be >= 5s.
   google.protobuf.Duration dns_min_refresh_rate = 14
       [(validate.rules).duration = {gte {seconds: 5}}];
 

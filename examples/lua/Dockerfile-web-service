@@ -1,1 +1,1 @@
-FROM solsson/http-echo
+FROM solsson/http-echo@sha256:cadde771b6e022c3ea1a8ee84958d9b82ba5f7bda5f75730a8f8542d206c321c

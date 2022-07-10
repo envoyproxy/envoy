@@ -297,7 +297,7 @@ public:
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return socket_factories_;
     }
-    bool bindToPort() override { return bind_to_port_; }
+    bool bindToPort() const override { return bind_to_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
     }
@@ -441,48 +441,6 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
       addInternalListener(new_listener_tag, "test_internal_listener", std::chrono::milliseconds(),
                           false, overridden_filter_chain_manager);
 
-  handler_->addListener(old_listener_tag, *new_test_listener, runtime_);
-
-  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-
-  auto internal_listener_cb = handler_->findByAddress(local_address);
-
-  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
-  EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _));
-  internal_listener_cb.value().get().onAccept(Network::ConnectionSocketPtr{connection});
-  EXPECT_EQ(0UL, handler_->numConnections());
-
-  testing::MockFunction<void()> completion;
-  handler_->removeFilterChains(old_listener_tag, {}, completion.AsStdFunction());
-  EXPECT_CALL(completion, Call());
-  dispatcher_.clearDeferredDeleteList();
-}
-
-TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdateWithoutUdpInplaceUpdateSupport) {
-  runtime_.mergeValues(
-      {{"envoy.reloadable_features.udp_listener_updates_filter_chain_in_place", "false"}});
-  InSequence s;
-  uint64_t old_listener_tag = 1;
-  uint64_t new_listener_tag = 2;
-  Network::Address::InstanceConstSharedPtr local_address{
-      new Network::Address::EnvoyInternalInstance("server_internal_address")};
-
-  TestListener* internal_listener = addInternalListener(
-      old_listener_tag, "test_internal_listener", std::chrono::milliseconds(), false, nullptr);
-  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
-                  internal_listener->socket_factories_[0].get()),
-              localAddress())
-      .WillRepeatedly(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener, runtime_);
-
-  ASSERT_NE(internal_listener, nullptr);
-
-  auto overridden_filter_chain_manager =
-      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
-  TestListener* new_test_listener =
-      addInternalListener(new_listener_tag, "test_internal_listener", std::chrono::milliseconds(),
-                          false, overridden_filter_chain_manager);
   handler_->addListener(old_listener_tag, *new_test_listener, runtime_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();

@@ -8,17 +8,20 @@
 # Usage: protoprint.py <source file path> <type database path> <load type db path>
 #                      <api version file path>
 
-from collections import deque
 import copy
 import functools
 import io
 import os
 import pathlib
 import re
+import shutil
 import subprocess
-import sys
+from collections import deque
+from functools import cached_property
 
-from tools.api_proto_plugin import annotations, traverse, visitor
+from packaging import version
+
+from tools.api_proto_plugin import annotations, constants, plugin, traverse, visitor
 from tools.api_versioning import utils as api_version_utils
 from tools.protoxform import options as protoxform_options, utils
 from tools.type_whisperer import type_whisperer, types_pb2
@@ -29,6 +32,8 @@ from google.protobuf import text_format
 from envoy.annotations import deprecation_pb2
 from udpa.annotations import migrate_pb2, status_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
+
+import envoy_repo
 
 NEXT_FREE_FIELD_MIN = 5
 
@@ -65,11 +70,7 @@ def extract_clang_proto_style(clang_format_text):
     return str(format_dict)
 
 
-# Ensure we are using the canonical clang-format proto style.
-CLANG_FORMAT_STYLE = extract_clang_proto_style(pathlib.Path('.clang-format').read_text())
-
-
-def clang_format(contents):
+def clang_format(style, contents):
     """Run proto-style oriented clang-format over given string.
 
     Args:
@@ -78,10 +79,13 @@ def clang_format(contents):
     Returns:
         clang-formatted string
     """
-    clang_format_path = os.getenv("CLANG_FORMAT", "clang-format")
+    clang_format_path = os.getenv("CLANG_FORMAT", shutil.which("clang-format"))
+    if not clang_format_path:
+        if not os.path.exists("/opt/llvm/bin/clang-format"):
+            raise RuntimeError("Unable to find clang-format, sorry")
+        clang_format_path = "/opt/llvm/bin/clang-format"
     return subprocess.run(
-        [clang_format_path,
-         '--style=%s' % CLANG_FORMAT_STYLE, '--assume-filename=.proto'],
+        [clang_format_path, '--style=%s' % style, '--assume-filename=.proto'],
         input=contents.encode('utf-8'),
         stdout=subprocess.PIPE).stdout
 
@@ -431,25 +435,8 @@ def format_field_type(type_context, field):
     elif field.type_name:
         return type_name
 
-    pretty_type_names = {
-        field.TYPE_DOUBLE: 'double',
-        field.TYPE_FLOAT: 'float',
-        field.TYPE_INT32: 'int32',
-        field.TYPE_SFIXED32: 'int32',
-        field.TYPE_SINT32: 'int32',
-        field.TYPE_FIXED32: 'uint32',
-        field.TYPE_UINT32: 'uint32',
-        field.TYPE_INT64: 'int64',
-        field.TYPE_SFIXED64: 'int64',
-        field.TYPE_SINT64: 'int64',
-        field.TYPE_FIXED64: 'uint64',
-        field.TYPE_UINT64: 'uint64',
-        field.TYPE_BOOL: 'bool',
-        field.TYPE_STRING: 'string',
-        field.TYPE_BYTES: 'bytes',
-    }
-    if field.type in pretty_type_names:
-        return label + pretty_type_names[field.type]
+    if field.type in constants.FIELD_TYPE_NAMES:
+        return label + constants.FIELD_TYPE_NAMES[field.type]
     raise ProtoPrintError('Unknown field type ' + str(field.type))
 
 
@@ -593,13 +580,28 @@ class ProtoFormatVisitor(visitor.Visitor):
 
     See visitor.Visitor for visitor method docs comments.
     """
+    _api_version = None
+    _requires_deprecation_annotation_import = False
 
-    def __init__(self, api_version_file_path, frozen_proto):
-        current_api_version = api_version_utils.get_api_version(api_version_file_path)
-        self._deprecated_annotation_version_value = '{}.{}'.format(
-            current_api_version.major, current_api_version.minor)
-        self._requires_deprecation_annotation_import = False
-        self._frozen_proto = frozen_proto
+    def __init__(self, params):
+        if params['type_db_path']:
+            utils.load_type_db(params['type_db_path'])
+
+        self.clang_format_config = pathlib.Path(params[".clang-format"])
+        if not self.clang_format_config.exists():
+            raise ProtoPrintError(f"Unable to find .clang-format file: {self.clang_format_config}")
+
+        if extra_args := params.get("extra_args"):
+            if extra_args.startswith("api_version:"):
+                self._api_version = extra_args.split(":")[1]
+
+    @cached_property
+    def current_api_version(self):
+        return version.Version(self._api_version or envoy_repo.API_VERSION)
+
+    @cached_property
+    def _deprecated_annotation_version_value(self):
+        return f"{self.current_api_version.major}.{self.current_api_version.minor}"
 
     def _add_deprecation_version(self, field_or_evalue, deprecation_tag, disallowed_tag):
         """Adds a deprecation version annotation if needed to the given field or enum value.
@@ -652,6 +654,7 @@ class ProtoFormatVisitor(visitor.Visitor):
             return ''
         # Verify that not hidden deprecated enum values of non-frozen protos have valid version
         # annotations.
+
         for v in enum_proto.value:
             self._add_deprecation_version(
                 v, deprecation_pb2.deprecated_at_minor_version_enum,
@@ -723,23 +726,28 @@ class ProtoFormatVisitor(visitor.Visitor):
         formatted_services = format_block('\n'.join(services))
         formatted_enums = format_block('\n'.join(enums))
         formatted_msgs = format_block('\n'.join(msgs))
-        return clang_format(header + formatted_services + formatted_enums + formatted_msgs)
+        return clang_format(
+            extract_clang_proto_style(self.clang_format_config.read_text()),
+            header + formatted_services + formatted_enums + formatted_msgs)
+
+
+class ProtoprintTraverser:
+
+    def traverse_file(self, file_proto, visitor):
+        # TODO(phlax): Figure out how to pass this to visitors
+        #   This currently breaks the Visitor contract, ie class props should not be set on individual visitation.
+        visitor._frozen_proto = (
+            file_proto.options.Extensions[status_pb2.file_status].package_version_status ==
+            status_pb2.FROZEN)
+        return traverse.traverse_file(file_proto, visitor)
+
+
+def main(data=None):
+    utils.load_protos()
+
+    plugin.plugin([plugin.direct_output_descriptor('.proto', ProtoFormatVisitor, want_params=True)],
+                  traverser=ProtoprintTraverser().traverse_file)
 
 
 if __name__ == '__main__':
-    proto_desc_path = sys.argv[1]
-
-    utils.load_protos()
-
-    file_proto = descriptor_pb2.FileDescriptorProto()
-    input_text = pathlib.Path(proto_desc_path).read_text()
-    if not input_text:
-        sys.exit(0)
-    text_format.Merge(input_text, file_proto)
-    dst_path = pathlib.Path(sys.argv[2])
-    utils.load_type_db(sys.argv[3])
-    api_version_file_path = pathlib.Path(sys.argv[4])
-    frozen_proto = file_proto.options.Extensions[
-        status_pb2.file_status].package_version_status == status_pb2.FROZEN
-    dst_path.write_bytes(
-        traverse.traverse_file(file_proto, ProtoFormatVisitor(api_version_file_path, frozen_proto)))
+    main()

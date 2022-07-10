@@ -1001,6 +1001,39 @@ private:
 };
 
 /**
+ * Route entry implementation for pattern path match routing.
+ */
+class PathTemplateRouteEntryImpl : public RouteEntryImplBase {
+public:
+  PathTemplateRouteEntryImpl(const VirtualHostImpl& vhost,
+                             const envoy::config::route::v3::Route& route,
+                             const OptionalHttpFilters& optional_http_filters,
+                             Server::Configuration::ServerFactoryContext& factory_context,
+                             ProtobufMessage::ValidationVisitor& validator);
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return path_template_; }
+  PathMatchType matchType() const override { return PathMatchType::Pattern; }
+
+  // Router::Matchable
+  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
+
+  // Router::DirectResponseEntry
+  void rewritePathHeader(Http::RequestHeaderMap& headers,
+                         bool insert_envoy_original_path) const override;
+
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+
+private:
+  const std::string path_template_;
+  const Matchers::PathMatcherConstSharedPtr path_matcher_;
+};
+
+/**
  * Route entry implementation for prefix path match routing.
  */
 class PrefixRouteEntryImpl : public RouteEntryImplBase {

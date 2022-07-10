@@ -1,8 +1,10 @@
 FROM envoyproxy/envoy-dev:latest
 
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y curl \
-    && apt-get autoremove -y \
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -qq update \
+    && apt-get -qq install --no-install-recommends -y curl \
+    && apt-get -qq autoremove -y \
     && apt-get clean \
     && rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 COPY ./front-envoy.yaml /etc/front-envoy.yaml
