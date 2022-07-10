@@ -87,7 +87,7 @@ void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& val
     return createTable(state, value.struct_value().fields());
   case ProtobufWkt::Value::kStringValue: {
     const auto& string_value = value.string_value();
-    return lua_pushstring(state, string_value.c_str());
+    return lua_pushlstring(state, string_value.c_str(), string_value.size());
   }
   case ProtobufWkt::Value::kListValue: {
     const auto& list = value.list_value();
