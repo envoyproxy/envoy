@@ -20,25 +20,32 @@ parameters:
 
 steps:
 - task: Cache@2
+  displayName: Cache ("${{ parameters.ciTarget }}")
   inputs:
     key: '"${{ parameters.ciTarget }}" | ./WORKSPACE | **/*.bzl'
     path: $(Build.StagingDirectory)/repository_cache
   continueOnError: true
 
+- script: .azure-pipelines/docker-cache.sh mount_ephemeral /tmp/ephemeral
+  displayName: Create ephemeral cache import directory
+  condition: ${{ parameters.managedAgent }}
+- task: Cache@2
+  displayName: "Docker cache (${{ parameters.ciTarget }})"
+  inputs:
+    key: "envoy-build-ubuntu | 0_0_0 | .devcontainer/Dockerfile"
+    path: /tmp/ephemeral/docker
+    cacheHitVar: CACHE_RESTORED
+  continueOnError: true
+  condition: ${{ parameters.managedAgent }}
+- script: .azure-pipelines/docker-cache.sh restore /tmp/ephemeral/docker/cache.tar.gz
+  displayName: "Docker cache restore (${{ parameters.ciTarget }})"
+  continueOnError: true
+  condition: and(${{ parameters.managedAgent }}, not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
+
 - bash: |
     echo "disk space at beginning of build:"
     df -h
   displayName: "Check disk space at beginning"
-
-- bash: |
-    sudo mkdir -p /etc/docker
-    echo '{
-      "ipv6": true,
-      "fixed-cidr-v6": "2001:db8:1::/64"
-    }' | sudo tee /etc/docker/daemon.json
-    sudo service docker restart
-  displayName: "Enable IPv6"
-  condition: ${{ parameters.managedAgent }}
 
 - script: ci/run_envoy_docker.sh 'ci/do_ci.sh ${{ parameters.ciTarget }}'
   workingDirectory: $(Build.SourcesDirectory)

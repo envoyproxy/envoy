@@ -13,8 +13,31 @@ pr: none
 stages:
 - stage: precheck
   jobs:
-  - job: format
+  - job: cache
     dependsOn: []
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+    - script: sudo mkdir /tmp/ephemeral && sudo mount -t tmpfs none /tmp/ephemeral
+      displayName: Create ephemeral cache import directory
+    - task: Cache@2
+      displayName: Warm Docker cache
+      inputs:
+        key: "envoy-build-ubuntu | 0_0_0 | .devcontainer/Dockerfile"
+        path: /tmp/ephemeral/docker
+        cacheHitVar: CACHE_RESTORED
+      continueOnError: true
+    - script: |
+        sudo umount /tmp/ephemeral &> /dev/null || :
+        sudo mkdir -p /tmp/ephemeral/docker
+        sudo chmod -R o+rwx /tmp/ephemeral/docker
+        .azure-pipelines/docker-cache.sh dump "/tmp/ephemeral/docker/cache.tar.gz"
+      displayName: Dump Docker cache
+      condition: and(not(canceled()), or(failed(), ne(variables.CACHE_RESTORED, 'true')))
+      continueOnError: true
+
+  - job: format
+    dependsOn: ["cache"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -23,6 +46,20 @@ stages:
         key: "format | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+
+    - script: .azure-pipelines/docker-cache.sh mount_ephemeral /tmp/ephemeral
+      displayName: Create ephemeral cache import directory
+    - task: Cache@2
+      displayName: Docker cache (format)
+      inputs:
+        key: "envoy-build-ubuntu | 0_0_0 | .devcontainer/Dockerfile"
+        path: /tmp/ephemeral/docker
+        cacheHitVar: CACHE_RESTORED
+      continueOnError: true
+    - script: .azure-pipelines/docker-cache.sh restore /tmp/ephemeral/docker/cache.tar.gz
+      displayName: Docker cache restore (format)
+      continueOnError: true
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
       workingDirectory: $(Build.SourcesDirectory)
@@ -34,6 +71,7 @@ stages:
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       displayName: "Run format checks"
+
     - task: PublishBuildArtifacts@1
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
@@ -42,7 +80,7 @@ stages:
       condition: failed()
 
   - job: proto_format
-    dependsOn: []
+    dependsOn: ["cache"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -51,6 +89,20 @@ stages:
         key: "proto_format | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+
+    - script: .azure-pipelines/docker-cache.sh mount_ephemeral /tmp/ephemeral
+      displayName: Create ephemeral cache import directory
+    - task: Cache@2
+      displayName: Docker cache (proto_format)
+      inputs:
+        key: "envoy-build-ubuntu | 0_0_0 | .devcontainer/Dockerfile"
+        path: /tmp/ephemeral/docker
+        cacheHitVar: CACHE_RESTORED
+      continueOnError: true
+    - script: .azure-pipelines/docker-cache.sh restore /tmp/ephemeral/docker/cache.tar.gz
+      displayName: Docker cache restore (proto_format)
+      continueOnError: true
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
       workingDirectory: $(Build.SourcesDirectory)
@@ -70,7 +122,7 @@ stages:
       condition: failed()
 
   - job: docs
-    dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    dependsOn: ["cache"]
     condition: ne(variables['PostSubmit'], true)
     pool:
       vmImage: "ubuntu-18.04"
@@ -80,6 +132,20 @@ stages:
         key: "docs | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+
+    - script: .azure-pipelines/docker-cache.sh mount_ephemeral /tmp/ephemeral
+      displayName: Create ephemeral cache import directory
+    - task: Cache@2
+      displayName: Docker cache (docs)
+      inputs:
+        key: "envoy-build-ubuntu | 0_0_0 | .devcontainer/Dockerfile"
+        path: /tmp/ephemeral/docker
+        cacheHitVar: CACHE_RESTORED
+      continueOnError: true
+    - script: .azure-pipelines/docker-cache.sh restore /tmp/ephemeral/docker/cache.tar.gz
+      displayName: Docker cache restore (docs)
+      continueOnError: true
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
@@ -102,7 +168,7 @@ stages:
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
 
   - job: dependencies
-    dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    dependsOn: ["cache"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -111,6 +177,20 @@ stages:
         key: "dependencies | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+
+    - script: .azure-pipelines/docker-cache.sh mount_ephemeral /tmp/ephemeral
+      displayName: Create ephemeral cache import directory
+    - task: Cache@2
+      displayName: Docker cache (dependencies)
+      inputs:
+        key: "envoy-build-ubuntu | 0_0_0 | .devcontainer/Dockerfile"
+        path: /tmp/ephemeral/docker
+        cacheHitVar: CACHE_RESTORED
+      continueOnError: true
+    - script: .azure-pipelines/docker-cache.sh restore /tmp/ephemeral/docker/cache.tar.gz
+      displayName: Docker cache restore (dependencies)
+      continueOnError: true
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
       workingDirectory: $(Build.SourcesDirectory)
@@ -126,7 +206,6 @@ stages:
 
 - stage: sync
   condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
-  dependsOn: []
   jobs:
   - job: filter_example
     dependsOn: []
@@ -359,6 +438,18 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+    - task: Cache@2
+      displayName: Docker cache (docker)
+      inputs:
+        key: "docker | **/Dockerfile*"
+        path: $(Build.StagingDirectory)/docker
+        cacheHitVar: CACHE_RESTORED
+      continueOnError: true
+    - script: .azure-pipelines/docker-cache.sh restore "$(Build.StagingDirectory)/docker/cache.tar"
+      displayName: Docker cache restore (docker)
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
+      continueOnError: true
+
     - bash: |
         echo "disk space at beginning of build:"
         df -h
@@ -391,6 +482,7 @@ stages:
         itemPattern: "bazel.release.arm64/envoy-contrib_binary.tar.gz"
         downloadType: single
         targetPath: $(Build.StagingDirectory)
+
     - bash: |
         set -e
         mkdir -p linux/amd64
@@ -410,6 +502,7 @@ stages:
         AZP_SHA1: $(Build.SourceVersion)
         DOCKERHUB_USERNAME: $(DockerUsername)
         DOCKERHUB_PASSWORD: $(DockerPassword)
+
     - bash: |
         echo "disk space at end of build:"
         df -h
@@ -433,6 +526,17 @@ stages:
       inputs:
         key: "docs | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+    - task: Cache@2
+      displayName: Docker cache (docs)
+      inputs:
+        key: "docs | **/Dockerfile*"
+        path: $(Build.StagingDirectory)/docker
+        cacheHitVar: CACHE_RESTORED
+      continueOnError: true
+    - script: .azure-pipelines/docker-cache.sh restore "$(Build.StagingDirectory)/docker/cache.tar"
+      displayName: Docker cache restore (docs)
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
       continueOnError: true
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
@@ -477,6 +581,18 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+    - task: Cache@2
+      displayName: Docker cache (verify)
+      inputs:
+        key: "verify | **/Dockerfile*"
+        path: $(Build.StagingDirectory)/docker
+        cacheHitVar: CACHE_RESTORED
+      continueOnError: true
+    - script: .azure-pipelines/docker-cache.sh restore "$(Build.StagingDirectory)/docker/cache.tar"
+      displayName: Docker cache restore (verify)
+      condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
+      continueOnError: true
+
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
