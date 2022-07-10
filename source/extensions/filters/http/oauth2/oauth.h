@@ -26,6 +26,11 @@ public:
   virtual void sendUnauthorizedResponse() PURE;
 };
 
+/**
+ * This is the enum class for authentication types used in client to auth server requests.
+ */
+enum class AuthType { BASIC_AUTH, URL_ENCODED_BODY };
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions

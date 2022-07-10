@@ -21,21 +21,41 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 namespace {
-constexpr const char* GetAccessTokenBodyFormatString =
+constexpr const char* GetAccessTokenBodyFormatString_01 =
     "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}";
 
+constexpr const char* GetAccessTokenBodyFormatString_02 =
+    "grant_type=authorization_code&code={0}&redirect_uri={1}";
+
+constexpr const char* BasicAuthHeader = "Basic {0}";
+
+constexpr const char* BasicAuthToken = "{0}:{1}";
 } // namespace
 
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                                            const std::string& client_id, const std::string& secret,
-                                           const std::string& cb_url) {
+                                           const std::string& cb_url, AuthType auth_type) {
   const auto encoded_client_id = Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
   const auto encoded_secret = Http::Utility::PercentEncoding::encode(secret, ":/=&?");
   const auto encoded_cb_url = Http::Utility::PercentEncoding::encode(cb_url, ":/=&?");
 
   Http::RequestMessagePtr request = createPostRequest();
-  const std::string body = fmt::format(GetAccessTokenBodyFormatString, auth_code, encoded_client_id,
-                                       encoded_secret, encoded_cb_url);
+  std::string body;
+  switch (auth_type) {
+  case AuthType::URL_ENCODED_BODY:
+    body = fmt::format(GetAccessTokenBodyFormatString_01, auth_code, encoded_client_id,
+                       encoded_secret, encoded_cb_url);
+    break;
+  case AuthType::BASIC_AUTH:
+    // Set Basic athentication header.
+    request->headers().setReference(
+        Http::CustomHeaders::get().Authorization,
+        fmt::format(BasicAuthHeader, Http::Utility::PercentEncoding::encode(
+                                         fmt::format(BasicAuthToken, client_id, secret), ":/=&?")));
+    body = fmt::format(GetAccessTokenBodyFormatString_02, auth_code, encoded_cb_url);
+    break;
+  }
+
   request->body().add(body);
   request->headers().setContentLength(body.length());
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");

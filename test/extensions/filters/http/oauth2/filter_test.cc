@@ -70,7 +70,7 @@ public:
                                     const Http::ResponseHeaderMap*) override {}
 
   MOCK_METHOD(void, asyncGetAccessToken,
-              (const std::string&, const std::string&, const std::string&, const std::string&));
+              (const std::string&, const std::string&, const std::string&, const std::string&, AuthType auth_type));
 };
 
 class OAuth2Test : public testing::Test {

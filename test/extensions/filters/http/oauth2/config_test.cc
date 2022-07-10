@@ -54,6 +54,7 @@ config:
   - oauth2-resource
   - http://example.com
   - https://example.com
+  auth_type: "URL_ENCODED_BODY"
     )EOF";
 
   OAuth2Config factory;
@@ -106,6 +107,7 @@ config:
   - oauth2-resource
   - http://example.com
   - https://example.com
+  auth_type: "URL_ENCODED_BODY"
     )EOF";
 
   OAuth2Config factory;
@@ -182,6 +184,7 @@ config:
   - oauth2-resource
   - http://example.com
   - https://example.com
+  auth_type: "URL_ENCODED_BODY"
     )EOF";
 
   OAuth2Config factory;
