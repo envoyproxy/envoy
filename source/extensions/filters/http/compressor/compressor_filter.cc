@@ -36,7 +36,7 @@ const std::vector<std::string>& defaultContentEncoding() {
                           "text/ecmascript", "text/js", "text/jscript", "text/x-js",
                           "application/ecmascript", "application/x-json", "application/xml",
                           "application/json", "image/svg+xml", "text/xml", "application/xhtml+xml",
-                          "application/grpc-web+proto"});
+                          "application/grpc-web", "application/grpc-web+proto"});
 }
 
 // List of CompressorFilterConfig objects registered for a stream.
