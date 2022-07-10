@@ -1800,8 +1800,8 @@ TEST_F(LuaHttpFilterTest, GetRequestedServerName) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// Verify that extracting dynamicMetadata() using LUA also works for binary values.
-TEST_F(LuaHttpFilterTest, DynamicMetadataBinaryData) {
+// Verify that binary values could also be extracted from dynamicMetadata() in LUA filter.
+TEST_F(LuaHttpFilterTest, GetDynamicMetadataBinaryData) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       local bin_data = request_handle:streamInfo():dynamicMetadata():get("envoy.pp")["bin_data"]

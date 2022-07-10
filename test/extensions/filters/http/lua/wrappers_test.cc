@@ -418,6 +418,45 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
   wrapper.reset();
 }
 
+// Verify that binary values could also be extracted from dynamicMetadata().
+TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local bin_data = object:dynamicMetadata():get("envoy.pp")["bin_data"]
+      local hex_table = { }
+      local data_length = 8
+      for idx = 1, data_length do
+        local hex_value = string.format('%x', string.byte(bin_data, idx))
+        if string.len(string.format('%x', string.byte(bin_data, idx))) < 2 then
+          hex_table[data_length - idx + 1] = '0'..hex_value
+        else
+          hex_table[data_length - idx + 1] = hex_value
+        end
+      end
+      local hex_data = table.concat(hex_table, '')
+      local int64_data = string.format('%d', tonumber(hex_data, 16))
+      testPrint('Data: ' .. int64_data)
+    end
+  )EOF"};
+
+  ProtobufWkt::Value metadata_value;
+  const uint64_t e0 = 9688686178336770;
+  metadata_value.set_string_value(reinterpret_cast<char const*>(&e0), 8);
+  ProtobufWkt::Struct metadata;
+  metadata.mutable_fields()->insert({"bin_data", metadata_value});
+
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  (*stream_info.metadata_.mutable_filter_metadata())["envoy.pp"] = metadata;
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+
+  EXPECT_CALL(printer_, testPrint("Data: 9688686178336770"));
+
+  start("callMe");
+}
+
 // Set, get complex key/values in stream info dynamic metadata.
 TEST_F(LuaStreamInfoWrapperTest, SetGetComplexDynamicMetadata) {
   const std::string SCRIPT{R"EOF(
