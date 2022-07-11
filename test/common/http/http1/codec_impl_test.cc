@@ -2118,7 +2118,8 @@ class Http1ClientConnectionImplTest : public Http1CodecTestBase {
 public:
   void initialize() {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_,
+        /* passing_through_proxy=*/false);
   }
 
   void readDisableOnRequestEncoder(RequestEncoder* request_encoder, bool disable) {
