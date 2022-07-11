@@ -3,6 +3,7 @@
 # Diff or copy pretty-printed artifacts to the source tree.
 
 import argparse
+import os
 import pathlib
 import shutil
 import subprocess
@@ -52,6 +53,13 @@ def sync(api_root, formatted, mode, is_ci):
         dst_dir = tmp_path.joinpath("b")
         with tarfile.open(formatted) as tar:
             tar.extractall(dst_dir)
+
+        # These support files are handled manually.
+        for f in ['envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
+                  'envoy/annotations/BUILD']:
+            copy_dst_dir = pathlib.Path(dst_dir, os.path.dirname(f))
+            copy_dst_dir.mkdir(exist_ok=True, parents=True)
+            shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
 
         diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
 

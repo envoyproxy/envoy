@@ -246,8 +246,8 @@ message FilterChain {
   core.v3.Metadata metadata = 5;
 
   // Optional custom transport socket implementation to use for downstream connections.
-  // To setup TLS, set a transport socket with name `envoy.transport_sockets.tls` and
-  // :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` in the `typed_config`.
+  // To setup TLS, set a transport socket with name ``envoy.transport_sockets.tls`` and
+  // :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` in the ``typed_config``.
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.
   // [#extension-category: envoy.transport_sockets.downstream]

@@ -80,6 +80,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
 
   static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   Http::ContextImpl http_context(stats_store.symbolTable());
 

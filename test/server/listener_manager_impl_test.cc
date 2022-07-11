@@ -251,6 +251,154 @@ filter_chains:
       "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener");
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, DuplicateNonIPAddressNotAllowed) {
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  pipe:
+    path: /path
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: bar
+address:
+  pipe:
+    path: /path
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+      "error adding listener: 'bar' has duplicate address '/path' as existing listener");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleAddressesDuplicatePortNotAllowed) {
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.3
+      port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+                            "error adding listener: 'bar' has duplicate address "
+                            "'127.0.0.1:1234,127.0.0.3:1234' as existing listener");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       MultipleAddressesDuplicatePortNotAllowedWithZeroPortAndNonBind) {
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 0
+bind_to_port: false
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.3
+      port_value: 0
+bind_to_port: false
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+                            "error adding listener: 'bar' has duplicate address "
+                            "'127.0.0.1:0,127.0.0.3:0' as existing listener");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, AllowCreateListenerWithMutipleZeroPorts) {
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 0
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 0
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLimit) {
   const std::string yaml = R"EOF(
 address:
@@ -576,6 +724,132 @@ filter_chains:
 
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("bar").value());
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, UsingAddressAsStatsPrefixForMultipleAddresses) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
+  TestStatsConfigFactory filter;
+  Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
+
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 4567
+bind_to_port: false
+filter_chains:
+- filters:
+  - name: stats_test
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
+      .Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
+
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("bar").value());
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
+}
+
+TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        protocol: TCP
+        address: "::0"
+        port_value: 13332
+    additional_addresses:
+    - address:
+        socket_address:
+          protocol: TCP
+          address: "::0"
+          port_value: 13333
+    - address:
+        socket_address:
+          protocol: UDP
+          address: "::0"
+          port_value: 13334
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "listener foo: has different socket type. The listener only "
+                            "support same socket type for all the addresses.");
+}
+
+TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      envoy_internal_address:
+        server_listener_name: a_listener_name_1
+    additional_addresses:
+    - address:
+        envoy_internal_address:
+          server_listener_name: a_listener_name_1
+    - address:
+        envoy_internal_address:
+          server_listener_name: a_listener_name_2
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "listener foo: internal address doesn't support multiple addresses.");
+
+  const std::string yaml2 = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        protocol: TCP
+        address: "::0"
+        port_value: 13332
+    additional_addresses:
+    - address:
+        envoy_internal_address:
+          server_listener_name: a_listener_name_1
+    - address:
+        envoy_internal_address:
+          server_listener_name: a_listener_name_2
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true),
+                            EnvoyException,
+                            "listener foo: internal address doesn't support multiple addresses.");
+
+  const std::string yaml3 = R"EOF(
+    name: "foo"
+    address:
+      envoy_internal_address:
+        server_listener_name: a_listener_name_1
+    additional_addresses:
+    - address:
+        socket_address:
+          protocol: TCP
+          address: "::0"
+          port_value: 13332
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml3), "", true),
+                            EnvoyException,
+                            "listener foo: internal address doesn't support multiple addresses.");
 }
 
 TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
@@ -1716,6 +1990,142 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
+TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleAddresses) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add and initialize foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 4567
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.2
+    port_value: 4567
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+per_connection_buffer_limit_bytes: 999
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(2);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+
+  // Should be both active and warming now.
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add and initialize foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1234
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(3);
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1234
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+per_connection_buffer_limit_bytes: 999
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(3);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+
+  // Should be both active and warming now.
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 TEST_P(ListenerManagerImplTest, AddReusableDrainingListener) {
   InSequence s;
 
@@ -1776,6 +2186,67 @@ filter_chains:
   EXPECT_CALL(*listener_foo2, onDestroy());
 }
 
+TEST_P(ListenerManagerImplTest, AddReusableDrainingListenerWithMultiAddresses) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add foo listener directly into active.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  worker_->callAddCompletion();
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Remove foo into draining.
+  std::function<void()> stop_completion;
+  EXPECT_CALL(*worker_, stopListener(_, _))
+      .WillOnce(Invoke(
+          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
+            ASSERT_TRUE(completion != nullptr);
+            stop_completion = std::move(completion);
+          }));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+  checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+  checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
+
+  // Add foo again.
+  ListenerHandle* listener_foo2 = expectListenerCreate(false, true);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(2);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  worker_->callAddCompletion();
+  checkStats(__LINE__, 2, 0, 1, 0, 1, 1, 0);
+
+  stop_completion();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+  checkStats(__LINE__, 2, 0, 1, 0, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo2, onDestroy());
+}
+
 TEST_P(ListenerManagerImplTest, AddClosedDrainingListener) {
   InSequence s;
 
@@ -1817,6 +2288,59 @@ filter_chains:
   // Add foo again. We should use the socket from draining.
   ListenerHandle* listener_foo2 = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  worker_->callAddCompletion();
+  checkStats(__LINE__, 2, 0, 1, 0, 1, 1, 0);
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+  checkStats(__LINE__, 2, 0, 1, 0, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo2, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, AddClosedDrainingListenerWithMultiAddresses) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add foo listener directly into active.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 4567
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  worker_->callAddCompletion();
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Remove foo into draining.
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(2);
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+  checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+  checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
+
+  ListenerHandle* listener_foo2 = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   EXPECT_CALL(*worker_, addListener(_, _, _, _));
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
   worker_->callAddCompletion();
@@ -6402,6 +6926,110 @@ filter_chains:
   auto listener_foo_expect_reuse_socket = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, _)).Times(0);
   EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_CALL(listener_foo_expect_reuse_socket->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1", true));
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_CALL(*listener_foo_expect_reuse_socket, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest,
+       ListenSocketFactoryIsClonedFromListenerDrainingFilterChainWithMultipleAddresses) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 4567
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+  EXPECT_EQ(1UL, manager_->listeners().size());
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 4567
+filter_chains:
+- filters:
+  filter_chain_match:
+    destination_port: 1234
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(true, listener_foo);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(2);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // The warmed up starts the drain timer.
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  EXPECT_CALL(server_.options_, drainTime()).WillOnce(Return(std::chrono::seconds(600)));
+  Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
+  EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
+  listener_foo_update1->target_.ready();
+  checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 1);
+  EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
+  filter_chain_drain_timer->invokeCallback();
+
+  // Stop the active listener listener_foo_update1.
+  std::function<void()> stop_completion;
+  EXPECT_CALL(*worker_, stopListener(_, _))
+      .WillOnce(Invoke(
+          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
+            ASSERT_TRUE(completion != nullptr);
+            stop_completion = std::move(completion);
+          }));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo_update1->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  worker_->callRemovalCompletion();
+
+  // The snapshot of the listener manager is
+  // 1) listener_foo is draining filter chain. The listen socket is open.
+  // 2) No listen is active. Note that listener_foo_update1 is stopped.
+  //
+  // The next step is to add a listener on the same socket address and the listen socket of
+  // listener_foo will be duplicated.
+  auto listener_foo_expect_reuse_socket = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, _)).Times(0);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(2);
   EXPECT_CALL(listener_foo_expect_reuse_socket->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1", true));
 

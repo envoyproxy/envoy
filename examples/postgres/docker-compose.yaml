@@ -6,12 +6,12 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     ports:
-    - "1999:1999"
-    - "8001:8001"
+    - "${PORT_ADMIN:-8001}:8001"
     command: "/usr/local/bin/envoy -c /etc/envoy.yaml"
 
   postgres:
-    image: postgres:latest
+    build:
+      context: ../shared/postgres
     environment:
       # WARNING! Do not use it on production environments because this will
       #          allow anyone with access to the Postgres port to access your

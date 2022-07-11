@@ -57,7 +57,7 @@ IntegrationTcpClient::IntegrationTcpClient(
   connection_ = dispatcher.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      source_address, Network::Test::createRawBufferSocket(), options);
+      source_address, Network::Test::createRawBufferSocket(), options, nullptr);
 
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
