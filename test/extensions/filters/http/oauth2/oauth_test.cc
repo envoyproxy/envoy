@@ -96,7 +96,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
       }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d", AuthType::URL_ENCODED_BODY);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess(_, _, _, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -127,7 +127,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d", AuthType::URL_ENCODED_BODY);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -152,7 +152,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenErrorResponse) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d", AuthType::URL_ENCODED_BODY);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -183,7 +183,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidResponse) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d", AuthType::URL_ENCODED_BODY);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -201,7 +201,7 @@ TEST_F(OAuth2ClientTest, NetworkError) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d", AuthType::URL_ENCODED_BODY);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
 
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
@@ -215,7 +215,7 @@ TEST_F(OAuth2ClientTest, NoCluster) {
   ON_CALL(cm_, getThreadLocalCluster("auth")).WillByDefault(Return(nullptr));
   client_->setCallbacks(*mock_callbacks_);
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
-  client_->asyncGetAccessToken("a", "b", "c", "d", AuthType::URL_ENCODED_BODY);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(0, callbacks_.size());
 }
 

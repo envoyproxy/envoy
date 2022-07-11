@@ -6,6 +6,7 @@
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
@@ -47,11 +48,12 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                        encoded_secret, encoded_cb_url);
     break;
   case AuthType::BASIC_AUTH:
+    std::string basic_auth_token = fmt::format(BasicAuthToken, client_id, secret);
     // Set Basic athentication header.
     request->headers().setReference(
         Http::CustomHeaders::get().Authorization,
-        fmt::format(BasicAuthHeader, Http::Utility::PercentEncoding::encode(
-                                         fmt::format(BasicAuthToken, client_id, secret), ":/=&?")));
+        fmt::format(BasicAuthHeader,
+                    Base64::encode(basic_auth_token.data(), basic_auth_token.length())));
     body = fmt::format(GetAccessTokenBodyFormatString_02, auth_code, encoded_cb_url);
     break;
   }

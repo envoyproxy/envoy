@@ -34,6 +34,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:message_validator_lib",
+        "//source/common/common:base64_lib",
         "//source/extensions/filters/http/oauth2:oauth_callback_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
