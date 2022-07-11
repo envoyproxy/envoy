@@ -141,6 +141,7 @@ message RateLimitQuotaFilterConfig {
 
 // Per-route and per-host configuration overrides. The more specific definition completely
 // overrides the less specific definition.
+// [#next-free-field: 6]
 message RateLimitQuotaOverride {
   // The application domain to use when calling the service. This enables sharing the quota
   // server between different applications without fear of overlap.
@@ -157,6 +158,29 @@ message RateLimitQuotaOverride {
   // See usage example: :ref:`RateLimitQuotaFilterConfig.bucket_matchers
   // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.bucket_matchers>`.
   xds.type.matcher.v3.Matcher bucket_matchers = 2;
+
+  // If set, this will enable -- but not necessarily enforce -- the rate limit for the given
+  // fraction of requests.
+  //
+  // Defaults to 100% of requests.
+  config.core.v3.RuntimeFractionalPercent filter_enabled = 3;
+
+  // If set, this will enforce the rate limit decisions for the given fraction of requests.
+  // For requests that are not enforced the filter will still obtain the quota and include it
+  // in the load computation, however the request will always be allowed regardless of the outcome
+  // of quota application. This allows validation or testing of the rate limiting service
+  // infrastructure without disrupting existing traffic.
+  //
+  // Note: this only applies to the fraction of enabled requests.
+  //
+  // Defaults to 100% of requests.
+  config.core.v3.RuntimeFractionalPercent filter_enforced = 4;
+
+  // Specifies a list of HTTP headers that should be added to each request that
+  // has been rate limited and is also forwarded upstream. This can only occur when the
+  // filter is enabled but not enforced.
+  repeated config.core.v3.HeaderValueOption request_headers_to_add_when_not_enforced = 5
+      [(validate.rules).repeated = {max_items: 10}];
 }
 
 // Rate Limit Quota Bucket Settings to apply on the successful ``bucket_matchers`` match.
