@@ -93,9 +93,11 @@ class Admin {
 public:
   virtual ~Admin() = default;
 
-  // Describes a parameter for an endpoint. This structure is used to populate
-  // an HTML form to enable a visitor to the admin console to intuitively
-  // specify query-parameters for each endpoint.
+  // Describes a parameter for an endpoint. This structure is used when
+  // admin-html has not been disabled to populate an HTML form to enable a
+  // visitor to the admin console to intuitively specify query-parameters for
+  // each endpoint. The parameter descriptions also appear in the /help
+  // endpoint, independent of how Envoy is compiled.
   struct ParamDescriptor {
     enum class Type { Boolean, String, Enum };
     const Type type_;
@@ -179,6 +181,7 @@ public:
    * @param callback supplies the callback to invoke when the prefix matches.
    * @param removable if true allows the handler to be removed via removeHandler.
    * @param mutates_server_state indicates whether callback will mutate server state.
+   * @param params command parameter descriptors.
    * @return bool true if the handler was added, false if it was not added.
    */
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,

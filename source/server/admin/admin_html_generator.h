@@ -14,11 +14,35 @@ class AdminHtmlGenerator {
 public:
   AdminHtmlGenerator(Buffer::Instance& response) : response_(response) {}
 
+  /**
+   * Renders the HTML head into the response buffer provided in the constructor.
+   */
   void renderHead();
+
+  /**
+   * Renders the beginning of the help-table into the response buffer provided
+   * in the constructor.
+   */
   void renderTableBegin();
+
+  /**
+   * Renders the end of the help-table into the response buffer provided in the
+   * constructor.
+   */
   void renderTableEnd();
+
+  /**
+   * Renders a table row for a URL endpoint, including the name of the endpoint,
+   * entries for each parameter, and help text.
+   *
+   * This must be called after renderTableBegin and before renderTableEnd. Any
+   * number of URL Handlers can be rendered.
+   *
+   * @param handler the URL handler.
+   */
   void renderUrlHandler(const Admin::UrlHandler& handler,
                         OptRef<const Http::Utility::QueryParams> query);
+
   void renderInput(absl::string_view id, absl::string_view path, Admin::ParamDescriptor::Type type,
                    OptRef<const Http::Utility::QueryParams> query,
                    const std::vector<absl::string_view>& enum_choices);
