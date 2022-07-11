@@ -1,5 +1,3 @@
-#include <sys/socket.h>
-
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 
 #include "source/common/network/dns_resolver/dns_factory_util.h"
@@ -47,7 +45,7 @@ public:
   }
 
   static addrinfo* makeGaiResponse(std::vector<Address::InstanceConstSharedPtr> addresses) {
-    auto gai_response = new addrinfo;
+    auto gai_response = reinterpret_cast<addrinfo*>(malloc(sizeof(addrinfo)));
     auto next_ai = gai_response;
 
     for (size_t i = 0; i < addresses.size(); i++) {
@@ -60,11 +58,11 @@ public:
         next_ai->ai_family = AF_INET6;
       }
 
-      next_ai->ai_addr = reinterpret_cast<sockaddr*>(new sockaddr_storage);
+      next_ai->ai_addr = reinterpret_cast<sockaddr*>(malloc(sizeof(sockaddr_storage)));
       memcpy(next_ai->ai_addr, address->sockAddr(), address->sockAddrLen());
 
       if (i != addresses.size() - 1) {
-        auto new_ai = new addrinfo;
+        auto new_ai = reinterpret_cast<addrinfo*>(malloc(sizeof(addrinfo)));
         next_ai->ai_next = new_ai;
         next_ai = new_ai;
       }
@@ -75,9 +73,9 @@ public:
 
   static void freeGaiResponse(addrinfo* response) {
     for (auto ai = response; ai != nullptr;) {
-      delete ai->ai_addr;
+      free(ai->ai_addr);
       auto next_ai = ai->ai_next;
-      delete ai;
+      free(ai);
       ai = next_ai;
     }
   }
