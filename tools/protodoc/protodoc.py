@@ -90,7 +90,7 @@ def format_comment_with_annotations(comment, show_wip_warning=False):
     if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
         for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
             formatted_extension_category += format_extension_category(category)
-    comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
+    comment = annotations.without_annotations(comment.raw + '\n')
     return comment + wip_warning + formatted_extension + formatted_extension_category
 
 
@@ -214,7 +214,7 @@ def format_header_from_file(style, source_code_info, proto_name):
     """
     anchor = format_anchor(file_cross_ref_label(proto_name))
     stripped_comment = annotations.without_annotations(
-        strip_leading_space('\n'.join(c + '\n' for c in source_code_info.file_level_comments)))
+        '\n'.join(c + '\n' for c in source_code_info.file_level_comments))
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in source_code_info.file_level_annotations:
         extension = source_code_info.file_level_annotations[annotations.EXTENSION_ANNOTATION]
@@ -350,11 +350,6 @@ def format_field_type(type_context, field):
             constants.FIELD_TYPE_NAMES[field.type],
             'https://developers.google.com/protocol-buffers/docs/proto#scalar')
     raise ProtodocError('Unknown field type ' + str(field.type))
-
-
-def strip_leading_space(s):
-    """Remove leading space in flat comment strings."""
-    return map_lines(lambda s: s[1:], s)
 
 
 def file_cross_ref_label(msg_name):

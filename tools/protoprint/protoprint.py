@@ -106,6 +106,12 @@ def format_block(block):
     return ''
 
 
+# TODO(htuch): not sure why this is needed, but clang-format does some weird
+# stuff with // comment indents when we have these trailing \
+def fixup_trailing_backslash(s):
+    return s[:-1].rstrip() if s.endswith('\\') else s
+
+
 def format_comments(comments):
     """Format a list of comment blocks from SourceCodeInfo.
 
@@ -119,16 +125,12 @@ def format_comments(comments):
         A string reprenting the formatted comment blocks.
     """
 
-    # TODO(htuch): not sure why this is needed, but clang-format does some weird
-    # stuff with // comment indents when we have these trailing \
-    def fixup_trailing_backslash(s):
-        return s[:-1].rstrip() if s.endswith('\\') else s
-
-    comments = '\n\n'.join(
-        '\n'.join(['//%s' % fixup_trailing_backslash(line)
-                   for line in comment.split('\n')[:-1]])
-        for comment in comments)
-    return format_block(comments)
+    return format_block(
+        '\n\n'.join(
+            '\n'.join(
+                ['// %s' % fixup_trailing_backslash(line)
+                 for line in comment.split('\n')[:-1]])
+            for comment in comments))
 
 
 def create_next_free_field_xform(msg_proto):
