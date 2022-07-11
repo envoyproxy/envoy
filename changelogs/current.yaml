@@ -249,6 +249,9 @@ new_features:
 - area: listener
   change: |
     added dynamic listener filter configuration for listener filters. :ref:`dynamic listener filter re-configuration<envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`. This dynamic listener filter configuration is only supported in TCP listeners.
+- area: redis
+  change: |
+    added support for multiple passwords to the redis proxy. See :ref:`downstream_auth_passwords <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_passwords>`.
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
@@ -334,3 +337,7 @@ deprecated:
 - area: matching
   change: |
     :ref:`google_re2 <envoy_v3_api_field_type.matcher.v3.RegexMatcher.google_re2>` has been deprecated.
+- area: redis
+  change: |
+    :ref:`downstream_auth_password <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_password>` has been deprecated. Please use
+    :ref:`downstream_auth_passwords <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_passwords>`.
