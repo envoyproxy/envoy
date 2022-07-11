@@ -46,7 +46,9 @@ void Span::finishSpan() {
   // Call into the parent tracer so we can access the shared exporter.
   span_.set_end_time_unix_nano(
       std::chrono::nanoseconds(time_source_.systemTime().time_since_epoch()).count());
-  parent_tracer_.sendSpan(span_);
+  if (sampled()) {
+    parent_tracer_.sendSpan(span_);
+  }
 }
 
 void Span::injectContext(Tracing::TraceContext& trace_context,
