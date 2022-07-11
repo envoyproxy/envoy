@@ -30,13 +30,17 @@ public:
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
     resolver_ =
         dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+
+    // NOP for coverage.
+    resolver_->resetNetworking();
   }
 
-  void setupFakeGai() {
+  void setupFakeGai(std::vector<Address::InstanceConstSharedPtr> addresses = {
+                        Utility::getCanonicalIpv4LoopbackAddress(),
+                        Utility::getIpv6LoopbackAddress()}) {
     EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-        .WillOnce(Invoke([](const char*, const char*, const addrinfo*, addrinfo** res) {
-          *res = makeGaiResponse(
-              {Utility::getCanonicalIpv4LoopbackAddress(), Utility::getIpv6LoopbackAddress()});
+        .WillOnce(Invoke([addresses](const char*, const char*, const addrinfo*, addrinfo** res) {
+          *res = makeGaiResponse(addresses);
           return Api::SysCallIntResult{0, 0};
         }));
     EXPECT_CALL(os_sys_calls_, freeaddrinfo(_)).WillOnce(Invoke([](addrinfo* res) {
@@ -58,7 +62,9 @@ public:
         next_ai->ai_family = AF_INET6;
       }
 
-      next_ai->ai_addr = reinterpret_cast<sockaddr*>(malloc(sizeof(sockaddr_storage)));
+      sockaddr_storage* storage =
+          reinterpret_cast<sockaddr_storage*>(malloc(sizeof(sockaddr_storage)));
+      next_ai->ai_addr = reinterpret_cast<sockaddr*>(storage);
       memcpy(next_ai->ai_addr, address->sockAddr(), address->sockAddrLen());
 
       if (i != addresses.size() - 1) {
@@ -221,6 +227,26 @@ TEST_F(GetAddrInfoDnsImplTest, V4Preferred) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
+TEST_F(GetAddrInfoDnsImplTest, V4PreferredNoV4) {
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
+  setupFakeGai({Utility::getIpv6LoopbackAddress()});
+
+  resolver_->resolve(
+      "localhost", DnsLookupFamily::V4Preferred,
+      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(1, response.size());
+        EXPECT_EQ("[[::1]:0]",
+                  accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
+                    return dns_response.addrInfo().address_->asString();
+                  }));
+
+        dispatcher_->exit();
+      });
+
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+}
+
 TEST_F(GetAddrInfoDnsImplTest, Auto) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
   setupFakeGai();
@@ -231,6 +257,26 @@ TEST_F(GetAddrInfoDnsImplTest, Auto) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[[::1]:0]",
+                  accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
+                    return dns_response.addrInfo().address_->asString();
+                  }));
+
+        dispatcher_->exit();
+      });
+
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+}
+
+TEST_F(GetAddrInfoDnsImplTest, AutoNoV6) {
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
+  setupFakeGai({Utility::getCanonicalIpv4LoopbackAddress()});
+
+  resolver_->resolve(
+      "localhost", DnsLookupFamily::Auto,
+      [this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) {
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(1, response.size());
+        EXPECT_EQ("[127.0.0.1:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
                     return dns_response.addrInfo().address_->asString();
                   }));
