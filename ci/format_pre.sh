@@ -51,10 +51,11 @@ bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 CURRENT=spelling
 "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
 
-# TODO(phlax): move these to bazel rules
-CURRENT=check_format_test
-"${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
-
+# TODO(phlax): move clang/buildifier checks to bazel rules (/aspects)
+if [[ -n "$AZP_BRANCH" ]]; then
+    CURRENT=check_format_test
+    "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
+fi
 
 fix_format () {
     echo "Fixing format..."
