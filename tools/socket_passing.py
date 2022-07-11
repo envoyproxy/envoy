@@ -14,7 +14,6 @@ import os.path
 import re
 import sys
 import time
-import json
 
 # Seconds to wait for the admin address output file to appear. The script exits
 # with failure if the file is not found.
