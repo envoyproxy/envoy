@@ -454,7 +454,7 @@ envoy_cc_library(
         "listener_manager_impl.h",
     ],
     deps = [
-        ":server_factory_context_wrapper_lib",
+        ":listener_factory_context_wrapper_lib",
         "active_raw_udp_listener_config",
         ":configuration_lib",
         ":drain_manager_lib",
@@ -567,8 +567,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "server_factory_context_wrapper_lib",
-    hdrs = ["server_factory_context_wrapper.h"],
+    name = "listener_factory_context_wrapper_lib",
+    hdrs = ["listener_factory_context_wrapper.h"],
     deps = [
         "//envoy/server:factory_context_interface",
     ],

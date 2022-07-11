@@ -7,10 +7,10 @@ namespace Server {
 
 // Wraps the global server context with a listener-local version, so that
 // downstream filters can access the downstream factory context.
-class ServerFactoryContextWrapper : public Configuration::ServerFactoryContext {
+class ListenerFactoryContextWrapper : public Configuration::ServerFactoryContext {
 public:
-  ServerFactoryContextWrapper(Configuration::ServerFactoryContext& context,
-                              Configuration::DownstreamFactoryContext& downstream_context)
+  ListenerFactoryContextWrapper(Configuration::ServerFactoryContext& context,
+                                Configuration::DownstreamFactoryContext& downstream_context)
       : context_(context), downstream_context_(downstream_context) {}
 
   // Configuration::ServerFactoryContext

@@ -147,9 +147,16 @@ public:
 };
 
 class MockDownstreamFactoryContext : public DownstreamFactoryContext {
+public:
+  MockDownstreamFactoryContext();
+
   MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, listenerTypedMetadata, (), (const));
+
+  testing::NiceMock<MockTransportSocketFactoryContext> transport_socket_factory_context_;
+  envoy::config::core::v3::Metadata listener_metadata_;
 };
 
 class MockServerFactoryContext : public virtual ServerFactoryContext {
@@ -199,6 +206,7 @@ public:
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
+  testing::NiceMock<MockDownstreamFactoryContext> downstream_context_;
 
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
@@ -208,6 +216,7 @@ public:
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Http::ContextImpl http_context_;
+  testing::NiceMock<MockOptions> options_;
 };
 
 } // namespace Configuration

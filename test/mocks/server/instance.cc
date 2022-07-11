@@ -57,6 +57,12 @@ MockInstance::~MockInstance() = default;
 
 namespace Configuration {
 
+MockDownstreamFactoryContext::MockDownstreamFactoryContext() {
+  ON_CALL(*this, getTransportSocketFactoryContext())
+      .WillByDefault(ReturnRef(transport_socket_factory_context_));
+  ON_CALL(*this, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
+}
+
 MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(scope_.symbolTable()), router_context_(scope_.symbolTable()),
@@ -83,6 +89,9 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
   ON_CALL(*this, httpContext()).WillByDefault(ReturnRef(http_context_));
+  ON_CALL(*this, downstreamContext())
+      .WillByDefault(Return(OptRef<DownstreamFactoryContext>{downstream_context_}));
+  ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 

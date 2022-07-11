@@ -111,7 +111,7 @@ config:
   OAuth2Config factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   context.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
