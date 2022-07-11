@@ -1267,7 +1267,8 @@ if __name__ == "__main__":
                 if not _files:
                     continue
                 format_checker.check_format_visitor(
-                    (pool, results, owned_directories, error_messages), root, _files, args.fail_on_diff)
+                    (pool, results, owned_directories, error_messages), root, _files,
+                    args.fail_on_diff)
 
             # Close the pool to new tasks, wait for all of the running tasks to finish,
             # then collect the error messages.
