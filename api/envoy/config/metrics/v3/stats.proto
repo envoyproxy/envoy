@@ -120,7 +120,7 @@ message StatsMatcher {
   // limited by either an exclusion or an inclusion list of :ref:`StringMatcher
   // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>` protos:
   //
-  // * If `reject_all` is set to `true`, no stats will be instantiated. If `reject_all` is set to
+  // * If ``reject_all`` is set to `true`, no stats will be instantiated. If ``reject_all`` is set to
   //   `false`, all stats will be instantiated.
   //
   // * If an exclusion list is supplied, any stat name matching *any* of the StringMatchers in the
@@ -186,7 +186,7 @@ message StatsMatcher {
   oneof stats_matcher {
     option (validate.required) = true;
 
-    // If `reject_all` is true, then all stats are disabled. If `reject_all` is false, then all
+    // If ``reject_all`` is true, then all stats are disabled. If ``reject_all`` is false, then all
     // stats are enabled.
     bool reject_all = 1;
 
@@ -287,7 +287,7 @@ message TagSpecifier {
 // Specifies a matcher for stats and the buckets that matching stats should use.
 message HistogramBucketSettings {
   // The stats that this rule applies to. The match is applied to the original stat name
-  // before tag-extraction, for example `cluster.exampleclustername.upstream_cx_length_ms`.
+  // before tag-extraction, for example ``cluster.exampleclustername.upstream_cx_length_ms``.
   type.matcher.v3.StringMatcher match = 1 [(validate.rules).message = {required: true}];
 
   // Each value is the upper bound of a bucket. Each bucket must be greater than 0 and unique.

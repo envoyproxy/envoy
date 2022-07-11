@@ -17,8 +17,9 @@ namespace Envoy {
 // save it into FilterState as name "state" as read-only Router::StringAccessor.
 class HeaderToFilterStateFilter : public Http::PassThroughDecoderFilter {
 public:
-  HeaderToFilterStateFilter(const std::string& header, const std::string& state, bool read_only)
-      : header_(header), state_(state), read_only_(read_only) {}
+  HeaderToFilterStateFilter(const std::string& header, const std::string& state, bool read_only,
+                            bool shared)
+      : header_(header), state_(state), read_only_(read_only), shared_(shared) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     const auto entry = headers.get(header_);
@@ -27,7 +28,9 @@ public:
           state_, std::make_unique<Router::StringAccessorImpl>(entry[0]->value().getStringView()),
           read_only_ ? StreamInfo::FilterState::StateType::ReadOnly
                      : StreamInfo::FilterState::StateType::Mutable,
-          StreamInfo::FilterState::LifeSpan::FilterChain);
+          StreamInfo::FilterState::LifeSpan::FilterChain,
+          shared_ ? StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection
+                  : StreamInfo::FilterState::StreamSharing::None);
     }
     return Http::FilterHeadersStatus::Continue;
   }
@@ -36,6 +39,7 @@ private:
   Http::LowerCaseString header_;
   std::string state_;
   bool read_only_;
+  bool shared_;
 };
 
 class HeaderToFilterStateFilterFactory
@@ -50,7 +54,8 @@ private:
       const std::string&, Server::Configuration::FactoryContext&) override {
     return [=](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<HeaderToFilterStateFilter>(
-          proto_config.header_name(), proto_config.state_name(), proto_config.read_only()));
+          proto_config.header_name(), proto_config.state_name(), proto_config.read_only(),
+          proto_config.shared()));
     };
   }
 };

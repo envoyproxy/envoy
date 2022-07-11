@@ -1316,7 +1316,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
   context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   ssl_client_ = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
-      context_->createTransportSocket(nullptr, nullptr), nullptr);
+      context_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
 
   // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.

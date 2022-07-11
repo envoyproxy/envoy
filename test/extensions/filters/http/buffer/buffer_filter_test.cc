@@ -127,8 +127,7 @@ TEST_F(BufferFilterTest, PerFilterConfigOverride) {
   buf->mutable_max_request_bytes()->set_value(123);
   BufferFilterSettings route_settings(per_route_cfg);
 
-  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.buffer"))
-      .WillOnce(Return(&route_settings));
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig(_)).WillOnce(Return(&route_settings));
   EXPECT_CALL(callbacks_, setDecoderBufferLimit(123ULL));
 
   Http::TestRequestHeaderMapImpl headers;
@@ -142,8 +141,7 @@ TEST_F(BufferFilterTest, PerFilterConfigDisabledConfigOverride) {
   per_route_cfg.set_disabled(true);
   BufferFilterSettings route_settings(per_route_cfg);
 
-  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.buffer"))
-      .WillOnce(Return(&route_settings));
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig(_)).WillOnce(Return(&route_settings));
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
   Buffer::OwnedImpl data1("hello");

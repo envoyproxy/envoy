@@ -100,7 +100,7 @@ typed_config:
         Ssl::createClientSslTransportSocketFactory(options, context_manager_, *api_);
     return dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
-        client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr);
+        client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
   }
 
   std::string upstream_cert_name_{"server"};

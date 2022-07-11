@@ -6,8 +6,10 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-    - "10000:10000/udp"
-    - "10001:10001"
+    - "${PORT_PROXY:-10000}:10000/udp"
+    - "${PORT_ADMIN:-10001}:10001"
 
   service-udp:
-    image: mendhak/udp-listener
+    build:
+      context: .
+      dockerfile: Dockerfile-udp

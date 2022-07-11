@@ -456,6 +456,7 @@ envoy_cc_library(
         ":proxy_protocol_filter_state_lib",
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
+        "//envoy/common:hashable_interface",
         "//envoy/network:proxy_protocol_options_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/stream_info:filter_state_interface",

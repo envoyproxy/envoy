@@ -40,8 +40,8 @@ protected:
   FilterPtr filter_;
   std::shared_ptr<Router::MockRoute> route_ = std::make_shared<Router::MockRoute>();
   Router::RouteSpecificFilterConfig filter_config_;
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
 // Verifies that an incoming request with too small a request body will immediately fail.
@@ -615,8 +615,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteDisabled) {
   filter_config_per_route.set_disabled(true);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(*decoder_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.grpc_http1_reverse_bridge"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
   EXPECT_CALL(decoder_callbacks_, route()).Times(2);
@@ -644,8 +643,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
   filter_config_per_route.set_disabled(false);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(*decoder_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.grpc_http1_reverse_bridge"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
   {
@@ -732,8 +730,7 @@ TEST_F(ReverseBridgeTest, RouteWithTrailers) {
   filter_config_per_route.set_disabled(false);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(*decoder_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.grpc_http1_reverse_bridge"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
   {

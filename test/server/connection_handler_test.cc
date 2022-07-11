@@ -42,6 +42,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::ReturnRefOfCopy;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -130,7 +131,7 @@ public:
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return socket_factories_;
     }
-    bool bindToPort() override { return bind_to_port_; }
+    bool bindToPort() const override { return bind_to_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
     }
@@ -308,7 +309,7 @@ public:
       listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(local_address_);
     } else {
       EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
-          .WillRepeatedly(ReturnRef(address));
+          .WillRepeatedly(ReturnRefOfCopy(address));
       listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(address);
     }
     EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))

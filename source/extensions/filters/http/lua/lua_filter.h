@@ -417,8 +417,8 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
                                     Http::StreamFilterCallbacks* callbacks) {
   const FilterConfigPerRoute* config_per_route = nullptr;
   if (callbacks && callbacks->route()) {
-    config_per_route = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-        "envoy.filters.http.lua", callbacks->route());
+    config_per_route =
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks);
   }
 
   if (config_per_route != nullptr) {
