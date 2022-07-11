@@ -1,7 +1,5 @@
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
-#include <netdb.h>
-
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 #include "envoy/network/dns_resolver.h"
 
@@ -186,10 +184,12 @@ private:
   }
 
   Event::Dispatcher& dispatcher_;
-  const Thread::ThreadPtr resolver_thread_;
   absl::Mutex mutex_;
   std::list<PendingQuerySharedPtr> pending_queries_ ABSL_GUARDED_BY(mutex_);
   bool shutting_down_ ABSL_GUARDED_BY(mutex_){};
+  // The resolver thread must be initialized last so that the above members are already fully
+  // initialized.
+  const Thread::ThreadPtr resolver_thread_;
 };
 
 // getaddrinfo DNS resolver factory
