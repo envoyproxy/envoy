@@ -153,9 +153,9 @@ message Cache {
 
 // Local Service
 message LocalService {
-  //The domain need to matched
+  // The domain need to matched
   string domain = 1;
 
-  //The parameter to get domain
+  // The parameter to get domain
   string parameter = 2;
 }

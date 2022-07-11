@@ -1,13 +1,14 @@
 abstracts>=0.0.12
 aio.api.bazel
+aiohttp>=3.8.1
 cffi>=1.15.0
 colorama
 coloredlogs
 envoy.base.utils>=0.3.6
 envoy.code.check>=0.2.1
-envoy.dependency.check>=0.1.2
+envoy.dependency.check>=0.1.3
 envoy.dependency.pip_check>=0.1.2
-envoy.distribution.release>=0.0.7
+envoy.distribution.release>=0.0.8
 envoy.distribution.repo>=0.0.5
 envoy.distribution.verify>=0.0.8
 envoy.docs.sphinx-runner>=0.1.8
@@ -17,6 +18,8 @@ flake8
 frozendict
 gitpython
 jinja2
+multidict>=6.0.2
+orjson
 pep8-naming
 ply
 pygithub
@@ -27,3 +30,4 @@ slackclient
 thrift
 verboselogs
 yapf
+yarl>=1.7.2
