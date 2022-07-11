@@ -3,6 +3,7 @@
 import argparse
 import common
 import functools
+import logging
 import multiprocessing
 import os
 import os.path
@@ -155,7 +156,6 @@ HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 
 SUBDIR_SET = set(common.include_dir_order())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
-PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
 X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
 DESIGNATED_INITIALIZER_REGEX = re.compile(r"\{\s*\.\w+\s*\=")
 MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}")
@@ -213,6 +213,8 @@ UNSORTED_FLAGS = {
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
     "envoy.reloadable_features.sanitize_http_header_referer",
 }
+
+logger = logging.getLogger(__name__)
 
 
 class FormatChecker:
@@ -355,17 +357,6 @@ class FormatChecker:
                 (self.namespace_check, nolint, file_path)
             ]
         return []
-
-    def package_name_for_proto(self, file_path):
-        package_name = None
-        error_message = []
-        result = PROTO_PACKAGE_REGEX.search(self.read_file(file_path))
-        if result is not None and len(result.groups()) == 1:
-            package_name = result.group(1)
-        if package_name is None:
-            error_message = ["Unable to find package name for proto file: %s" % file_path]
-
-        return [package_name, error_message]
 
     # To avoid breaking the Lyft import, we just check for path inclusion here.
     def allow_listed_for_protobuf_deps(self, file_path):
@@ -888,10 +879,6 @@ class FormatChecker:
         if not file_path.endswith(PROTO_SUFFIX):
             error_messages += self.fix_header_order(file_path)
         error_messages += self.clang_format(file_path)
-        if file_path.endswith(PROTO_SUFFIX) and self.is_api_file(file_path):
-            package_name, error_message = self.package_name_for_proto(file_path)
-            if package_name is None:
-                error_messages += error_message
         return error_messages
 
     def check_source_path(self, file_path):
@@ -906,11 +893,6 @@ class FormatChecker:
                 command, "header_order.py check failed", file_path)
         command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
         error_messages += self.execute_command(command, "clang-format check failed", file_path)
-
-        if file_path.endswith(PROTO_SUFFIX) and self.is_api_file(file_path):
-            package_name, error_message = self.package_name_for_proto(file_path)
-            if package_name is None:
-                error_messages += error_message
         return error_messages
 
     # Example target outputs are:
@@ -1123,6 +1105,12 @@ if __name__ == "__main__":
     if format_checker.check_error_messages(ct_error_messages):
         sys.exit(1)
 
+    # TODO(phlax): Remove this after a month or so
+    logger.warning(
+        "Please note: `tools/code_format/check_format.py` no longer checks API `.proto` files, "
+        "please use `tools/proto_format/proto_format.sh` if you are making changes to the API files"
+    )
+
     def check_visibility(error_messages):
         # https://github.com/envoyproxy/envoy/issues/20589
         # https://github.com/envoyproxy/envoy/issues/9953
@@ -1246,7 +1234,8 @@ if __name__ == "__main__":
                     file_path = os.path.join(root, filename)
                     check_file = (
                         path_predicate(filename) and not file_path.startswith(EXCLUDED_PREFIXES)
-                        and file_path.endswith(SUFFIXES))
+                        and file_path.endswith(SUFFIXES) and
+                        not (file_path.endswith(PROTO_SUFFIX) and root.startswith(args.api_prefix)))
                     if check_file:
                         _files.append(filename)
                 if not _files:
