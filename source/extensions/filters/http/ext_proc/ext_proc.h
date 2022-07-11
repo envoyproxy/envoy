@@ -59,9 +59,10 @@ public:
                            ProcessorState::CallbackState callback_state,
                            envoy::config::core::v3::TrafficDirection traffic_direction);
 
-  GrpcStats& grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction);
+  const GrpcStats& grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) const;
 
 private:
+  GrpcStats& grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcStats decoding_processor_grpc_stats_;
   GrpcStats encoding_processor_grpc_stats_;
 };

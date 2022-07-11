@@ -79,10 +79,11 @@ public:
     TrailersCallback,
   };
 
-  explicit ProcessorState(Filter& filter)
+  explicit ProcessorState(Filter& filter,
+                          envoy::config::core::v3::TrafficDirection traffic_direction)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
         complete_body_available_(false), trailers_available_(false), body_replaced_(false),
-        partial_body_processed_(false) {}
+        partial_body_processed_(false), traffic_direction_(traffic_direction) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -163,8 +164,6 @@ protected:
   Filter& filter_;
   Http::StreamFilterCallbacks* filter_callbacks_;
   CallbackState callback_state_ = CallbackState::Idle;
-  envoy::config::core::v3::TrafficDirection traffic_direction_ =
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED;
 
   // Keep track of whether we requested a watermark.
   bool watermark_requested_ : 1;
@@ -197,15 +196,15 @@ protected:
   Event::TimerPtr message_timer_;
   ChunkQueue chunk_queue_;
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
+  const envoy::config::core::v3::TrafficDirection traffic_direction_;
 };
 
 class DecodingProcessorState : public ProcessorState {
 public:
   explicit DecodingProcessorState(
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
-      : ProcessorState(filter) {
+      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND) {
     setProcessingModeInternal(mode);
-    traffic_direction_ = envoy::config::core::v3::TrafficDirection::INBOUND;
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
   DecodingProcessorState& operator=(const DecodingProcessorState&) = delete;
@@ -274,9 +273,8 @@ class EncodingProcessorState : public ProcessorState {
 public:
   explicit EncodingProcessorState(
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
-      : ProcessorState(filter) {
+      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND) {
     setProcessingModeInternal(mode);
-    traffic_direction_ = envoy::config::core::v3::TrafficDirection::OUTBOUND;
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;
   EncodingProcessorState& operator=(const EncodingProcessorState&) = delete;

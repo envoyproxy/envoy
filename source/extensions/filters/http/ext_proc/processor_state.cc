@@ -258,6 +258,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         }
       }
     } else {
+      // Fake a grpc error when processor state and received message type doesn't match, beware this
+      // is not an error from grpc.
       onFinishProcessorCall(Grpc::Status::FailedPrecondition);
     }
 

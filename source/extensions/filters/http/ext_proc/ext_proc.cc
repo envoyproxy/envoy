@@ -66,6 +66,15 @@ void ExtProcStreamStats::recordGrpcCallStats(
 
 ExtProcStreamStats::GrpcStats&
 ExtProcStreamStats::grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) {
+  ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+  return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
+             ? decoding_processor_grpc_stats_
+             : encoding_processor_grpc_stats_;
+}
+
+const ExtProcStreamStats::GrpcStats&
+ExtProcStreamStats::grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) const {
+  ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
   return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
              ? decoding_processor_grpc_stats_
              : encoding_processor_grpc_stats_;

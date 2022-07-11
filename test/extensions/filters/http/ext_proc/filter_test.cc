@@ -240,6 +240,20 @@ protected:
     }
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
+  void expectGrpcCalls(int decoding_processor_calls, int encoding_processor_calls) {
+    const auto& stream_stats =
+        stream_info_.filterState()
+            ->getDataReadOnly<
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcStreamStats>(
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcStreamStatsName);
+
+    EXPECT_EQ(
+        stream_stats->grpcStats(envoy::config::core::v3::TrafficDirection::INBOUND).stats_.size(),
+        decoding_processor_calls);
+    EXPECT_EQ(
+        stream_stats->grpcStats(envoy::config::core::v3::TrafficDirection::OUTBOUND).stats_.size(),
+        encoding_processor_calls);
+  }
 
   envoy::config::core::v3::GrpcService grpc_service_;
   std::unique_ptr<MockClient> client_;
@@ -322,6 +336,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  expectGrpcCalls(1, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -465,6 +480,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  expectGrpcCalls(1, 0);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1183,6 +1199,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_EQ(9, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(9, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  expectGrpcCalls(2, 7);
 }
 
 // Using a configuration with streaming set for the request and
