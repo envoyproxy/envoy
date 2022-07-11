@@ -240,6 +240,8 @@ protected:
     }
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
+
+  // The number of processor grpc calls made in the encoding and decoding path.
   void expectGrpcCalls(int decoding_processor_calls, int encoding_processor_calls) {
     const auto& stream_stats =
         stream_info_.filterState()
