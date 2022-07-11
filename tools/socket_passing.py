@@ -42,7 +42,8 @@ def generate_new_config(original_yaml, admin_address, updated_json):
             index = 0
             for discovered in discovered_listeners['listener_statuses']:
                 replaced = False
-                addresses = discovered['additional_local_addresses'] + [discovered['local_address']] if discovered.get('additional_local_addresses') else [discovered['local_address']]
+                addresses = (discovered['additional_local_addresses'] + [discovered['local_address']]
+                    if discovered.get('additional_local_addresses') else [discovered['local_address']])
                 for local_address in  addresses:
                     if 'pipe' in local_address:
                         path = local_address['pipe']['path']
