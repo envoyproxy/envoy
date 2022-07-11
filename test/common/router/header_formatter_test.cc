@@ -1172,43 +1172,11 @@ TEST(HeaderParserTest, TestParseInternal) {
   absl::optional<std::string> rc_details{"via_upstream"};
   ON_CALL(stream_info, responseCodeDetails()).WillByDefault(ReturnRef(rc_details));
 
-  for (const auto& test_case : test_cases) {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
-    envoy::config::core::v3::HeaderValueOption* header = to_add.Add();
-    header->mutable_header()->set_key("x-header");
-    header->mutable_header()->set_value(test_case.input_);
-
-    if (test_case.expected_exception_) {
-      EXPECT_FALSE(test_case.expected_output_);
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-        EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException,
-                                  test_case.expected_exception_.value());
-      } else {
-        EXPECT_THROW(HeaderParser::configure(to_add), EnvoyException);
-      }
-      continue;
-    }
-
-    HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
-
-    Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
-    req_header_parser->evaluateHeaders(header_map, request_headers,
-                                       *Http::StaticEmptyHeaders::get().response_headers,
-                                       stream_info);
-
-    std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
-
-    if (!test_case.expected_output_) {
-      EXPECT_FALSE(header_map.has("x-header")) << descriptor;
-      continue;
-    }
-
-    EXPECT_TRUE(header_map.has("x-header")) << descriptor;
-    EXPECT_EQ(test_case.expected_output_.value(), header_map.get_("x-header")) << descriptor;
-  }
-
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-    for (const auto& test_case : obsolete_test_cases) {
+  // Run all tests twice: once using old parser and again using access log's parser.
+  for (const bool use_unified_parser : std::vector<bool>{false, true}) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.unified_header_formatter",
+                                  use_unified_parser);
+    for (const auto& test_case : test_cases) {
       Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
       envoy::config::core::v3::HeaderValueOption* header = to_add.Add();
       header->mutable_header()->set_key("x-header");
@@ -1216,9 +1184,46 @@ TEST(HeaderParserTest, TestParseInternal) {
 
       if (test_case.expected_exception_) {
         EXPECT_FALSE(test_case.expected_output_);
-        EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException,
-                                  test_case.expected_exception_.value());
+        if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+          EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException,
+                                    test_case.expected_exception_.value());
+        } else {
+          EXPECT_THROW(HeaderParser::configure(to_add), EnvoyException);
+        }
         continue;
+      }
+
+      HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
+
+      Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+      req_header_parser->evaluateHeaders(header_map, request_headers,
+                                         *Http::StaticEmptyHeaders::get().response_headers,
+                                         stream_info);
+
+      std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
+
+      if (!test_case.expected_output_) {
+        EXPECT_FALSE(header_map.has("x-header")) << descriptor;
+        continue;
+      }
+
+      EXPECT_TRUE(header_map.has("x-header")) << descriptor;
+      EXPECT_EQ(test_case.expected_output_.value(), header_map.get_("x-header")) << descriptor;
+    }
+
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+      for (const auto& test_case : obsolete_test_cases) {
+        Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
+        envoy::config::core::v3::HeaderValueOption* header = to_add.Add();
+        header->mutable_header()->set_key("x-header");
+        header->mutable_header()->set_value(test_case.input_);
+
+        if (test_case.expected_exception_) {
+          EXPECT_FALSE(test_case.expected_output_);
+          EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException,
+                                    test_case.expected_exception_.value());
+          continue;
+        }
       }
     }
   }
