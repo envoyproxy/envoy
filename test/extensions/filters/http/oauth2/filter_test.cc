@@ -70,8 +70,7 @@ public:
                                     const Http::ResponseHeaderMap*) override {}
 
   MOCK_METHOD(void, asyncGetAccessToken,
-              (const std::string&, const std::string&, const std::string&, const std::string&,
-               Envoy::Extensions::HttpFilters::Oauth2::AuthType auth_type));
+              (const std::string&, const std::string&, const std::string&, const std::string&, Envoy::Extensions::HttpFilters::Oauth2::AuthType));
 };
 
 class OAuth2Test : public testing::Test {
@@ -113,6 +112,7 @@ public:
     p.add_resources("oauth2-resource");
     p.add_resources("http://example.com");
     p.add_resources("https://example.com");
+    p.set_auth_type(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_URL_ENCODED_BODY);
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
     matcher->mutable_string_match()->set_exact("OPTIONS");
