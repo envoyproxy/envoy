@@ -3,8 +3,6 @@
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 
-#include "absl/strings/str_cat.h"
-
 namespace Envoy {
 namespace Network {
 namespace Matching {
@@ -13,18 +11,18 @@ Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data
   const auto transport_protocol = data.socket().detectedTransportProtocol();
   if (!transport_protocol.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(transport_protocol)};
+            Matcher::InputValue(transport_protocol)};
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, Matcher::InputValue()};
 }
 
 Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& data) const {
   const auto& protocols = data.socket().requestedApplicationProtocols();
   if (!protocols.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat("'", absl::StrJoin(protocols, "','"), "'")};
+            Matcher::InputValue(absl::StrCat("'", absl::StrJoin(protocols, "','"), "'"))};
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, Matcher::InputValue()};
 }
 
 class DestinationIPInputFactory : public DestinationIPInputBaseFactory<MatchingData> {};

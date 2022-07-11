@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -11,6 +12,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/variant.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
@@ -151,6 +153,95 @@ public:
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
 
+// Generic container for an input value.
+class InputValue {
+public:
+  InputValue() {}
+  InputValue(absl::string_view data) : data_(absl::in_place_type<std::string>, data) {}
+  InputValue(int64_t data) : data_(data) {}
+
+  enum class Kind {
+    // Null value (use when value is not present).
+    Null,
+    // String value (possibly invalid UTF-8).
+    String,
+    // 64-bit signed integer value.
+    Int,
+    // Dynamic list value (possibly heterogenous).
+    List
+  };
+
+  Kind kind() const {
+    switch (data_.index()) {
+    case 1:
+      return Kind::String;
+    case 2:
+      return Kind::Int;
+    case 3:
+      return Kind::List;
+    default:
+      return Kind::Null;
+    }
+  }
+
+  bool isNull() const { return kind() == Kind::Null; }
+
+  /**
+   * Access the stored string value or throw an exception if the kind does not match.
+   */
+  absl::string_view asString() const { return absl::get<std::string>(data_); }
+
+  /**
+   * Access the stored integer value or throw an exception if the kind does not match.
+   */
+  int64_t asInt() const { return absl::get<int64_t>(data_); }
+
+  /**
+   * Access the stored list value or throw an exception if the kind does not match.
+   */
+  absl::Span<const InputValue> asList() const { return absl::get<std::vector<InputValue>>(data_); }
+
+  /**
+   * String representation of the value.
+   */
+  friend std::ostream& operator<<(std::ostream& out, const InputValue& result) {
+    switch (result.kind()) {
+    case Kind::Null:
+      break;
+    case Kind::String:
+      out << result.asString();
+      break;
+    case Kind::Int:
+      out << result.asInt();
+      break;
+    case Kind::List:
+      bool first = true;
+      for (const auto& elt : result.asList()) {
+        if (!first) {
+          out << ",";
+        } else {
+          first = false;
+        }
+        out << "'" << elt << "'";
+      }
+      break;
+    }
+    return out;
+  }
+
+  /**
+   * Returns conversion to string.
+   */
+  std::string toString() const {
+    std::stringstream out;
+    out << *this;
+    return out.str();
+  }
+
+private:
+  const absl::variant<absl::monostate, std::string, int64_t, std::vector<InputValue>> data_;
+};
+
 // InputMatcher provides the interface for determining whether an input value matches.
 class InputMatcher {
 public:
@@ -161,7 +252,7 @@ public:
    * @param absl::optional<absl::string_view> the value to match on. Will be absl::nullopt if the
    * lookup failed.
    */
-  virtual bool match(absl::optional<absl::string_view> input) PURE;
+  virtual bool match(const InputValue& input) PURE;
 };
 
 using InputMatcherPtr = std::unique_ptr<InputMatcher>;
@@ -198,16 +289,16 @@ struct DataInputGetResult {
   };
 
   DataAvailability data_availability_;
-  // The resulting data. This will be absl::nullopt if we don't have sufficient data available (as
+  // The resulting data. This will be Null if we don't have sufficient data available (as
   // per data_availability_) or because no value was extracted. For example, consider a DataInput
   // which attempts to look a key up in the map: if we don't have access to the map yet, we return
-  // absl::nullopt with NotAvailable. If we have the entire map, but the key doesn't exist in the
-  // map, we return absl::nullopt with AllDataAvailable.
-  absl::optional<std::string> data_;
+  // Null with NotAvailable. If we have the entire map, but the key doesn't exist in the
+  // map, we return Null with AllDataAvailable.
+  InputValue data_;
 
   // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
-    out << "data input: " << (result.data_ ? result.data_.value() : "n/a");
+    out << "data input: " << result.data_;
     switch (result.data_availability_) {
     case DataInputGetResult::DataAvailability::NotAvailable:
       out << " (not available)";
@@ -266,7 +357,7 @@ public:
 class CommonProtocolInput {
 public:
   virtual ~CommonProtocolInput() = default;
-  virtual absl::optional<std::string> get() PURE;
+  virtual InputValue get() PURE;
 };
 using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
 using CommonProtocolInputFactoryCb = std::function<CommonProtocolInputPtr()>;

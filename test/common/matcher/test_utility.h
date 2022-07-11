@@ -19,7 +19,7 @@ struct TestData {
 // A CommonProtocolInput that returns the configured value every time.
 struct CommonProtocolTestInput : public CommonProtocolInput {
   explicit CommonProtocolTestInput(const std::string& data) : data_(data) {}
-  absl::optional<std::string> get() override { return data_; }
+  InputValue get() override { return InputValue(data_); }
 
   const std::string data_;
 };
@@ -59,7 +59,7 @@ public:
   TestDataInputStringFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
   TestDataInputStringFactory(absl::string_view data)
       : TestDataInputStringFactory(
-            {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
+            {DataInputGetResult::DataAvailability::AllDataAvailable, InputValue(data)}) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return [&]() { return std::make_unique<TestInput>(result_); };
@@ -81,7 +81,7 @@ public:
   TestDataInputBoolFactory(DataInputGetResult result) : result_(result), injection_(*this) {}
   TestDataInputBoolFactory(absl::string_view data)
       : TestDataInputBoolFactory(
-            {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
+            {DataInputGetResult::DataAvailability::AllDataAvailable, InputValue(data)}) {}
   DataInputFactoryCb<TestData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return [&]() { return std::make_unique<TestInput>(result_); };
@@ -101,19 +101,18 @@ private:
 struct BoolMatcher : public InputMatcher {
   explicit BoolMatcher(bool value) : value_(value) {}
 
-  bool match(absl::optional<absl::string_view>) override { return value_; }
+  bool match(const InputValue&) override { return value_; }
 
   const bool value_;
 };
 
 // An InputMatcher that evaluates the input against a provided callback.
 struct TestMatcher : public InputMatcher {
-  explicit TestMatcher(std::function<bool(absl::optional<absl::string_view>)> predicate)
-      : predicate_(predicate) {}
+  explicit TestMatcher(std::function<bool(const InputValue&)> predicate) : predicate_(predicate) {}
 
-  bool match(absl::optional<absl::string_view> input) override { return predicate_(input); }
+  bool match(const InputValue& input) override { return predicate_(input); }
 
-  std::function<bool(absl::optional<absl::string_view>)> predicate_;
+  std::function<bool(const InputValue&)> predicate_;
 };
 
 // An action that evaluates to a proto StringValue.
@@ -143,7 +142,7 @@ public:
 // An InputMatcher that always returns false.
 class NeverMatch : public InputMatcher {
 public:
-  bool match(absl::optional<absl::string_view>) override { return false; }
+  bool match(const InputValue&) override { return false; }
 };
 
 /**
@@ -176,12 +175,12 @@ public:
  */
 SingleFieldMatcherPtr<TestData>
 createSingleMatcher(absl::optional<absl::string_view> input,
-                    std::function<bool(absl::optional<absl::string_view>)> predicate,
+                    std::function<bool(const InputValue&)> predicate,
                     DataInputGetResult::DataAvailability availability =
                         DataInputGetResult::DataAvailability::AllDataAvailable) {
   return std::make_unique<SingleFieldMatcher<TestData>>(
-      std::make_unique<TestInput>(DataInputGetResult{
-          availability, input ? absl::make_optional(std::string(*input)) : absl::nullopt}),
+      std::make_unique<TestInput>(
+          DataInputGetResult{availability, input ? InputValue(*input) : InputValue()}),
       std::make_unique<TestMatcher>(predicate));
 }
 

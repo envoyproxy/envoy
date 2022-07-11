@@ -11,9 +11,21 @@ TEST(ValueInputMatcher, TestMatch) {
 
   StringInputMatcher matcher(matcher_proto);
 
-  EXPECT_TRUE(matcher.match("exact"));
-  EXPECT_FALSE(matcher.match("not"));
-  EXPECT_FALSE(matcher.match(absl::nullopt));
+  EXPECT_TRUE(matcher.match(InputValue("exact")));
+  EXPECT_FALSE(matcher.match(InputValue("not")));
+  EXPECT_FALSE(matcher.match(InputValue(42)));
+  EXPECT_FALSE(matcher.match(InputValue()));
+}
+
+TEST(ValueInputMatcher, TestMatchInt) {
+  envoy::type::matcher::v3::StringMatcher matcher_proto;
+  matcher_proto.set_exact("42");
+
+  StringInputMatcher matcher(matcher_proto);
+
+  EXPECT_TRUE(matcher.match(InputValue("42")));
+  EXPECT_TRUE(matcher.match(InputValue(42)));
+  EXPECT_FALSE(matcher.match(InputValue()));
 }
 
 } // namespace Matcher

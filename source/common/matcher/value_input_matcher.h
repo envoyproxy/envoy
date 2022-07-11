@@ -11,12 +11,23 @@ template <class StringMatcherType> class StringInputMatcher : public InputMatche
 public:
   explicit StringInputMatcher(const StringMatcherType& matcher) : matcher_(matcher) {}
 
-  bool match(absl::optional<absl::string_view> input) override {
-    if (!input) {
+  bool match(const InputValue& input) override {
+    switch (input.kind()) {
+    case InputValue::Kind::Null:
+      return false;
+    case InputValue::Kind::List: {
+      for (const auto& elt : input.asList()) {
+        if (match(elt)) {
+          return true;
+        }
+      }
       return false;
     }
-
-    return matcher_.match(*input);
+    case InputValue::Kind::String:
+      return matcher_.match(input.asString());
+    case InputValue::Kind::Int:
+      return matcher_.match(absl::StrCat(input.asInt()));
+    }
   }
 
 private:

@@ -38,10 +38,11 @@ public:
     const auto& address = data.localAddress();
 
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              Matcher::InputValue()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address.ip()->addressAsString()};
+            Matcher::InputValue(address.ip()->addressAsString())};
   }
 };
 
@@ -64,10 +65,11 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.localAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              Matcher::InputValue()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address.ip()->port())};
+            Matcher::InputValue(address.ip()->port())};
   }
 };
 
@@ -90,10 +92,11 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              Matcher::InputValue()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address.ip()->addressAsString()};
+            Matcher::InputValue(address.ip()->addressAsString())};
   }
 };
 
@@ -115,10 +118,11 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              Matcher::InputValue()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address.ip()->port())};
+            Matcher::InputValue(address.ip()->port())};
   }
 };
 
@@ -140,10 +144,11 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.connectionInfoProvider().directRemoteAddress();
     if (address->type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              Matcher::InputValue()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address->ip()->addressAsString()};
+            Matcher::InputValue(address->ip()->addressAsString())};
   }
 };
 
@@ -167,9 +172,10 @@ public:
     const bool is_local_connection =
         Network::Utility::isSameIpOrLoopback(data.connectionInfoProvider());
     if (is_local_connection) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              Matcher::InputValue("local")};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, Matcher::InputValue()};
   }
 };
 
@@ -192,9 +198,9 @@ public:
     const auto server_name = data.connectionInfoProvider().requestedServerName();
     if (!server_name.empty()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              std::string(server_name)};
+              Matcher::InputValue(server_name)};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, Matcher::InputValue()};
   }
 };
 

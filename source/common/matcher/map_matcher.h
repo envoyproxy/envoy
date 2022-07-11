@@ -27,11 +27,12 @@ public:
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    if (!input.data_) {
+    if (input.data_.isNull()) {
       return {MatchState::MatchComplete, on_no_match_};
     }
 
-    const auto result = doMatch(*input.data_);
+    const auto result = doMatch(input.data_);
+
     if (result) {
       if (result->matcher_) {
         return result->matcher_->match(data);
@@ -55,7 +56,28 @@ protected:
   // The inner match method. Attempts to match against the resulting data string. If the match
   // result was determined, the OnMatch will be returned. If a match result was determined to be no
   // match, {} will be returned.
-  virtual absl::optional<OnMatch<DataType>> doMatch(const std::string& data) PURE;
+  virtual absl::optional<OnMatch<DataType>> doMatch(absl::string_view data) PURE;
+
+private:
+  absl::optional<OnMatch<DataType>> doMatch(const InputValue& data) {
+    switch (data.kind()) {
+    case InputValue::Kind::Null:
+      return absl::nullopt;
+    case InputValue::Kind::String:
+      return doMatch(data.asString());
+    case InputValue::Kind::Int:
+      return doMatch(absl::StrCat(data.asInt()));
+    case InputValue::Kind::List: {
+      for (const auto& elt : data.asList()) {
+        const auto result = doMatch(elt);
+        if (result) {
+          return result;
+        }
+      }
+      return absl::nullopt;
+    }
+    }
+  }
 };
 
 } // namespace Matcher

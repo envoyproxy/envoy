@@ -19,7 +19,7 @@ public:
     matchers.reserve(values.size());
     for (const auto& v : values) {
       matchers.emplace_back(std::make_unique<SingleFieldMatcher<TestData>>(
-          std::make_unique<TestInput>(DataInputGetResult{v.second, absl::nullopt}),
+          std::make_unique<TestInput>(DataInputGetResult{v.second, InputValue()}),
           std::make_unique<BoolMatcher>(v.first)));
     }
 
@@ -39,29 +39,32 @@ public:
 };
 
 TEST_F(FieldMatcherTest, SingleFieldMatcher) {
-  EXPECT_EQ(
-      createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()).match_state_,
-      MatchState::MatchComplete);
+  EXPECT_EQ(createSingleMatcher("foo", [](auto v) { return v.toString() == "foo"; })
+                ->match(TestData())
+                .match_state_,
+            MatchState::MatchComplete);
   EXPECT_EQ(createSingleMatcher(
-                absl::nullopt, [](auto v) { return v == "foo"; },
+                absl::nullopt, [](auto v) { return v.toString() == "foo"; },
                 DataInputGetResult::DataAvailability::NotAvailable)
                 ->match(TestData())
                 .match_state_,
             MatchState::UnableToMatch);
   EXPECT_EQ(createSingleMatcher(
-                "fo", [](auto v) { return v == "foo"; },
+                "fo", [](auto v) { return v.toString() == "foo"; },
                 DataInputGetResult::DataAvailability::MoreDataMightBeAvailable)
                 ->match(TestData())
                 .match_state_,
             MatchState::UnableToMatch);
-  EXPECT_TRUE(
-      createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()).result());
-  EXPECT_FALSE(
-      createSingleMatcher("foo", [](auto v) { return v != "foo"; })->match(TestData()).result());
-  EXPECT_TRUE(createSingleMatcher(absl::nullopt, [](auto v) { return v == absl::nullopt; })
+  EXPECT_TRUE(createSingleMatcher("foo", [](auto v) { return v.toString() == "foo"; })
                   ->match(TestData())
                   .result());
-  EXPECT_FALSE(createSingleMatcher(absl::nullopt, [](auto v) { return v == "foo"; })
+  EXPECT_FALSE(createSingleMatcher("foo", [](auto v) { return v.toString() != "foo"; })
+                   ->match(TestData())
+                   .result());
+  EXPECT_TRUE(createSingleMatcher(absl::nullopt, [](auto v) { return v.isNull(); })
+                  ->match(TestData())
+                  .result());
+  EXPECT_FALSE(createSingleMatcher(absl::nullopt, [](auto v) { return v.toString() == "foo"; })
                    ->match(TestData())
                    .result());
 }

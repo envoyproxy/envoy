@@ -13,8 +13,8 @@ namespace Matcher {
 
 TEST(ExactMapMatcherTest, NoMatch) {
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
+      std::make_unique<TestInput>(DataInputGetResult{
+          DataInputGetResult::DataAvailability::AllDataAvailable, InputValue("blah")}),
       absl::nullopt);
 
   TestData data;
@@ -24,8 +24,8 @@ TEST(ExactMapMatcherTest, NoMatch) {
 
 TEST(ExactMapMatcherTest, NoMatchDueToNoData) {
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(DataInputGetResult{
-          DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt}),
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, InputValue()}),
       absl::nullopt);
 
   TestData data;
@@ -35,8 +35,8 @@ TEST(ExactMapMatcherTest, NoMatchDueToNoData) {
 
 TEST(ExactMapMatcherTest, NoMatchWithFallback) {
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
+      std::make_unique<TestInput>(DataInputGetResult{
+          DataInputGetResult::DataAvailability::AllDataAvailable, InputValue("blah")}),
       stringOnMatch<TestData>("no_match"));
 
   TestData data;
@@ -46,8 +46,8 @@ TEST(ExactMapMatcherTest, NoMatchWithFallback) {
 
 TEST(ExactMapMatcherTest, Match) {
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
+      std::make_unique<TestInput>(DataInputGetResult{
+          DataInputGetResult::DataAvailability::AllDataAvailable, InputValue("match")}),
       stringOnMatch<TestData>("no_match"));
 
   matcher.addChild("match", stringOnMatch<TestData>("match"));
@@ -58,9 +58,10 @@ TEST(ExactMapMatcherTest, Match) {
 }
 
 TEST(ExactMapMatcherTest, DataNotAvailable) {
-  ExactMapMatcher<TestData> matcher(std::make_unique<TestInput>(DataInputGetResult{
-                                        DataInputGetResult::DataAvailability::NotAvailable, {}}),
-                                    stringOnMatch<TestData>("no_match"));
+  ExactMapMatcher<TestData> matcher(
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::NotAvailable, InputValue()}),
+      stringOnMatch<TestData>("no_match"));
 
   matcher.addChild("match", stringOnMatch<TestData>("match"));
 
@@ -72,7 +73,7 @@ TEST(ExactMapMatcherTest, DataNotAvailable) {
 TEST(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(DataInputGetResult{
-          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "no match"}),
+          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, InputValue("no match")}),
       stringOnMatch<TestData>("no_match"));
 
   matcher.addChild("match", stringOnMatch<TestData>("match"));
@@ -85,7 +86,7 @@ TEST(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
 TEST(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(DataInputGetResult{
-          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
+          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, InputValue("match")}),
       stringOnMatch<TestData>("no_match"));
 
   matcher.addChild("match", stringOnMatch<TestData>("match"));

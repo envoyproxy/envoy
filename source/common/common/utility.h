@@ -680,10 +680,10 @@ template <class Value> struct TrieLookupTable {
    * @param key the key used to find.
    * @return the value matching the longest prefix based on the key.
    */
-  Value findLongestPrefix(const char* key) const {
+  Value findLongestPrefix(absl::string_view key) const {
     const TrieEntry<Value>* current = &root_;
     const TrieEntry<Value>* result = nullptr;
-    while (uint8_t c = *key) {
+    for (uint8_t c : key) {
       if (current->value_) {
         result = current;
       }
@@ -693,8 +693,6 @@ template <class Value> struct TrieLookupTable {
       if (current == nullptr) {
         return result ? result->value_ : nullptr;
       }
-
-      key++;
     }
     return current ? current->value_ : result->value_;
   }

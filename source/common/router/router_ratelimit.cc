@@ -61,9 +61,10 @@ public:
     Http::Matching::HttpMatchingDataImpl data(info.downstreamAddressProvider());
     data.onRequestHeaders(headers);
     auto result = data_input_->get(data);
-    if (result.data_) {
-      if (!result.data_.value().empty()) {
-        descriptor_entry = {descriptor_key_, result.data_.value()};
+    if (!result.data_.isNull()) {
+      std::string value = result.data_.toString();
+      if (!value.empty()) {
+        descriptor_entry = {descriptor_key_, value};
       }
       return true;
     }

@@ -26,17 +26,17 @@ public:
     const auto maybe_headers = headerMap(data);
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, Matcher::InputValue()};
     }
 
     auto header_string = HeaderUtility::getAllOfHeaderAsString(maybe_headers->get(), name_, ",");
 
     if (header_string.result()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              std::string(header_string.result().value())};
+              Matcher::InputValue(header_string.result().value())};
     }
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, Matcher::InputValue()};
   }
 
 private:
