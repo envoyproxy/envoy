@@ -30,6 +30,7 @@ envoy_extension_cc_test(
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/oauth2:config",
         "//source/extensions/filters/http/oauth2:oauth_lib",
+        "//source/common/common:base64_lib",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:factory_context_mocks",
