@@ -199,7 +199,17 @@ stat_prefix: ingress
 route_config:
   name: local_route
 thrift_filters:
-  - name: envoy.filters.thrift.mock_filter
+  - name: envoy.filters.thrift.mock_decoder_filter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        key: value
+  - name: envoy.filters.thrift.mock_encoder_filter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        key: value
+  - name: envoy.filters.thrift.mock_bidirectional_filter
     typed_config:
       "@type": type.googleapis.com/google.protobuf.Struct
       value:
@@ -209,7 +219,7 @@ thrift_filters:
       "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
-  ThriftFilters::MockFilterConfigFactory factory;
+  ThriftFilters::MockBidirectionalFilterConfigFactory factory;
   Registry::InjectFactory<ThriftFilters::NamedThriftFilterConfigFactory> registry(factory);
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
