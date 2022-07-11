@@ -124,13 +124,15 @@ deadline of 3 weeks.
   the final docs. The final documentation will end up in the
   [envoy-website repository](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy).
 * Update the website ([example PR](https://github.com/envoyproxy/envoy-website/pull/148)) for the new release.
-* Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
+* Craft a witty/uplifting email and send it to all the email aliases: envoy-announce@ envoy-users@ envoy-dev@ envoy-maintainers
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
 * Switch the repo back to "dev" mode by running `bazel run //tools/project:dev`. See the [project
   tool](tools/project/README.md#bazel-run-toolsprojectdev) for further information. This tool will create a commit with the
   necessary changes to continue development.
 * Create a pull request with commit created by the project tool.
+* Run the deprecate_versions.py script (`bazel run //tools/deprecate_version:deprecate_version`)
+
 
 ## Security release schedule
 
