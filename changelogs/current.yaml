@@ -249,6 +249,9 @@ new_features:
 - area: listener
   change: |
     added dynamic listener filter configuration for listener filters. :ref:`dynamic listener filter re-configuration<envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`. This dynamic listener filter configuration is only supported in TCP listeners.
+- area: listener
+  change: |
+    added multiple listening addresses in single listener. :ref:`dynamic listener filter re-configuration<envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`
 - area: thrift
   change: |
     added flag to router to control downstream local close. :ref:`close_downstream_on_upstream_error <envoy_v3_api_field_extensions.filters.network.thrift_proxy.router.v3.Router.close_downstream_on_upstream_error>`.
