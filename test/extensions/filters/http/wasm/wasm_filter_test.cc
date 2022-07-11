@@ -716,6 +716,9 @@ TEST_P(WasmHttpFilterTest, AsyncCall) {
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callbacks = nullptr;
   cluster_manager_.initializeThreadLocalClusters({"cluster"});
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  rootContext().setDecoderFilterCallbacks(decoder_callbacks);
+  EXPECT_CALL(decoder_callbacks, activeSpan());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -959,6 +962,9 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     auto client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
     auto async_client = std::make_unique<Grpc::MockAsyncClient>();
     Tracing::Span* parent_span{};
+    Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+    rootContext().setDecoderFilterCallbacks(decoder_callbacks);
+    EXPECT_CALL(decoder_callbacks, activeSpan());
     EXPECT_CALL(*async_client, sendRaw(_, _, _, _, _, _))
         .WillOnce(
             Invoke([&](absl::string_view service_full_name, absl::string_view method_name,
