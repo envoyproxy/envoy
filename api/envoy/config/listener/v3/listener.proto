@@ -124,7 +124,6 @@ message Listener {
   // The additional addresses the listener should listen on. The addresses must be unique across all
   // listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in a single listener,
   // all addresses use the same protocol, and multiple internal addresses are not supported.
-  // [#not-implemented-hide:]
   repeated AdditionalAddress additional_addresses = 33;
 
   // Optional prefix to use on listener stats. If empty, the stats will be rooted at
