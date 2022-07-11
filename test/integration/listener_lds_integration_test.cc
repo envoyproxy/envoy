@@ -70,7 +70,6 @@ public:
     setUpGrpcRds();
     // Note this has to be the last modifier as it nuke static_resource listeners.
     setUpGrpcLds();
-    ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
 
     HttpIntegrationTest::initialize();
   }
