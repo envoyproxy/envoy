@@ -44,8 +44,44 @@ public:
 
   ~ListenerIntegrationTestBase() override { resetConnections(); }
 
-  virtual void setUpGrpcRds() PURE;
-  virtual void setUpGrpcLds() PURE;
+  virtual void setGrpcServiceHelper(envoy::config::core::v3::GrpcService& grpc_service,
+                                    const std::string& cluster_name,
+                                    Network::Address::InstanceConstSharedPtr address) PURE;
+
+  void setUpGrpcRds() {
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                http_connection_manager) {
+          auto* rds_config = http_connection_manager.mutable_rds();
+          rds_config->set_route_config_name(route_table_name_);
+          rds_config->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
+          envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
+              rds_config->mutable_config_source()->mutable_api_config_source();
+          rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+          envoy::config::core::v3::GrpcService* grpc_service =
+              rds_api_config_source->add_grpc_services();
+          setGrpcServiceHelper(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+        });
+  }
+
+  void setUpGrpcLds() {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+      listener_config_.set_name(listener_name_);
+      bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+      lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+      envoy::config::core::v3::GrpcService* grpc_service =
+          lds_api_config_source->add_grpc_services();
+      setGrpcServiceHelper(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
+    });
+  }
 
   void initialize() override {
     // We want to use the GRPC based LDS.
@@ -179,39 +215,10 @@ public:
                                     ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/false,
                                                                   /*multiple_addresses=*/false)) {}
 
-  void setUpGrpcRds() override {
-    config_helper_.addConfigModifier(
-        [this](
-            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                http_connection_manager) {
-          auto* rds_config = http_connection_manager.mutable_rds();
-          rds_config->set_route_config_name(route_table_name_);
-          rds_config->mutable_config_source()->set_resource_api_version(
-              envoy::config::core::v3::ApiVersion::V3);
-          envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
-              rds_config->mutable_config_source()->mutable_api_config_source();
-          rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-          envoy::config::core::v3::GrpcService* grpc_service =
-              rds_api_config_source->add_grpc_services();
-          setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
-        });
-  }
-
-  void setUpGrpcLds() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
-      listener_config_.set_name(listener_name_);
-      bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
-      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
-      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
-      lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-      envoy::config::core::v3::GrpcService* grpc_service =
-          lds_api_config_source->add_grpc_services();
-      setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
-    });
+  void setGrpcServiceHelper(envoy::config::core::v3::GrpcService& grpc_service,
+                            const std::string& cluster_name,
+                            Network::Address::InstanceConstSharedPtr address) override {
+    setGrpcService(grpc_service, cluster_name, address);
   }
 };
 
@@ -223,39 +230,10 @@ public:
                                     ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/false,
                                                                   /*multiple_addresses=*/true)) {}
 
-  void setUpGrpcRds() override {
-    config_helper_.addConfigModifier(
-        [this](
-            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                http_connection_manager) {
-          auto* rds_config = http_connection_manager.mutable_rds();
-          rds_config->set_route_config_name(route_table_name_);
-          rds_config->mutable_config_source()->set_resource_api_version(
-              envoy::config::core::v3::ApiVersion::V3);
-          envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
-              rds_config->mutable_config_source()->mutable_api_config_source();
-          rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-          envoy::config::core::v3::GrpcService* grpc_service =
-              rds_api_config_source->add_grpc_services();
-          setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
-        });
-  }
-
-  void setUpGrpcLds() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
-      listener_config_.set_name(listener_name_);
-      bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
-      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
-      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
-      lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-      envoy::config::core::v3::GrpcService* grpc_service =
-          lds_api_config_source->add_grpc_services();
-      setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
-    });
+  void setGrpcServiceHelper(envoy::config::core::v3::GrpcService& grpc_service,
+                            const std::string& cluster_name,
+                            Network::Address::InstanceConstSharedPtr address) override {
+    setGrpcService(grpc_service, cluster_name, address);
   }
 };
 
