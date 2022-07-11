@@ -1404,7 +1404,7 @@ TEST_F(GrpcJsonTranscoderFilterEchoStructTest, TranscodingFailedWithTooDeepProto
   auto response_message = createDeepStruct(65);
   auto response_data = Grpc::Common::serializeToGrpcFrame(response_message);
 
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadGateway, _, _, _, _));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_.encodeData(*response_data, false));

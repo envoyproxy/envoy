@@ -768,7 +768,7 @@ bool JsonTranscoderFilter::checkAndRejectIfResponseTranscoderFailed() {
     ENVOY_LOG(debug, "Transcoding response error {}", response_status.ToString());
     error_ = true;
     encoder_callbacks_->sendLocalReply(
-        Http::Code::InternalServerError,
+        Http::Code::BadGateway,
         absl::string_view(response_status.message().data(), response_status.message().size()),
         nullptr, absl::nullopt,
         absl::StrCat(
