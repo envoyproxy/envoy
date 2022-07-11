@@ -25,10 +25,24 @@ const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config) {
   http_parser_init(&parser_, HTTP_REQUEST);
+  parser_.data = this;
 }
 
 http_parser_settings Filter::settings_{
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    [](http_parser* parser) -> int {
+      auto* filter = static_cast<Filter*>(parser->data);
+      filter->onMessageBegin();
+      return 0;
+    },
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
@@ -87,6 +101,11 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
 
       // Errors in parsing HTTP.
       if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
+        return ParseState::Error;
+      }
+
+      if (!parsing_begin_) {
+        // Parsing not begin and no parsing error. May be there is only \r or \n in the data.
         return ParseState::Error;
       }
 

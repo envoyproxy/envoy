@@ -416,6 +416,11 @@ TEST_F(HttpInspectorTest, InvalidRequestLine) {
   testHttpInspectNotFound(header);
 }
 
+TEST_F(HttpInspectorTest, InvalidRequestLine2) {
+  const absl::string_view header = "\r\n\r\n\r\n";
+  testHttpInspectNotFound(header);
+}
+
 TEST_F(HttpInspectorTest, InspectHttp2) {
   const std::string header =
       "505249202a20485454502f322e300d0a0d0a534d0d0a0d0a00000c04000000000000041000000000020000000000"
