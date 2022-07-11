@@ -522,10 +522,10 @@ TEST(Context, ConnectionAttributes) {
   EXPECT_CALL(*upstream_ssl_info, sha256PeerCertificateDigest())
       .WillRepeatedly(ReturnRef(peer_certificate_digest));
 
-  EXPECT_EQ(11, connection.size());
+  EXPECT_EQ(12, connection.size());
   EXPECT_FALSE(connection.empty());
 
-  EXPECT_EQ(11, upstream.size());
+  EXPECT_EQ(12, upstream.size());
   EXPECT_FALSE(connection.empty());
 
   EXPECT_EQ(2, source.size());

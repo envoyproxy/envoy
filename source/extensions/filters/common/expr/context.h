@@ -124,6 +124,7 @@ public:
       CelValue::CreateStringView(URISanPeerCertificate),
       CelValue::CreateStringView(DNSSanLocalCertificate),
       CelValue::CreateStringView(DNSSanPeerCertificate),
+      CelValue::CreateStringView(SHA256PeerCertificateDigest),
   }};
   const ContainerBackedListImpl Upstream{{
       CelValue::CreateStringView(Address),
@@ -137,6 +138,7 @@ public:
       CelValue::CreateStringView(URISanPeerCertificate),
       CelValue::CreateStringView(DNSSanLocalCertificate),
       CelValue::CreateStringView(DNSSanPeerCertificate),
+      CelValue::CreateStringView(SHA256PeerCertificateDigest),
   }};
   const ContainerBackedListImpl Peer{{
       CelValue::CreateStringView(Address),
