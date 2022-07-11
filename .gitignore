@@ -1,3 +1,26 @@
+# Dot files, disallow by default, and enable explicitly
+\.*
+!\.azure-pipelines
+!\.bazelci
+!\.bazelignore
+!\.bazelrc
+!\.bazelversion
+!\.clang-format
+!\.clang-tidy
+!\.coveragerc
+!\.devcontainer
+!\.dockerignore
+!\.flake8
+!\.gitattributes
+!\.github
+!\.gitignore
+!\.python-version
+!\.style.yapf
+!\.vscode
+!\.yapfignore
+!\.zuul
+!\.zuul.yaml
+
 /bazel-*
 BROWSE
 /build
