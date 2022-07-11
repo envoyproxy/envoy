@@ -164,7 +164,9 @@ void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
   callback->stream_ = async_client_->start(service_method, *callback,
                                            Http::AsyncClient::StreamOptions().setParentContext(
                                                Http::AsyncClient::ParentContext{&stream_info}));
-  callback->stream_.sendMessage(request, false);
+  if (!callback->stream_.sendMessage(request, false)) {
+    return;
+  }
   LinkedList::moveIntoList(std::move(callback), stream_callbacks_);
 }
 

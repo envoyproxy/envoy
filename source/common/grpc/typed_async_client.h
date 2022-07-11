@@ -35,8 +35,13 @@ template <typename Request> class AsyncStream /* : public RawAsyncStream */ {
 public:
   AsyncStream() = default;
   AsyncStream(RawAsyncStream* stream) : stream_(stream) {}
-  void sendMessage(const Protobuf::Message& request, bool end_stream) {
-    Internal::sendMessageUntyped(stream_, std::move(request), end_stream);
+  bool sendMessage(const Protobuf::Message& request, bool end_stream) {
+    if (stream_ == nullptr) {
+      return false;
+    } else {
+      Internal::sendMessageUntyped(stream_, std::move(request), end_stream);
+      return true;
+    }
   }
   void closeStream() { stream_->closeStream(); }
   void resetStream() { stream_->resetStream(); }
