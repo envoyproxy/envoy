@@ -55,15 +55,8 @@ CURRENT=spelling
 CURRENT=check_format_test
 "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
 
-
-fix_format () {
-    echo "Fixing format..."
-    "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
-    return 1
-}
-
 CURRENT=check_format
-"${ENVOY_SRCDIR}"/tools/code_format/check_format.py check || fix_format
+"${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
 
 CURRENT=buf
 cd api/ || exit 1
