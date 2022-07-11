@@ -2,6 +2,8 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_admin_html",
+    "envoy_select_admin_no_html",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +12,11 @@ envoy_package()
 
 envoy_cc_library(
     name = "admin_lib",
-    srcs = ["admin.cc"],
+    srcs = ["admin.cc"] + envoy_select_admin_html([
+        "admin_html.cc",
+    ]) + envoy_select_admin_no_html([
+        "admin_no_html.cc",
+    ]),
     hdrs = ["admin.h"],
     deps = [
         ":admin_filter_lib",
@@ -45,7 +51,6 @@ envoy_cc_library(
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
-        "//source/common/html:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:date_provider_lib",
@@ -92,6 +97,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "stats_params_lib",
+    srcs = ["stats_params.cc"],
+    hdrs = ["stats_params.h"],
+    deps = [
+        ":utils_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/stats:histogram_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "stats_request_lib",
     srcs = ["stats_request.cc"],
     hdrs = ["stats_request.h"],
@@ -114,6 +130,7 @@ envoy_cc_library(
     srcs = ["stats_render.cc"],
     hdrs = ["stats_render.h"],
     deps = [
+        ":stats_params_lib",
         ":utils_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/html:utility_lib",
@@ -147,6 +164,7 @@ envoy_cc_library(
     srcs = ["prometheus_stats.cc"],
     hdrs = ["prometheus_stats.h"],
     deps = [
+        ":stats_params_lib",
         ":utils_lib",
         "//envoy/stats:custom_stat_namespaces_interface",
         "//source/common/buffer:buffer_lib",

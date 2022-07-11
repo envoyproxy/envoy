@@ -43,6 +43,7 @@ public:
                                                   const std::string& body);
   bool sawGoAway() const { return saw_goaway_; }
   bool connected() const { return connected_; }
+  bool streamOpen() const { return !stream_gone_; }
   void sendData(Http::RequestEncoder& encoder, absl::string_view data, bool end_stream);
   void sendData(Http::RequestEncoder& encoder, Buffer::Instance& data, bool end_stream);
   void sendData(Http::RequestEncoder& encoder, uint64_t size, bool end_stream);
@@ -82,14 +83,26 @@ private:
     IntegrationCodecClient& parent_;
   };
 
+  struct CodecClientCallbacks : public Http::CodecClientCallbacks {
+    CodecClientCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
+
+    // Http::CodecClientCallbacks
+    void onStreamDestroy() override { parent_.stream_gone_ = true; }
+    void onStreamReset(Http::StreamResetReason) override { parent_.stream_gone_ = true; }
+
+    IntegrationCodecClient& parent_;
+  };
+
   void flushWrite();
 
   Event::Dispatcher& dispatcher_;
   ConnectionCallbacks callbacks_;
   CodecCallbacks codec_callbacks_;
+  CodecClientCallbacks codec_client_callbacks_;
   bool connected_{};
   bool disconnected_{};
   bool saw_goaway_{};
+  bool stream_gone_{};
   Network::ConnectionEvent last_connection_event_;
 };
 
@@ -218,6 +231,7 @@ protected:
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
   void testRouterVirtualClusters();
+  void testRouteStats();
   void testRouterUpstreamProtocolError(const std::string&, const std::string&);
 
   void testRouterRequestAndResponseWithBody(
@@ -274,6 +288,12 @@ protected:
                     bool response_trailers_present);
   // Test /drain_listener from admin portal.
   void testAdminDrain(Http::CodecClient::Type admin_request_type);
+
+  // Test sending and receiving large request and response bodies with autonomous upstream.
+  void testGiantRequestAndResponse(
+      uint64_t request_size, uint64_t response_size, bool set_content_length_header,
+      std::chrono::milliseconds timeout = 2 * TestUtility::DefaultTimeout * TSAN_TIMEOUT_FACTOR);
+
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   std::string downstreamProtocolStatsRoot() const;
   // Return the upstream protocol part of the stats root.
@@ -281,7 +301,7 @@ protected:
   // Prefix listener stat with IP:port, including IP version dependent loopback address.
   std::string listenerStatPrefix(const std::string& stat_name);
 
-  Network::TransportSocketFactoryPtr quic_transport_socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr quic_transport_socket_factory_;
   // Must outlive |codec_client_| because it may not close connection till the end of its life
   // scope.
   std::unique_ptr<Http::PersistentQuicInfo> quic_connection_persistent_info_;

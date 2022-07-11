@@ -13,62 +13,8 @@ pr: none
 stages:
 - stage: precheck
   jobs:
-  - job: format_pre
-    dependsOn: []
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-    - task: Cache@2
-      inputs:
-        key: "format_pre | ./WORKSPACE | **/*.bzl"
-        path: $(Build.StagingDirectory)/repository_cache
-      continueOnError: true
-
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format_pre'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      displayName: "Run format pre-checks"
-    - task: PublishBuildArtifacts@1
-      inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/fix_format_pre.diff"
-        artifactName: format
-      # not all have fixes so improve condition/handling
-      condition: failed()
-
-  - job: tooling
-    dependsOn: []
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-    - task: Cache@2
-      inputs:
-        key: "tooling | ./WORKSPACE | **/*.bzl"
-        path: $(Build.StagingDirectory)/repository_cache
-      continueOnError: true
-
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh tooling'
-      workingDirectory: $(Build.SourcesDirectory)
-      env:
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      displayName: "Run tooling checks"
-
-    - script: |
-        ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/tooling tooling'
-      displayName: "Upload tooling coverage to GCS"
-      env:
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-        GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
-
   - job: format
-    dependsOn: ["format_pre"]
+    dependsOn: []
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -78,9 +24,39 @@ stages:
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
+        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+        BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+        BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+        GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      displayName: "Run format checks"
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
+        artifactName: format
+      # not all have fixes so improve condition/handling
+      condition: failed()
+
+  - job: proto_format
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+    - task: Cache@2
+      inputs:
+        key: "proto_format | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
     - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -89,7 +65,7 @@ stages:
 
     - task: PublishBuildArtifacts@1
       inputs:
-        pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
+        pathtoPublish: "$(Build.StagingDirectory)/fix_proto_format.diff"
         artifactName: format
       condition: failed()
 
@@ -108,6 +84,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
@@ -128,9 +106,17 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+    - task: Cache@2
+      inputs:
+        key: "dependencies | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -212,8 +198,6 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
     - template: bazel.yml
       parameters:
         ciTarget: bazel.release
@@ -323,6 +307,8 @@ stages:
           CI_TARGET: "bazel.clang_tidy"
         asan:
           CI_TARGET: "bazel.asan"
+        msan:
+          CI_TARGET: "bazel.msan"
         tsan:
           CI_TARGET: "bazel.tsan"
         compile_time_options:
@@ -373,8 +359,6 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
-    - bash: .azure-pipelines/cleanup.sh
-      displayName: "Removing tools from agent"
     - bash: |
         echo "disk space at beginning of build:"
         df -h
@@ -454,6 +438,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
@@ -555,7 +541,7 @@ stages:
   dependsOn: ["precheck"]
   jobs:
   - job: release
-    timeoutInMinutes: 120
+    timeoutInMinutes: 180
     pool:
       vmImage: "windows-2019"
     steps:

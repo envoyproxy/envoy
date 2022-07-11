@@ -11,6 +11,7 @@
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/connection_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
@@ -228,8 +229,8 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
-    // Wake up every 5ms to run the client dispatcher.
-    if (time_system.waitFor(lock, absl::Condition(&condition), 5ms)) {
+    // Wake up periodically to run the client dispatcher.
+    if (time_system.waitFor(lock, absl::Condition(&condition), 5ms * TSAN_TIMEOUT_FACTOR)) {
       return true;
     }
 
@@ -263,6 +264,21 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
     }
   }
   return succeeded;
+}
+
+testing::AssertionResult
+FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
+                        const FakeStream::ValidatorFunction& data_validator,
+                        std::chrono::milliseconds timeout) {
+  absl::MutexLock lock(&lock_);
+  if (!waitForWithDispatcherRun(
+          time_system_, lock_,
+          [this, data_validator]()
+              ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return data_validator(body_.toString()); },
+          client_dispatcher, timeout)) {
+    return AssertionFailure() << "Timed out waiting for data.";
+  }
+  return AssertionSuccess();
 }
 
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,
@@ -505,8 +521,9 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
   return AssertionSuccess();
 }
 
-FakeUpstream::FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config)
-    : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
+FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
+                           const std::string& uds_path, const FakeUpstreamConfig& config)
+    : FakeUpstream(std::move(transport_socket_factory),
                    Network::SocketPtr{new Network::UdsListenSocket(
                        std::make_shared<Network::Address::PipeInstance>(uds_path))},
                    config) {}
@@ -541,27 +558,26 @@ makeListenSocket(const FakeUpstreamConfig& config,
 
 FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
-    : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
+    : FakeUpstream(Network::Test::createRawBufferDownstreamSocketFactory(),
                    makeListenSocket(config, makeAddress(port, version)), config) {}
 
-FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                            const Network::Address::InstanceConstSharedPtr& address,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory), makeListenSocket(config, address), config) {
 }
 
-FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory),
                    makeListenSocket(config, makeAddress(port, version)), config) {}
 
-FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
     : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
       http3_options_(config.http3_options_), quic_options_(config.quic_options_),
       socket_(Network::SocketSharedPtr(listen_socket.release())),
-      socket_factory_(std::make_unique<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, 0)), config_(config),
@@ -569,6 +585,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       listener_(*this, http_type_ == Http::CodecType::HTTP3),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))),
       stats_scope_(stats_store_.createScope("test_server_scope")) {
+  socket_factories_.emplace_back(std::make_unique<FakeListenSocketFactory>(socket_));
   ENVOY_LOG(info, "starting fake server at {}. UDP={} codec={}", localAddress()->asString(),
             config.udp_fake_upstream_.has_value(), FakeHttpConnection::typeToString(http_type_));
   if (config.udp_fake_upstream_.has_value() &&
@@ -599,6 +616,9 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
     // initialization is complete.
     connection.detectEarlyCloseWhenReadDisabled(false);
     connection.readDisable(true);
+    if (disable_and_do_not_enable_) {
+      dynamic_cast<Network::ConnectionImpl*>(&connection)->ioHandle().enableFileEvents(0);
+    }
   }
   auto connection_wrapper = std::make_unique<SharedConnectionWrapper>(connection);
 
@@ -624,7 +644,7 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 }
 
 void FakeUpstream::threadRoutine() {
-  socket_factory_->doFinalPreWorkerInit();
+  socket_factories_[0]->doFinalPreWorkerInit();
   handler_->addListener(absl::nullopt, listener_, runtime_);
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -752,6 +772,18 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
   });
 }
 
+void FakeUpstream::convertFromRawToHttp(FakeRawConnectionPtr& raw_connection,
+                                        FakeHttpConnectionPtr& connection) {
+  absl::MutexLock lock(&lock_);
+  SharedConnectionWrapper& shared_connection = raw_connection->sharedConnection();
+
+  connection = std::make_unique<FakeHttpConnection>(
+      *this, shared_connection, http_type_, time_system_, config_.max_request_headers_kb_,
+      config_.max_request_headers_count_, config_.headers_with_underscores_action_);
+  connection->initialize();
+  raw_connection.release();
+}
+
 SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   ASSERT(!new_connections_.empty());
   auto* const connection_wrapper = new_connections_.front().get();
@@ -761,7 +793,7 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   connection_wrapper->setParented();
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
   if (read_disable_on_new_connection_ && connection_wrapper->connected() &&
-      http_type_ != Http::CodecType::HTTP3) {
+      http_type_ != Http::CodecType::HTTP3 && !disable_and_do_not_enable_) {
     // Re-enable read and early close detection.
     auto& connection = connection_wrapper->connection();
     connection.detectEarlyCloseWhenReadDisabled(true);
@@ -916,4 +948,41 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
   data.drain(data.length());
   return Network::FilterStatus::StopIteration;
 }
+
+ABSL_MUST_USE_RESULT
+testing::AssertionResult
+FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
+                                          std::chrono::milliseconds timeout) {
+  absl::MutexLock lock(&lock_);
+  const auto reached = [this, data, &out]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+    char peek_buf[200];
+    auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())
+                      ->ioHandle()
+                      .recv(peek_buf, 200, MSG_PEEK);
+    ASSERT(result.ok());
+    absl::string_view peek_data(peek_buf, result.return_value_);
+    size_t index = peek_data.find(data);
+    if (index != absl::string_view::npos) {
+      Buffer::OwnedImpl buffer;
+      *out = std::string(peek_data.data(), index + 4);
+      auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())
+                        ->ioHandle()
+                        .recv(peek_buf, index + 4, 0);
+      return true;
+    }
+    return false;
+  };
+  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
+    return AssertionFailure() << "timed out waiting for raw data";
+  }
+  return AssertionSuccess();
+}
+
+void FakeHttpConnection::writeRawData(absl::string_view data) {
+  Buffer::OwnedImpl buffer(data);
+  Api::IoCallUint64Result result =
+      dynamic_cast<Network::ConnectionImpl*>(&connection())->ioHandle().write(buffer);
+  ASSERT(result.ok());
+}
+
 } // namespace Envoy

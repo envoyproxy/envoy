@@ -57,6 +57,8 @@ private:
   // Mocked callbacks.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+
+  const Buffer::Instance* decoding_buffer_{};
 };
 
 } // namespace HttpFilters

@@ -13,13 +13,8 @@ namespace Http {
 Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveClient() {
   uint32_t initial_streams = 1;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
-    // For now, use the hard-coded setting. Eventually use the cached setting if available.
-    initial_streams = host()->cluster().http2Options().max_concurrent_streams().value();
-    auto max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
-        host()->cluster().maxRequestsPerConnection());
-    if (max_requests < initial_streams) {
-      initial_streams = max_requests;
-    }
+    initial_streams = Http2::ActiveClient::calculateInitialStreamsLimit(
+        http_server_properties_cache_, origin_, host());
   }
   return std::make_unique<Tcp::ActiveTcpClient>(
       *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams);
@@ -29,7 +24,8 @@ CodecClientPtr
 HttpConnPoolImplMixed::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   auto protocol = protocol_ == Protocol::Http11 ? CodecType::HTTP1 : CodecType::HTTP2;
   CodecClientPtr codec{new CodecClientProd(protocol, std::move(data.connection_),
-                                           data.host_description_, dispatcher_, random_generator_)};
+                                           data.host_description_, dispatcher_, random_generator_,
+                                           transportSocketOptions())};
   return codec;
 }
 
@@ -64,6 +60,9 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
     uint32_t delta = client.concurrent_stream_limit_ - 1;
     client.concurrent_stream_limit_ = 1;
     decrConnectingAndConnectedStreamCapacity(delta, client);
+    if (http_server_properties_cache_ && origin_.has_value()) {
+      http_server_properties_cache_->setConcurrentStreams(origin_.value(), 1);
+    }
   }
 
   Upstream::Host::CreateConnectionData data{std::move(tcp_client->connection_),

@@ -12,6 +12,7 @@ HTTP filters
   aws_request_signing_filter
   bandwidth_limit_filter
   buffer_filter
+  cache_filter
   cdn_loop_filter
   compressor_filter
   composite_filter
@@ -23,6 +24,7 @@ HTTP filters
   ext_authz_filter
   ext_proc_filter
   fault_filter
+  file_system_buffer_filter
   gcp_authn_filter
   grpc_http1_bridge_filter
   grpc_http1_reverse_bridge_filter

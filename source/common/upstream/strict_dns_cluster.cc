@@ -12,7 +12,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api, factory_context.mainThreadDispatcher().timeSource()),
       load_assignment_(cluster.load_assignment()), local_info_(factory_context.localInfo()),
@@ -35,10 +35,9 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
         throw EnvoyException("STRICT_DNS clusters must NOT have a custom resolver name set");
       }
 
-      const std::string& url =
-          fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
-      resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.mainThreadDispatcher(),
-                                                     url, locality_lb_endpoint, lb_endpoint));
+      resolve_targets.emplace_back(
+          new ResolveTarget(*this, factory_context.mainThreadDispatcher(), socket_address.address(),
+                            socket_address.port_value(), locality_lb_endpoint, lb_endpoint));
     }
   }
   resolve_targets_ = std::move(resolve_targets);
@@ -85,14 +84,15 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
 }
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
-    StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher, const std::string& url,
+    StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher, const std::string& dns_address,
+    const uint32_t dns_port,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint)
     : parent_(parent), locality_lb_endpoints_(locality_lb_endpoint), lb_endpoint_(lb_endpoint),
-      dns_address_(Network::Utility::hostFromTcpUrl(url)),
+      dns_address_(dns_address),
       hostname_(lb_endpoint_.endpoint().hostname().empty() ? dns_address_
                                                            : lb_endpoint_.endpoint().hostname()),
-      port_(Network::Utility::portFromTcpUrl(url)),
+      port_(dns_port),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
@@ -198,7 +198,7 @@ std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 StrictDnsClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopePtr&& stats_scope) {
+    Stats::ScopeSharedPtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
   return std::make_pair(std::make_shared<StrictDnsClusterImpl>(

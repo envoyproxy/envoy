@@ -19,14 +19,11 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
 static constexpr uint32_t kDefaultTimeoutMs = 300;
 
 std::string getSni(const Network::TransportSocketOptionsConstSharedPtr& options,
-                   Network::TransportSocketFactory& transport_socket_factory) {
+                   Network::UpstreamTransportSocketFactory& transport_socket_factory) {
   if (options && options->serverNameOverride().has_value()) {
     return options->serverNameOverride().value();
   }
-  auto* quic_socket_factory =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory*>(&transport_socket_factory);
-  ASSERT(quic_socket_factory != nullptr);
-  return quic_socket_factory->clientContextConfig().serverNameIndication();
+  return std::string(transport_socket_factory.defaultServerNameIndication());
 }
 
 } // namespace
@@ -128,7 +125,7 @@ ConnectivityGrid::StreamCreationResult ConnectivityGrid::WrapperCallbacks::newSt
 
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
     ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
-    Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+    Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
     absl::optional<Http::Protocol> protocol) {
   ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(attempt->pool()),
             host->hostname());
@@ -163,7 +160,7 @@ void ConnectivityGrid::WrapperCallbacks::maybeMarkHttp3Broken() {
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(
     RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-    const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
   cancellable_ = nullptr; // Attempt succeeded and can no longer be cancelled.
   parent_.onConnectionAttemptReady(this, encoder, host, info, protocol);
 }
@@ -268,7 +265,8 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
         makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_);
   } else {
     pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
-                                                   options_, transport_socket_options_, state_);
+                                                   options_, transport_socket_options_, state_,
+                                                   origin_, alternate_protocols_);
   }
 
   setupPool(*pool);
@@ -383,7 +381,10 @@ HttpServerPropertiesCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusT
 
 bool ConnectivityGrid::isHttp3Broken() const { return getHttp3StatusTracker().isHttp3Broken(); }
 
-void ConnectivityGrid::markHttp3Broken() { getHttp3StatusTracker().markHttp3Broken(); }
+void ConnectivityGrid::markHttp3Broken() {
+  host_->cluster().stats().upstream_http3_broken_.inc();
+  getHttp3StatusTracker().markHttp3Broken();
+}
 
 void ConnectivityGrid::markHttp3Confirmed() { getHttp3StatusTracker().markHttp3Confirmed(); }
 
@@ -411,8 +412,7 @@ void ConnectivityGrid::onIdleReceived() {
 
 bool ConnectivityGrid::shouldAttemptHttp3() {
   if (host_->address()->type() != Network::Address::Type::Ip) {
-    ENVOY_LOG(error, "Address is not an IP address");
-    ASSERT(false);
+    IS_ENVOY_BUG("Address is not an IP address");
     return false;
   }
   uint32_t port = host_->address()->ip()->port();
@@ -463,6 +463,7 @@ void ConnectivityGrid::onHandshakeComplete() {
 
 void ConnectivityGrid::onZeroRttHandshakeFailed() {
   ENVOY_LOG(trace, "Marking HTTP/3 failed for host '{}'.", host_->hostname());
+  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"));
   getHttp3StatusTracker().markHttp3FailedRecently();
 }
 

@@ -604,7 +604,7 @@ protected:
                                ? active_request_bias_runtime_.value().value()
                                : 1.0;
 
-    if (active_request_bias_ < 0.0) {
+    if (active_request_bias_ < 0.0 || std::isnan(active_request_bias_)) {
       ENVOY_LOG_MISC(warn,
                      "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
                      active_request_bias_runtime_->runtimeKey());

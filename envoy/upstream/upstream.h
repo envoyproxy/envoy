@@ -576,6 +576,7 @@ public:
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
+  COUNTER(upstream_rq_0rtt)                                                                        \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_per_try_idle_timeout)                                                        \
   COUNTER(upstream_rq_retry)                                                                       \
@@ -588,6 +589,7 @@ public:
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
+  COUNTER(upstream_http3_broken)                                                                   \
   GAUGE(lb_subsets_active, Accumulate)                                                             \
   GAUGE(max_host_weight, NeverImport)                                                              \
   GAUGE(membership_degraded, NeverImport)                                                          \

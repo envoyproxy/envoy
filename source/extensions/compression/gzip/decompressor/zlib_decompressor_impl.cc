@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -15,6 +16,16 @@ namespace Extensions {
 namespace Compression {
 namespace Gzip {
 namespace Decompressor {
+
+namespace {
+
+// How many times the output buffer is allowed to be bigger than the size of
+// accumulated input. This value is used to detect compression bombs.
+// TODO(rojkov): Re-design the Decompressor interface to handle compression
+// bombs gracefully instead of this quick solution.
+constexpr uint64_t MaxInflateRatio = 100;
+
+} // namespace
 
 ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix)
     : ZlibDecompressorImpl(scope, stats_prefix, 4096) {}
@@ -43,12 +54,25 @@ void ZlibDecompressorImpl::init(int64_t window_bits) {
 
 void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
+  uint64_t limit = MaxInflateRatio * input_buffer.length();
+
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     while (inflateNext()) {
       if (zstream_ptr_->avail_out == 0) {
         updateOutput(output_buffer);
+      }
+
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_compression_bomb_protection") &&
+          (output_buffer.length() > limit)) {
+        stats_.zlib_data_error_.inc();
+        ENVOY_LOG(trace,
+                  "excessive decompression ratio detected: output "
+                  "size {} for input size {}",
+                  output_buffer.length(), input_buffer.length());
+        return;
       }
     }
   }

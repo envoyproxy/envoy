@@ -106,6 +106,9 @@ public:
   MOCK_METHOD(void, onDnsHostAddOrUpdate,
               (const std::string& host, const DnsHostInfoSharedPtr& address));
   MOCK_METHOD(void, onDnsHostRemove, (const std::string& host));
+  MOCK_METHOD(void, onDnsResolutionComplete,
+              (const std::string& host, const DnsHostInfoSharedPtr& host_info,
+               Network::DnsResolver::ResolutionStatus status));
 };
 
 class MockLoadDnsCacheEntryCallbacks : public DnsCache::LoadDnsCacheEntryCallbacks {

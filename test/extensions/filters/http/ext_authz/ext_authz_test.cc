@@ -1596,11 +1596,9 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
 
-  EXPECT_CALL(*decoder_filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  EXPECT_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&auth_per_route));
-  EXPECT_CALL(*decoder_filter_callbacks_.route_,
-              traversePerFilterConfig("envoy.filters.http.ext_authz", _))
+  EXPECT_CALL(*decoder_filter_callbacks_.route_, traversePerFilterConfig(_, _))
       .WillOnce(Invoke([&](const std::string&,
                            std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
         cb(auth_per_vhost);
@@ -1634,8 +1632,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRoute) {
 
   prepareCheck();
 
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -1666,8 +1663,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -1717,18 +1713,6 @@ TEST_P(HttpFilterTestParam, NoRoute) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-}
-
-// Test that the authentication will be skipped when the filter_callbacks has no route(both
-// direct response and redirect have no route) when the runtime flag
-// `envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect` is false.
-TEST_P(HttpFilterTestParam, NoRouteWithSkipAuth) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
-        "false"}});
-  EXPECT_CALL(*decoder_filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
 // Test that the request is stopped till there is an OK response back after which it continues on.
@@ -2365,8 +2349,7 @@ TEST_P(HttpFilterTestParam, NoCluster) {
       "value_route";
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   prepareCheck();
@@ -2392,8 +2375,7 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable_request_body_buffering = [&](bool bypass) {

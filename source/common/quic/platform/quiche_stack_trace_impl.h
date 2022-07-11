@@ -22,4 +22,7 @@ inline std::string QuicheStackTraceImpl() {
   return os.str();
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
+inline bool QuicheShouldRunStackTraceTestImpl() { return true; }
+
 } // namespace quiche

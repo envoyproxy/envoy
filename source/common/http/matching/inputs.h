@@ -135,7 +135,7 @@ public:
 
 class HttpResponseTrailersDataInputFactory
     : public HttpHeadersDataInputFactoryBase<
-          HttpRequestTrailersDataInput, envoy::type::matcher::v3::HttpRequestTrailerMatchInput> {
+          HttpResponseTrailersDataInput, envoy::type::matcher::v3::HttpResponseTrailerMatchInput> {
 public:
   HttpResponseTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_trailers") {}
 };

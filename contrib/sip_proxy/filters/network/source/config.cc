@@ -58,7 +58,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
    */
   auto transaction_infos = std::make_shared<Router::TransactionInfos>();
   for (auto& cluster : unique_clusters) {
-    Stats::ScopePtr stats_scope =
+    Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.sip_cluster", cluster));
     auto transaction_info_ptr = std::make_shared<Router::TransactionInfo>(
         cluster, context.threadLocal(),

@@ -339,9 +339,10 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
 
-  void drainConnections(const std::string& cluster) override;
+  void drainConnections(const std::string& cluster,
+                        DrainConnectionsHostPredicate predicate) override;
 
-  void drainConnections() override;
+  void drainConnections(DrainConnectionsHostPredicate predicate) override;
 
   void checkActiveStaticCluster(const std::string& cluster) override;
 
@@ -512,7 +513,7 @@ private:
       // Drains idle clients in connection pools for all hosts.
       void drainConnPools();
       // Drain all clients in connection pools for all hosts.
-      void drainAllConnPools();
+      void drainAllConnPools(DrainConnectionsHostPredicate predicate);
 
     private:
       Http::ConnectionPool::Instance*

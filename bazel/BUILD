@@ -1,4 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 load("//bazel:utils.bzl", "json_data")
@@ -17,6 +16,7 @@ exports_files([
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",
+    "exported_symbols.txt",
 ])
 
 genrule(
@@ -319,6 +319,11 @@ selects.config_setting_group(
 )
 
 config_setting(
+    name = "disable_admin_html",
+    values = {"define": "admin_html=disabled"},
+)
+
+config_setting(
     name = "disable_hot_restart_setting",
     values = {"define": "hot_restart=disabled"},
     visibility = ["//visibility:private"],
@@ -524,6 +529,11 @@ config_setting(
 )
 
 config_setting(
+    name = "ios_sim_arm64",
+    values = {"cpu": "ios_sim_arm64"},
+)
+
+config_setting(
     name = "ios_arm64e",
     values = {"cpu": "ios_arm64e"},
 )
@@ -531,6 +541,13 @@ config_setting(
 config_setting(
     name = "manual_stamp",
     values = {"define": "manual_stamp=manual_stamp"},
+)
+
+config_setting(
+    name = "android",
+    constraint_values = [
+        "@platforms//os:android",
+    ],
 )
 
 config_setting(
@@ -576,7 +593,32 @@ selects.config_setting_group(
         ":ios_armv7",
         ":ios_armv7s",
         ":ios_i386",
+        ":ios_sim_arm64",
         ":ios_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_dbg",
+    match_all = [
+        ":apple",
+        ":dbg_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_fastbuild",
+    match_all = [
+        ":apple",
+        ":fastbuild_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_non_opt",
+    match_any = [
+        ":apple_dbg",
+        ":apple_fastbuild",
     ],
 )
 
@@ -610,6 +652,7 @@ selects.config_setting_group(
         ":ios_armv7",
         ":ios_armv7s",
         ":ios_i386",
+        ":ios_sim_arm64",
         ":linux_aarch64",
         ":linux_mips64",
         ":linux_ppc",
@@ -713,7 +756,7 @@ platform(
 )
 
 platform(
-    name = "ios_sim_arm64",
+    name = "ios_sim_arm64_platform",  # TODO(keith): Resolve duplicate name issue
     constraint_values = [
         "@platforms//cpu:arm64",
         "@platforms//os:ios",

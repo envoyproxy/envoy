@@ -17,12 +17,16 @@ def generate_compilation_database(args):
         "--remote_download_outputs=all",
     ]
 
-    subprocess.check_call(["bazel", "build"] + bazel_options + [
+    source_dir_targets = args.bazel_targets
+    if args.exclude_contrib:
+        source_dir_targets.remove("//contrib/...")
+
+    subprocess.check_call([args.bazel, "build"] + bazel_options + [
         "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
         "--output_groups=compdb_files,header_files"
-    ] + args.bazel_targets)
+    ] + source_dir_targets)
 
-    execroot = subprocess.check_output(["bazel", "info", "execution_root"]
+    execroot = subprocess.check_output([args.bazel, "info", "execution_root"]
                                        + bazel_options).decode().strip()
 
     db_entries = []
@@ -111,6 +115,8 @@ if __name__ == "__main__":
     parser.add_argument('--include_headers', action='store_true')
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument('--include_all', action='store_true')
+    parser.add_argument('--exclude_contrib', action='store_true')
+    parser.add_argument('--bazel', default='bazel')
     parser.add_argument(
         'bazel_targets',
         nargs='*',

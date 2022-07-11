@@ -43,8 +43,9 @@ public:
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
     EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
-    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                              Event::FileReadyType::Read))
+    EXPECT_CALL(dispatcher_,
+                createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                 Event::FileReadyType::Read | Event::FileReadyType::Closed))
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
@@ -482,6 +483,11 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
+#ifdef ENVOY_ENABLE_UHV
+  // permissive parsing
+  return;
+#endif
+
   const std::string valid_header = "GET /index HTTP/1.1\r";
   //  offset:                       0         10
   const std::string truncate_header = valid_header.substr(0, 14).append("\r");

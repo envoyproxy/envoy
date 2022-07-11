@@ -3,131 +3,36 @@
 # for the underlying protos mentioned in this file. See
 # https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
-from collections import defaultdict
-import json
+import logging
 import functools
 import sys
+from collections import defaultdict
+from functools import cached_property
 
-from google.protobuf import json_format
-from bazel_tools.tools.python.runfiles import runfiles
 import yaml
 
-from jinja2 import Template
+from envoy.code.check.checker import BackticksCheck
 
-# We have to do some evil things to sys.path due to the way that Python module
-# resolution works; we have both tools/ trees in bazel_tools and envoy. By
-# default, Bazel leaves us with a sys.path in which the @bazel_tools repository
-# takes precedence. Now that we're done with importing runfiles above, we can
-# just remove it from the sys.path.
-sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
-
-from envoy.base import utils
-
-from tools.api_proto_plugin import annotations
+from tools.api_proto_plugin import annotations, constants
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
-from tools.config_validation import validate_fragment
+from tools.protodoc.data import data
+from tools.protodoc.jinja import env as jinja_env
 
-from tools.protodoc import manifest_pb2
 from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
 from validate import validate_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
 
-# Namespace prefix for Envoy core APIs.
-ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
+logger = logging.getLogger(__name__)
 
-# Last documented v2 api version
-ENVOY_LAST_V2_VERSION = "1.17"
-
-# Namespace prefix for Envoy top-level APIs.
-ENVOY_PREFIX = '.envoy.'
-
-# Namespace prefix for WKTs.
-WKT_NAMESPACE_PREFIX = '.google.protobuf.'
-
-# Namespace prefix for RPCs.
-RPC_NAMESPACE_PREFIX = '.google.rpc.'
-
-# Namespace prefix for cncf/xds top-level APIs.
-CNCF_PREFIX = '.xds.'
-
-# http://www.fileformat.info/info/unicode/char/2063/index.htm
-UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
-
-# Template for formating extension descriptions.
-EXTENSION_TEMPLATE = Template(
-    """
-.. _extension_{{extension}}:
-
-This extension may be referenced by the qualified name ``{{extension}}``
-{{contrib}}
-.. note::
-  {{status}}
-
-  {{security_posture}}
-
-.. tip::
-  This extension extends and can be used with the following extension {% if categories|length > 1 %}categories{% else %}category{% endif %}:
-
-{% for cat in categories %}
-  - :ref:`{{cat}} <extension_category_{{cat}}>`
-{% endfor %}
-
-""")
-
-# Template for formating an extension category.
-EXTENSION_CATEGORY_TEMPLATE = Template(
-    """
-.. _extension_category_{{category}}:
-
-.. tip::
-{% if extensions %}
-  This extension category has the following known extensions:
-
-{% for ext in extensions %}
-  - :ref:`{{ext}} <extension_{{ext}}>`
-{% endfor %}
-
-{% endif %}
-{% if contrib_extensions %}
-  The following extensions are available in :ref:`contrib <install_contrib>` images only:
-
-{% for ext in contrib_extensions %}
-  - :ref:`{{ext}} <extension_{{ext}}>`
-{% endfor %}
-{% endif %}
-
-""")
-
-# A map from the extension security postures (as defined in the
-# envoy_cc_extension build macro) to human readable text for extension docs.
-EXTENSION_SECURITY_POSTURES = {
-    'robust_to_untrusted_downstream':
-        'This extension is intended to be robust against untrusted downstream traffic. It '
-        'assumes that the upstream is trusted.',
-    'robust_to_untrusted_downstream_and_upstream':
-        'This extension is intended to be robust against both untrusted downstream and '
-        'upstream traffic.',
-    'requires_trusted_downstream_and_upstream':
-        'This extension is not hardened and should only be used in deployments'
-        ' where both the downstream and upstream are trusted.',
-    'unknown':
-        'This extension has an unknown security posture and should only be '
-        'used in deployments where both the downstream and upstream are '
-        'trusted.',
-    'data_plane_agnostic':
-        'This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.',
-}
-
-# A map from the extension status value to a human readable text for extension
-# docs.
-EXTENSION_STATUS_VALUES = {
-    'alpha':
-        'This extension is functional but has not had substantial production burn time, use only with this caveat.',
-    'wip':
-        'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
-}
+manifest_db = data["manifest"]
+EXTENSION_DB = data["extensions"]
+CONTRIB_EXTENSION_DB = data["contrib_extensions"]
+EXTENSION_CATEGORIES = data["extension_categories"]
+CONTRIB_EXTENSION_CATEGORIES = data["contrib_extension_categories"]
+EXTENSION_SECURITY_POSTURES = data["extension_security_postures"]
+EXTENSION_STATUS_VALUES = data["extension_status_values"]
 
 WIP_WARNING = (
     '.. warning::\n   This API feature is currently work-in-progress. API features marked as '
@@ -135,36 +40,6 @@ WIP_WARNING = (
     '<arch_overview_threat_model>`, are not supported by the security team, and are subject to '
     'breaking changes. Do not use this feature without understanding each of the previous '
     'points.\n\n')
-
-r = runfiles.Create()
-
-EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml"))
-CONTRIB_EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/contrib/extensions_metadata.yaml"))
-
-
-# create an index of extension categories from extension db
-def build_categories(extensions_db):
-    ret = {}
-    for _k, _v in extensions_db.items():
-        for _cat in _v['categories']:
-            ret.setdefault(_cat, []).append(_k)
-    return ret
-
-
-EXTENSION_CATEGORIES = build_categories(EXTENSION_DB)
-CONTRIB_EXTENSION_CATEGORIES = build_categories(CONTRIB_EXTENSION_DB)
-
-V2_LINK_TEMPLATE = Template(
-    """
-This documentation is for the Envoy v3 API.
-
-As of Envoy v1.18 the v2 API has been removed and is no longer supported.
-
-If you are upgrading from v2 API config you may wish to view the v2 API documentation:
-
-    :ref:`{{v2_text}} <{{v2_url}}>`
-
-""")
 
 
 class ProtodocError(Exception):
@@ -185,7 +60,7 @@ def github_url(text, type_context):
     Returns:
         A string with a corresponding data plane API GitHub Url.
     """
-    if type_context.name.startswith(CNCF_PREFIX[1:]):
+    if type_context.name.startswith(constants.CNCF_PREFIX[1:]):
         return format_external_link(
             text,
             f"https://github.com/cncf/xds/blob/main/{type_context.source_code_info.name}#L{type_context.location.span[0]}"
@@ -215,7 +90,7 @@ def format_comment_with_annotations(comment, show_wip_warning=False):
     if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
         for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
             formatted_extension_category += format_extension_category(category)
-    comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
+    comment = annotations.without_annotations(comment.raw + '\n')
     return comment + wip_warning + formatted_extension + formatted_extension_category
 
 
@@ -283,9 +158,11 @@ def format_extension(extension):
   This extension is only available in :ref:`contrib <install_contrib>` images.
 
 """
-        status = EXTENSION_STATUS_VALUES.get(extension_metadata.get('status'), '')
-        security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
+        status = (EXTENSION_STATUS_VALUES.get(extension_metadata.get('status')) or "").strip()
+        security_posture = EXTENSION_SECURITY_POSTURES[
+            extension_metadata['security_posture']].strip()
         categories = extension_metadata["categories"]
+        type_urls = extension_metadata.get('type_urls') or []
     except KeyError as e:
         sys.stderr.write(
             f"\n\nDid you forget to add '{extension}' to extensions_build_config.bzl, "
@@ -293,12 +170,14 @@ def format_extension(extension):
             "or contrib/extensions_metadata.yaml?\n\n")
         exit(1)  # Raising the error buries the above message in tracebacks.
 
-    return EXTENSION_TEMPLATE.render(
+    extension = jinja_env.get_template("extension.rst.tpl").render(
         extension=extension,
         contrib=contrib,
         status=status,
         security_posture=security_posture,
-        categories=categories)
+        categories=categories,
+        type_urls=type_urls)
+    return f"\n{extension}\n"
 
 
 def format_extension_category(extension_category):
@@ -314,13 +193,14 @@ def format_extension_category(extension_category):
     contrib_extensions = CONTRIB_EXTENSION_CATEGORIES.get(extension_category, [])
     if not extensions and not contrib_extensions:
         raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
-    return EXTENSION_CATEGORY_TEMPLATE.render(
+    extension_category = jinja_env.get_template("extension_category.rst.tpl").render(
         category=extension_category,
         extensions=sorted(extensions),
         contrib_extensions=sorted(contrib_extensions))
+    return f"\n{extension_category}\n"
 
 
-def format_header_from_file(style, source_code_info, proto_name, v2_link):
+def format_header_from_file(style, source_code_info, proto_name):
     """Format RST header based on special file level title
 
     Args:
@@ -334,17 +214,17 @@ def format_header_from_file(style, source_code_info, proto_name, v2_link):
     """
     anchor = format_anchor(file_cross_ref_label(proto_name))
     stripped_comment = annotations.without_annotations(
-        strip_leading_space('\n'.join(c + '\n' for c in source_code_info.file_level_comments)))
+        '\n'.join(c + '\n' for c in source_code_info.file_level_comments))
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in source_code_info.file_level_annotations:
         extension = source_code_info.file_level_annotations[annotations.EXTENSION_ANNOTATION]
         formatted_extension = format_extension(extension)
     if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
         return anchor + format_header(
-            style, source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION]
-        ) + v2_link + "\n\n" + formatted_extension, stripped_comment
+            style, source_code_info.file_level_annotations[
+                annotations.DOC_TITLE_ANNOTATION]) + "\n\n" + formatted_extension, stripped_comment
     return anchor + format_header(
-        style, proto_name) + v2_link + "\n\n" + formatted_extension, stripped_comment
+        style, proto_name) + "\n\n" + formatted_extension, stripped_comment
 
 
 def format_field_type_as_json(type_context, field):
@@ -390,16 +270,16 @@ def normalize_field_type_name(field_fqn):
 
     .envoy.foo.bar.
 
-    Strips leading ENVOY_API_NAMESPACE_PREFIX and ENVOY_PREFIX.
+    Strips leading constants.ENVOY_API_NAMESPACE_PREFIX and constants.ENVOY_PREFIX.
 
     Args:
         field_fqn: a fully qualified type name from FieldDescriptorProto.type_name.
     Return: Normalized type name.
     """
-    if field_fqn.startswith(ENVOY_API_NAMESPACE_PREFIX):
-        return field_fqn[len(ENVOY_API_NAMESPACE_PREFIX):]
-    if field_fqn.startswith(ENVOY_PREFIX):
-        return field_fqn[len(ENVOY_PREFIX):]
+    if field_fqn.startswith(constants.ENVOY_API_NAMESPACE_PREFIX):
+        return field_fqn[len(constants.ENVOY_API_NAMESPACE_PREFIX):]
+    if field_fqn.startswith(constants.ENVOY_PREFIX):
+        return field_fqn[len(constants.ENVOY_PREFIX):]
     return field_fqn
 
 
@@ -408,7 +288,7 @@ def normalize_type_context_name(type_name):
 
     envoy.foo.bar.
 
-    Strips leading ENVOY_API_NAMESPACE_PREFIX and ENVOY_PREFIX.
+    Strips leading constants.ENVOY_API_NAMESPACE_PREFIX and constants.ENVOY_PREFIX.
 
     Args:
         type_name: a name from a TypeContext.
@@ -437,8 +317,9 @@ def format_field_type(type_context, field):
     Return: RST formatted field type.
     """
     envoy_proto = (
-        field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX)
-        or field.type_name.startswith(ENVOY_PREFIX) or field.type_name.startswith(CNCF_PREFIX))
+        field.type_name.startswith(constants.ENVOY_API_NAMESPACE_PREFIX)
+        or field.type_name.startswith(constants.ENVOY_PREFIX)
+        or field.type_name.startswith(constants.CNCF_PREFIX))
     if envoy_proto:
         type_name = normalize_field_type_name(field.type_name)
         if field.type == field.TYPE_MESSAGE:
@@ -451,46 +332,24 @@ def format_field_type(type_context, field):
             return format_internal_link(type_name, message_cross_ref_label(type_name))
         if field.type == field.TYPE_ENUM:
             return format_internal_link(type_name, enum_cross_ref_label(type_name))
-    elif field.type_name.startswith(WKT_NAMESPACE_PREFIX):
-        wkt = field.type_name[len(WKT_NAMESPACE_PREFIX):]
+    elif field.type_name.startswith(constants.WKT_NAMESPACE_PREFIX):
+        wkt = field.type_name[len(constants.WKT_NAMESPACE_PREFIX):]
         return format_external_link(
             wkt, 'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s'
             % wkt.lower())
-    elif field.type_name.startswith(RPC_NAMESPACE_PREFIX):
-        rpc = field.type_name[len(RPC_NAMESPACE_PREFIX):]
+    elif field.type_name.startswith(constants.RPC_NAMESPACE_PREFIX):
+        rpc = field.type_name[len(constants.RPC_NAMESPACE_PREFIX):]
         return format_external_link(
             rpc, 'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s'
             % rpc.lower())
     elif field.type_name:
         return field.type_name
 
-    pretty_type_names = {
-        field.TYPE_DOUBLE: 'double',
-        field.TYPE_FLOAT: 'float',
-        field.TYPE_INT32: 'int32',
-        field.TYPE_SFIXED32: 'int32',
-        field.TYPE_SINT32: 'int32',
-        field.TYPE_FIXED32: 'uint32',
-        field.TYPE_UINT32: 'uint32',
-        field.TYPE_INT64: 'int64',
-        field.TYPE_SFIXED64: 'int64',
-        field.TYPE_SINT64: 'int64',
-        field.TYPE_FIXED64: 'uint64',
-        field.TYPE_UINT64: 'uint64',
-        field.TYPE_BOOL: 'bool',
-        field.TYPE_STRING: 'string',
-        field.TYPE_BYTES: 'bytes',
-    }
-    if field.type in pretty_type_names:
+    if field.type in constants.FIELD_TYPE_NAMES:
         return format_external_link(
-            pretty_type_names[field.type],
+            constants.FIELD_TYPE_NAMES[field.type],
             'https://developers.google.com/protocol-buffers/docs/proto#scalar')
     raise ProtodocError('Unknown field type ' + str(field.type))
-
-
-def strip_leading_space(s):
-    """Remove leading space in flat comment strings."""
-    return map_lines(lambda s: s[1:], s)
 
 
 def file_cross_ref_label(msg_name):
@@ -533,11 +392,10 @@ def format_security_options(security_option, field, type_context, edge_config):
     if security_option.configure_for_untrusted_upstream:
         sections.append(
             indent(4, 'This field should be configured in the presence of untrusted *upstreams*.'))
-    if edge_config.note:
-        sections.append(indent(4, edge_config.note))
+    if edge_config["note"]:
+        sections.append(indent(4, edge_config["note"].strip()))
 
-    example_dict = json_format.MessageToDict(edge_config.example)
-    validate_fragment.validate_fragment(field.type_name[1:], example_dict)
+    example_dict = edge_config["example"]
     field_name = type_context.name.split('.')[-1]
     example = {field_name: example_dict}
     sections.append(
@@ -610,20 +468,16 @@ def format_field_as_definition_list_item(
 
     # If there is a udpa.annotations.security option, include it after the comment.
     if field.options.HasExtension(security_pb2.security):
-        manifest_description = protodoc_manifest.fields.get(type_context.name)
+        manifest_description = protodoc_manifest.get(type_context.name)
         if not manifest_description:
             raise ProtodocError('Missing protodoc manifest YAML for %s' % type_context.name)
         formatted_security_options = format_security_options(
             field.options.Extensions[security_pb2.security], field, type_context,
-            manifest_description.edge_config)
+            manifest_description)
     else:
         formatted_security_options = ''
-    pretty_label_names = {
-        field.LABEL_OPTIONAL: '',
-        field.LABEL_REPEATED: '**repeated** ',
-    }
     comment = '(%s) ' % ', '.join(
-        [pretty_label_names[field.label] + format_field_type(type_context, field)]
+        [constants.FIELD_LABEL_NAMES[field.label] + format_field_type(type_context, field)]
         + field_annotations) + formatted_leading_comment
     return anchor + field.name + '\n' + map_lines(
         functools.partial(indent, 2),
@@ -678,7 +532,7 @@ def format_enum_value_as_definition_list_item(type_context, enum_value):
     formatted_leading_comment = format_comment_with_annotations(leading_comment)
     if hide_not_implemented(leading_comment):
         return ''
-    comment = default_comment + UNICODE_INVISIBLE_SEPARATOR + formatted_leading_comment
+    comment = default_comment + constants.UNICODE_INVISIBLE_SEPARATOR + formatted_leading_comment
     return anchor + enum_value.name + '\n' + map_lines(functools.partial(indent, 2), comment)
 
 
@@ -713,15 +567,11 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-        with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
-            self.v2_mapping = json.load(f)
+        self.protodoc_manifest = manifest_db
 
-        # Load as YAML, emit as JSON and then parse as proto to provide type
-        # checking.
-        protodoc_manifest_untyped = utils.from_yaml(
-            r.Rlocation('envoy/docs/protodoc_manifest.yaml'))
-        self.protodoc_manifest = manifest_pb2.Manifest()
-        json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
+    @cached_property
+    def backticks_check(self):
+        return BackticksCheck()
 
     def visit_enum(self, enum_proto, type_context):
         normal_enum_type = normalize_type_context_name(type_context.name)
@@ -751,10 +601,14 @@ class RstFormatVisitor(visitor.Visitor):
         if hide_not_implemented(leading_comment):
             return ''
 
-        return anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
+        message = anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
             type_context, msg_proto) + format_message_as_definition_list(
                 type_context, msg_proto,
                 self.protodoc_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
+        error = self.backticks_check(message)
+        if error:
+            logger.warning(f"Bad RST ({msg_proto.name}): {error}")
+        return message
 
     def visit_file(self, file_proto, type_context, services, msgs, enums):
         # If there is a file-level 'not-implemented-hide' annotation then return empty string.
@@ -765,13 +619,6 @@ class RstFormatVisitor(visitor.Visitor):
         has_messages = True
         if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
             has_messages = False
-
-        v2_link = ""
-        if file_proto.name in self.v2_mapping:
-            v2_filepath = f"envoy_api_file_{self.v2_mapping[file_proto.name]}"
-            v2_text = v2_filepath.split('/', 1)[1]
-            v2_url = f"v{ENVOY_LAST_V2_VERSION}:{v2_filepath}"
-            v2_link = V2_LINK_TEMPLATE.render(v2_url=v2_url, v2_text=v2_text)
 
         # TODO(mattklein123): The logic in both the doc and transform tool around files without messages
         # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
@@ -786,7 +633,7 @@ class RstFormatVisitor(visitor.Visitor):
         # Find the earliest detached comment, attribute it to file level.
         # Also extract file level titles if any.
         header, comment = format_header_from_file(
-            '=', type_context.source_code_info, file_proto.name, v2_link)
+            '=', type_context.source_code_info, file_proto.name)
 
         # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the

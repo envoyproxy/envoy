@@ -12,6 +12,8 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
+#include "source/common/http/matching/data_impl.h"
+#include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -36,6 +38,43 @@ bool populateDescriptor(const std::vector<RateLimit::DescriptorProducerPtr>& act
   }
   return result;
 }
+
+class RateLimitDescriptorValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
+public:
+  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
+                                          absl::string_view) override {
+    return absl::OkStatus();
+  }
+};
+
+class MatchInputRateLimitDescriptor : public RateLimit::DescriptorProducer {
+public:
+  MatchInputRateLimitDescriptor(const std::string& descriptor_key,
+                                Matcher::DataInputPtr<Http::HttpMatchingData>&& data_input)
+      : descriptor_key_(descriptor_key), data_input_(std::move(data_input)) {}
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override {
+    Http::Matching::HttpMatchingDataImpl data(info.downstreamAddressProvider());
+    data.onRequestHeaders(headers);
+    auto result = data_input_->get(data);
+    if (result.data_) {
+      if (!result.data_.value().empty()) {
+        descriptor_entry = {descriptor_key_, result.data_.value()};
+      }
+      return true;
+    }
+    return false;
+  }
+
+private:
+  const std::string descriptor_key_;
+  Matcher::DataInputPtr<Http::HttpMatchingData> data_input_;
+};
+
 } // namespace
 
 const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
@@ -110,6 +149,30 @@ bool RemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
   }
 
   descriptor_entry = {"remote_address", remote_address->ip()->addressAsString()};
+
+  return true;
+}
+
+bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                                   const std::string&,
+                                                   const Http::RequestHeaderMap&,
+                                                   const StreamInfo::StreamInfo& info) const {
+  const Network::Address::InstanceConstSharedPtr& remote_address =
+      info.downstreamAddressProvider().remoteAddress();
+  if (remote_address->type() != Network::Address::Type::Ip) {
+    return false;
+  }
+
+  uint32_t mask_len = v4_prefix_mask_len_;
+  if (remote_address->ip()->version() == Network::Address::IpVersion::v6) {
+    mask_len = v6_prefix_mask_len_;
+  }
+
+  // TODO: increase the efficiency, avoid string transform back and forth
+  Network::Address::CidrRange cidr_entry =
+      Network::Address::CidrRange::create(remote_address->ip()->addressAsString(), mask_len);
+  descriptor_entry = {"masked_remote_address", cidr_entry.asString()};
+
   return true;
 }
 
@@ -213,8 +276,18 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       auto* factory = Envoy::Config::Utility::getFactory<RateLimit::DescriptorProducerFactory>(
           action.extension());
       if (!factory) {
-        throw EnvoyException(
-            absl::StrCat("Rate limit descriptor extension not found: ", action.extension().name()));
+        // If no descriptor extension is found, fallback to using HTTP matcher
+        // input functions. Note that if the same extension name or type was
+        // dual registered as an extension descriptor and an HTTP matcher input
+        // function, the descriptor extension takes priority.
+        RateLimitDescriptorValidationVisitor validation_visitor;
+        Matcher::MatchInputFactory<Http::HttpMatchingData> input_factory(validator,
+                                                                         validation_visitor);
+        Matcher::DataInputFactoryCb<Http::HttpMatchingData> data_input_cb =
+            input_factory.createDataInput(action.extension());
+        actions_.emplace_back(std::make_unique<MatchInputRateLimitDescriptor>(
+            action.extension().name(), data_input_cb()));
+        break;
       }
       auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
           action.extension().typed_config(), validator, *factory);
@@ -228,6 +301,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       }
       break;
     }
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kMaskedRemoteAddress:
+      actions_.emplace_back(new MaskedRemoteAddressAction(action.masked_remote_address()));
+      break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
       throw EnvoyException("invalid config");
     }

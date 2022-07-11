@@ -81,5 +81,6 @@ message BandwidthLimit {
   bool enable_response_trailers = 6;
 
   // Optional The prefix for the response trailers.
-  string response_trailer_prefix = 7;
+  string response_trailer_prefix = 7
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }

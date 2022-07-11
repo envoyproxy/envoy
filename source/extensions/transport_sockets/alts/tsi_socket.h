@@ -128,16 +128,21 @@ private:
 };
 
 /**
- * An implementation of Network::TransportSocketFactory for TsiSocket
+ * An implementation of Network::UpstreamTransportSocketFactory for TsiSocket
  */
-class TsiSocketFactory : public Network::CommonTransportSocketFactory {
+class TsiSocketFactory : public Network::DownstreamTransportSocketFactory,
+                         public Network::CommonUpstreamTransportSocketFactory {
 public:
   TsiSocketFactory(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
 
   bool implementsSecureTransport() const override;
+  absl::string_view defaultServerNameIndication() const override { return ""; }
 
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr) const override;
+
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override;
 
 private:
   HandshakerFactory handshaker_factory_;

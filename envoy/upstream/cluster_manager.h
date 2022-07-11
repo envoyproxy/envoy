@@ -386,15 +386,30 @@ public:
   virtual const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const PURE;
 
   /**
+   * Predicate function used in drainConnections().
+   * @param host supplies the host that is about to be drained.
+   * @return true if the host should be drained, and false otherwise.
+   *
+   * IMPORTANT: This predicate must be completely self contained and thread safe. It will be posted
+   * to all worker threads and run concurrently.
+   */
+  using DrainConnectionsHostPredicate = std::function<bool(const Host&)>;
+
+  /**
    * Drain all connection pool connections owned by this cluster.
    * @param cluster, the cluster to drain.
+   * @param predicate supplies the optional drain connections host predicate. If not supplied, all
+   *                  hosts are drained.
    */
-  virtual void drainConnections(const std::string& cluster) PURE;
+  virtual void drainConnections(const std::string& cluster,
+                                DrainConnectionsHostPredicate predicate) PURE;
 
   /**
    * Drain all connection pool connections owned by all clusters in the cluster manager.
+   * @param predicate supplies the optional drain connections host predicate. If not supplied, all
+   *                  hosts are drained.
    */
-  virtual void drainConnections() PURE;
+  virtual void drainConnections(DrainConnectionsHostPredicate predicate) PURE;
 
   /**
    * Check if the cluster is active and statically configured, and if not, throw exception.

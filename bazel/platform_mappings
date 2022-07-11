@@ -29,7 +29,7 @@ flags:
 
   --cpu=ios_sim_arm64
   --apple_platform_type=ios
-    @envoy//bazel:ios_sim_arm64
+    @envoy//bazel:ios_sim_arm64_platform
 
   --cpu=ios_arm64
   --apple_platform_type=ios

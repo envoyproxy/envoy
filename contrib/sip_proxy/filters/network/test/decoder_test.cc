@@ -241,6 +241,8 @@ TEST_F(SipDecoderTest, DecodeOK200) {
       "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
       "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
       "Service-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+      "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
+      "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
       "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
       "Path: "
       "<sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip=192."
@@ -259,6 +261,8 @@ TEST_F(SipDecoderTest, DecodeOK200) {
       "Service-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
       "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
       "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
+      "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
+      "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
       "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
       "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
@@ -267,7 +271,7 @@ TEST_F(SipDecoderTest, DecodeOK200) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   EXPECT_EQ(2U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
+  EXPECT_EQ(2U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 TEST_F(SipDecoderTest, DecodeGeneral) {
@@ -344,7 +348,7 @@ TEST_F(SipDecoderTest, DecodeSUBSCRIBE) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   EXPECT_EQ(2U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
+  EXPECT_EQ(2U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 

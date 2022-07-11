@@ -427,6 +427,8 @@ public:
    */
   const RouterStats& stats() { return stats_; }
 
+  virtual void onReset() {}
+
 protected:
   struct UpstreamRequestInfo {
     bool passthrough_supported;

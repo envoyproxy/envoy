@@ -71,6 +71,7 @@ envoy_cc_test(
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",

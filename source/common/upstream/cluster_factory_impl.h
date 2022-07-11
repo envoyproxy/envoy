@@ -150,7 +150,7 @@ private:
   virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) PURE;
+      Stats::ScopeSharedPtr&& stats_scope) PURE;
   const std::string name_;
 };
 
@@ -174,7 +174,7 @@ private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) override {
+      Stats::ScopeSharedPtr&& stats_scope) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
     Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(),
                                            socket_factory_context.messageValidationVisitor(),
@@ -189,7 +189,7 @@ private:
       const envoy::config::cluster::v3::Cluster& cluster, const ConfigProto& proto_config,
       ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) PURE;
+      Stats::ScopeSharedPtr&& stats_scope) PURE;
 };
 
 } // namespace Upstream

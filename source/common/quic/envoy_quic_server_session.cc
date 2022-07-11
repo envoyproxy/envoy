@@ -166,7 +166,8 @@ void EnvoyQuicServerSession::setHttp3Options(
       return;
     }
     if (initial_interval > 0) {
-      connection()->set_ping_timeout(quic::QuicTime::Delta::FromMilliseconds(max_interval));
+      connection()->set_keep_alive_ping_timeout(
+          quic::QuicTime::Delta::FromMilliseconds(max_interval));
       connection()->set_initial_retransmittable_on_wire_timeout(
           quic::QuicTime::Delta::FromMilliseconds(initial_interval));
     }

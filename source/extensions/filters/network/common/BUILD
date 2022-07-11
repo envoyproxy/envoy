@@ -11,12 +11,10 @@ envoy_extension_package()
 envoy_cc_library(
     name = "factory_base_lib",
     hdrs = ["factory_base.h"],
-    # This is useful code for classes implementing generic extensions.
-    visibility = [
-        "//contrib:__subpackages__",
-        "//source/extensions:__subpackages__",
-        "//test:__subpackages__",
-    ],
+    # This is useful code for registering filters, both for in-repo and out-of-repo
+    # extensions. Mark as public because there's no way to allow external visibility
+    # but prevent core-Envoy visibility.
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/server:filter_config_interface",
     ],

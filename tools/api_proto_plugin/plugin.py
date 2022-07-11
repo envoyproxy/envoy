@@ -1,11 +1,11 @@
 """Python protoc plugin for Envoy APIs."""
 
 import cProfile
-from collections import namedtuple
 import io
 import os
 import pstats
 import sys
+from collections import namedtuple
 
 from tools.api_proto_plugin import traverse
 
@@ -35,7 +35,7 @@ def direct_output_descriptor(output_suffix, visitor, want_params=False):
 
 
 # TODO(phlax): make this into a class
-def plugin(output_descriptors):
+def plugin(output_descriptors, traverser=None):
     """Protoc plugin entry point.
 
     This defines protoc plugin and manages the stdin -> stdout flow. An
@@ -48,6 +48,9 @@ def plugin(output_descriptors):
     Args:
         output_descriptors: a list of OutputDescriptors.
     """
+
+    traverser = traverser or traverse.traverse_file
+
     request = plugin_pb2.CodeGeneratorRequest()
     request.ParseFromString(sys.stdin.buffer.read())
     response = plugin_pb2.CodeGeneratorResponse()
@@ -64,12 +67,7 @@ def plugin(output_descriptors):
             pr.enable()
         for od in output_descriptors:
             f = response.file.add()
-            f.name = file_proto.name + od.output_suffix
-            # Don't run API proto plugins on things like WKT types etc.
-            envoy_proto = file_proto.package.startswith('envoy.') or file_proto.package.startswith(
-                'xds.')
-            if not envoy_proto:
-                continue
+            f.name = f"{file_proto.name}{od.output_suffix}"
             if request.HasField("parameter") and od.want_params:
                 params = dict(param.split('=') for param in request.parameter.split(','))
                 xformed_proto = od.xform(file_proto, params)
@@ -77,8 +75,7 @@ def plugin(output_descriptors):
             else:
                 xformed_proto = od.xform(file_proto)
                 visitor_factory = od.visitor_factory()
-            f.content = traverse.traverse_file(
-                xformed_proto, visitor_factory) if xformed_proto else ''
+            f.content = traverser(xformed_proto, visitor_factory)
         if cprofile_enabled:
             pr.disable()
             stats_stream = io.StringIO()

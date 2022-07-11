@@ -28,9 +28,14 @@ static_resources {
       }
       interval_jitter_percent: 16
     }
-    http_protocol_options {
-      header_key_format {
-        proper_case_words {
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        http_protocol_options {
+          header_key_format {
+            proper_case_words {
+            }
+          }
         }
       }
     }

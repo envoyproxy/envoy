@@ -35,18 +35,15 @@ template <class MatchingDataType>
 class DestinationIPInput : public Matcher::DataInput<MatchingDataType> {
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto& address = data.connectionInfoProvider().localAddress();
-    if (address->type() != Network::Address::Type::Ip) {
+    const auto& address = data.localAddress();
+
+    if (address.type() != Network::Address::Type::Ip) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address->ip()->addressAsString()};
+            address.ip()->addressAsString()};
   }
 };
-
-template <>
-Matcher::DataInputGetResult
-DestinationIPInput<UdpMatchingData>::get(const UdpMatchingData& data) const;
 
 template <class MatchingDataType>
 class DestinationIPInputBaseFactory
@@ -65,18 +62,14 @@ template <class MatchingDataType>
 class DestinationPortInput : public Matcher::DataInput<MatchingDataType> {
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto& address = data.connectionInfoProvider().localAddress();
-    if (address->type() != Network::Address::Type::Ip) {
+    const auto& address = data.localAddress();
+    if (address.type() != Network::Address::Type::Ip) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address->ip()->port())};
+            absl::StrCat(address.ip()->port())};
   }
 };
-
-template <>
-Matcher::DataInputGetResult
-DestinationPortInput<UdpMatchingData>::get(const UdpMatchingData& data) const;
 
 template <class MatchingDataType>
 class DestinationPortInputBaseFactory
@@ -95,17 +88,14 @@ template <class MatchingDataType>
 class SourceIPInput : public Matcher::DataInput<MatchingDataType> {
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto& address = data.connectionInfoProvider().remoteAddress();
-    if (address->type() != Network::Address::Type::Ip) {
+    const auto& address = data.remoteAddress();
+    if (address.type() != Network::Address::Type::Ip) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            address->ip()->addressAsString()};
+            address.ip()->addressAsString()};
   }
 };
-
-template <>
-Matcher::DataInputGetResult SourceIPInput<UdpMatchingData>::get(const UdpMatchingData& data) const;
 
 template <class MatchingDataType>
 class SourceIPInputBaseFactory
@@ -123,18 +113,14 @@ template <class MatchingDataType>
 class SourcePortInput : public Matcher::DataInput<MatchingDataType> {
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
-    const auto& address = data.connectionInfoProvider().remoteAddress();
-    if (address->type() != Network::Address::Type::Ip) {
+    const auto& address = data.remoteAddress();
+    if (address.type() != Network::Address::Type::Ip) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat(address->ip()->port())};
+            absl::StrCat(address.ip()->port())};
   }
 };
-
-template <>
-Matcher::DataInputGetResult
-SourcePortInput<UdpMatchingData>::get(const UdpMatchingData& data) const;
 
 template <class MatchingDataType>
 class SourcePortInputBaseFactory

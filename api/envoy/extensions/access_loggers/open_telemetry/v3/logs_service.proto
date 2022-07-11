@@ -20,14 +20,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the built-in *envoy.access_loggers.open_telemetry*
 // :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`. This configuration will
 // populate `opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto>`_.
-// OpenTelemetry `Resource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/resource/v1/resource.proto>`_
-// attributes are filled with Envoy node info. In addition, the request start time is set in the
-// dedicated field.
+// In addition, the request start time is set in the dedicated field.
 // [#extension: envoy.access_loggers.open_telemetry]
-// [#comment:TODO(itamarkam): allow configuration for resource attributes.]
 message OpenTelemetryAccessLogConfig {
   // [#comment:TODO(itamarkam): add 'filter_state_objects_to_log' to logs.]
   grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
+
+  // OpenTelemetry `Resource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto#L51>`_
+  // attributes are filled with Envoy node info.
+  // Example: ``resource_attributes { values { key: "region" value { string_value: "cn-north-7" } } }``.
+  opentelemetry.proto.common.v1.KeyValueList resource_attributes = 4;
 
   // OpenTelemetry `LogResource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto>`_
   // fields, following `Envoy access logging formatting <https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage>`_.

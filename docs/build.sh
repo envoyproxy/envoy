@@ -10,11 +10,6 @@ if [[ ! $(command -v bazel) ]]; then
     echo 'ERROR: bazel must be installed and available in "$PATH" to build docs' >&2
     exit 1
 fi
-if [[ ! $(command -v jq) ]]; then
-    # shellcheck disable=SC2016
-    echo 'ERROR: jq must be installed and available in "$PATH" to build docs' >&2
-    exit 1
-fi
 
 MAIN_BRANCH="refs/heads/main"
 RELEASE_TAG_REGEX="^refs/tags/v.*"
@@ -34,11 +29,17 @@ else
     fi
 fi
 
+if [[ -n "${AZP_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
+    export SPHINX_RUNNER_ARGS="-v warn"
+fi
+
+
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
 IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 BAZEL_BUILD_OPTIONS+=(
     "--action_env=DOCS_TAG"
     "--action_env=BUILD_SHA"
+    "--action_env=SPHINX_RUNNER_ARGS"
     "--action_env=SPHINX_SKIP_CONFIG_VALIDATION")
 
 # Building html/rst is determined by then needs of CI but can be overridden in dev.
@@ -63,8 +64,8 @@ mkdir -p "${DOCS_OUTPUT_DIR}"
 
 # Save html/rst to output directory
 if [[ -n "${BUILD_HTML}" ]]; then
-    tar -xf bazel-bin/docs/html.tar -C "$DOCS_OUTPUT_DIR"
+    tar -xzf bazel-bin/docs/html.tar.gz -C "$DOCS_OUTPUT_DIR"
 fi
 if [[ -n "${BUILD_RST}" ]]; then
-    gzip -c bazel-bin/docs/rst.tar > "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+    cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
 fi

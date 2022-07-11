@@ -52,7 +52,7 @@ private:
   // Common::GrpcAccessLoggerCache
   GrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               const Grpc::RawAsyncClientSharedPtr& client, Event::Dispatcher& dispatcher) override;
+               Event::Dispatcher& dispatcher) override;
 
   const LocalInfo::LocalInfo& local_info_;
 };

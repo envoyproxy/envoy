@@ -1,4 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_test")
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
@@ -11,6 +10,8 @@ load(
     "EXTERNAL_PROTO_GO_BAZEL_DEP_MAP",
     "EXTERNAL_PROTO_PY_BAZEL_DEP_MAP",
 )
+
+EnvoyProtoDepsInfo = provider(fields = ["deps"])
 
 _PY_PROTO_SUFFIX = "_py_proto"
 _CC_PROTO_SUFFIX = "_cc_proto"
@@ -143,7 +144,7 @@ def api_cc_py_proto_library(
         _api_cc_grpc_library(name = cc_grpc_name, proto = relative_name, deps = cc_proto_deps)
 
 def api_cc_test(name, **kwargs):
-    cc_test(
+    native.cc_test(
         name = name,
         **kwargs
     )

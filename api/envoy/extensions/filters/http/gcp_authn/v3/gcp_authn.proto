@@ -5,6 +5,8 @@ package envoy.extensions.filters.http.gcp_authn.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -27,11 +29,20 @@ message GcpAuthnFilterConfig {
   // Retry policy for fetching tokens.
   // This field is optional. If it is not configured, the filter will be fail-closed (i.e., reject the requests).
   config.core.v3.RetryPolicy retry_policy = 2;
+
+  // Token cache configuration. This field is optional.
+  TokenCacheConfig cache_config = 3;
 }
 
+// Audience is the URL of the receiving service that performs token authentication.
+// It will be provided to the filter through cluster's typed_filter_metadata.
 message Audience {
-  // The map of audience key to audience value.
-  // The key is defined as the contract with control plane in the configuration. It is fixed string "audience_key".
-  // The value is URL of the receiving service that performs token authentication.
-  map<string, string> audience_map = 1;
+  string url = 1 [(validate.rules).string = {min_len: 1}];
+}
+
+// Token Cache configuration.
+message TokenCacheConfig {
+  // The number of cache entries. The maximum number of entries is INT64_MAX as it is constrained by underlying cache implementation.
+  // Default value 0 (i.e., proto3 defaults) disables the cache by default. Other default values will enable the cache.
+  google.protobuf.UInt64Value cache_size = 1 [(validate.rules).uint64 = {lte: 9223372036854775807}];
 }

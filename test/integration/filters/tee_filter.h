@@ -43,19 +43,22 @@ public:
 
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext&) override;
-  bool inspectStreamTee(int /*stream_number*/, std::function<void(const StreamTee&)> inspector);
-  bool setEncodeDataCallback(int /*stream_number*/,
+  bool inspectStreamTee(uint32_t stream_id, std::function<void(const StreamTee&)> inspector);
+  bool setEncodeDataCallback(uint32_t stream_id,
                              std::function<Http::FilterDataStatus(
                                  StreamTee&, Http::StreamEncoderFilterCallbacks* encoder_cbs)>
                                  cb);
-  bool setDecodeDataCallback(int /*stream_number*/,
+  bool setDecodeDataCallback(uint32_t stream_id,
                              std::function<Http::FilterDataStatus(
                                  StreamTee&, Http::StreamDecoderFilterCallbacks* decoder_cbs)>
                                  cb);
+  static uint32_t computeClientStreamId(uint32_t stream_number) { return 2 * stream_number + 1; }
 
 private:
-  // TODO(kbaichoo): support multiple streams.
-  StreamTeeSharedPtr current_tee_;
+  // TODO(kbaichoo): support multiple connections.
+  absl::flat_hash_map<uint32_t, StreamTeeSharedPtr> stream_id_to_stream_tee_;
+  uint32_t client_streams_created_{0};
+  uint32_t consumeNextClientStreamId() { return computeClientStreamId(client_streams_created_++); }
 };
 
 } // namespace Envoy

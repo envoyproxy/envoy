@@ -6,9 +6,9 @@
 # enough to consume all memory constrained by cgroup in large host.
 # Limiting JVM heapsize here to let it do GC more when approaching the limit to
 # leave room for compiler/linker.
-# The number 2G is chosen heuristically to both support large VM and small VM with RBE.
+# The number 3G is chosen heuristically to both support large VM and small VM with RBE.
 # Startup options cannot be selected via config.
-startup --host_jvm_args=-Xmx2g
+startup --host_jvm_args=-Xmx3g
 
 run --color=yes
 
@@ -19,14 +19,17 @@ build --host_force_python=PY3
 build --java_runtime_version=remotejdk_11
 build --tool_java_runtime_version=remotejdk_11
 build --platform_mappings=bazel/platform_mappings
+# silence absl logspam.
+build --copt=-DABSL_MIN_LOG_LEVEL=4
 
 # Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
-build --action_env=CC
-build --action_env=CXX
-build --action_env=LLVM_CONFIG
-build --action_env=PATH
+build --action_env=CC --host_action_env=CC
+build --action_env=CXX --host_action_env=CXX
+build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
+build --action_env=PATH --host_action_env=PATH
 
 build --enable_platform_specific_config
+build --test_summary=terse
 
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
@@ -93,9 +96,10 @@ build:clang-asan --linkopt --unwindlib=libgcc
 
 # macOS
 build:macos --cxxopt=-std=c++17
-build:macos --action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
-build:macos --host_action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
+build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
+build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
+build:macos --define wasm=disabled
 
 # macOS ASAN/UBSAN
 build:macos-asan --config=asan
@@ -205,9 +209,9 @@ build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
 build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/12.0.1/lib/linux
-build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
-build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a
+build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/14.0.0/lib/x86_64-unknown-linux-gnu'
+build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
+build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 
 build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
@@ -281,7 +285,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:142e6d5662b98277a84c327da26ed266ab0e3191
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -314,6 +318,10 @@ build:docker-tsan --config=rbe-toolchain-tsan
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
+
+# Build Event Service
+build:google-bes --bes_backend=grpcs://buildeventservice.googleapis.com
+build:google-bes --bes_results_url=https://source.cloud.google.com/results/invocations/
 
 # Fuzz builds
 

@@ -15,11 +15,10 @@ struct TcpProxyIntegrationTestParams {
   bool test_original_version;
 };
 
-class TcpProxyIntegrationTest : public testing::TestWithParam<TcpProxyIntegrationTestParams>,
+class TcpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 public:
-  TcpProxyIntegrationTest()
-      : BaseIntegrationTest(GetParam().version, ConfigHelper::tcpProxyConfig()) {
+  TcpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
     enableHalfClose(true);
   }
 
@@ -36,7 +35,7 @@ public:
                              const std::string& data_to_send_downstream);
 
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Network::TransportSocketFactoryPtr context_;
+  Network::UpstreamTransportSocketFactoryPtr context_;
   ConnectionStatusCallbacks connect_callbacks_;
   MockWatermarkBuffer* client_write_buffer_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;

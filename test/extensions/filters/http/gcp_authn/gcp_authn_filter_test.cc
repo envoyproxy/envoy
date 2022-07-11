@@ -58,8 +58,7 @@ public:
   }
 
   void setupFilterAndCallback() {
-    std::string stats_prefix = "test";
-    filter_ = std::make_unique<GcpAuthnFilter>(config_, context_, stats_prefix);
+    filter_ = std::make_unique<GcpAuthnFilter>(config_, context_, "stats", nullptr);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
@@ -69,8 +68,7 @@ public:
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
     if (valid) {
       envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-      audience.mutable_audience_map()->insert(
-          {std::string(Envoy::Extensions::HttpFilters::GcpAuthn::AudienceKey), "test"});
+      audience.set_url("test");
 
       (*metadata_.mutable_typed_filter_metadata())
           [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
@@ -129,7 +127,6 @@ TEST_F(GcpAuthnFilterTest, Success) {
   Envoy::Http::ResponseMessagePtr response(
       new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
 
-  // EXPECT_CALL(request_callbacks_, onComplete(response.get()));
   EXPECT_CALL(request_callbacks_, onComplete(response.get()));
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -213,7 +210,7 @@ TEST_F(GcpAuthnFilterTest, NoFilterMetadata) {
   setupMockObjects();
   setupFilterAndCallback();
   // Set up mock filter metadata.
-  setupMockFilterMetadata(/*is_valid=*/false);
+  setupMockFilterMetadata(/*valid=*/false);
   // decodeHeaders() is expected to return `Continue` because no filter metadata is specified
   // in configuration.
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
@@ -224,7 +221,7 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIteration) {
   setupMockObjects();
   setupFilterAndCallback();
   // Set up mock filter metadata.
-  setupMockFilterMetadata(/*is_valid=*/true);
+  setupMockFilterMetadata(/*valid=*/true);
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopIteration);
@@ -243,7 +240,7 @@ TEST_F(GcpAuthnFilterTest, DestoryFilter) {
   setupMockObjects();
   setupFilterAndCallback();
   // Set up mock filter metadata.
-  setupMockFilterMetadata(/*is_valid=*/true);
+  setupMockFilterMetadata(/*valid=*/true);
 
   // decodeHeaders() is expected to return `StopIteration` and state is expected to be in `Calling`
   // state because none of complete functions(i.e., onSuccess, onFailure, onDestroy, etc) has been

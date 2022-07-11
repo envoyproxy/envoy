@@ -5,12 +5,12 @@ ARG ENVOY_VRP_BASE_IMAGE=envoy
 
 FROM scratch AS binary
 
-ARG TARGETPLATFORM
+ARG TARGETPLATFORM=linux/amd64
 ARG ENVOY_BINARY=envoy
 ARG ENVOY_BINARY_SUFFIX=_stripped
 ADD ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release${ENVOY_BINARY_SUFFIX}/envoy* /usr/local/bin/
 ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
-COPY --chown=root:root ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release/su-exec /usr/local/bin/
+COPY --chown=0:0 ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release/su-exec /usr/local/bin/
 COPY ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release/schema_validator_tool /usr/local/bin/schema_validator_tool
 COPY ci/docker-entrypoint.sh /
 
@@ -41,7 +41,7 @@ CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
 
 # STAGE: envoy-distroless
 # gcr.io/distroless/base-debian11:nonroot
-FROM gcr.io/distroless/base-debian11@sha256:764b74b1789b4ec9044e6f20bb938d077fe8c7bcf9e4d3767eebb440c5d76f11 AS envoy-distroless
+FROM gcr.io/distroless/base-debian11@sha256:d65ac1a65a4d82a48ebd0a22aea2acdd95d7abeeda245dfee932ec0018c781f4 AS envoy-distroless
 
 COPY --from=binary /usr/local/bin/envoy* /usr/local/bin/
 COPY --from=binary /usr/local/bin/su-exec /usr/local/bin/

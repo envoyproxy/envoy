@@ -121,7 +121,7 @@ def check_tool_not_found_error():
     # Temporarily change PATH to test the error about lack of external tools.
     oldPath = os.environ["PATH"]
     os.environ["PATH"] = "/sbin:/usr/sbin"
-    clang_format = os.getenv("CLANG_FORMAT", "clang-format-11")
+    clang_format = os.getenv("CLANG_FORMAT", "clang-format")
     # If CLANG_FORMAT points directly to the binary, skip this test.
     if os.path.isfile(clang_format) and os.access(clang_format, os.X_OK):
         os.environ["PATH"] = oldPath
@@ -308,6 +308,9 @@ def run_checks():
         "term absl::make_unique< should be replaced with standard library term std::make_unique<")
     errors += check_and_fix_error(
         "code_conventions.cc", "term .Times(1); should be replaced with preferred term ;")
+    errors += check_and_fix_error(
+        "code_conventions.cc",
+        "term Stats::ScopePtr should be replaced with preferred term Stats::ScopeSharedPtr")
 
     errors += check_file_expecting_ok("real_time_source_override.cc")
     errors += check_file_expecting_ok("duration_value_zero.cc")

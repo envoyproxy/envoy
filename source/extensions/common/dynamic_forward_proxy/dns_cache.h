@@ -129,6 +129,16 @@ public:
      * @param host supplies the removed host.
      */
     virtual void onDnsHostRemove(const std::string& host) PURE;
+
+    /**
+     * Called when any resolution for a host completes.
+     * @param host supplies the added/updated host.
+     * @param host_info supplies the associated host info.
+     * @param status supplies the resolution status.
+     */
+    virtual void onDnsResolutionComplete(const std::string& host,
+                                         const DnsHostInfoSharedPtr& host_info,
+                                         Network::DnsResolver::ResolutionStatus status) PURE;
   };
 
   /**

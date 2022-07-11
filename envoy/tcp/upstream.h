@@ -25,8 +25,10 @@ class GenericUpstream;
 class TunnelingConfigHelper {
 public:
   virtual ~TunnelingConfigHelper() = default;
+
   // The host name of the tunneling upstream HTTP request.
-  virtual const std::string& hostname() const PURE;
+  // This function evaluates command operators if specified. Otherwise it returns host name as is.
+  virtual std::string host(const StreamInfo::StreamInfo& stream_info) const PURE;
 
   // The method of the upstream HTTP request. True if using POST method, CONNECT otherwise.
   virtual bool usePost() const PURE;
@@ -78,10 +80,13 @@ public:
    * Called to indicate a failure for GenericConnPool::newStream to establish a stream.
    *
    * @param reason supplies the failure reason.
+   * @param failure_reason failure reason string (Note: it is expected that the caller will provide
+   * matching `reason` and `failure_reason`).
    * @param host supplies the description of the host that caused the failure. This may be nullptr
    *             if no host was involved in the failure (for example overflow).
    */
   virtual void onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                    absl::string_view failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) PURE;
 };
 

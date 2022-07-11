@@ -20,7 +20,6 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/default_server_string.h"
@@ -93,6 +92,11 @@ public:
     return Http::FilterHeadersStatus::StopIteration;
   }
 };
+
+static Http::FilterFactoryCb MissingConfigFilterFactory =
+    [](Http::FilterChainFactoryCallbacks& cb) {
+      cb.addStreamDecoderFilter(std::make_shared<MissingConfigFilter>());
+    };
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
     PathWithEscapedSlashesAction
@@ -653,7 +657,7 @@ void HttpConnectionManagerConfig::processFilter(
   Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
-      callback, proto_config.name());
+      {factory->name(), callback}, proto_config.name());
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessageOrError(
@@ -683,7 +687,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
 
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
       config_discovery, name, context_, stats_prefix_, last_filter_in_current_config,
-      filter_chain_type);
+      filter_chain_type, nullptr);
   filter_factories.push_back(std::move(filter_config_provider));
 }
 
@@ -725,20 +729,21 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 }
 
 void HttpConnectionManagerConfig::createFilterChainForFactories(
-    Http::FilterChainFactoryCallbacks& callbacks, const FilterFactoriesList& filter_factories) {
+    Http::FilterChainManager& manager, const FilterFactoriesList& filter_factories) {
   bool added_missing_config_filter = false;
   for (const auto& filter_config_provider : filter_factories) {
     auto config = filter_config_provider->config();
     if (config.has_value()) {
-      config.value()(callbacks);
+      Filter::NamedHttpFilterFactoryCb& factory_cb = config.value().get();
+      manager.applyFilterFactoryCb({filter_config_provider->name(), factory_cb.name},
+                                   factory_cb.factory_cb);
       continue;
     }
 
     // If a filter config is missing after warming, inject a local reply with status 500.
     if (!added_missing_config_filter) {
       ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
-      callbacks.addStreamDecoderFilter(
-          Http::StreamDecoderFilterSharedPtr{std::make_shared<MissingConfigFilter>()});
+      manager.applyFilterFactoryCb({}, MissingConfigFilterFactory);
       added_missing_config_filter = true;
     } else {
       ENVOY_LOG(trace, "Provider {} missing a filter config", filter_config_provider->name());
@@ -746,14 +751,14 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
   }
 }
 
-void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
+void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& callbacks) {
   createFilterChainForFactories(callbacks, filter_factories_);
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainFactoryCallbacks& callbacks) {
+    Http::FilterChainManager& callbacks) {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);

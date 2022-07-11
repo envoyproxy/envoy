@@ -47,6 +47,8 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
+  std::set<std::string> configTypes() override { return {}; }
+
   std::string name() const override {
     return absl::StrCat(category(), ".fake_config_validator_",
                         should_reject_ ? "reject" : "accept");

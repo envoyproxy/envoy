@@ -46,7 +46,8 @@ namespace ProxyProtocol {
 Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
-    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {
+    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
+      allow_requests_without_proxy_protocol_(proto_config.allow_requests_without_proxy_protocol()) {
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
@@ -63,6 +64,10 @@ const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
 
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
+bool Config::allowRequestsWithoutProxyProtocol() const {
+  return allow_requests_without_proxy_protocol_;
+}
+
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   cb_ = &cb;
@@ -72,12 +77,17 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   const ReadOrParseState read_state = parseBuffer(buffer);
-  if (read_state == ReadOrParseState::Error) {
+  switch (read_state) {
+  case ReadOrParseState::Error:
     config_->stats_.downstream_cx_proxy_proto_error_.inc();
     cb_->socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
-  } else if (read_state == ReadOrParseState::TryAgainLater) {
+  case ReadOrParseState::TryAgainLater:
     return Network::FilterStatus::StopIteration;
+  case ReadOrParseState::SkipFilter:
+    return Network::FilterStatus::Continue;
+  case ReadOrParseState::Done:
+    return Network::FilterStatus::Continue;
   }
   return Network::FilterStatus::Continue;
 }
@@ -398,6 +408,19 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
 ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) {
   auto raw_slice = buffer.rawSlice();
   const char* buf = static_cast<const char*>(raw_slice.mem_);
+
+  if (config_.get()->allowRequestsWithoutProxyProtocol()) {
+    auto matchv2 = !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
+                           std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_));
+    auto matchv1 = !memcmp(buf, PROXY_PROTO_V1_SIGNATURE,
+                           std::min<size_t>(PROXY_PROTO_V1_SIGNATURE_LEN, raw_slice.len_));
+    if (!matchv2 && !matchv1) {
+      // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
+      // short-circuit
+      ENVOY_LOG(trace, "request does not use v1 or v2 proxy protocol, forwarding as is");
+      return ReadOrParseState::SkipFilter;
+    }
+  }
 
   if (raw_slice.len_ >= PROXY_PROTO_V2_HEADER_LEN) {
     const char* sig = PROXY_PROTO_V2_SIGNATURE;

@@ -581,7 +581,7 @@ TEST_F(HdsTest, TestSocketContext) {
   EXPECT_CALL(test_factory_, createClusterInfo(_))
       .WillRepeatedly(Invoke([&](const ClusterInfoFactory::CreateClusterInfoParams& params) {
         // Build scope, factory_context as does ProdClusterInfoFactory.
-        Envoy::Stats::ScopePtr scope =
+        Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
@@ -589,7 +589,7 @@ TEST_F(HdsTest, TestSocketContext) {
             params.validation_visitor_, params.api_, params.options_, params.access_log_manager_);
 
         // Create a mock socket_factory for the scope of this unit test.
-        std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
+        std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =
             std::make_unique<Network::MockTransportSocketFactory>();
 
         // set socket_matcher object in test scope.
@@ -1033,7 +1033,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
   EXPECT_CALL(test_factory_, createClusterInfo(_))
       .WillRepeatedly(Invoke([&](const ClusterInfoFactory::CreateClusterInfoParams& params) {
         // Build scope, factory_context as does ProdClusterInfoFactory.
-        Envoy::Stats::ScopePtr scope =
+        Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
@@ -1041,7 +1041,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
             params.validation_visitor_, params.api_, params.options_, params.access_log_manager_);
 
         // Create a mock socket_factory for the scope of this unit test.
-        std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
+        std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =
             std::make_unique<Network::MockTransportSocketFactory>();
 
         // set socket_matcher object in test scope.

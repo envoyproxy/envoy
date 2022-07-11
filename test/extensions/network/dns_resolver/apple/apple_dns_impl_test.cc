@@ -386,7 +386,8 @@ TEST_F(AppleDnsImplTest, LocalResolution) {
 class AppleDnsImplFakeApiTest : public testing::Test {
 public:
   void SetUp() override {
-    resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, stats_store_);
+    config_.set_include_unroutable_families(false);
+    resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(config_, dispatcher_, stats_store_);
   }
 
   void checkErrorStat(DNSServiceErrorType error_code) {
@@ -559,10 +560,21 @@ protected:
   TestThreadsafeSingletonInjector<Network::DnsService> dns_service_injector_{&dns_service_};
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::AppleDnsResolverImpl> resolver_{};
+  envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig config_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockFileEvent>* file_event_;
   Event::FileReadyCb file_ready_cb_;
 };
+
+TEST_F(AppleDnsImplFakeApiTest, IncludeUnroutableFamiliesConfigFalse) {
+  config_.set_include_unroutable_families(false);
+  EXPECT_EQ(false, config_.include_unroutable_families());
+}
+
+TEST_F(AppleDnsImplFakeApiTest, IncludeUnroutableFamiliesConfigTrue) {
+  config_.set_include_unroutable_families(true);
+  EXPECT_EQ(true, config_.include_unroutable_families());
+}
 
 TEST_F(AppleDnsImplFakeApiTest, ErrorInSocketAccess) {
   const std::string hostname = "foo.com";
@@ -689,6 +701,47 @@ TEST_F(AppleDnsImplFakeApiTest, SynchronousConnectionErrorInGetAddrInfo) {
 
 TEST_F(AppleDnsImplFakeApiTest, SynchronousTimeoutInGetAddrInfo) {
   synchronousWithError(kDNSServiceErr_Timeout);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletionUnroutableFamilies) {
+  config_.set_include_unroutable_families(true);
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(config_, dispatcher_, stats_store_);
+
+  const std::string hostname = "foo.com";
+  sockaddr_in addr4;
+  memset(&addr4, 0, sizeof(addr4));
+  addr4.sin_family = AF_INET;
+  EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
+  addr4.sin_port = htons(6502);
+
+  Network::Address::Ipv4Instance address(&addr4);
+  absl::Notification dns_callback_executed;
+
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0,
+                                    kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
+                                    StrEq(hostname.c_str()), _, _))
+      .WillOnce(DoAll(
+          // Have the API call synchronously call the provided callback.
+          WithArgs<5, 6>(Invoke([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
+            callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
+                     address.sockAddr(), 30, context);
+          })),
+          Return(kDNSServiceErr_NoError)));
+
+  // The returned value is nullptr because the query has already been fulfilled. Verify that the
+  // callback ran via notification.
+  EXPECT_EQ(nullptr, resolver_->resolve(
+                         hostname, Network::DnsLookupFamily::Auto,
+                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
+                                                  std::list<DnsResponse>&& response) -> void {
+                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                           EXPECT_EQ(1, response.size());
+                           EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
+                           EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
+                           dns_callback_executed.Notify();
+                         }));
+  dns_callback_executed.WaitForNotification();
 }
 
 TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {

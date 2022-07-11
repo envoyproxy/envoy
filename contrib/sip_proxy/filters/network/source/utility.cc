@@ -11,13 +11,15 @@ void PendingList::pushIntoPendingList(const std::string& type, const std::string
                                       SipFilters::DecoderFilterCallbacks& activetrans,
                                       std::function<void(void)> func) {
   ENVOY_LOG(debug, "PUSH {}-{} {} into PendigList", type, key, activetrans.transactionId());
-  if (activetrans.metadata()->queryMap()[type]) {
+  if (activetrans.metadata()->affinityIteration() != activetrans.metadata()->affinity().end() &&
+      type == activetrans.metadata()->affinityIteration()->type()) {
     if (pending_list_[type + key].empty()) {
       // need to do tra query
       func();
     }
     pending_list_[type + key].emplace_back(activetrans);
   } else {
+    // handle connection
     func();
     pending_list_[type + key].emplace_back(activetrans);
   }
@@ -30,6 +32,8 @@ void PendingList::eraseActiveTransFromPendingList(std::string& transaction_id) {
   for (auto& item : pending_list_) {
     for (auto it = item.second.begin(); it != item.second.end();) {
       if ((*it).get().transactionId() == transaction_id) {
+        // TODO timeout handle this transaction, need send 408 timeout
+        //
         it = item.second.erase(it);
       } else {
         ++it;

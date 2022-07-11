@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: DNS Filter]
 // DNS Filter :ref:`configuration overview <config_udp_listener_filters_dns_filter>`.
-// [#extension: envoy.filters.udp_listener.dns_filter]
+// [#extension: envoy.filters.udp.dns_filter]
 
 // Configuration for the DNS filter.
 message DnsFilterConfig {

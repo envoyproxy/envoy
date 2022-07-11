@@ -113,7 +113,7 @@ generate_cert_chain() {
         then
             ca_name="i$((x - 1))"
         fi
-        echo $x: $certname $ca_name
+        echo "$x: $certname $ca_name"
         generate_ca $certname $ca_name
     done
     for x in {1..3}; do

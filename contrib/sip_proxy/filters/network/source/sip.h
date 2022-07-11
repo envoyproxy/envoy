@@ -33,7 +33,7 @@ enum HeaderType {
 
 enum class MsgType { Request, Response, ErrorMsg };
 
-enum class MethodType {
+enum MethodType {
   Invite,
   Register,
   Update,
@@ -59,8 +59,6 @@ enum class AppExceptionType {
   ProtocolError = 7,
   InvalidTransform = 8,
   InvalidProtocol = 9,
-  // FBThrift values.
-  // See https://github.com/facebook/fbthrift/blob/master/thrift/lib/cpp/TApplicationException.h#L52
   UnsupportedClientType = 10,
   LoadShedding = 11,
   Timeout = 12,
@@ -108,6 +106,7 @@ private:
 };
 
 using HeaderTypes = ConstSingleton<HeaderTypeMap>;
+extern std::vector<std::string> methodStr;
 
 } // namespace SipProxy
 } // namespace NetworkFilters

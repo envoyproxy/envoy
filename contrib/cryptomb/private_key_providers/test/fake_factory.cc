@@ -78,8 +78,6 @@ uint32_t FakeIppCryptoImpl::mbxRsaPrivateCrtSslMb8(
     status = mbxSetSts(status, i, inject_errors_ ? !ret : ret);
   }
 
-  UNREFERENCED_PARAMETER(expected_rsa_bitsize);
-
   return status;
 }
 
@@ -109,8 +107,6 @@ uint32_t FakeIppCryptoImpl::mbxRsaPublicSslMb8(const uint8_t* const from_pa[8],
 
     status = mbxSetSts(status, i, inject_errors_ ? !ret : ret);
   }
-
-  UNREFERENCED_PARAMETER(expected_rsa_bitsize);
 
   return status;
 }

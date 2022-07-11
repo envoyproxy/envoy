@@ -100,10 +100,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "happy_eyeballs_connection_impl_test",
-    srcs = ["happy_eyeballs_connection_impl_test.cc"],
+    name = "happy_eyeballs_connection_provider_test",
+    srcs = ["happy_eyeballs_connection_provider_test.cc"],
     deps = [
         "//source/common/network:happy_eyeballs_connection_impl_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "multi_connection_base_impl_test",
+    srcs = ["multi_connection_base_impl_test.cc"],
+    deps = [
+        "//source/common/network:multi_connection_base_impl_lib",
         "//source/common/network:socket_option_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",

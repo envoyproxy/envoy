@@ -28,12 +28,15 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class FakeTransportSocketFactory : public Network::TransportSocketFactory {
+class FakeTransportSocketFactory : public Network::UpstreamTransportSocketFactory {
 public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, supportsAlpn, (), (const));
+  MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
-              (Network::TransportSocketOptionsConstSharedPtr), (const));
+              (Network::TransportSocketOptionsConstSharedPtr,
+               Upstream::HostDescriptionConstSharedPtr),
+              (const));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&, Network::TransportSocketOptionsConstSharedPtr),
               (const));
   FakeTransportSocketFactory(std::string id, bool alpn) : supports_alpn_(alpn), id_(std::move(id)) {
@@ -48,17 +51,20 @@ private:
 };
 
 class FooTransportSocketFactory
-    : public Network::TransportSocketFactory,
+    : public Network::UpstreamTransportSocketFactory,
       public Server::Configuration::UpstreamTransportSocketConfigFactory,
       Logger::Loggable<Logger::Id::upstream> {
 public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
-              (Network::TransportSocketOptionsConstSharedPtr), (const));
+              (Network::TransportSocketOptionsConstSharedPtr,
+               Upstream::HostDescriptionConstSharedPtr),
+              (const));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&, Network::TransportSocketOptionsConstSharedPtr),
               (const));
+  MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
 
-  Network::TransportSocketFactoryPtr
+  Network::UpstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& proto,
                                Server::Configuration::TransportSocketFactoryContext&) override {
     const auto& node = dynamic_cast<const envoy::config::core::v3::Node&>(proto);
@@ -107,9 +113,9 @@ protected:
 
   TransportSocketMatcherPtr matcher_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_context_;
-  Network::TransportSocketFactoryPtr mock_default_factory_;
+  Network::UpstreamTransportSocketFactoryPtr mock_default_factory_;
   Stats::IsolatedStoreImpl stats_store_;
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
 };
 
 TEST_F(TransportSocketMatcherTest, ReturnDefaultSocketFactoryWhenNoMatch) {

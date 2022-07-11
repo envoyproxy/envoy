@@ -91,9 +91,10 @@ def _config(key):
 sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
-    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig',
-    'sphinx.ext.intersphinx', 'sphinx_tabs.tabs', 'sphinx_copybutton', 'validating_code_block',
-    'sphinxext.rediraffe', 'powershell_lexer'
+    'envoy.docs.sphinx_runner.ext.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig',
+    'sphinx.ext.intersphinx', 'sphinx_tabs.tabs', 'sphinx_copybutton',
+    'envoy.docs.sphinx_runner.ext.validating_code_block', 'sphinxext.rediraffe',
+    'envoy.docs.sphinx_runner.ext.powershell_lexer'
 ]
 
 release_level = _config('release_level')
@@ -106,7 +107,7 @@ extlinks = {
 
 # Only lookup intersphinx for explicitly prefixed in cross-references
 # This makes docs versioning work
-intersphinx_disabled_domains = ['std']
+intersphinx_disabled_reftypes = ['*']
 
 # Setup global substitutions
 if 'pre-release' in release_level:
@@ -313,22 +314,6 @@ htmlhelp_basename = 'envoydoc'
 # TODO(phlax): add redirect diff (`rediraffe_branch` setting)
 #  - not sure how diffing will work with main merging in PRs - might need
 #    to be injected dynamically, somehow
-rediraffe_redirects = "envoy-redirects.txt"
+rediraffe_redirects = "redirects.txt"
 
-intersphinx_mapping = {
-    'v1.5': ('https://www.envoyproxy.io/docs/envoy/v1.5.0', None),
-    'v1.6': ('https://www.envoyproxy.io/docs/envoy/v1.6.0', None),
-    'v1.7': ('https://www.envoyproxy.io/docs/envoy/v1.7.1', None),
-    'v1.8': ('https://www.envoyproxy.io/docs/envoy/v1.8.0', None),
-    'v1.9': ('https://www.envoyproxy.io/docs/envoy/v1.9.1', None),
-    'v1.10': ('https://www.envoyproxy.io/docs/envoy/v1.10.0', None),
-    'v1.11': ('https://www.envoyproxy.io/docs/envoy/v1.11.2', None),
-    'v1.12': ('https://www.envoyproxy.io/docs/envoy/v1.12.6', None),
-    'v1.13': ('https://www.envoyproxy.io/docs/envoy/v1.13.3', None),
-    'v1.14': ('https://www.envoyproxy.io/docs/envoy/v1.14.7', None),
-    'v1.15': ('https://www.envoyproxy.io/docs/envoy/v1.15.5', None),
-    'v1.16': ('https://www.envoyproxy.io/docs/envoy/v1.16.5', None),
-    'v1.17': ('https://www.envoyproxy.io/docs/envoy/v1.17.4', None),
-    'v1.18': ('https://www.envoyproxy.io/docs/envoy/v1.18.4', None),
-    'v1.19': ('https://www.envoyproxy.io/docs/envoy/v1.19.1', None),
-}
+intersphinx_mapping = _config("intersphinx_mapping")
