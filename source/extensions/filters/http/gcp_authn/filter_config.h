@@ -13,7 +13,8 @@ namespace GcpAuthn {
 
 class GcpAuthnFilterFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>,
+          envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig,
+          envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig>,
       public Logger::Loggable<Logger::Id::filter> {
 public:
   GcpAuthnFilterFactory() : FactoryBase(std::string(FilterName)) {}
@@ -21,6 +22,12 @@ public:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig&
+          proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 } // namespace GcpAuthn

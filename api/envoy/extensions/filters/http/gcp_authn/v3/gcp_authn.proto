@@ -46,3 +46,7 @@ message TokenCacheConfig {
   // Default value 0 (i.e., proto3 defaults) disables the cache by default. Other default values will enable the cache.
   google.protobuf.UInt64Value cache_size = 1 [(validate.rules).uint64 = {lte: 9223372036854775807}];
 }
+
+message GcpAuthnFilterPerRouteConfig {
+  Audience audience = 1;
+}

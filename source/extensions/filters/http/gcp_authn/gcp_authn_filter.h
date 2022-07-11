@@ -35,6 +35,22 @@ struct GcpAuthnFilterStats {
 using FilterConfigProtoSharedPtr =
     std::shared_ptr<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>;
 
+class RouteSpecificGcpAuthnFilterConfig : public Envoy::Router::RouteSpecificFilterConfig {
+public:
+  explicit RouteSpecificGcpAuthnFilterConfig(
+      const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig&
+          filter_config)
+      : config_(filter_config) {}
+
+  const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig&
+  config() const {
+    return config_;
+  }
+
+private:
+  const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig config_;
+};
+
 class GcpAuthnFilter : public Http::PassThroughFilter,
                        public RequestCallbacks,
                        public Logger::Loggable<Logger::Id::filter> {

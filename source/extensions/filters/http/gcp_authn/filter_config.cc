@@ -12,6 +12,7 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
+using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig;
 
 Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
     const GcpAuthnFilterConfig& config, const std::string& stats_prefix,
@@ -26,6 +27,13 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
         config, context, stats_prefix,
         (token_cache != nullptr) ? &token_cache->tls.get()->cache() : nullptr));
   };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+GcpAuthnFilterFactory::createRouteSpecificFilterConfigTyped(
+    const GcpAuthnFilterPerRouteConfig& proto_config, Server::Configuration::ServerFactoryContext&,
+    ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const RouteSpecificGcpAuthnFilterConfig>(proto_config);
 }
 
 /**

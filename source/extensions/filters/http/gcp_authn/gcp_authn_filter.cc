@@ -31,6 +31,15 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
+  const RouteSpecificGcpAuthnFilterConfig* route_config =
+      Envoy::Http::Utility::resolveMostSpecificPerFilterConfig<RouteSpecificGcpAuthnFilterConfig>(
+          std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName), route);
+  auto audience_per_route = route_config->config().audience();
+  // if (!audience_per_route.url().empty() && audience_per_route.url() != "http://test.com") {
+  //   ENVOY_LOG(error, "URL is {}", audience_per_route.url());
+  // }
+  ENVOY_LOG(error, "hahaha URL is {}", audience_per_route.url());
+
   state_ = State::Calling;
   initiating_call_ = true;
 

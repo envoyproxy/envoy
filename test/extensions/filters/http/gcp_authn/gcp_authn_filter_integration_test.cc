@@ -47,6 +47,63 @@ public:
   }
 
   void initializeConfig(bool add_audience) {
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig
+              per_route_config;
+          auto* audience = per_route_config.mutable_audience();
+          audience->set_url(std::string(AudienceValue));
+          auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+          auto* route = vhost->mutable_routes(0);
+
+          (*route->mutable_typed_per_filter_config())
+              [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                  .PackFrom(per_route_config);
+
+          auto* route2 = vhost->add_routes();
+          route2->MergeFrom(hcm.route_config().virtual_hosts(0).routes(0));
+          // Modify the route's match to wrong one so that the traffic will be routed by route2
+          // and we expect the `hahaha` audience url to be used.
+          // And then it is overrrided at weighted cluster level so final url is hahaha_0.
+          route->mutable_match()->set_prefix("/both");
+          route2->set_name("route-2");
+          envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig config_2;
+          auto* audience_2 = config_2.mutable_audience();
+          audience_2->set_url("hahaha");
+          (*route2->mutable_typed_per_filter_config())
+              [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                  .PackFrom(config_2);
+
+          for (int i = 0; i < 2; ++i) {
+            auto* cluster_with_name = hcm.mutable_route_config()
+                                          ->mutable_virtual_hosts(0)
+                                          ->mutable_routes(1)
+                                          ->mutable_route()
+                                          ->mutable_weighted_clusters()
+                                          ->add_clusters();
+            if (i == 1) {
+              cluster_with_name->set_name("gcp_authn");
+              cluster_with_name->mutable_weight()->set_value(0);
+            } else {
+              // The destination cluster is cluster_0 and gcp_authn cluster is reached by http callout.
+              // So we set weight of cluster_0 to 100.
+              cluster_with_name->set_name("cluster_0");
+              cluster_with_name->mutable_weight()->set_value(100);
+            }
+
+
+            envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterPerRouteConfig config;
+            auto* aud = config.mutable_audience();
+            //aud->set_url(absl::StrFormat("hahaha_%d", i))
+            // Override here.
+            aud->set_url(absl::StrFormat("hahaha_%d", i));
+            (*cluster_with_name->mutable_typed_per_filter_config())
+                [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                    .PackFrom(config);
+          }
+        });
+
     config_helper_.addConfigModifier([this, add_audience](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* gcp_authn_cluster = bootstrap.mutable_static_resources()->add_clusters();
