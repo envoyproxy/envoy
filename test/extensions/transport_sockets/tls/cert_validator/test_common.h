@@ -24,10 +24,7 @@ public:
     return status_;
   }
 
-  Ssl::ValidateResultCallbackPtr
-  createValidateResultCallback(uint8_t /*current_tls_alert*/) override {
-    return nullptr;
-  };
+  Ssl::ValidateResultCallbackPtr createValidateResultCallback() override { return nullptr; };
 
   void onCertificateValidationCompleted(bool succeeded) override {
     validate_result_ = succeeded ? Ssl::ValidateStatus::Successful : Ssl::ValidateStatus::Failed;

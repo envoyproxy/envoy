@@ -49,8 +49,8 @@ public:
                     Ssl::SslExtendedSocketInfo* ssl_extended_info,
                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                     SSL_CTX& ssl_ctx,
-                    const CertValidator::ExtraValidationContext& validation_context, bool is_server,
-                    uint8_t current_tls_alert) override;
+                    const CertValidator::ExtraValidationContext& validation_context,
+                    bool is_server) override;
 
   int initializeSslContexts(std::vector<SSL_CTX*> contexts, bool provides_certificates) override;
 
@@ -75,7 +75,7 @@ private:
   bool verifyCertChainUsingTrustBundleStore(Ssl::SslExtendedSocketInfo* ssl_extended_info,
                                             X509& leaf_cert, STACK_OF(X509)* cert_chain,
                                             X509_VERIFY_PARAM* verify_param,
-                                            std::string* error_details, uint8_t* out_alert);
+                                            std::string* error_details);
 
   bool allow_expired_certificate_{false};
   std::vector<bssl::UniquePtr<X509>> ca_certs_;

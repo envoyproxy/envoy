@@ -85,7 +85,6 @@ public:
    * @param ssl_ctx the config context this validation should use.
    * @param validation_context a placeholder for additional validation parameters.
    * @param is_server whether the validation is on server side.
-   * @param current_tls_alert the TLS alert from boring SSL stack.
    * @return ValidationResult the validation status and error messages if there is any.
    */
   virtual ValidationResults
@@ -93,7 +92,7 @@ public:
                     Ssl::SslExtendedSocketInfo* ssl_extended_info,
                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                     SSL_CTX& ssl_ctx, const ExtraValidationContext& validation_context,
-                    bool is_server, uint8_t current_tls_alert) PURE;
+                    bool is_server) PURE;
 
   /**
    * Called to initialize all ssl contexts

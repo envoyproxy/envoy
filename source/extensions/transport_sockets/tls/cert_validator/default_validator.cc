@@ -308,8 +308,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
-    const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server,
-    uint8_t current_tls_alert) {
+    const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server) {
   if (sk_X509_num(&cert_chain) == 0) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(
@@ -344,14 +343,14 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
       ENVOY_LOG(debug, error);
       return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
     }
-    int ret = X509_verify_cert(ctx.get());
+    const bool verify_succeeded = (X509_verify_cert(ctx.get()) == 1);
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(
-          ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
-                   : Envoy::Ssl::ClientValidationStatus::Failed);
+          verify_succeeded ? Envoy::Ssl::ClientValidationStatus::Validated
+                           : Envoy::Ssl::ClientValidationStatus::Failed);
     }
 
-    if (ret <= 0) {
+    if (!verify_succeeded) {
       stats_.fail_verify_error_.inc();
       const std::string error =
           absl::StrCat("verify cert failed: ", Utility::getX509VerificationErrorInfo(ctx.get()));
@@ -365,13 +364,13 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     }
   }
   std::string error_details;
-  bool succeeded =
-      verifyCertAndUpdateStatus(ssl_extended_info, leaf_cert, transport_socket_options.get(),
-                                &error_details, &current_tls_alert);
+  uint8_t tls_alert = SSL_AD_CERTIFICATE_UNKNOWN;
+  const bool succeeded = verifyCertAndUpdateStatus(
+      ssl_extended_info, leaf_cert, transport_socket_options.get(), &error_details, &tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                        absl::nullopt, absl::nullopt}
-                   : ValidationResults{ValidationResults::ValidationStatus::Failed,
-                                       current_tls_alert, error_details};
+                   : ValidationResults{ValidationResults::ValidationStatus::Failed, tls_alert,
+                                       error_details};
 }
 
 bool DefaultCertValidator::verifySubjectAltName(X509* cert,

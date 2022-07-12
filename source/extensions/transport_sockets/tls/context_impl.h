@@ -128,8 +128,7 @@ protected:
   // Helper function to validate cert for TCP connections asynchronously.
   ValidationResults customVerifyCertChain(
       Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
-      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl,
-      uint8_t current_tls_alert);
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
