@@ -126,11 +126,12 @@ AuthType getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_
   switch (authType) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-      OAuth2Config_AuthType_BASIC_AUTH:
-    return AuthType::BASIC_AUTH;
-  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_URL_ENCODED_BODY:
     return AuthType::URL_ENCODED_BODY;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+      OAuth2Config_AuthType_BASIC_AUTH:
+  default:
+    return AuthType::BASIC_AUTH;
   }
 }
 
