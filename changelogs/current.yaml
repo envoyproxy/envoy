@@ -254,7 +254,7 @@ new_features:
     added dynamic listener filter configuration for listener filters. :ref:`dynamic listener filter re-configuration<envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`. This dynamic listener filter configuration is only supported in TCP listeners.
 - area: listener
   change: |
-    added multiple listening addresses in single listener. :ref:`dynamic listener filter re-configuration<envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`
+    added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.additional_addresses>`.
 - area: redis
   change: |
     added support for multiple passwords to the redis proxy. See :ref:`downstream_auth_passwords <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_passwords>`.
