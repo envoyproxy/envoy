@@ -40,11 +40,11 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   Http::RequestMessagePtr request = createPostRequest();
   std::string body;
   switch (auth_type) {
-  case AuthType::URL_ENCODED_BODY:
+  case AuthType::UrlEncodedBody:
     body = fmt::format(GetAccessTokenBodyFormatString_01, auth_code, encoded_client_id,
                        encoded_secret, encoded_cb_url);
     break;
-  case AuthType::BASIC_AUTH:
+  case AuthType::BasicAuth:
     const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
     const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
     const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);

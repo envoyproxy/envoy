@@ -557,7 +557,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  AuthType::URL_ENCODED_BODY));
+                                                  AuthType::UrlEncodedBody));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
@@ -813,7 +813,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  AuthType::URL_ENCODED_BODY));
+                                                  AuthType::UrlEncodedBody));
 
   // Invoke the callback logic. As a side effect, state_ will be populated.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,

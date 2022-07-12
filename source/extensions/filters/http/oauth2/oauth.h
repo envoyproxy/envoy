@@ -29,7 +29,7 @@ public:
 /**
  * This is the enum class for authentication types used in client to auth server requests.
  */
-enum class AuthType { BASIC_AUTH, URL_ENCODED_BODY };
+enum class AuthType { BasicAuth, UrlEncodedBody };
 
 } // namespace Oauth2
 } // namespace HttpFilters

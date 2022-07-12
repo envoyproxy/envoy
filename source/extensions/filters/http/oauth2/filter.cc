@@ -122,16 +122,17 @@ std::string findValue(const absl::flat_hash_map<std::string, std::string>& map,
   return value_it != map.end() ? value_it->second : EMPTY_STRING;
 }
 
-AuthType getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType authType) {
-  switch (authType) {
+AuthType
+getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType auth_type) {
+  switch (auth_type) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_URL_ENCODED_BODY:
-    return AuthType::URL_ENCODED_BODY;
+    return AuthType::UrlEncodedBody;
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_BASIC_AUTH:
   default:
-    return AuthType::BASIC_AUTH;
+    return AuthType::BasicAuth;
   }
 }
 
