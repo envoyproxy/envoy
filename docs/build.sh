@@ -64,8 +64,8 @@ mkdir -p "${DOCS_OUTPUT_DIR}"
 
 # Save html/rst to output directory
 if [[ -n "${BUILD_HTML}" ]]; then
-    tar -xf bazel-bin/docs/html.tar -C "$DOCS_OUTPUT_DIR"
+    tar -xzf bazel-bin/docs/html.tar.gz -C "$DOCS_OUTPUT_DIR"
 fi
 if [[ -n "${BUILD_RST}" ]]; then
-    gzip -c bazel-bin/docs/rst.tar > "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+    cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
 fi

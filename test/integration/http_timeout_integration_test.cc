@@ -49,7 +49,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("504", response->headers().getStatusValue());
   EXPECT_EQ(response->headers().getProxyStatusValue(),
-            "envoy; error=connection_timeout; details=\"upstream_response_timeout; UT\"");
+            "envoy; error=connection_timeout; details=\"response_timeout; UT\"");
 }
 
 // Testing that `x-envoy-expected-timeout-ms` header, set by egress envoy, is respected by ingress

@@ -371,6 +371,23 @@ resource_spans:
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+TEST_F(OpenTelemetryDriverTest, IgnoreNotSampledSpan) {
+  setupValidDriver();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
+                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  span->setSampled(false);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
 } // namespace OpenTelemetry
 } // namespace Tracers
 } // namespace Extensions

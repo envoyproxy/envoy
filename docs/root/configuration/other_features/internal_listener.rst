@@ -38,8 +38,6 @@ This extension emits the following statistics:
    :widths: 1, 1, 2
 
    no_metadata, Counter, Metadata key is absent from the import location.
-   no_filter_state, Counter, Filter state object key is absent from the downstream filter state.
-   filter_state_error, Counter, Unable to copy the filter state object (e.g. it is read only).
 
 Example config
 --------------
