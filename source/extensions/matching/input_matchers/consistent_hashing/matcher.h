@@ -14,14 +14,14 @@ class Matcher : public Envoy::Matcher::InputMatcher {
 public:
   Matcher(uint32_t threshold, uint32_t modulo, uint64_t seed)
       : threshold_(threshold), modulo_(modulo), seed_(seed) {}
-  bool match(absl::optional<absl::string_view> input) override {
+  bool match(const Envoy::Matcher::InputValue& input) override {
     // Only match if the value is present.
-    if (!input) {
+    if (input.isNull()) {
       return false;
     }
 
     // Otherwise, match if (hash(input) % modulo) >= threshold.
-    return HashUtil::xxHash64(*input, seed_) % modulo_ >= threshold_;
+    return HashUtil::xxHash64(input.toString(), seed_) % modulo_ >= threshold_;
   }
 
 private:

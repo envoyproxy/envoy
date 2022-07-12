@@ -25,11 +25,11 @@ Matcher::Matcher(std::vector<Network::Address::CidrRange> const& ranges,
       // store any associated data.
       trie_({{true, ranges}}), stats_(generateStats(stat_prefix, stat_scope)) {}
 
-bool Matcher::match(absl::optional<absl::string_view> input) {
-  if (!input) {
+bool Matcher::match(const Envoy::Matcher::InputValue& input) {
+  if (input.kind() != Envoy::Matcher::InputValue::Kind::String) {
     return false;
   }
-  const absl::string_view ip_str = *input;
+  const absl::string_view ip_str = input.asString();
   if (ip_str.empty()) {
     return false;
   }
