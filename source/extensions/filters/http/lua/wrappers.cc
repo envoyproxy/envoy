@@ -119,7 +119,8 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
 }
 
 int StreamInfoWrapper::luaProtocol(lua_State* state) {
-  lua_pushstring(state, Http::Utility::getProtocolString(stream_info_.protocol().value()).c_str());
+  const std::string& protocol = Http::Utility::getProtocolString(stream_info_.protocol().value());
+  lua_pushlstring(state, protocol.c_str(), protocol.length());
   return 1;
 }
 
@@ -148,19 +149,23 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
 }
 
 int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {
-  lua_pushstring(state,
-                 stream_info_.downstreamAddressProvider().localAddress()->asString().c_str());
+  const std::string& local_address =
+      stream_info_.downstreamAddressProvider().localAddress()->asString();
+  lua_pushlstring(state, local_address.c_str(), local_address.length());
   return 1;
 }
 
 int StreamInfoWrapper::luaDownstreamDirectRemoteAddress(lua_State* state) {
-  lua_pushstring(
-      state, stream_info_.downstreamAddressProvider().directRemoteAddress()->asString().c_str());
+  const std::string& direct_remote_address =
+      stream_info_.downstreamAddressProvider().directRemoteAddress()->asString();
+  lua_pushlstring(state, direct_remote_address.c_str(), direct_remote_address.length());
   return 1;
 }
 
 int StreamInfoWrapper::luaRequestedServerName(lua_State* state) {
-  lua_pushstring(state, stream_info_.downstreamAddressProvider().requestedServerName().data());
+  absl::string_view requested_serve_name =
+      stream_info_.downstreamAddressProvider().requestedServerName();
+  lua_pushlstring(state, requested_serve_name.data(), requested_serve_name.length());
   return 1;
 }
 
@@ -175,7 +180,7 @@ int DynamicMetadataMapIterator::luaPairsIterator(lua_State* state) {
     return 0;
   }
 
-  lua_pushstring(state, current_->first.c_str());
+  lua_pushlstring(state, current_->first.c_str(), current_->first.length());
   Filters::Common::Lua::MetadataMapHelper::createTable(state, current_->second.fields());
 
   current_++;
@@ -229,7 +234,7 @@ int PublicKeyWrapper::luaGet(lua_State* state) {
   if (public_key_.empty()) {
     lua_pushnil(state);
   } else {
-    lua_pushstring(state, public_key_.c_str());
+    lua_pushlstring(state, public_key_.c_str(), public_key_.length());
   }
   return 1;
 }

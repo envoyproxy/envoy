@@ -22,7 +22,7 @@ template <typename StringList>
 void createLuaTableFromStringList(lua_State* state, const StringList& list) {
   lua_createtable(state, list.size(), 0);
   for (size_t i = 0; i < list.size(); i++) {
-    lua_pushstring(state, list[i].c_str());
+    lua_pushlstring(state, list[i].c_str(), list[i].size());
     // After the list[i].c_str() is pushed to the stack, we need to set the "current element" with
     // that value. The lua_rawseti(state, t, i) helps us to set the value of table t with key i.
     // Given the index of the current element/table in the stack is below the pushed value i.e. -2
@@ -121,7 +121,7 @@ void MetadataMapHelper::createTable(lua_State* state,
   lua_createtable(state, 0, fields.size());
   for (const auto& field : fields) {
     int top = lua_gettop(state);
-    lua_pushstring(state, field.first.c_str());
+    lua_pushlstring(state, field.first.c_str(), field.first.length());
     setValue(state, field.second);
     lua_settable(state, top);
   }
@@ -229,7 +229,7 @@ int MetadataMapIterator::luaPairsIterator(lua_State* state) {
     return 0;
   }
 
-  lua_pushstring(state, current_->first.c_str());
+  lua_pushlstring(state, current_->first.c_str(), current_->first.length());
   MetadataMapHelper::setValue(state, current_->second);
 
   current_++;
@@ -273,22 +273,26 @@ int SslConnectionWrapper::luaUriSanLocalCertificate(lua_State* state) {
 }
 
 int SslConnectionWrapper::luaSha256PeerCertificateDigest(lua_State* state) {
-  lua_pushstring(state, connection_info_.sha256PeerCertificateDigest().c_str());
+  const std::string& cert_digest = connection_info_.sha256PeerCertificateDigest();
+  lua_pushlstring(state, cert_digest.c_str(), cert_digest.length());
   return 1;
 }
 
 int SslConnectionWrapper::luaSerialNumberPeerCertificate(lua_State* state) {
-  lua_pushstring(state, connection_info_.serialNumberPeerCertificate().c_str());
+  const std::string& peer_cert = connection_info_.serialNumberPeerCertificate();
+  lua_pushlstring(state, peer_cert.c_str(), peer_cert.length());
   return 1;
 }
 
 int SslConnectionWrapper::luaIssuerPeerCertificate(lua_State* state) {
-  lua_pushstring(state, connection_info_.issuerPeerCertificate().c_str());
+  const std::string& peer_cert_serial = connection_info_.issuerPeerCertificate();
+  lua_pushlstring(state, peer_cert_serial.c_str(), peer_cert_serial.length());
   return 1;
 }
 
 int SslConnectionWrapper::luaSubjectPeerCertificate(lua_State* state) {
-  lua_pushstring(state, connection_info_.subjectPeerCertificate().c_str());
+  const std::string& peer_cert_subject = connection_info_.subjectPeerCertificate();
+  lua_pushlstring(state, peer_cert_subject.c_str(), peer_cert_subject.length());
   return 1;
 }
 
@@ -298,7 +302,8 @@ int SslConnectionWrapper::luaUriSanPeerCertificate(lua_State* state) {
 }
 
 int SslConnectionWrapper::luaSubjectLocalCertificate(lua_State* state) {
-  lua_pushstring(state, connection_info_.subjectLocalCertificate().c_str());
+  const std::string& subject_local_cert = connection_info_.subjectLocalCertificate();
+  lua_pushlstring(state, subject_local_cert.c_str(), subject_local_cert.length());
   return 1;
 }
 
@@ -323,33 +328,40 @@ int SslConnectionWrapper::luaExpirationPeerCertificate(lua_State* state) {
 }
 
 int SslConnectionWrapper::luaSessionId(lua_State* state) {
-  lua_pushstring(state, connection_info_.sessionId().c_str());
+  const std::string& session_id = connection_info_.sessionId();
+  lua_pushlstring(state, session_id.c_str(), session_id.length());
   return 1;
 }
 
 int SslConnectionWrapper::luaCiphersuiteId(lua_State* state) {
-  lua_pushstring(state,
-                 absl::StrCat("0x", Hex::uint16ToHex(connection_info_.ciphersuiteId())).c_str());
+  const std::string& cipher_suite_id =
+      absl::StrCat("0x", Hex::uint16ToHex(connection_info_.ciphersuiteId()));
+  lua_pushlstring(state, cipher_suite_id.c_str(), cipher_suite_id.length());
   return 1;
 }
 
 int SslConnectionWrapper::luaCiphersuiteString(lua_State* state) {
-  lua_pushstring(state, connection_info_.ciphersuiteString().c_str());
+  const std::string& cipher_suite = connection_info_.ciphersuiteString();
+  lua_pushlstring(state, cipher_suite.c_str(), cipher_suite.length());
   return 1;
 }
 
 int SslConnectionWrapper::luaUrlEncodedPemEncodedPeerCertificate(lua_State* state) {
-  lua_pushstring(state, connection_info_.urlEncodedPemEncodedPeerCertificate().c_str());
+  const std::string& peer_cert_pem = connection_info_.urlEncodedPemEncodedPeerCertificate();
+  lua_pushlstring(state, peer_cert_pem.c_str(), peer_cert_pem.length());
   return 1;
 }
 
 int SslConnectionWrapper::luaUrlEncodedPemEncodedPeerCertificateChain(lua_State* state) {
-  lua_pushstring(state, connection_info_.urlEncodedPemEncodedPeerCertificateChain().c_str());
+  const std::string& peer_cert_chain_pem =
+      connection_info_.urlEncodedPemEncodedPeerCertificateChain();
+  lua_pushlstring(state, peer_cert_chain_pem.c_str(), peer_cert_chain_pem.length());
   return 1;
 }
 
 int SslConnectionWrapper::luaTlsVersion(lua_State* state) {
-  lua_pushstring(state, connection_info_.tlsVersion().c_str());
+  const std::string& tls_version = connection_info_.tlsVersion();
+  lua_pushlstring(state, tls_version.c_str(), tls_version.length());
   return 1;
 }
 

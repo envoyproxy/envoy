@@ -422,26 +422,22 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
 TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
   const std::string SCRIPT{R"EOF(
     function callMe(object)
-      local bin_data = object:dynamicMetadata():get("envoy.pp")["bin_data"]
-      local hex_table = { }
-      local data_length = 8
+      local metadata = request_handle:streamInfo():dynamicMetadata():get("envoy.pp")
+      local bin_data = metadata["bin_data"]
+      local str_table = { }
+      local data_length = string.len(metadata["bin_data"])
       for idx = 1, data_length do
-        local hex_value = string.format('%x', string.byte(bin_data, idx))
-        if string.len(string.format('%x', string.byte(bin_data, idx))) < 2 then
-          hex_table[data_length - idx + 1] = '0'..hex_value
-        else
-          hex_table[data_length - idx + 1] = hex_value
+        if string.byte(bin_data, idx) ~= 0 then
+          str_table[#str_table + 1] = string.char(string.byte(bin_data, idx))
         end
       end
-      local hex_data = table.concat(hex_table, '')
-      local int64_data = string.format('%d', tonumber(hex_data, 16))
-      testPrint('Data: ' .. int64_data)
+      testPrint:logTrace('Data: ' .. table.concat(str_table, ''))
     end
   )EOF"};
 
   ProtobufWkt::Value metadata_value;
-  const uint64_t e0 = 9688686178336770;
-  metadata_value.set_string_value(reinterpret_cast<char const*>(&e0), 8);
+  constexpr uint8_t buffer[] = {'h', 'e', 0x00, 'l', 'l', 'o'};
+  metadata_value.set_string_value(reinterpret_cast<char const*>(&buffer), sizeof(buffer));
   ProtobufWkt::Struct metadata;
   metadata.mutable_fields()->insert({"bin_data", metadata_value});
 
@@ -452,7 +448,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
 
-  EXPECT_CALL(printer_, testPrint("Data: 9688686178336770"));
+  EXPECT_CALL(printer_, testPrint("Data: hello"));
 
   start("callMe");
 }

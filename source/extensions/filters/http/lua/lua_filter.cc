@@ -657,12 +657,12 @@ int StreamHandleWrapper::luaTimestampString(lua_State* state) {
     auto milliseconds_since_epoch =
         std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
     std::string timestamp = std::to_string(milliseconds_since_epoch);
-    lua_pushstring(state, timestamp.c_str());
+    lua_pushlstring(state, timestamp.c_str(), timestamp.length());
   } else if (resolution == Timestamp::Resolution::Microsecond) {
     auto microseconds_since_epoch =
         std::chrono::duration_cast<std::chrono::microseconds>(now).count();
     std::string timestamp = std::to_string(microseconds_since_epoch);
-    lua_pushstring(state, timestamp.c_str());
+    lua_pushlstring(state, timestamp.c_str(), timestamp.length());
   } else {
     luaL_error(state, "timestamp format must be MILLISECOND or MICROSECOND.");
   }
