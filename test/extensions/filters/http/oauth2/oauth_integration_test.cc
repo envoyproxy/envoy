@@ -1,7 +1,7 @@
+#include "source/common/common/base64.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/common/base64.h"
 #include "source/extensions/filters/http/oauth2/filter.h"
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
 

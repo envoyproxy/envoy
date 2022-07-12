@@ -46,11 +46,10 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
     break;
   case AuthType::BASIC_AUTH:
     const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
-    const auto encoded_token =
-        Base64::encode(basic_auth_token.data(), basic_auth_token.size());
+    const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
     const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
     request->headers().appendCopy(Http::CustomHeaders::get().Authorization,
-                                    basic_auth_header_value);
+                                  basic_auth_header_value);
     body = fmt::format(GetAccessTokenBodyFormatString_02, auth_code, encoded_cb_url);
     break;
   }

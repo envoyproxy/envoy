@@ -64,7 +64,6 @@ message OAuth2Credentials {
 //
 // [#next-free-field: 11]
 message OAuth2Config {
-
   enum AuthType {
     // The client_id and clinet_secret will be sent using HTTP Basic authentication scheme.
     BASIC_AUTH = 0;
