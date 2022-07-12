@@ -69,11 +69,11 @@ private:
     addrinfo* info_;
   };
 
-  // Parse a GAI response and determine the final address list. We could potentially avoid adding
-  // v4 or v6 addresses if we know they will never be used. Right now the final filtering is done
-  // below and this code is kept simple.
+  // Parse a getaddrinfo() response and determine the final address list. We could potentially avoid
+  // adding v4 or v6 addresses if we know they will never be used. Right now the final filtering is
+  // done below and this code is kept simple.
   std::pair<ResolutionStatus, std::list<DnsResponse>>
-  processGaiResponse(const PendingQuery& query, const addrinfo* addrinfo_result) {
+  processResponse(const PendingQuery& query, const addrinfo* addrinfo_result) {
     std::list<DnsResponse> v4_results;
     std::list<DnsResponse> v6_results;
     for (auto ai = addrinfo_result; ai != nullptr; ai = ai->ai_next) {
@@ -161,7 +161,7 @@ private:
 
       ENVOY_LOG(debug, "popped pending query [{}]", next_query->dns_name_);
 
-      // For mock testing make sure the GAI response is freed prior to the post.
+      // For mock testing make sure the getaddrinfo() response is freed prior to the post.
       std::pair<ResolutionStatus, std::list<DnsResponse>> response;
       {
         addrinfo hints;
@@ -177,7 +177,7 @@ private:
             next_query->dns_name_.c_str(), nullptr, &hints, &addrinfo_result_do_not_use);
         auto addrinfo_wrapper = AddrInfoWrapper(addrinfo_result_do_not_use);
         if (rc.return_value_ == 0) {
-          response = processGaiResponse(*next_query, addrinfo_wrapper.get());
+          response = processResponse(*next_query, addrinfo_wrapper.get());
         } else {
           // TODO(mattklein123): Handle some errors differently such as `EAI_NODATA`.
           ENVOY_LOG(debug, "getaddrinfo failed with rc={} errno={}", gai_strerror(rc.return_value_),

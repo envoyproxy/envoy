@@ -460,7 +460,7 @@ SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVec
 
 SysCallIntResult OsSysCallsImpl::getaddrinfo(const char* node, const char* service,
                                              const addrinfo* hints, addrinfo** res) {
-  const auto rc = ::getaddrinfo(node, service, hints, res);
+  const int rc = ::getaddrinfo(node, service, hints, res);
   return {rc, errno};
 }
 
