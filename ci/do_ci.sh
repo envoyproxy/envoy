@@ -497,7 +497,12 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
 
   echo "check dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check -- -v warn
+  # Using todays date as an action_env expires the NIST cache daily, which is the update frequency
+  TODAY_DATE=$(date -u -I"date")
+  export TODAY_DATE
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
+        --action_env=TODAY_DATE \
+        -- -v warn
 
   # Run pip requirements tests
   echo "check pip..."
