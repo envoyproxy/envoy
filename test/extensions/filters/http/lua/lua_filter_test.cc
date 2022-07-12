@@ -83,7 +83,7 @@ public:
   // test cases, the existing configuration methods must be compatible.
   void setup(const std::string& lua_code) {
     envoy::extensions::filters::http::lua::v3::Lua proto_config;
-    proto_config.set_inline_code(lua_code);
+    proto_config.mutable_default_source_code()->set_inline_string(lua_code);
     envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
     setupConfig(proto_config, per_route_proto_config);
     setupFilter();
@@ -228,7 +228,7 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   NiceMock<Api::MockApi> api;
 
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
-  proto_config.set_inline_code(SCRIPT);
+  proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
 
   EXPECT_THROW_WITH_MESSAGE(FilterConfig(proto_config, tls, cluster_manager, api),
                             Filters::Common::Lua::LuaException,
@@ -2174,7 +2174,7 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
 // Test whether the route configuration can properly disable the Lua filter.
 TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
-  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  proto_config.mutable_default_source_code()->set_inline_string(ADD_HEADERS_SCRIPT);
   envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
   per_route_proto_config.set_disabled(true);
 
@@ -2214,7 +2214,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   )EOF"};
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
-  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  proto_config.mutable_default_source_code()->set_inline_string(ADD_HEADERS_SCRIPT);
   envoy::config::core::v3::DataSource source1, source2;
   source1.set_inline_string(SCRIPT_FOR_ROUTE_ONE);
   source2.set_inline_string(SCRIPT_FOR_ROUTE_TWO);
@@ -2244,7 +2244,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
   )EOF"};
 
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
-  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  proto_config.mutable_default_source_code()->set_inline_string(ADD_HEADERS_SCRIPT);
   envoy::config::core::v3::DataSource source1;
   source1.set_inline_string(SCRIPT_FOR_ROUTE_ONE);
   proto_config.mutable_source_codes()->insert({"route_one.lua", source1});

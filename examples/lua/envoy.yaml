@@ -27,16 +27,17 @@ static_resources:
           - name: envoy.filters.http.lua
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-              inline_code: |
-                local mylibrary = require("lib.mylibrary")
+              default_source_code:
+                inline_string:
+                  local mylibrary = require("lib.mylibrary")
 
-                function envoy_on_request(request_handle)
-                  request_handle:headers():add("foo", mylibrary.foobar())
-                end
-                function envoy_on_response(response_handle)
-                  body_size = response_handle:body():length()
-                  response_handle:headers():add("response-body-size", tostring(body_size))
-                end
+                  function envoy_on_request(request_handle)
+                    request_handle:headers():add("foo", mylibrary.foobar())
+                  end
+                  function envoy_on_response(response_handle)
+                    body_size = response_handle:body():length()
+                    response_handle:headers():add("response-body-size", tostring(body_size))
+                  end
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

@@ -361,8 +361,12 @@ public:
                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
                Api::Api& api);
 
-  PerLuaCodeSetup* perLuaCodeSetup(const std::string& name) const {
-    const auto iter = per_lua_code_setups_map_.find(name);
+  PerLuaCodeSetup* perLuaCodeSetup(absl::optional<absl::string_view> name = absl::nullopt) const {
+    if (!name.has_value()) {
+      return default_lua_code_setup_.get();
+    }
+
+    const auto iter = per_lua_code_setups_map_.find(name.value());
     if (iter != per_lua_code_setups_map_.end()) {
       return iter->second.get();
     }
@@ -372,6 +376,7 @@ public:
   Upstream::ClusterManager& cluster_manager_;
 
 private:
+  PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
 };
 
@@ -432,7 +437,7 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
     return config_per_route->perLuaCodeSetup();
   }
   ASSERT(filter_config);
-  return filter_config->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
+  return filter_config->perLuaCodeSetup();
 }
 
 } // namespace
