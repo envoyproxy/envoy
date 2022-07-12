@@ -42,13 +42,6 @@ behavior_changes:
     If there is no entry referred by the filter config name, the canonical filter name
     (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) will be used for the backwards
     compatibility.
-- area: lua
-  change: |
-    Update all HTTP filters to get per-filter config by the :ref:`HTTP filter config name
-    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
-    If there is no entry referred by the filter config name, the canonical filter name
-    (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) will be used for the backwards
-    compatibility.
 
 minor_behavior_changes:
 - area: thrift
