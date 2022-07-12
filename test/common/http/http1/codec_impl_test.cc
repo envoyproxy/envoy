@@ -46,8 +46,8 @@ enum class ParserImpl {
   BalsaParser // Balsa from QUICHE
 };
 
-std::string PrintToString(const ParserImpl& impl) {
-  return impl == ParserImpl::HttpParser ? "HttpParser" : "BalsaParser";
+std::string testParamToString(const ::testing::TestParamInfo<ParserImpl>& info) {
+  return info.param == ParserImpl::HttpParser ? "HttpParser" : "BalsaParser";
 }
 
 std::string createHeaderFragment(int num_headers) {
@@ -395,7 +395,7 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
 
 INSTANTIATE_TEST_SUITE_P(Parsers, Http1ServerConnectionImplTest,
                          ::testing::Values(ParserImpl::HttpParser, ParserImpl::BalsaParser),
-                         ::testing::PrintToStringParamName());
+                         testParamToString);
 
 TEST_P(Http1ServerConnectionImplTest, EmptyHeader) {
   initialize();
@@ -2257,7 +2257,7 @@ void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(uint32_t
 
 INSTANTIATE_TEST_SUITE_P(Parsers, Http1ClientConnectionImplTest,
                          ::testing::Values(ParserImpl::HttpParser, ParserImpl::BalsaParser),
-                         ::testing::PrintToStringParamName());
+                         testParamToString);
 
 TEST_P(Http1ClientConnectionImplTest, SimpleGet) {
   initialize();
