@@ -295,6 +295,10 @@ new_features:
 - area: rbac
   change: |
     added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
+- area: http
+  change: |
+    added :ref:`treat_missing_header_as_empty <envoy_v3_api_field_config.route.v3.HeaderMatcher.treat_missing_header_as_empty>` to allow
+header match rule to treat the header value as empty and apply the match rule when the header is missing.
 
 deprecated:
 - area: dubbo_proxy
