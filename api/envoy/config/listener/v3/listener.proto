@@ -34,7 +34,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Listener :ref:`configuration overview <config_listeners>`
 
 // The additional address the listener is listening on.
-// [#not-implemented-hide:]
 message AdditionalAddress {
   core.v3.Address address = 1;
 }
