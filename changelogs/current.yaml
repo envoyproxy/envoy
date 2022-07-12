@@ -138,6 +138,9 @@ minor_behavior_changes:
     remove unnecessary "spawnChild" annotations in OpenCensus tracer.
 
 bug_fixes:
+- area: grpc_json_transcoder
+  change: |
+    Response with a error messsage if a proto message is too deep (>64). Before the fix the response is an empty JSON.
 - area: http
   change: |
     Fixed HTTP/2 CONNECT to be RFC compliant, rather than following the abandoned extended connect draft.
