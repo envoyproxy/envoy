@@ -1,8 +1,7 @@
 #pragma once
 
-#include "source/server/admin/stats_render.h"
-
 #include "source/server/admin/admin_html_generator.h"
+#include "source/server/admin/stats_render.h"
 
 namespace Envoy {
 namespace Server {
