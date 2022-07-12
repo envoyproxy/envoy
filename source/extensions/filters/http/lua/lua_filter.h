@@ -15,8 +15,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-constexpr char GLOBAL_SCRIPT_NAME[] = "GLOBAL";
-
 class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
   PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls);
