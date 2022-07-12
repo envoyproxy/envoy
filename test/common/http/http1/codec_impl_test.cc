@@ -1055,10 +1055,6 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
 // This behavior was observed during CVE-2019-18801 and helped to limit the
 // scope of affected Envoy configurations.
 TEST_P(Http1ServerConnectionImplTest, RejectInvalidMethod) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    return;
-  }
-
   initialize();
 
   MockRequestDecoder decoder;
@@ -1863,10 +1859,6 @@ TEST_P(Http1ServerConnectionImplTest, UpgradeRequest) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, UpgradeRequestWithEarlyData) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    return;
-  }
-
   initialize();
 
   InSequence sequence;
@@ -1883,10 +1875,6 @@ TEST_P(Http1ServerConnectionImplTest, UpgradeRequestWithEarlyData) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, UpgradeRequestWithTEChunked) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    return;
-  }
-
   initialize();
 
   InSequence sequence;
@@ -2421,10 +2409,6 @@ TEST_P(Http1ClientConnectionImplTest, EmptyBodyResponse200) {
 }
 
 TEST_P(Http1ClientConnectionImplTest, HeadRequest) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    return;
-  }
-
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -2640,10 +2624,6 @@ TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
 }
 
 TEST_P(Http1ClientConnectionImplTest, NoContentLengthResponse) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    return;
-  }
-
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -2742,10 +2722,6 @@ TEST_P(Http1ClientConnectionImplTest, UpgradeResponse) {
 // Same data as above, but make sure directDispatch immediately hands off any
 // outstanding data.
 TEST_P(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    return;
-  }
-
   initialize();
 
   InSequence s;
@@ -2801,10 +2777,6 @@ TEST_P(Http1ClientConnectionImplTest, ConnectResponse) {
 // Same data as above, but make sure directDispatch immediately hands off any
 // outstanding data.
 TEST_P(Http1ClientConnectionImplTest, ConnectResponseWithEarlyData) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    return;
-  }
-
   initialize();
 
   InSequence s;
