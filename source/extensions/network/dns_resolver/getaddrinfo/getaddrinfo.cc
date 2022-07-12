@@ -161,26 +161,29 @@ private:
 
       ENVOY_LOG(debug, "popped pending query [{}]", next_query->dns_name_);
 
-      addrinfo hints;
-      memset(&hints, 0, sizeof(hints));
-      hints.ai_flags = AI_ADDRCONFIG;
-      hints.ai_family = AF_UNSPEC;
-      // If we don't specify a socket type, every address will appear twice, once
-      // for SOCK_STREAM and one for SOCK_DGRAM. Since we do not return the family
-      // anyway, just pick one.
-      hints.ai_socktype = SOCK_STREAM;
-      addrinfo* addrinfo_result_do_not_use = nullptr;
-      auto rc = Api::OsSysCallsSingleton::get().getaddrinfo(next_query->dns_name_.c_str(), nullptr,
-                                                            &hints, &addrinfo_result_do_not_use);
-      auto addrinfo_wrapper = AddrInfoWrapper(addrinfo_result_do_not_use);
+      // For mock testing make sure the GAI response is freed prior to the post.
       std::pair<ResolutionStatus, std::list<DnsResponse>> response;
-      if (rc.return_value_ == 0) {
-        response = processGaiResponse(*next_query, addrinfo_wrapper.get());
-      } else {
-        // TODO(mattklein123): Handle some errors differently such as `EAI_NODATA`.
-        ENVOY_LOG(debug, "getaddrinfo failed with rc={} errno={}", gai_strerror(rc.return_value_),
-                  errorDetails(rc.errno_));
-        response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
+      {
+        addrinfo hints;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_flags = AI_ADDRCONFIG;
+        hints.ai_family = AF_UNSPEC;
+        // If we don't specify a socket type, every address will appear twice, once
+        // for SOCK_STREAM and one for SOCK_DGRAM. Since we do not return the family
+        // anyway, just pick one.
+        hints.ai_socktype = SOCK_STREAM;
+        addrinfo* addrinfo_result_do_not_use = nullptr;
+        auto rc = Api::OsSysCallsSingleton::get().getaddrinfo(
+            next_query->dns_name_.c_str(), nullptr, &hints, &addrinfo_result_do_not_use);
+        auto addrinfo_wrapper = AddrInfoWrapper(addrinfo_result_do_not_use);
+        if (rc.return_value_ == 0) {
+          response = processGaiResponse(*next_query, addrinfo_wrapper.get());
+        } else {
+          // TODO(mattklein123): Handle some errors differently such as `EAI_NODATA`.
+          ENVOY_LOG(debug, "getaddrinfo failed with rc={} errno={}", gai_strerror(rc.return_value_),
+                    errorDetails(rc.errno_));
+          response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
+        }
       }
 
       dispatcher_.post(
