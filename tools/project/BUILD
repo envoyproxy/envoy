@@ -1,3 +1,4 @@
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("@envoy_repo//:path.bzl", "PATH")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")

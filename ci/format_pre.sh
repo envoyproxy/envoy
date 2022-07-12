@@ -60,6 +60,9 @@ fi
 CURRENT=check_format
 "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix --fail_on_diff
 
+CURRENT=owners
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:owners
+
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2
     for failed in "${FAILED[@]}"; do

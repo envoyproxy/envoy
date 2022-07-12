@@ -1,3 +1,4 @@
+load("@base_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("@envoy_repo//:path.bzl", "PATH")
@@ -30,4 +31,16 @@ envoy_entry_point(
         "@com_github_aignas_rules_shellcheck//:shellcheck",
     ],
     pkg = "envoy.code.check",
+)
+
+py_binary(
+    name = "owners",
+    srcs = ["owners.py"],
+    data = ["//:CODEOWNERS", "//:OWNERS.md"],
+    deps = [
+        "@envoy_repo",
+        "//tools/code_format:config",
+        requirement("aio.run.checker"),
+    ],
+    args = ["$(location //:CODEOWNERS)", "$(location //:OWNERS.md)"],
 )
