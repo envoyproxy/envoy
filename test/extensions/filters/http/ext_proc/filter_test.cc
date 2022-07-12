@@ -19,6 +19,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <algorithm>
 
 namespace Envoy {
 namespace Extensions {
@@ -242,19 +243,19 @@ protected:
   }
 
   // The number of processor grpc calls made in the encoding and decoding path.
-  void expectGrpcCalls(int decoding_processor_calls, int encoding_processor_calls) {
-    const auto& stream_stats =
+  void expectGrpcCalls(const envoy::config::core::v3::TrafficDirection trafic_direction,
+                       const Grpc::Status::GrpcStatus status, const int expected_calls) {
+    const ExtProcStreamStats::GrpcStats& grpc_call_stats =
         stream_info_.filterState()
             ->getDataReadOnly<
                 Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcStreamStats>(
-                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcStreamStatsName);
-
-    EXPECT_EQ(
-        stream_stats->grpcStats(envoy::config::core::v3::TrafficDirection::INBOUND).stats_.size(),
-        decoding_processor_calls);
-    EXPECT_EQ(
-        stream_stats->grpcStats(envoy::config::core::v3::TrafficDirection::OUTBOUND).stats_.size(),
-        encoding_processor_calls);
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcStreamStatsName)
+            ->grpcStats(trafic_direction);
+    int calls = std::count_if(grpc_call_stats.stats_.begin(), grpc_call_stats.stats_.end(),
+                              [&](ExtProcStreamStats::GrpcStats::GrpcCallStats grpc_call) {
+                                return grpc_call.status_ == status;
+                              });
+    EXPECT_EQ(calls, expected_calls);
   }
 
   envoy::config::core::v3::GrpcService grpc_service_;
@@ -338,7 +339,8 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
-  expectGrpcCalls(1, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -482,7 +484,8 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
-  expectGrpcCalls(1, 0);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 0);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1201,7 +1204,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_EQ(9, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(9, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
-  expectGrpcCalls(2, 7);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 2);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 7);
 }
 
 // Using a configuration with streaming set for the request and
@@ -1593,6 +1597,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Internal, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1647,6 +1652,8 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Internal, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
