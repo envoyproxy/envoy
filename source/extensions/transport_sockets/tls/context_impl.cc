@@ -1264,7 +1264,7 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
   // config.
   SSL_CTX* ssl_ctx = tls_contexts_[0].ssl_ctx_.get();
   if (SSL_CTX_get_verify_mode(ssl_ctx) == SSL_VERIFY_NONE) {
-    // Skip validation if the tls is configured SSL_VERIFY_NONE.
+    // Skip validation if the TLS is configured SSL_VERIFY_NONE.
     return {ValidationResults::ValidationStatus::Successful, absl::nullopt, absl::nullopt};
   }
   ValidationResults result = cert_validator_->doVerifyCertChain(
