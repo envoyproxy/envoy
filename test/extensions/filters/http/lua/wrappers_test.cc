@@ -422,7 +422,7 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
 TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
   const std::string SCRIPT{R"EOF(
     function callMe(object)
-      local metadata = request_handle:streamInfo():dynamicMetadata():get("envoy.pp")
+      local metadata = object:dynamicMetadata():get("envoy.pp")
       local bin_data = metadata["bin_data"]
       local str_table = { }
       local data_length = string.len(metadata["bin_data"])
@@ -431,7 +431,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
           str_table[#str_table + 1] = string.char(string.byte(bin_data, idx))
         end
       end
-      testPrint:logTrace('Data: ' .. table.concat(str_table, ''))
+      testPrint('Data: ' .. table.concat(str_table, ''))
     end
   )EOF"};
 
