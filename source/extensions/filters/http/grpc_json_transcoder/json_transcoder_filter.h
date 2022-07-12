@@ -169,7 +169,8 @@ public:
   void onDestroy() override {}
 
 private:
-  bool checkIfTranscoderFailed(const std::string& details);
+  bool checkAndRejectIfRequestTranscoderFailed(const std::string& details);
+  bool checkAndRejectIfResponseTranscoderFailed();
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
   void maybeSendHttpBodyRequestMessage();
   /**
