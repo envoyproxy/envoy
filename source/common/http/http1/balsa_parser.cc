@@ -194,7 +194,11 @@ void BalsaParser::HeaderDone() {
     return;
   }
   headers_done_ = true;
-  status_ = convertResult(connection_->onHeadersComplete());
+  CallbackResult result = connection_->onHeadersComplete();
+  status_ = convertResult(result);
+  if (result == CallbackResult::NoBody || result == CallbackResult::NoBodyData) {
+    MessageDone();
+  }
 }
 
 void BalsaParser::ContinueHeaderDone() {}
