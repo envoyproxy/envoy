@@ -130,15 +130,13 @@ public:
       : formatter_(std::move(formatter)), append_(append) {}
 
   // HttpHeaderFormatter::format
+  // Trailers are not available when HTTP headers are manipulated.
   const std::string format(const Http::RequestHeaderMap& request_headers,
                            const Http::ResponseHeaderMap& response_headers,
                            const Envoy::StreamInfo::StreamInfo& stream_info) const override {
     std::string buf;
-
-    // Trailers are not available when HTTP headers are manipulated.
     buf = formatter_->format(request_headers, response_headers,
                              *Http::StaticEmptyHeaders::get().response_trailers, stream_info, "");
-
     return buf;
   };
   bool append() const override { return append_; }
