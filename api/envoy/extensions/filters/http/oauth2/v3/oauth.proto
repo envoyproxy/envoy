@@ -62,13 +62,13 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message OAuth2Config {
   enum AuthType {
-    // The client_id and clinet_secret will be sent using HTTP Basic authentication scheme.
+    // The client_id and client_secret will be sent using HTTP Basic authentication scheme.
     BASIC_AUTH = 0;
 
-    // The cleint_id and clinet_secret will be sent in the URL encoded request body.
+    // The client_id and client_secret will be sent in the URL encoded request body.
     // This type should only be used when Auth server does not support Basic authentication.
     URL_ENCODED_BODY = 1;
   }
