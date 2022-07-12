@@ -1,5 +1,9 @@
 #include "source/server/admin/stats_request.h"
 
+#ifdef ENVOY_ADMIN_HTML
+#include "source/server/admin/stats_html_render.h"
+#endif
+
 namespace Envoy {
 namespace Server {
 

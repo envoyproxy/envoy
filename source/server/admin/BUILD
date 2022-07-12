@@ -157,8 +157,12 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "stats_render_lib",
-    srcs = ["stats_render.cc"],
-    hdrs = ["stats_render.h"],
+    srcs = ["stats_render.cc"] + envoy_select_admin_html([
+        "stats_html_render.cc",
+    ]),
+    hdrs = ["stats_render.h"] + envoy_select_admin_html([
+        "stats_html_render.h",
+    ]),
     deps = [
         ":stats_params_lib",
         ":utils_lib",

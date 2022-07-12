@@ -4,10 +4,6 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/buffer/buffer_impl.h"
-
-#ifdef ENVOY_ADMIN_HTML
-#include "source/server/admin/admin_html_generator.h"
-#endif
 #include "source/server/admin/stats_params.h"
 #include "source/server/admin/utils.h"
 
@@ -98,29 +94,6 @@ private:
   std::string name_buffer_;  // Used for Json::sanitize for names.
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
 };
-
-#ifdef ENVOY_ADMIN_HTML
-class StatsHtmlRender : public StatsTextRender {
-public:
-  StatsHtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                  const Admin::UrlHandler& url_handler, const StatsParams& params);
-
-  void noStats(Buffer::Instance&, absl::string_view types) override;
-  void finalize(Buffer::Instance&) override;
-  void generate(Buffer::Instance& response, const std::string& name,
-                const std::string& value) override;
-  void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
-    StatsTextRender::generate(response, name, value);
-  }
-  void generate(Buffer::Instance& response, const std::string& name,
-                const Stats::ParentHistogram& histogram) override {
-    StatsTextRender::generate(response, name, histogram);
-  }
-
-private:
-  AdminHtmlGenerator html_;
-};
-#endif
 
 } // namespace Server
 } // namespace Envoy

@@ -9,6 +9,10 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 
+#ifdef ENVOY_ADMIN_HTML
+#include "source/server/admin/stats_html_render.h"
+#endif
+
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
