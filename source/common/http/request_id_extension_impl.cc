@@ -8,7 +8,8 @@ namespace Http {
 RequestIDExtensionSharedPtr RequestIDExtensionFactory::fromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
         config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::RequestIDExtensionFactory>::getFactoryByType(

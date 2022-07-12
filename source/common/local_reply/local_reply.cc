@@ -55,7 +55,7 @@ public:
   ResponseMapper(
       const envoy::extensions::filters::network::http_connection_manager::v3::ResponseMapper&
           config,
-      Server::Configuration::FactoryContext& context)
+      Server::Configuration::ServerFactoryContext& context)
       : filter_(AccessLog::FilterFactory::fromProto(config.filter(), context.runtime(),
                                                     context.api().randomGenerator(),
                                                     context.messageValidationVisitor())) {
@@ -121,10 +121,12 @@ public:
           config,
       Server::Configuration::FactoryContext& context)
       : body_formatter_(config.has_body_format()
-                            ? std::make_unique<BodyFormatter>(config.body_format(), context)
+                            ? std::make_unique<BodyFormatter>(config.body_format(),
+                                                              context.getServerFactoryContext())
                             : std::make_unique<BodyFormatter>()) {
     for (const auto& mapper : config.mappers()) {
-      mappers_.emplace_back(std::make_unique<ResponseMapper>(mapper, context));
+      mappers_.emplace_back(
+          std::make_unique<ResponseMapper>(mapper, context.getServerFactoryContext()));
     }
   }
 

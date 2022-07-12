@@ -149,7 +149,7 @@ public:
  * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
  * across listeners.
  */
-class ServerFactoryContext : public virtual CommonFactoryContext {
+class ServerFactoryContext : public CommonFactoryContext {
 public:
   ~ServerFactoryContext() override = default;
 
@@ -177,16 +177,31 @@ public:
    * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
    */
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
+
+  /**
+   * @return OverloadManager& the overload manager for the server.
+   */
+  virtual OverloadManager& overloadManager() PURE;
+
+  /**
+   * @return whether external healthchecks are currently failed or not.
+   */
+  virtual bool healthCheckFailed() PURE;
 };
 
 /**
- * Context passed to network and HTTP filters to access server resources.
+ * Context for downstream network and HTTP filters.
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
  * access the rest of the server via interfaces exposed here.
  */
-class FactoryContext : public virtual CommonFactoryContext {
+class DownstreamFactoryContext {
 public:
-  ~FactoryContext() override = default;
+  virtual ~DownstreamFactoryContext() = default;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
@@ -211,11 +226,6 @@ public:
   virtual const Network::DrainDecision& drainDecision() PURE;
 
   /**
-   * @return whether external healthchecks are currently failed or not.
-   */
-  virtual bool healthCheckFailed() PURE;
-
-  /**
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
@@ -236,11 +246,6 @@ public:
    * for this listener.
    */
   virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
-
-  /**
-   * @return OverloadManager& the overload manager for the server.
-   */
-  virtual OverloadManager& overloadManager() PURE;
 
   /**
    * @return Http::Context& a reference to the http context.
@@ -265,11 +270,43 @@ public:
 };
 
 /**
+ * Context for downstream network and HTTP filters.
+ */
+class FilterFactoryContext {
+public:
+  FilterFactoryContext(ServerFactoryContext& server_context,
+                       OptRef<DownstreamFactoryContext> downstream_context)
+      : server_context_(server_context), downstream_context_(downstream_context) {}
+
+  /**
+   * @return ServerFactoryContext which lifetime is no shorter than the server.
+   */
+  ServerFactoryContext& getServerFactoryContext() { return server_context_; }
+
+  OptRef<DownstreamFactoryContext> getDownstreamFactoryContext() { return downstream_context_; }
+
+  // A convenience function to avoid fix ups for the 127 call sites.
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() {
+    if (getDownstreamFactoryContext().has_value()) {
+      return getDownstreamFactoryContext()->messageValidationVisitor();
+    }
+    return getServerFactoryContext().messageValidationVisitor();
+  }
+
+private:
+  ServerFactoryContext& server_context_;
+  OptRef<DownstreamFactoryContext> downstream_context_;
+};
+
+// For legacy naming.
+using FactoryContext = FilterFactoryContext;
+
+/**
  * An implementation of FactoryContext. The life time is no shorter than the created filter chains.
  * The life time is no longer than the owning listener. It should be used to create
  * NetworkFilterChain.
  */
-class FilterChainFactoryContext : public virtual FactoryContext {
+class FilterChainFactoryContext : public DownstreamFactoryContext {
 public:
   /**
    * Set the flag that all attached filter chains will be destroyed.
@@ -283,8 +320,9 @@ using FilterChainFactoryContextPtr = std::unique_ptr<FilterChainFactoryContext>;
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
  * and connections. It can be used to create ListenerFilterChain.
  */
-class ListenerFactoryContext : public virtual FactoryContext {
+class ListenerFactoryContext : public DownstreamFactoryContext {
 public:
+  virtual ~ListenerFactoryContext() = default;
   /**
    * Give access to the listener configuration
    */

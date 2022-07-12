@@ -19,6 +19,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
     const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   ASSERT(proto_config.has_pass_through_mode());
+  Server::Configuration::ServerFactoryContext& server_context = context.getServerFactoryContext();
 
   const bool pass_through_mode = proto_config.pass_through_mode().value();
   const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cache_time, 0);
@@ -33,7 +34,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   HealthCheckCacheManagerSharedPtr cache_manager;
   if (cache_time_ms > 0) {
     cache_manager = std::make_shared<HealthCheckCacheManager>(
-        context.mainThreadDispatcher(), std::chrono::milliseconds(cache_time_ms));
+        server_context.mainThreadDispatcher(), std::chrono::milliseconds(cache_time_ms));
   }
 
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages;
@@ -45,9 +46,9 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
     cluster_min_healthy_percentages = std::move(cluster_to_percentage);
   }
 
-  return [&context, pass_through_mode, cache_manager, header_match_data,
+  return [&server_context, pass_through_mode, cache_manager, header_match_data,
           cluster_min_healthy_percentages](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<HealthCheckFilter>(context, pass_through_mode,
+    callbacks.addStreamFilter(std::make_shared<HealthCheckFilter>(server_context, pass_through_mode,
                                                                   cache_manager, header_match_data,
                                                                   cluster_min_healthy_percentages));
   };

@@ -82,7 +82,8 @@ protected:
           : parent_(parent),
             connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
                 parent.parent_.address_, parent.parent_.address_)),
-            stream_info_(parent_.parent_.factory_context_.timeSource(), connection_info_provider_),
+            stream_info_(parent_.parent_.factory_context_.getServerFactoryContext().timeSource(),
+                         connection_info_provider_),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
 
       void raiseConnectionEvent(Network::ConnectionEvent event);
@@ -119,7 +120,7 @@ protected:
       }
       void close(Network::ConnectionCloseType) override {}
       Event::Dispatcher& dispatcher() override {
-        return parent_.parent_.factory_context_.mainThreadDispatcher();
+        return parent_.parent_.factory_context_.getServerFactoryContext().mainThreadDispatcher();
       }
       uint64_t id() const override { return 12345; }
       void hashKey(std::vector<uint8_t>&) const override {}
@@ -186,7 +187,8 @@ protected:
   Network::Address::InstanceConstSharedPtr address_;
   Stats::ScopeSharedPtr global_scope_;
   Stats::ScopeSharedPtr listener_scope_;
-  FactoryContextImpl factory_context_;
+  FactoryContextImpl downstream_factory_context_;
+  Server::Configuration::FilterFactoryContext factory_context_;
   SyntheticReadCallbacks read_callbacks_;
 };
 

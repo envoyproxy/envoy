@@ -66,7 +66,7 @@ OnDemandStats OnDemandConfig::generateStats(Stats::Scope& scope) {
 
 Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
-    Server::Configuration::FactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
@@ -94,7 +94,7 @@ Config::SharedConfig::SharedConfig(
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
-               Server::Configuration::FactoryContext& context)
+               Server::Configuration::ServerFactoryContext& context)
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
@@ -544,7 +544,7 @@ const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
         config_message,
-    Server::Configuration::FactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context)
     : use_post_(config_message.use_post()),
       header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())) {
   envoy::config::core::v3::SubstitutionFormatString substitution_format_config;

@@ -80,7 +80,7 @@ void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& stat
 std::vector<Network::FilterFactoryCb>
 ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
+    Server::Configuration::FactoryContext& factory_context) {
   std::vector<Network::FilterFactoryCb> ret;
   ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
@@ -97,13 +97,14 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
             proto_config);
 
     auto message = Config::Utility::translateToFactoryConfig(
-        proto_config, filter_chain_factory_context.messageValidationVisitor(), factory);
+        proto_config, factory_context.getServerFactoryContext().messageValidationVisitor(),
+        factory);
     Config::Utility::validateTerminalFilters(
         filters[i].name(), factory.name(), "network",
-        factory.isTerminalFilterByProto(*message, filter_chain_factory_context),
+        factory.isTerminalFilterByProto(*message, factory_context.getServerFactoryContext()),
         i == filters.size() - 1);
     Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
+        factory.createFilterFactoryFromProto(*message, factory_context);
     ret.push_back(std::move(callback));
   }
   return ret;
@@ -155,7 +156,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
           Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
               proto_config);
       const auto message = Config::Utility::translateToFactoryConfig(
-          proto_config, context.messageValidationVisitor(), factory);
+          proto_config, context.getServerFactoryContext().messageValidationVisitor(), factory);
       const auto callback = factory.createListenerFilterFactoryFromProto(
           *message, createListenerFilterMatcher(proto_config), context);
       auto filter_config_provider =
@@ -191,7 +192,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
             proto_config);
 
     auto message = Config::Utility::translateToFactoryConfig(
-        proto_config, context.messageValidationVisitor(), factory);
+        proto_config, context.getServerFactoryContext().messageValidationVisitor(), factory);
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;
@@ -1004,16 +1005,19 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
 
+  std::unique_ptr<FilterChainImpl::OwningFilterFactoryContext> owning_context =
+      std::make_unique<FilterChainImpl::OwningFilterFactoryContext>(
+          std::move(filter_chain_factory_context));
   auto filter_chain_res = std::make_shared<FilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
       listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
-                                                                 *filter_chain_factory_context),
+                                                                 *owning_context),
       std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
       filter_chain.name());
 
-  filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
+  filter_chain_res->setFilterChainFactoryContext(std::move(owning_context));
   return filter_chain_res;
 }
 

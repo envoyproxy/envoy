@@ -76,22 +76,15 @@ public:
 } // namespace
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
-    Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
-    : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
-      filter_chain_scope_(parent_context_.listenerScope().createScope("")),
-      init_manager_(init_manager) {}
+    Configuration::DownstreamFactoryContext& parent_context)
+    : parent_context_(parent_context),
+      filter_chain_scope_(parent_context.listenerScope().createScope("")) {}
 
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
 }
 
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }
-
-Init::Manager& PerFilterChainFactoryContextImpl::initManager() { return init_manager_; }
-
-ThreadLocal::SlotAllocator& PerFilterChainFactoryContextImpl::threadLocal() {
-  return parent_context_.threadLocal();
-}
 
 const envoy::config::core::v3::Metadata&
 PerFilterChainFactoryContextImpl::listenerMetadata() const {
@@ -107,35 +100,12 @@ envoy::config::core::v3::TrafficDirection PerFilterChainFactoryContextImpl::dire
   return parent_context_.direction();
 }
 
-ProtobufMessage::ValidationContext& PerFilterChainFactoryContextImpl::messageValidationContext() {
-  return parent_context_.messageValidationContext();
-}
 ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
 }
 
-AccessLog::AccessLogManager& PerFilterChainFactoryContextImpl::accessLogManager() {
-  return parent_context_.accessLogManager();
-}
-
-Upstream::ClusterManager& PerFilterChainFactoryContextImpl::clusterManager() {
-  return parent_context_.clusterManager();
-}
-
-Event::Dispatcher& PerFilterChainFactoryContextImpl::mainThreadDispatcher() {
-  return parent_context_.mainThreadDispatcher();
-}
-
-const Server::Options& PerFilterChainFactoryContextImpl::options() {
-  return parent_context_.options();
-}
-
 Grpc::Context& PerFilterChainFactoryContextImpl::grpcContext() {
   return parent_context_.grpcContext();
-}
-
-bool PerFilterChainFactoryContextImpl::healthCheckFailed() {
-  return parent_context_.healthCheckFailed();
 }
 
 Http::Context& PerFilterChainFactoryContextImpl::httpContext() {
@@ -144,34 +114,6 @@ Http::Context& PerFilterChainFactoryContextImpl::httpContext() {
 
 Router::Context& PerFilterChainFactoryContextImpl::routerContext() {
   return parent_context_.routerContext();
-}
-
-const LocalInfo::LocalInfo& PerFilterChainFactoryContextImpl::localInfo() const {
-  return parent_context_.localInfo();
-}
-
-Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
-  return parent_context_.runtime();
-}
-
-Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
-
-Singleton::Manager& PerFilterChainFactoryContextImpl::singletonManager() {
-  return parent_context_.singletonManager();
-}
-
-OverloadManager& PerFilterChainFactoryContextImpl::overloadManager() {
-  return parent_context_.overloadManager();
-}
-
-Admin& PerFilterChainFactoryContextImpl::admin() { return parent_context_.admin(); }
-
-TimeSource& PerFilterChainFactoryContextImpl::timeSource() { return api().timeSource(); }
-
-Api::Api& PerFilterChainFactoryContextImpl::api() { return parent_context_.api(); }
-
-ServerLifecycleNotifier& PerFilterChainFactoryContextImpl::lifecycleNotifier() {
-  return parent_context_.lifecycleNotifier();
 }
 
 ProcessContextOptRef PerFilterChainFactoryContextImpl::processContext() {
@@ -196,10 +138,9 @@ bool PerFilterChainFactoryContextImpl::isQuicListener() const {
 
 FilterChainManagerImpl::FilterChainManagerImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
-    Configuration::FactoryContext& factory_context, Init::Manager& init_manager,
+    Configuration::DownstreamFactoryContext& factory_context, Init::Manager&,
     const FilterChainManagerImpl& parent_manager)
-    : addresses_(addresses), parent_context_(factory_context), origin_(&parent_manager),
-      init_manager_(init_manager) {}
+    : addresses_(addresses), parent_context_(factory_context), origin_(&parent_manager) {}
 
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
@@ -842,45 +783,21 @@ Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilter
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
-  return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_, init_manager_);
+  return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_);
 }
 
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
                                        const envoy::config::listener::v3::Listener& config,
                                        Network::DrainDecision& drain_decision,
-                                       Stats::Scope& global_scope, Stats::Scope& listener_scope,
-                                       bool is_quic)
+                                       Stats::Scope& listener_scope, bool is_quic)
     : server_(server), config_(config), drain_decision_(drain_decision),
-      global_scope_(global_scope), listener_scope_(listener_scope), is_quic_(is_quic) {}
+      listener_scope_(listener_scope), is_quic_(is_quic) {}
 
-AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
-  return server_.accessLogManager();
-}
-Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.clusterManager(); }
-Event::Dispatcher& FactoryContextImpl::mainThreadDispatcher() { return server_.dispatcher(); }
-const Server::Options& FactoryContextImpl::options() { return server_.options(); }
 Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
 Router::Context& FactoryContextImpl::routerContext() { return server_.routerContext(); }
-bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
 Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
-Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
-const LocalInfo::LocalInfo& FactoryContextImpl::localInfo() const { return server_.localInfo(); }
-Envoy::Runtime::Loader& FactoryContextImpl::runtime() { return server_.runtime(); }
-Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
-Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }
-OverloadManager& FactoryContextImpl::overloadManager() { return server_.overloadManager(); }
-ThreadLocal::SlotAllocator& FactoryContextImpl::threadLocal() { return server_.threadLocal(); }
-Admin& FactoryContextImpl::admin() { return server_.admin(); }
-TimeSource& FactoryContextImpl::timeSource() { return server_.timeSource(); }
-ProtobufMessage::ValidationContext& FactoryContextImpl::messageValidationContext() {
-  return server_.messageValidationContext();
-}
 ProtobufMessage::ValidationVisitor& FactoryContextImpl::messageValidationVisitor() {
   return server_.messageValidationContext().staticValidationVisitor();
-}
-Api::Api& FactoryContextImpl::api() { return server_.api(); }
-ServerLifecycleNotifier& FactoryContextImpl::lifecycleNotifier() {
-  return server_.lifecycleNotifier();
 }
 ProcessContextOptRef FactoryContextImpl::processContext() { return server_.processContext(); }
 Configuration::ServerFactoryContext& FactoryContextImpl::getServerFactoryContext() const {

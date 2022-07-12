@@ -69,7 +69,7 @@ public:
   }
   Http::RequestIDExtensionSharedPtr
   createExtensionInstance(const Protobuf::Message& config,
-                          Server::Configuration::FactoryContext& context) override {
+                          Server::Configuration::ServerFactoryContext& context) override {
     return std::make_shared<UUIDRequestIDExtension>(
         MessageUtil::downcastAndValidate<
             const envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig&>(

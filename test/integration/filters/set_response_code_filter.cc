@@ -18,7 +18,8 @@ class SetResponseCodeFilterConfig {
 public:
   SetResponseCodeFilterConfig(const std::string& prefix, uint32_t code, const std::string& body,
                               Server::Configuration::FactoryContext& context)
-      : prefix_(prefix), code_(code), body_(body), tls_slot_(context.threadLocal()) {}
+      : prefix_(prefix), code_(code), body_(body),
+        tls_slot_(context.getServerFactoryContext().threadLocal()) {}
 
   const std::string prefix_;
   const uint32_t code_;

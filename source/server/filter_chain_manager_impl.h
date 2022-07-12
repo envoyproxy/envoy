@@ -45,8 +45,8 @@ public:
 class PerFilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
                                          public Network::DrainDecision {
 public:
-  explicit PerFilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context,
-                                            Init::Manager& init_manager);
+  explicit PerFilterChainFactoryContextImpl(
+      Configuration::DownstreamFactoryContext& parent_context);
 
   // DrainDecision
   bool drainClose() const override;
@@ -56,32 +56,14 @@ public:
   }
 
   // Configuration::FactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& mainThreadDispatcher() override;
-  const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
   Router::Context& routerContext() override;
-  bool healthCheckFailed() override;
   Http::Context& httpContext() override;
-  Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::Loader& runtime() override;
-  Stats::Scope& scope() override;
-  Stats::Scope& serverScope() override { return parent_context_.serverScope(); }
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::SlotAllocator& threadLocal() override;
-  Admin& admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
-  TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  ProtobufMessage::ValidationContext& messageValidationContext() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
   ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
@@ -91,12 +73,8 @@ public:
   void startDraining() override { is_draining_.store(true); }
 
 private:
-  Configuration::FactoryContext& parent_context_;
-  // The scope that has empty prefix.
-  Stats::ScopeSharedPtr scope_;
-  // filter_chain_scope_ has the same prefix as listener owners scope.
+  Configuration::DownstreamFactoryContext& parent_context_;
   Stats::ScopeSharedPtr filter_chain_scope_;
-  Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };
 
@@ -120,18 +98,30 @@ public:
   const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
     return filters_factory_;
   }
-  void startDraining() override { factory_context_->startDraining(); }
+  void startDraining() override { factory_context_->filterChainFactoryContext().startDraining(); }
 
-  void setFilterChainFactoryContext(
-      Configuration::FilterChainFactoryContextPtr filter_chain_factory_context) {
-    ASSERT(factory_context_ == nullptr);
-    factory_context_ = std::move(filter_chain_factory_context);
+  // A FilterFactoryContext which takes ownership of a FilterChainFactoryContext.
+  class OwningFilterFactoryContext : public Configuration::FilterFactoryContext {
+  public:
+    OwningFilterFactoryContext(std::unique_ptr<Configuration::FilterChainFactoryContext>&& context)
+        : Configuration::FilterFactoryContext(context->getServerFactoryContext(), {*context}),
+          owned_context_(std::move(context)) {}
+    Configuration::FilterChainFactoryContext& filterChainFactoryContext() {
+      return *owned_context_;
+    }
+
+  private:
+    std::unique_ptr<Configuration::FilterChainFactoryContext> owned_context_;
+  };
+
+  void setFilterChainFactoryContext(std::unique_ptr<OwningFilterFactoryContext> factory_context) {
+    factory_context_ = std::move(factory_context);
   }
 
   absl::string_view name() const override { return name_; }
 
 private:
-  Configuration::FilterChainFactoryContextPtr factory_context_;
+  std::unique_ptr<OwningFilterFactoryContext> factory_context_;
   const Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
   const std::chrono::milliseconds transport_socket_connect_timeout_;
@@ -141,37 +131,20 @@ private:
 /**
  * Implementation of FactoryContext wrapping a Server::Instance and some listener components.
  */
-class FactoryContextImpl : public Configuration::FactoryContext {
+class FactoryContextImpl : public Configuration::DownstreamFactoryContext {
 public:
   FactoryContextImpl(Server::Instance& server, const envoy::config::listener::v3::Listener& config,
-                     Network::DrainDecision& drain_decision, Stats::Scope& global_scope,
-                     Stats::Scope& listener_scope, bool is_quic);
+                     Network::DrainDecision& drain_decision, Stats::Scope& listener_scope,
+                     bool is_quic);
 
-  // Configuration::FactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& mainThreadDispatcher() override;
-  const Server::Options& options() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+
+  // Configuration::DownstreamFactoryContext
   Grpc::Context& grpcContext() override;
   Router::Context& routerContext() override;
-  bool healthCheckFailed() override;
   Http::Context& httpContext() override;
-  Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::Loader& runtime() override;
-  Stats::Scope& scope() override;
-  Stats::Scope& serverScope() override { return server_.stats(); }
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::SlotAllocator& threadLocal() override;
-  Admin& admin() override;
-  TimeSource& timeSource() override;
-  ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
   ProcessContextOptRef processContext() override;
-  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
@@ -184,7 +157,6 @@ private:
   Server::Instance& server_;
   const envoy::config::listener::v3::Listener& config_;
   Network::DrainDecision& drain_decision_;
-  Stats::Scope& global_scope_;
   Stats::Scope& listener_scope_;
   bool is_quic_;
 };
@@ -200,13 +172,12 @@ public:
       absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
                           Network::DrainableFilterChainSharedPtr, MessageUtil, MessageUtil>;
   FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
-                         Configuration::FactoryContext& factory_context,
-                         Init::Manager& init_manager)
-      : addresses_(addresses), parent_context_(factory_context), init_manager_(init_manager) {}
+                         Configuration::DownstreamFactoryContext& factory_context, Init::Manager&)
+      : addresses_(addresses), parent_context_(factory_context) {}
 
   FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
-                         Configuration::FactoryContext& factory_context,
-                         Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager);
+                         Configuration::DownstreamFactoryContext& factory_context, Init::Manager&,
+                         const FilterChainManagerImpl& parent_manager);
 
   // FilterChainFactoryContextCreator
   Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
@@ -381,17 +352,12 @@ private:
 
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses_;
   // This is the reference to a factory context which all the generations of listener share.
-  Configuration::FactoryContext& parent_context_;
+  Configuration::DownstreamFactoryContext& parent_context_;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
 
   // Reference to the previous generation of filter chain manager to share the filter chains.
   // Caution: only during warm up could the optional have value.
   absl::optional<const FilterChainManagerImpl*> origin_{nullptr};
-
-  // For FilterChainFactoryContextCreator
-  // init manager owned by the corresponding listener. The reference is valid when building the
-  // filter chain.
-  Init::Manager& init_manager_;
 
   // Matcher selecting the filter chain name.
   Matcher::MatchTreePtr<Network::MatchingData> matcher_;

@@ -71,7 +71,7 @@ public:
   }
 
   Event::SimulatedTimeSystem time_system_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   ThriftProxyFilterConfigFactory factory_;
 };
 

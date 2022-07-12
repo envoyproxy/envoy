@@ -17,10 +17,10 @@ Network::FilterFactoryCb ConfigFactory::createFilterFactoryFromProtoTyped(
   ASSERT(!proto_config.stat_prefix().empty());
 
   Envoy::TcpProxy::ConfigSharedPtr filter_config(
-      std::make_shared<Envoy::TcpProxy::Config>(proto_config, context));
+      std::make_shared<Envoy::TcpProxy::Config>(proto_config, context.getServerFactoryContext()));
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(
-        std::make_shared<Envoy::TcpProxy::Filter>(filter_config, context.clusterManager()));
+    filter_manager.addReadFilter(std::make_shared<Envoy::TcpProxy::Filter>(
+        filter_config, context.getServerFactoryContext().clusterManager()));
   };
 }
 

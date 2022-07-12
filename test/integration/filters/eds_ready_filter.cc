@@ -45,12 +45,12 @@ class EdsReadyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFi
 public:
   EdsReadyFilterConfig() : EmptyHttpFilterConfig("eds-ready-filter") {}
 
-  Http::FilterFactoryCb
-  createFilter(const std::string&,
-               Server::Configuration::FactoryContext& factory_context) override {
-    return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
-      const Stats::Scope& scope = factory_context.api().rootScope();
-      Stats::SymbolTable& symbol_table = factory_context.scope().symbolTable();
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext& base_context) override {
+    return [&base_context](Http::FilterChainFactoryCallbacks& callbacks) {
+      Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
+      const Stats::Scope& scope = context.api().rootScope();
+      Stats::SymbolTable& symbol_table = context.scope().symbolTable();
       callbacks.addStreamFilter(std::make_shared<EdsReadyFilter>(scope, symbol_table));
     };
   }
