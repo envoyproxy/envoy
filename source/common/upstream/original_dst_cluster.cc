@@ -22,8 +22,13 @@ namespace Upstream {
 
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
+    // Check if filter state override is present, if yes use it before headers and local address.
+    Network::Address::InstanceConstSharedPtr dst_host = filterStateOverrideHost(context);
+
     // Check if override host header is present, if yes use it otherwise check local address.
-    Network::Address::InstanceConstSharedPtr dst_host = requestOverrideHost(context);
+    if (dst_host == nullptr) {
+      dst_host = requestOverrideHost(context);
+    }
 
     if (dst_host == nullptr) {
       const Network::Connection* connection = context->downstreamConnection();
