@@ -7,6 +7,7 @@ import "envoy/config/core/v3/base.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
@@ -23,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -259,7 +260,26 @@ message RedisProxy {
   // password is set, then a "NOAUTH Authentication required." error response will be sent to the
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no password is set" error will be returned.
-  config.core.v3.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
+  //
+  // .. attention::
+  //   This field is deprecated. Use :ref:`downstream_auth_passwords
+  //   <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_passwords>`.
+  config.core.v3.DataSource downstream_auth_password = 6 [
+    deprecated = true,
+    (udpa.annotations.sensitive) = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
+
+  // Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
+  // AUTH command <https://redis.io/commands/auth>`_ with one of these passwords before enabling any other
+  // command. If an AUTH command's password matches one of these passwords, an "OK" response will be returned
+  // to the client. If the AUTH command password does not match, then an "ERR invalid
+  // password" error will be returned. If any other command is received before AUTH when the
+  // password(s) are set, then a "NOAUTH Authentication required." error response will be sent to the
+  // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
+  // AUTH, but no password is set" error will be returned.
+  repeated config.core.v3.DataSource downstream_auth_passwords = 9
+      [(udpa.annotations.sensitive) = true];
 
   // List of faults to inject. Faults currently come in two flavors:
   // - Delay, which delays a request.

@@ -453,7 +453,7 @@ public:
   }
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
-  MockListenSocketFactory socket_factory_;
+  std::vector<ListenSocketFactoryPtr> socket_factories_;
   SocketSharedPtr socket_;
   Stats::IsolatedStoreImpl scope_;
   std::string name_;
