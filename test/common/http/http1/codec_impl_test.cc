@@ -1025,6 +1025,7 @@ TEST_F(Http1ServerConnectionImplTest, RejectInvalidMethod) {
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
 }
 
 TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
