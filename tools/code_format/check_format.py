@@ -117,7 +117,12 @@ class FormatChecker:
         self.config_path = args.config_path
         self.operation_type = args.operation_type
         self.target_path = args.target_path
-        self.api_prefix = args.api_prefix
+        self.api_prefix = (
+            args.api_prefix[2:]
+            if args.api_prefix.startswith("./")
+            else args.api_prefix)
+
+        args.api_prefix
         self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
         self._include_dir_order = args.include_dir_order
 
@@ -259,12 +264,20 @@ class FormatChecker:
 
         return error_messages
 
+    @cached_property
+    def nolint_namespace_files(self):
+        cmd = r"^// NOLINT\(namespace-envoy"
+        response = subprocess.run(["git", "grep", "-ilE", cmd], capture_output=True, encoding="utf-8")
+        return set(x for x in response.stdout.split("\n") if x)
+
     def check_namespace(self, file_path):
         for excluded_path in self.namespace_check_excluded_paths:
             if file_path.startswith(excluded_path):
                 return []
 
-        nolint = "NOLINT(namespace-%s)" % self.namespace_check.lower()
+        if file_path in self.nolint_namespace_files or file_path[2:] in self.nolint_namespace_files:
+            return []
+
         text = self.read_file(file_path)
         if not self.namespace_re.search(text) and not nolint in text:
             return [
@@ -289,7 +302,7 @@ class FormatChecker:
         return file_path in self.config.paths["real_time"]["include"]
 
     def allow_listed_for_register_factory(self, file_path):
-        if not file_path.startswith("./test/"):
+        if not file_path.startswith("test/"):
             return True
 
         return any(
@@ -316,8 +329,8 @@ class FormatChecker:
         return file_path in self.config.paths["grpc_init"]["include"]
 
     def allow_listed_for_unpack_to(self, file_path):
-        return file_path.startswith("./test") or file_path in [
-            "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
+        return file_path.startswith("test") or file_path in [
+            "source/common/protobuf/utility.cc", "source/common/protobuf/utility.h"
         ]
 
     def allow_listed_for_raw_try(self, file_path):
@@ -346,8 +359,8 @@ class FormatChecker:
 
     def is_external_build_file(self, file_path):
         return self.is_build_file(file_path) and (
-            file_path.startswith("./bazel/external/")
-            or file_path.startswith("./tools/clang_tools"))
+            file_path.startswith("bazel/external/")
+            or file_path.startswith("tools/clang_tools"))
 
     def is_starlark_file(self, file_path):
         return file_path.endswith(".bzl")
@@ -457,7 +470,7 @@ class FormatChecker:
         if filename.count("/") <= 1:
             return True
         for subdir in subdirs:
-            if filename.startswith('./' + subdir + '/'):
+            if filename.startswith(subdir + '/'):
                 return True
         return False
 
@@ -621,11 +634,11 @@ class FormatChecker:
         if self.token_in_line("std::visit", line):
             report_error("Don't use std::visit; use absl::visit instead")
         if " try {" in line and file_path.startswith(
-                "./source") and not self.allow_listed_for_raw_try(file_path):
+                "source") and not self.allow_listed_for_raw_try(file_path):
             report_error(
                 "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
             )
-        if "__attribute__((packed))" in line and file_path != "./envoy/common/platform.h":
+        if "__attribute__((packed))" in line and file_path != "envoy/common/platform.h":
             # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
             # can be used instead
             report_error(
@@ -686,8 +699,8 @@ class FormatChecker:
             )
 
         normalized_target_path = file_path
-        if not normalized_target_path.startswith("./"):
-            normalized_target_path = f"./{normalized_target_path}"
+        if not normalized_target_path.startswith(""):
+            normalized_target_path = f"{normalized_target_path}"
         if not self.allow_listed_for_std_regex(normalized_target_path) and "std::regex" in line:
             report_error(
                 "Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
@@ -737,7 +750,7 @@ class FormatChecker:
 
     def check_build_line(self, line, file_path, report_error):
         if "@bazel_tools" in line and not (self.is_starlark_file(file_path)
-                                           or file_path.startswith("./bazel/")
+                                           or file_path.startswith("bazel/")
                                            or "python/runfiles" in line):
             report_error(
                 "unexpected @bazel_tools reference, please indirect via a definition in //bazel")
@@ -789,12 +802,7 @@ class FormatChecker:
                 command, "envoy_build_fixer check failed", file_path)
 
         if self.is_build_file(file_path) and file_path.startswith(self.api_prefix + "envoy"):
-            found = False
-            for line in self.read_lines(file_path):
-                if "api_proto_package(" in line:
-                    found = True
-                    break
-            if not found:
+            if file_path not in self.api_proto_packages:
                 error_messages += ["API build file does not provide api_proto_package()"]
 
         command = "%s -mode=diff %s" % (self.config.buildifier_path, file_path)
@@ -925,6 +933,9 @@ class FormatChecker:
             names: a list of file names.
         """
 
+        dir_name = f"{filepath.parent}"
+        name = filepath.name
+
         # Unpack the multiprocessing.Pool process pool and list of results. Since
         # python lists are passed as references, this is used to collect the list of
         # async results (futures) from running check_format and passing them back to
@@ -933,22 +944,23 @@ class FormatChecker:
 
         # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
         # manner as it is a small and limited list.
-        source_prefix = './source/'
-        core_extensions_full_prefix = './source/extensions/'
+        source_prefix = 'source/'
+        core_extensions_full_prefix = 'source/extensions/'
         # Check to see if this directory is a subdir under /source/extensions
         # Also ignore top level directories under /source/extensions since we don't
         # need owners for source/extensions/access_loggers etc, just the subdirectories.
-        if dir_name.startswith(
+        if dir_name and dir_name.startswith(
                 core_extensions_full_prefix) and '/' in dir_name[len(core_extensions_full_prefix):]:
             self.check_owners(dir_name[len(source_prefix):], owned_directories, error_messages)
 
         # For contrib extensions we track ownership at the top level only.
-        contrib_prefix = './contrib/'
+        contrib_prefix = 'contrib/'
         if dir_name.startswith(contrib_prefix):
-            top_level = pathlib.PurePath('/', *pathlib.PurePath(dir_name).parts[:2], '/')
-            self.check_owners(str(top_level), owned_directories, error_messages)
+            self.check_owners(str(pathlib.Path(*pathlib.PurePath(dir_name).parts[:2])), owned_directories, error_messages)
 
-        dir_name = normalize_path(dir_name)
+        # These need to be pre-warmed before this class is sent to the pool or the mem forks and it repeats
+        self.api_proto_packages
+        self.nolint_namespace_files
 
         # TODO(phlax): improve class/process handling - this is required because if these
         #   are not cached before the class is sent into the pool, it only caches them on the
@@ -979,8 +991,6 @@ class FormatChecker:
 
 def normalize_path(path):
     """Convert path to form ./path/to/dir/ for directories and ./path/to/file otherwise"""
-    if not path.startswith("./"):
-        path = "./" + path
 
     isdir = os.path.isdir(path)
     if isdir and not path.endswith("/"):
@@ -1084,7 +1094,7 @@ if __name__ == "__main__":
                     "approval to add an exemption to check_visibility tools/code_format/check_format.py"
                 )
             output = subprocess.check_output(
-                "grep -r --include BUILD envoy_package source/extensions/*",
+                "git grep -l envoy_package source/**/BUILD",
                 shell=True,
                 stderr=subprocess.STDOUT).strip()
             if output:
@@ -1138,9 +1148,9 @@ if __name__ == "__main__":
                                     stripped_path))
                             continue
 
-                        if not (stripped_path.count('/') == 3 or
-                                (stripped_path.count('/') == 4
-                                 and stripped_path.startswith('/contrib/common/'))):
+                        if not (stripped_path.count('/') == 2 or
+                                (stripped_path.count('/') == 3
+                                 and stripped_path.startswith('contrib/common/'))):
                             error_messages.append(
                                 "Contrib CODEOWNERS entry '{}' must be 2 directories deep unless in /contrib/common/ and then it can be 3 directories deep"
                                 .format(stripped_path))
@@ -1179,22 +1189,20 @@ if __name__ == "__main__":
             pool = multiprocessing.Pool(processes=args.num_workers)
             # For each file in target_path, start a new task in the pool and collect the
             # results (results is passed by reference, and is used as an output).
-            for root, _, files in os.walk(args.target_path):
-                _files = []
-                for filename in files:
-                    file_path = os.path.join(root, filename)
-                    check_file = (
-                        path_predicate(filename) and not file_path.startswith(excluded_prefixes)
-                        and file_path.endswith(format_checker.config.suffixes["included"]) and not (
-                            file_path.endswith(format_checker.config.suffixes["proto"])
-                            and root.startswith(args.api_prefix)))
-                    if check_file:
-                        _files.append(filename)
-                if not _files:
-                    continue
-                format_checker.check_format_visitor(
-                    (pool, results, owned_directories, error_messages), root, _files,
-                    args.fail_on_diff)
+
+            files = subprocess.run(["git", "ls-files", args.target_path], encoding="utf-8", capture_output=True).stdout.splitlines()
+            for file_path in files:
+                fpath = pathlib.Path(file_path)
+                root = f"{fpath.parent}/"
+                filename = fpath.name
+                check_file = (
+                    path_predicate(filename) and not file_path.startswith(excluded_prefixes)
+                    and file_path.endswith(format_checker.config.suffixes["included"]) and not (
+                        file_path.endswith(format_checker.config.suffixes["proto"])
+                        and root.startswith(args.api_prefix)))
+                if check_file:
+                    format_checker.check_format_visitor(
+                        (pool, results, owned_directories, error_messages), fpath)
 
             # Close the pool to new tasks, wait for all of the running tasks to finish,
             # then collect the error messages.
