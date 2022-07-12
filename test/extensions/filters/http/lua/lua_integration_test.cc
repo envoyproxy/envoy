@@ -556,7 +556,7 @@ name: lua
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   default_source_code:
-    inline_string:
+    inline_string: |
       function envoy_on_request(request_handle)
         local headers, body = request_handle:httpCall(
         "lua_cluster",
@@ -607,7 +607,7 @@ name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   default_source_code:
-    inline_string:
+    inline_string: |
       function envoy_on_request(request_handle)
         local headers, body = request_handle:httpCall(
         "lua_cluster",
@@ -961,7 +961,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
     EXPECT_EQ("200", response->headers().getStatusValue());
   };
 
-  // Lua code defined in 'inline_code' will be executed by default.
+  // Lua code defined in 'default_source_code' will be executed by default.
   Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
                                                  {":path", "/lua/per/route/default"},
                                                  {":scheme", "http"},
@@ -1018,7 +1018,7 @@ TEST_P(LuaIntegrationTest, DirectResponseLuaMetadata) {
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
     default_source_code:
-      inline_string:
+      inline_string: |
         function envoy_on_response(response_handle)
           response_handle:headers():add('foo', response_handle:metadata():get('foo') or 'nil')
         end
@@ -1046,7 +1046,7 @@ virtual_hosts:
   initializeWithYaml(filter_config, route_config);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Lua code defined in 'inline_code' will be executed by default.
+  // Lua code defined in 'default_source_code' will be executed by default.
   Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
                                                  {":path", "/lua/direct_response"},
                                                  {":scheme", "http"},

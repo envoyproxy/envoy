@@ -62,7 +62,7 @@ TEST(LuaFilterConfigTest, LuaFilterWithDefaultSourceCode) {
 
 TEST(LuaFilterConfigTest, LuaFilterWithDeprecatedInlineCode) {
   const std::string yaml_string = R"EOF(
-  inline_code:
+  inline_code: |
     function envoy_on_request(request_handle)
       request_handle:headers():add("code", "code_from_hello")
     end
@@ -85,7 +85,7 @@ TEST(LuaFilterConfigTest, LuaFilterWithBothDeprecatedInlineCodeAndDefaultSourceC
       function envoy_on_request(request_handle)
         request_handle:headers():add("code", "code_from_hello")
       end
-  inline_code:
+  inline_code: |
     function envoy_on_request(request_handle)
       request_handle:headers():add("code", "code_from_hello")
     end
