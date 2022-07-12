@@ -439,6 +439,10 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   }
   if (Utility::isUpgrade(headers)) {
     upgrade_request_ = true;
+    // If the flag is flipped from true to false all outstanding upgrade requests that are waiting
+    // for upstream connections will become invalid, as Envoy will add chunk encoding to the
+    // protocol stream. This will likely cause the server to disconnect, since it will be unable to
+    // parse the protocol.
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade")) {
       disableChunkEncoding();

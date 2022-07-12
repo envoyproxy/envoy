@@ -555,6 +555,11 @@ public:
     return [bytes](const std::string& data) -> bool { return data.size() >= bytes; };
   }
 
+  void clearData() {
+    absl::MutexLock lock(&lock_);
+    data_.clear();
+  }
+
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(FakeRawConnection& parent) : parent_(parent) {}
