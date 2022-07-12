@@ -32,10 +32,12 @@ public:
   }
 
   void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
-                          const std::string& override_auto_sni_header = "") {
+                          const std::string& override_auto_sni_header = "",
+                          const std::string& typed_dns_resolver_config = "") {
     setUpstreamProtocol(Http::CodecType::HTTP1);
 
-    const std::string filter = fmt::format(R"EOF(
+    const std::string filter =
+        fmt::format(R"EOF(
 name: dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
@@ -44,10 +46,10 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
     dns_cache_circuit_breaker:
-      max_pending_requests: {}{}
+      max_pending_requests: {}{}{}
 )EOF",
-                                           Network::Test::ipVersionToDnsFamily(GetParam()),
-                                           max_hosts, max_pending_requests, key_value_config_);
+                    Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts,
+                    max_pending_requests, key_value_config_, typed_dns_resolver_config);
     config_helper_.prependFilter(filter);
 
     config_helper_.prependFilter(fmt::format(R"EOF(
@@ -108,10 +110,10 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
     dns_cache_circuit_breaker:
-      max_pending_requests: {}{}
+      max_pending_requests: {}{}{}
 )EOF",
         Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests,
-        key_value_config_);
+        key_value_config_, typed_dns_resolver_config);
 
     TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
     cluster_.mutable_circuit_breakers()
@@ -165,6 +167,45 @@ typed_config:
     ASSERT_TRUE(fake_raw_upstream_connection->write(upstream_send_data));
     response->waitForBodyData(strlen(downstream_received_data));
     EXPECT_EQ(downstream_received_data, response->body());
+  }
+
+  void requestWithBodyTest(const std::string& typed_dns_resolver_config = "") {
+    int64_t original_usec = dispatcher_->timeSource().monotonicTime().time_since_epoch().count();
+
+    config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+    initializeWithArgs(1024, 1024, "", typed_dns_resolver_config);
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    const Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"},
+        {":path", "/test/long/url"},
+        {":scheme", "http"},
+        {":authority",
+         fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+    auto response =
+        sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+    checkSimpleRequestSuccess(1024, 1024, response.get());
+    testConnectionTiming(response, false, original_usec);
+    EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+    EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+
+    // Now send another request. This should hit the DNS cache.
+    response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
+    checkSimpleRequestSuccess(512, 512, response.get());
+    testConnectionTiming(response, true, original_usec);
+    EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+    EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+    // Make sure dns timings are tracked for cache-hits.
+    ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_start")).empty());
+    ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_end")).empty());
+
+    const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+        dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+            fake_upstream_connection_->connection().ssl().get());
+    EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
   }
 
   bool upstream_tls_{};
@@ -225,43 +266,22 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
 
 // A basic test where we pause a request to lookup localhost, and then do another request which
 // should hit the TLS cache.
-TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
-  int64_t original_usec = dispatcher_->timeSource().monotonicTime().time_since_epoch().count();
+TEST_P(ProxyFilterIntegrationTest, RequestWithBody) { requestWithBodyTest(); }
 
-  config_helper_.prependFilter(fmt::format(R"EOF(
-  name: stream-info-to-headers-filter
-)EOF"));
+// Do a sanity check using the getaddrinfo() resolver.
+TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
+  // getaddrinfo() does not reliably return v6 addresses depending on the environment. For now
+  // just run this on v4 which is most likely to succeed. In v6 only environments this test won't
+  // run at all but should still be covered in public CI.
+  if (GetParam() != Network::Address::IpVersion::v4) {
+    return;
+  }
 
-  initializeWithArgs();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
-
-  auto response =
-      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
-  testConnectionTiming(response, false, original_usec);
-  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
-  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
-
-  // Now send another request. This should hit the DNS cache.
-  response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
-  checkSimpleRequestSuccess(512, 512, response.get());
-  testConnectionTiming(response, true, original_usec);
-  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
-  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
-  // Make sure dns timings are tracked for cache-hits.
-  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_start")).empty());
-  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_end")).empty());
-
-  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
-          fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+  requestWithBodyTest(R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF");
 }
 
 // Currently if the first DNS resolution fails, the filter will continue with
