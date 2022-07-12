@@ -76,8 +76,6 @@ public:
 private:
   static const absl::string_view HTTP2_CONNECTION_PREFACE;
 
-  void onMessageBegin() { parsing_begin_ = true; }
-
   void done(bool success);
   ParseState parseHttpHeader(absl::string_view data);
 
@@ -88,7 +86,6 @@ private:
   Network::ListenerFilterCallbacks* cb_{nullptr};
   absl::string_view protocol_;
   http_parser parser_;
-  bool parsing_begin_{false};
   static http_parser_settings settings_;
 };
 
