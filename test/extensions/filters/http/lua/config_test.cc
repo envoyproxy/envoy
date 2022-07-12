@@ -78,6 +78,29 @@ TEST(LuaFilterConfigTest, LuaFilterWithDeprecatedInlineCode) {
   cb(filter_callback);
 }
 
+TEST(LuaFilterConfigTest, LuaFilterWithBothDeprecatedInlineCodeAndDefaultSourceCode) {
+  const std::string yaml_string = R"EOF(
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        request_handle:headers():add("code", "code_from_hello")
+      end
+  inline_code:
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("code", "code_from_hello")
+    end
+  )EOF";
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  LuaFilterConfig factory;
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
+                            EnvoyException,
+                            "Error: Only one of `inline_code` or `default_source_code` of can be "
+                            "set for the Lua filter.");
+}
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters
