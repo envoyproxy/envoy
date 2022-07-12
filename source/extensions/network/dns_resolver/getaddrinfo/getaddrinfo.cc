@@ -58,7 +58,7 @@ private:
   // Must be a shared_ptr for passing around via post.
   using PendingQuerySharedPtr = std::shared_ptr<PendingQuery>;
 
-  // RAII wrapper to free the addrinfo.
+  // RAII wrapper to free the `addrinfo`.
   class AddrInfoWrapper : NonCopyable {
   public:
     AddrInfoWrapper(addrinfo* info) : info_(info) {}
