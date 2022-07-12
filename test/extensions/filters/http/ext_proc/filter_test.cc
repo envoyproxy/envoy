@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
@@ -19,7 +21,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <algorithm>
 
 namespace Envoy {
 namespace Extensions {
