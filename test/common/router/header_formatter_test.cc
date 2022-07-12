@@ -52,6 +52,7 @@ public:
       auto f = StreamInfoHeaderFormatter(variable, false);
       const std::string formatted_string = f.format(stream_info);
       EXPECT_EQ(expected_output, formatted_string);
+      ASSERT_FALSE(f.append());
     }
   }
 
@@ -965,6 +966,21 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
       "1111111111111111111111111111111111111'\n");
 }
 
+TEST(PlainFormatterTest, BasicTest) {
+  PlainHeaderFormatter formatter("test", true);
+
+  ASSERT_TRUE(formatter.append());
+}
+
+TEST(CompoundFormatterTest, BasicTest) {
+  std::vector<HeaderFormatterPtr> formatters;
+  formatters.push_back(std::make_unique<PlainHeaderFormatter>("test1", true));
+  formatters.push_back(std::make_unique<PlainHeaderFormatter>("test2", false));
+
+  CompoundHeaderFormatter formatter(std::move(formatters), false);
+  ASSERT_FALSE(formatter.append());
+}
+
 TEST(HeaderParserTest, TestParseInternal) {
   struct TestCase {
     std::string input_;
@@ -1012,6 +1028,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
       {"%RESPONSE_FLAGS%", {"LR"}, {}},
       {"%RESPONSE_CODE_DETAILS%", {"via_upstream"}, {}},
+      {"STATIC_TEXT", {"STATIC_TEXT"}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
@@ -1246,6 +1263,17 @@ TEST(HeaderParser, TestMetadataTranslator) {
 
   for (const auto& test_case : test_cases) {
     EXPECT_EQ(test_case.expected_output_, HeaderParser::translateMetadataFormat(test_case.input_));
+  }
+}
+
+// Test passing incorrect json. translateMetadataFormat should return
+// the same value without any modifications.
+TEST(HeaderParser, TestMetadataTranslatorExceptions) {
+  static const std::string test_cases[] = {
+      "%UPSTREAM_METADATA([\"a\" - \"b\"])%",
+  };
+  for (const auto& test_case : test_cases) {
+    EXPECT_EQ(test_case, HeaderParser::translateMetadataFormat(test_case));
   }
 }
 
