@@ -1,15 +1,13 @@
 #include "source/common/html/utility.h"
 #include "source/server/admin/admin.h"
-#include "source/server/admin/admin_html_generator.h"
+#include "source/server/admin/stats_html_render.h"
 
 namespace Envoy {
 namespace Server {
 
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
-  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-  AdminHtmlGenerator html(response);
-  html.renderHead();
+  StatsHtmlRender html(response_headers, response, StatsParams());
   html.renderTableBegin();
 
   // Prefix order is used during searching, but for printing do them in alpha order.

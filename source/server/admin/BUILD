@@ -102,21 +102,6 @@ genrule(
 )
 
 envoy_cc_library(
-    name = "admin_html_generator_lib",
-    srcs = [
-        "admin_html_generator.cc",
-        ":generate_admin_html",
-    ],
-    hdrs = ["admin_html_generator.h"],
-    deps = [
-        "//envoy/server:admin_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/html:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "handler_ctx_lib",
     hdrs = ["handler_ctx.h"],
     deps = [
@@ -158,6 +143,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_render_lib",
     srcs = ["stats_render.cc"] + envoy_select_admin_html([
+        ":generate_admin_html",
         "stats_html_render.cc",
     ]),
     hdrs = ["stats_render.h"] + envoy_select_admin_html([
@@ -171,7 +157,6 @@ envoy_cc_library(
         "//source/common/json:json_sanitizer_lib",
         "//source/common/stats:histogram_lib",
     ] + envoy_select_admin_html([
-        ":admin_html_generator_lib",
         "//source/common/html:utility_lib",
     ]),
 )

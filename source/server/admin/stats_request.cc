@@ -34,10 +34,16 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
     render_ = std::make_unique<StatsTextRender>(params_);
     break;
 #ifdef ENVOY_ADMIN_HTML
-  case StatsFormat::Html:
-    render_ =
-        std::make_unique<StatsHtmlRender>(response_headers, response_, url_handler_fn_(), params_);
+  case StatsFormat::Html: {
+    auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
+    html_render->setSubmitOnChange(true);
+    html_render->renderTableBegin();
+    html_render->renderUrlHandler(url_handler_fn_(), params_.query_);
+    html_render->renderTableEnd();
+    response_.add("<pre>\n");
+    render_.reset(html_render.release());
     break;
+  }
 #endif
   case StatsFormat::Prometheus:
     // TODO(#16139): once Prometheus shares this algorithm here, this becomes a legitimate choice.
