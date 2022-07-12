@@ -1477,7 +1477,7 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   auto error_msg = MessageUtil::unpackToNoThrow(source_any, dst);
   ASSERT_TRUE(error_msg.has_value());
   EXPECT_THAT(error_msg.value(),
-              testing::MatchesRegex("Unable to unpack as google.protobuf.Timestamp: .*"));
+              testing::MatchesRegex("Unable to unpack as google.protobuf.Timestamp.*"));
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.
