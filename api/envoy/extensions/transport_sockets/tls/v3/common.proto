@@ -155,7 +155,7 @@ message TlsCertificate {
   // applies to dynamic secrets, when the *TlsCertificate* is delivered via SDS.
   config.core.v3.DataSource private_key = 2 [(udpa.annotations.sensitive) = true];
 
-  // `Pkcs12` data containing TLS certificate, chain, and private key.
+  // ``Pkcs12`` data containing TLS certificate, chain, and private key.
   //
   // If *pkcs12* is a filesystem path, the file will be read, but no watch will
   // be added to the parent directory, since *pkcs12* isn't used by SDS.
@@ -167,7 +167,7 @@ message TlsCertificate {
   // and :ref:`pkcs12 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.pkcs12>`
   // fields will result in an error. Use :ref:`password
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.password>`
-  // to specify the password to unprotect the `PKCS12` data, if necessary.
+  // to specify the password to unprotect the ``PKCS12`` data, if necessary.
   config.core.v3.DataSource pkcs12 = 8 [(udpa.annotations.sensitive) = true];
 
   // If specified, updates of file-based *certificate_chain* and *private_key*

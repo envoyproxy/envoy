@@ -193,6 +193,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                 Filesystem::fileSystemForTest(), random_generator, bootstrap);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   TestConnectionCallbacks connection_callbacks(*dispatcher);
+  Network::TransportSocketOptionsConstSharedPtr options;
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
@@ -200,11 +201,11 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       time_system)};
 
   if (type <= Http::CodecType::HTTP2) {
-    Http::CodecClientProd client(
-        type,
-        dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
-                                           Network::Test::createRawBufferSocket(), nullptr),
-        host_description, *dispatcher, random);
+    Http::CodecClientProd client(type,
+                                 dispatcher->createClientConnection(
+                                     addr, Network::Address::InstanceConstSharedPtr(),
+                                     Network::Test::createRawBufferSocket(), nullptr, nullptr),
+                                 host_description, *dispatcher, random, options);
     return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type,
                                          client);
   }
@@ -231,7 +232,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                          static_cast<uint16_t>(addr->ip()->port())),
       *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store, nullptr, nullptr);
   connection->addConnectionCallbacks(connection_callbacks);
-  Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
+  Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random,
+                               options);
   // Quic connection needs to finish handshake.
   dispatcher->run(Event::Dispatcher::RunType::Block);
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);
@@ -283,7 +285,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   client_ = dispatcher_.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr, nullptr);
   // ConnectionCallbacks will call write_request_callback from the connect and low-watermark
   // callbacks. Set a small buffer limit so high-watermark is triggered after every write and
   // low-watermark is triggered every time the buffer is drained.

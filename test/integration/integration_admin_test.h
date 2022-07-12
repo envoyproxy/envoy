@@ -17,6 +17,12 @@ public:
   void initialize() override {
     config_helper_.addConfigModifier(
         [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto listener_config = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          auto additional_address = listener_config->add_additional_addresses();
+          envoy::config::core::v3::SocketAddress& socket_address =
+              *additional_address->mutable_address()->mutable_socket_address();
+          socket_address.set_address("127.0.0.2");
+          socket_address.set_port_value(0);
           auto& hist_settings =
               *bootstrap.mutable_stats_config()->mutable_histogram_bucket_settings();
           envoy::config::metrics::v3::HistogramBucketSettings* setting = hist_settings.Add();

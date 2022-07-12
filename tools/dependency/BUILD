@@ -19,6 +19,7 @@ envoy_entry_point(
         "//bazel:all_repository_locations",
     ],
     pkg = "envoy.dependency.check",
+    deps = [requirement("orjson")],
 )
 
 envoy_entry_point(

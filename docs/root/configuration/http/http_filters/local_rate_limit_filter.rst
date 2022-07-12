@@ -93,8 +93,8 @@ Example filter configuration using descriptors:
    :lineno-start: 21
    :caption: :download:`local-rate-limit-with-descriptors.yaml <_include/local-rate-limit-with-descriptors.yaml>`
 
-In this example, requests are rate-limited for routes prefixed with "/foo" as
-follow. If requests come from a downstream service cluster "foo" for "/foo/bar"
+In this example, requests are rate-limited for routes prefixed with "/foo" as follows.
+If requests come from a downstream service cluster "foo" for "/foo/bar"
 path, then 10 req/min are allowed. But if they come from a downstream service
 cluster "foo" for "/foo/bar2" path, then 100 req/min are allowed. Otherwise,
 1000 req/min are allowed.

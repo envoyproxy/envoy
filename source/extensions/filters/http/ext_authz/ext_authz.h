@@ -278,8 +278,7 @@ public:
 private:
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
-  void initiateCall(const Http::RequestHeaderMap& headers,
-                    const Router::RouteConstSharedPtr& route);
+  void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
   bool isBufferFull() const;
 

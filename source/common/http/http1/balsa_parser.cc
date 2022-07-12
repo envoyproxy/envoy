@@ -20,6 +20,19 @@ using ::quiche::BalsaHeaders;
 
 constexpr absl::string_view kColonSlashSlash = "://";
 
+bool isMethodValid(absl::string_view method) {
+  static constexpr absl::string_view kValidMethods[] = {
+      "ACL",       "BIND",    "CHECKOUT", "CONNECT", "COPY",       "DELETE",     "GET",
+      "HEAD",      "LINK",    "LOCK",     "MERGE",   "MKACTIVITY", "MKCALENDAR", "MKCOL",
+      "MOVE",      "MSEARCH", "NOTIFY",   "OPTIONS", "PATCH",      "POST",       "PROPFIND",
+      "PROPPATCH", "PURGE",   "PUT",      "REBIND",  "REPORT",     "SEARCH",     "SOURCE",
+      "SUBSCRIBE", "TRACE",   "UNBIND",   "UNLINK",  "UNLOCK",     "UNSUBSCRIBE"};
+
+  const auto* begin = &kValidMethods[0];
+  const auto* end = &kValidMethods[ABSL_ARRAYSIZE(kValidMethods) - 1] + 1;
+  return std::binary_search(begin, end, method);
+}
+
 // This method is crafted to match the URL validation behavior of the http-parser library.
 bool isUrlValid(absl::string_view url, bool is_connect) {
   if (url.empty()) {
@@ -95,6 +108,12 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
 
 size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
+
+  if (len == 0 && headers_done_ && !isChunked() &&
+      ((!framer_.is_request() && hasTransferEncoding()) || !headers_.content_length_valid())) {
+    MessageDone();
+  }
+
   return framer_.ProcessInput(slice, len);
 }
 
@@ -188,6 +207,11 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
+  if (!isMethodValid(method_input)) {
+    status_ = ParserStatus::Error;
+    error_message_ = "HPE_INVALID_METHOD";
+    return;
+  }
   status_ = convertResult(connection_->onMessageBegin());
   if (status_ == ParserStatus::Error) {
     return;
@@ -230,6 +254,7 @@ void BalsaParser::HeaderDone() {
   if (status_ == ParserStatus::Error) {
     return;
   }
+  headers_done_ = true;
   status_ = convertResult(connection_->onHeadersComplete());
 }
 

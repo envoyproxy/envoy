@@ -196,7 +196,8 @@ public:
     auto client_transport_socket = makeAltsTransportSocket();
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               std::move(client_transport_socket), nullptr);
+                                               std::move(client_transport_socket), nullptr,
+                                               nullptr);
   }
 
   std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {

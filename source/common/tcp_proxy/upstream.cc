@@ -277,7 +277,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-      {Http::Headers::get().Host, config_.hostname()},
+      {Http::Headers::get().Host, config_.host(downstream_info_)},
   });
 
   if (config_.usePost()) {
@@ -309,7 +309,7 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
 
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-      {Http::Headers::get().Host, config_.hostname()},
+      {Http::Headers::get().Host, config_.host(downstream_info_)},
   });
 
   if (config_.usePost()) {

@@ -320,36 +320,36 @@ message HttpConnectionManager {
   // [#next-free-field: 7]
   message ProxyStatusConfig {
     // If true, the details field of the Proxy-Status header is not populated with stream_info.response_code_details.
-    // This value defaults to `false`, i.e. the `details` field is populated by default.
+    // This value defaults to ``false``, i.e. the ``details`` field is populated by default.
     bool remove_details = 1;
 
     // If true, the details field of the Proxy-Status header will not contain
-    // connection termination details. This value defaults to `false`, i.e. the
-    // `details` field will contain connection termination details by default.
+    // connection termination details. This value defaults to ``false``, i.e. the
+    // ``details`` field will contain connection termination details by default.
     bool remove_connection_termination_details = 2;
 
     // If true, the details field of the Proxy-Status header will not contain an
-    // enumeration of the Envoy ResponseFlags. This value defaults to `false`,
-    // i.e. the `details` field will contain a list of ResponseFlags by default.
+    // enumeration of the Envoy ResponseFlags. This value defaults to ``false``,
+    // i.e. the ``details`` field will contain a list of ResponseFlags by default.
     bool remove_response_flags = 3;
 
     // If true, overwrites the existing Status header with the response code
     // recommended by the Proxy-Status spec.
-    // This value defaults to `false`, i.e. the HTTP response code is not
+    // This value defaults to ``false``, i.e. the HTTP response code is not
     // overwritten.
     bool set_recommended_response_code = 4;
 
     // The name of the proxy as it appears at the start of the Proxy-Status
     // header.
     //
-    // If neither of these values are set, this value defaults to `server_name`,
+    // If neither of these values are set, this value defaults to ``server_name``,
     // which itself defaults to "envoy".
     oneof proxy_name {
-      // If `use_node_id` is set, Proxy-Status headers will use the Envoy's node
+      // If ``use_node_id`` is set, Proxy-Status headers will use the Envoy's node
       // ID as the name of the proxy.
       bool use_node_id = 5;
 
-      // If `literal_proxy_name` is set, Proxy-Status headers will use this
+      // If ``literal_proxy_name`` is set, Proxy-Status headers will use this
       // value as the name of the proxy.
       string literal_proxy_name = 6;
     }
@@ -671,8 +671,8 @@ message HttpConnectionManager {
 
   // Determines if adjacent slashes in the path are merged into one before any processing of
   // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
-  // setting this option, incoming requests with path `//dir///file` will not match against route
-  // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
+  // setting this option, incoming requests with path ``//dir///file`` will not match against route
+  // with ``prefix`` match set to ``/dir``. Defaults to ``false``. Note that slash merging is not part of
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   // [#comment:TODO: This field is ignored when the
   // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
@@ -717,10 +717,10 @@ message HttpConnectionManager {
   // local port. This affects the upstream host header unless the method is
   // CONNECT in which case if no filter adds a port the original port will be restored before headers are
   // sent upstream.
-  // Without setting this option, incoming requests with host `example:443` will not match against
-  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
+  // Without setting this option, incoming requests with host ``example:443`` will not match against
+  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to ``example``. Defaults to ``false``. Note that port removal is not part
   // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
-  // Only one of `strip_matching_host_port` or `strip_any_host_port` can be set.
+  // Only one of ``strip_matching_host_port`` or ``strip_any_host_port`` can be set.
   bool strip_matching_host_port = 39
       [(udpa.annotations.field_migrate).oneof_promotion = "strip_port_mode"];
 
@@ -729,10 +729,10 @@ message HttpConnectionManager {
     // of request by HTTP filters or routing.
     // This affects the upstream host header unless the method is CONNECT in
     // which case if no filter adds a port the original port will be restored before headers are sent upstream.
-    // Without setting this option, incoming requests with host `example:443` will not match against
-    // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
+    // Without setting this option, incoming requests with host ``example:443`` will not match against
+    // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to ``example``. Defaults to ``false``. Note that port removal is not part
     // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
-    // Only one of `strip_matching_host_port` or `strip_any_host_port` can be set.
+    // Only one of ``strip_matching_host_port`` or ``strip_any_host_port`` can be set.
     bool strip_any_host_port = 42;
   }
 
@@ -767,11 +767,11 @@ message HttpConnectionManager {
   // Determines if trailing dot of the host should be removed from host/authority header before any
   // processing of request by HTTP filters or routing.
   // This affects the upstream host header.
-  // Without setting this option, incoming requests with host `example.com.` will not match against
-  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to `example.com`. Defaults to `false`.
+  // Without setting this option, incoming requests with host ``example.com.`` will not match against
+  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to ``example.com``. Defaults to ``false``.
   // When the incoming request contains a host/authority header that includes a port number,
   // setting this option will strip a trailing dot, if present, from the host section,
-  // leaving the port as is (e.g. host value `example.com.:443` will be updated to `example.com:443`).
+  // leaving the port as is (e.g. host value ``example.com.:443`` will be updated to ``example.com:443``).
   bool strip_trailing_host_dot = 47;
 
   // Proxy-Status HTTP response header configuration.
@@ -860,11 +860,11 @@ message ResponseMapper {
   // The new response status code if specified.
   google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
-  // The new local reply body text if specified. It will be used in the `%LOCAL_REPLY_BODY%`
-  // command operator in the `body_format`.
+  // The new local reply body text if specified. It will be used in the ``%LOCAL_REPLY_BODY%``
+  // command operator in the ``body_format``.
   config.core.v3.DataSource body = 3;
 
-  // A per mapper `body_format` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>`.
+  // A per mapper ``body_format`` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>`.
   // It will be used when this mapper is matched.
   config.core.v3.SubstitutionFormatString body_format_override = 4;
 
