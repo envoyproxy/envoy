@@ -21,7 +21,7 @@ If a request does not match any set of matchers then quota assignment for the "c
 :ref:`bucket_matchers <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.bucket_matchers>` is applied. If the ``on_no_match``
 configuration is not provided, all unmatched requests are not rate limited.
 
-Bucket definitions can be overridden in the virtual host or route configurations. The more specific definition completely overrides the less specific definition.
+Bucket definitions can be overridden by the virtual host or route configurations. The more specific definition completely overrides the less specific definition.
 
 Initially all Envoy's quota assignments are empty. The rate limit quota filter requests quota assignment from RLQS when the request matches a bucket for the first time.
 The behavior of the filter while it waits for the initial assignment is determined by the ``no_assignment_behavior`` value. In this state requests can either all be
