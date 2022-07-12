@@ -131,7 +131,7 @@ void AdminHtmlGenerator::renderInput(absl::string_view id, absl::string_view pat
   }
 
   auto value_tag = [](const std::string& value) -> std::string {
-    return value.empty() ? "" : absl::StrCat(" value=", value);
+    return value.empty() ? "" : absl::StrCat(" value=", Html::Utility::sanitize(value));
   };
 
   switch (type) {
@@ -141,7 +141,7 @@ void AdminHtmlGenerator::renderInput(absl::string_view id, absl::string_view pat
     break;
   case Admin::ParamDescriptor::Type::String:
     response_.addFragments({"<input type='text' name='", id, "' id='", id, "' form='", path, "'",
-                            on_change, value_tag(value), "/>"});
+                            on_change, value_tag(value), " />"});
     break;
   case Admin::ParamDescriptor::Type::Enum:
     response_.addFragments(
