@@ -44,6 +44,14 @@ TEST_P(UdsUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseCompl
   testRouterDownstreamDisconnectBeforeResponseComplete();
 }
 
+TEST_P(UdsUpstreamIntegrationTest, TestTls) {
+  upstream_tls_ = true;
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  config_helper_.configureUpstreamTls(false, upstreamProtocol() == Http::CodecType::HTTP3);
+
+  testRouterHeaderOnlyRequestAndResponse();
+}
+
 #if defined(__linux__)
 INSTANTIATE_TEST_SUITE_P(
     TestParameters, UdsListenerIntegrationTest,

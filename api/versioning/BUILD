@@ -196,6 +196,7 @@ proto_library(
         "//envoy/extensions/stat_sinks/graphite_statsd/v3:pkg",
         "//envoy/extensions/stat_sinks/wasm/v3:pkg",
         "//envoy/extensions/transport_sockets/alts/v3:pkg",
+        "//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg",
         "//envoy/extensions/transport_sockets/internal_upstream/v3:pkg",
         "//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg",
         "//envoy/extensions/transport_sockets/quic/v3:pkg",
