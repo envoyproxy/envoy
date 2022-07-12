@@ -891,13 +891,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common and com_googlesource_chromium_zlib.
-        version = "10.0.139.6",
+        version = "10.4.132.18",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "3585ebc8db95e61b65260b3d141ed5392b843bd066744fa62ce92dab3708e2f8",
+        sha256 = "154223731091f531a3cb1a95ab9c14225983891240220a9e232c729358badd2c",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/v8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-03-07",
+        release_date = "2022-07-11",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_chromium_base_trace_event_common = dict(
@@ -921,13 +921,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://chromium.googlesource.com/chromium/src/third_party/zlib/",
         # NOTE: Update together with v8 and com_googlesource_chromium_base_trace_event_common.
         # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
-        version = "9538f4194f6e5eff1bd59f2396ed9d05b1a8d801",
+        version = "64bbf988543996eb8df9a86877b32917187eba8f",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "7045c6808267f3e803e3196fa06346647c2a060cfd1a2f96ef6325fba6eaa956",
+        sha256 = "6e70bbb25ad1c567e3b44f4ad76f50fcc8fb7d34c6e2e8858e033ffd579ac1af",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-zlib-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-02-15",
+        release_date = "2022-05-31",
         cpe = "N/A",
     ),
     com_github_google_quiche = dict(
@@ -1119,8 +1119,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "694a0b073912ff3bd00b6ca70d16ca43b2aebbf2",
-        sha256 = "d8b8ed52c48a4847a76c2192095362972e4ce07b95311f36da844128d5b35ab5",
+        version = "bcd1c4a698ca2cee79959e150ba3b02ffa790eea",
+        sha256 = "b1124d3667c24d1ad3ddb8f12c3646fe9bf31a1316dd4ce50efc9f1a2f82f68a",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -1136,7 +1136,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2022-04-07",
+        release_date = "2022-07-12",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(
