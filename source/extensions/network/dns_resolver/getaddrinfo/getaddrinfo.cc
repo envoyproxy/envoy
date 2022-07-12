@@ -58,9 +58,22 @@ private:
   // Must be a shared_ptr for passing around via post.
   using PendingQuerySharedPtr = std::shared_ptr<PendingQuery>;
 
-  // Parse a GAI response and determine the final address list.
+  // RAII wrapper to free the addrinfo.
+  class AddrInfoWrapper : NonCopyable {
+  public:
+    AddrInfoWrapper(addrinfo* info) : info_(info) {}
+    ~AddrInfoWrapper() { Api::OsSysCallsSingleton::get().freeaddrinfo(info_); }
+    const addrinfo* get() { return info_; }
+
+  private:
+    addrinfo* info_;
+  };
+
+  // Parse a GAI response and determine the final address list. We could potentially avoid adding
+  // v4 or v6 addresses if we know they will never be used. Right now the final filtering is done
+  // below and this code is kept simple.
   std::pair<ResolutionStatus, std::list<DnsResponse>>
-  processGaiResponse(const PendingQuery& query, addrinfo* addrinfo_result) {
+  processGaiResponse(const PendingQuery& query, const addrinfo* addrinfo_result) {
     std::list<DnsResponse> v4_results;
     std::list<DnsResponse> v6_results;
     for (auto ai = addrinfo_result; ai != nullptr; ai = ai->ai_next) {
@@ -71,19 +84,18 @@ private:
         address.sin_port = 0;
         address.sin_addr = reinterpret_cast<sockaddr_in*>(ai->ai_addr)->sin_addr;
 
-        v4_results.emplace_back(DnsResponse(std::make_shared<const Address::Ipv4Instance>(&address),
-                                            std::chrono::seconds(60)));
+        v4_results.emplace_back(
+            DnsResponse(std::make_shared<const Address::Ipv4Instance>(&address), DEFAULT_TTL));
       } else if (ai->ai_family == AF_INET6) {
         sockaddr_in6 address;
         memset(&address, 0, sizeof(address));
         address.sin6_family = AF_INET6;
         address.sin6_port = 0;
         address.sin6_addr = reinterpret_cast<sockaddr_in6*>(ai->ai_addr)->sin6_addr;
-        v6_results.emplace_back(DnsResponse(std::make_shared<const Address::Ipv6Instance>(address),
-                                            std::chrono::seconds(60)));
+        v6_results.emplace_back(
+            DnsResponse(std::make_shared<const Address::Ipv6Instance>(address), DEFAULT_TTL));
       }
     }
-    Api::OsSysCallsSingleton::get().freeaddrinfo(addrinfo_result);
 
     std::list<DnsResponse> final_results;
     switch (query.dns_lookup_family_) {
@@ -157,12 +169,13 @@ private:
       // for SOCK_STREAM and one for SOCK_DGRAM. Since we do not return the family
       // anyway, just pick one.
       hints.ai_socktype = SOCK_STREAM;
-      addrinfo* addrinfo_result;
+      addrinfo* addrinfo_result_do_not_use = nullptr;
       auto rc = Api::OsSysCallsSingleton::get().getaddrinfo(next_query->dns_name_.c_str(), nullptr,
-                                                            &hints, &addrinfo_result);
+                                                            &hints, &addrinfo_result_do_not_use);
+      auto addrinfo_wrapper = AddrInfoWrapper(addrinfo_result_do_not_use);
       std::pair<ResolutionStatus, std::list<DnsResponse>> response;
       if (rc.return_value_ == 0) {
-        response = processGaiResponse(*next_query, addrinfo_result);
+        response = processGaiResponse(*next_query, addrinfo_wrapper.get());
       } else {
         // TODO(mattklein123): Handle some errors differently such as `EAI_NODATA`.
         ENVOY_LOG(debug, "getaddrinfo failed with rc={} errno={}", gai_strerror(rc.return_value_),
@@ -182,6 +195,10 @@ private:
 
     ENVOY_LOG(debug, "getaddrinfo resolver thread exiting");
   }
+
+  // getaddrinfo() doesn't provide TTL so use a hard coded default. This can be made configurable
+  // later if needed.
+  static constexpr std::chrono::seconds DEFAULT_TTL = std::chrono::seconds(60);
 
   Event::Dispatcher& dispatcher_;
   absl::Mutex mutex_;
