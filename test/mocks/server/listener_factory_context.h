@@ -15,10 +15,10 @@
 namespace Envoy {
 namespace Server {
 namespace Configuration {
-class MockListenerFactoryContext : public ListenerFactoryContext {
+class MockListenerFactoryContextOld : public ListenerFactoryContext {
 public:
-  MockListenerFactoryContext();
-  ~MockListenerFactoryContext() override;
+  MockListenerFactoryContextOld();
+  ~MockListenerFactoryContextOld() override;
 
   const Network::ListenerConfig& listenerConfig() const override { return listener_config_; }
   MOCK_METHOD(const Network::ListenerConfig&, listenerConfig_, (), (const));
@@ -48,9 +48,6 @@ public:
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
-  Grpc::Context& grpcContext() override { return grpc_context_; }
-  Http::Context& httpContext() override { return http_context_; }
-  Router::Context& routerContext() override { return router_context_; }
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
@@ -74,9 +71,6 @@ public:
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
-  Grpc::ContextImpl grpc_context_;
-  Http::ContextImpl http_context_;
-  Router::ContextImpl router_context_;
   testing::NiceMock<Api::MockApi> api_;
 
   Network::MockListenerConfig listener_config_;

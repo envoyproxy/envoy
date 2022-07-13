@@ -187,6 +187,22 @@ public:
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() PURE;
+
+  /**
+   * @return ProcessContextOptRef an optional reference to the
+   * process context. Will be unset when running in validation mode.
+   */
+  virtual ProcessContextOptRef processContext() PURE;
+
+  /**
+   * @return Http::Context& a reference to the http context.
+   */
+  virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 };
 
 /**
@@ -207,11 +223,6 @@ public:
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
   virtual ServerFactoryContext& getServerFactoryContext() const PURE;
-
-  /**
-   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
-   */
-  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
    * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
@@ -246,27 +257,6 @@ public:
    * for this listener.
    */
   virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
-
-  /**
-   * @return Http::Context& a reference to the http context.
-   */
-  virtual Http::Context& httpContext() PURE;
-
-  /**
-   * @return Grpc::Context& a reference to the grpc context.
-   */
-  virtual Grpc::Context& grpcContext() PURE;
-
-  /**
-   * @return Router::Context& a reference to the router context.
-   */
-  virtual Router::Context& routerContext() PURE;
-
-  /**
-   * @return ProcessContextOptRef an optional reference to the
-   * process context. Will be unset when running in validation mode.
-   */
-  virtual ProcessContextOptRef processContext() PURE;
 };
 
 /**
@@ -274,28 +264,29 @@ public:
  */
 class FilterFactoryContext {
 public:
-  FilterFactoryContext(ServerFactoryContext& server_context,
-                       OptRef<DownstreamFactoryContext> downstream_context)
-      : server_context_(server_context), downstream_context_(downstream_context) {}
+  virtual ~FilterFactoryContext() = default;
 
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  ServerFactoryContext& getServerFactoryContext() { return server_context_; }
+  virtual ServerFactoryContext& getServerFactoryContext() PURE;
 
-  OptRef<DownstreamFactoryContext> getDownstreamFactoryContext() { return downstream_context_; }
+  /**
+   * @return an optional DownstreamFactoryContext. This will be present for
+   * downstream filters only, and presence should be validated.
+   */
+  virtual OptRef<DownstreamFactoryContext> getDownstreamFactoryContext() PURE;
 
-  // A convenience function to avoid fix ups for the 127 call sites.
+  /**
+   * @return the best validation visitor.  If there's a downstream context, that
+   * validation visitor is prefered.
+   */
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() {
     if (getDownstreamFactoryContext().has_value()) {
       return getDownstreamFactoryContext()->messageValidationVisitor();
     }
     return getServerFactoryContext().messageValidationVisitor();
   }
-
-private:
-  ServerFactoryContext& server_context_;
-  OptRef<DownstreamFactoryContext> downstream_context_;
 };
 
 // For legacy naming.

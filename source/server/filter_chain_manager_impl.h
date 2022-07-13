@@ -20,6 +20,7 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
 #include "source/server/filter_chain_factory_context_callback.h"
+#include "source/server/filter_factory_context_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -57,16 +58,11 @@ public:
 
   // Configuration::FactoryContext
   Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  Router::Context& routerContext() override;
-  Http::Context& httpContext() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
 
@@ -101,10 +97,10 @@ public:
   void startDraining() override { factory_context_->filterChainFactoryContext().startDraining(); }
 
   // A FilterFactoryContext which takes ownership of a FilterChainFactoryContext.
-  class OwningFilterFactoryContext : public Configuration::FilterFactoryContext {
+  class OwningFilterFactoryContext : public Configuration::FilterFactoryContextImpl {
   public:
     OwningFilterFactoryContext(std::unique_ptr<Configuration::FilterChainFactoryContext>&& context)
-        : Configuration::FilterFactoryContext(context->getServerFactoryContext(), {*context}),
+        : Configuration::FilterFactoryContextImpl(context->getServerFactoryContext(), {*context}),
           owned_context_(std::move(context)) {}
     Configuration::FilterChainFactoryContext& filterChainFactoryContext() {
       return *owned_context_;
@@ -140,12 +136,7 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
 
   // Configuration::DownstreamFactoryContext
-  Grpc::Context& grpcContext() override;
-  Router::Context& routerContext() override;
-  Http::Context& httpContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  ProcessContextOptRef processContext() override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;

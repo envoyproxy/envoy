@@ -175,6 +175,11 @@ public:
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
+  MOCK_METHOD(OverloadManager&, overloadManager, ());
+  MOCK_METHOD(Http::Context&, httpContext, ());
+  MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(bool, healthCheckFailed, ());
+  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -188,6 +193,7 @@ public:
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
+  testing::NiceMock<MockOptions> options_;
 
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
@@ -196,6 +202,8 @@ public:
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
+  testing::NiceMock<Configuration::MockTransportSocketFactoryContext> transport_socket_factory_context_;
+  testing::NiceMock<MockOverloadManager> overload_manager_;
 };
 
 } // namespace Configuration

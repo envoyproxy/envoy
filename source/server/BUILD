@@ -454,6 +454,7 @@ envoy_cc_library(
         "listener_manager_impl.h",
     ],
     deps = [
+      ":filter_factory_context_impl_lib",
         "active_raw_udp_listener_config",
         ":configuration_lib",
         ":drain_manager_lib",
@@ -512,6 +513,7 @@ envoy_cc_library(
     srcs = ["filter_chain_manager_impl.cc"],
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
+      ":filter_factory_context_impl_lib",
         ":filter_chain_factory_context_callback",
         "//envoy/config:typed_metadata_interface",
         "//envoy/matcher:matcher_interface",
@@ -560,6 +562,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "factory_context_base_impl_lib",
     hdrs = ["factory_context_base_impl.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_factory_context_impl_lib",
+    hdrs = ["filter_factory_context_impl.h"],
     deps = [
         "//envoy/server:factory_context_interface",
     ],

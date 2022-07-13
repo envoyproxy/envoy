@@ -23,6 +23,7 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/filter_chain_manager_impl.h"
+#include "source/server/filter_factory_context_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
@@ -122,16 +123,11 @@ public:
                                  const envoy::config::listener::v3::Listener& config,
                                  Server::DrainManagerPtr drain_manager);
   Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  Http::Context& httpContext() override;
-  Router::Context& routerContext() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
 
@@ -181,16 +177,11 @@ public:
 
   // FactoryContext
   Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  Http::Context& httpContext() override;
-  Router::Context& routerContext() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
@@ -477,7 +468,7 @@ private:
 
   Quic::QuicStatNames& quic_stat_names_;
   MissingListenerConfigStats missing_listener_config_stats_;
-  Server::Configuration::FilterFactoryContext factory_context_;
+  Server::Configuration::FilterFactoryContextImpl factory_context_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

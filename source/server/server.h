@@ -197,7 +197,10 @@ public:
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
   bool healthCheckFailed() override { return server_.healthCheckFailed(); }
+  ProcessContextOptRef processContext() override { return server_.processContext(); }
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
+  Http::Context& httpContext() override { return server_.httpContext(); }
+  TransportSocketFactoryContext& getTransportSocketFactoryContext() const override { return server_.transportSocketFactoryContext(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }

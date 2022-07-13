@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Router {
 
 MockRouterFilterInterface::MockRouterFilterInterface()
-    : pool_(*symbol_table_), config_(pool_.add("prefix"), context_,
+    : pool_(*symbol_table_), config_(pool_.add("prefix"), context_, context_,
                                      ShadowWriterPtr(new MockShadowWriter()), router_proto) {
   auto cluster_info = new NiceMock<Upstream::MockClusterInfo>();
   cluster_info->timeout_budget_stats_ = nullptr;

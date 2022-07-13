@@ -75,12 +75,15 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
-  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, statsConfig()).WillByDefault(ReturnRef(stats_config_));
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
+    ON_CALL(*this, getTransportSocketFactoryContext())
+              .WillByDefault(ReturnRef(transport_socket_factory_context_));
+  ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
+  ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 

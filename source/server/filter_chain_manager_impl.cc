@@ -104,30 +104,9 @@ ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageVal
   return parent_context_.messageValidationVisitor();
 }
 
-Grpc::Context& PerFilterChainFactoryContextImpl::grpcContext() {
-  return parent_context_.grpcContext();
-}
-
-Http::Context& PerFilterChainFactoryContextImpl::httpContext() {
-  return parent_context_.httpContext();
-}
-
-Router::Context& PerFilterChainFactoryContextImpl::routerContext() {
-  return parent_context_.routerContext();
-}
-
-ProcessContextOptRef PerFilterChainFactoryContextImpl::processContext() {
-  return parent_context_.processContext();
-}
-
 Configuration::ServerFactoryContext&
 PerFilterChainFactoryContextImpl::getServerFactoryContext() const {
   return parent_context_.getServerFactoryContext();
-}
-
-Configuration::TransportSocketFactoryContext&
-PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
-  return parent_context_.getTransportSocketFactoryContext();
 }
 
 Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
@@ -793,19 +772,11 @@ FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
     : server_(server), config_(config), drain_decision_(drain_decision),
       listener_scope_(listener_scope), is_quic_(is_quic) {}
 
-Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
-Router::Context& FactoryContextImpl::routerContext() { return server_.routerContext(); }
-Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
 ProtobufMessage::ValidationVisitor& FactoryContextImpl::messageValidationVisitor() {
   return server_.messageValidationContext().staticValidationVisitor();
 }
-ProcessContextOptRef FactoryContextImpl::processContext() { return server_.processContext(); }
 Configuration::ServerFactoryContext& FactoryContextImpl::getServerFactoryContext() const {
   return server_.serverFactoryContext();
-}
-Configuration::TransportSocketFactoryContext&
-FactoryContextImpl::getTransportSocketFactoryContext() const {
-  return server_.transportSocketFactoryContext();
 }
 const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
   return config_.metadata();

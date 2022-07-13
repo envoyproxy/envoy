@@ -21,6 +21,7 @@
 #include "source/common/network/socket_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/server/filter_chain_manager_impl.h"
+#include "source/server/filter_factory_context_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -188,7 +189,7 @@ protected:
   Stats::ScopeSharedPtr global_scope_;
   Stats::ScopeSharedPtr listener_scope_;
   FactoryContextImpl downstream_factory_context_;
-  Server::Configuration::FilterFactoryContext factory_context_;
+  Server::Configuration::FilterFactoryContextImpl factory_context_;
   SyntheticReadCallbacks read_callbacks_;
 };
 

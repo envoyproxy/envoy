@@ -226,9 +226,6 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
       is_quic_(config.udp_listener_config().has_quic_options()) {}
 
-Grpc::Context& ListenerFactoryContextBaseImpl::grpcContext() { return server_.grpcContext(); }
-Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.httpContext(); }
-Router::Context& ListenerFactoryContextBaseImpl::routerContext() { return server_.routerContext(); }
 const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listenerMetadata() const {
   return metadata_;
 };
@@ -241,16 +238,9 @@ envoy::config::core::v3::TrafficDirection ListenerFactoryContextBaseImpl::direct
 ProtobufMessage::ValidationVisitor& ListenerFactoryContextBaseImpl::messageValidationVisitor() {
   return validation_visitor_;
 }
-ProcessContextOptRef ListenerFactoryContextBaseImpl::processContext() {
-  return server_.processContext();
-}
 Configuration::ServerFactoryContext&
 ListenerFactoryContextBaseImpl::getServerFactoryContext() const {
   return server_.serverFactoryContext();
-}
-Configuration::TransportSocketFactoryContext&
-ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
-  return server_.transportSocketFactoryContext();
 }
 Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
 bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
@@ -771,15 +761,6 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
 }
 
 Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() { PANIC("not implemented"); }
-Grpc::Context& PerListenerFactoryContextImpl::grpcContext() {
-  return listener_factory_context_base_->grpcContext();
-}
-Http::Context& PerListenerFactoryContextImpl::httpContext() {
-  return listener_factory_context_base_->httpContext();
-}
-Router::Context& PerListenerFactoryContextImpl::routerContext() {
-  return listener_factory_context_base_->routerContext();
-}
 const envoy::config::core::v3::Metadata& PerListenerFactoryContextImpl::listenerMetadata() const {
   return listener_factory_context_base_->listenerMetadata();
 };
@@ -795,16 +776,9 @@ const Network::ListenerConfig& PerListenerFactoryContextImpl::listenerConfig() c
 ProtobufMessage::ValidationVisitor& PerListenerFactoryContextImpl::messageValidationVisitor() {
   return listener_factory_context_base_->messageValidationVisitor();
 }
-ProcessContextOptRef PerListenerFactoryContextImpl::processContext() {
-  return listener_factory_context_base_->processContext();
-}
 Configuration::ServerFactoryContext&
 PerListenerFactoryContextImpl::getServerFactoryContext() const {
   return listener_factory_context_base_->getServerFactoryContext();
-}
-Configuration::TransportSocketFactoryContext&
-PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
-  return listener_factory_context_base_->getTransportSocketFactoryContext();
 }
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
