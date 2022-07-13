@@ -2,14 +2,10 @@
 
 #include "envoy/registry/registry.h"
 #include "envoy/router/url_template.h"
-// TODO change includes
 
 namespace Envoy {
-namespace Extensions {
-namespace UrlTemplate {
+namespace matching {
 
-REGISTER_FACTORY(UrlTemplatePredicateFactory, Router::UrlTemplatePredicateFactory);
-
-} // namespace UrlTemplate
-} // namespace Extensions
+REGISTER_FACTORY(PatternTemplatePredicateFactory, Router::PatternTemplatePredicateFactory);
+} // namespace matching
 } // namespace Envoy

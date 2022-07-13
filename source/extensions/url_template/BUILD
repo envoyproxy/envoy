@@ -79,6 +79,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":url_template_matching",
         "//envoy/registry",

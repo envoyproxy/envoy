@@ -7,6 +7,7 @@
 
 #include "source/extensions/url_template/url_template_matching_internal.h"
 
+
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "envoy/router/url_template.h"
@@ -22,16 +23,28 @@ struct RewritePatternSegment {
   RewriteStringKind kind;
 };
 
-class UrlTemplatePredicate : public Router::UrlTemplatePredicate {
-public:
-  explicit UrlTemplatePredicate(absl::string_view url_pattern, absl::string_view url_rewrite_pattern)
-      : url_pattern_(url_pattern), url_rewrite_pattern_(url_rewrite_pattern),
-        matching_pattern_regex_(RE2(convertURLPatternSyntaxToRegex(url_pattern).value())) {}
 
-  absl::string_view name() const override { return "envoy.url_template"; }
+class PatternTemplatePredicate : public Router::PatternTemplatePredicate {
+public:
+  explicit PatternTemplatePredicate(std::string url_pattern, std::string url_rewrite_pattern)
+      : Router::PatternTemplatePredicate(url_pattern, url_rewrite_pattern),
+        matching_pattern_regex_(RE2(convertURLPatternSyntaxToRegex(url_pattern).value())) {}
+  PatternTemplatePredicate() = default;
+
+  absl::string_view name() const override { return "envoy.url_template.pattern_template_predicates"; }
+  std::string category() const override { return "envoy.url_template"; }
 
   // Returns if the regex pattern matches the given regex from constructor.
-  bool match(absl::string_view pattern) const;
+  bool match(absl::string_view pattern) const override;
+
+  absl::Status is_valid_match_pattern(std::string match_pattern) const override;
+
+  absl::Status is_valid_rewrite_pattern(std::string match_pattern, std::string rewrite_pattern) const override;
+
+  absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
+                                             absl::string_view matched_path) const override;
+
+private:
 
   // Returns the regex pattern that is equivalent to the given url_pattern.
   // Used in the config pipeline to translate user given url pattern to
@@ -57,25 +70,18 @@ public:
       const envoy::extensions::url_template::v3::RouteUrlRewritePattern& rewrite_pattern) const;
 
   // Returns if provided template match pattern is valid
-  bool isValidPathTemplateMatchPattern(const std::string& path_template_match);
+  absl::Status isValidPathTemplateMatchPattern(const std::string& path_template_match) const;
 
   // Returns if provided rewrite pattern is valid
-  bool isValidPathTemplateRewritePattern(const std::string& path_template_rewrite);
+  absl::Status isValidPathTemplateRewritePattern(const std::string& path_template_rewrite) const;
 
   // Returns if path_template and rewrite_template have valid variables
-  bool isValidSharedVariableSet(const std::string& path_template_rewrite,
-                                absl::string_view capture_regex);
-
-  absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
-                                             absl::string_view matched_path) const;
-
-public:
-    absl::string_view url_pattern_;
+  absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
+                                std::string& capture_regex) const;
 
 private:
   // move into library
-  absl::string_view url_rewrite_pattern_;
-  RE2 matching_pattern_regex_;
+  RE2 matching_pattern_regex_{nullptr};
 
 };
 

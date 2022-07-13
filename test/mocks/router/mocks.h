@@ -164,6 +164,18 @@ public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };
 
+class MockPatternTemplatePolicy : public PatternTemplatePolicy {
+public:
+  MockPatternTemplatePolicy();
+  MOCK_METHOD(bool, enabled, (), (const));
+  MOCK_METHOD(PatternTemplatePredicateSharedPtr, predicate, (), (const));
+};
+
+class MockPatternTemplatePredicate : public PatternTemplatePredicate {
+public:
+  MOCK_METHOD(absl::string_view, name, (), (const));
+};
+
 class MockRetryState : public RetryState {
 public:
   MockRetryState();
@@ -376,6 +388,7 @@ public:
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
+  MOCK_METHOD(const PatternTemplatePolicy&, patternTemplatePolicy, (), (const));
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
@@ -413,6 +426,7 @@ public:
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
+  testing::NiceMock<MockPatternTemplatePolicy> pattern_template_policy_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;

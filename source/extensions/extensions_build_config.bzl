@@ -59,7 +59,7 @@ EXTENSIONS = {
     #
     # Pattern Matcher
     #
-    "envoy.url_template": "//source/extensions/url_template:config",
+    "envoy.url_template.pattern_template_predicates": "//source/extensions/url_template:config",
 
     #
     # Generic Inputs

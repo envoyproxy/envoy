@@ -34,6 +34,8 @@
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
 
+#include "source/extensions/url_template/url_template_matching.h"
+
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
@@ -457,6 +459,31 @@ private:
  * Implementation of InternalRedirectPolicy that reads from the proto
  * InternalRedirectPolicy of the RouteAction.
  */
+class PatternTemplatePolicyImpl : public PatternTemplatePolicy {
+public:
+  // Constructor that enables internal redirect with policy_config controlling the configurable
+  // behaviors.
+  PatternTemplatePolicyImpl(std::string url_pattern, std::string url_rewrite_pattern);
+
+  // Default constructor that disables internal redirect.
+  PatternTemplatePolicyImpl();
+
+  bool enabled() const override { return enabled_; }
+
+  PatternTemplatePredicateSharedPtr predicate() const override;
+
+  const std::string url_pattern_;
+  const std::string url_rewrite_pattern_;
+
+private:
+  const bool enabled_;
+  PatternTemplatePredicateFactory* predicate_factory_;
+};
+
+/**
+ * Implementation of InternalRedirectPolicy that reads from the proto
+ * InternalRedirectPolicy of the RouteAction.
+ */
 class InternalRedirectPolicyImpl : public InternalRedirectPolicy {
 public:
   // Constructor that enables internal redirect with policy_config controlling the configurable
@@ -563,6 +590,9 @@ public:
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
   const InternalRedirectPolicy& internalRedirectPolicy() const override {
     return internal_redirect_policy_;
+  }
+  const PatternTemplatePolicy& patternTemplatePolicy() const override {
+    return pattern_template_policy_;
   }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
@@ -676,6 +706,9 @@ public:
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
     const InternalRedirectPolicy& internalRedirectPolicy() const override {
       return parent_->internalRedirectPolicy();
+    }
+    const PatternTemplatePolicy& patternTemplatePolicy() const override {
+      return parent_->patternTemplatePolicy();
     }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
     const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
@@ -842,6 +875,7 @@ protected:
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
+  const PatternTemplatePolicyImpl pattern_template_policy_;
   std::string regex_rewrite_substitution_;
   std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
@@ -922,6 +956,9 @@ private:
   buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
+
+  PatternTemplatePolicyImpl
+  buildPatternTemplatePolicy(std::string path_template, std::string path_template_rewrite) const;
 
   RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
                                                   const Http::HeaderMap& headers) const;
@@ -1012,7 +1049,7 @@ public:
                              ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override { return path_template_; }
+  const std::string& matcher() const override { return match_pattern_; }
   PathMatchType matchType() const override { return PathMatchType::Pattern; }
 
   // Router::Matchable
@@ -1028,9 +1065,8 @@ public:
   absl::optional<std::string>
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
-private:
-  const std::string path_template_;
-  const Matchers::PathMatcherConstSharedPtr path_matcher_;
+  private:
+    const std::string match_pattern_;
 };
 
 /**

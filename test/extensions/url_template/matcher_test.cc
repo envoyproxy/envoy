@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Extensions {
 namespace UrlTemplate {
 
-TEST(StringMatcher, PatternMatch) {
+TEST(UrlTemplate, RouteMatcher) {
   matching::UrlTemplatePredicate matcher("/foo/{lang}/{country}", "rewrite");
 
   EXPECT_TRUE(matcher.match("/foo/english/us"));

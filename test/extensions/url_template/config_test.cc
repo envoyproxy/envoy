@@ -31,7 +31,7 @@ TEST_F(UrlTemplateConfigTest, EmptyCreation) {
   std::string current_route_name = "fake_current_route";
   // Create the predicate for the first time.
   {
-    auto predicate = factory_->createUrlTemplatePredicate("url_pattern", "rewrite_pattern");
+    auto predicate = factory_->createUrlTemplatePredicate("/url_pattern/{TEST}", "rewrite_pattern");
     ASSERT(predicate);
   }
 }

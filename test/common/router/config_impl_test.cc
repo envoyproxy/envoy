@@ -8832,6 +8832,81 @@ virtual_hosts:
   EXPECT_FALSE(internal_redirect_policy.enabled());
 }
 
+TEST_F(RouteConfigurationV2, TemplatePatternIsDisabledWhenNotSpecifiedInRouteAction) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& pattern_template_policy =
+      config.route(headers, 0)->routeEntry()->patternTemplatePolicy();
+  EXPECT_FALSE(pattern_template_policy.enabled());
+}
+
+TEST_F(RouteConfigurationV2, TemplatePatternIsFilledFromConfigInRouteAction) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_template: "/bar/{country}/{lang}"
+        route:
+          path_template_rewrite: "/bar/{lang}/{country}"
+          cluster: some-cluster
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/bar/one/two", "GET");
+
+  const auto& pattern_template_policy =
+      config.route(headers, 0)->routeEntry()->patternTemplatePolicy();
+
+  EXPECT_TRUE(pattern_template_policy.enabled());
+  EXPECT_EQ(pattern_template_policy.predicate()->url_pattern_, "/bar/{country}/{lang}");
+  EXPECT_EQ(pattern_template_policy.predicate()->url_rewrite_pattern_, "/bar/{lang}/{country}");
+}
+
+TEST_F(RouteMatcherTest, SimplePathPatternMatchOnly) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_template: "/rest/{lang}/{state}"
+          case_sensitive: false
+        route: { cluster: path-pattern-cluster}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster", "default-cluster"},
+                                                       {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // Pattern matches
+  EXPECT_EQ("path-pattern-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/english/wa", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-pattern-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/spanish/mexico", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+}
+
 TEST_F(RouteConfigurationV2, DefaultInternalRedirectPolicyIsSensible) {
   const std::string yaml = R"EOF(
 virtual_hosts:

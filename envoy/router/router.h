@@ -20,6 +20,7 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
+#include "envoy/router/url_template.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -296,6 +297,24 @@ public:
  * RetryStatus whether request should be retried or not.
  */
 enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
+
+class PatternTemplatePolicy {
+public:
+  virtual ~PatternTemplatePolicy() = default;
+
+  /**
+   * @return whether internal redirect is enabled on this route.
+   */
+  virtual bool enabled() const PURE;
+
+  /**
+   * Creates the target route predicates. This should really be called only once for each upstream
+   * redirect response. Creating the predicates lazily to avoid wasting CPU cycles on non-redirect
+   * responses, which should be the most common case.
+   * @return a vector of newly constructed InternalRedirectPredicate instances.
+   */
+  virtual PatternTemplatePredicateSharedPtr predicate() const PURE;
+};
 
 /**
  * InternalRedirectPolicy from the route configuration.
@@ -914,6 +933,8 @@ public:
    *         simply proxied as normal responses.
    */
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
+
+  virtual const PatternTemplatePolicy& patternTemplatePolicy() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.

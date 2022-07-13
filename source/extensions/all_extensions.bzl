@@ -9,6 +9,7 @@ _required_extensions = {
     "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
     "envoy.network.dns_resolver.cares": "//source/extensions/network/dns_resolver/cares:config",
     "envoy.network.dns_resolver.apple": "//source/extensions/network/dns_resolver/apple:config",
+    "envoy.url_template.pattern_template_predicates": "//source/extensions/url_template:config",
 }
 
 # Return the extension cc_library target after select
@@ -34,6 +35,7 @@ _core_extensions = [
     "envoy.transport_sockets.raw_buffer",
     "envoy.network.dns_resolver.cares",
     "envoy.network.dns_resolver.apple",
+    "envoy.url_template.pattern_template_predicates",
 ]
 
 # Return all core extensions to be compiled into Envoy.

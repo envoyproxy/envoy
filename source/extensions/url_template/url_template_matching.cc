@@ -27,12 +27,12 @@ using matching::url_template_matching_internal::ParsedUrlPattern;
 
 inline re2::StringPiece ToStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
 
-bool UrlTemplatePredicate::match(absl::string_view pattern) const {
+bool PatternTemplatePredicate::match(absl::string_view pattern) const {
   return RE2::FullMatch(ToStringPiece(Http::PathUtil::removeQueryAndFragment(pattern)), matching_pattern_regex_);
 }
 
 absl::StatusOr<std::string>
-UrlTemplatePredicate::convertURLPatternSyntaxToRegex(absl::string_view url_pattern) const {
+PatternTemplatePredicate::convertURLPatternSyntaxToRegex(absl::string_view url_pattern) const {
 
   absl::StatusOr<ParsedUrlPattern> status =
       url_template_matching_internal::parseURLPatternSyntax(url_pattern);
@@ -44,7 +44,7 @@ UrlTemplatePredicate::convertURLPatternSyntaxToRegex(absl::string_view url_patte
 }
 
 absl::StatusOr<std::vector<RewritePatternSegment>>
-UrlTemplatePredicate::parseRewritePatternHelper(absl::string_view pattern) const {
+PatternTemplatePredicate::parseRewritePatternHelper(absl::string_view pattern) const {
   std::vector<RewritePatternSegment> result;
 
   // Don't allow contiguous '/' patterns.
@@ -88,7 +88,7 @@ UrlTemplatePredicate::parseRewritePatternHelper(absl::string_view pattern) const
 }
 
 absl::StatusOr<envoy::extensions::url_template::v3::RouteUrlRewritePattern>
-UrlTemplatePredicate::parseRewritePattern(absl::string_view pattern,
+PatternTemplatePredicate::parseRewritePattern(absl::string_view pattern,
                                           absl::string_view capture_regex) const {
   envoy::extensions::url_template::v3::RouteUrlRewritePattern parsed_pattern;
   RE2 regex = RE2(ToStringPiece(capture_regex));
@@ -122,7 +122,7 @@ UrlTemplatePredicate::parseRewritePattern(absl::string_view pattern,
   return parsed_pattern;
 }
 
-absl::StatusOr<std::string> UrlTemplatePredicate::rewriteURLTemplatePattern(
+absl::StatusOr<std::string> PatternTemplatePredicate::rewriteURLTemplatePattern(
     absl::string_view url, absl::string_view capture_regex,
     const envoy::extensions::url_template::v3::RouteUrlRewritePattern& rewrite_pattern) const {
   RE2 regex = RE2(ToStringPiece(capture_regex));
@@ -154,20 +154,20 @@ absl::StatusOr<std::string> UrlTemplatePredicate::rewriteURLTemplatePattern(
   return rewritten_url;
 }
 
-bool UrlTemplatePredicate::isValidPathTemplateMatchPattern(const std::string& path_template_match) {
-  return convertURLPatternSyntaxToRegex(path_template_match).ok();
+absl::Status PatternTemplatePredicate::isValidPathTemplateMatchPattern(const std::string& path_template_match) const {
+  return convertURLPatternSyntaxToRegex(path_template_match).status();
 }
 
-bool UrlTemplatePredicate::isValidPathTemplateRewritePattern(const std::string& path_template_rewrite) {
-  return parseRewritePatternHelper(path_template_rewrite).ok();
+absl::Status PatternTemplatePredicate::isValidPathTemplateRewritePattern(const std::string& path_template_rewrite) const {
+  return parseRewritePatternHelper(path_template_rewrite).status();
 }
 
-bool UrlTemplatePredicate::isValidSharedVariableSet(const std::string& path_template_rewrite,
-                              absl::string_view capture_regex) {
-  return parseRewritePattern(path_template_rewrite, capture_regex).ok();
+absl::Status PatternTemplatePredicate::isValidSharedVariableSet(const std::string& path_template_rewrite,
+                              std::string& capture_regex) const {
+  return parseRewritePattern(path_template_rewrite, capture_regex).status();
 }
 
-absl::StatusOr<std::string> UrlTemplatePredicate::rewritePattern(absl::string_view current_pattern, absl::string_view matched_path) const {
+absl::StatusOr<std::string> PatternTemplatePredicate::rewritePattern(absl::string_view current_pattern, absl::string_view matched_path) const {
   absl::StatusOr<std::string> regex_pattern = convertURLPatternSyntaxToRegex(matched_path);
   if (!regex_pattern.ok()) {
     return absl::InvalidArgumentError("Unable to parse url pattern regex");
@@ -193,6 +193,27 @@ absl::StatusOr<std::string> UrlTemplatePredicate::rewritePattern(absl::string_vi
 
   return *std::move(new_path);
 }
+
+absl::Status PatternTemplatePredicate::is_valid_match_pattern(std::string match_pattern) const {
+    return isValidPathTemplateMatchPattern(match_pattern);
+};
+
+absl::Status PatternTemplatePredicate::is_valid_rewrite_pattern(std::string match_pattern, std::string rewrite_pattern) const {
+    absl::StatusOr<std::string> status =
+        convertURLPatternSyntaxToRegex(match_pattern);
+    if (!status.ok()) {
+      return absl::InvalidArgumentError(fmt::format("path_template {} is invalid", match_pattern));
+    }
+
+    std::string path_template_match_regex = *std::move(status);
+    if (path_template_match_regex.empty() ||
+        !isValidSharedVariableSet(rewrite_pattern, path_template_match_regex).ok()) {
+      return absl::InvalidArgumentError(fmt::format("mismatch between path_template_match {} and pattern_rewrite {}",
+                      match_pattern, rewrite_pattern));
+    }
+
+    return absl::OkStatus();
+};
 
 } // namespace matching
 } // namespace Envoy
