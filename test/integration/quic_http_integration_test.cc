@@ -383,6 +383,10 @@ public:
       // address, then expects the `UdpWorkerRouter` will route the connection to the correct
       // `ActiveQuicListener` instance. If the two connections with same connection id are going to
       // the same `ActiveQuicListener`, the test will fail.
+      // For the case of the packets from the different addresses in the same listener wants to be
+      // the same QUIC connection,(Which mentioned at
+      // https://github.com/envoyproxy/envoy/issues/11184#issuecomment-679214885) it doesn't support
+      // for now. When someday that case supported by envoy, we can change this testcase.
       designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
       codec_clients2.push_back(makeHttpConnection(lookupPort("address2")));
     }
