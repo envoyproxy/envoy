@@ -166,7 +166,7 @@ public:
       }));
 
       if (alpn == Http::Utility::AlpnNames::get().Http2c) {
-        for (size_t i = 1; i <= 24; i++) {
+        for (size_t i = 0; i <= 24; i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
               .WillOnce(Invoke(
                   [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -176,7 +176,7 @@ public:
                   }));
         }
       } else {
-        for (size_t i = 1; i <= header.size(); i++) {
+        for (size_t i = 0; i <= header.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
               .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
                                             int) -> Api::SysCallSizeResult {
