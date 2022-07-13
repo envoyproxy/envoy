@@ -21,9 +21,8 @@ namespace {
 
 TEST(LuaFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(LuaFilterConfig().createFilterFactoryFromProto(
-                   envoy::extensions::filters::http::lua::v3::Lua(), "stats", context),
-               ProtoValidationException);
+  EXPECT_NO_THROW(LuaFilterConfig().createFilterFactoryFromProto(
+      envoy::extensions::filters::http::lua::v3::Lua(), "stats", context));
 }
 
 TEST(LuaFilterConfigTest, LuaFilterInJson) {
