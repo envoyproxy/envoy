@@ -11,7 +11,6 @@ public:
                   const StatsParams& params);
 
   void noStats(Buffer::Instance&, absl::string_view types) override;
-  void finalize(Buffer::Instance&) override;
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override;
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
@@ -21,23 +20,25 @@ public:
                 const Stats::ParentHistogram& histogram) override {
     StatsTextRender::generate(response, name, histogram);
   }
-
-  /**
-   * Renders the HTML head into the response buffer provided in the constructor.
-   */
-  void renderHead();
+  void finalize(Buffer::Instance&) override;
 
   /**
    * Renders the beginning of the help-table into the response buffer provided
    * in the constructor.
    */
-  void renderTableBegin();
+  void tableBegin(Buffer::Instance&);
 
   /**
    * Renders the end of the help-table into the response buffer provided in the
    * constructor.
    */
-  void renderTableEnd();
+  void tableEnd(Buffer::Instance&);
+
+  /**
+   * Initiates an HTML PRE section. The PRE will be auto-closed when the render
+   * object is finalized.
+   */
+  void startPre(Buffer::Instance&);
 
   /**
    * Renders a table row for a URL endpoint, including the name of the endpoint,
@@ -48,12 +49,12 @@ public:
    *
    * @param handler the URL handler.
    */
-  void renderUrlHandler(const Admin::UrlHandler& handler,
-                        OptRef<const Http::Utility::QueryParams> query);
+  void urlHandler(Buffer::Instance&, const Admin::UrlHandler& handler,
+                  OptRef<const Http::Utility::QueryParams> query);
 
-  void renderInput(absl::string_view id, absl::string_view path, Admin::ParamDescriptor::Type type,
-                   OptRef<const Http::Utility::QueryParams> query,
-                   const std::vector<absl::string_view>& enum_choices);
+  void input(Buffer::Instance&, absl::string_view id, absl::string_view path,
+             Admin::ParamDescriptor::Type type, OptRef<const Http::Utility::QueryParams> query,
+             const std::vector<absl::string_view>& enum_choices);
 
   // By default, editing parameters does not cause a form-submit -- you have
   // to click on the link or button first. This is useful for the admin home
@@ -69,6 +70,8 @@ private:
   Buffer::Instance& response_;
   int index_{0}; // Used to alternate row-group background color
   bool submit_on_change_{false};
+  bool has_pre_{false};
+  bool finalized_{false};
 };
 
 } // namespace Server

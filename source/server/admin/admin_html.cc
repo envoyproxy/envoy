@@ -8,15 +8,16 @@ namespace Server {
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
   StatsHtmlRender html(response_headers, response, StatsParams());
-  html.renderTableBegin();
+  html.tableBegin(response);
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   OptRef<const Http::Utility::QueryParams> no_query_params;
   for (const UrlHandler* handler : sortedHandlers()) {
-    html.renderUrlHandler(*handler, no_query_params);
+    html.urlHandler(response, *handler, no_query_params);
   }
 
-  html.renderTableEnd();
+  html.tableEnd(response);
+  html.finalize(response);
 
   return Http::Code::OK;
 }

@@ -37,10 +37,10 @@ Http::Code StatsRequest::start(Http::ResponseHeaderMap& response_headers) {
   case StatsFormat::Html: {
     auto html_render = std::make_unique<StatsHtmlRender>(response_headers, response_, params_);
     html_render->setSubmitOnChange(true);
-    html_render->renderTableBegin();
-    html_render->renderUrlHandler(url_handler_fn_(), params_.query_);
-    html_render->renderTableEnd();
-    response_.add("<pre>\n");
+    html_render->tableBegin(response_);
+    html_render->urlHandler(response_, url_handler_fn_(), params_.query_);
+    html_render->tableEnd(response_);
+    html_render->startPre(response_);
     render_.reset(html_render.release());
     break;
   }

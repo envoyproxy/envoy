@@ -56,9 +56,22 @@ StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
     : StatsTextRender(params), response_(response) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-  renderHead();
+  response_.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
   response.add("<body>\n");
-  renderTableBegin();
+}
+
+void StatsHtmlRender::finalize(Buffer::Instance& response) {
+  ASSERT(!finalized_);
+  finalized_ = true;
+  if (has_pre_) {
+    response.add("</pre>\n");
+  }
+  response.add("</body>\n");
+}
+
+void StatsHtmlRender::startPre(Buffer::Instance& response) {
+  has_pre_ = true;
+  response.add("<pre>\n");
 }
 
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
@@ -66,22 +79,16 @@ void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& na
   response.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
 }
 
-void StatsHtmlRender::finalize(Buffer::Instance& response) { response.add("</pre></body>\n"); }
-
 void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view types) {
   response.addFragments({"</pre>\n<br/><i>No ", types, " found</i><br/>\n<pre>\n"});
 }
 
-void StatsHtmlRender::renderHead() {
-  response_.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
-}
+void StatsHtmlRender::tableBegin(Buffer::Instance& response) { response.add(AdminHtmlTableBegin); }
 
-void StatsHtmlRender::renderTableBegin() { response_.add(AdminHtmlTableBegin); }
+void StatsHtmlRender::tableEnd(Buffer::Instance& response) { response.add(AdminHtmlTableEnd); }
 
-void StatsHtmlRender::renderTableEnd() { response_.add(AdminHtmlTableEnd); }
-
-void StatsHtmlRender::renderUrlHandler(const Admin::UrlHandler& handler,
-                                       OptRef<const Http::Utility::QueryParams> query) {
+void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHandler& handler,
+                                 OptRef<const Http::Utility::QueryParams> query) {
   absl::string_view path = handler.prefix_;
 
   if (path == "/") {
@@ -113,30 +120,30 @@ void StatsHtmlRender::renderUrlHandler(const Admin::UrlHandler& handler,
   // page from accidentally mutating all the server state by GETting all the hrefs.
   const char* method = handler.mutates_server_state_ ? "post" : "get";
   if (submit_on_change_) {
-    response_.addFragments({"\n<form action='", path, "' method='", method, "' id='", path,
-                            "' class='home-form'></form>\n"});
+    response.addFragments({"\n<form action='", path, "' method='", method, "' id='", path,
+                           "' class='home-form'></form>\n"});
   } else {
     // Render an explicit visible submit as a link (for GET) or button (for POST).
     const char* button_style = handler.mutates_server_state_ ? "" : " class='button-as-link'";
-    response_.addFragments({"\n<tr class='vert-space'></tr>\n<tr", row_class,
-                            ">\n  <td class='home-data'><form action='", path, "' method='", method,
-                            "' id='", path, "' class='home-form'>\n    <button", button_style, ">",
-                            path, "</button>\n  </form></td>\n  <td class='home-data'>",
-                            Html::Utility::sanitize(handler.help_text_), "</td>\n</tr>\n"});
+    response.addFragments({"\n<tr class='vert-space'></tr>\n<tr", row_class,
+                           ">\n  <td class='home-data'><form action='", path, "' method='", method,
+                           "' id='", path, "' class='home-form'>\n    <button", button_style, ">",
+                           path, "</button>\n  </form></td>\n  <td class='home-data'>",
+                           Html::Utility::sanitize(handler.help_text_), "</td>\n</tr>\n"});
   }
 
   for (const Admin::ParamDescriptor& param : handler.params_) {
-    response_.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
-    renderInput(param.id_, path, param.type_, query, param.enum_choices_);
-    response_.addFragments({"</td>\n  <td class='home-data'>", Html::Utility::sanitize(param.help_),
-                            "</td>\n</tr>\n"});
+    response.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
+    input(response, param.id_, path, param.type_, query, param.enum_choices_);
+    response.addFragments({"</td>\n  <td class='home-data'>", Html::Utility::sanitize(param.help_),
+                           "</td>\n</tr>\n"});
   }
 }
 
-void StatsHtmlRender::renderInput(absl::string_view id, absl::string_view path,
-                                  Admin::ParamDescriptor::Type type,
-                                  OptRef<const Http::Utility::QueryParams> query,
-                                  const std::vector<absl::string_view>& enum_choices) {
+void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
+                            absl::string_view path, Admin::ParamDescriptor::Type type,
+                            OptRef<const Http::Utility::QueryParams> query,
+                            const std::vector<absl::string_view>& enum_choices) {
   std::string value;
   if (query.has_value()) {
     auto iter = query->find(std::string(id));
@@ -156,23 +163,23 @@ void StatsHtmlRender::renderInput(absl::string_view id, absl::string_view path,
 
   switch (type) {
   case Admin::ParamDescriptor::Type::Boolean:
-    response_.addFragments({"<input type='checkbox' name='", id, "' id='", id, "' form='", path,
-                            "'", on_change, value.empty() ? "" : " checked/>"});
+    response.addFragments({"<input type='checkbox' name='", id, "' id='", id, "' form='", path, "'",
+                           on_change, value.empty() ? "" : " checked/>"});
     break;
   case Admin::ParamDescriptor::Type::String:
-    response_.addFragments({"<input type='text' name='", id, "' id='", id, "' form='", path, "'",
-                            on_change, value_tag(value), " />"});
+    response.addFragments({"<input type='text' name='", id, "' id='", id, "' form='", path, "'",
+                           on_change, value_tag(value), " />"});
     break;
   case Admin::ParamDescriptor::Type::Enum:
-    response_.addFragments(
+    response.addFragments(
         {"\n    <select name='", id, "' id='", id, "' form='", path, "'", on_change, ">\n"});
     for (absl::string_view choice : enum_choices) {
       std::string sanitized = Html::Utility::sanitize(choice);
       absl::string_view selected = (value == sanitized) ? " selected" : "";
-      response_.addFragments(
+      response.addFragments(
           {"      <option value='", sanitized, "'", selected, ">", sanitized, "</option>\n"});
     }
-    response_.add("    </select>\n  ");
+    response.add("    </select>\n  ");
     break;
   }
 }

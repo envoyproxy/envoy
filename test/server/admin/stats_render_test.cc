@@ -2,8 +2,6 @@
 
 #include "test/server/admin/stats_render_test_base.h"
 
-using testing::HasSubstr;
-
 namespace Envoy {
 namespace Server {
 

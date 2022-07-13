@@ -40,22 +40,23 @@ TEST_F(StatsHtmlRenderTest, HistogramNoBuckets) {
 }
 
 TEST_F(StatsHtmlRenderTest, RenderHead) {
-  renderer_.renderHead();
+  // The "<head>...</head>" is rendered by the constructor.
   EXPECT_THAT(response_.toString(), HasSubstr("<head>"));
+  EXPECT_THAT(response_.toString(), HasSubstr("</head>"));
 }
 
 TEST_F(StatsHtmlRenderTest, RenderTableBegin) {
-  renderer_.renderTableBegin();
+  renderer_.tableBegin(response_);
   EXPECT_THAT(response_.toString(), HasSubstr("<table class='home-table'>"));
 }
 
 TEST_F(StatsHtmlRenderTest, RenderTableEnd) {
-  renderer_.renderTableEnd();
+  renderer_.tableEnd(response_);
   EXPECT_THAT(response_.toString(), HasSubstr("</table>"));
 }
 
 TEST_F(StatsHtmlRenderTest, RenderUrlHandlerNoQuery) {
-  renderer_.renderUrlHandler(handler_, query_params_);
+  renderer_.urlHandler(response_, handler_, query_params_);
   std::string out = response_.toString();
   EXPECT_THAT(out, HasSubstr("<input type='checkbox' name='param' id='param' form='prefix'"));
   EXPECT_THAT(out, Not(HasSubstr(" checked/>")));
@@ -68,7 +69,7 @@ TEST_F(StatsHtmlRenderTest, RenderUrlHandlerNoQuery) {
 
 TEST_F(StatsHtmlRenderTest, RenderUrlHandlerWithQuery) {
   query_params_["param"] = "on";
-  renderer_.renderUrlHandler(handler_, query_params_);
+  renderer_.urlHandler(response_, handler_, query_params_);
   std::string out = response_.toString();
   EXPECT_THAT(out, HasSubstr("<input type='checkbox' name='param' id='param' form='prefix'"));
   EXPECT_THAT(out, HasSubstr(" checked/>"));
@@ -81,7 +82,7 @@ TEST_F(StatsHtmlRenderTest, RenderUrlHandlerWithQuery) {
 
 TEST_F(StatsHtmlRenderTest, RenderUrlHandlerSubmitOnChange) {
   renderer_.setSubmitOnChange(true);
-  renderer_.renderUrlHandler(handler_, query_params_);
+  renderer_.urlHandler(response_, handler_, query_params_);
   std::string out = response_.toString();
   EXPECT_THAT(out, HasSubstr(" onchange='prefix.submit()"));
   EXPECT_THAT(out, Not(HasSubstr("<button class='button-as-link'>prefix</button>")));
