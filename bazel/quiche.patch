@@ -1,0 +1,38 @@
+# llround is not constexpr on Android
+
+diff --git a/quiche/quic/core/quic_bandwidth.h b/quiche/quic/core/quic_bandwidth.h
+index b6572281..06cbaa30 100644
+--- a/quiche/quic/core/quic_bandwidth.h
++++ b/quiche/quic/core/quic_bandwidth.h
+@@ -142,8 +142,13 @@ inline constexpr QuicBandwidth operator-(QuicBandwidth lhs, QuicBandwidth rhs) {
+   return QuicBandwidth(lhs.bits_per_second_ - rhs.bits_per_second_);
+ }
+ inline constexpr QuicBandwidth operator*(QuicBandwidth lhs, float rhs) {
++#if defined(__ANDROID__)
++  return QuicBandwidth(
++      static_cast<int64_t>(lhs.bits_per_second_ * rhs));
++#else
+   return QuicBandwidth(
+       static_cast<int64_t>(std::llround(lhs.bits_per_second_ * rhs)));
++#endif
+ }
+ inline QuicBandwidth operator*(float lhs, QuicBandwidth rhs) {
+   return rhs * lhs;
+diff --git a/quiche/quic/core/quic_time.h b/quiche/quic/core/quic_time.h
+index d6c24b51..fdaebdd2 100644
+--- a/quiche/quic/core/quic_time.h
++++ b/quiche/quic/core/quic_time.h
+@@ -258,8 +258,13 @@ inline constexpr QuicTime::Delta operator*(QuicTime::Delta lhs, int rhs) {
+   return QuicTime::Delta(lhs.time_offset_ * rhs);
+ }
+ inline constexpr QuicTime::Delta operator*(QuicTime::Delta lhs, double rhs) {
++#if defined(__ANDROID__)
++  return QuicTime::Delta(static_cast<int64_t>(
++      static_cast<double>(lhs.time_offset_) * rhs));
++#else
+   return QuicTime::Delta(static_cast<int64_t>(
+       std::llround(static_cast<double>(lhs.time_offset_) * rhs)));
++#endif
+ }
+ inline QuicTime::Delta operator*(int lhs, QuicTime::Delta rhs) {
+   return rhs * lhs;

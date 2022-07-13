@@ -884,6 +884,8 @@ def _com_googlesource_chromium_zlib():
 def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
+        patches = ["@envoy//bazel:quiche.patch"],
+        patch_args = ["-p1"],
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
