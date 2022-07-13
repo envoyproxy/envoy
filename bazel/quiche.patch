@@ -1,4 +1,5 @@
 # llround is not constexpr on Android
+# TODO(jpsim): Remove this patch once fixed upstream - https://github.com/google/quiche/pull/18
 
 diff --git a/quiche/quic/core/quic_bandwidth.h b/quiche/quic/core/quic_bandwidth.h
 index b6572281..06cbaa30 100644
