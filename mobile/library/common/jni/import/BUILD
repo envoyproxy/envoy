@@ -1,4 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 
 licenses(["notice"])  # Apache 2
