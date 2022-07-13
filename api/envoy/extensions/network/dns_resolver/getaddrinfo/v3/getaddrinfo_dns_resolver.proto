@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // .. attention::
 //
 //   This resolver uses a single background thread to do resolutions. As such, it is not currently
-//   advised for use in situations requiring a high resolution late. A thread pool can be added
+//   advised for use in situations requiring a high resolution rate. A thread pool can be added
 //   in the future if needed.
 //
 // .. attention::

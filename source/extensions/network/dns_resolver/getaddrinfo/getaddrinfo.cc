@@ -62,7 +62,11 @@ private:
   class AddrInfoWrapper : NonCopyable {
   public:
     AddrInfoWrapper(addrinfo* info) : info_(info) {}
-    ~AddrInfoWrapper() { Api::OsSysCallsSingleton::get().freeaddrinfo(info_); }
+    ~AddrInfoWrapper() {
+      if (info_ != nullptr) {
+        Api::OsSysCallsSingleton::get().freeaddrinfo(info_);
+      }
+    }
     const addrinfo* get() { return info_; }
 
   private:

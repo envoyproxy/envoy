@@ -178,22 +178,19 @@ typed_config:
 
     initializeWithArgs(1024, 1024, "", typed_dns_resolver_config);
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    const Http::TestRequestHeaderMapImpl request_headers{
-        {":method", "POST"},
-        {":path", "/test/long/url"},
-        {":scheme", "http"},
-        {":authority",
-         fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+    default_request_headers_.setHost(
+        fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
 
-    auto response =
-        sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+    auto response = sendRequestAndWaitForResponse(default_request_headers_, 1024,
+                                                  default_response_headers_, 1024);
     checkSimpleRequestSuccess(1024, 1024, response.get());
     testConnectionTiming(response, false, original_usec);
     EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
     EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 
     // Now send another request. This should hit the DNS cache.
-    response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
+    response = sendRequestAndWaitForResponse(default_request_headers_, 512,
+                                             default_response_headers_, 512);
     checkSimpleRequestSuccess(512, 512, response.get());
     testConnectionTiming(response, true, original_usec);
     EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
@@ -206,6 +203,23 @@ typed_config:
         dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
             fake_upstream_connection_->connection().ssl().get());
     EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+  }
+
+  void requestWithUnknownDomainTest(const std::string& typed_dns_resolver_config = "") {
+    useAccessLog("%RESPONSE_CODE_DETAILS%");
+    initializeWithArgs(1024, 1024, "", typed_dns_resolver_config);
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    default_request_headers_.setHost("doesnotexist.example.com");
+
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("503", response->headers().getStatusValue());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
+
+    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("503", response->headers().getStatusValue());
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
   }
 
   bool upstream_tls_{};
@@ -286,24 +300,15 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
 
 // Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
-TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  initializeWithArgs();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                       {":path", "/test/long/url"},
-                                                       {":scheme", "http"},
-                                                       {":authority", "doesnotexist.example.com"}};
+TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) { requestWithUnknownDomainTest(); }
 
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
-
-  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
+// Do a sanity check using the getaddrinfo() resolver.
+TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainGetAddrInfoResolver) {
+  requestWithUnknownDomainTest(R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF");
 }
 
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainAndNoCaching) {
