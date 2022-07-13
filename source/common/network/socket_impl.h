@@ -66,6 +66,9 @@ public:
     ASSERT(!ssl_info_);
     ssl_info_ = ssl_connection_info;
   }
+  void restoreSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+    ssl_info_ = ssl_connection_info;
+  }
   absl::string_view ja3Hash() const override { return ja3_hash_; }
   void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
 
