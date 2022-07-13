@@ -324,9 +324,9 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
   response->headers().iterate([lua_State = coroutine_.luaState()](
                                   const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     lua_pushlstring(lua_State, header.key().getStringView().data(),
-                    header.key().getStringView().length());
+                    header.key().getStringView().size());
     lua_pushlstring(lua_State, header.value().getStringView().data(),
-                    header.value().getStringView().length());
+                    header.value().getStringView().size());
     lua_settable(lua_State, -3);
     return Http::HeaderMap::Iterate::Continue;
   });
@@ -587,7 +587,7 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   if (output.result_) {
     lua_pushnil(state);
   } else {
-    lua_pushlstring(state, output.error_message_.data(), output.error_message_.length());
+    lua_pushlstring(state, output.error_message_.data(), output.error_message_.size());
   }
   return 2;
 }
@@ -622,7 +622,7 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
   absl::string_view input = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   auto output = absl::Base64Escape(input);
-  lua_pushlstring(state, output.data(), output.length());
+  lua_pushlstring(state, output.data(), output.size());
 
   return 1;
 }
@@ -657,12 +657,12 @@ int StreamHandleWrapper::luaTimestampString(lua_State* state) {
     auto milliseconds_since_epoch =
         std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
     std::string timestamp = std::to_string(milliseconds_since_epoch);
-    lua_pushlstring(state, timestamp.c_str(), timestamp.length());
+    lua_pushlstring(state, timestamp.data(), timestamp.size());
   } else if (resolution == Timestamp::Resolution::Microsecond) {
     auto microseconds_since_epoch =
         std::chrono::duration_cast<std::chrono::microseconds>(now).count();
     std::string timestamp = std::to_string(microseconds_since_epoch);
-    lua_pushlstring(state, timestamp.c_str(), timestamp.length());
+    lua_pushlstring(state, timestamp.data(), timestamp.size());
   } else {
     luaL_error(state, "timestamp format must be MILLISECOND or MICROSECOND.");
   }
