@@ -42,6 +42,9 @@ behavior_changes:
     If there is no entry referred by the filter config name, the canonical filter name
     (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) will be used for the backwards
     compatibility.
+- area: router
+  change: |
+    Add an option to return status code 500 when the configured cluster is not found.
 
 minor_behavior_changes:
 - area: thrift
