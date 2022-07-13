@@ -29,7 +29,10 @@ message Lua {
   // strings so complex scripts can be easily expressed inline in the configuration.
   //
   // This field is deprecated. Please use
-  // :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`
+  // :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`.
+  // Only one of :ref:`inline_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`
+  // or :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`
+  // can be set for the Lua filter.
   string inline_code = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
