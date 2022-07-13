@@ -13,6 +13,7 @@
 
 #include "source/common/http/headers.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -81,6 +82,21 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
   // TODO(ramaraochavali): add a stat and move this log line to debug.
   ENVOY_LOG(warn, "original_dst_load_balancer: No downstream connection or no original_dst.");
   return nullptr;
+}
+
+Network::Address::InstanceConstSharedPtr
+OriginalDstCluster::LoadBalancer::filterStateOverrideHost(LoadBalancerContext* context) {
+  const auto* conn = context->downstreamConnection();
+  if (!conn) {
+    return nullptr;
+  }
+  const auto* dst_address =
+      conn->streamInfo().filterState().getDataReadOnly<Network::DestinationAddress>(
+          Network::DestinationAddress::key());
+  if (!dst_address) {
+    return nullptr;
+  }
+  return dst_address->address();
 }
 
 Network::Address::InstanceConstSharedPtr
