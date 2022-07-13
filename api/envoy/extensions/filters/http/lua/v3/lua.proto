@@ -52,7 +52,7 @@ message Lua {
   //
   map<string, config.core.v3.DataSource> source_codes = 2;
 
-  // The default Lua code that Envoy will execute. If no any per route config is provided
+  // The default Lua code that Envoy will execute. If no per route config is provided
   // for the request, this Lua code will be applied.
   config.core.v3.DataSource default_source_code = 3;
 }
