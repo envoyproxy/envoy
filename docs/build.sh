@@ -39,7 +39,7 @@ fi
 if [[ "${BUILD_TYPE}" == "html" ]] || [[ -n "${DOCS_BUILD_HTML}" ]]; then
     BUILD_HTML=1
     BUILD_HTML_TARGET="//docs:html"
-    BUILD_HTML_TARBALL="bazel-bin/docs/html.tar"
+    BUILD_HTML_TARBALL="bazel-bin/docs/html.tar.gz"
     if [[ -n "${AZP_BRANCH}" ]] || [[ -n "${DOCS_BUILD_RELEASE}" ]]; then
         # CI build - use git sha
         BUILD_HTML_TARGET="//docs:html_release"
