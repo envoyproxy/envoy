@@ -39,9 +39,9 @@ struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-inline constexpr absl::string_view ExtProcStreamStatsName = "ext-proc-stream-stats";
+inline constexpr absl::string_view ExtProcLoggingInfoName = "ext-proc-logging-info";
 
-class ExtProcStreamStats : public Envoy::StreamInfo::FilterState::Object {
+class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
   struct GrpcStats {
     struct GrpcCallStats {
@@ -154,7 +154,7 @@ public:
   const FilterConfig& config() const { return *config_; }
 
   ExtProcFilterStats& stats() { return stats_; }
-  ExtProcStreamStats& streamStats() { return *stream_stats_; }
+  ExtProcLoggingInfo& loggingInfo() { return *logging_info_; }
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -210,7 +210,7 @@ private:
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
-  ExtProcStreamStats* stream_stats_;
+  ExtProcLoggingInfo* logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;
 
   // The state of the filter on both the encoding and decoding side.

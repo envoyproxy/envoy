@@ -56,7 +56,7 @@ private:
   std::unique_ptr<Checker> rule_checker_;
 };
 
-void ExtProcStreamStats::recordGrpcCallStats(
+void ExtProcLoggingInfo::recordGrpcCallStats(
     std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
     ProcessorState::CallbackState callback_state,
     envoy::config::core::v3::TrafficDirection traffic_direction) {
@@ -64,16 +64,16 @@ void ExtProcStreamStats::recordGrpcCallStats(
   grpcStats(traffic_direction).stats_.emplace_back(latency, call_status, callback_state);
 }
 
-ExtProcStreamStats::GrpcStats&
-ExtProcStreamStats::grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) {
+ExtProcLoggingInfo::GrpcStats&
+ExtProcLoggingInfo::grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
   return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
              ? decoding_processor_grpc_stats_
              : encoding_processor_grpc_stats_;
 }
 
-const ExtProcStreamStats::GrpcStats&
-ExtProcStreamStats::grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) const {
+const ExtProcLoggingInfo::GrpcStats&
+ExtProcLoggingInfo::grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) const {
   ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
   return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
              ? decoding_processor_grpc_stats_
@@ -103,12 +103,12 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoding_state_.setDecoderFilterCallbacks(callbacks);
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
-  if (!filter_state->hasData<ExtProcStreamStats>(ExtProcStreamStatsName)) {
-    filter_state->setData(ExtProcStreamStatsName, std::make_shared<ExtProcStreamStats>(),
+  if (!filter_state->hasData<ExtProcLoggingInfo>(ExtProcLoggingInfoName)) {
+    filter_state->setData(ExtProcLoggingInfoName, std::make_shared<ExtProcLoggingInfo>(),
                           Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }
-  stream_stats_ = filter_state->getDataMutable<ExtProcStreamStats>(ExtProcStreamStatsName);
+  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(ExtProcLoggingInfoName);
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {

@@ -244,16 +244,16 @@ protected:
   }
 
   // The number of processor grpc calls made in the encoding and decoding path.
-  void expectGrpcCalls(const envoy::config::core::v3::TrafficDirection trafic_direction,
+  void expectGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction,
                        const Grpc::Status::GrpcStatus status, const int expected_calls) {
-    const ExtProcStreamStats::GrpcStats& grpc_call_stats =
+    const ExtProcLoggingInfo::GrpcStats& grpc_call_stats =
         stream_info_.filterState()
             ->getDataReadOnly<
-                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcStreamStats>(
-                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcStreamStatsName)
-            ->grpcStats(trafic_direction);
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfoName)
+            ->grpcStats(traffic_direction);
     int calls = std::count_if(grpc_call_stats.stats_.begin(), grpc_call_stats.stats_.end(),
-                              [&](ExtProcStreamStats::GrpcStats::GrpcCallStats grpc_call) {
+                              [&](ExtProcLoggingInfo::GrpcStats::GrpcCallStats grpc_call) {
                                 return grpc_call.status_ == status;
                               });
     EXPECT_EQ(calls, expected_calls);
