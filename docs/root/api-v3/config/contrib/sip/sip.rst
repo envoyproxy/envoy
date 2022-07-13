@@ -1,4 +1,4 @@
-Sip Filiter
+Sip filiter
 ===========
 
 .. toctree::

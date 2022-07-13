@@ -1,4 +1,4 @@
-Dlb Connection Balancer
+Dlb connection balancer
 =======================
 
 .. toctree::

@@ -1,4 +1,4 @@
-Cryptomb Private Key Providers
+Cryptomb private key providers
 ==============================
 
 .. toctree::

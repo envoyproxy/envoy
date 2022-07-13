@@ -1,4 +1,4 @@
-Hyperscan Matching
+Hyperscan matching
 ==================
 
 .. toctree::
