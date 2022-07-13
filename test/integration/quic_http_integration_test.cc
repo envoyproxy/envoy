@@ -377,6 +377,12 @@ public:
       // TODO(sunjayBhatia,wrowe): deserialize this, establishing all connections in parallel
       // (Expected to save ~14s each across 6 tests on Windows)
       codec_clients1.push_back(makeHttpConnection(lookupPort("address1")));
+
+      // Using the same connection id for the address1 and address2 here. Since the multiple
+      // addresses listener are expected to create separated `ActiveQuicListener` instance for each
+      // address, then expects the `UdpWorkerRouter` will route the connection to the currect
+      // `ActiveQuicListener` instance. If the two connections with same connection id are going to
+      // the same `ActiveQuicListener`, the test will fail.
       designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
       codec_clients2.push_back(makeHttpConnection(lookupPort("address2")));
     }
