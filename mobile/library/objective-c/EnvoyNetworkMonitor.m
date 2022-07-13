@@ -26,6 +26,11 @@
   if (_path_monitor) {
     nw_path_monitor_cancel(_path_monitor);
   }
+  if (_reachability_ref) {
+    SCNetworkReachabilitySetCallback(_reachability_ref, nil, nil);
+    SCNetworkReachabilitySetDispatchQueue(_reachability_ref, nil);
+    CFRelease(_reachability_ref);
+  }
 }
 
 - (void)startPathMonitor {
@@ -38,6 +43,7 @@
   nw_path_monitor_set_queue(_path_monitor, queue);
 
   __block envoy_network_t previousNetworkType = -1;
+  envoy_engine_t engineHandle = _engineHandle;
   nw_path_monitor_set_update_handler(_path_monitor, ^(nw_path_t _Nonnull path) {
     BOOL isSatisfied = nw_path_get_status(path) == nw_path_status_satisfied;
     if (!isSatisfied) {
@@ -60,7 +66,7 @@
 
     if (network != previousNetworkType) {
       NSLog(@"[Envoy] setting preferred network to %d", network);
-      set_preferred_network(_engineHandle, network);
+      set_preferred_network(engineHandle, network);
       previousNetworkType = network;
     }
 
