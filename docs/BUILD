@@ -217,16 +217,40 @@ pkg_tar(
     ],
 )
 
+# TODO(phlax): Add `envoy_sphinx` rule to encapsulate these and above targets
+genrule(
+    name = "html_release",
+    outs = ["html_release.tar.gz"],
+    cmd = """
+    . $(location //bazel:volatile_env) \
+    && $(location //tools/docs:sphinx_runner) \
+         $${SPHINX_RUNNER_ARGS:-} \
+         --build_sha="$${BUILD_SCM_REVISION:-}" \
+         --docs_tag="$${BUILD_DOCS_TAG:-}" \
+         --version_file=$(location //:VERSION.txt) \
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \\
+         $(location rst) \
+         $@
+    """,
+    exec_tools = [
+        "//bazel:volatile_env",
+        "//tools/docs:sphinx_runner",
+        ":rst",
+        "//:VERSION.txt",
+        "@envoy_api//:v3_proto_set",
+    ],
+    stamp = 1,
+)
+
+# No git stamping, speeds up local dev switching branches
 genrule(
     name = "html",
     outs = ["html.tar.gz"],
     cmd = """
     $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$${BUILD_SHA:-}" \
-         --docs_tag="$${DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
-         --descriptor_path=$(location @envoy_api//:v3_proto_set) \\
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \
          $(location :rst) \
          $@
     """,
