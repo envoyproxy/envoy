@@ -424,20 +424,16 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
     function callMe(object)
       local metadata = object:dynamicMetadata():get("envoy.pp")
       local bin_data = metadata["bin_data"]
-      local str_table = { }
       local data_length = string.len(metadata["bin_data"])
       for idx = 1, data_length do
-        if string.byte(bin_data, idx) ~= 0 then
-          str_table[#str_table + 1] = string.char(string.byte(bin_data, idx))
-        end
+        testPrint('Hex Data: ' .. string.format('%x', string.byte(bin_data, idx)))
       end
-      testPrint('Data: ' .. table.concat(str_table, ''))
     end
   )EOF"};
 
   ProtobufWkt::Value metadata_value;
   constexpr uint8_t buffer[] = {'h', 'e', 0x00, 'l', 'l', 'o'};
-  metadata_value.set_string_value(reinterpret_cast<char const*>(&buffer), sizeof(buffer));
+  metadata_value.set_string_value(reinterpret_cast<char const*>(buffer), sizeof(buffer));
   ProtobufWkt::Struct metadata;
   metadata.mutable_fields()->insert({"bin_data", metadata_value});
 
@@ -448,7 +444,12 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
 
-  EXPECT_CALL(printer_, testPrint("Data: hello"));
+  EXPECT_CALL(printer_, testPrint("Hex Data: 68")); // h (Hex: 68)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 65")); // e (Hex: 65)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 0"));  // \0 (Hex: 0)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 6c")); // l (Hex: 6c)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 6c")); // l (Hex: 6c)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 6f")); // 0 (Hex: 6f)
 
   start("callMe");
 }

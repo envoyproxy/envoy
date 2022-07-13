@@ -1806,20 +1806,16 @@ TEST_F(LuaHttpFilterTest, GetDynamicMetadataBinaryData) {
     function envoy_on_request(request_handle)
       local metadata = request_handle:streamInfo():dynamicMetadata():get("envoy.pp")
       local bin_data = metadata["bin_data"]
-      local str_table = { }
       local data_length = string.len(metadata["bin_data"])
       for idx = 1, data_length do
-        if string.byte(bin_data, idx) ~= 0 then
-          str_table[#str_table + 1] = string.char(string.byte(bin_data, idx))
-        end
+        request_handle:logTrace('Hex Data: ' .. string.format('%x', string.byte(bin_data, idx)))
       end
-      request_handle:logTrace('Data: ' .. table.concat(str_table, ''))
     end
   )EOF"};
 
   ProtobufWkt::Value metadata_value;
   constexpr uint8_t buffer[] = {'h', 'e', 0x00, 'l', 'l', 'o'};
-  metadata_value.set_string_value(reinterpret_cast<char const*>(&buffer), sizeof(buffer));
+  metadata_value.set_string_value(reinterpret_cast<char const*>(buffer), sizeof(buffer));
   ProtobufWkt::Struct metadata;
   metadata.mutable_fields()->insert({"bin_data", metadata_value});
   (*stream_info_.metadata_.mutable_filter_metadata())["envoy.pp"] = metadata;
@@ -1829,7 +1825,12 @@ TEST_F(LuaHttpFilterTest, GetDynamicMetadataBinaryData) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Data: hello")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 68"))); // h (Hex: 68)
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 65"))); // e (Hex: 65)
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 0")));  // \0 (Hex: 0)
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 6c"))); // l (Hex: 6c)
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 6c"))); // l (Hex: 6c)
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 6f"))); // 0 (Hex: 6f)
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
