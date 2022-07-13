@@ -1807,9 +1807,11 @@ TEST_F(LuaHttpFilterTest, GetDynamicMetadataBinaryData) {
       local metadata = request_handle:streamInfo():dynamicMetadata():get("envoy.pp")
       local bin_data = metadata["bin_data"]
       local data_length = string.len(metadata["bin_data"])
+      local hex_table = { }
       for idx = 1, data_length do
-        request_handle:logTrace('Hex Data: ' .. string.format('%x', string.byte(bin_data, idx)))
+        hex_table[#hex_table + 1] = string.format("\\x%02x", string.byte(bin_data, idx))
       end
+      request_handle:logTrace('Hex Data: ' .. table.concat(hex_table, ''))
     end
   )EOF"};
 
@@ -1825,12 +1827,9 @@ TEST_F(LuaHttpFilterTest, GetDynamicMetadataBinaryData) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 68"))); // h (Hex: 68)
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 65"))); // e (Hex: 65)
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 0")));  // \0 (Hex: 0)
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 6c"))); // l (Hex: 6c)
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 6c"))); // l (Hex: 6c)
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Hex Data: 6f"))); // 0 (Hex: 6f)
+  // Hex values for "he\0llo"
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("Hex Data: \\x68\\x65\\x00\\x6c\\x6c\\x6f")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
