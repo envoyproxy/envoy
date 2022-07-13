@@ -157,10 +157,13 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
     }
   } else if (type == "text") {
     auto header_type = HeaderTypes::get().str2Header(header);
+
     ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(
-        header, std::string(metadata->header(header_type).text()), *callbacks_, host);
+        header, std::string(metadata->header(header_type).text()), metadata->traContext(),
+        *callbacks_, host);
   } else {
-    ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(type, key, *callbacks_, host);
+    ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(
+        type, key, metadata->traContext(), *callbacks_, host);
   }
 
   if (QueryStatus::Continue == ret) {
@@ -179,7 +182,7 @@ FilterStatus Router::handleAffinity() {
   if (metadata->pCookieIpMap().has_value()) {
     auto [key, val] = metadata->pCookieIpMap().value();
     ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
-    callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val);
+    callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, absl::nullopt);
   }
 
   const std::shared_ptr<const ProtocolOptionsConfig> options =
@@ -693,7 +696,8 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       if (metadata->pCookieIpMap().has_value()) {
         auto [key, val] = metadata->pCookieIpMap().value();
         ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
-        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val);
+        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val,
+                                                                  absl::nullopt);
       }
 
       active_trans->startUpstreamResponse();
