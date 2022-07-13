@@ -692,8 +692,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
     : cluster_manager_(cluster_manager) {
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
-      throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` of can be "
-                           "set for the Lua filter.");
+      throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
+                           "for the Lua filter.");
     }
 
     const std::string code =

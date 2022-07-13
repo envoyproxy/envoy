@@ -95,10 +95,9 @@ TEST(LuaFilterConfigTest, LuaFilterWithBothDeprecatedInlineCodeAndDefaultSourceC
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
-                            EnvoyException,
-                            "Error: Only one of `inline_code` or `default_source_code` of can be "
-                            "set for the Lua filter.");
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(proto_config, "stats", context), EnvoyException,
+      "Error: Only one of `inline_code` or `default_source_code` can be set for the Lua filter.");
 }
 
 } // namespace
