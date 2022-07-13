@@ -165,11 +165,6 @@ public:
   virtual void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
 
   /**
-   * @param connection_info restores the downstream ssl connection in case transport socket is internal.
-   */
-  virtual void restoreSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
-  
-  /**
    * @param JA3 fingerprint.
    */
   virtual void setJA3Hash(const absl::string_view ja3_hash) PURE;
