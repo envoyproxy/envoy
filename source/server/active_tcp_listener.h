@@ -84,7 +84,7 @@ public:
   Network::TcpConnectionHandler& tcp_conn_handler_;
   // The number of connections currently active on this listener. This is typically used for
   // connection balancing across per-handler listeners.
-  std::atomic<uint64_t> num_listener_connections_{};
+  std::atomic<uint64_t> num_listener_connections_{0};
 
   Network::ConnectionBalancer& connection_balancer_;
   // This is the address this listener is listening on. It's used to get the correct listener

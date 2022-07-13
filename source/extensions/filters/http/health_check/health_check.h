@@ -42,9 +42,9 @@ private:
 
   Event::TimerPtr clear_cache_timer_;
   const std::chrono::milliseconds timeout_;
-  std::atomic<bool> use_cached_response_{};
-  std::atomic<Http::Code> last_response_code_{};
-  std::atomic<bool> last_response_degraded_{};
+  std::atomic<bool> use_cached_response_{false};
+  std::atomic<Http::Code> last_response_code_{Http::Code::OK};
+  std::atomic<bool> last_response_degraded_{false};
 };
 
 using HealthCheckCacheManagerSharedPtr = std::shared_ptr<HealthCheckCacheManager>;

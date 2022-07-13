@@ -105,7 +105,7 @@ private:
   std::set<SimulatedScheduler*> schedulers_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   uint32_t pending_updates_ ABSL_GUARDED_BY(mutex_);
-  std::atomic<uint32_t> warning_logged_{};
+  std::atomic<uint32_t> warning_logged_{0};
 };
 
 // Represents a simulated time system, where time is advanced by calling

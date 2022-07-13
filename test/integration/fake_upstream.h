@@ -432,7 +432,7 @@ protected:
   Event::Dispatcher& dispatcher_;
   bool initialized_ ABSL_GUARDED_BY(lock_){};
   bool half_closed_ ABSL_GUARDED_BY(lock_){};
-  std::atomic<uint64_t> pending_cbs_{};
+  std::atomic<uint64_t> pending_cbs_{0};
   Event::TestTimeSystem& time_system_;
 };
 

@@ -114,8 +114,8 @@ private:
                    // high performance. It is always local to the process.
   Thread::ThreadPtr flush_thread_;
   Thread::CondVar flush_event_;
-  std::atomic<bool> flush_thread_exit_{};
-  std::atomic<bool> reopen_file_{};
+  std::atomic<bool> flush_thread_exit_{false};
+  std::atomic<bool> reopen_file_{false};
   Buffer::OwnedImpl
       flush_buffer_ ABSL_GUARDED_BY(write_lock_); // This buffer is used by multiple threads. It
                                                   // gets filled and then flushed either when max

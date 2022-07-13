@@ -541,9 +541,9 @@ private:
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;
   HistogramSettingsConstPtr histogram_settings_;
-  std::atomic<bool> threading_ever_initialized_{};
-  std::atomic<bool> shutting_down_{};
-  std::atomic<bool> merge_in_progress_{};
+  std::atomic<bool> threading_ever_initialized_{false};
+  std::atomic<bool> shutting_down_{false};
+  std::atomic<bool> merge_in_progress_{false};
   OptRef<ThreadLocal::Instance> tls_;
 
   NullCounterImpl null_counter_;
@@ -552,7 +552,7 @@ private:
   NullTextReadoutImpl null_text_readout_;
 
   mutable Thread::ThreadSynchronizer sync_;
-  std::atomic<uint64_t> next_scope_id_{};
+  std::atomic<uint64_t> next_scope_id_{0};
   uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
 
   StatNameSetPtr well_known_tags_;

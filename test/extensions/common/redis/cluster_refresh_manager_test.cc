@@ -107,9 +107,9 @@ public:
   Event::SimulatedTimeSystem time_system_;
   std::shared_ptr<ClusterRefreshManagerImpl> refresh_manager_;
   ClusterRefreshManager::HandlePtr handle_;
-  std::atomic<uint32_t> callback_count_{};
-  std::atomic<uint32_t> nthreads_waiting_{};
-  std::atomic<uint32_t> nthreads_going_{};
+  std::atomic<uint32_t> callback_count_{0};
+  std::atomic<uint32_t> nthreads_waiting_{0};
+  std::atomic<uint32_t> nthreads_going_{0};
   Thread::CondVar wait_cv_;
   Thread::CondVar setter_wait_cv_;
   Thread::MutexBasicLockable time_mutex_;

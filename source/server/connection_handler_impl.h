@@ -142,7 +142,7 @@ private:
   absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
       internal_listener_map_by_address_;
 
-  std::atomic<uint64_t> num_handler_connections_{};
+  std::atomic<uint64_t> num_handler_connections_{0};
   bool disable_listeners_;
   UnitFloat listener_reject_fraction_{UnitFloat::min()};
 };
