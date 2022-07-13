@@ -444,11 +444,11 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
 
-  EXPECT_CALL(printer_, testPrint("Hex Data: 68")); // h (Hex: 68)
-  EXPECT_CALL(printer_, testPrint("Hex Data: 65")); // e (Hex: 65)
-  EXPECT_CALL(printer_, testPrint("Hex Data: 0"));  // \0 (Hex: 0)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 68"));          // h (Hex: 68)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 65"));          // e (Hex: 65)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 0"));           // \0 (Hex: 0)
   EXPECT_CALL(printer_, testPrint("Hex Data: 6c")).Times(2); // l (Hex: 6c)
-  EXPECT_CALL(printer_, testPrint("Hex Data: 6f")); // 0 (Hex: 6f)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 6f"));          // 0 (Hex: 6f)
 
   start("callMe");
 }
