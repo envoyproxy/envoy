@@ -75,15 +75,16 @@ class UdpProxyFilterConfig {
 public:
   UdpProxyFilterConfig(Server::Configuration::ListenerFactoryContext& context,
                        const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
-      : cluster_manager_(context.clusterManager()), time_source_(context.timeSource()),
+      : cluster_manager_(context.getServerFactoryContext().clusterManager()),
+        time_source_(context.getServerFactoryContext().timeSource()),
         router_(std::make_shared<Router::RouterImpl>(config, context.getServerFactoryContext())),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         use_original_src_ip_(config.use_original_src_ip()),
         use_per_packet_load_balancing_(config.use_per_packet_load_balancing()),
-        stats_(generateStats(config.stat_prefix(), context.scope())),
+        stats_(generateStats(config.stat_prefix(), context.getServerFactoryContext().scope())),
         // Default prefer_gro to true for upstream client traffic.
         upstream_socket_config_(config.upstream_socket_config(), true),
-        random_(context.api().randomGenerator()) {
+        random_(context.getServerFactoryContext().api().randomGenerator()) {
     if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
       ExceptionUtil::throwEnvoyException(
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
@@ -92,7 +93,8 @@ public:
 
     access_logs_.reserve(config.access_log_size());
     for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
-      access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
+      access_logs_.emplace_back(
+          AccessLog::AccessLogFactory::fromProto(log_config, context.getServerFactoryContext()));
     }
 
     if (!config.hash_policies().empty()) {

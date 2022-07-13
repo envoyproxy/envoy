@@ -23,8 +23,9 @@ ThriftProxy::ThriftFilters::FilterFactoryCb
 RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit&
         proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string&, Server::Configuration::FactoryContext& base_context) {
   ASSERT(!proto_config.domain().empty());
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   ConfigSharedPtr config(new Config(proto_config, context.localInfo(), context.scope(),
                                     context.runtime(), context.clusterManager()));
   const std::chrono::milliseconds timeout =

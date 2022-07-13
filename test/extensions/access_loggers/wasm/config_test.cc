@@ -30,12 +30,12 @@ class WasmAccessLogConfigTest
     : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmAccessLogConfigTest() : api_(Api::createApiForTest(stats_store_)) {
-    ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_store_));
-    ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
-    ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));
-    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.mock_server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(context_.mock_server_context_, scope()).WillByDefault(ReturnRef(stats_store_));
+    ON_CALL(context_.mock_downstream_context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
+    ON_CALL(context_.mock_server_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
+    ON_CALL(context_.mock_server_context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(context_.mock_server_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   }
 
   void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
@@ -229,12 +229,12 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
       factory.createAccessLogInstance(proto_config, nullptr, context_);
   filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
   auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})};
   response->body().add(code);
   async_callbacks->onSuccess(request, std::move(response));
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
 }
 

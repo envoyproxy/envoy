@@ -68,7 +68,7 @@ public:
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls =
-        ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(context_.threadLocal());
+        ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(context_.mock_server_context_.threadLocal());
     evaluator_ = std::make_shared<MockResponseEvaluator>();
 
     return std::make_shared<TestConfig>(proto, runtime_, random_, scope_, std::move(tls),

@@ -45,7 +45,7 @@ public:
   std::string name() const override { return name_; }
 
   bool isTerminalFilterByProto(const Protobuf::Message& proto_config,
-                               Server::Configuration::ServerFactoryContext& context) override {
+                               Server::Configuration::FactoryContext& context) override {
     return isTerminalFilterByProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                             proto_config, context.messageValidationVisitor()),
                                         context);
@@ -57,7 +57,7 @@ protected:
 
 private:
   virtual bool isTerminalFilterByProtoTyped(const ConfigProto&,
-                                            Server::Configuration::ServerFactoryContext&) {
+                                            Server::Configuration::FactoryContext&) {
     return is_terminal_filter_;
   }
   virtual Network::FilterFactoryCb

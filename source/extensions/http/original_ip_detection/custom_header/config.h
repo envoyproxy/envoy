@@ -20,7 +20,7 @@ class CustomHeaderIPDetectionFactory : public Envoy::Http::OriginalIPDetectionFa
 public:
   Envoy::Http::OriginalIPDetectionSharedPtr
   createExtension(const Protobuf::Message& message,
-                  Server::Configuration::FactoryContext& context) override;
+                  Server::Configuration::ServerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<

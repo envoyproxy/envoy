@@ -20,7 +20,8 @@ public:
 private:
   DubboFilters::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::dubbo_proxy::router::v3::Router& proto_config,
-      const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stat_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 } // namespace Router

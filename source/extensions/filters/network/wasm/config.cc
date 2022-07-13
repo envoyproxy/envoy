@@ -15,10 +15,11 @@ namespace Wasm {
 
 Network::FilterFactoryCb WasmFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::wasm::v3::Wasm& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   context.api().customStatNamespaces().registerStatNamespace(
       Extensions::Common::Wasm::CustomStatNamespace);
-  auto filter_config = std::make_shared<FilterConfig>(proto_config, context);
+  auto filter_config = std::make_shared<FilterConfig>(proto_config, base_context);
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     auto filter = filter_config->createFilter();
     if (filter) {

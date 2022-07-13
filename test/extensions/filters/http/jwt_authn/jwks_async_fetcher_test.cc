@@ -32,7 +32,7 @@ private:
 // TestParam is for fast_listener,
 class JwksAsyncFetcherTest : public testing::TestWithParam<bool> {
 public:
-  JwksAsyncFetcherTest() : stats_(generateMockStats(context_.scope())) {}
+  JwksAsyncFetcherTest() : stats_(generateMockStats(context_.mock_server_context_.scope())) {}
 
   // init manager is used in is_slow_listener mode
   bool initManagerUsed() const {
@@ -49,7 +49,7 @@ public:
     }
 
     if (initManagerUsed()) {
-      EXPECT_CALL(context_.init_manager_, add(_))
+      EXPECT_CALL(context_.mock_server_context_.init_manager_, add(_))
           .WillOnce(Invoke([this](const Init::Target& target) {
             init_target_handle_ = target.createHandle("test");
           }));
@@ -57,7 +57,7 @@ public:
 
     // if async_fetch is enabled, timer is created
     if (config_.has_async_fetch()) {
-      timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+      timer_ = new NiceMock<Event::MockTimer>(&context_.mock_server_context_.dispatcher_);
       expected_duration_ = JwksAsyncFetcher::getCacheDuration(config_);
     }
 

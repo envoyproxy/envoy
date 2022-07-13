@@ -21,7 +21,7 @@ FileSystemBufferFilterFactory::FileSystemBufferFilterFactory()
 Http::FilterFactoryCb FileSystemBufferFilterFactory::createFilterFactoryFromProtoTyped(
     const ProtoFileSystemBufferFilterConfig& config,
     const std::string& stats_prefix ABSL_ATTRIBUTE_UNUSED,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context) {
   auto factory = AsyncFileManagerFactory::singleton(&context.singletonManager());
   auto manager = config.has_manager_config() ? factory->getAsyncFileManager(config.manager_config())
                                              : std::shared_ptr<AsyncFileManager>();

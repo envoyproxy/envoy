@@ -136,7 +136,7 @@ public:
                                              Network::ConnectionCallbacks& upstream_callbacks)
       : FactoryBase(name), upstream_callbacks_(&upstream_callbacks) {}
   bool isTerminalFilterByProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
-                                    Server::Configuration::ServerFactoryContext&) override {
+                                    Server::Configuration::FactoryContext&) override {
     return true;
   }
 
@@ -145,7 +145,7 @@ public:
                                     Server::Configuration::FactoryContext& context) override {
     return [&](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(
-          StartTlsSwitchFilter::newInstance(context.clusterManager(), upstream_callbacks_));
+          StartTlsSwitchFilter::newInstance(context.getServerFactoryContext().clusterManager(), upstream_callbacks_));
     };
   }
 

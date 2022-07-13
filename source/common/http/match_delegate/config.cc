@@ -243,7 +243,7 @@ void DelegatingStreamFilter::setEncoderFilterCallbacks(
   encoder_filter_->setEncoderFilterCallbacks(callbacks);
 }
 
-Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTyped(
+Envoy::Http::FilterFactoryCb MatchDelegateConfig::createDownstreamFilterFactoryFromProtoTyped(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
     const std::string& prefix, Server::Configuration::FactoryContext& context) {
 
@@ -253,7 +253,8 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
           proto_config.extension_config());
 
   auto message = Config::Utility::translateAnyToFactoryConfig(
-      proto_config.extension_config().typed_config(), context.messageValidationVisitor(), factory);
+      proto_config.extension_config().typed_config(),
+      context.getServerFactoryContext().messageValidationVisitor(), factory);
   auto filter_factory = factory.createFilterFactoryFromProto(*message, prefix, context);
 
   MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());

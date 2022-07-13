@@ -200,7 +200,9 @@ public:
   ProcessContextOptRef processContext() override { return server_.processContext(); }
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
   Http::Context& httpContext() override { return server_.httpContext(); }
-  TransportSocketFactoryContext& getTransportSocketFactoryContext() const override { return server_.transportSocketFactoryContext(); }
+  TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {
+    return server_.transportSocketFactoryContext();
+  }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }

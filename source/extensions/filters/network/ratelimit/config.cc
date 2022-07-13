@@ -19,7 +19,8 @@ namespace RateLimitFilter {
 
 Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::ratelimit::v3::RateLimit& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
 
   ASSERT(!proto_config.stat_prefix().empty());
   ASSERT(!proto_config.domain().empty());

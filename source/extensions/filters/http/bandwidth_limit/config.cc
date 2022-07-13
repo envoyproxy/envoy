@@ -14,7 +14,7 @@ namespace BandwidthLimitFilter {
 
 Http::FilterFactoryCb BandwidthLimitFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
   FilterConfigSharedPtr filter_config = std::make_shared<FilterConfig>(
       proto_config, context.scope(), context.runtime(), context.timeSource());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

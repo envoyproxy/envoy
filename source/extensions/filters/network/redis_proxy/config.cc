@@ -31,8 +31,8 @@ inline void addUniqueClusters(
 
 Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& proto_config,
-    Server::Configuration::FactoryContext& context) {
-
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   ASSERT(!proto_config.stat_prefix().empty());
   ASSERT(proto_config.has_settings());
 
@@ -42,7 +42,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
           context.timeSource());
 
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
-      proto_config, context.scope(), context.drainDecision(), context.runtime(), context.api()));
+      proto_config, context.scope(), base_context.getDownstreamFactoryContext()->drainDecision(),
+      context.runtime(), context.api()));
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());

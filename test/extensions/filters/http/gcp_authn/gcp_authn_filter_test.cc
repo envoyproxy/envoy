@@ -43,7 +43,7 @@ constexpr char DefaultConfig[] = R"EOF(
 class GcpAuthnFilterTest : public testing::Test {
 public:
   void setupMockObjects() {
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_))
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(_))
         .WillRepeatedly(Return(&thread_local_cluster_));
     EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _))
         .WillRepeatedly(Invoke([&](Envoy::Http::RequestMessagePtr& message,
@@ -146,8 +146,8 @@ TEST_F(GcpAuthnFilterTest, NoCluster) {
 
   // The pointer of thread local cluster is expected to be nullptr and http async client is not
   // expected to be called since `cluster` is not configured.
-  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
+  EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(context_.mock_server_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
 
   EXPECT_CALL(request_callbacks_, onComplete(/*response_ptr=*/nullptr));
   GcpAuthnFilterConfig config;

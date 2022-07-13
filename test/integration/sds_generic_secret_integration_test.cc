@@ -81,7 +81,7 @@ public:
     return
         [&factory_context, secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {
           callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::SdsGenericSecretTestFilter>(
-              factory_context.api(), secret_provider));
+              factory_context.getServerFactoryContext().api(), secret_provider));
         };
   }
 

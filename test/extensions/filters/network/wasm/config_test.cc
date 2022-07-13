@@ -27,12 +27,12 @@ class WasmNetworkFilterConfigTest
     : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmNetworkFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
-    ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_store_));
-    ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
-    ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));
-    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.mock_server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(context_.mock_server_context_, scope()).WillByDefault(ReturnRef(stats_store_));
+    ON_CALL(context_.mock_downstream_context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
+    ON_CALL(context_.mock_server_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
+    ON_CALL(context_.mock_server_context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(context_.mock_server_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   }
 
   void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
@@ -87,8 +87,8 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
     WasmFilterConfig factory;
     Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
     EXPECT_CALL(init_watcher_, ready());
-    context_.initManager().initialize(init_watcher_);
-    EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+    context_.mock_server_context_.initManager().initialize(init_watcher_);
+    EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
     Network::MockConnection connection;
     EXPECT_CALL(connection, addFilter(_)).WillOnce([&context](Network::FilterSharedPtr filter) {
       context = std::static_pointer_cast<Envoy::Extensions::Common::Wasm::Context>(filter);
@@ -124,8 +124,8 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {
   WasmFilterConfig factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
@@ -295,8 +295,8 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
   WasmFilterConfig factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
@@ -348,8 +348,8 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   TestUtility::loadFromYaml(valid_yaml, proto_config);
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
@@ -400,17 +400,17 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
             return &request;
           }));
   NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
-  EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(threadlocal));
+  EXPECT_CALL(context_.mock_server_context_, threadLocal()).WillRepeatedly(ReturnRef(threadlocal));
   threadlocal.registered_ = false;
   auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
   EXPECT_EQ(filter_config->createFilter(), nullptr);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
   auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})};
   response->body().add(code);
   async_callbacks->onSuccess(request, std::move(response));
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   threadlocal.registered_ = true;
   EXPECT_NE(filter_config->createFilter(), nullptr);
 }

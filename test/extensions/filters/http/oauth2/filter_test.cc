@@ -76,7 +76,7 @@ public:
 class OAuth2Test : public testing::Test {
 public:
   OAuth2Test() : request_(&cm_.thread_local_cluster_.async_client_) {
-    factory_context_.cluster_manager_.initializeClusters({"auth.example.com"}, {});
+    factory_context_.mock_server_context_.cluster_manager_.initializeClusters({"auth.example.com"}, {});
     init();
   }
 
@@ -126,7 +126,7 @@ public:
 
     // Create filter config.
     auto secret_reader = std::make_shared<MockSecretReader>();
-    FilterConfigSharedPtr c = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_,
+    FilterConfigSharedPtr c = std::make_shared<FilterConfig>(p, factory_context_.mock_server_context_.cluster_manager_,
                                                              secret_reader, scope_, "test.");
 
     return c;
@@ -271,7 +271,7 @@ generic_secret:
 }
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
-  ON_CALL(factory_context_.cluster_manager_, clusters())
+  ON_CALL(factory_context_.mock_server_context_.cluster_manager_, clusters())
       .WillByDefault(Return(Upstream::ClusterManager::ClusterInfoMaps()));
 
   EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
@@ -308,7 +308,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
+  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.mock_server_context_.cluster_manager_, secret_reader,
                                                 scope_, "test.");
 
   // Auth_scopes was not set, should return default value.

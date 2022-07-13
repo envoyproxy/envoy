@@ -17,6 +17,7 @@
 #include "test/mocks/server/guard_dog.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_component_factory.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/worker.h"
 #include "test/mocks/server/worker_factory.h"
 #include "test/test_common/environment.h"
@@ -81,11 +82,11 @@ protected:
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-               Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
+               Server::Configuration::FactoryContext&)
                 -> std::vector<Network::FilterFactoryCb> {
               return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-                  filters, filter_chain_factory_context);
+                  filters, server_context_);
             }));
     ON_CALL(listener_factory_, getTcpListenerConfigProviderManager())
         .WillByDefault(Return(&tcp_listener_config_provider_manager_));
@@ -145,12 +146,12 @@ protected:
         .WillOnce(Invoke(
             [raw_listener, need_init](
                 const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
-                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                Server::Configuration::FactoryContext& factory_context)
                 -> std::vector<Network::FilterFactoryCb> {
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &filter_chain_factory_context;
+              raw_listener->context_ = &factory_context;
               if (need_init) {
-                filter_chain_factory_context.initManager().add(notifier->target_);
+                factory_context.getServerFactoryContext().initManager().add(notifier->target_);
               }
               return {[notifier](Network::FilterManager&) -> void {}};
             }));
@@ -172,12 +173,12 @@ protected:
         .WillOnce(Invoke(
             [raw_listener, need_init](
                 const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
-                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                Server::Configuration::FactoryContext& filter_chain_factory_context)
                 -> std::vector<Network::FilterFactoryCb> {
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
               raw_listener->context_ = &filter_chain_factory_context;
               if (need_init) {
-                filter_chain_factory_context.initManager().add(notifier->target_);
+                filter_chain_factory_context.getServerFactoryContext().initManager().add(notifier->target_);
               }
               return {[notifier](Network::FilterManager&) -> void {}};
             }));
@@ -349,6 +350,7 @@ protected:
   std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{
       std::make_shared<DumbInternalListenerRegistry>()};
 
+  NiceMock<Configuration::MockFactoryContext> server_context_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();

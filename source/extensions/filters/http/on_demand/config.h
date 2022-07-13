@@ -23,7 +23,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-      const std::string&, Server::Configuration::FactoryContext& context) override;
+      const std::string&, Server::Configuration::ServerFactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& config,

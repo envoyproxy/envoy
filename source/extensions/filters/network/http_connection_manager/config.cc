@@ -100,9 +100,10 @@ static Http::FilterFactoryCb MissingConfigFilterFactory =
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
     PathWithEscapedSlashesAction
-    getPathWithEscapedSlashesActionRuntimeOverride(Server::Configuration::FactoryContext& context) {
+    getPathWithEscapedSlashesActionRuntimeOverride(
+        Server::Configuration::ServerFactoryContext& context) {
   // The default behavior is to leave escaped slashes unchanged.
-  uint64_t runtime_override = context.getServerFactoryContext().runtime().snapshot().getInteger(
+  uint64_t runtime_override = context.runtime().snapshot().getInteger(
       "http_connection_manager.path_with_escaped_slashes_action", 0);
   switch (runtime_override) {
   default:
@@ -125,11 +126,11 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
     PathWithEscapedSlashesAction
     getPathWithEscapedSlashesAction(const envoy::extensions::filters::network::
                                         http_connection_manager::v3::HttpConnectionManager& config,
-                                    Server::Configuration::FactoryContext& context) {
+                                    Server::Configuration::ServerFactoryContext& context) {
   envoy::type::v3::FractionalPercent default_fraction;
   default_fraction.set_numerator(100);
   default_fraction.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
-  if (context.getServerFactoryContext().runtime().snapshot().featureEnabled(
+  if (context.runtime().snapshot().featureEnabled(
           "http_connection_manager.path_with_escaped_slashes_action_enabled", default_fraction)) {
     return config.path_with_escaped_slashes_action() ==
                    envoy::extensions::filters::network::http_connection_manager::v3::
@@ -241,9 +242,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
     auto& server_context = context.getServerFactoryContext();
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         *filter_config, context.getDownstreamFactoryContext()->drainDecision(),
-        server_context.api().randomGenerator(),
-        context.getDownstreamFactoryContext()->httpContext(), server_context.runtime(),
-        server_context.localInfo(), server_context.clusterManager(),
+        server_context.api().randomGenerator(), context.getServerFactoryContext().httpContext(),
+        server_context.runtime(), server_context.localInfo(), server_context.clusterManager(),
         server_context.overloadManager(), server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
@@ -348,7 +348,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
       local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
-      path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
+      path_with_escaped_slashes_action_(
+          getPathWithEscapedSlashesAction(config, context.getServerFactoryContext())),
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_requests_per_connection, 0)),
@@ -825,8 +826,8 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
   }
   // Otherwise, for the sake of backwards compatibility, fall back to using tracing provider
   // configuration defined in the bootstrap config.
-  if (context_.getDownstreamFactoryContext()->httpContext().defaultTracingConfig().has_http()) {
-    return &context_.getDownstreamFactoryContext()->httpContext().defaultTracingConfig().http();
+  if (context_.getServerFactoryContext().httpContext().defaultTracingConfig().has_http()) {
+    return &context_.getServerFactoryContext().httpContext().defaultTracingConfig().http();
   }
   return nullptr;
 }
@@ -855,7 +856,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.getDownstreamFactoryContext()->drainDecision(),
         server_factory_context.api().randomGenerator(),
-        context.getDownstreamFactoryContext()->httpContext(), server_factory_context.runtime(),
+        context.getServerFactoryContext().httpContext(), server_factory_context.runtime(),
         server_factory_context.localInfo(), server_factory_context.clusterManager(),
         server_factory_context.overloadManager(),
         server_factory_context.mainThreadDispatcher().timeSource());

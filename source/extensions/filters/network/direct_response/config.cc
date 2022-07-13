@@ -24,7 +24,8 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::direct_response::v3::Config& config,
-      Server::Configuration::FactoryContext& context) override {
+      Server::Configuration::FactoryContext& base_context) override {
+    Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
     return [config, &context](Network::FilterManager& filter_manager) -> void {
       auto content = Config::DataSource::read(config.response(), true, context.api());
       filter_manager.addReadFilter(std::make_shared<DirectResponseFilter>(content));
@@ -33,7 +34,7 @@ private:
 
   bool isTerminalFilterByProtoTyped(
       const envoy::extensions::filters::network::direct_response::v3::Config&,
-      Server::Configuration::ServerFactoryContext&) override {
+      Server::Configuration::FactoryContext&) override {
     return true;
   }
 };

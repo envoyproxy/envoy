@@ -454,7 +454,7 @@ envoy_cc_library(
         "listener_manager_impl.h",
     ],
     deps = [
-      ":filter_factory_context_impl_lib",
+        ":filter_factory_context_impl_lib",
         "active_raw_udp_listener_config",
         ":configuration_lib",
         ":drain_manager_lib",
@@ -513,8 +513,8 @@ envoy_cc_library(
     srcs = ["filter_chain_manager_impl.cc"],
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
-      ":filter_factory_context_impl_lib",
         ":filter_chain_factory_context_callback",
+        ":filter_factory_context_impl_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/matcher:matcher_interface",
         "//envoy/network:filter_interface",

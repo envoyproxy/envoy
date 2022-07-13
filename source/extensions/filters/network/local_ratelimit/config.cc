@@ -12,7 +12,8 @@ namespace LocalRateLimitFilter {
 
 Network::FilterFactoryCb LocalRateLimitConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   ConfigSharedPtr filter_config(
       std::make_shared<Config>(proto_config, context.mainThreadDispatcher(), context.scope(),
                                context.runtime(), context.singletonManager()));

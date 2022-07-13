@@ -104,7 +104,8 @@ SINGLETON_MANAGER_REGISTRATION(thrift_route_config_provider_manager);
 
 Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
       context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(thrift_route_config_provider_manager), [&context] {
@@ -112,15 +113,16 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
           });
 
   std::shared_ptr<Config> filter_config(
-      new ConfigImpl(proto_config, context, *route_config_provider_manager));
+      new ConfigImpl(proto_config, base_context, *route_config_provider_manager));
 
   // We capture route_config_provider_manager here only to copy the shared_ptr and keep the
   // reference passed to ConfigImpl valid even after the local variable goes out of scope.
-  return [route_config_provider_manager, filter_config,
-          &context](Network::FilterManager& filter_manager) -> void {
+  return [route_config_provider_manager, filter_config, &context,
+          &base_context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
         *filter_config, context.api().randomGenerator(),
-        context.mainThreadDispatcher().timeSource(), context.drainDecision()));
+        context.mainThreadDispatcher().timeSource(),
+        base_context.getDownstreamFactoryContext()->drainDecision()));
   };
 }
 
@@ -135,7 +137,8 @@ ConfigImpl::ConfigImpl(
     Server::Configuration::FactoryContext& context,
     Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
-      stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
+      stats_(ThriftFilterStats::generateStats(stats_prefix_,
+                                              context_.getServerFactoryContext().scope())),
       transport_(lookupTransport(config.transport())), proto_(lookupProtocol(config.protocol())),
       payload_passthrough_(config.payload_passthrough()),
       max_requests_per_connection_(config.max_requests_per_connection().value()),
@@ -168,7 +171,8 @@ ConfigImpl::ConfigImpl(
       }
     }
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
-        config.trds(), context_.getServerFactoryContext(), stats_prefix_, context_.initManager());
+        config.trds(), context_.getServerFactoryContext(), stats_prefix_,
+        context_.getServerFactoryContext().initManager());
   } else {
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
         config.route_config(), context_.getServerFactoryContext());

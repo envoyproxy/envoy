@@ -200,9 +200,11 @@ public:
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Api::MockApi> api_;
   Grpc::ContextImpl grpc_context_;
+  Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
-  testing::NiceMock<Configuration::MockTransportSocketFactoryContext> transport_socket_factory_context_;
+  testing::NiceMock<Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
 };
 

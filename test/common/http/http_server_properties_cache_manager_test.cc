@@ -75,7 +75,7 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithEntry) {
 }
 
 TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
-  EXPECT_CALL(context_.options_, concurrency()).WillOnce(Return(5));
+  EXPECT_CALL(context_.mock_server_context_.options_, concurrency()).WillOnce(Return(5));
   options1_.mutable_key_value_store_config();
   initialize();
   EXPECT_THROW_WITH_REGEX(manager_->getCache(options1_, dispatcher_), EnvoyException,

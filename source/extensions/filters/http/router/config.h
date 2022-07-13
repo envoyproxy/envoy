@@ -27,7 +27,8 @@ private:
   }
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::router::v3::Router& proto_config,
-      const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stat_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(RouterFilterConfig);

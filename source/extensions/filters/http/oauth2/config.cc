@@ -38,7 +38,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 
 Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
   if (!proto.has_config()) {
     throw EnvoyException("config must be present for global config");
   }

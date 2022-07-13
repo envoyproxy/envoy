@@ -222,7 +222,6 @@ public:
   }
 
   FilterConfig(Stats::StatName stat_prefix, Server::Configuration::ServerFactoryContext& context,
-               Server::Configuration::DownstreamFactoryContext& downstream_context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config)
       : FilterConfig(
@@ -231,7 +230,7 @@ public:
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
             config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
             config.suppress_grpc_request_failure_code_stats(), config.strict_check_headers(),
-            context.api().timeSource(), downstream_context.httpContext(), context.routerContext()) {
+            context.api().timeSource(), context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }

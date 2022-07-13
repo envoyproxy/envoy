@@ -94,7 +94,7 @@ public:
 };
 
 TEST_F(HealthCheckFilterNoPassThroughTest, OkOrFailed) {
-  EXPECT_CALL(context_, healthCheckFailed()).Times(0);
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).Times(0);
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -109,7 +109,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, NotHcRequest) {
             filter_->decodeHeaders(request_headers_no_hc_, true));
 
   Http::TestResponseHeaderMapImpl service_response{{":status", "200"}};
-  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillOnce(Return(true));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_response, false));
   Buffer::OwnedImpl body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(body, false));
@@ -123,7 +123,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
   prepareFilter(false);
   {
     Http::TestResponseHeaderMapImpl health_check_response{{":status", "200"}};
-    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillOnce(Return(false));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers_, true));
@@ -131,7 +131,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
   }
   {
     Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
-    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
+    EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillOnce(Return(true));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers_, true));
@@ -147,11 +147,11 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestResponseHeaderMapImpl health_check_response{{":status", "200"}};
     MockHealthCheckCluster cluster_www1(100, 50);
     MockHealthCheckCluster cluster_www2(1000, 800);
-    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
-    EXPECT_CALL(context_, clusterManager());
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
+    EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_.mock_server_context_, clusterManager());
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
         .WillRepeatedly(Return(&cluster_www1));
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
         .WillRepeatedly(Return(&cluster_www2));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -163,11 +163,11 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
     MockHealthCheckCluster cluster_www1(100, 49);
     MockHealthCheckCluster cluster_www2(1000, 800);
-    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
-    EXPECT_CALL(context_, clusterManager());
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
+    EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_.mock_server_context_, clusterManager());
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
         .WillRepeatedly(Return(&cluster_www1));
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
         .WillRepeatedly(Return(&cluster_www2));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -179,11 +179,11 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
     MockHealthCheckCluster cluster_www1(0, 0);
     MockHealthCheckCluster cluster_www2(1000, 800);
-    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
-    EXPECT_CALL(context_, clusterManager());
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
+    EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_.mock_server_context_, clusterManager());
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
         .WillRepeatedly(Return(&cluster_www1));
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
         .WillRepeatedly(Return(&cluster_www2));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -198,11 +198,11 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestResponseHeaderMapImpl health_check_response{{":status", "200"}};
     MockHealthCheckCluster cluster_www1(0, 0);
     MockHealthCheckCluster cluster_www2(1000, 0);
-    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
-    EXPECT_CALL(context_, clusterManager());
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
+    EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_.mock_server_context_, clusterManager());
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
         .WillRepeatedly(Return(&cluster_www1));
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
         .WillRepeatedly(Return(&cluster_www2));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -215,11 +215,11 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
     Http::TestResponseHeaderMapImpl health_check_response{{":status", "200"}};
     MockHealthCheckCluster cluster_www1(100, 40, 20);
     MockHealthCheckCluster cluster_www2(1000, 0, 800);
-    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
-    EXPECT_CALL(context_, clusterManager());
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
+    EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_.mock_server_context_, clusterManager());
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
         .WillRepeatedly(Return(&cluster_www1));
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
+    EXPECT_CALL(context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
         .WillRepeatedly(Return(&cluster_www2));
     EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -229,7 +229,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
-  EXPECT_CALL(context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(true));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
@@ -253,7 +253,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, Ok) {
-  EXPECT_CALL(context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(false));
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -265,7 +265,7 @@ TEST_F(HealthCheckFilterPassThroughTest, Ok) {
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
-  EXPECT_CALL(context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(false));
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -283,7 +283,7 @@ TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, Failed) {
-  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -291,14 +291,14 @@ TEST_F(HealthCheckFilterPassThroughTest, Failed) {
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, NotHcRequest) {
-  EXPECT_CALL(context_, healthCheckFailed()).Times(0);
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).Times(0);
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(_)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_no_hc_, true));
 }
 
 TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
-  EXPECT_CALL(context_, healthCheckFailed()).WillRepeatedly(Return(false));
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   cache_manager_->setCachedResponse(Http::Code::ServiceUnavailable, false);
@@ -319,7 +319,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
 }
 
 TEST_F(HealthCheckFilterCachingTest, CachedOkCallbackNotCalled) {
-  EXPECT_CALL(context_, healthCheckFailed()).WillRepeatedly(Return(false));
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   cache_manager_->setCachedResponse(Http::Code::OK, false);
@@ -404,7 +404,7 @@ TEST_F(HealthCheckFilterCachingTest, DegradedHeader) {
 }
 
 TEST_F(HealthCheckFilterCachingTest, NotHcRequest) {
-  EXPECT_CALL(context_, healthCheckFailed()).Times(0);
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).Times(0);
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(_)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_no_hc_, true));

@@ -34,12 +34,12 @@ class WasmFilterConfigTest : public Event::TestUsingSimulatedTime,
                              public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
-    ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_store_));
-    ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
-    EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
-    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.mock_server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(context_.mock_server_context_, scope()).WillByDefault(ReturnRef(stats_store_));
+    ON_CALL(context_.mock_downstream_context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
+    EXPECT_CALL(context_.mock_server_context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
+    ON_CALL(context_.mock_server_context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(context_.mock_server_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   }
 
   void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
@@ -95,8 +95,8 @@ TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
   WasmFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -129,8 +129,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
     Http::FilterFactoryCb cb =
         factory.createFilterFactoryFromProto(proto_config, "stats", context_);
     EXPECT_CALL(init_watcher_, ready());
-    context_.initManager().initialize(init_watcher_);
-    EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+    context_.mock_server_context_.initManager().initialize(init_watcher_);
+    EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
     Http::MockFilterChainFactoryCallbacks filter_callback;
     EXPECT_CALL(filter_callback, addStreamFilter(_))
         .WillOnce([&context](Http::StreamFilterSharedPtr filter) {
@@ -166,8 +166,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
   WasmFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -216,8 +216,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   TestUtility::loadFromYaml(valid_yaml, proto_config);
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -246,8 +246,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {
   WasmFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -313,8 +313,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -365,19 +365,19 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
                             WasmException, "Unable to create Wasm HTTP filter ");
 
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
 
   Init::ManagerImpl init_manager2{"init_manager2"};
   Init::ExpectableWatcherImpl init_watcher2;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager2));
+  EXPECT_CALL(context_.mock_server_context_, initManager()).WillRepeatedly(ReturnRef(init_manager2));
 
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
 
   EXPECT_CALL(init_watcher2, ready());
   init_manager2.initialize(init_watcher2);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -447,20 +447,20 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
 
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
 
   // Case 2: fail immediately with negatively cached result.
   Init::ManagerImpl init_manager2{"init_manager2"};
   Init::ExpectableWatcherImpl init_watcher2;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager2));
+  EXPECT_CALL(context_.mock_server_context_, initManager()).WillRepeatedly(ReturnRef(init_manager2));
   EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context_),
                             WasmException, "Unable to create Wasm HTTP filter ");
 
   EXPECT_CALL(init_watcher2, ready());
   init_manager2.initialize(init_watcher2);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
 
   // Wait for negative cache to timeout.
   ::Envoy::Extensions::Common::Wasm::setTimeOffsetForCodeCacheForTesting(std::chrono::seconds(10));
@@ -481,26 +481,26 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   Init::ManagerImpl init_manager3{"init_manager3"};
   Init::ExpectableWatcherImpl init_watcher3;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager3));
+  EXPECT_CALL(context_.mock_server_context_, initManager()).WillRepeatedly(ReturnRef(init_manager3));
 
   EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context_),
                             WasmException, "Unable to create Wasm HTTP filter ");
 
   EXPECT_CALL(init_watcher3, ready());
   init_manager3.initialize(init_watcher3);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
 
   // Case 4: success from cache.
   Init::ManagerImpl init_manager4{"init_manager4"};
   Init::ExpectableWatcherImpl init_watcher4;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager4));
+  EXPECT_CALL(context_.mock_server_context_, initManager()).WillRepeatedly(ReturnRef(init_manager4));
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
 
   EXPECT_CALL(init_watcher4, ready());
   init_manager4.initialize(init_watcher4);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -538,38 +538,38 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   Init::ManagerImpl init_manager5{"init_manager4"};
   Init::ExpectableWatcherImpl init_watcher5;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager5));
+  EXPECT_CALL(context_.mock_server_context_, initManager()).WillRepeatedly(ReturnRef(init_manager5));
 
   EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config2, "stats", context_),
                             WasmException, "Unable to create Wasm HTTP filter ");
 
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
 
   // Case 6: fail and fetch in the background, got 200, cache success.
   Init::ManagerImpl init_manager6{"init_manager6"};
   Init::ExpectableWatcherImpl init_watcher6;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager6));
+  EXPECT_CALL(context_.mock_server_context_, initManager()).WillRepeatedly(ReturnRef(init_manager6));
 
   factory.createFilterFactoryFromProto(proto_config, "stats", context_);
 
   EXPECT_CALL(init_watcher6, ready());
   init_manager6.initialize(init_watcher6);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
 
   // Case 7: success from cache.
   Init::ManagerImpl init_manager7{"init_manager7"};
   Init::ExpectableWatcherImpl init_watcher7;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager7));
+  EXPECT_CALL(context_.mock_server_context_, initManager()).WillRepeatedly(ReturnRef(init_manager7));
 
   Http::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
 
   EXPECT_CALL(init_watcher7, ready());
   init_manager7.initialize(init_watcher7);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
 
   Http::MockFilterChainFactoryCallbacks filter_callback2;
   EXPECT_CALL(filter_callback2, addStreamFilter(_));
@@ -619,7 +619,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
@@ -664,7 +664,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
@@ -709,7 +709,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
@@ -777,8 +777,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -825,7 +825,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
 
   // Fail closed.
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -895,7 +895,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpen) {
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   // The filter is not registered.
   cb(filter_callback);
@@ -939,17 +939,17 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
             return &request;
           }));
   NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
-  EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(threadlocal));
+  EXPECT_CALL(context_.mock_server_context_, threadLocal()).WillRepeatedly(ReturnRef(threadlocal));
   threadlocal.registered_ = false;
   auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
   EXPECT_EQ(filter_config->createFilter(), nullptr);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  context_.mock_server_context_.initManager().initialize(init_watcher_);
   auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})};
   response->body().add(code);
   async_callbacks->onSuccess(request, std::move(response));
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
   threadlocal.registered_ = true;
   EXPECT_NE(filter_config->createFilter(), nullptr);
 }

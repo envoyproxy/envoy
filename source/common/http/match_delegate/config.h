@@ -91,14 +91,14 @@ private:
   Envoy::Http::StreamFilterBase* base_filter_{};
 };
 
-class MatchDelegateConfig : public Extensions::HttpFilters::Common::FactoryBase<
+class MatchDelegateConfig : public Extensions::HttpFilters::Common::DownstreamFactoryBase<
                                 envoy::extensions::common::matching::v3::ExtensionWithMatcher> {
 public:
   // TODO(wbpcode): move this filter to 'source/extensions/filters/http'.
-  MatchDelegateConfig() : FactoryBase("envoy.filters.http.match_delegate") {}
+  MatchDelegateConfig() : DownstreamFactoryBase("envoy.filters.http.match_delegate") {}
 
 private:
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  Envoy::Http::FilterFactoryCb createDownstreamFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override;
 };

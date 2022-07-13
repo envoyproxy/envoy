@@ -157,7 +157,7 @@ public:
       std::make_shared<Network::MockFilterChain>()};
 
   NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
-  NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
+  NiceMock<Server::Configuration::MockListenerFactoryContext> parent_context_;
   std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
   // Test target.
   std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;

@@ -28,7 +28,7 @@ JwtAuthnFilterStats generateMockStats(Stats::Scope& scope) {
 
 class JwksCacheTest : public testing::Test {
 protected:
-  JwksCacheTest() : stats_(generateMockStats(context_.scope())) {}
+  JwksCacheTest() : stats_(generateMockStats(context_.mock_server_context_.scope())) {}
 
   void SetUp() override {
     // fetcher is only called at async_fetch. In this test, it is never called.
@@ -101,7 +101,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   EXPECT_FALSE(jwks->isExpired());
 
   // cache duration is 1 second, sleep two seconds to expire it
-  context_.time_system_.advanceTimeWait(std::chrono::seconds(2));
+  context_.mock_server_context_.time_system_.advanceTimeWait(std::chrono::seconds(2));
   EXPECT_TRUE(jwks->isExpired());
 }
 

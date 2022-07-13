@@ -26,8 +26,9 @@ namespace {
 
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
-  JwksDataImpl(const JwtProvider& jwt_provider, Server::Configuration::FactoryContext& context,
-               CreateJwksFetcherCb fetcher_cb, JwtAuthnFilterStats& stats)
+  JwksDataImpl(const JwtProvider& jwt_provider,
+               Server::Configuration::ServerFactoryContext& context, CreateJwksFetcherCb fetcher_cb,
+               JwtAuthnFilterStats& stats)
       : jwt_provider_(jwt_provider), time_source_(context.timeSource()),
         tls_(context.threadLocal()) {
 
@@ -125,7 +126,8 @@ using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
 class JwksCacheImpl : public JwksCache {
 public:
   // Load the config from envoy config.
-  JwksCacheImpl(const JwtAuthentication& config, Server::Configuration::FactoryContext& context,
+  JwksCacheImpl(const JwtAuthentication& config,
+                Server::Configuration::ServerFactoryContext& context,
                 CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats)
       : stats_(stats) {
     for (const auto& [name, provider] : config.providers()) {
@@ -178,8 +180,8 @@ private:
 
 JwksCachePtr
 JwksCache::create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
-                  Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
-                  JwtAuthnFilterStats& stats) {
+                  Server::Configuration::ServerFactoryContext& context,
+                  CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats) {
   return std::make_unique<JwksCacheImpl>(config, context, fetcher_fn, stats);
 }
 

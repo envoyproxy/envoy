@@ -79,7 +79,7 @@ public:
    */
   virtual OriginalIPDetectionSharedPtr
   createExtension(const Protobuf::Message& config,
-                  Server::Configuration::FactoryContext& context) PURE;
+                  Server::Configuration::ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.http.original_ip_detection"; }
 };

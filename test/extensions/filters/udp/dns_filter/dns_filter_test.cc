@@ -7,7 +7,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/instance.h"
-#include "test/mocks/server/listener_factory_context.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
@@ -74,10 +74,10 @@ public:
     envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
     auto store = stats_store_.createScope("dns_scope");
-    ON_CALL(listener_factory_, scope()).WillByDefault(ReturnRef(*store));
-    ON_CALL(listener_factory_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(listener_factory_.server_factory_context_, scope()).WillByDefault(ReturnRef(*store));
+    ON_CALL(listener_factory_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(listener_factory_.server_factory_context_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(random_, random()).WillByDefault(Return(3));
-    ON_CALL(listener_factory_, random()).WillByDefault(ReturnRef(random_));
 
     resolver_ = std::make_shared<Network::MockDnsResolver>();
     NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;

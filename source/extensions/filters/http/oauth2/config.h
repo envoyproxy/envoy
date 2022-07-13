@@ -20,7 +20,7 @@ public:
   Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
                                     const std::string&,
-                                    Server::Configuration::FactoryContext&) override;
+                                    Server::Configuration::ServerFactoryContext&) override;
 };
 
 } // namespace Oauth2

@@ -34,8 +34,9 @@ class JwksAsyncFetcher : public Logger::Loggable<Logger::Id::jwt>,
                          public Common::JwksFetcher::JwksReceiver {
 public:
   JwksAsyncFetcher(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks,
-                   Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
-                   JwtAuthnFilterStats& stats, JwksDoneFetched done_fn);
+                   Server::Configuration::ServerFactoryContext& context,
+                   CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats,
+                   JwksDoneFetched done_fn);
 
   // Get the remote Jwks cache duration.
   static std::chrono::seconds
@@ -54,7 +55,7 @@ private:
   // the remote Jwks config
   const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks_;
   // the factory context
-  Server::Configuration::FactoryContext& context_;
+  Server::Configuration::ServerFactoryContext& context_;
   // the jwks fetcher creator function
   const CreateJwksFetcherCb create_fetcher_fn_;
   // stats

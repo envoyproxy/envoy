@@ -34,11 +34,11 @@ class ThriftRateLimitConfigurationTest : public testing::Test {
 public:
   ThriftRateLimitConfigurationTest() {
     route_config_provider_manager_ =
-        std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
+        std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.mock_server_context_.admin_);
   }
 
   void initializeClusters(const std::vector<std::string>& cluster_names) {
-    factory_context_.server_factory_context_.cluster_manager_.initializeClusters(cluster_names, {});
+    factory_context_.mock_server_context_.cluster_manager_.initializeClusters(cluster_names, {});
   }
   void initialize(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config,
                   const std::vector<std::string>& cluster_names) {

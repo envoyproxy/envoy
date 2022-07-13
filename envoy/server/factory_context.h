@@ -278,7 +278,7 @@ public:
   virtual OptRef<DownstreamFactoryContext> getDownstreamFactoryContext() PURE;
 
   /**
-   * @return the best validation visitor.  If there's a downstream context, that
+   * @return the best validation visitor. If there's a downstream context, that
    * validation visitor is prefered.
    */
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() {
@@ -287,6 +287,8 @@ public:
     }
     return getServerFactoryContext().messageValidationVisitor();
   }
+
+  operator ServerFactoryContext&() { return this->getServerFactoryContext(); }
 };
 
 // For legacy naming.

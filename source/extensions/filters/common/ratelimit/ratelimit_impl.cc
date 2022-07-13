@@ -119,7 +119,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
-ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
+ClientPtr rateLimitClient(Server::Configuration::ServerFactoryContext& context,
                           const envoy::config::core::v3::GrpcService& grpc_service,
                           const std::chrono::milliseconds timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent

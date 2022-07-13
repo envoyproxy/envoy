@@ -90,8 +90,8 @@ class ThriftConnectionManagerTest : public testing::Test {
 public:
   ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {
     route_config_provider_manager_ =
-        std::make_unique<Router::RouteConfigProviderManagerImpl>(context_.admin_);
-    ON_CALL(*context_.access_log_manager_.file_, write(_))
+        std::make_unique<Router::RouteConfigProviderManagerImpl>(context_.mock_server_context_.admin_);
+    ON_CALL(*context_.mock_server_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
   }
   ~ThriftConnectionManagerTest() override {
@@ -182,7 +182,7 @@ stat_prefix: test
 
     decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();
 
-    context_.server_factory_context_.cluster_manager_.initializeClusters(cluster_names, {});
+    context_.mock_server_context_.cluster_manager_.initializeClusters(cluster_names, {});
 
     proto_config_ = config;
     decoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockDecoderFilter>>();

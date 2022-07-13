@@ -57,17 +57,20 @@ public:
 };
 
 class MockFactoryContext : public FilterFactoryContext {
- public:
+public:
   MockFactoryContext() {
-  ON_CALL(*this, getServerFactoryContext()).WillByDefault(testing::ReturnRef(mock_server_context_));
-  ON_CALL(*this, getDownstreamFactoryContext()).WillByDefault(Return(OptRef<DownstreamFactoryContext>{mock_downstream_context_}));
+    ON_CALL(*this, getServerFactoryContext())
+        .WillByDefault(testing::ReturnRef(mock_server_context_));
+    ON_CALL(*this, getDownstreamFactoryContext())
+        .WillByDefault(Return(OptRef<DownstreamFactoryContext>{mock_downstream_context_}));
   }
 
-  MOCK_METHOD(ServerFactoryContext&,getServerFactoryContext, ());
+  MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, ());
   MOCK_METHOD(OptRef<DownstreamFactoryContext>, getDownstreamFactoryContext, ());
 
-  MockServerFactoryContext mock_server_context_;
-  MockListenerFactoryContext mock_downstream_context_;
+  testing::NiceMock<MockServerFactoryContext> server_factory_context_;
+  NiceMock<MockServerFactoryContext> mock_server_context_;
+  NiceMock<MockListenerFactoryContext> mock_downstream_context_;
 };
 
 } // namespace Configuration

@@ -45,33 +45,23 @@ class FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryTestBase() {
     // For server_factory_context
-    ON_CALL(factory_context_.server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
-    ON_CALL(factory_context_, messageValidationContext())
-        .WillByDefault(ReturnRef(validation_context_));
-    ON_CALL(factory_context_.server_factory_context_, messageValidationContext())
-        .WillByDefault(ReturnRef(validation_context_));
-    ON_CALL(validation_context_, dynamicValidationVisitor())
-        .WillByDefault(ReturnRef(validation_visitor_));
-    ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     }));
     ON_CALL(init_manager_, initialize(_))
         .WillByDefault(Invoke(
             [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
-    // Thread local storage assumes a single (main) thread with no workers.
-    ON_CALL(factory_context_.admin_, concurrency()).WillByDefault(Return(0));
+    //ON_CALL(factory_context_.admin_.mock_server_context_, concurrency()).WillByDefault(Return(0));
 
-    ON_CALL(factory_context_, listenerConfig()).WillByDefault(ReturnRef(listener_config_));
+    //ON_CALL(factory_context_, listenerConfig()).WillByDefault(ReturnRef(listener_config_));
   }
 
   virtual ~FilterConfigDiscoveryTestBase() = default;
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
   Event::SimulatedTimeSystem time_system_;
-  NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Init::MockManager> init_manager_;
+  NiceMock<Server::Configuration::MockListenerFactoryContext> listener_context_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
@@ -86,10 +76,10 @@ public:
   FilterConfigDiscoveryImplTest() {
     filter_config_provider_manager_ = std::make_unique<CfgProviderMgrImpl>();
   }
-  ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
   // Create listener filter config provider callbacks.
-  DynamicFilterConfigProviderPtr<FactoryCb> createProvider(std::string name, bool warm,
+  DynamicFilterConfigProviderPtr<FactoryCb> createProvider(FactoryCtx& ctx,
+                                                           std::string name, bool warm,
                                                            bool default_configuration,
                                                            bool last_filter_config = true) {
     EXPECT_CALL(init_manager_, add(_));
@@ -104,12 +94,12 @@ public:
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, factory_context_, "xds.", last_filter_config, getFilterType(),
+        config_source, name, ctx, "xds.", last_filter_config, getFilterType(),
         getMatcher());
   }
 
-  void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
-    provider_ = createProvider("foo", warm, default_configuration, last_filter_config);
+  void setup(FactoryCtx& ctx, bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
+    provider_ = createProvider(ctx, "foo", warm, default_configuration, last_filter_config);
     callbacks_ =
         factory_context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*factory_context_.server_factory_context_.cluster_manager_.subscription_factory_
@@ -163,6 +153,8 @@ public:
   virtual const std::string getConfigReloadCounter() const PURE;
   virtual const std::string getConfigFailCounter() const PURE;
 
+  virtual FactoryCtx& getCtx() PURE;
+
   std::unique_ptr<FilterConfigProviderManager<FactoryCb, FactoryCtx>>
       filter_config_provider_manager_;
   DynamicFilterConfigProviderPtr<FactoryCb> provider_;
@@ -183,6 +175,8 @@ public:
   const std::string getConfigFailCounter() const override {
     return "extension_config_discovery.http_filter.foo.config_fail";
   }
+
+  Server::Configuration::FactoryContext& getCtx() override { return factory_context_; }
 };
 
 // TCP listener filter test
@@ -199,6 +193,7 @@ public:
   const std::string getConfigFailCounter() const override {
     return "extension_config_discovery.tcp_listener_filter.foo.config_fail";
   }
+  Server::Configuration::ListenerFactoryContext& getCtx() override { return listener_context_; }
 };
 
 // UDP listener filter test
@@ -215,6 +210,7 @@ public:
   const std::string getConfigFailCounter() const override {
     return "extension_config_discovery.udp_listener_filter.foo.config_fail";
   }
+  Server::Configuration::ListenerFactoryContext& getCtx() override { return listener_context_; }
 };
 
 /***************************************************************************************
@@ -235,14 +231,14 @@ TYPED_TEST_SUITE(FilterConfigDiscoveryImplTestParameter, FilterConfigDiscoveryTe
 // TYPED_TEST will run the same test for each of the above filter type.
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DestroyReady) {
   TypeParam config_discovery_test;
-  config_discovery_test.setup();
+  config_discovery_test.setup(config_discovery_test.getCtx());
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
   InSequence s;
   TypeParam config_discovery_test;
-  config_discovery_test.setup();
+  config_discovery_test.setup(config_discovery_test.getCtx());
   EXPECT_EQ("foo", config_discovery_test.provider_->name());
   EXPECT_EQ(absl::nullopt, config_discovery_test.provider_->config());
 
@@ -287,7 +283,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, BasicDeprecatedStatPrefix) {
 
   InSequence s;
   TypeParam config_discovery_test;
-  config_discovery_test.setup();
+  config_discovery_test.setup(config_discovery_test.getCtx());
   EXPECT_EQ("foo", config_discovery_test.provider_->name());
   EXPECT_EQ(absl::nullopt, config_discovery_test.provider_->config());
 
@@ -310,7 +306,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, BasicDeprecatedStatPrefix) {
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ConfigFailed) {
   InSequence s;
   TypeParam config_discovery_test;
-  config_discovery_test.setup();
+  config_discovery_test.setup(config_discovery_test.getCtx());
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
   config_discovery_test.callbacks_->onConfigUpdateFailed(
       Config::ConfigUpdateFailureReason::FetchTimedout, {});
@@ -325,7 +321,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ConfigFailed) {
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {
   InSequence s;
   TypeParam config_discovery_test;
-  config_discovery_test.setup();
+  config_discovery_test.setup(config_discovery_test.getCtx());
   auto response = config_discovery_test.createResponse("1", "foo");
   envoy::config::core::v3::TypedExtensionConfig extension_config;
   extension_config.set_name("foo");
@@ -347,7 +343,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongName) {
   InSequence s;
   TypeParam config_discovery_test;
-  config_discovery_test.setup();
+  config_discovery_test.setup(config_discovery_test.getCtx());
   const auto response = config_discovery_test.createResponse("1", "bar");
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
@@ -366,7 +362,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongName) {
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, IncrementalWithOutDefault) {
   InSequence s;
   TypeParam config_discovery_test;
-  config_discovery_test.setup();
+  config_discovery_test.setup(config_discovery_test.getCtx());
   config_discovery_test.incrementalTest();
   // Verify the provider config is empty.
   EXPECT_EQ(absl::nullopt, config_discovery_test.provider_->config());
@@ -377,7 +373,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, IncrementalWithOutDefault) {
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, IncrementalWithDefault) {
   InSequence s;
   TypeParam config_discovery_test;
-  config_discovery_test.setup(true, true);
+  config_discovery_test.setup(config_discovery_test.getCtx(), true, true);
   config_discovery_test.incrementalTest();
   // Verify the provider config is not empty since the default config is there.
   EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
@@ -386,7 +382,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, IncrementalWithDefault) {
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ApplyWithoutWarming) {
   InSequence s;
   TypeParam config_discovery_test;
-  config_discovery_test.setup(false);
+  config_discovery_test.setup(config_discovery_test.getCtx(), false);
   EXPECT_EQ("foo", config_discovery_test.provider_->name());
   EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
   EXPECT_EQ(
@@ -400,8 +396,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ApplyWithoutWarming) {
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
   InSequence s;
   TypeParam config_discovery_test;
-  config_discovery_test.setup();
-  const auto provider2 = config_discovery_test.createProvider("foo", true, false);
+  config_discovery_test.setup(config_discovery_test.getCtx());
+  const auto provider2 = config_discovery_test.createProvider(config_discovery_test.getCtx(), "foo", true, false);
   EXPECT_EQ("foo", provider2->name());
   EXPECT_EQ(absl::nullopt, provider2->config());
   const auto response = config_discovery_test.createResponse("1", "foo");
@@ -420,8 +416,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
   InSequence s;
   TypeParam config_discovery_test;
-  config_discovery_test.setup();
-  const auto provider2 = config_discovery_test.createProvider("foo", true, false);
+  config_discovery_test.setup(config_discovery_test.getCtx());
+  const auto provider2 = config_discovery_test.createProvider(config_discovery_test.getCtx(), "foo", true, false);
 
   // Create a response with a random type AddBodyFilterConfig not matching with providers.
   auto add_body_filter_config = test::integration::filters::AddBodyFilterConfig();
@@ -458,7 +454,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
       "type.googleapis.com/test.integration.filters.Bogus");
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
-          config_source, "foo", config_discovery_test.factory_context_, "xds.", true,
+          config_source, "foo", config_discovery_test.getCtx(), "xds.", true,
           config_discovery_test.getFilterType(), config_discovery_test.getMatcher()),
       EnvoyException,
       "Error: cannot find filter factory foo for default filter "
@@ -475,7 +471,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
     return;
   }
 
-  config_discovery_test.setup(true, false, false);
+  config_discovery_test.setup(config_discovery_test.getCtx(), true, false, false);
   const std::string response_yaml = R"EOF(
   version_info: "1"
   resources:
@@ -514,7 +510,7 @@ public:
 // Setup matcher as nullptr
 TEST_F(TcpListenerFilterConfigMatcherTest, TcpListenerFilterNullMatcher) {
   // By default, getMatcher() returns nullptr.
-  setup();
+  setup(getCtx());
   // Verify the listener_filter_matcher_ stored in provider_ matches with the configuration.
   EXPECT_EQ(provider_->getListenerFilterMatcher(), nullptr);
   EXPECT_CALL(init_watcher_, ready());
@@ -527,7 +523,7 @@ TEST_F(TcpListenerFilterConfigMatcherTest, TcpListenerFilterAnyMatcher) {
   Network::ListenerFilterMatcherSharedPtr matcher =
       Network::ListenerFilterMatcherBuilder::buildListenerFilterMatcher(pred);
   setMatcher(matcher);
-  setup();
+  setup(getCtx());
   EXPECT_EQ(provider_->getListenerFilterMatcher(), matcher);
   EXPECT_CALL(init_watcher_, ready());
 }

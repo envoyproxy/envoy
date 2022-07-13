@@ -16,7 +16,8 @@ SniDynamicForwardProxyNetworkFilterConfigFactory::SniDynamicForwardProxyNetworkF
 
 Network::FilterFactoryCb
 SniDynamicForwardProxyNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const FilterConfig& proto_config, Server::Configuration::FactoryContext& context) {
+    const FilterConfig& proto_config, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context);

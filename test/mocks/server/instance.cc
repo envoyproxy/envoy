@@ -59,7 +59,8 @@ namespace Configuration {
 
 MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
-      grpc_context_(scope_.symbolTable()), router_context_(scope_.symbolTable()) {
+      grpc_context_(scope_.symbolTable()), http_context_(scope_.symbolTable()),
+      router_context_(scope_.symbolTable()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
@@ -80,10 +81,11 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
-    ON_CALL(*this, getTransportSocketFactoryContext())
-              .WillByDefault(ReturnRef(transport_socket_factory_context_));
+  ON_CALL(*this, getTransportSocketFactoryContext())
+      .WillByDefault(ReturnRef(transport_socket_factory_context_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, httpContext()).WillByDefault(ReturnRef(http_context_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 

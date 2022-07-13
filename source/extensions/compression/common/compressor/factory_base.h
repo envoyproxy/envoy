@@ -16,7 +16,7 @@ class CompressorLibraryFactoryBase
 public:
   Envoy::Compression::Compressor::CompressorFactoryPtr
   createCompressorFactoryFromProto(const Protobuf::Message& proto_config,
-                                   Server::Configuration::FactoryContext& context) override {
+                                   Server::Configuration::ServerFactoryContext& context) override {
     return createCompressorFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
                                                              context.messageValidationVisitor()),
@@ -35,7 +35,7 @@ protected:
 private:
   virtual Envoy::Compression::Compressor::CompressorFactoryPtr
   createCompressorFactoryFromProtoTyped(const ConfigProto&,
-                                        Server::Configuration::FactoryContext&) PURE;
+                                        Server::Configuration::ServerFactoryContext&) PURE;
 
   const std::string name_;
 };

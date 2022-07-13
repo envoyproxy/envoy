@@ -13,9 +13,8 @@ namespace Http {
 namespace OriginalIPDetection {
 namespace CustomHeader {
 
-Envoy::Http::OriginalIPDetectionSharedPtr
-CustomHeaderIPDetectionFactory::createExtension(const Protobuf::Message& message,
-                                                Server::Configuration::FactoryContext& context) {
+Envoy::Http::OriginalIPDetectionSharedPtr CustomHeaderIPDetectionFactory::createExtension(
+    const Protobuf::Message& message, Server::Configuration::ServerFactoryContext& context) {
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
       dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
   const auto& proto_config = MessageUtil::downcastAndValidate<

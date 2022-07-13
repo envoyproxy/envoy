@@ -693,7 +693,7 @@ public:
 
 private:
   Network::FilterFactoryCb commonFilterFactory(Configuration::FactoryContext& context) {
-    context.scope().counterFromString("bar").inc();
+    context.getServerFactoryContext().scope().counterFromString("bar").inc();
     return [](Network::FilterManager&) -> void {};
   }
 };
@@ -1441,7 +1441,7 @@ filter_chains: {}
   Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
   { // Add and remove a listener before starting workers.
     ListenerHandle* listener_foo = expectListenerCreate(true, true);
-    EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
+    EXPECT_CALL(*server_.server_factory_context_, initManager()).WillOnce(ReturnRef(server_init_mgr));
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1"));
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -1488,7 +1488,7 @@ static_listeners:
   // Now add new version listener foo after workers start, note it's fine that server_init_mgr is
   // initialized, as no target will be added to it.
   time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
-  EXPECT_CALL(server_, initManager()).Times(0); // No target added to server init manager.
+  EXPECT_CALL(*server_.server_factory_context_, initManager()).Times(0); // No target added to server init manager.
   server_init_watcher.expectReady().Times(0);
   {
     ListenerHandle* listener_foo2 = expectListenerCreate(true, true);
@@ -2435,7 +2435,7 @@ filter_chains:
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_FALSE(listener_foo->context_->getDownstreamFactoryContext()->drainDecision().drainClose());
 
   EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
@@ -2697,7 +2697,7 @@ filter_chains:
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_FALSE(listener_foo->context_->getDownstreamFactoryContext()->drainDecision().drainClose());
 
   EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
@@ -2706,7 +2706,7 @@ filter_chains:
 
   // NOTE: || short circuit here prevents the server drain manager from getting called.
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_TRUE(listener_foo->context_->getDownstreamFactoryContext()->drainDecision().drainClose());
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
@@ -2714,7 +2714,7 @@ filter_chains:
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_TRUE(listener_foo->context_->getDownstreamFactoryContext()->drainDecision().drainClose());
 
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();

@@ -13,7 +13,7 @@ namespace Csrf {
 
 Http::FilterFactoryCb CsrfFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
   CsrfFilterConfigSharedPtr config =
       std::make_shared<CsrfFilterConfig>(policy, stats_prefix, context.scope(), context.runtime());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

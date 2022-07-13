@@ -237,7 +237,7 @@ TEST_F(GrpcStatsFilterConfigTest, DisableStatsForAllMethods) {
 // This is deprecated behavior and will be changed during the deprecation window.
 TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSetting) {
   EXPECT_CALL(
-      context_.runtime_loader_.snapshot_,
+      context_.mock_server_context_.runtime_loader_.snapshot_,
       deprecatedFeatureEnabled(
           "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
       .WillOnce(Invoke([](absl::string_view, bool default_value) { return default_value; }));
@@ -269,7 +269,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSetting) {
 // This is deprecated behavior and will be changed during the deprecation window.
 TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSettingRuntimeOverrideTrue) {
   EXPECT_CALL(
-      context_.runtime_loader_.snapshot_,
+      context_.mock_server_context_.runtime_loader_.snapshot_,
       deprecatedFeatureEnabled(
           "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
       .WillOnce(Return(true));
@@ -302,7 +302,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSettingRuntimeOverrid
 // Test that the runtime override for the deprecated previous default behavior works.
 TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSettingRuntimeOverrideFalse) {
   EXPECT_CALL(
-      context_.runtime_loader_.snapshot_,
+      context_.mock_server_context_.runtime_loader_.snapshot_,
       deprecatedFeatureEnabled(
           "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
       .WillOnce(Return(false));

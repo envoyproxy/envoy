@@ -22,9 +22,10 @@ namespace ExtAuthz {
 
 Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& proto_config,
-    Server::Configuration::FactoryContext& context) {
-  ConfigSharedPtr ext_authz_config = std::make_shared<Config>(
-      proto_config, context.scope(), context.getServerFactoryContext().bootstrap());
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
+  ConfigSharedPtr ext_authz_config =
+      std::make_shared<Config>(proto_config, context.scope(), context.bootstrap());
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
   Envoy::Config::Utility::checkTransportVersion(proto_config);

@@ -20,7 +20,8 @@ namespace ZooKeeperProxy {
  */
 Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::zookeeper_proxy::v3::ZooKeeperProxy& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
 
   ASSERT(!proto_config.stat_prefix().empty());
 

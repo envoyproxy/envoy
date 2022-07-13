@@ -39,7 +39,7 @@ public:
         {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_{context_.mainThreadDispatcher().timeSource()};
+  Http::SlowDateProviderImpl date_provider_{context_.mock_server_context_.mainThreadDispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
   NiceMock<Tracing::MockHttpTracerManager> http_tracer_manager_;
@@ -63,7 +63,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::http_connection_manager::FilterDependencyTestFilter&, const std::string&,
-      Server::Configuration::FactoryContext&) override {
+      Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<Http::PassThroughDecoderFilter>());
     };

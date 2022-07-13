@@ -12,18 +12,8 @@ namespace Common {
  * boilerplate.
  */
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
-class FactoryBase : public Server::Configuration::NamedHttpFilterConfigFactory {
+class CommonFactoryBase : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::FactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(
-        MessageUtil::downcastAndValidate<const ConfigProto&>(
-            proto_config, context.getServerFactoryContext().messageValidationVisitor()),
-        stats_prefix, context);
-  }
-
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ConfigProto>();
   }
@@ -51,17 +41,13 @@ public:
   }
 
 protected:
-  FactoryBase(const std::string& name) : name_(name) {}
+  CommonFactoryBase(const std::string& name) : name_(name) {}
 
 private:
   virtual bool isTerminalFilterByProtoTyped(const ConfigProto&,
                                             Server::Configuration::ServerFactoryContext&) {
     return false;
   }
-  virtual Http::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                    const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) PURE;
 
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
@@ -71,6 +57,56 @@ private:
   }
 
   const std::string name_;
+};
+
+/**
+ * Specialization for filters which can be upstream or downstream filters.
+ */
+template <class ConfigProto, class RouteConfigProto = ConfigProto>
+class FactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto> {
+public:
+  Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            proto_config, context.getServerFactoryContext().messageValidationVisitor()),
+        stats_prefix, context.getServerFactoryContext());
+  }
+
+protected:
+  FactoryBase(const std::string& name) : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
+
+  virtual Http::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
+                                    const std::string& stats_prefix,
+                                    Server::Configuration::ServerFactoryContext& context) PURE;
+};
+
+/**
+ * Common base class for Downstream-only HTTP filter factories.
+ */
+template <class ConfigProto, class RouteConfigProto = ConfigProto>
+class DownstreamFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto> {
+public:
+  Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) override {
+    return createDownstreamFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            proto_config, context.getServerFactoryContext().messageValidationVisitor()),
+        stats_prefix, context);
+  }
+
+protected:
+  DownstreamFactoryBase(const std::string& name)
+      : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
+  virtual Http::FilterFactoryCb
+  createDownstreamFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
+                                              const std::string& stats_prefix,
+                                              Server::Configuration::FactoryContext& context) PURE;
 };
 
 } // namespace Common

@@ -21,7 +21,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/listener_factory_context.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -1943,8 +1943,8 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
 
-  Server::Configuration::MockListenerFactoryContext context;
-  EXPECT_CALL(context, scope());
+  NiceMock<Server::Configuration::MockListenerFactoryContext> context;
+  EXPECT_CALL(context.server_factory_context_, scope());
   EXPECT_CALL(context, messageValidationVisitor());
   Network::ListenerFilterFactoryCb cb =
       factory->createListenerFilterFactoryFromProto(*proto_config, nullptr, context);

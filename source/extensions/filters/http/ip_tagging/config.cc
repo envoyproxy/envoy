@@ -14,7 +14,7 @@ namespace IpTagging {
 
 Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stat_prefix, Server::Configuration::ServerFactoryContext& context) {
 
   IpTaggingFilterConfigSharedPtr config(
       new IpTaggingFilterConfig(proto_config, stat_prefix, context.scope(), context.runtime()));

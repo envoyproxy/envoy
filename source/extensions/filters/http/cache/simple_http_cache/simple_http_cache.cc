@@ -319,7 +319,7 @@ public:
   // From HttpCacheFactory
   std::shared_ptr<HttpCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
-           Server::Configuration::FactoryContext& context) override {
+           Server::Configuration::ServerFactoryContext& context) override {
     return context.singletonManager().getTyped<SimpleHttpCache>(
         SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_singleton), &createCache);
   }

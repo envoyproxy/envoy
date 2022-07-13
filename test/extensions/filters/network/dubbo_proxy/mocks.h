@@ -275,9 +275,10 @@ public:
 template <class ConfigProto> class MockFactoryBase : public NamedDubboFilterConfigFactory {
 public:
   FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+  createFilterFactoryFromProto(
+                               const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
-                               Server::Configuration::FactoryContext& context) override {
+                               Server::Configuration::ServerFactoryContext& context) override {
     const auto& typed_config = dynamic_cast<const ConfigProto&>(proto_config);
     return createFilterFactoryFromProtoTyped(typed_config, stats_prefix, context);
   }
@@ -295,7 +296,7 @@ private:
   virtual FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) PURE;
+                                    Server::Configuration::ServerFactoryContext& context) PURE;
 
   const std::string name_;
 };
@@ -308,7 +309,7 @@ public:
   DubboFilters::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
                                     const std::string& stat_prefix,
-                                    Server::Configuration::FactoryContext& context) override;
+                                    Server::Configuration::ServerFactoryContext& context) override;
 
   std::shared_ptr<MockDecoderFilter> mock_filter_;
   ProtobufWkt::Struct config_struct_;

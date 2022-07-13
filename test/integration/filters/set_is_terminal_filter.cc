@@ -25,7 +25,7 @@ private:
   Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const test::integration::filters::SetIsTerminalFilterConfig&,
                                     const std::string&,
-                                    Server::Configuration::FactoryContext&) override {
+                                    Server::Configuration::ServerFactoryContext&) override {
 
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<SetIsTerminalFilter>());

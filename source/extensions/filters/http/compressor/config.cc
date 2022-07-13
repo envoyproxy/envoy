@@ -12,7 +12,7 @@ namespace Compressor {
 
 Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(
       proto_config.compressor_library().typed_config().type_url())};
   Compression::Compressor::NamedCompressorLibraryConfigFactory* const config_factory =

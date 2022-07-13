@@ -15,7 +15,7 @@ using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 
 Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
     const GcpAuthnFilterConfig& config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context) {
   std::shared_ptr<TokenCache> token_cache;
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.cache_config(), cache_size, 0) > 0) {
     token_cache = std::make_shared<TokenCache>(config.cache_config(), context);

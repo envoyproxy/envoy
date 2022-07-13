@@ -132,9 +132,7 @@ public:
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
-  virtual bool isTerminalFilterByProto(const Protobuf::Message&, ServerFactoryContext&) {
-    return false;
-  }
+  virtual bool isTerminalFilterByProto(const Protobuf::Message&, FactoryContext&) { return false; }
 };
 
 /**

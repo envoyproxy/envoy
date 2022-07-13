@@ -71,7 +71,7 @@ public:
   }
 
   Event::SimulatedTimeSystem time_system_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   ThriftProxyFilterConfigFactory factory_;
 };
 
@@ -265,9 +265,9 @@ resources:
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
   const auto decoded_resources = TestUtility::decodeResources<
       envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>(response);
-  context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+  context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_
       ->onConfigUpdate(decoded_resources.refvec_, response.version_info());
-  auto message_ptr = context_.admin_.config_tracker_.config_tracker_callbacks_["trds_routes"](
+  auto message_ptr = context_.mock_server_context_.admin_.config_tracker_.config_tracker_callbacks_["trds_routes"](
       universal_name_matcher);
   const auto& dump =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);

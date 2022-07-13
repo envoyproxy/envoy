@@ -101,8 +101,7 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
         factory);
     Config::Utility::validateTerminalFilters(
         filters[i].name(), factory.name(), "network",
-        factory.isTerminalFilterByProto(*message, factory_context.getServerFactoryContext()),
-        i == filters.size() - 1);
+        factory.isTerminalFilterByProto(*message, factory_context), i == filters.size() - 1);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, factory_context);
     ret.push_back(std::move(callback));

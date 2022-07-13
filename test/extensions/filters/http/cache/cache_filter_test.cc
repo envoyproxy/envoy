@@ -28,8 +28,8 @@ protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
   CacheFilterSharedPtr makeFilter(HttpCache& cache) {
-    auto filter = std::make_shared<CacheFilter>(config_, /*stats_prefix=*/"", context_.scope(),
-                                                context_.timeSource(), cache);
+    auto filter = std::make_shared<CacheFilter>(config_, /*stats_prefix=*/"", context_.mock_server_context_.scope(),
+                                                context_.mock_server_context_.timeSource(), cache);
     filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
         StreamInfo::FilterState::LifeSpan::FilterChain);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);

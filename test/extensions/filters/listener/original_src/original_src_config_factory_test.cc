@@ -2,7 +2,7 @@
 #include "source/extensions/filters/listener/original_src/original_src.h"
 #include "source/extensions/filters/listener/original_src/original_src_config_factory.h"
 
-#include "test/mocks/server/listener_factory_context.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
