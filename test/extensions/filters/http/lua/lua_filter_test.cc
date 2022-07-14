@@ -1827,7 +1827,7 @@ TEST_F(LuaHttpFilterTest, GetDynamicMetadataBinaryData) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
-  // Hex values for "he\0llo"
+  // Hex values for the buffer data
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::trace, StrEq("Hex Data: \\x68\\x65\\x00\\x6c\\x6c\\x6f")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
