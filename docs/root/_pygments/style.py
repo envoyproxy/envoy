@@ -2,7 +2,7 @@ from pygments.styles import get_style_by_name
 from pygments.token import Generic
 
 ENVOY_STYLES = {
-    Generic.Output: "#aaaaaa",
+    Generic.Output: "#888888",
 }
 
 TangoStyle = get_style_by_name("tango")
