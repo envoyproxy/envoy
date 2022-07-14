@@ -59,6 +59,8 @@ public:
   const std::string ZooKeeperProxy = "envoy.filters.network.zookeeper_proxy";
   // WebAssembly filter
   const std::string Wasm = "envoy.filters.network.wasm";
+  // Bumping filter
+  const std::string Bumping = "envoy.filters.network.bumping";
 };
 
 using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;

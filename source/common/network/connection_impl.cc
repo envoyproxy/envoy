@@ -588,7 +588,9 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 
   if (events & Event::FileReadyType::Write) {
-    onWriteReady();
+    if (!write_disable) {
+      onWriteReady();
+    }
   }
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).

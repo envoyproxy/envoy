@@ -612,6 +612,13 @@ envoy.filters.network.zookeeper_proxy:
   status: alpha
   type_urls:
   - envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy
+envoy.filters.network.bumping:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.bumping.v3.Bumping
 envoy.filters.thrift.header_to_metadata:
   categories:
   - envoy.thrift_proxy.filters

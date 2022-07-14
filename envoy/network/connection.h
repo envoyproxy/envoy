@@ -351,6 +351,8 @@ public:
    * return value is cwnd(in packets) times the connection's MSS.
    */
   virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
+
+  bool write_disable{false};
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;
