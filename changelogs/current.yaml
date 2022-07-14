@@ -317,6 +317,11 @@ new_features:
 - area: router
   change: |
     added :ref:`stat_prefix <envoy_v3_api_field_config.route.v3.Route.stat_prefix>` support to generate route level statistics.
+- area: router
+  change: |
+    Add an :ref:`option
+    <envoy_v3_api_enum_value_config.route.v3.RouteAction.ClusterNotFoundResponseCode.INTERNAL_SERVER_ERROR>` to return
+    status code 500 when the configured cluster is not found.
 - area: matching
   change : |
     added support for matching authenticated inputs in network and HTTP matching data.
