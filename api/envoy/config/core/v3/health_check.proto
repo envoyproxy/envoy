@@ -316,7 +316,7 @@ message HealthCheck {
   // (including new hosts) when the cluster has received no traffic.
   //
   // This is useful for when we want to send frequent health checks with
-  // `no_traffic_interval` but then revert to lower frequency `no_traffic_healthy_interval` once
+  // ``no_traffic_interval`` but then revert to lower frequency ``no_traffic_healthy_interval`` once
   // a host in the cluster is marked as healthy.
   //
   // Once a cluster has been used for traffic routing, Envoy will shift back to using the

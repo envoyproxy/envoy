@@ -96,9 +96,9 @@ message HTTPFault {
   // filter. Note that because this setting can be overridden at the route level, it's possible
   // for the number of active faults to be greater than this value (if injected via a different
   // route). If not specified, defaults to unlimited. This setting can be overridden via
-  // `runtime <config_http_filters_fault_injection_runtime>` and any faults that are not injected
-  // due to overflow will be indicated via the `faults_overflow
-  // <config_http_filters_fault_injection_stats>` stat.
+  // ``runtime <config_http_filters_fault_injection_runtime>`` and any faults that are not injected
+  // due to overflow will be indicated via the ``faults_overflow
+  // <config_http_filters_fault_injection_stats>`` stat.
   //
   // .. attention::
   //   Like other :ref:`circuit breakers <arch_overview_circuit_break>` in Envoy, this is a fuzzy

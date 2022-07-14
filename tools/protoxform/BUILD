@@ -63,6 +63,7 @@ jq(
 
 protoxform_rule(
     name = "test_protoxform",
+    visibility = ["//visibility:public"],
     deps = ["//tools/testdata/protoxform:fix_protos"],
 )
 
@@ -75,5 +76,6 @@ pkg_files(
 pkg_tar(
     name = "xformed_test_protos",
     srcs = [":xformed_test_files"],
+    extension = "tar.gz",
     visibility = ["//visibility:public"],
 )

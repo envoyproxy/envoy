@@ -7,6 +7,7 @@ NAME="${NAME:-}"
 PATHS="${PATHS:-.}"
 UPARGS="${UPARGS:-}"
 
+DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker-compose}"
 
 run_log () {
     echo -e "\n> [${NAME}] ${*}"
@@ -16,20 +17,22 @@ bring_up_example_stack () {
     local args path up_args
     args=("${UPARGS[@]}")
     path="$1"
-    read -ra up_args <<< "up --build -d ${args[*]}"
+    read -ra up_args <<< "up --quiet-pull --build -d ${args[*]}"
+
     if [[ -z "$DOCKER_NO_PULL" ]]; then
         run_log "Pull the images ($path)"
-        docker-compose pull
+        "$DOCKER_COMPOSE" pull -q
         echo
     fi
     run_log "Bring up services ($path)"
-    docker-compose "${up_args[@]}" || return 1
+    "$DOCKER_COMPOSE" "${up_args[@]}" || return 1
     echo
 }
 
 bring_up_example () {
     local path paths
     read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
+
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
         bring_up_example_stack "$path" || {
@@ -44,8 +47,8 @@ bring_up_example () {
     fi
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
-        docker-compose ps
-        docker-compose logs
+        "$DOCKER_COMPOSE" ps
+        "$DOCKER_COMPOSE" logs
         popd > /dev/null || return 1
     done
 }
@@ -54,7 +57,7 @@ cleanup_stack () {
     local path
     path="$1"
     run_log "Cleanup ($path)"
-    docker-compose down
+    "$DOCKER_COMPOSE" down
 }
 
 cleanup () {

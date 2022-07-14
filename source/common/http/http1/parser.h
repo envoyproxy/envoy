@@ -128,7 +128,7 @@ public:
   virtual CallbackResult pause() PURE;
 
   // Returns a ParserStatus representing the internal state of the parser.
-  virtual ParserStatus getStatus() PURE;
+  virtual ParserStatus getStatus() const PURE;
 
   // Returns an integer representing the status code stored in the parser structure. For responses
   // only.

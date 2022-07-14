@@ -84,7 +84,8 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options,
+      nullptr));
 
   connection->enableHalfClose(enableHalfClose());
   return connection;
@@ -477,13 +478,18 @@ size_t entryIndex(const std::string& file, uint32_t entry) {
   return index;
 }
 
-std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
+                                                  bool allow_excess_entries) {
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
   for (int i = 0; i < 1000; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
     size_t index = entryIndex(contents, entry);
     if (contents.length() > index) {
+      if (!allow_excess_entries) {
+        EXPECT_EQ(contents.length(), entryIndex(contents, entry + 1))
+            << "Waiting for entry " << entry << " but it was not the last entry";
+      }
       return contents.substr(index);
     }
     absl::SleepFor(absl::Milliseconds(1));

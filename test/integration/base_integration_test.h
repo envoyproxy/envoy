@@ -143,8 +143,10 @@ public:
 
   // Enable the listener access log
   void useListenerAccessLog(absl::string_view format = "");
-  // Waits for the nth access log entry, defaulting to log entry 0.
-  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0);
+  // Returns all log entries after the nth access log entry, defaulting to log entry 0.
+  // By default will trigger an expect failure if more than one entry is returned.
+  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0,
+                               bool allow_excess_entries = false);
 
   std::string listener_access_log_name_;
 

@@ -204,6 +204,12 @@ const std::string CONFIG_WITH_DOWNSTREAM_AUTH_PASSWORD_SET = CONFIG + R"EOF(
           downstream_auth_password: { inline_string: somepassword }
 )EOF";
 
+const std::string CONFIG_WITH_MULTIPLE_DOWNSTREAM_AUTH_PASSWORDS_SET = CONFIG + R"EOF(
+          downstream_auth_passwords:
+          - inline_string: somepassword
+          - inline_string: someotherpassword
+)EOF";
+
 const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS = fmt::format(R"EOF(
 admin:
   access_log:
@@ -457,6 +463,12 @@ public:
       : RedisProxyIntegrationTest(CONFIG_WITH_DOWNSTREAM_AUTH_PASSWORD_SET, 2) {}
 };
 
+class RedisProxyWithMultipleDownstreamAuthIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithMultipleDownstreamAuthIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_MULTIPLE_DOWNSTREAM_AUTH_PASSWORDS_SET, 2) {}
+};
+
 class RedisProxyWithRoutesAndAuthPasswordsIntegrationTest : public RedisProxyIntegrationTest {
 public:
   RedisProxyWithRoutesAndAuthPasswordsIntegrationTest()
@@ -497,6 +509,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithDownstreamAuthIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMultipleDownstreamAuthIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -941,7 +957,8 @@ TEST_P(RedisProxyWithRoutesIntegrationTest, SimpleRequestAndResponseRoutedByPref
 // is set for the redis_proxy filter. It also verifies the errors sent by the proxy
 // when no password or the wrong password is received.
 
-TEST_P(RedisProxyWithDownstreamAuthIntegrationTest, ErrorsUntilCorrectPasswordSent) {
+TEST_P(RedisProxyWithDownstreamAuthIntegrationTest,
+       DEPRECATED_FEATURE_TEST(ErrorsUntilCorrectPasswordSent)) {
   initialize();
 
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
@@ -961,6 +978,62 @@ TEST_P(RedisProxyWithDownstreamAuthIntegrationTest, ErrorsUntilCorrectPasswordSe
                     redis_client);
 
   proxyResponseStep(makeBulkStringArray({"auth", "somepassword"}), "+OK\r\n", redis_client);
+
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
+                          redis_client, fake_upstream_connection, "", "");
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithMultipleDownstreamAuthIntegrationTest, ErrorsUntilCorrectPasswordSent1) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  std::stringstream error_response;
+  error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
+  proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"auth", "wrongpassword"}), "-ERR invalid password\r\n",
+                    redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"auth", "somepassword"}), "+OK\r\n", redis_client);
+
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
+                          redis_client, fake_upstream_connection, "", "");
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithMultipleDownstreamAuthIntegrationTest, ErrorsUntilCorrectPasswordSent2) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  std::stringstream error_response;
+  error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
+  proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"auth", "wrongpassword"}), "-ERR invalid password\r\n",
+                    redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"auth", "someotherpassword"}), "+OK\r\n", redis_client);
 
   roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
                           redis_client, fake_upstream_connection, "", "");

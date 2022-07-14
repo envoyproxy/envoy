@@ -1,6 +1,7 @@
 """Envoy API annotations."""
 
 import re
+from functools import partial
 
 # Key-value annotation regex.
 ANNOTATION_REGEX = re.compile('\[#([\w-]+?):\s*(.*?)\](\s?)', re.DOTALL)
@@ -77,6 +78,21 @@ def extract_annotations(s, inherited_annotations=None):
     return annotations
 
 
+def append(s, annotation, content):
+    return '%s[#%s: %s]\n' % (s, annotation, content)
+
+
+def xform_sub(annotation_xforms, present_annotations, match):
+    annotation, content, trailing = match.groups()
+    present_annotations.add(annotation)
+    annotation_xform = annotation_xforms.get(annotation)
+    if annotation_xform:
+        value = annotation_xform(annotation)
+        return '[#%s: %s]%s' % (annotation, value, trailing) if value is not None else ''
+    else:
+        return match.group(0)
+
+
 def xform_annotation(s, annotation_xforms):
     """Return transformed string with annotation transformers.
 
@@ -93,20 +109,7 @@ def xform_annotation(s, annotation_xforms):
     """
     present_annotations = set()
 
-    def xform(match):
-        annotation, content, trailing = match.groups()
-        present_annotations.add(annotation)
-        annotation_xform = annotation_xforms.get(annotation)
-        if annotation_xform:
-            value = annotation_xform(annotation)
-            return '[#%s: %s]%s' % (annotation, value, trailing) if value is not None else ''
-        else:
-            return match.group(0)
-
-    def append(s, annotation, content):
-        return '%s [#%s: %s]\n' % (s, annotation, content)
-
-    xformed = re.sub(ANNOTATION_REGEX, xform, s)
+    xformed = ANNOTATION_REGEX.sub(partial(xform_sub, annotation_xforms, present_annotations), s)
     for annotation, xform in sorted(annotation_xforms.items()):
         if annotation not in present_annotations:
             value = xform(None)
