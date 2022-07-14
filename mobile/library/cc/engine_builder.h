@@ -24,6 +24,7 @@ public:
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
   EngineBuilder& addDnsPreresolveHostnames(const std::string& dns_preresolve_hostnames);
+  EngineBuilder& useDnsSystemResolver(bool use_system_resolver);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       int h2_connection_keepalive_idle_interval_milliseconds);
   EngineBuilder&
@@ -63,6 +64,7 @@ private:
   int dns_failure_refresh_seconds_max_ = 10;
   int dns_query_timeout_seconds_ = 25;
   std::string dns_preresolve_hostnames_ = "[]";
+  bool use_system_resolver_ = false;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
   int stats_flush_seconds_ = 60;
@@ -72,8 +74,6 @@ private:
   std::string virtual_clusters_ = "[]";
   std::string config_override_for_tests_ = "";
   std::string admin_address_path_for_tests_ = "";
-  std::string dns_resolver_name_ = "";
-  std::string dns_resolver_config_ = "";
   int stream_idle_timeout_seconds_ = 15;
   int per_try_idle_timeout_seconds_ = 15;
   bool gzip_filter_ = true;

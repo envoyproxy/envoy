@@ -18,6 +18,7 @@ EXTENSIONS = {
     "envoy.http.original_ip_detection.xff":                "//source/extensions/http/original_ip_detection/xff:config",
     "envoy.key_value.platform":                            "@envoy_mobile//library/common/extensions/key_value/platform:config",
     "envoy.network.dns_resolver.apple":                    "//source/extensions/network/dns_resolver/apple:config",
+    "envoy.network.dns_resolver.getaddrinfo":              "//source/extensions/network/dns_resolver/getaddrinfo:config",
     "envoy.retry.options.network_configuration":           "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
     "envoy.stat_sinks.metrics_service":                    "//source/extensions/stat_sinks/metrics_service:config",
     "envoy.transport_sockets.raw_buffer":                  "//source/extensions/transport_sockets/raw_buffer:config",

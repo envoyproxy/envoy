@@ -54,6 +54,7 @@ class EnvoyConfigurationTest {
     dnsPreresolveHostnames: String = "[hostname]",
     dnsFallbackNameservers: List<String> = emptyList(),
     enableDnsFilterUnroutableFamilies: Boolean = true,
+    dnsUseSystemResolver: Boolean = false,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = false,
     enableGzip: Boolean = true,
@@ -87,6 +88,7 @@ class EnvoyConfigurationTest {
       dnsPreresolveHostnames,
       dnsFallbackNameservers,
       enableDnsFilterUnroutableFamilies,
+      dnsUseSystemResolver,
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzip,
@@ -228,6 +230,20 @@ class EnvoyConfigurationTest {
 
     // Forcing IPv6
     assertThat(resolvedTemplate).contains("&force_ipv6 true")
+  }
+
+  @Test
+  fun `configuration resolves with system DNS resolver`() {
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      dnsUseSystemResolver = true
+    )
+
+    val resolvedTemplate = envoyConfiguration.resolveTemplate(
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT
+    )
+
+    assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig\"}")
+    assertThat(resolvedTemplate).contains("&dns_resolver_name envoy.network.dns_resolver.getaddrinfo")
   }
 
   @Test
