@@ -659,12 +659,24 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (route.route().has_regex_rewrite()) {
-    if (!prefix_rewrite_.empty()) {
-      throw EnvoyException("Cannot specify both prefix_rewrite and regex_rewrite");
+    if (!prefix_rewrite_.empty() || pattern_template_policy_.enabled()) {
+      throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or path_template_rewrite");
     }
     auto rewrite_spec = route.route().regex_rewrite();
     regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
     regex_rewrite_substitution_ = rewrite_spec.substitution();
+  }
+
+  if (pattern_template_policy_.enabled()) {
+    if (!prefix_rewrite_.empty() || route.route().has_regex_rewrite()) {
+      throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or path_template_rewrite");
+    }
+  }
+
+  if (!prefix_rewrite_.empty()) {
+    if (route.route().has_regex_rewrite() || pattern_template_policy_.enabled()) {
+      throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or path_template_rewrite");
+    }
   }
 
   if (route.redirect().has_regex_rewrite()) {
@@ -1170,32 +1182,28 @@ RouteEntryImplBase::buildPatternTemplatePolicy(std::string path_template,
                                                std::string path_template_rewrite) const {
   // match + rewrite
   if (!path_template.empty() && !path_template_rewrite.empty()) {
-    PatternTemplatePolicyImpl policy =
-        PatternTemplatePolicyImpl(path_template, path_template_rewrite);
 
-    if (!policy.predicate()->is_valid_match_pattern(path_template).ok()) {
+    if (!matching::PatternTemplatePredicate::is_valid_match_pattern(path_template).ok()) {
       throw EnvoyException(fmt::format("path_template {} is invalid", path_template));
     }
 
-    if (!policy.predicate()->is_valid_rewrite_pattern(path_template, path_template_rewrite).ok()) {
+    if (!matching::PatternTemplatePredicate::is_valid_rewrite_pattern(path_template, path_template_rewrite).ok()) {
       throw EnvoyException(
-          fmt::format("mismatch between path_template_match {} and pattern_rewrite {}",
+          fmt::format("mismatch between path_template {} and path_template_rewrite {}",
                       path_template, path_template_rewrite));
     }
 
-    return policy;
+    return PatternTemplatePolicyImpl(path_template, path_template_rewrite);;
   }
 
   // only match
   if (!path_template.empty()) {
-    PatternTemplatePolicyImpl policy =
-        PatternTemplatePolicyImpl(path_template, path_template_rewrite);
 
-    if (!policy.predicate()->is_valid_match_pattern(path_template).ok()) {
+    if (!matching::PatternTemplatePredicate::is_valid_match_pattern(path_template).ok()) {
       throw EnvoyException(fmt::format("path_template {} is invalid", path_template));
     }
 
-    return policy;
+    return PatternTemplatePolicyImpl(path_template, path_template_rewrite);;
   }
 
   // no match + no rewrite

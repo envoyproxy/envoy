@@ -31,9 +31,6 @@ public:
   virtual absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
                                              absl::string_view matched_path) const PURE;
 
-  virtual absl::Status is_valid_match_pattern(std::string match_pattern) const PURE;
-  virtual absl::Status is_valid_rewrite_pattern(std::string match_pattern, std::string rewrite_pattern) const PURE;
-
   const std::string url_pattern_;
   const std::string url_rewrite_pattern_;
 };
