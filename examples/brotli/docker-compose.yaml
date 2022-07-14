@@ -14,9 +14,9 @@ services:
       context: .
       dockerfile: Dockerfile-brotli
     ports:
-    - "9901:9901"
-    - "9902:9902"
-    - "10000:10000"
+    - "${PORT_PROXY:-10000}:10000"
+    - "${PORT_STATS0:-9901}:9901"
+    - "${PORT_STATS1:-9902}:9902"
 
   service:
     build:

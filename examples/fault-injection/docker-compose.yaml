@@ -10,6 +10,8 @@ services:
     ports:
     - 9211:9211
   backend:
-    image: kennethreitz/httpbin@sha256:2c7abc4803080c22928265744410173b6fea3b898872c01c5fd0f0f9df4a59fb
+    build:
+      context: .
+      dockerfile: Dockerfile-backend
     ports:
     - 8080:80

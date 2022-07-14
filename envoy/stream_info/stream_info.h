@@ -156,8 +156,8 @@ struct ResponseCodeDetailValues {
   const std::string MaintenanceMode = "maintenance_mode";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
-  // The upstream response timed out.
-  const std::string UpstreamTimeout = "upstream_response_timeout";
+  // The request was forwarded upstream but the response timed out.
+  const std::string ResponseTimeout = "response_timeout";
   // The final upstream try timed out.
   const std::string UpstreamPerTryTimeout = "upstream_per_try_timeout";
   // The final upstream try idle timed out.

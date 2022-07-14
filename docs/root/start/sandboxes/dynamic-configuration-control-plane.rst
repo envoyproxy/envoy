@@ -34,8 +34,8 @@ The control plane has not yet been started.
 
     $ pwd
     envoy/examples/dynamic-config-cp
-    $ docker-compose build --pull
-    $ docker-compose up -d proxy
+    $ docker-compose pull
+    $ docker-compose up --build -d proxy
     $ docker-compose ps
 
            Name                            Command                State                     Ports

@@ -751,8 +751,8 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
   }
 }
 
-void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& callbacks) {
-  createFilterChainForFactories(callbacks, filter_factories_);
+void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) {
+  createFilterChainForFactories(manager, filter_factories_);
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
