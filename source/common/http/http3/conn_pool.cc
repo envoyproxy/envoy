@@ -191,10 +191,10 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                 "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")
                 ? std::make_unique<NoConnectCodecClientProd>(
                       CodecType::HTTP3, std::move(data.connection_), data.host_description_,
-                      pool->dispatcher(), pool->randomGenerator())
-                : std::make_unique<CodecClientProd>(CodecType::HTTP3, std::move(data.connection_),
-                                                    data.host_description_, pool->dispatcher(),
-                                                    pool->randomGenerator());
+                      pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())
+                : std::make_unique<CodecClientProd>(
+                      CodecType::HTTP3, std::move(data.connection_), data.host_description_,
+                      pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions());
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info);

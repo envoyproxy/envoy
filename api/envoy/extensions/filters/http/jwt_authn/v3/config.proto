@@ -166,7 +166,7 @@ message JwtProvider {
   //
   repeated JwtHeader from_headers = 6;
 
-  // JWT is sent in a query parameter. `jwt_params` represents the query parameter names.
+  // JWT is sent in a query parameter. ``jwt_params`` represents the query parameter names.
   //
   // For example, if config is:
   //
@@ -181,7 +181,7 @@ message JwtProvider {
   //
   repeated string from_params = 7;
 
-  // JWT is sent in a cookie. `from_cookies` represents the cookie names to extract from.
+  // JWT is sent in a cookie. ``from_cookies`` represents the cookie names to extract from.
   //
   // For example, if config is:
   //
@@ -190,7 +190,7 @@ message JwtProvider {
   //   from_cookies:
   //   - auth-token
   //
-  // Then JWT will be extracted from `auth-token` cookie in the request.
+  // Then JWT will be extracted from ``auth-token`` cookie in the request.
   //
   repeated string from_cookies = 13;
 
@@ -271,7 +271,7 @@ message JwtProvider {
   string header_in_metadata = 14;
 
   // Specify the clock skew in seconds when verifying JWT time constraint,
-  // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
+  // such as ``exp``, and ``nbf``. If not specified, default is 60 seconds.
   uint32 clock_skew_seconds = 10;
 
   // Enables JWT cache, its size is specified by *jwt_cache_size*.
@@ -550,13 +550,13 @@ message RequirementRule {
     // Use requirement_name to specify a Jwt requirement.
     // This requirement_name MUST be specified at the
     // :ref:`requirement_map <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.requirement_map>`
-    // in `JwtAuthentication`.
+    // in ``JwtAuthentication``.
     string requirement_name = 3 [(validate.rules).string = {min_len: 1}];
   }
 }
 
 // This message specifies Jwt requirements based on stream_info.filterState.
-// This FilterState should use `Router::StringAccessor` object to set a string value.
+// This FilterState should use ``Router::StringAccessor`` object to set a string value.
 // Other HTTP filters can use it to specify Jwt requirements dynamically.
 //
 // Example:
@@ -576,7 +576,7 @@ message FilterStateRule {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.FilterStateRule";
 
-  // The filter state name to retrieve the `Router::StringAccessor` object.
+  // The filter state name to retrieve the ``Router::StringAccessor`` object.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A map of string keys to requirements. The string key is the string value
@@ -698,7 +698,7 @@ message JwtAuthentication {
 
   // A map of unique requirement_names to JwtRequirements.
   // :ref:`requirement_name <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.PerRouteConfig.requirement_name>`
-  // in `PerRouteConfig` uses this map to specify a JwtRequirement.
+  // in ``PerRouteConfig`` uses this map to specify a JwtRequirement.
   map<string, JwtRequirement> requirement_map = 5;
 }
 
@@ -713,7 +713,7 @@ message PerRouteConfig {
     // Use requirement_name to specify a JwtRequirement.
     // This requirement_name MUST be specified at the
     // :ref:`requirement_map <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.requirement_map>`
-    // in `JwtAuthentication`. If no, the requests using this route will be rejected with 403.
+    // in ``JwtAuthentication``. If no, the requests using this route will be rejected with 403.
     string requirement_name = 2 [(validate.rules).string = {min_len: 1}];
   }
 }

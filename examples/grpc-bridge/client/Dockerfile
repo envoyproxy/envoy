@@ -1,11 +1,11 @@
-FROM python:3.8-slim
+FROM python:3.10.5-slim@sha256:2ae2b820fbcf4e1c5354ec39d0c7ec4b3a92cce71411dfde9ed91d640dcdafd8
 
 WORKDIR /client
 
 COPY requirements.txt /client/requirements.txt
 
 # Cache the dependencies
-RUN pip install --require-hashes -r /client/requirements.txt
+RUN pip install --require-hashes -qr /client/requirements.txt
 
 # Copy the sources, including the stubs
 COPY client.py /client/grpc-kv-client.py

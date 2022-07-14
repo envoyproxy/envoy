@@ -128,8 +128,8 @@ message Listener {
   repeated AdditionalAddress additional_addresses = 33;
 
   // Optional prefix to use on listener stats. If empty, the stats will be rooted at
-  // `listener.<address as string>.`. If non-empty, stats will be rooted at
-  // `listener.<stat_prefix>.`.
+  // ``listener.<address as string>.``. If non-empty, stats will be rooted at
+  // ``listener.<stat_prefix>.``.
   string stat_prefix = 28;
 
   // A list of filter chains to consider for this listener. The
@@ -198,7 +198,7 @@ message Listener {
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
   // the accepted socket is closed without a connection being created unless
-  // `continue_on_listener_filters_timeout` is set to true. Specify 0 to disable the
+  // ``continue_on_listener_filters_timeout`` is set to true. Specify 0 to disable the
   // timeout. If not specified, a default timeout of 15s is used.
   google.protobuf.Duration listener_filters_timeout = 15;
 
@@ -295,7 +295,7 @@ message Listener {
   // enable the balance config in Y1 and Y2 to balance the connections among the workers.
   ConnectionBalanceConfig connection_balance_config = 20;
 
-  // Deprecated. Use `enable_reuse_port` instead.
+  // Deprecated. Use ``enable_reuse_port`` instead.
   bool reuse_port = 21 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and

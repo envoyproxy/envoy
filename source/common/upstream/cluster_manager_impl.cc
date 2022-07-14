@@ -80,7 +80,7 @@ getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostCons
   if (options && options->serverNameOverride().has_value()) {
     sni = options->serverNameOverride().value();
   }
-  if (sni.empty()) {
+  if (sni.empty() || !host->address() || !host->address()->ip()) {
     return absl::nullopt;
   }
   return {{"https", sni, host->address()->ip()->port()}};
@@ -1893,7 +1893,6 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
-    // TODO(alyssar) remove the origin check #21345
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_concurrency_for_alpn_pool") &&
         origin.has_value()) {

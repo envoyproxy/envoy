@@ -28,6 +28,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+GiB
 Repick
 TRA
 btree

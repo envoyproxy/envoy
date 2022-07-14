@@ -28,21 +28,21 @@ TrafficRoutingAssistantHandler::TrafficRoutingAssistantHandler(
   }
 }
 
-void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(const std::string& type,
-                                                                   const std::string& key,
-                                                                   const std::string& val) {
+void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
+    const std::string& type, const std::string& key, const std::string& val,
+    const absl::optional<TraContextMap> context) {
   if (cache_manager_[type][key] != val) {
     cache_manager_.insertCache(type, key, val);
     if (traClient()) {
       traClient()->updateTrafficRoutingAssistant(
-          type, absl::flat_hash_map<std::string, std::string>{std::make_pair(key, val)},
+          type, absl::flat_hash_map<std::string, std::string>{std::make_pair(key, val)}, context,
           Tracing::NullSpan::instance(), stream_info_);
     }
   }
 }
 
 QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
-    const std::string& type, const std::string& key,
+    const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
   if (cache_manager_.contains(type, key)) {
     host = cache_manager_[type][key];
@@ -52,8 +52,8 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
   if (activetrans.metadata()->affinityIteration()->query()) {
     parent_.pushIntoPendingList(type, key, activetrans, [&]() {
       if (traClient()) {
-        traClient()->retrieveTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
-                                                     stream_info_);
+        traClient()->retrieveTrafficRoutingAssistant(type, key, context,
+                                                     Tracing::NullSpan::instance(), stream_info_);
       }
     });
     host = "";
@@ -63,11 +63,11 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
   return QueryStatus::Stop;
 }
 
-void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(const std::string& type,
-                                                                   const std::string& key) {
+void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(
+    const std::string& type, const std::string& key, const absl::optional<TraContextMap> context) {
   cache_manager_[type].erase(key);
   if (traClient()) {
-    traClient()->deleteTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
+    traClient()->deleteTrafficRoutingAssistant(type, key, context, Tracing::NullSpan::instance(),
                                                stream_info_);
   }
 }

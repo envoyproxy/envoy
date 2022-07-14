@@ -30,8 +30,8 @@ Change to the ``examples/gzip`` directory and bring up the docker composition.
 
     $ pwd
     envoy/examples/gzip
-    $ docker-compose build --pull
-    $ docker-compose up -d
+    $ docker-compose pull
+    $ docker-compose up --build -d
     $ docker-compose ps
     Name                 Command                        State   Ports
     --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
