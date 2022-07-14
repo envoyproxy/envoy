@@ -5,6 +5,7 @@
 # 5. Don't expose Wasm C API (only Wasm C++ API).
 # 6. Fix cross-compilation (https://crrev.com/c/3735165).
 # 7. Fix build errors in SIMD IndexOf/includes (https://crrev.com/c/3749192).
+# 8. Fix build on arm64.
 
 diff --git a/BUILD.bazel b/BUILD.bazel
 index 13f2a5bebf..2197568c48 100644
@@ -29,10 +30,18 @@ index 13f2a5bebf..2197568c48 100644
  
  # Default setting for v8_enable_pointer_compression.
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
-index dee5e69cc4..d0b5a3c49a 100644
+index e957c0fad3..eee285ab60 100644
 --- a/bazel/defs.bzl
 +++ b/bazel/defs.bzl
-@@ -151,6 +151,11 @@ def _default_args():
+@@ -116,6 +116,7 @@ def _default_args():
+         }) + select({
+             "@v8//bazel/config:is_clang": [
+                 "-Wno-invalid-offsetof",
++                "-Wno-unneeded-internal-declaration",
+                 "-std=c++17",
+             ],
+             "@v8//bazel/config:is_gcc": [
+@@ -151,6 +152,11 @@ def _default_args():
                  "-fno-integrated-as",
              ],
              "//conditions:default": [],
