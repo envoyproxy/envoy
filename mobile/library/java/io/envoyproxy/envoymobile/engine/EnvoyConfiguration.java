@@ -36,6 +36,7 @@ public class EnvoyConfiguration {
   public final String dnsPreresolveHostnames;
   public final List<String> dnsFallbackNameservers;
   public final Boolean dnsFilterUnroutableFamilies;
+  public final Boolean dnsUseSystemResolver;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
   public final Boolean enableGzip;
@@ -77,6 +78,8 @@ public class EnvoyConfiguration {
    * @param dnsPreresolveHostnames       hostnames to preresolve on Envoy Client construction.
    * @param dnsFallbackNameservers       addresses to use as DNS name server fallback.
    * @param dnsFilterUnroutableFamilies  whether to filter unroutable IP families or not.
+   * @param dnsUseSystemResolver         whether to use the getaddrinfo-based system resolver or
+   *     c-ares.
    * @param enableDrainPostDnsRefresh    whether to drain connections after soft DNS refresh.
    * @param enableHttp3                  whether to enable experimental support for HTTP/3 (QUIC).
    * @param enableGzip                   whether to enable response gzip decompression.
@@ -104,18 +107,19 @@ public class EnvoyConfiguration {
    * @param keyValueStores               platform key-value store implementations.
    */
   public EnvoyConfiguration(
-      Boolean adminInterfaceEnabled, String grpcStatsDomain, @Nullable Integer statsdPort,
+      boolean adminInterfaceEnabled, String grpcStatsDomain, @Nullable Integer statsdPort,
       int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
       int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds,
       String dnsPreresolveHostnames, List<String> dnsFallbackNameservers,
-      Boolean dnsFilterUnroutableFamilies, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
-      boolean enableGzip, boolean enableBrotli, boolean enableHappyEyeballs,
-      boolean enableInterfaceBinding, boolean forceIPv6,
-      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
-      boolean h2ExtendKeepaliveTimeout, List<String> h2RawDomains, int maxConnectionsPerHost,
-      int statsFlushSeconds, int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
-      String appVersion, String appId, TrustChainVerification trustChainVerification,
-      String virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
+      boolean dnsFilterUnroutableFamilies, boolean dnsUseSystemResolver,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean enableGzip,
+      boolean enableBrotli, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      boolean forceIPv6, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      int h2ConnectionKeepaliveTimeoutSeconds, boolean h2ExtendKeepaliveTimeout,
+      List<String> h2RawDomains, int maxConnectionsPerHost, int statsFlushSeconds,
+      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
+      TrustChainVerification trustChainVerification, String virtualClusters,
+      List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores) {
@@ -131,6 +135,7 @@ public class EnvoyConfiguration {
     this.dnsPreresolveHostnames = dnsPreresolveHostnames;
     this.dnsFallbackNameservers = dnsFallbackNameservers;
     this.dnsFilterUnroutableFamilies = dnsFilterUnroutableFamilies;
+    this.dnsUseSystemResolver = dnsUseSystemResolver;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
     this.enableGzip = enableGzip;
@@ -228,10 +233,19 @@ public class EnvoyConfiguration {
       h2RawDomainsAsString = sb.toString();
     }
 
-    String dnsResolverConfig = String.format(
-        "{\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":%s,\"use_resolvers_as_fallback\": %s, \"filter_unroutable_families\": %s}",
-        dnsFallbackNameserversAsString, !dnsFallbackNameservers.isEmpty() ? "true" : "false",
-        dnsFilterUnroutableFamilies ? "true" : "false");
+    String dnsResolverName = "";
+    String dnsResolverConfig = "";
+    if (dnsUseSystemResolver) {
+      dnsResolverName = "envoy.network.dns_resolver.getaddrinfo";
+      dnsResolverConfig =
+          "{\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig\"}";
+    } else {
+      dnsResolverName = "envoy.network.dns_resolver.cares";
+      dnsResolverConfig = String.format(
+          "{\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":%s,\"use_resolvers_as_fallback\": %s, \"filter_unroutable_families\": %s}",
+          dnsFallbackNameserversAsString, !dnsFallbackNameservers.isEmpty() ? "true" : "false",
+          dnsFilterUnroutableFamilies ? "true" : "false");
+    }
 
     StringBuilder configBuilder = new StringBuilder("!ignore platform_defs:\n");
     configBuilder.append(String.format("- &connect_timeout %ss\n", connectTimeoutSeconds))
@@ -246,7 +260,7 @@ public class EnvoyConfiguration {
             String.format("- &dns_multiple_addresses %s\n", enableHappyEyeballs ? "true" : "false"))
         .append(String.format("- &h2_delay_keepalive_timeout %s\n",
                               h2ExtendKeepaliveTimeout ? "true" : "false"))
-        .append("- &dns_resolver_name envoy.network.dns_resolver.cares\n")
+        .append(String.format("- &dns_resolver_name %s\n", dnsResolverName))
         .append(String.format("- &dns_refresh_rate %ss\n", dnsRefreshSeconds))
         .append(String.format("- &dns_resolver_config %s\n", dnsResolverConfig))
         .append(String.format("- &enable_drain_post_dns_refresh %s\n",
