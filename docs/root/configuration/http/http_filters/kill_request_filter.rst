@@ -10,6 +10,7 @@ build Envoy with ``--//source/extensions/filters/http/kill_request:enabled``.
 Configuration
 -------------
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.kill_request.v3.KillRequest``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.kill_request.v3.KillRequest>`
 
 .. _config_http_filters_kill_request_http_header:

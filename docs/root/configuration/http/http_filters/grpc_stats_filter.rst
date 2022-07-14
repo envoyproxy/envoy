@@ -4,6 +4,7 @@ gRPC Statistics
 ===============
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.grpc_stats.v3.FilterConfig``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.grpc_stats.v3.FilterConfig>`
 * This filter can be enabled to emit a :ref:`filter state object
   <envoy_v3_api_msg_extensions.filters.http.grpc_stats.v3.FilterObject>`

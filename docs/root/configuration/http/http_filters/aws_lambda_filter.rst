@@ -4,6 +4,7 @@
 AWS Lambda
 ==========
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.aws_lambda.v3.Config``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.Config>`
 
 .. attention::

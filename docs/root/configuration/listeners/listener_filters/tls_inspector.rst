@@ -15,6 +15,7 @@ from the client. This can be used to select a
 of a :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`.
 
 * :ref:`SNI <faq_how_to_setup_sni>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.listener.tls_inspector.v3.TlsInspector>`
 
 Example

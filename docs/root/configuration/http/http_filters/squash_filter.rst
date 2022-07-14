@@ -22,6 +22,7 @@ request, before the request arrive to the application code, without any changes 
 Configuration
 -------------
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.squash.v3.Squash``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.squash.v3.Squash>`
 
 How it works

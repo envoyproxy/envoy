@@ -41,6 +41,7 @@ For more information on CSRF please refer to the pages below.
 
 * https://www.owasp.org/index.php/Cross-Site_Request_Forgery_%28CSRF%29
 * https://seclab.stanford.edu/websec/csrf/csrf.pdf
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.csrf.v3.CsrfPolicy>`
 
 .. _csrf-configuration:

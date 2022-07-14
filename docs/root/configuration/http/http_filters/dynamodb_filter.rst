@@ -4,6 +4,7 @@ DynamoDB
 ========
 
 * DynamoDB :ref:`architecture overview <arch_overview_dynamo>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.dynamo.v3.Dynamo``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.dynamo.v3.Dynamo>`
 
 Statistics

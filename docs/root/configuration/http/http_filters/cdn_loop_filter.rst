@@ -24,6 +24,8 @@ The filter will coalesce multiple CDN-Loop headers into a single, comma-separate
 Configuration
 -------------
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig``.
+
 The :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.cdn_loop.v3.CdnLoopConfig>` has two fields.
 
 * The *cdn_id* field sets the identifier that the filter will look for within and append to the

@@ -37,6 +37,7 @@ host set changes. This filter implements 'strong' stickiness. It is intended to 
 Configuration
 -------------
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>`
 
 How it works

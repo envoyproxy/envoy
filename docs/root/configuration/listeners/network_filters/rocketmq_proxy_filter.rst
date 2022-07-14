@@ -3,6 +3,7 @@
 RocketMQ proxy
 ==============
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.rocketmq_proxy.v3.RocketmqProxy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.rocketmq_proxy.v3.RocketmqProxy>`
 
 Apache RocketMQ is a distributed messaging system, which is composed of four types of roles: producer, consumer, name

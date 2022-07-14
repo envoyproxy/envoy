@@ -4,6 +4,7 @@ gRPC HTTP/1.1 bridge
 ====================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.grpc_http1_bridge.v3.Config``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.grpc_http1_bridge.v3.Config>`
 
 This is a simple filter which enables the bridging of an HTTP/1.1 client which does not support

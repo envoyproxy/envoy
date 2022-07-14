@@ -3,6 +3,7 @@
 Thrift proxy
 ============
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProxy>`
 
 Statistics

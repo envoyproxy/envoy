@@ -3,6 +3,7 @@
 Original Source
 ===============
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.original_src.v3.OriginalSrc``.
 * :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.original_src.v3.OriginalSrc>`
 
 The original source http filter replicates the downstream remote address of the connection on

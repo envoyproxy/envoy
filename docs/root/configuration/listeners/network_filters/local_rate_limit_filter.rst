@@ -4,6 +4,7 @@ Local rate limit
 ================
 
 * Local rate limiting :ref:`architecture overview <arch_overview_local_rate_limit>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit``.
 * :ref:`v3 API reference
   <envoy_v3_api_msg_extensions.filters.network.local_ratelimit.v3.LocalRateLimit>`
 

@@ -24,6 +24,7 @@ Configuration
   The fault injection filter must be inserted before any other filter,
   including the router filter.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.fault.v3.HTTPFault>`
 
 .. _config_http_filters_fault_injection_http_header:

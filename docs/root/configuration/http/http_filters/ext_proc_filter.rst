@@ -2,6 +2,7 @@
 
 External Processing
 ===================
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor``.
 * :ref:`Http filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`
 
 The external processing filter connects an external service, called an "external processor,"

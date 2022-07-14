@@ -4,6 +4,7 @@ Redis proxy
 ===========
 
 * Redis :ref:`architecture overview <arch_overview_redis>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>`
 
 .. _config_network_filters_redis_proxy_stats:

@@ -4,6 +4,7 @@ gRPC-JSON transcoder
 ====================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder>`
 
 This is a filter which allows a RESTful JSON API client to send requests to Envoy over HTTP

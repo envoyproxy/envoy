@@ -4,6 +4,7 @@ External Authorization
 ======================
 
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz``.
 * :ref:`Network filter v3 API reference <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`
 
 The external authorization network filter calls an external authorization service to check if the
