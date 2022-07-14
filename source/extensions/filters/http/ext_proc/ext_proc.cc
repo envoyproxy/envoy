@@ -56,28 +56,28 @@ private:
   std::unique_ptr<Checker> rule_checker_;
 };
 
-void ExtProcLoggingInfo::recordGrpcCallStats(
+void ExtProcLoggingInfo::recordGrpcCall(
     std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
     ProcessorState::CallbackState callback_state,
     envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
-  grpcStats(traffic_direction).stats_.emplace_back(latency, call_status, callback_state);
+  grpcCalls(traffic_direction).emplace_back(latency, call_status, callback_state);
 }
 
-ExtProcLoggingInfo::GrpcStats&
-ExtProcLoggingInfo::grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) {
+ExtProcLoggingInfo::GrpcCalls&
+ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) {
   ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
   return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
-             ? decoding_processor_grpc_stats_
-             : encoding_processor_grpc_stats_;
+             ? decoding_processor_grpc_calls_
+             : encoding_processor_grpc_calls_;
 }
 
-const ExtProcLoggingInfo::GrpcStats&
-ExtProcLoggingInfo::grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) const {
+const ExtProcLoggingInfo::GrpcCalls&
+ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const {
   ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
   return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
-             ? decoding_processor_grpc_stats_
-             : encoding_processor_grpc_stats_;
+             ? decoding_processor_grpc_calls_
+             : encoding_processor_grpc_calls_;
 }
 
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)

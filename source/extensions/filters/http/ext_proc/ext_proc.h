@@ -43,28 +43,26 @@ inline constexpr absl::string_view ExtProcLoggingInfoName = "ext-proc-logging-in
 
 class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
-  struct GrpcStats {
-    struct GrpcCallStats {
-      GrpcCallStats(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus status,
-                    const ProcessorState::CallbackState callback_state)
-          : latency_(latency), status_(status), callback_state_(callback_state) {}
-      const std::chrono::microseconds latency_;
-      const Grpc::Status::GrpcStatus status_;
-      const ProcessorState::CallbackState callback_state_;
-    };
-    std::vector<GrpcCallStats> stats_;
+  struct GrpcCall {
+    GrpcCall(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus status,
+             const ProcessorState::CallbackState callback_state)
+        : latency_(latency), status_(status), callback_state_(callback_state) {}
+    const std::chrono::microseconds latency_;
+    const Grpc::Status::GrpcStatus status_;
+    const ProcessorState::CallbackState callback_state_;
   };
+  using GrpcCalls = std::vector<GrpcCall>;
 
-  void recordGrpcCallStats(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
-                           ProcessorState::CallbackState callback_state,
-                           envoy::config::core::v3::TrafficDirection traffic_direction);
+  void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
+                      ProcessorState::CallbackState callback_state,
+                      envoy::config::core::v3::TrafficDirection traffic_direction);
 
-  const GrpcStats& grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction) const;
+  const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
 
 private:
-  GrpcStats& grpcStats(envoy::config::core::v3::TrafficDirection traffic_direction);
-  GrpcStats decoding_processor_grpc_stats_;
-  GrpcStats encoding_processor_grpc_stats_;
+  GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
+  GrpcCalls decoding_processor_grpc_calls_;
+  GrpcCalls encoding_processor_grpc_calls_;
 };
 
 class FilterConfig {
