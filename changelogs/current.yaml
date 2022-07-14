@@ -206,6 +206,12 @@ removed_config_or_runtime:
 - area: runtime
   change: |
     removed ``envoy.restart_features.no_runtime_singleton`` and replaced with ``envoy.restart_features.remove_runtime_singleton``.
+- area: udp listener
+  change: |
+    removed ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.skip_dispatching_frames_for_closed_connection`` and legacy code paths.
 
 new_features:
 - area: lua
@@ -334,18 +340,14 @@ deprecated:
   change: |
     deprecated :ref:`old dubbo route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.route_config>`. Please use
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.multiple_route_config>` or
-    :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.
+    :ref:`DRDS <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.
 - area: http
   change: |
-    deprecated ``envoy.reloadable_features.skip_dispatching_frames_for_closed_connection`` and legacy code paths.
-  change: |
-    deprecate the short name ``preserve_case`` for the header formatter extension in favor of the fully-qualified name
+    deprecated the short name ``preserve_case`` for the header formatter extension in favor of the fully-qualified name
     ``envoy.http.stateful_header_formatters.preserve_case``.
-  change: |
-    deprecated ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place`` and legacy code paths.
 - area: matching
   change: |
-    :ref:`google_re2 <envoy_v3_api_field_type.matcher.v3.RegexMatcher.google_re2>` has been deprecated.
+    :ref:`google_re2 <envoy_v3_api_field_type.matcher.v3.RegexMatcher.google_re2>` has been deprecated. A default regex engine can be set using :ref:`default_regex_engine <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.default_regex_engine>`.
 - area: redis
   change: |
     :ref:`downstream_auth_password <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_password>` has been deprecated. Please use
