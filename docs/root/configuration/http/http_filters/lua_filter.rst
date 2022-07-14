@@ -59,26 +59,27 @@ Configuration
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
 * This filter should be configured with the name *envoy.filters.http.lua*.
 
-A simple example of configuring Lua HTTP filter that contains only :ref:`inline_code
-<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` is as follow:
+A simple example of configuring Lua HTTP filter that contains only :ref:`default source code
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>` is as follow:
 
 .. code-block:: yaml
 
   name: envoy.filters.http.lua
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-    inline_code: |
-      -- Called on the request path.
-      function envoy_on_request(request_handle)
-        -- Do something.
-      end
-      -- Called on the response path.
-      function envoy_on_response(response_handle)
-        -- Do something.
-      end
+    default_source_code:
+      inline_string: |
+        -- Called on the request path.
+        function envoy_on_request(request_handle)
+          -- Do something.
+        end
+        -- Called on the response path.
+        function envoy_on_response(response_handle)
+          -- Do something.
+        end
 
-By default, Lua script defined in ``inline_code`` will be treated as a ``GLOBAL`` script. Envoy will
-execute it for every HTTP request.
+By default, Lua script defined in ``default_source_code`` will be treated as a ``default`` script. Envoy will
+execute it for every HTTP request. This ``default`` script is optional.
 
 Per-Route Configuration
 -----------------------
@@ -87,7 +88,7 @@ The Lua HTTP filter also can be disabled or overridden on a per-route basis by p
 :ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration
 on the virtual host, route, or weighted cluster.
 
-LuaPerRoute provides two ways of overriding the ``GLOBAL`` Lua script:
+LuaPerRoute provides two ways of overriding the ``default`` Lua script:
 
 * By providing a name reference to the defined :ref:`named Lua source codes map
   <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
@@ -102,10 +103,11 @@ As a concrete example, given the following Lua filter configuration:
   name: envoy.filters.http.lua
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-    inline_code: |
-      function envoy_on_request(request_handle)
-        -- do something
-      end
+    default_source_code:
+      inline_string:
+        function envoy_on_request(request_handle)
+          -- do something
+        end
     source_codes:
       hello.lua:
         inline_string: |
@@ -130,7 +132,7 @@ follow:
       disabled: true
 
 We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute.
-The ``GLOBAL`` Lua script will be overridden by the referenced script:
+The ``default`` Lua script will be overridden by the referenced script:
 
 .. code-block:: yaml
 
@@ -139,13 +141,7 @@ The ``GLOBAL`` Lua script will be overridden by the referenced script:
       "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       name: hello.lua
 
-.. attention::
-
-  The name ``GLOBAL`` is reserved for :ref:`Lua.inline_code
-  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use
-  ``GLOBAL`` as name for other Lua scripts.
-
-Or we can define a new Lua script in the LuaPerRoute configuration directly to override the ``GLOBAL``
+Or we can define a new Lua script in the LuaPerRoute configuration directly to override the ``default``
 Lua script as follows:
 
 .. code-block:: yaml
