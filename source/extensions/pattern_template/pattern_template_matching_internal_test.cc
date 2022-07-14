@@ -169,7 +169,7 @@ INSTANTIATE_TEST_SUITE_P(
                     "/api/{version=*}/{url=**}", "/api/{VERSION}/{version}/{verSION}",
                     "/api/1234/abcd", "/media/abcd/%10%20%30/{v1=*/%10%20}_suffix", "/"));
 
-TEST_P(parseURLPatternSyntaxSuccess, parseURLPatternSyntaxSuccessTest) {
+TEST_P(ParseURLPatternSyntaxSuccess, ParseURLPatternSyntaxSuccessTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
@@ -181,7 +181,7 @@ TEST_P(parseURLPatternSyntaxSuccess, parseURLPatternSyntaxSuccessTest) {
 class parseURLPatternSyntaxFailure : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(
-    parseURLPatternSyntaxFailureTestSuite, parseURLPatternSyntaxFailure,
+    ParseURLPatternSyntaxFailureTestSuite, ParseURLPatternSyntaxFailure,
     testing::Values("/api/v*/1234", "/api/{version=v*}/1234", "/api/v{versionNum=*}/1234",
                     "/api/{version=*beta}/1234", "/media/eff456/ll-sd-out.{ext}",
                     "/media/eff456/ll-sd-out.{ext=*}", "/media/eff456/ll-sd-out.**",
@@ -193,7 +193,7 @@ INSTANTIATE_TEST_SUITE_P(
                     "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", "/{=*}",
                     "/{var12345678901234=*}"));
 
-TEST_P(parseURLPatternSyntaxFailure, parseURLPatternSyntaxFailureTest) {
+TEST_P(ParseURLPatternSyntaxFailure, ParseURLPatternSyntaxFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 

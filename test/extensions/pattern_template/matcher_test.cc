@@ -29,6 +29,6 @@ TEST(PatternTemplate, RouteMatcher) {
   EXPECT_FALSE(matcher.match("/foo?param=regex"));
 }
 
-} // namespace UrlTemplate
+} // namespace PatternTemplate
 } // namespace Extensions
 } // namespace Envoy

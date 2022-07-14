@@ -7,5 +7,5 @@ namespace Envoy {
 namespace PatternTemplate {
 
 REGISTER_FACTORY(PatternTemplatePredicateFactory, Router::PatternTemplatePredicateFactory);
-} // namespace matching
+} // namespace PatternTemplate
 } // namespace Envoy

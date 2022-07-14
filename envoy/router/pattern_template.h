@@ -1,10 +1,11 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
+
 #include "source/common/common/logger.h"
 
-#include "absl/strings/string_view.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Router {
@@ -15,9 +16,8 @@ namespace Router {
  */
 class PatternTemplatePredicate : Logger::Loggable<Logger::Id::router> {
 public:
-  PatternTemplatePredicate(std::string url_pattern, std::string url_rewrite_pattern) :
-      url_pattern_(url_pattern),
-      url_rewrite_pattern_(url_rewrite_pattern) {};
+  PatternTemplatePredicate(std::string url_pattern, std::string url_rewrite_pattern)
+      : url_pattern_(url_pattern), url_rewrite_pattern_(url_rewrite_pattern){};
 
   PatternTemplatePredicate() = default;
 
@@ -29,7 +29,7 @@ public:
   virtual bool match(absl::string_view pattern) const PURE;
 
   virtual absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
-                                             absl::string_view matched_path) const PURE;
+                                                     absl::string_view matched_path) const PURE;
 
   const std::string url_pattern_;
   const std::string url_rewrite_pattern_;
@@ -40,10 +40,9 @@ using PatternTemplatePredicateSharedPtr = std::shared_ptr<PatternTemplatePredica
 /**
  * Factory for PatternTemplatePredicate.
  */
-class PatternTemplatePredicateFactory : public Envoy::Config::TypedFactory  {
+class PatternTemplatePredicateFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~PatternTemplatePredicateFactory() = default;
-
 
   virtual PatternTemplatePredicateSharedPtr
   createUrlTemplatePredicate(std::string url_pattern, std::string url_rewrite_pattern) PURE;

@@ -3,9 +3,9 @@
 #include <vector>
 
 #include "source/common/common/assert.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/pattern_template/pattern_template_matching.h"
 #include "source/extensions/pattern_template/pattern_template_matching_internal.h"
-#include "source/common/protobuf/protobuf.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
@@ -331,5 +331,5 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
 
 } // namespace
 
-} // namespace matching
+} // namespace PatternTemplate
 } // namespace Envoy

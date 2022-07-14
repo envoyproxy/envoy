@@ -19,7 +19,6 @@ envoy_extension_cc_test(
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/pattern_template:config",
         "//test/mocks/server:factory_context_mocks",
-        "@envoy_api//envoy/extensions/pattern_template/v3:pkg_cc_proto",
     ],
 )
 

@@ -19,11 +19,8 @@ public:
     return std::make_unique<envoy::extensions::pattern_template::v3::PatternTemplateRewrite>();
   }
 
- std::string name() const override {
-    return "envoy.pattern_template.pattern_template_predicate";
-  }
-
+  std::string name() const override { return "envoy.pattern_template.pattern_template_predicate"; }
 };
 
-} // namespace matching
+} // namespace PatternTemplate
 } // namespace Envoy

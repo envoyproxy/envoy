@@ -7,8 +7,8 @@
 
 #include "envoy/extensions/pattern_template/v3/pattern_template_rewrite.pb.h"
 
-#include "source/extensions/pattern_template/pattern_template_matching_internal.h"
 #include "source/common/http/path_utility.h"
+#include "source/extensions/pattern_template/pattern_template_matching_internal.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"

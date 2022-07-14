@@ -4,12 +4,12 @@
 #include <string>
 
 #include "envoy/extensions/pattern_template/v3/pattern_template_rewrite.pb.h"
+#include "envoy/router/pattern_template.h"
 
 #include "source/extensions/pattern_template/pattern_template_matching_internal.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "envoy/router/pattern_template.h"
 
 namespace Envoy {
 namespace PatternTemplate {
@@ -80,7 +80,7 @@ private:
   absl::StatusOr<std::string> rewriteURLTemplatePattern(
       absl::string_view url, absl::string_view capture_regex,
       const envoy::extensions::pattern_template::v3::PatternTemplateRewrite& rewrite_pattern) const;
-  
+
   RE2 matching_pattern_regex_{nullptr};
 };
 
