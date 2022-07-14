@@ -690,9 +690,17 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager, Api::Api& api)
     : cluster_manager_(cluster_manager) {
-  auto global_setup_ptr = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
-  if (global_setup_ptr) {
-    per_lua_code_setups_map_[GLOBAL_SCRIPT_NAME] = std::move(global_setup_ptr);
+  if (proto_config.has_default_source_code()) {
+    if (!proto_config.inline_code().empty()) {
+      throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
+                           "for the Lua filter.");
+    }
+
+    const std::string code =
+        Config::DataSource::read(proto_config.default_source_code(), true, api);
+    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(code, tls);
+  } else if (!proto_config.inline_code().empty()) {
+    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
   }
 
   for (const auto& source : proto_config.source_codes()) {
