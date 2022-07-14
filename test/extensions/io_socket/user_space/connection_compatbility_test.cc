@@ -49,7 +49,7 @@ TEST_F(InternalClientConnectionImplTest, Basic) {
       *dispatcher_,
       std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
                                                       remote_addr_),
-      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr);
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
   client_->connect();
   client_->noDelay(true);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -62,7 +62,7 @@ TEST_F(InternalClientConnectionImplTest, ConnectCallbacksAreInvoked) {
       *dispatcher_,
       std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
                                                       remote_addr_),
-      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr);
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
   client_->addConnectionCallbacks(connection_callbacks);
   client_->connect();
   client_->noDelay(true);
@@ -82,7 +82,7 @@ TEST_F(InternalClientConnectionImplTest, ConnectFailed) {
       *dispatcher_,
       std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
                                                       remote_addr_),
-      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr);
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
   client_->addConnectionCallbacks(connection_callbacks);
   client_->connect();
   client_->noDelay(true);

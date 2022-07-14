@@ -202,11 +202,12 @@ public:
 class UdpConnectionHandler : public virtual ConnectionHandler {
 public:
   /**
-   * Get the ``UdpListenerCallbacks`` associated with ``listener_tag``. This will be
+   * Get the ``UdpListenerCallbacks`` associated with ``listener_tag`` and ``address``. This will be
    * absl::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
    * removed.
    */
-  virtual UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) PURE;
+  virtual UdpListenerCallbacksOptRef
+  getUdpListenerCallbacks(uint64_t listener_tag, const Network::Address::Instance& address) PURE;
 };
 
 /**

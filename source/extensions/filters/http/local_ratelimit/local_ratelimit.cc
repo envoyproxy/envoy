@@ -241,8 +241,8 @@ void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descri
 }
 
 const FilterConfig* Filter::getConfig() const {
-  const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
-      "envoy.filters.http.local_ratelimit", decoder_callbacks_->route());
+  const auto* config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
   if (config) {
     return config;
   }

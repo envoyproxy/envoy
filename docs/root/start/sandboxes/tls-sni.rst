@@ -101,8 +101,8 @@ The client proxy has no ``TLS`` termination but instead proxies three routed pat
 
    $ pwd
    envoy/examples/tls-sni
-   $ docker-compose build --pull
-   $ docker-compose up -d
+   $ docker-compose pull
+   $ docker-compose up --build -d
    $ docker-compose ps
 
           Name                        Command                State         Ports

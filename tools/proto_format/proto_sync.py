@@ -3,6 +3,7 @@
 # Diff or copy pretty-printed artifacts to the source tree.
 
 import argparse
+import os
 import pathlib
 import shutil
 import subprocess
@@ -12,7 +13,8 @@ import tempfile
 
 
 def git_status(path):
-    return subprocess.check_output(['git', 'status', '--porcelain', str(path)]).decode()
+    return subprocess.check_output(
+        ['git', 'status', '--porcelain', str(path)], cwd=str(path)).decode()
 
 
 def generate_current_api_dir(api_dir, dst_dir):
@@ -52,6 +54,13 @@ def sync(api_root, formatted, mode, is_ci):
         with tarfile.open(formatted) as tar:
             tar.extractall(dst_dir)
 
+        # These support files are handled manually.
+        for f in ['envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
+                  'envoy/annotations/BUILD']:
+            copy_dst_dir = pathlib.Path(dst_dir, os.path.dirname(f))
+            copy_dst_dir.mkdir(exist_ok=True, parents=True)
+            shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
+
         diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
 
         if diff.strip():
@@ -62,7 +71,7 @@ def sync(api_root, formatted, mode, is_ci):
                 print(diff.decode(), file=sys.stderr)
                 sys.exit(1)
             if mode == "fix":
-                _git_status = git_status(api_root)
+                _git_status = git_status(api_root_path)
                 if _git_status:
                     print('git status indicates a dirty API tree:\n%s' % _git_status)
                     print(

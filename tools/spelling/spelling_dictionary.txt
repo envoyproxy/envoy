@@ -28,6 +28,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+GiB
 Repick
 TRA
 btree
@@ -314,6 +315,7 @@ RFC
 RHS
 RLE
 RLS
+RLQS
 RNG
 RPC
 RSA
