@@ -134,6 +134,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
+      expected_response_(config.http_health_check().response()),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
@@ -200,6 +201,7 @@ bool HttpHealthCheckerImpl::HttpStatusChecker::inRetriableRanges(uint64_t http_s
 }
 
 bool HttpHealthCheckerImpl::HttpStatusChecker::inExpectedRanges(uint64_t http_status) const {
+  ENVOY_LOG_MISC(info, "Boteng {}, expected {}", http_status, expected_ranges_);
   return inRanges(http_status, expected_ranges_);
 }
 
@@ -251,6 +253,14 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
     Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!response_headers_);
   response_headers_ = std::move(headers);
+  if (end_stream) {
+    onResponseComplete();
+  }
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeData(Buffer::Instance& data,
+                                                                     bool end_stream) {
+  absl::StrAppend(&body_, data.toString());
   if (end_stream) {
     onResponseComplete();
   }
@@ -347,8 +357,24 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HealthCheckResult
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   const uint64_t response_code = Http::Utility::getResponseStatus(*response_headers_);
-  ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
+  ENVOY_CONN_LOG(debug, "hc response_code={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
+
+  absl::string_view expected_response = parent_.expected_response_;
+  if (!expected_response.empty()) {
+    // If the expected response is set, check the first 1024 bytes of actual response if contains
+    // the expected response.
+    std::string response_data = body_.substr(0, fmin(1024, body_.size()));
+    ENVOY_CONN_LOG(debug, "hc response_body={} expected_response={}", *client_, response_data,
+                   expected_response);
+
+    if (!absl::StrContains(response_data, expected_response)) {
+      if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
+        host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+      }
+      return HealthCheckResult::Failed;
+    }
+  }
 
   if (!parent_.http_status_checker_.inExpectedRanges(response_code)) {
     // If the HTTP response code would indicate failure AND the immediate health check

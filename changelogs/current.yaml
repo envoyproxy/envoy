@@ -350,3 +350,6 @@ deprecated:
   change: |
     :ref:`downstream_auth_password <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_password>` has been deprecated. Please use
     :ref:`downstream_auth_passwords <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_passwords>`.
+- area: http
+  change: |
+    added the support of ref:`expected response health check <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response>` for http.

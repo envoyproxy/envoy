@@ -95,11 +95,7 @@ private:
     void onDeferredDelete() final;
 
     // Http::StreamDecoder
-    void decodeData(Buffer::Instance&, bool end_stream) override {
-      if (end_stream) {
-        onResponseComplete();
-      }
-    }
+    void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::ResponseDecoder
@@ -146,6 +142,7 @@ private:
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     Http::ResponseHeaderMapPtr response_headers_;
+    std::string body_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
     Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
@@ -170,6 +167,7 @@ private:
 
   const std::string path_;
   const std::string host_value_;
+  const std::string expected_response_;
   absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
       service_name_matcher_;
   Router::HeaderParserPtr request_headers_parser_;
