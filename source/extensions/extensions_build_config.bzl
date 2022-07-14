@@ -349,7 +349,7 @@ EXTENSIONS = {
     "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
 
     #
-    # Pattern Template Matcher
+    # Pattern Template
     #
     "envoy.pattern_template.pattern_template_predicates": "//source/extensions/pattern_template:config",
 
