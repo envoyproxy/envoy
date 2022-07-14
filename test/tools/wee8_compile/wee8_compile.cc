@@ -155,7 +155,7 @@ wasm::vec<byte_t> stripWasmModule(const wasm::vec<byte_t>& module) {
 
 wasm::vec<byte_t> serializeWasmModule(const char* path, const wasm::vec<byte_t>& content) {
   ::v8::internal::FLAG_liftoff = false;
-  ::v8::internal::FLAG_wasm_max_mem_pages = 16384;
+  ::v8::internal::FLAG_wasm_max_mem_pages = 16384; /* 16,384 * 64 KiB pages == 1 GiB limit */
   const auto engine = wasm::Engine::make();
   if (engine == nullptr) {
     std::cerr << "ERROR: Failed to start V8." << std::endl;
