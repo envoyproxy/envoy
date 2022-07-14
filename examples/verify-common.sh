@@ -176,7 +176,7 @@ if [[ -z "$MANUAL" ]]; then
 fi
 
 
-# These allow the fun to be used in subshells, eg in `wait_for`
+# These allow the functions to be used in subshells, e.g. in `wait_for`
 export -f responds_with
 export -f responds_without
 export -f responds_with_header
