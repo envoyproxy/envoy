@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Router {
 
 /**
- * Used to decide if an internal redirect is allowed to be followed based on the target route.
+ * Used to decide if pattern template match or rewrite is needed based on the target route.
  * Subclassing Logger::Loggable so that implementations can log details.
  */
 class PatternTemplatePredicate : Logger::Loggable<Logger::Id::router> {
