@@ -23,5 +23,7 @@ jobs:
       - name: Run dependency checker
         run: |
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          bazel run //tools/dependency:check -- -c release_issues --fix
-          bazel run //tools/dependency:check -- -c cves -w error
+          TODAY_DATE=$(date -u -I"date")
+          export TODAY_DATE
+          bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c release_issues --fix
+          bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error
