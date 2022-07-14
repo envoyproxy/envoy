@@ -61,6 +61,10 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 #else
   int flags = SOCK_NONBLOCK;
 
+  if (io_uring_factory_ != nullptr) {
+    flags = 0;
+  }
+
   if (options.mptcp_enabled_) {
     ASSERT(socket_type == Socket::Type::Stream);
     ASSERT(addr_type == Address::Type::Ip);
