@@ -100,7 +100,7 @@ public:
     : thread_id_(thread_id), downstream_connection_id_(connection_id) {}
   
   std::string toHeaderValue() {
-    return thread_id_ + ";downstream_connection=" + downstream_connection_id_;
+    return "thread=" + thread_id_ + ";downstream-connection=" + downstream_connection_id_;
   }
 
   std::string getDownstreamConnectionID() {

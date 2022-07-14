@@ -167,18 +167,18 @@ ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& ra
 ConnectionManager::~ConnectionManager() = default;
 
   Network::FilterStatus ConnectionManager::onNewConnection() {
-    // fixme - we need a somethign better than integer thread number here 
-    // - ideally some sort of base64(host@uuid) which is stored at the thread level and passed to each filter instance
-    std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString();
+    std::string remote_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
+    std::string local_ip = read_callbacks_->connection().connectionInfoProvider().localAddress()->ip()->asString();
+
+    // fixme - we need to define it somewhere else
+    std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() + "@" + local_ip;
     
     // fixme - sja3Hash or connectionID doesn't appear to be populated
     // downstream_conn_id_ = read_callbacks_->connection().connectionInfoProvider().ja3Hash().data();
     // also going to need a unique value for the connection - e.g base64(remoteIPport@host@uuid)
     Random::RandomGeneratorImpl random;
-    std::string remote_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
-    std::string local_address = read_callbacks_->connection().connectionInfoProvider().localAddress()->asString();
     std::string uuid = random.uuid();
-    std::string downstream_conn_id = remote_address + "@" + local_address + "@" + uuid;
+    std::string downstream_conn_id = remote_address + "@" + uuid;
     local_ingress_id_ = IngressID(thread_id, downstream_conn_id);
 
     downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
