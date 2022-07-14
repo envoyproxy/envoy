@@ -163,6 +163,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     for (auto ctx : ssl_contexts) {
       if (verify_mode != SSL_VERIFY_NONE) {
         if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
+          // TODO(danzh) do not set SSL_VERIFY_NONE, instead, retain the state
+          // in ContextImpl and let boring SSL always call the verify callback
+          // which checks the state before doing actual verification.
           SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
           SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
         } else {
