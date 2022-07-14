@@ -238,9 +238,7 @@ def sync_build_files(cmd, dst_root):
             f.write(build_contents)
 
 
-def format_api(api_root, mode, outfile, xformed, printed):
-    # this is currently assumed by protoprint
-    os.chdir(pathlib.Path(api_root).parent)
+def format_api(mode, outfile, xformed, printed):
 
     with tempfile.TemporaryDirectory() as tmp:
         dst_dir = pathlib.Path(tmp)
@@ -272,28 +270,20 @@ def format_api(api_root, mode, outfile, xformed, printed):
             sync_proto_file(v, k)
         sync_build_files(mode, dst_dir)
 
-        # These support files are handled manually.
-        for f in ['envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
-                  'envoy/annotations/BUILD']:
-            copy_dst_dir = pathlib.Path(dst_dir, os.path.dirname(f))
-            copy_dst_dir.mkdir(exist_ok=True, parents=True)
-            shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
-
         shutil.rmtree(str(printed_dir))
         shutil.rmtree(str(xformed_dir))
-        with tarfile.open(outfile, "w") as tar:
+        with tarfile.open(outfile, "w:gz") as tar:
             tar.add(dst_dir, arcname=".")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['check', 'fix'])
-    parser.add_argument('--api_root', default='./api')
     parser.add_argument('--outfile')
     parser.add_argument('--protoprinted')
     parser.add_argument('--xformed')
     args = parser.parse_args()
 
     format_api(
-        args.api_root, args.mode, str(pathlib.Path(args.outfile).absolute()),
+        args.mode, str(pathlib.Path(args.outfile).absolute()),
         str(pathlib.Path(args.xformed).absolute()), args.protoprinted)

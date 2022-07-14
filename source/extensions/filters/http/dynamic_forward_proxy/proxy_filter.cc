@@ -105,8 +105,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   // Check for per route filter config.
-  const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<ProxyPerRouteConfig>(
-      "envoy.filters.http.dynamic_forward_proxy", route);
+  const auto* config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<ProxyPerRouteConfig>(decoder_callbacks_);
 
   if (config != nullptr) {
     const auto& host_rewrite = config->hostRewrite();

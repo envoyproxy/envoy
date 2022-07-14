@@ -13,7 +13,7 @@ import yaml
 
 from envoy.code.check.checker import BackticksCheck
 
-from tools.api_proto_plugin import annotations
+from tools.api_proto_plugin import annotations, constants
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
 from tools.protodoc.data import data
@@ -33,27 +33,6 @@ EXTENSION_CATEGORIES = data["extension_categories"]
 CONTRIB_EXTENSION_CATEGORIES = data["contrib_extension_categories"]
 EXTENSION_SECURITY_POSTURES = data["extension_security_postures"]
 EXTENSION_STATUS_VALUES = data["extension_status_values"]
-
-# Namespace prefix for Envoy core APIs.
-ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
-
-# Last documented v2 api version
-ENVOY_LAST_V2_VERSION = "1.17"
-
-# Namespace prefix for Envoy top-level APIs.
-ENVOY_PREFIX = '.envoy.'
-
-# Namespace prefix for WKTs.
-WKT_NAMESPACE_PREFIX = '.google.protobuf.'
-
-# Namespace prefix for RPCs.
-RPC_NAMESPACE_PREFIX = '.google.rpc.'
-
-# Namespace prefix for cncf/xds top-level APIs.
-CNCF_PREFIX = '.xds.'
-
-# http://www.fileformat.info/info/unicode/char/2063/index.htm
-UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
 
 WIP_WARNING = (
     '.. warning::\n   This API feature is currently work-in-progress. API features marked as '
@@ -81,7 +60,7 @@ def github_url(text, type_context):
     Returns:
         A string with a corresponding data plane API GitHub Url.
     """
-    if type_context.name.startswith(CNCF_PREFIX[1:]):
+    if type_context.name.startswith(constants.CNCF_PREFIX[1:]):
         return format_external_link(
             text,
             f"https://github.com/cncf/xds/blob/main/{type_context.source_code_info.name}#L{type_context.location.span[0]}"
@@ -111,7 +90,7 @@ def format_comment_with_annotations(comment, show_wip_warning=False):
     if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
         for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
             formatted_extension_category += format_extension_category(category)
-    comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
+    comment = annotations.without_annotations(comment.raw + '\n')
     return comment + wip_warning + formatted_extension + formatted_extension_category
 
 
@@ -235,7 +214,7 @@ def format_header_from_file(style, source_code_info, proto_name):
     """
     anchor = format_anchor(file_cross_ref_label(proto_name))
     stripped_comment = annotations.without_annotations(
-        strip_leading_space('\n'.join(c + '\n' for c in source_code_info.file_level_comments)))
+        '\n'.join(c + '\n' for c in source_code_info.file_level_comments))
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in source_code_info.file_level_annotations:
         extension = source_code_info.file_level_annotations[annotations.EXTENSION_ANNOTATION]
@@ -291,16 +270,16 @@ def normalize_field_type_name(field_fqn):
 
     .envoy.foo.bar.
 
-    Strips leading ENVOY_API_NAMESPACE_PREFIX and ENVOY_PREFIX.
+    Strips leading constants.ENVOY_API_NAMESPACE_PREFIX and constants.ENVOY_PREFIX.
 
     Args:
         field_fqn: a fully qualified type name from FieldDescriptorProto.type_name.
     Return: Normalized type name.
     """
-    if field_fqn.startswith(ENVOY_API_NAMESPACE_PREFIX):
-        return field_fqn[len(ENVOY_API_NAMESPACE_PREFIX):]
-    if field_fqn.startswith(ENVOY_PREFIX):
-        return field_fqn[len(ENVOY_PREFIX):]
+    if field_fqn.startswith(constants.ENVOY_API_NAMESPACE_PREFIX):
+        return field_fqn[len(constants.ENVOY_API_NAMESPACE_PREFIX):]
+    if field_fqn.startswith(constants.ENVOY_PREFIX):
+        return field_fqn[len(constants.ENVOY_PREFIX):]
     return field_fqn
 
 
@@ -309,7 +288,7 @@ def normalize_type_context_name(type_name):
 
     envoy.foo.bar.
 
-    Strips leading ENVOY_API_NAMESPACE_PREFIX and ENVOY_PREFIX.
+    Strips leading constants.ENVOY_API_NAMESPACE_PREFIX and constants.ENVOY_PREFIX.
 
     Args:
         type_name: a name from a TypeContext.
@@ -338,8 +317,9 @@ def format_field_type(type_context, field):
     Return: RST formatted field type.
     """
     envoy_proto = (
-        field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX)
-        or field.type_name.startswith(ENVOY_PREFIX) or field.type_name.startswith(CNCF_PREFIX))
+        field.type_name.startswith(constants.ENVOY_API_NAMESPACE_PREFIX)
+        or field.type_name.startswith(constants.ENVOY_PREFIX)
+        or field.type_name.startswith(constants.CNCF_PREFIX))
     if envoy_proto:
         type_name = normalize_field_type_name(field.type_name)
         if field.type == field.TYPE_MESSAGE:
@@ -352,46 +332,24 @@ def format_field_type(type_context, field):
             return format_internal_link(type_name, message_cross_ref_label(type_name))
         if field.type == field.TYPE_ENUM:
             return format_internal_link(type_name, enum_cross_ref_label(type_name))
-    elif field.type_name.startswith(WKT_NAMESPACE_PREFIX):
-        wkt = field.type_name[len(WKT_NAMESPACE_PREFIX):]
+    elif field.type_name.startswith(constants.WKT_NAMESPACE_PREFIX):
+        wkt = field.type_name[len(constants.WKT_NAMESPACE_PREFIX):]
         return format_external_link(
             wkt, 'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s'
             % wkt.lower())
-    elif field.type_name.startswith(RPC_NAMESPACE_PREFIX):
-        rpc = field.type_name[len(RPC_NAMESPACE_PREFIX):]
+    elif field.type_name.startswith(constants.RPC_NAMESPACE_PREFIX):
+        rpc = field.type_name[len(constants.RPC_NAMESPACE_PREFIX):]
         return format_external_link(
             rpc, 'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s'
             % rpc.lower())
     elif field.type_name:
         return field.type_name
 
-    pretty_type_names = {
-        field.TYPE_DOUBLE: 'double',
-        field.TYPE_FLOAT: 'float',
-        field.TYPE_INT32: 'int32',
-        field.TYPE_SFIXED32: 'int32',
-        field.TYPE_SINT32: 'int32',
-        field.TYPE_FIXED32: 'uint32',
-        field.TYPE_UINT32: 'uint32',
-        field.TYPE_INT64: 'int64',
-        field.TYPE_SFIXED64: 'int64',
-        field.TYPE_SINT64: 'int64',
-        field.TYPE_FIXED64: 'uint64',
-        field.TYPE_UINT64: 'uint64',
-        field.TYPE_BOOL: 'bool',
-        field.TYPE_STRING: 'string',
-        field.TYPE_BYTES: 'bytes',
-    }
-    if field.type in pretty_type_names:
+    if field.type in constants.FIELD_TYPE_NAMES:
         return format_external_link(
-            pretty_type_names[field.type],
+            constants.FIELD_TYPE_NAMES[field.type],
             'https://developers.google.com/protocol-buffers/docs/proto#scalar')
     raise ProtodocError('Unknown field type ' + str(field.type))
-
-
-def strip_leading_space(s):
-    """Remove leading space in flat comment strings."""
-    return map_lines(lambda s: s[1:], s)
 
 
 def file_cross_ref_label(msg_name):
@@ -518,12 +476,8 @@ def format_field_as_definition_list_item(
             manifest_description)
     else:
         formatted_security_options = ''
-    pretty_label_names = {
-        field.LABEL_OPTIONAL: '',
-        field.LABEL_REPEATED: '**repeated** ',
-    }
     comment = '(%s) ' % ', '.join(
-        [pretty_label_names[field.label] + format_field_type(type_context, field)]
+        [constants.FIELD_LABEL_NAMES[field.label] + format_field_type(type_context, field)]
         + field_annotations) + formatted_leading_comment
     return anchor + field.name + '\n' + map_lines(
         functools.partial(indent, 2),
@@ -578,7 +532,7 @@ def format_enum_value_as_definition_list_item(type_context, enum_value):
     formatted_leading_comment = format_comment_with_annotations(leading_comment)
     if hide_not_implemented(leading_comment):
         return ''
-    comment = default_comment + UNICODE_INVISIBLE_SEPARATOR + formatted_leading_comment
+    comment = default_comment + constants.UNICODE_INVISIBLE_SEPARATOR + formatted_leading_comment
     return anchor + enum_value.name + '\n' + map_lines(functools.partial(indent, 2), comment)
 
 

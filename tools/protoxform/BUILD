@@ -76,5 +76,6 @@ pkg_files(
 pkg_tar(
     name = "xformed_test_protos",
     srcs = [":xformed_test_files"],
+    extension = "tar.gz",
     visibility = ["//visibility:public"],
 )
