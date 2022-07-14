@@ -1800,6 +1800,39 @@ TEST_F(LuaHttpFilterTest, GetRequestedServerName) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+// Verify that binary values could also be extracted from dynamicMetadata() in LUA filter.
+TEST_F(LuaHttpFilterTest, GetDynamicMetadataBinaryData) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local metadata = request_handle:streamInfo():dynamicMetadata():get("envoy.pp")
+      local bin_data = metadata["bin_data"]
+      local data_length = string.len(metadata["bin_data"])
+      local hex_table = { }
+      for idx = 1, data_length do
+        hex_table[#hex_table + 1] = string.format("\\x%02x", string.byte(bin_data, idx))
+      end
+      request_handle:logTrace('Hex Data: ' .. table.concat(hex_table, ''))
+    end
+  )EOF"};
+
+  ProtobufWkt::Value metadata_value;
+  constexpr uint8_t buffer[] = {'h', 'e', 0x00, 'l', 'l', 'o'};
+  metadata_value.set_string_value(reinterpret_cast<char const*>(buffer), sizeof(buffer));
+  ProtobufWkt::Struct metadata;
+  metadata.mutable_fields()->insert({"bin_data", metadata_value});
+  (*stream_info_.metadata_.mutable_filter_metadata())["envoy.pp"] = metadata;
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  // Hex values for the buffer data
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("Hex Data: \\x68\\x65\\x00\\x6c\\x6c\\x6f")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
 // Set and get stream info dynamic metadata.
 TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
   const std::string SCRIPT{R"EOF(
