@@ -324,9 +324,9 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
   response->headers().iterate([lua_State = coroutine_.luaState()](
                                   const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     lua_pushlstring(lua_State, header.key().getStringView().data(),
-                    header.key().getStringView().length());
+                    header.key().getStringView().size());
     lua_pushlstring(lua_State, header.value().getStringView().data(),
-                    header.value().getStringView().length());
+                    header.value().getStringView().size());
     lua_settable(lua_State, -3);
     return Http::HeaderMap::Iterate::Continue;
   });
@@ -587,7 +587,7 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   if (output.result_) {
     lua_pushnil(state);
   } else {
-    lua_pushlstring(state, output.error_message_.data(), output.error_message_.length());
+    lua_pushlstring(state, output.error_message_.data(), output.error_message_.size());
   }
   return 2;
 }
@@ -622,7 +622,7 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
   absl::string_view input = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   auto output = absl::Base64Escape(input);
-  lua_pushlstring(state, output.data(), output.length());
+  lua_pushlstring(state, output.data(), output.size());
 
   return 1;
 }
@@ -657,12 +657,12 @@ int StreamHandleWrapper::luaTimestampString(lua_State* state) {
     auto milliseconds_since_epoch =
         std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
     std::string timestamp = std::to_string(milliseconds_since_epoch);
-    lua_pushstring(state, timestamp.c_str());
+    lua_pushlstring(state, timestamp.data(), timestamp.size());
   } else if (resolution == Timestamp::Resolution::Microsecond) {
     auto microseconds_since_epoch =
         std::chrono::duration_cast<std::chrono::microseconds>(now).count();
     std::string timestamp = std::to_string(microseconds_since_epoch);
-    lua_pushstring(state, timestamp.c_str());
+    lua_pushlstring(state, timestamp.data(), timestamp.size());
   } else {
     luaL_error(state, "timestamp format must be MILLISECOND or MICROSECOND.");
   }
@@ -690,9 +690,17 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager, Api::Api& api)
     : cluster_manager_(cluster_manager) {
-  auto global_setup_ptr = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
-  if (global_setup_ptr) {
-    per_lua_code_setups_map_[GLOBAL_SCRIPT_NAME] = std::move(global_setup_ptr);
+  if (proto_config.has_default_source_code()) {
+    if (!proto_config.inline_code().empty()) {
+      throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
+                           "for the Lua filter.");
+    }
+
+    const std::string code =
+        Config::DataSource::read(proto_config.default_source_code(), true, api);
+    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(code, tls);
+  } else if (!proto_config.inline_code().empty()) {
+    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
   }
 
   for (const auto& source : proto_config.source_codes()) {

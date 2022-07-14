@@ -651,8 +651,6 @@ protected:
   // nghttp2 library will keep calling this callback to write the rest of the frame.
   ssize_t onSend(const uint8_t* data, size_t length);
 
-  const bool skip_dispatching_frames_for_closed_connection_;
-
   // Called when a stream encodes to the http2 connection which enables us to
   // keep the active_streams list in LRU if deferred processing.
   void updateActiveStreamsOnEncode(StreamImpl& stream) {

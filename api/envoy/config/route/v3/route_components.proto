@@ -389,7 +389,7 @@ message WeightedCluster {
     // An integer between 0 and :ref:`total_weight
     // <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>`. When a request matches the route,
     // the choice of an upstream cluster is determined by its weight. The sum of weights across all
-    // entries in the clusters array must add up to the total_weight, which defaults to 100.
+    // entries in the clusters array must add up to the total_weight, if total_weight is greater than 0.
     google.protobuf.UInt32Value weight = 2;
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
@@ -458,8 +458,8 @@ message WeightedCluster {
   repeated ClusterWeight clusters = 1 [(validate.rules).repeated = {min_items: 1}];
 
   // Specifies the total weight across all clusters. The sum of all cluster weights must equal this
-  // value, which must be greater than 0. Defaults to 100.
-  google.protobuf.UInt32Value total_weight = 3 [(validate.rules).uint32 = {gte: 1}];
+  // value, if this is greater than 0.
+  google.protobuf.UInt32Value total_weight = 3;
 
   // Specifies the runtime key prefix that should be used to construct the
   // runtime keys associated with each cluster. When the *runtime_key_prefix* is
