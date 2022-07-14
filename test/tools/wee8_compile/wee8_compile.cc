@@ -12,6 +12,7 @@
 #include "wasm-api/wasm.hh"
 
 namespace v8::internal {
+extern bool FLAG_liftoff;
 extern unsigned int FLAG_wasm_max_mem_pages;
 } // namespace v8::internal
 
@@ -153,6 +154,7 @@ wasm::vec<byte_t> stripWasmModule(const wasm::vec<byte_t>& module) {
 }
 
 wasm::vec<byte_t> serializeWasmModule(const char* path, const wasm::vec<byte_t>& content) {
+  ::v8::internal::FLAG_liftoff = false;
   ::v8::internal::FLAG_wasm_max_mem_pages = 16384; /* 16,384 * 64 KiB pages == 1 GiB limit */
   const auto engine = wasm::Engine::make();
   if (engine == nullptr) {
