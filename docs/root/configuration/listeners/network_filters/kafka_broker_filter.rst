@@ -11,8 +11,8 @@ The filter attempts not to influence the communication between client and broker
 that could not be decoded (due to Kafka client or broker running a newer version than supported by
 this filter) are forwarded as-is.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.kafka_broker.v3.KafkaBroker>`
-* This filter should be configured with the name *envoy.filters.network.kafka_broker*.
 
 .. attention::
 
