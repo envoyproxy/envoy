@@ -23,9 +23,9 @@ int HeaderMapIterator::luaPairsIterator(lua_State* state) {
     return 0;
   } else {
     const absl::string_view key_view(entries_[current_]->key().getStringView());
-    lua_pushlstring(state, key_view.data(), key_view.length());
+    lua_pushlstring(state, key_view.data(), key_view.size());
     const absl::string_view value_view(entries_[current_]->value().getStringView());
-    lua_pushlstring(state, value_view.data(), value_view.length());
+    lua_pushlstring(state, value_view.data(), value_view.size());
     current_++;
     return 2;
   }
@@ -45,7 +45,7 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
   const Http::HeaderUtility::GetAllOfHeaderAsStringResult value =
       Http::HeaderUtility::getAllOfHeaderAsString(headers_, Http::LowerCaseString(key));
   if (value.result().has_value()) {
-    lua_pushlstring(state, value.result().value().data(), value.result().value().length());
+    lua_pushlstring(state, value.result().value().data(), value.result().value().size());
     return 1;
   } else {
     return 0;
@@ -58,7 +58,7 @@ int HeaderMapWrapper::luaGetAtIndex(lua_State* state) {
   const Http::HeaderMap::GetResult header_value = headers_.get(Http::LowerCaseString(key));
   if (index >= 0 && header_value.size() > static_cast<uint64_t>(index)) {
     absl::string_view value = header_value[index]->value().getStringView();
-    lua_pushlstring(state, value.data(), value.length());
+    lua_pushlstring(state, value.data(), value.size());
     return 1;
   }
   return 0;
@@ -119,7 +119,8 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
 }
 
 int StreamInfoWrapper::luaProtocol(lua_State* state) {
-  lua_pushstring(state, Http::Utility::getProtocolString(stream_info_.protocol().value()).c_str());
+  const std::string& protocol = Http::Utility::getProtocolString(stream_info_.protocol().value());
+  lua_pushlstring(state, protocol.data(), protocol.size());
   return 1;
 }
 
@@ -148,19 +149,23 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
 }
 
 int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {
-  lua_pushstring(state,
-                 stream_info_.downstreamAddressProvider().localAddress()->asString().c_str());
+  const std::string& local_address =
+      stream_info_.downstreamAddressProvider().localAddress()->asString();
+  lua_pushlstring(state, local_address.data(), local_address.size());
   return 1;
 }
 
 int StreamInfoWrapper::luaDownstreamDirectRemoteAddress(lua_State* state) {
-  lua_pushstring(
-      state, stream_info_.downstreamAddressProvider().directRemoteAddress()->asString().c_str());
+  const std::string& direct_remote_address =
+      stream_info_.downstreamAddressProvider().directRemoteAddress()->asString();
+  lua_pushlstring(state, direct_remote_address.data(), direct_remote_address.size());
   return 1;
 }
 
 int StreamInfoWrapper::luaRequestedServerName(lua_State* state) {
-  lua_pushstring(state, stream_info_.downstreamAddressProvider().requestedServerName().data());
+  absl::string_view requested_serve_name =
+      stream_info_.downstreamAddressProvider().requestedServerName();
+  lua_pushlstring(state, requested_serve_name.data(), requested_serve_name.size());
   return 1;
 }
 
@@ -175,7 +180,7 @@ int DynamicMetadataMapIterator::luaPairsIterator(lua_State* state) {
     return 0;
   }
 
-  lua_pushstring(state, current_->first.c_str());
+  lua_pushlstring(state, current_->first.data(), current_->first.size());
   Filters::Common::Lua::MetadataMapHelper::createTable(state, current_->second.fields());
 
   current_++;
@@ -229,7 +234,7 @@ int PublicKeyWrapper::luaGet(lua_State* state) {
   if (public_key_.empty()) {
     lua_pushnil(state);
   } else {
-    lua_pushstring(state, public_key_.c_str());
+    lua_pushlstring(state, public_key_.data(), public_key_.size());
   }
   return 1;
 }
