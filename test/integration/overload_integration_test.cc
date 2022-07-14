@@ -337,7 +337,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
       Ssl::getSslAddress(version_, lookupPort("http"));
   auto bad_ssl_client =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          std::move(bad_transport_socket), nullptr);
+                                          std::move(bad_transport_socket), nullptr, nullptr);
   bad_ssl_client->addConnectionCallbacks(connect_callbacks);
   bad_ssl_client->enableHalfClose(true);
   bad_ssl_client->connect();

@@ -6,14 +6,15 @@ namespace Envoy {
 namespace StreamInfo {
 
 void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                              FilterState::StateType state_type, FilterState::LifeSpan life_span) {
+                              FilterState::StateType state_type, FilterState::LifeSpan life_span,
+                              FilterState::StreamSharing stream_sharing) {
   if (life_span > life_span_) {
     if (hasDataWithNameInternally(data_name)) {
       throw EnvoyException(
           "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
     }
     maybeCreateParent(ParentAccessMode::ReadWrite);
-    parent_->setData(data_name, data, state_type, life_span);
+    parent_->setData(data_name, data, state_type, life_span, stream_sharing);
     return;
   }
   if (parent_ && parent_->hasDataWithName(data_name)) {
@@ -23,7 +24,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
   const auto& it = data_storage_.find(data_name);
   if (it != data_storage_.end()) {
     // We have another object with same data_name. Check for mutability
-    // violations namely: readonly data cannot be overwritten. mutable data
+    // violations namely: readonly data cannot be overwritten, mutable data
     // cannot be overwritten by readonly data.
     const FilterStateImpl::FilterObject* current = it->second.get();
     if (current->state_type_ == FilterState::StateType::ReadOnly) {
@@ -38,6 +39,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
   std::unique_ptr<FilterStateImpl::FilterObject> filter_object(new FilterStateImpl::FilterObject());
   filter_object->data_ = data;
   filter_object->state_type_ = state_type;
+  filter_object->stream_sharing_ = stream_sharing;
   data_storage_[data_name] = std::move(filter_object);
 }
 
@@ -88,6 +90,17 @@ bool FilterStateImpl::hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) 
     return parent_ && parent_->hasDataAtOrAboveLifeSpan(life_span);
   }
   return !data_storage_.empty() || (parent_ && parent_->hasDataAtOrAboveLifeSpan(life_span));
+}
+
+FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() const {
+  auto objects = parent_ ? parent_->objectsSharedWithUpstreamConnection()
+                         : std::make_unique<FilterState::Objects>();
+  for (const auto& [name, object] : data_storage_) {
+    if (object->stream_sharing_ == StreamSharing::SharedWithUpstreamConnection) {
+      objects->push_back({object->data_, object->state_type_, object->stream_sharing_, name});
+    }
+  }
+  return objects;
 }
 
 bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {

@@ -67,10 +67,8 @@ Config::Config(
     }
     metadata_sources_.push_back(MetadataSource(kind, metadata.name()));
   }
-  for (const auto& filter_state_object : config_proto.passthrough_filter_state_objects()) {
-    filter_state_names_.push_back(filter_state_object.name());
-  }
 }
+
 std::unique_ptr<envoy::config::core::v3::Metadata>
 Config::extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) const {
   if (metadata_sources_.empty()) {
@@ -101,40 +99,6 @@ Config::extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) con
   return metadata;
 }
 
-std::unique_ptr<IoSocket::UserSpace::FilterStateObjects>
-Config::extractFilterState(const StreamInfo::FilterStateSharedPtr& filter_state) const {
-  if (filter_state_names_.empty()) {
-    return nullptr;
-  }
-  auto filter_state_objects = std::make_unique<IoSocket::UserSpace::FilterStateObjects>();
-  for (const auto& name : filter_state_names_) {
-    try {
-      auto object = filter_state->getDataSharedMutableGeneric(name);
-      if (object == nullptr) {
-        ENVOY_LOG(trace, "Internal upstream missing filter state: {}", name);
-        stats_.no_filter_state_.inc();
-        continue;
-      }
-      filter_state_objects->emplace_back(name, object);
-    } catch (const EnvoyException& e) {
-      ENVOY_LOG(trace, "Internal upstream filter state error: {}. Error: {}", name, e.what());
-      stats_.filter_state_error_.inc();
-    }
-  }
-  return filter_state_objects;
-}
-
-void Config::hashKey(std::vector<uint8_t>& key,
-                     const StreamInfo::FilterStateSharedPtr& filter_state) const {
-  for (const auto& name : filter_state_names_) {
-    if (auto object = filter_state->getDataReadOnly<Hashable>(name); object != nullptr) {
-      if (auto hash = object->hash(); hash) {
-        pushScalarToByteVector(hash.value(), key);
-      }
-    }
-  }
-}
-
 InternalSocketFactory::InternalSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& context,
     const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
@@ -153,23 +117,9 @@ InternalSocketFactory::createTransportSocket(Network::TransportSocketOptionsCons
   if (host) {
     extracted_metadata = config_.extractMetadata(host);
   }
-  std::unique_ptr<IoSocket::UserSpace::FilterStateObjects> extracted_filter_state;
-  if (options && options->filterState()) {
-    extracted_filter_state = config_.extractFilterState(options->filterState());
-  }
   return std::make_unique<InternalSocket>(std::move(inner_socket), std::move(extracted_metadata),
-                                          std::move(extracted_filter_state));
-}
-
-void InternalSocketFactory::hashKey(std::vector<uint8_t>& key,
-                                    Network::TransportSocketOptionsConstSharedPtr options) const {
-  PassthroughFactory::hashKey(key, options);
-  // Filter state should be included in the hash since it can originate from
-  // the downstream request, but it is only applied once per upstream connection in
-  // the internal listener.
-  if (options && options->filterState()) {
-    config_.hashKey(key, options->filterState());
-  }
+                                          options ? options->downstreamSharedFilterStateObjects()
+                                                  : StreamInfo::FilterState::Objects());
 }
 
 REGISTER_FACTORY(InternalUpstreamConfigFactory,

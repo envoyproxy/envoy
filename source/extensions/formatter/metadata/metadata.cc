@@ -49,6 +49,12 @@ MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
                                               absl::optional<size_t> max_length) {
     return std::make_unique<RouteMetadataFormatter>(filter_namespace, path, max_length);
   };
+  metadata_formatter_providers_["UPSTREAM_HOST"] = [](const std::string& filter_namespace,
+                                                      const std::vector<std::string>& path,
+                                                      absl::optional<size_t> max_length) {
+    return std::make_unique<::Envoy::Formatter::UpstreamHostMetadataFormatter>(filter_namespace,
+                                                                               path, max_length);
+  };
 }
 
 ::Envoy::Formatter::FormatterProviderPtr

@@ -101,7 +101,7 @@ message ThriftProxy {
   // A list of individual Thrift filters that make up the filter chain for requests made to the
   // Thrift proxy. Order matters as the filters are processed sequentially. For backwards
   // compatibility, if no thrift_filters are specified, a default Thrift router filter
-  // (`envoy.filters.thrift.router`) is used.
+  // (``envoy.filters.thrift.router``) is used.
   // [#extension-category: envoy.thrift_proxy.filters]
   repeated ThriftFilter thrift_filters = 5;
 
@@ -153,7 +153,7 @@ message ThriftFilter {
 // ThriftProtocolOptions specifies Thrift upstream protocol options. This object is used in
 // in
 // :ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
-// keyed by the name `envoy.filters.network.thrift_proxy`.
+// keyed by the name ``envoy.filters.network.thrift_proxy``.
 message ThriftProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProtocolOptions";

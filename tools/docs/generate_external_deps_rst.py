@@ -142,7 +142,7 @@ def main():
                                  [csv_row(dep) for dep in sorted(deps, key=lambda d: d.sort_name)])
         output_path.write_text(content)
 
-    with tarfile.open(output_filename, "w") as tar:
+    with tarfile.open(output_filename, "w:gz") as tar:
         tar.add(generated_rst_dir, arcname=".")
 
 
