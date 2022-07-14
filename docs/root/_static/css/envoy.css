@@ -36,3 +36,9 @@ table.docutils div.line-block {
     padding: 2px 2px;
     border: solid #eee 1px;
 }
+
+/* suppress errs on pseudo-json code highlights */
+.highlight-json .highlight .err {
+    border: inherit;
+    box-sizing: inherit;
+}

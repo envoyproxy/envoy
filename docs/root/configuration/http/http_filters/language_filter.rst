@@ -31,7 +31,7 @@ to match the desired locale of a client.
 
   supported_languages: [en, fr]
 
-.. code-block::
+.. code-block:: yaml
 
   // Multiple types, weighted with the quality value syntax:
   Accept-Language: fr-CH, fr;q=0.9, en;q=0.8, *;q=0.5
@@ -42,7 +42,7 @@ to match the desired locale of a client.
 * The application is only configured to match French fr
 * The filter sets the value of the ``x-language`` header to fr
 
-.. code-block::
+.. code-block:: yaml
 
   x-language: fr
 
