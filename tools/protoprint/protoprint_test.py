@@ -9,8 +9,6 @@ import sys
 import tarfile
 import tempfile
 
-sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
-
 from tools.protoprint.test_data import data as test_data
 from tools.run_command import run_command
 

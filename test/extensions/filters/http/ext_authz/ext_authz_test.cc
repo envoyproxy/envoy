@@ -1596,11 +1596,9 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
 
-  EXPECT_CALL(*decoder_filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  EXPECT_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&auth_per_route));
-  EXPECT_CALL(*decoder_filter_callbacks_.route_,
-              traversePerFilterConfig("envoy.filters.http.ext_authz", _))
+  EXPECT_CALL(*decoder_filter_callbacks_.route_, traversePerFilterConfig(_, _))
       .WillOnce(Invoke([&](const std::string&,
                            std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
         cb(auth_per_vhost);
@@ -1634,8 +1632,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRoute) {
 
   prepareCheck();
 
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -1666,8 +1663,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -2353,8 +2349,7 @@ TEST_P(HttpFilterTestParam, NoCluster) {
       "value_route";
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   prepareCheck();
@@ -2380,8 +2375,7 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable_request_body_buffering = [&](bool bypass) {

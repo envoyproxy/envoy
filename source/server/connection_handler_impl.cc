@@ -29,9 +29,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config, Runtime::Loader& runtime) {
-  const bool support_udp_in_place_filter_chain_update = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place");
-  if (support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
+  if (overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());
     ASSERT(listener_detail.has_value());
@@ -71,17 +69,6 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
                                listener_reject_fraction_, disable_listeners_,
                                std::move(internal_listener));
   } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
-    if (!support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
-      if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
-          iter != listener_map_by_tag_.end()) {
-        iter->second->invokeListenerMethod(
-            [&config](Network::ConnectionHandler::ActiveListener& listener) {
-              listener.updateListenerConfig(config);
-            });
-        return;
-      }
-      IS_ENVOY_BUG("unexpected");
-    }
     for (auto& socket_factory : config.listenSocketFactories()) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.

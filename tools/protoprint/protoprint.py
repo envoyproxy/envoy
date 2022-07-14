@@ -14,23 +14,14 @@ import io
 import os
 import pathlib
 import re
+import shutil
 import subprocess
-import sys
 from collections import deque
 from functools import cached_property
 
 from packaging import version
 
-from bazel_tools.tools.python.runfiles import runfiles
-
-# We have to do some evil things to sys.path due to the way that Python module
-# resolution works; we have both tools/ trees in bazel_tools and envoy. By
-# default, Bazel leaves us with a sys.path in which the @bazel_tools repository
-# takes precedence. Now that we're done with importing runfiles above, we can
-# just remove it from the sys.path.
-sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
-
-from tools.api_proto_plugin import annotations, plugin, traverse, visitor
+from tools.api_proto_plugin import annotations, constants, plugin, traverse, visitor
 from tools.api_versioning import utils as api_version_utils
 from tools.protoxform import options as protoxform_options, utils
 from tools.type_whisperer import type_whisperer, types_pb2
@@ -79,11 +70,7 @@ def extract_clang_proto_style(clang_format_text):
     return str(format_dict)
 
 
-CLANG_FORMAT_STYLE = extract_clang_proto_style(
-    pathlib.Path(runfiles.Create().Rlocation("envoy/.clang-format")).read_text())
-
-
-def clang_format(contents):
+def clang_format(style, contents):
     """Run proto-style oriented clang-format over given string.
 
     Args:
@@ -92,10 +79,13 @@ def clang_format(contents):
     Returns:
         clang-formatted string
     """
-    clang_format_path = os.getenv("CLANG_FORMAT", "clang-format")
+    clang_format_path = os.getenv("CLANG_FORMAT", shutil.which("clang-format"))
+    if not clang_format_path:
+        if not os.path.exists("/opt/llvm/bin/clang-format"):
+            raise RuntimeError("Unable to find clang-format, sorry")
+        clang_format_path = "/opt/llvm/bin/clang-format"
     return subprocess.run(
-        [clang_format_path,
-         '--style=%s' % CLANG_FORMAT_STYLE, '--assume-filename=.proto'],
+        [clang_format_path, '--style=%s' % style, '--assume-filename=.proto'],
         input=contents.encode('utf-8'),
         stdout=subprocess.PIPE).stdout
 
@@ -116,6 +106,12 @@ def format_block(block):
     return ''
 
 
+# TODO(htuch): not sure why this is needed, but clang-format does some weird
+# stuff with // comment indents when we have these trailing \
+def fixup_trailing_backslash(s):
+    return s[:-1].rstrip() if s.endswith('\\') else s
+
+
 def format_comments(comments):
     """Format a list of comment blocks from SourceCodeInfo.
 
@@ -129,16 +125,12 @@ def format_comments(comments):
         A string reprenting the formatted comment blocks.
     """
 
-    # TODO(htuch): not sure why this is needed, but clang-format does some weird
-    # stuff with // comment indents when we have these trailing \
-    def fixup_trailing_backslash(s):
-        return s[:-1].rstrip() if s.endswith('\\') else s
-
-    comments = '\n\n'.join(
-        '\n'.join(['//%s' % fixup_trailing_backslash(line)
-                   for line in comment.split('\n')[:-1]])
-        for comment in comments)
-    return format_block(comments)
+    return format_block(
+        '\n\n'.join(
+            '\n'.join(
+                ['// %s' % fixup_trailing_backslash(line)
+                 for line in comment.split('\n')[:-1]])
+            for comment in comments))
 
 
 def create_next_free_field_xform(msg_proto):
@@ -445,25 +437,8 @@ def format_field_type(type_context, field):
     elif field.type_name:
         return type_name
 
-    pretty_type_names = {
-        field.TYPE_DOUBLE: 'double',
-        field.TYPE_FLOAT: 'float',
-        field.TYPE_INT32: 'int32',
-        field.TYPE_SFIXED32: 'int32',
-        field.TYPE_SINT32: 'int32',
-        field.TYPE_FIXED32: 'uint32',
-        field.TYPE_UINT32: 'uint32',
-        field.TYPE_INT64: 'int64',
-        field.TYPE_SFIXED64: 'int64',
-        field.TYPE_SINT64: 'int64',
-        field.TYPE_FIXED64: 'uint64',
-        field.TYPE_UINT64: 'uint64',
-        field.TYPE_BOOL: 'bool',
-        field.TYPE_STRING: 'string',
-        field.TYPE_BYTES: 'bytes',
-    }
-    if field.type in pretty_type_names:
-        return label + pretty_type_names[field.type]
+    if field.type in constants.FIELD_TYPE_NAMES:
+        return label + constants.FIELD_TYPE_NAMES[field.type]
     raise ProtoPrintError('Unknown field type ' + str(field.type))
 
 
@@ -614,6 +589,10 @@ class ProtoFormatVisitor(visitor.Visitor):
         if params['type_db_path']:
             utils.load_type_db(params['type_db_path'])
 
+        self.clang_format_config = pathlib.Path(params[".clang-format"])
+        if not self.clang_format_config.exists():
+            raise ProtoPrintError(f"Unable to find .clang-format file: {self.clang_format_config}")
+
         if extra_args := params.get("extra_args"):
             if extra_args.startswith("api_version:"):
                 self._api_version = extra_args.split(":")[1]
@@ -749,7 +728,9 @@ class ProtoFormatVisitor(visitor.Visitor):
         formatted_services = format_block('\n'.join(services))
         formatted_enums = format_block('\n'.join(enums))
         formatted_msgs = format_block('\n'.join(msgs))
-        return clang_format(header + formatted_services + formatted_enums + formatted_msgs)
+        return clang_format(
+            extract_clang_proto_style(self.clang_format_config.read_text()),
+            header + formatted_services + formatted_enums + formatted_msgs)
 
 
 class ProtoprintTraverser:

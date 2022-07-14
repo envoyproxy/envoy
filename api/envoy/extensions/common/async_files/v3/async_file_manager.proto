@@ -16,7 +16,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: AsyncFileManager configuration]
 
-// Configuration to instantiate or select a singleton `AsyncFileManager`.
+// Configuration to instantiate or select a singleton ``AsyncFileManager``.
 message AsyncFileManagerConfig {
   message ThreadPool {
     // The number of threads to use. If unset or zero, will default to the number
@@ -26,7 +26,7 @@ message AsyncFileManagerConfig {
   }
 
   // An optional identifier for the manager. An empty string is a valid identifier
-  // for a common, default `AsyncFileManager`.
+  // for a common, default ``AsyncFileManager``.
   //
   // Reusing the same id with different configurations in the same envoy instance
   // is an error.

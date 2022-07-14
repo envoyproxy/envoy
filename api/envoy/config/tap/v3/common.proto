@@ -271,7 +271,7 @@ message StreamingAdminSink {
 // BufferedAdminSink configures a tap output to collect traces without returning them until
 // one of multiple criteria are satisfied.
 // Similar to StreamingAdminSink, it is only allowed to specify the buffered admin output
-// sink if the tap is being configured from the `/tap` admin endpoint.
+// sink if the tap is being configured from the ``/tap`` admin endpoint.
 message BufferedAdminSink {
   // Stop collecting traces when the specified number are collected.
   // If other criteria for ending collection are reached first, this value will not be used.

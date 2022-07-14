@@ -50,24 +50,24 @@ genrule(
         "//source/extensions:extensions_metadata.yaml",
         "//contrib:extensions_metadata.yaml",
     ],
-    outs = ["extensions_security_rst.tar"],
+    outs = ["extensions_security_rst.tar.gz"],
     cmd = """
     $(location //tools/docs:generate_extensions_security_rst) \\
         $(location //source/extensions:extensions_metadata.yaml) \\
         $(location //contrib:extensions_metadata.yaml) $@
     """,
-    tools = ["//tools/docs:generate_extensions_security_rst"],
+    exec_tools = ["//tools/docs:generate_extensions_security_rst"],
 )
 
 genrule(
     name = "external_deps_rst",
-    outs = ["external_deps_rst.tar"],
+    outs = ["external_deps_rst.tar.gz"],
     cmd = """
     $(location //tools/docs:generate_external_deps_rst) \
         $(location //bazel:all_repository_locations) \
         $@
     """,
-    tools = [
+    exec_tools = [
         "//bazel:all_repository_locations",
         "//tools/docs:generate_external_deps_rst",
     ],
@@ -93,7 +93,7 @@ genrule(
     cmd = """
     cat $(location :v3_proto_srcs) $(location :xds_proto_srcs)  > $@
     """,
-    tools = [
+    exec_tools = [
         ":v3_proto_srcs",
         ":xds_proto_srcs",
     ],
@@ -102,12 +102,12 @@ genrule(
 genrule(
     name = "empty_protos_rst",
     srcs = [":empty_extensions.json"],
-    outs = ["empty_protos_rst.tar"],
+    outs = ["empty_protos_rst.tar.gz"],
     cmd = """
     $(location //tools/protodoc:generate_empty) \\
         $(location empty_extensions.json) $@
     """,
-    tools = ["//tools/protodoc:generate_empty"],
+    exec_tools = ["//tools/protodoc:generate_empty"],
 )
 
 genrule(
@@ -116,12 +116,12 @@ genrule(
         "//tools/protodoc:api_v3_protodoc",
         ":proto_srcs",
     ],
-    outs = ["api_rst.tar"],
+    outs = ["api_rst.tar.gz"],
     cmd = """
     $(location //tools/docs:generate_api_rst) \\
         $(location proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
     """,
-    tools = ["//tools/docs:generate_api_rst"],
+    exec_tools = ["//tools/docs:generate_api_rst"],
 )
 
 pkg_files(
@@ -136,23 +136,34 @@ pkg_files(
 
 pkg_files(
     name = "sphinx_root",
-    srcs = glob(["root/**/*"]),
+    srcs = glob([
+        "root/**/*.css",
+        "root/**/*.ico",
+        "root/**/*.js",
+        "root/**/*.json",
+        "root/**/*.pb",
+        "root/**/*.png",
+        "root/**/*.proto",
+        "root/**/*.rst",
+        "root/**/*.svg",
+        "root/**/*.yaml",
+    ]),
     strip_prefix = "/docs/root",
 )
 
 pkg_files(
     name = "sphinx_inventories",
-    srcs = glob(["inventories/**/*"]),
+    srcs = glob(["inventories/**/*.inv"]),
     strip_prefix = "",
 )
 
 genrule(
     name = "version_histories",
-    outs = ["version_histories.tar"],
+    outs = ["version_histories.tar.gz"],
     cmd = """
     $(location //tools/docs:generate_version_histories) $@
     """,
-    tools = [
+    exec_tools = [
         ":versions.yaml",
         "//:VERSION.txt",
         "//changelogs",
@@ -188,7 +199,7 @@ pkg_filegroup(
 
 pkg_tar(
     name = "version_history_rst",
-    extension = "tar",
+    extension = "tar.gz",
     package_dir = "version_history",
     deps = [":version_histories"],
 )
@@ -196,7 +207,7 @@ pkg_tar(
 pkg_tar(
     name = "rst",
     srcs = [":rst_files"],
-    extension = "tar",
+    extension = "tar.gz",
     deps = [
         ":api_rst",
         ":empty_protos_rst",
@@ -206,17 +217,41 @@ pkg_tar(
     ],
 )
 
+# TODO(phlax): Add `envoy_sphinx` rule to encapsulate these and above targets
 genrule(
-    name = "html",
-    outs = ["html.tar"],
+    name = "html_release",
+    outs = ["html_release.tar.gz"],
     cmd = """
-    $(location //tools/docs:sphinx_runner) \
+    . $(location //bazel:volatile_env) \
+    && $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$${BUILD_SHA:-}" \
-         --docs_tag="$${DOCS_TAG:-}" \
+         --build_sha="$${BUILD_SCM_REVISION:-}" \
+         --docs_tag="$${BUILD_DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
          --descriptor_path=$(location @envoy_api//:v3_proto_set) \\
          $(location rst) \
+         $@
+    """,
+    exec_tools = [
+        "//bazel:volatile_env",
+        "//tools/docs:sphinx_runner",
+        ":rst",
+        "//:VERSION.txt",
+        "@envoy_api//:v3_proto_set",
+    ],
+    stamp = 1,
+)
+
+# No git stamping, speeds up local dev switching branches
+genrule(
+    name = "html",
+    outs = ["html.tar.gz"],
+    cmd = """
+    $(location //tools/docs:sphinx_runner) \
+         $${SPHINX_RUNNER_ARGS:-} \
+         --version_file=$(location //:VERSION.txt) \
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \
+         $(location :rst) \
          $@
     """,
     exec_tools = [
