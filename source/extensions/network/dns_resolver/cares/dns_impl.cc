@@ -27,13 +27,15 @@ namespace Network {
 DnsResolverImpl::DnsResolverImpl(
     const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
     Event::Dispatcher& dispatcher,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+    Stats::Scope& root_scope)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       dns_resolver_options_(config.dns_resolver_options()),
       use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)),
-      filter_unroutable_families_(config.filter_unroutable_families()) {
+      filter_unroutable_families_(config.filter_unroutable_families()),
+      scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
 }
@@ -41,6 +43,10 @@ DnsResolverImpl::DnsResolverImpl(
 DnsResolverImpl::~DnsResolverImpl() {
   timer_->disableTimer();
   ares_destroy(channel_);
+}
+
+CaresDnsResolverStats DnsResolverImpl::generateCaresDnsResolverStats(Stats::Scope& scope) {
+  return {ALL_CARES_DNS_RESOLVER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
 absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
@@ -134,6 +140,13 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     int status, int timeouts, ares_addrinfo* addrinfo) {
   ASSERT(pending_resolutions_ > 0);
   pending_resolutions_--;
+
+  parent_.stats_.resolve_total_.inc();
+  parent_.stats_.pending_resolutions_.dec();
+
+  if (status != ARES_SUCCESS) {
+    parent_.chargeGetAddrInfoErrorStats(status, timeouts);
+  }
 
   if (status != ARES_SUCCESS && !isResponseWithNoRecords(status)) {
     ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
@@ -370,6 +383,21 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   }
 }
 
+void DnsResolverImpl::chargeGetAddrInfoErrorStats(int status, int timeouts) {
+  switch (status) {
+  case ARES_ENODATA:
+    ABSL_FALLTHROUGH_INTENDED;
+  case ARES_ENOTFOUND:
+    stats_.not_found_.inc();
+    break;
+  case ARES_ETIMEOUT:
+    stats_.timeouts_.add(timeouts);
+    break;
+  default:
+    stats_.get_addr_failure_.inc();
+  }
+}
+
 DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
     DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
     ares_channel channel, const std::string& dns_name, DnsLookupFamily dns_lookup_family)
@@ -406,6 +434,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolution() { startResolu
 
 void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family) {
   pending_resolutions_++;
+  parent_.stats_.pending_resolutions_.inc();
   if (parent_.filter_unroutable_families_ && family != AF_UNSPEC) {
     switch (family) {
     case AF_INET:
@@ -503,7 +532,7 @@ public:
         new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
   }
 
-  DnsResolverSharedPtr createDnsResolver(Event::Dispatcher& dispatcher, Api::Api&,
+  DnsResolverSharedPtr createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
                                          const envoy::config::core::v3::TypedExtensionConfig&
                                              typed_dns_resolver_config) const override {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
@@ -520,7 +549,8 @@ public:
         resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
       }
     }
-    return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, resolvers);
+    return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, resolvers,
+                                                      api.rootScope());
   }
 
   void initialize() override {
