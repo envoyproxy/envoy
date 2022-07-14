@@ -197,6 +197,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # DNS resolution
 /*/extensions/network/dns_resolver/cares @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
+/*/extensions/network/dns_resolver/getaddrinfo @alyssawilk @mattklein123
 # compression code
 /*/extensions/filters/http/decompressor @kbaichoo @mattklein123
 /*/extensions/filters/http/compressor @kbaichoo @mattklein123

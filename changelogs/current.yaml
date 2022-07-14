@@ -232,6 +232,8 @@ new_features:
     added :ref:`include_unroutable_families<envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families>` to the Apple DNS resolver.
   change: |
     added support for multiple addresses. This is most valuable when used in conjunction with :ref:`ALL <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.ALL>` enabling full happy eyeballs support for Envoy (see detailed documentation :ref:`here <arch_overview_conn_pool>` but will also result in trying multiple addresses for resolvers doing only IPv4 or IPv6. This behavioral change can be temporarily disabled by setting runtime guard ``envoy.restart_features.remove_runtime_singleton`` to false.
+  change: |
+    added :ref:`GetAddrInfoDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig>`, a new DNS resolver that uses the system's getaddrinfo() function to resolve DNS. This was primarily added for use on Android but can also be used in other situations in which the system resolver is desired.
 - area: dubbo_proxy
   change: |
     added :ref:`dynamic routes discovery <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` support to the dubbo proxy.
