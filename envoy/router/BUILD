@@ -154,6 +154,5 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

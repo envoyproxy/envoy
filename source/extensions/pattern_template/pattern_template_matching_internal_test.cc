@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "source/common/common/assert.h"
-#include "source/extensions/pattern_template/pattern_template_matching_internal.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/pattern_template/pattern_template_matching_internal.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
@@ -64,7 +64,7 @@ TEST(InternalParsing, isValidLiteralWorks) {
   EXPECT_FALSE(isValidLiteral("{abc}"));
 }
 
-TEST(InternalParsing, isValidRewriteLiteralWorks) {
+TEST(InternalParsing, IsValidRewriteLiteralWorks) {
   EXPECT_TRUE(isValidRewriteLiteral("123abcABC"));
   EXPECT_TRUE(isValidRewriteLiteral("abc/"));
   EXPECT_TRUE(isValidRewriteLiteral("abc/def"));
@@ -78,7 +78,7 @@ TEST(InternalParsing, isValidRewriteLiteralWorks) {
   EXPECT_FALSE(isValidRewriteLiteral("?a=c"));
 }
 
-TEST(InternalParsing, isValidIdentWorks) {
+TEST(InternalParsing, IsValidIndentWorks) {
   EXPECT_TRUE(isValidIndent("abc"));
   EXPECT_TRUE(isValidIndent("ABC_def_123"));
   EXPECT_TRUE(isValidIndent("a1"));
@@ -463,6 +463,6 @@ TEST_P(GenPatternRegexWithoutMatch, WithCapture) {
 }
 
 } // namespace
-} // namespace url_template_matching_internal
-} // namespace matching
+} // namespace PatternTemplateInternal
+} // namespace PatternTemplate
 } // namespace Envoy
