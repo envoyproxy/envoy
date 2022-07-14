@@ -519,6 +519,8 @@ High resolution timestamp function. *format* is an optional enum parameter to in
 *EnvoyTimestampResolution.MILLISECOND* is supported
 The function returns timestamp in milliseconds since epoch by default if format is not set.
 
+.. _config_http_filters_lua_stream_handle_api_timestamp_string:
+
 timestampString()
 ^^^^^^^^^^^^^^^^^
 
