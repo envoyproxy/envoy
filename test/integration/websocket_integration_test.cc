@@ -455,8 +455,8 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedDataLegacyAddTE) {
 }
 
 TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      upstreamProtocol() == Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
 
@@ -491,8 +491,7 @@ TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding)
   fake_upstream_connection->clearData();
   // Send data and make sure Envoy did not add chunk framing
   ASSERT_TRUE(tcp_client->write("foo bar", false, false));
-  ASSERT_TRUE(fake_upstream_connection->waitForData(
-      [](const std::string& data) -> bool { return data == "foo bar"; }));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("foo bar")));
 
   tcp_client->clearData();
   // Send response data and make sure Envoy did not add chunk framing on the response path
@@ -504,8 +503,8 @@ TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding)
 
 TEST_P(WebsocketIntegrationTest,
        BidirectionalNoContentLengthNoTransferEncodingLegacyZeroContentLength) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      upstreamProtocol() == Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
 
@@ -542,8 +541,7 @@ TEST_P(WebsocketIntegrationTest,
   fake_upstream_connection->clearData();
   // Send data and make sure Envoy did not add chunk framing
   ASSERT_TRUE(tcp_client->write("foo bar", false, false));
-  ASSERT_TRUE(fake_upstream_connection->waitForData(
-      [](const std::string& data) -> bool { return data == "foo bar"; }));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("foo bar")));
 
   tcp_client->clearData();
   // Send response data and make sure Envoy did not add chunk framing on the response path
@@ -554,8 +552,8 @@ TEST_P(WebsocketIntegrationTest,
 }
 
 TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithTransferEncoding) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      upstreamProtocol() == Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
 
@@ -591,7 +589,7 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithTransferEncoding) {
   // Send data and make sure Envoy did not add chunk framing
   ASSERT_TRUE(tcp_client->write("7\r\nfoo bar\r\n0\r\n\r\n", false, false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(
-      [](const std::string& data) -> bool { return data == "7\r\nfoo bar\r\n0\r\n\r\n"; }));
+      FakeRawConnection::waitForMatch("7\r\nfoo bar\r\n0\r\n\r\n")));
 
   tcp_client->clearData();
   // Send response data and make sure Envoy did not add chunk framing on the response path
@@ -602,8 +600,8 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithTransferEncoding) {
 }
 
 TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithContentLength) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      upstreamProtocol() == Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
 
@@ -637,8 +635,7 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithContentLength) {
   fake_upstream_connection->clearData();
   // Send data and make sure Envoy did not add chunk framing
   ASSERT_TRUE(tcp_client->write("foo bar", false, false));
-  ASSERT_TRUE(fake_upstream_connection->waitForData(
-      [](const std::string& data) -> bool { return data == "foo bar"; }));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("foo bar")));
 
   tcp_client->clearData();
   // Send response data and make sure Envoy did not add chunk framing on the response path
@@ -650,8 +647,8 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithContentLength) {
 
 // Verify that CONNECT requests are treated the same way as upgrades by H/1 codec.
 TEST_P(WebsocketIntegrationTest, BidirectionalConnectNoContentLengthNoTransferEncoding) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      upstreamProtocol() == Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
 
@@ -692,8 +689,7 @@ TEST_P(WebsocketIntegrationTest, BidirectionalConnectNoContentLengthNoTransferEn
   fake_upstream_connection->clearData();
   // Send data and make sure Envoy did not add chunk framing
   ASSERT_TRUE(tcp_client->write("foo bar", false, false));
-  ASSERT_TRUE(fake_upstream_connection->waitForData(
-      [](const std::string& data) -> bool { return data == "foo bar"; }));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("foo bar")));
 
   tcp_client->clearData();
   // Send response data and make sure Envoy did not add chunk framing on the response path

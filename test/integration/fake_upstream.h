@@ -563,6 +563,12 @@ public:
     };
   }
 
+  // Creates a ValidatorFunction which returns true when data_to_wait_for
+  // equals the incoming data string.
+  static ValidatorFunction waitForMatch(const char* data_to_wait_for) {
+    return [data_to_wait_for](const std::string& data) -> bool { return data == data_to_wait_for; };
+  }
+
   // Creates a ValidatorFunction which returns true when data_to_wait_for is
   // contains at least bytes_read bytes.
   static ValidatorFunction waitForAtLeastBytes(uint32_t bytes) {
