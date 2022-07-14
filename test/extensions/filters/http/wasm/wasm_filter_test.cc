@@ -1,7 +1,9 @@
+#include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/grpc/async_client.h"
 
 #include "source/common/http/message_impl.h"
 #include "source/extensions/filters/http/wasm/wasm_filter.h"
+#include "source/extensions/tracers/datadog/datadog_tracer_impl.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/connection.h"
@@ -94,9 +96,41 @@ public:
   TestRoot& rootContext() { return *static_cast<TestRoot*>(root_context_); }
   TestFilter& filter() { return *static_cast<TestFilter*>(context_.get()); }
 
+  void setupSpan() {
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    )EOF";
+    envoy::config::trace::v3::DatadogConfig datadog_config;
+    TestUtility::loadFromYaml(yaml_string, datadog_config);
+
+    cm_.initializeClusters({"fake_cluster"}, {});
+    cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
+
+    timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
+    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900), _));
+
+    driver_ =
+        std::make_unique<Tracers::Datadog::Driver>(datadog_config, cm_, stats_, tls_, runtime_);
+
+    datadog_span_ = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                       {Tracing::Reason::Sampling, true});
+  }
+
 protected:
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   Grpc::MockAsyncClientManager async_client_manager_;
+  std::unique_ptr<Tracers::Datadog::Driver> driver_;
+  Tracing::SpanPtr datadog_span_;
+  NiceMock<Event::MockTimer>* timer_;
+  Stats::TestUtil::TestStore stats_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Tracing::MockConfig> config_;
+  const std::string operation_name_{"test"};
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
+  SystemTime start_time_;
 };
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmHttpFilterTest,
@@ -716,14 +750,18 @@ TEST_P(WasmHttpFilterTest, AsyncCall) {
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callbacks = nullptr;
   cluster_manager_.initializeThreadLocalClusters({"cluster"});
+
+  setupSpan();
+  Tracing::SpanPtr current_span;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   rootContext().setDecoderFilterCallbacks(decoder_callbacks);
-  EXPECT_CALL(decoder_callbacks, activeSpan());
+  EXPECT_CALL(decoder_callbacks, activeSpan()).WillOnce(ReturnRef(*datadog_span_));
+
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                       {":path", "/"},
                                                       {":authority", "foo"},
@@ -731,6 +769,12 @@ TEST_P(WasmHttpFilterTest, AsyncCall) {
                       message->headers());
             EXPECT_EQ((Http::TestRequestTrailerMapImpl{{"trail", "cow"}}), *message->trailers());
             callbacks = &cb;
+            current_span =
+                options.parent_span_->spawnChild(Tracing::EgressConfig::get(), "fake", start_time_);
+            current_span->injectContext(message->headers(), nullptr);
+            EXPECT_TRUE(message->headers().getByKey("x-datadog-parent-id") != "");
+            EXPECT_TRUE(message->headers().getByKey("x-datadog-parent-id") != "");
+            EXPECT_TRUE(message->headers().getByKey("x-datadog-sampling-priority") != "");
             return &request;
           }));
 
@@ -962,26 +1006,32 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     auto client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
     auto async_client = std::make_unique<Grpc::MockAsyncClient>();
     Tracing::Span* parent_span{};
+
+    setupSpan();
+    Tracing::SpanPtr current_span;
     Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
     rootContext().setDecoderFilterCallbacks(decoder_callbacks);
-    EXPECT_CALL(decoder_callbacks, activeSpan());
+    EXPECT_CALL(decoder_callbacks, activeSpan()).WillOnce(ReturnRef(*datadog_span_));
+
     EXPECT_CALL(*async_client, sendRaw(_, _, _, _, _, _))
-        .WillOnce(
-            Invoke([&](absl::string_view service_full_name, absl::string_view method_name,
-                       Buffer::InstancePtr&& message, Grpc::RawAsyncRequestCallbacks& cb,
-                       Tracing::Span& span,
-                       const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
-              EXPECT_EQ(service_full_name, "service");
-              EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
-              EXPECT_TRUE(
-                  value.ParseFromArray(message->linearize(message->length()), message->length()));
-              EXPECT_EQ(value.string_value(), "request");
-              callbacks = &cb;
-              parent_span = &span;
-              EXPECT_EQ(options.timeout->count(), 1000);
-              return &request;
-            }));
+        .WillOnce(Invoke([&](absl::string_view service_full_name, absl::string_view method_name,
+                             Buffer::InstancePtr&& message, Grpc::RawAsyncRequestCallbacks& cb,
+                             Tracing::Span& span, const Http::AsyncClient::RequestOptions& options)
+                             -> Grpc::AsyncRequest* {
+          EXPECT_EQ(service_full_name, "service");
+          EXPECT_EQ(method_name, "method");
+          ProtobufWkt::Value value;
+          EXPECT_TRUE(
+              value.ParseFromArray(message->linearize(message->length()), message->length()));
+          EXPECT_EQ(value.string_value(), "request");
+          callbacks = &cb;
+          parent_span = &span;
+          EXPECT_EQ(options.timeout->count(), 1000);
+          current_span = span.spawnChild(
+              Tracing::EgressConfig::get(),
+              absl::StrCat("async ", service_full_name, ".", method_name, " egress"), start_time_);
+          return &request;
+        }));
     EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
         .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
     EXPECT_CALL(client_manager, getOrCreateRawAsyncClient(_, _, _, _))
@@ -1005,7 +1055,11 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     EXPECT_NE(callbacks, nullptr);
     NiceMock<Tracing::MockSpan> span;
     if (callbacks) {
+      current_span->injectContext(request_headers, nullptr);
       callbacks->onCreateInitialMetadata(request_headers);
+      EXPECT_TRUE(request_headers.has("x-datadog-trace-id"));
+      EXPECT_TRUE(request_headers.has("x-datadog-parent-id"));
+      EXPECT_TRUE(request_headers.has("x-datadog-sampling-priority"));
       const auto source = request_headers.get(Http::LowerCaseString{"source"});
       EXPECT_EQ(source.size(), 1);
       EXPECT_EQ(source[0]->value().getStringView(), id);
