@@ -11,6 +11,8 @@ namespace Envoy {
 namespace Network {
 namespace Matching {
 
+using Matcher::InputValue;
+
 TEST(MatchingData, DestinationIPInput) {
   DestinationIPInput<MatchingData> input;
   MockConnectionSocket socket;
@@ -22,7 +24,7 @@ TEST(MatchingData, DestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(result.data_, InputValue("127.0.0.1"));
   }
 
   {
@@ -31,7 +33,7 @@ TEST(MatchingData, DestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 }
 
@@ -49,42 +51,42 @@ TEST(MatchingData, HttpDestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(result.data_, InputValue("127.0.0.1"));
   }
   {
     DestinationPortInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "8080");
+    EXPECT_EQ(result.data_, InputValue(8080));
   }
   {
     SourceIPInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "10.0.0.1");
+    EXPECT_EQ(result.data_, InputValue("10.0.0.1"));
   }
   {
     SourcePortInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "9090");
+    EXPECT_EQ(result.data_, InputValue(9090));
   }
   {
     DirectSourceIPInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.2");
+    EXPECT_EQ(result.data_, InputValue("127.0.0.2"));
   }
   {
     ServerNameInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, host);
+    EXPECT_EQ(result.data_, InputValue(host));
   }
 
   connection_info_provider.setRemoteAddress(
@@ -94,7 +96,7 @@ TEST(MatchingData, HttpDestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "local");
+    EXPECT_EQ(result.data_, InputValue("local"));
   }
 }
 
@@ -109,7 +111,7 @@ TEST(MatchingData, DestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "8080");
+    EXPECT_EQ(result.data_, InputValue(8080));
   }
 
   {
@@ -118,7 +120,7 @@ TEST(MatchingData, DestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 }
 
@@ -133,7 +135,7 @@ TEST(MatchingData, SourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(result.data_, InputValue("127.0.0.1"));
   }
 
   {
@@ -142,7 +144,7 @@ TEST(MatchingData, SourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 }
 
@@ -157,7 +159,7 @@ TEST(MatchingData, SourcePortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "8080");
+    EXPECT_EQ(result.data_, InputValue(8080));
   }
 
   {
@@ -166,7 +168,7 @@ TEST(MatchingData, SourcePortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 }
 
@@ -181,7 +183,7 @@ TEST(MatchingData, DirectSourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(result.data_, InputValue("127.0.0.1"));
   }
 
   {
@@ -190,7 +192,7 @@ TEST(MatchingData, DirectSourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 }
 
@@ -205,7 +207,7 @@ TEST(MatchingData, SourceTypeInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "local");
+    EXPECT_EQ(result.data_, InputValue("local"));
   }
 
   {
@@ -214,7 +216,7 @@ TEST(MatchingData, SourceTypeInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 }
 
@@ -227,7 +229,7 @@ TEST(MatchingData, ServerNameInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 
   {
@@ -236,7 +238,7 @@ TEST(MatchingData, ServerNameInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, host);
+    EXPECT_EQ(result.data_, InputValue(host));
   }
 }
 
@@ -250,7 +252,7 @@ TEST(MatchingData, TransportProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 
   {
@@ -259,7 +261,7 @@ TEST(MatchingData, TransportProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, protocol);
+    EXPECT_EQ(result.data_, InputValue(protocol));
   }
 }
 
@@ -274,7 +276,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 
   {
@@ -283,7 +285,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "'h2c'");
+    EXPECT_EQ(result.data_, InputValue("'h2c'"));
   }
 
   {
@@ -292,7 +294,7 @@ TEST(MatchingData, ApplicationProtocolInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "'h2','http/1.1'");
+    EXPECT_EQ(result.data_, InputValue("'h2','http/1.1'"));
   }
 }
 
@@ -306,7 +308,7 @@ TEST(UdpMatchingData, UdpDestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(result.data_, InputValue("127.0.0.1"));
   }
 
   {
@@ -314,7 +316,7 @@ TEST(UdpMatchingData, UdpDestinationIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 }
 
@@ -328,7 +330,7 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "8080");
+    EXPECT_EQ(result.data_, InputValue(8080));
   }
 
   {
@@ -336,7 +338,7 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 }
 
@@ -350,7 +352,7 @@ TEST(UdpMatchingData, UdpSourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "127.0.0.1");
+    EXPECT_EQ(result.data_, InputValue("127.0.0.1"));
   }
 
   {
@@ -358,7 +360,7 @@ TEST(UdpMatchingData, UdpSourceIPInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 }
 
@@ -372,7 +374,7 @@ TEST(UdpMatchingData, UdpSourcePortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "8080");
+    EXPECT_EQ(result.data_, InputValue(8080));
   }
 
   {
@@ -380,7 +382,7 @@ TEST(UdpMatchingData, UdpSourcePortInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, InputValue());
   }
 }
 

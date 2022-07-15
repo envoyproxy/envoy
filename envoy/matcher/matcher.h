@@ -238,6 +238,8 @@ public:
     return out.str();
   }
 
+  bool operator==(const InputValue& that) const { return data_ == that.data_; }
+
 private:
   const absl::variant<absl::monostate, std::string, int64_t, std::vector<InputValue>> data_;
 };

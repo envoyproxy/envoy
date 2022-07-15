@@ -69,11 +69,11 @@ public:
     if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
     }
-    if (!input.data_) {
+    if (input.data_.isNull()) {
       return {MatchState::MatchComplete, on_no_match_};
     }
     const Network::Address::InstanceConstSharedPtr addr =
-        Network::Utility::parseInternetAddressNoThrow(*input.data_);
+        Network::Utility::parseInternetAddressNoThrow(input.data_.toString());
     if (!addr) {
       return {MatchState::MatchComplete, on_no_match_};
     }

@@ -30,6 +30,7 @@ namespace {
 using ::Envoy::Matcher::ActionFactory;
 using ::Envoy::Matcher::CustomMatcherFactory;
 using ::Envoy::Matcher::DataInputGetResult;
+using ::Envoy::Matcher::InputValue;
 using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
 using ::Envoy::Matcher::StringAction;
@@ -182,7 +183,7 @@ on_no_match:
   {
     // Input is nullopt.
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, InputValue()});
     validateMatch("bar");
   }
 }
@@ -473,26 +474,26 @@ matcher_tree:
 
   {
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, InputValue()});
     auto nested = TestDataInputBoolFactory("");
     validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::AllDataAvailable, InputValue()});
     validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::NotAvailable, InputValue()});
     auto nested = TestDataInputBoolFactory("");
     validateUnableToMatch();
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+        {DataInputGetResult::DataAvailability::NotAvailable, InputValue()});
     validateUnableToMatch();
   }
 }

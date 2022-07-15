@@ -22,7 +22,7 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
     TestRequestHeaderMapImpl request_headers({{"header", "bar"}});
     data.onRequestHeaders(request_headers);
 
-    EXPECT_EQ(input.get(data).data_, "bar");
+    EXPECT_EQ(input.get(data).data_, Matcher::InputValue("bar"));
   }
 
   {
@@ -31,7 +31,7 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, Matcher::InputValue());
   }
 }
 
@@ -46,7 +46,7 @@ TEST(MatchingData, HttpRequestTrailersDataInput) {
     TestRequestTrailerMapImpl request_trailers({{"header", "bar"}});
     data.onRequestTrailers(request_trailers);
 
-    EXPECT_EQ(input.get(data).data_, "bar");
+    EXPECT_EQ(input.get(data).data_, Matcher::InputValue("bar"));
   }
 
   {
@@ -55,7 +55,7 @@ TEST(MatchingData, HttpRequestTrailersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, Matcher::InputValue());
   }
 }
 
@@ -70,7 +70,7 @@ TEST(MatchingData, HttpResponseHeadersDataInput) {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
     data.onResponseHeaders(response_headers);
 
-    EXPECT_EQ(input.get(data).data_, "bar");
+    EXPECT_EQ(input.get(data).data_, Matcher::InputValue("bar"));
   }
 
   {
@@ -79,7 +79,7 @@ TEST(MatchingData, HttpResponseHeadersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, Matcher::InputValue());
   }
 }
 
@@ -94,7 +94,7 @@ TEST(MatchingData, HttpResponseTrailersDataInput) {
     TestResponseTrailerMapImpl response_trailers({{"header", "bar"}});
     data.onResponseTrailers(response_trailers);
 
-    EXPECT_EQ(input.get(data).data_, "bar");
+    EXPECT_EQ(input.get(data).data_, Matcher::InputValue("bar"));
   }
 
   {
@@ -103,7 +103,7 @@ TEST(MatchingData, HttpResponseTrailersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, Matcher::InputValue());
   }
 }
 

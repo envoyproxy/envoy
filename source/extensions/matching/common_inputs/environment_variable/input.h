@@ -12,7 +12,9 @@ class Input : public Matcher::CommonProtocolInput {
 public:
   explicit Input(absl::optional<std::string>&& value) : storage_(std::move(value)) {}
 
-  Matcher::InputValue get() override { return storage_ ? Matcher::InputValue(storage_.value()) : Matcher::InputValue(); }
+  Matcher::InputValue get() override {
+    return storage_ ? Matcher::InputValue(storage_.value()) : Matcher::InputValue();
+  }
 
 private:
   const absl::optional<std::string> storage_;

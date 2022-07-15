@@ -11,13 +11,11 @@ namespace EnvironmentVariable {
 TEST(InputTest, BasicUsage) {
   {
     Input input("foo");
-    ASSERT_TRUE(input.get().has_value());
-    EXPECT_EQ(input.get().value(), "foo");
+    EXPECT_EQ(input.get(), Matcher::InputValue("foo"));
   }
 
   Input input("foo");
-  ASSERT_TRUE(input.get().has_value());
-  EXPECT_EQ(input.get().value(), "foo");
+  EXPECT_EQ(input.get(), Matcher::InputValue("foo"));
 }
 } // namespace EnvironmentVariable
 } // namespace CommonInputs

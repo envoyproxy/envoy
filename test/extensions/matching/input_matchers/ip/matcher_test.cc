@@ -13,6 +13,8 @@ namespace Matching {
 namespace InputMatchers {
 namespace IP {
 
+using Envoy::Matcher::InputValue;
+
 class MatcherTest : public testing::Test {
 public:
   void initialize(std::vector<Network::Address::CidrRange>&& ranges) {
@@ -29,14 +31,14 @@ TEST_F(MatcherTest, TestV4) {
   ranges.emplace_back(Network::Address::CidrRange::create("192.0.2.0", 24));
   ranges.emplace_back(Network::Address::CidrRange::create("10.0.0.0", 24));
   initialize(std::move(ranges));
-  EXPECT_FALSE(m_->match("192.0.1.255"));
-  EXPECT_TRUE(m_->match("192.0.2.0"));
-  EXPECT_TRUE(m_->match("192.0.2.1"));
-  EXPECT_TRUE(m_->match("192.0.2.255"));
-  EXPECT_FALSE(m_->match("9.255.255.255"));
-  EXPECT_TRUE(m_->match("10.0.0.0"));
-  EXPECT_TRUE(m_->match("10.0.0.255"));
-  EXPECT_FALSE(m_->match("10.0.1.0"));
+  EXPECT_FALSE(m_->match(InputValue("192.0.1.255")));
+  EXPECT_TRUE(m_->match(InputValue("192.0.2.0")));
+  EXPECT_TRUE(m_->match(InputValue("192.0.2.1")));
+  EXPECT_TRUE(m_->match(InputValue("192.0.2.255")));
+  EXPECT_FALSE(m_->match(InputValue("9.255.255.255")));
+  EXPECT_TRUE(m_->match(InputValue("10.0.0.0")));
+  EXPECT_TRUE(m_->match(InputValue("10.0.0.255")));
+  EXPECT_FALSE(m_->match(InputValue("10.0.1.0")));
 }
 
 TEST_F(MatcherTest, TestV6) {
@@ -46,29 +48,29 @@ TEST_F(MatcherTest, TestV6) {
   ranges.emplace_back(Network::Address::CidrRange::create("2002::/16"));
   initialize(std::move(ranges));
 
-  EXPECT_FALSE(m_->match("::"));
-  EXPECT_TRUE(m_->match("::1"));
-  EXPECT_FALSE(m_->match("::2"));
+  EXPECT_FALSE(m_->match(InputValue("::")));
+  EXPECT_TRUE(m_->match(InputValue("::1")));
+  EXPECT_FALSE(m_->match(InputValue("::2")));
 
-  EXPECT_FALSE(m_->match("2000:ffff:ffff:ffff:ffff:ffff:ffff:ffff"));
-  EXPECT_TRUE(m_->match("2001::1"));
-  EXPECT_TRUE(m_->match("2001:ffff:ffff:ffff:ffff:ffff:ffff:ffff"));
-  EXPECT_TRUE(m_->match("2002::1"));
-  EXPECT_TRUE(m_->match("2002:ffff:ffff:ffff:ffff:ffff:ffff:ffff"));
-  EXPECT_FALSE(m_->match("2003::"));
+  EXPECT_FALSE(m_->match(InputValue("2000:ffff:ffff:ffff:ffff:ffff:ffff:ffff")));
+  EXPECT_TRUE(m_->match(InputValue("2001::1")));
+  EXPECT_TRUE(m_->match(InputValue("2001:ffff:ffff:ffff:ffff:ffff:ffff:ffff")));
+  EXPECT_TRUE(m_->match(InputValue("2002::1")));
+  EXPECT_TRUE(m_->match(InputValue("2002:ffff:ffff:ffff:ffff:ffff:ffff:ffff")));
+  EXPECT_FALSE(m_->match(InputValue("2003::")));
 }
 
 TEST_F(MatcherTest, EmptyRanges) {
   initialize(std::vector<Network::Address::CidrRange>{});
-  EXPECT_FALSE(m_->match("192.0.2.0"));
+  EXPECT_FALSE(m_->match(InputValue("192.0.2.0")));
 }
 
 TEST_F(MatcherTest, EmptyIP) {
   std::vector<Network::Address::CidrRange> ranges;
   ranges.emplace_back(Network::Address::CidrRange::create("192.0.2.0", 24));
   initialize(std::move(ranges));
-  EXPECT_FALSE(m_->match(""));
-  EXPECT_FALSE(m_->match(absl::optional<absl::string_view>{}));
+  EXPECT_FALSE(m_->match(InputValue("")));
+  EXPECT_FALSE(m_->match(InputValue()));
 }
 
 TEST_F(MatcherTest, InvalidIP) {
@@ -76,7 +78,7 @@ TEST_F(MatcherTest, InvalidIP) {
   ranges.emplace_back(Network::Address::CidrRange::create("192.0.2.0", 24));
   initialize(std::move(ranges));
   EXPECT_EQ(m_->stats()->ip_parsing_failed_.value(), 0);
-  EXPECT_FALSE(m_->match("foo"));
+  EXPECT_FALSE(m_->match(InputValue("foo")));
   EXPECT_EQ(m_->stats()->ip_parsing_failed_.value(), 1);
 }
 

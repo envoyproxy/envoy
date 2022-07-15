@@ -12,6 +12,8 @@ namespace Matching {
 namespace CommonInputs {
 namespace EnvironmentVariable {
 
+using Envoy::Matcher::InputValue;
+
 TEST(ConfigTest, TestConfig) {
   const std::string yaml_string = R"EOF(
     name: hashing
@@ -31,7 +33,7 @@ TEST(ConfigTest, TestConfig) {
     auto input_factory = factory.createCommonProtocolInputFactoryCb(
         *message, ProtobufMessage::getStrictValidationVisitor());
     EXPECT_NE(nullptr, input_factory);
-    EXPECT_EQ(input_factory()->get(), absl::nullopt);
+    EXPECT_EQ(input_factory()->get(), InputValue());
   }
 
   TestEnvironment::setEnvVar("foo", "bar", 1);
@@ -39,7 +41,7 @@ TEST(ConfigTest, TestConfig) {
     auto input_factory = factory.createCommonProtocolInputFactoryCb(
         *message, ProtobufMessage::getStrictValidationVisitor());
     EXPECT_NE(nullptr, input_factory);
-    EXPECT_EQ(input_factory()->get(), absl::make_optional("bar"));
+    EXPECT_EQ(input_factory()->get(), InputValue("bar"));
   }
 
   TestEnvironment::unsetEnvVar("foo");
