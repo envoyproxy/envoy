@@ -204,7 +204,6 @@ bool HttpHealthCheckerImpl::HttpStatusChecker::inRetriableRanges(uint64_t http_s
 }
 
 bool HttpHealthCheckerImpl::HttpStatusChecker::inExpectedRanges(uint64_t http_status) const {
-  ENVOY_LOG_MISC(info, "Boteng {}, expected {}", http_status, expected_ranges_);
   return inRanges(http_status, expected_ranges_);
 }
 
@@ -263,7 +262,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeData(Buffer::Instance& data,
                                                                      bool end_stream) {
-  absl::StrAppend(&body_, data.toString());
+  if (!parent_.expected_response_.empty()) {
+    absl::StrAppend(&body_, data.toString());
+  }
   if (end_stream) {
     onResponseComplete();
   }
@@ -363,10 +364,10 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response_code={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  absl::string_view expected_response = parent_.expected_response_;
-  if (!expected_response.empty()) {
+  if (!parent_.expected_response_.empty()) {
     // If the expected response is set, check the first 1024 bytes of actual response if contains
     // the expected response.
+    absl::string_view expected_response = parent_.expected_response_;
     std::string response_data = body_.substr(0, fmin(1024, body_.size()));
     ENVOY_CONN_LOG(debug, "hc response_body={} expected_response={}", *client_, response_data,
                    expected_response);
