@@ -340,9 +340,6 @@ new_features:
 - area: router
   change: |
     added :ref:`ignore_path_parameters_in_path_matching <envoy_v3_api_field_config.route.v3.RouteConfiguration.ignore_path_parameters_in_path_matching>`. When set to true, path-parameters(rfc1808) is ignored during path matching.
-- area: http
-  change: |
-    added the support of :ref:`expected response health check <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response>` for http.
 
 deprecated:
 - area: dubbo_proxy
