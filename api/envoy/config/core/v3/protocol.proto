@@ -75,9 +75,9 @@ message QuicProtocolOptions {
   google.protobuf.UInt32Value initial_stream_window_size = 2
       [(validate.rules).uint32 = {lte: 16777216 gte: 1}];
 
-  // Similar to *initial_stream_window_size*, but for connection-level
+  // Similar to ``initial_stream_window_size``, but for connection-level
   // flow-control. Valid values rage from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults to 65536 (2^16).
-  // window. Currently, this has the same minimum/default as *initial_stream_window_size*.
+  // window. Currently, this has the same minimum/default as ``initial_stream_window_size``.
   //
   // NOTE: 16384 (2^14) is the minimum window size supported in Google QUIC. We only support increasing the default
   // window size now, so it's also the minimum.
@@ -282,18 +282,18 @@ message Http1ProtocolOptions {
   // Handle HTTP requests with absolute URLs in the requests. These requests
   // are generally sent by clients to forward/explicit proxies. This allows clients to configure
   // envoy as their HTTP proxy. In Unix, for example, this is typically done by setting the
-  // *http_proxy* environment variable.
+  // ``http_proxy`` environment variable.
   google.protobuf.BoolValue allow_absolute_url = 1;
 
   // Handle incoming HTTP/1.0 and HTTP 0.9 requests.
   // This is off by default, and not fully standards compliant. There is support for pre-HTTP/1.1
   // style connect logic, dechunking, and handling lack of client host iff
-  // *default_host_for_http_10* is configured.
+  // ``default_host_for_http_10`` is configured.
   bool accept_http_10 = 2;
 
-  // A default host for HTTP/1.0 requests. This is highly suggested if *accept_http_10* is true as
+  // A default host for HTTP/1.0 requests. This is highly suggested if ``accept_http_10`` is true as
   // Envoy does not otherwise support HTTP/1.0 without a Host header.
-  // This is a no-op if *accept_http_10* is not true.
+  // This is a no-op if ``accept_http_10`` is not true.
   string default_host_for_http_10 = 3;
 
   // Describes how the keys for response headers should be formatted. By default, all header keys
@@ -425,8 +425,8 @@ message Http2ProtocolOptions {
   google.protobuf.UInt32Value initial_stream_window_size = 3
       [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
 
-  // Similar to *initial_stream_window_size*, but for connection-level flow-control
-  // window. Currently, this has the same minimum/maximum/default as *initial_stream_window_size*.
+  // Similar to ``initial_stream_window_size``, but for connection-level flow-control
+  // window. Currently, this has the same minimum/maximum/default as ``initial_stream_window_size``.
   google.protobuf.UInt32Value initial_connection_window_size = 4
       [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
 
@@ -466,7 +466,7 @@ message Http2ProtocolOptions {
   // of PRIORITY frames received over the lifetime of connection exceeds the value calculated
   // using this formula::
   //
-  //   max_inbound_priority_frames_per_stream * (1 + opened_streams)
+  //   ``max_inbound_priority_frames_per_stream`` * (1 + ``opened_streams``)
   //
   // the connection is terminated. For downstream connections the ``opened_streams`` is incremented when
   // Envoy receives complete response headers from the upstream server. For upstream connection the
@@ -479,8 +479,8 @@ message Http2ProtocolOptions {
   // of WINDOW_UPDATE frames received over the lifetime of connection exceeds the value calculated
   // using this formula::
   //
-  //   5 + 2 * (opened_streams +
-  //            max_inbound_window_update_frames_per_data_frame_sent * outbound_data_frames)
+  //   5 + 2 * (``opened_streams`` +
+  //            ``max_inbound_window_update_frames_per_data_frame_sent`` * ``outbound_data_frames``)
   //
   // the connection is terminated. For downstream connections the ``opened_streams`` is incremented when
   // Envoy receives complete response headers from the upstream server. For upstream connections the

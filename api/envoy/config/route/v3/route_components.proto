@@ -148,7 +148,7 @@ message VirtualHost {
   // The per_filter_config field can be used to provide virtual host-specific configurations for filters.
   // The key should match the :ref:`filter config name
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
-  // The canonical filter name (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) can also
+  // The canonical filter name (e.g., ``envoy.filters.http.buffer`` for the HTTP buffer filter) can also
   // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
   // entry referred by the canonical filter name will be provided to the filters as fallback.
   //
@@ -267,7 +267,7 @@ message Route {
   // about the route. It can be used for configuration, stats, and logging.
   // The metadata should go under the filter namespace that will need it.
   // For instance, if the metadata is intended for the Router filter,
-  // the filter name should be specified as *envoy.filters.http.router*.
+  // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 4;
 
   // Decorator for the matched route.
@@ -276,7 +276,7 @@ message Route {
   // The per_filter_config field can be used to provide route-specific configurations for filters.
   // The key should match the :ref:`filter config name
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
-  // The canonical filter name (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) can also
+  // The canonical filter name (e.g., ``envoy.filters.http.buffer`` for the HTTP buffer filter) can also
   // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
   // entry referred by the canonical filter name will be provided to the filters as fallback.
   //
@@ -360,13 +360,13 @@ message WeightedCluster {
 
     reserved "per_filter_config";
 
-    // Only one of *name* and *cluster_header* may be specified.
+    // Only one of ``name`` and ``cluster_header`` may be specified.
     // [#next-major-version: Need to add back the validation rule: (validate.rules).string = {min_len: 1}]
     // Name of the upstream cluster. The cluster must exist in the
     // :ref:`cluster manager configuration <config_cluster_manager>`.
     string name = 1 [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
-    // Only one of *name* and *cluster_header* may be specified.
+    // Only one of ``name`` and ``cluster_header`` may be specified.
     // [#next-major-version: Need to add back the validation rule: (validate.rules).string = {min_len: 1 }]
     // Envoy will determine the cluster to route to by reading the value of the
     // HTTP header named by cluster_header from the request headers. If the
@@ -375,8 +375,8 @@ message WeightedCluster {
     //
     // .. attention::
     //
-    //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
-    //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    //   Internally, Envoy always uses the HTTP/2 ``:authority`` header to represent the HTTP/1
+    //   ``Host`` header. Thus, if attempting to match on ``Host``, match on ``:authority`` instead.
     //
     // .. note::
     //
@@ -396,7 +396,7 @@ message WeightedCluster {
     // the upstream cluster with metadata matching what is set in this field will be considered for
     // load balancing. Note that this will be merged with what's provided in
     // :ref:`RouteAction.metadata_match <envoy_v3_api_field_config.route.v3.RouteAction.metadata_match>`, with
-    // values here taking precedence. The filter name should be specified as *envoy.lb*.
+    // values here taking precedence. The filter name should be specified as ``envoy.lb``.
     core.v3.Metadata metadata_match = 3;
 
     // Specifies a list of headers to be added to requests when this cluster is selected
@@ -435,7 +435,7 @@ message WeightedCluster {
     // for filters.
     // The key should match the :ref:`filter config name
     // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
-    // The canonical filter name (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) can also
+    // The canonical filter name (e.g., ``envoy.filters.http.buffer`` for the HTTP buffer filter) can also
     // be used for the backwards compatibility. If there is no entry referred by the filter config name, the
     // entry referred by the canonical filter name will be provided to the filters as fallback.
     //
@@ -462,10 +462,10 @@ message WeightedCluster {
   google.protobuf.UInt32Value total_weight = 3;
 
   // Specifies the runtime key prefix that should be used to construct the
-  // runtime keys associated with each cluster. When the *runtime_key_prefix* is
+  // runtime keys associated with each cluster. When the ``runtime_key_prefix`` is
   // specified, the router will look for weights associated with each upstream
-  // cluster under the key *runtime_key_prefix* + "." + *cluster[i].name* where
-  // *cluster[i]* denotes an entry in the clusters array field. If the runtime
+  // cluster under the key ``runtime_key_prefix`` + ``.`` + ``cluster[i].name`` where
+  // ``cluster[i]`` denotes an entry in the clusters array field. If the runtime
   // key for the cluster does not exist, the value specified in the
   // configuration file will be used as the default weight. See the :ref:`runtime documentation
   // <operations_runtime>` for how key names map to the underlying implementation.
@@ -529,17 +529,17 @@ message RouteMatch {
     option (validate.required) = true;
 
     // If specified, the route is a prefix rule meaning that the prefix must
-    // match the beginning of the *:path* header.
+    // match the beginning of the ``:path`` header.
     string prefix = 1;
 
     // If specified, the route is an exact path rule meaning that the path must
-    // exactly match the *:path* header once the query string is removed.
+    // exactly match the ``:path`` header once the query string is removed.
     string path = 2;
 
     // If specified, the route is a regular expression rule meaning that the
-    // regex must match the *:path* header once the query string is removed. The entire path
+    // regex must match the ``:path`` header once the query string is removed. The entire path
     // (without the query string) must match the regex. The rule will not match if only a
-    // subsequence of the *:path* header matches the regex.
+    // subsequence of the ``:path`` header matches the regex.
     //
     // [#next-major-version: In the v3 API we should redo how path specification works such
     // that we utilize StringMatcher, and additionally have consistent options around whether we
@@ -632,9 +632,9 @@ message RouteMatch {
   repeated HeaderMatcher headers = 6;
 
   // Specifies a set of URL query parameters on which the route should
-  // match. The router will check the query string from the *path* header
+  // match. The router will check the query string from the ``path`` header
   // against all the specified query parameters. If the number of specified
-  // query parameters is nonzero, they all must match the *path* header's
+  // query parameters is nonzero, they all must match the ``path`` header's
   // query string for a match to occur.
   //
   // .. note::
@@ -676,16 +676,16 @@ message CorsPolicy {
   // string matchers match.
   repeated type.matcher.v3.StringMatcher allow_origin_string_match = 11;
 
-  // Specifies the content for the *access-control-allow-methods* header.
+  // Specifies the content for the ``access-control-allow-methods`` header.
   string allow_methods = 2;
 
-  // Specifies the content for the *access-control-allow-headers* header.
+  // Specifies the content for the ``access-control-allow-headers`` header.
   string allow_headers = 3;
 
-  // Specifies the content for the *access-control-expose-headers* header.
+  // Specifies the content for the ``access-control-expose-headers`` header.
   string expose_headers = 4;
 
-  // Specifies the content for the *access-control-max-age* header.
+  // Specifies the content for the ``access-control-max-age`` header.
   string max_age = 5;
 
   // Specifies whether the resource allows credentials.
@@ -710,7 +710,7 @@ message CorsPolicy {
   //
   // If :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is specified,
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
-  // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
+  // and track the request's ``Origin`` to determine if it's valid but will not enforce any policies.
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
@@ -743,8 +743,8 @@ message RouteAction {
   // respond before returning the response from the primary cluster. All normal statistics are
   // collected for the shadow cluster making this feature useful for testing.
   //
-  // During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
-  // useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
+  // During shadowing, the host/authority header is altered such that ``-shadow`` is appended. This is
+  // useful for logging. For example, ``cluster1`` becomes ``cluster1-shadow``.
   //
   // .. note::
   //
@@ -758,13 +758,13 @@ message RouteAction {
 
     reserved "runtime_key";
 
-    // Only one of *cluster* and *cluster_header* can be specified.
+    // Only one of ``cluster`` and ``cluster_header`` can be specified.
     // [#next-major-version: Need to add back the validation rule: (validate.rules).string = {min_len: 1}]
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration.
     string cluster = 1 [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
 
-    // Only one of *cluster* and *cluster_header* can be specified.
+    // Only one of ``cluster`` and ``cluster_header`` can be specified.
     // Envoy will determine the cluster to route to by reading the value of the
     // HTTP header named by cluster_header from the request headers. Only the first value in header is used,
     // and no shadow request will happen if the value is not found in headers. Envoy will not wait for
@@ -772,8 +772,8 @@ message RouteAction {
     //
     // .. attention::
     //
-    //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
-    //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    //   Internally, Envoy always uses the HTTP/2 ``:authority`` header to represent the HTTP/1
+    //   ``Host`` header. Thus, if attempting to match on ``Host``, match on ``:authority`` instead.
     //
     // .. note::
     //
@@ -969,7 +969,7 @@ message RouteAction {
 
     // If present, and the request contains a `grpc-timeout header
     // <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, use that value as the
-    // *max_stream_duration*, but limit the applied timeout to the maximum value specified here.
+    // ``max_stream_duration``, but limit the applied timeout to the maximum value specified here.
     // If set to 0, the ``grpc-timeout`` header is used without modification.
     google.protobuf.Duration grpc_timeout_header_max = 2;
 
@@ -1000,8 +1000,8 @@ message RouteAction {
     //
     // .. attention::
     //
-    //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
-    //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    //   Internally, Envoy always uses the HTTP/2 ``:authority`` header to represent the HTTP/1
+    //   ``Host`` header. Thus, if attempting to match on ``Host``, match on ``:authority`` instead.
     //
     // .. note::
     //
@@ -1036,7 +1036,7 @@ message RouteAction {
   // in the upstream cluster with metadata matching what's set in this field will be considered
   // for load balancing. If using :ref:`weighted_clusters
   // <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>`, metadata will be merged, with values
-  // provided there taking precedence. The filter name should be specified as *envoy.lb*.
+  // provided there taking precedence. The filter name should be specified as ``envoy.lb``.
   core.v3.Metadata metadata_match = 4;
 
   // Indicates that during forwarding, the matched prefix (or path) should be
@@ -1047,14 +1047,14 @@ message RouteAction {
   //
   // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`
   // [#comment:TODO(silverstar194) add the following once path_template_rewrite is implemented: :ref:`path_template_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.path_template_rewrite>`]
-  // or *prefix_rewrite* may be specified.
+  // or ``prefix_rewrite`` may be specified.
   //
   // .. attention::
   //
   //   Pay careful attention to the use of trailing slashes in the
   //   :ref:`route's match <envoy_v3_api_field_config.route.v3.Route.match>` prefix value.
   //   Stripping a prefix from a path requires multiple Routes to handle all cases. For example,
-  //   rewriting */prefix* to */* and */prefix/etc* to */etc* cannot be done in a single
+  //   rewriting ``/prefix`` to ``/`` and ``/prefix/etc`` to ``/etc`` cannot be done in a single
   //   :ref:`Route <envoy_v3_api_msg_config.route.v3.Route>`, as shown by the below config entries:
   //
   //   .. code-block:: yaml
@@ -1068,8 +1068,8 @@ message RouteAction {
   //       route:
   //         prefix_rewrite: "/"
   //
-  //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
-  //   requests to */prefix/etc* will be stripped to */etc*.
+  //   Having above entries in the config, requests to ``/prefix`` will be stripped to ``/``, while
+  //   requests to ``/prefix/etc`` will be stripped to ``/etc``.
   string prefix_rewrite = 5
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
@@ -1084,7 +1084,7 @@ message RouteAction {
   //
   // Only one of :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
   // [#comment:TODO(silverstar194) add the following once path_template_rewrite is implemented: :ref:`path_template_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.path_template_rewrite>`,]
-  // or *regex_rewrite* may be specified.
+  // or ``regex_rewrite`` may be specified.
   //
   // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
   //
@@ -1115,7 +1115,7 @@ message RouteAction {
   //
   // Only one of :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
   // :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
-  // or *path_template_rewrite* may be specified.
+  // or ``path_template_rewrite`` may be specified.
   //
   // Template pattern matching types:
   //
@@ -1159,7 +1159,7 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
     // option is applicable only when the destination cluster for a route is of
-    // type *strict_dns* or *logical_dns*. Setting this to true with other cluster types
+    // type ``strict_dns`` or ``logical_dns``. Setting this to true with other cluster types
     // has no effect. Using this option will append the
     // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
     // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
@@ -1754,7 +1754,7 @@ message DirectResponseAction {
   //
   // .. note::
   //
-  //   Headers can be specified using *response_headers_to_add* in the enclosing
+  //   Headers can be specified using ``response_headers_to_add`` in the enclosing
   //   :ref:`envoy_v3_api_msg_config.route.v3.Route`, :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` or
   //   :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.
   core.v3.DataSource body = 2;
@@ -1897,7 +1897,7 @@ message RateLimit {
     }
 
     // The following descriptor entry is appended when a header contains a key that matches the
-    // *header_name*:
+    // ``header_name``:
     //
     // .. code-block:: cpp
     //
@@ -2017,7 +2017,7 @@ message RateLimit {
       // only happen if the value in the dynamic metadata is of type string.
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
 
-      // An optional value to use if *metadata_key* is empty. If not set and
+      // An optional value to use if ``metadata_key`` is empty. If not set and
       // no value is present under the metadata_key then no descriptor is generated.
       string default_value = 3;
     }
@@ -2043,7 +2043,7 @@ message RateLimit {
       // only happen if the value in the metadata is of type string.
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
 
-      // An optional value to use if *metadata_key* is empty. If not set and
+      // An optional value to use if ``metadata_key`` is empty. If not set and
       // no value is present under the metadata_key then no descriptor is generated.
       string default_value = 3;
 
@@ -2147,12 +2147,12 @@ message RateLimit {
 
 // .. attention::
 //
-//   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1 *Host*
-//   header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+//   Internally, Envoy always uses the HTTP/2 ``:authority`` header to represent the HTTP/1 ``Host``
+//   header. Thus, if attempting to match on ``Host``, match on ``:authority`` instead.
 //
 // .. attention::
 //
-//   To route on HTTP method, use the special HTTP/2 *:method* header. This works for both
+//   To route on HTTP method, use the special HTTP/2 ``:method`` header. This works for both
 //   HTTP/1 and HTTP/2 as Envoy normalizes headers. E.g.,
 //
 //   .. code-block:: json
@@ -2204,8 +2204,8 @@ message HeaderMatcher {
     //
     // Examples:
     //
-    // * For range [-10,0), route will match for header value -1, but not for 0, "somestring", 10.9,
-    //   "-1somestring"
+    // * For range [-10,0), route will match for header value -1, but not for 0, ``somestring``, 10.9,
+    //   ``-1somestring``
     type.v3.Int64Range range_match = 6;
 
     // If specified as true, header match will be performed based on whether the header is in the
@@ -2218,7 +2218,7 @@ message HeaderMatcher {
     //
     // Examples:
     //
-    // * The prefix *abcd* matches the value *abcdxyz*, but not for *abcxyz*.
+    // * The prefix ``abcd`` matches the value ``abcdxyz``, but not for ``abcxyz``.
     string prefix_match = 9 [
       deprecated = true,
       (validate.rules).string = {min_len: 1},
@@ -2231,7 +2231,7 @@ message HeaderMatcher {
     //
     // Examples:
     //
-    // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
+    // * The suffix ``abcd`` matches the value ``xyzabcd``, but not for ``xyzbcd``.
     string suffix_match = 10 [
       deprecated = true,
       (validate.rules).string = {min_len: 1},
@@ -2245,7 +2245,7 @@ message HeaderMatcher {
     //
     // Examples:
     //
-    // * The value *abcd* matches the value *xyzabcdpqr*, but not for *xyzbcdpqr*.
+    // * The value ``abcd`` matches the value ``xyzabcdpqr``, but not for ``xyzbcdpqr``.
     string contains_match = 12 [
       deprecated = true,
       (validate.rules).string = {min_len: 1},
@@ -2260,7 +2260,7 @@ message HeaderMatcher {
   //
   // Examples:
   //
-  // * The regex ``\d{3}`` does not match the value *1234*, so it will match when inverted.
+  // * The regex ``\d{3}`` does not match the value ``1234``, so it will match when inverted.
   // * The range [-10,0) will match the value -1, so it will not match when inverted.
   bool invert_match = 8;
 
@@ -2305,7 +2305,7 @@ message QueryParameterMatcher {
   reserved "value", "regex";
 
   // Specifies the name of a key that must be present in the requested
-  // *path*'s query string.
+  // ``path``'s query string.
   string name = 1 [(validate.rules).string = {min_len: 1 max_bytes: 1024}];
 
   oneof query_parameter_match_specifier {
