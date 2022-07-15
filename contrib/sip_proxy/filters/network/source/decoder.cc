@@ -1,6 +1,7 @@
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
 
 #include <utility>
+#include <regex>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
@@ -303,28 +304,20 @@ int Decoder::HeaderHandler::processPCookieIPMap(absl::string_view& header) {
 }
 
 int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header) {
-  // X-Envoy-Origin-Ingress: worker-thread;downstream_connection=xxxxxx
-  auto downstream_conn_location = header.find('=');
-  if (downstream_conn_location == absl::string_view::npos) {
-    return 0;
+  // X-Envoy-Origin-Ingress: thread=xxxxxx;downstream-connection=yyyyyy
+
+  std::regex rgx("thread=(.+);downstream-connection=(.+)");
+  std::match_results<absl::string_view::iterator> match;
+
+  if(std::regex_search<absl::string_view::iterator>(header.begin(), header.end(), match, rgx) && (match.size() == 3)) {
+    auto worker_thread_id = match[1].str();
+    auto downstream_conn_id = match[2].str();
+    auto ingress_id = std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
+    metadata()->setIngressId(std::move(ingress_id));
+    ENVOY_LOG(trace, "X-Envoy_origin-Ingress header processed: thread={}, downstream-connection={}", worker_thread_id, downstream_conn_id);
+  } else {
+    ENVOY_LOG(error, "No processable match found for X-Envoy_origin-Ingress={}", header);
   }
-
-  // todo error checks
-  auto worker_thread_id = header.substr(header.find(": ")+2, header.find(";")-header.find(": ")-2);
-  auto downstream_conn_id = header.substr(header.find("=")+1, header.length()-header.find("="-1));
-  auto ingress_id = std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
-
-  ENVOY_LOG(trace, "IngressID thread-id={}, downstream-connection={}", worker_thread_id, downstream_conn_id);
-
-  metadata()->setIngressId(std::move(ingress_id));
-
-  //metadata()->setIngressID(IngressID());
-  // if (metadata()->msgType() == MsgType::Request && woker_thread_id == localThreadID) { // we don't have a ref localThreadID here yet
-  // can we assume this is a requesat recvd form upstream, or can we check.. 
-  //   // delete the header 
-  //   //  metadata()->setOperation(Operation(OperationType::Delete, rawOffset(),
-  //   //                                  DeleteOperationValue(header.length() + strlen("\r\n"))));
-  // }
   return 0;
 }
 
