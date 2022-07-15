@@ -29,10 +29,10 @@ message Hyperscan {
   //
   // The expression may still use PCRE tokens (notably `(?i)` and `(?-i)`) to switch
   // case-insensitive matching on and off.
-  bool caseless = 1;
+  bool case_insensitive = 1;
 
-  // Matching a `.` will not exclude newlines.
-  bool dot_all = 2;
+  // Matching a `.` will include newlines.
+  bool dot_includes_newlines = 2;
 
   // `^` and `$` anchors match any newlines in data.
   bool multiline = 3;
@@ -45,5 +45,5 @@ message Hyperscan {
   // This option instructs Hyperscan to use Unicode properties, rather than the default ASCII
   // interpretations, for character mnemonics like `\w` and `\s` as well as the POSIX character
   // classes. It is only meaningful in conjunction with `utf8`.
-  bool ucp = 6;
+  bool unicode_property_escapes = 6;
 }

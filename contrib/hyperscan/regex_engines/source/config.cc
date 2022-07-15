@@ -19,10 +19,10 @@ Config::createEngine(const Protobuf::Message& config,
   throw EnvoyException("X86_64 architecture is required for Hyperscan.");
 #else
   unsigned int flag = 0;
-  if (hyperscan.caseless()) {
+  if (hyperscan.case_insensitive()) {
     flag |= HS_FLAG_CASELESS;
   }
-  if (hyperscan.dot_all()) {
+  if (hyperscan.dot_includes_newlines()) {
     flag |= HS_FLAG_DOTALL;
   }
   if (hyperscan.multiline()) {
@@ -30,7 +30,7 @@ Config::createEngine(const Protobuf::Message& config,
   }
   if (hyperscan.utf8()) {
     flag |= HS_FLAG_UTF8;
-    if (hyperscan.ucp()) {
+    if (hyperscan.unicode_property_escapes()) {
       flag |= HS_FLAG_UCP;
     }
   }
