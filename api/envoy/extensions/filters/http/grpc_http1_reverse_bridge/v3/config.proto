@@ -39,8 +39,8 @@ message FilterConfig {
   // When :ref:`withhold_grpc_frames
   // <envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.withhold_grpc_frames>`
   // is true, this option controls how Envoy calculates the ``Content-Length``. When
-  // *response_size_header* is empty, Envoy will buffer the upstream response to calculate its
-  // size. When *response_size_header* is set to a non-empty string, Envoy will stream the response
+  // ``response_size_header`` is empty, Envoy will buffer the upstream response to calculate its
+  // size. When ``response_size_header`` is set to a non-empty string, Envoy will stream the response
   // to the downstream and it will use the value of the response header with this name to set the
   // ``Content-Length`` header and gRPC frame size. If the header with this name is repeated, only
   // the first value will be used.

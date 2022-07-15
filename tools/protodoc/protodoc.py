@@ -236,12 +236,12 @@ def format_field_type_as_json(type_context, field):
     Return: RST formatted pseudo-JSON string representation of field type.
     """
     if type_name_from_fqn(field.type_name) in type_context.map_typenames:
-        return '"{...}"'
+        return "{...}"
     if field.label == field.LABEL_REPEATED:
-        return '[]'
+        return "[]"
     if field.type == field.TYPE_MESSAGE:
-        return '"{...}"'
-    return '"..."'
+        return "{...}"
+    return "..."
 
 
 def format_message_as_json(type_context, msg):
@@ -261,7 +261,8 @@ def format_message_as_json(type_context, msg):
         lines.append('"%s": %s' % (field.name, format_field_type_as_json(type_context, field)))
 
     if lines:
-        return '.. code-block:: json\n\n  {\n' + ',\n'.join(indent_lines(4, lines)) + '\n  }\n\n'
+        return '.. code-block:: json\n  :force:\n\n  {\n' + ',\n'.join(
+            indent_lines(4, lines)) + '\n  }\n\n'
     return ""
 
 
