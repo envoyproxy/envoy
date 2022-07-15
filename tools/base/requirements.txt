@@ -31,9 +31,9 @@ aio-api-github==0.1.2 \
     # via
     #   envoy-base-utils
     #   envoy-dependency-check
-aio-api-nist==0.0.2 \
-    --hash=sha256:27ff7d899760cc666bdbab2123c206c173a45090411d2a766263ffd78123ce0c \
-    --hash=sha256:d188116eca1b468448ada0d3172cf054432da19da91c45bd0b5bea2f5712a351
+aio-api-nist==0.0.3 \
+    --hash=sha256:3465d25e4ffdec35d824960e6d68fbff070f823fde55a40fa4eb53a7fd7d18ca \
+    --hash=sha256:5ecf9f32e19ad8804bba1358dde93d1008029335009541dadc69c3823241b382
     # via envoy-dependency-check
 aio-core==0.9.1 \
     --hash=sha256:9b1b48f1808804d48260515f17d943864e3a4368a733314dda4685e8fd888945 \
@@ -328,9 +328,8 @@ envoy-code-check==0.2.2 \
     --hash=sha256:25b4fcee184e4b40ad68b26cbfd0614bbe0a5f980aefc95b5e3f9c6803e68bbb \
     --hash=sha256:3ad2dd3e01ff57bfcc21475c1268e79d065959911bc9fe8bf1d3ea3cb3f5adf1
     # via -r requirements.in
-envoy-dependency-check==0.1.3 \
-    --hash=sha256:4f703f718389ee68f97dd29e997a6508d7ce27a9f2f2f1fe26d27803a450e436 \
-    --hash=sha256:e243624375292a26410e1edecfcda239349f56799f8c5b6b4f30333d1541084c
+envoy-dependency-check==0.1.4 \
+    --hash=sha256:caad14caa31faba120702a015f6d5c7d69c11d8b68138f9269abe8f868625d78
     # via -r requirements.in
 envoy-dependency-pip-check==0.1.3 \
     --hash=sha256:b07ca0c1f2786b13b0dfcdfc82647afece3918d44dc7ddaca5739dfaadc9d0e8 \
@@ -1038,7 +1037,7 @@ yarl==1.7.2 \
     #   aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==63.1.0 \
-    --hash=sha256:16923d366ced322712c71ccb97164d07472abeecd13f3a6c283f6d5d26722793 \
-    --hash=sha256:db3b8e2f922b2a910a29804776c643ea609badb6a32c4bcc226fd4fd902cce65
+setuptools==63.2.0 \
+    --hash=sha256:0d33c374d41c7863419fc8f6c10bfe25b7b498aa34164d135c622e52580c6b16 \
+    --hash=sha256:c04b44a57a6265fe34a4a444e965884716d34bae963119a76353434d6f18e450
     # via -r requirements.in
