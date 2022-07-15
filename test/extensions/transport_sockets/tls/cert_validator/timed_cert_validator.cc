@@ -12,12 +12,11 @@ namespace Tls {
 ValidationResults TimedCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
-    const Network::TransportSocketOptions* transport_socket_options, SSL_CTX& ssl_ctx,
-    const CertValidator::ExtraValidationContext& validation_context, bool is_server,
-    uint8_t current_tls_alert) {
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
+    const CertValidator::ExtraValidationContext& validation_context, bool is_server) {
   if (callback == nullptr) {
     ASSERT(ssl_extended_info);
-    callback = ssl_extended_info->createValidateResultCallback(current_tls_alert);
+    callback = ssl_extended_info->createValidateResultCallback();
   }
   ASSERT(callback_ == nullptr);
   callback_ = std::move(callback);
@@ -44,7 +43,7 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
         }
         ValidationResults result = DefaultCertValidator::doVerifyCertChain(
             *certs, nullptr, nullptr, transport_socket_options, ssl_ctx, validation_context_,
-            is_server, SSL_AD_CERTIFICATE_UNKNOWN);
+            is_server);
         callback_->onCertValidationResult(
             result.status == ValidationResults::ValidationStatus::Successful,
             (result.error_details.has_value() ? result.error_details.value() : ""),

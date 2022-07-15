@@ -59,7 +59,7 @@ public:
    * Only called when doing asynchronous cert validation.
    * @return ValidateResultCallbackPtr a callback used to return the validation result.
    */
-  virtual ValidateResultCallbackPtr createValidateResultCallback(uint8_t current_tls_alert) PURE;
+  virtual ValidateResultCallbackPtr createValidateResultCallback() PURE;
 
   /**
    * Called after the cert validation completes either synchronously or asynchronously.

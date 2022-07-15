@@ -56,13 +56,11 @@ void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded)
   }
 }
 
-Ssl::ValidateResultCallbackPtr
-SslExtendedSocketInfoImpl::createValidateResultCallback(uint8_t current_tls_alert) {
+Ssl::ValidateResultCallbackPtr SslExtendedSocketInfoImpl::createValidateResultCallback() {
   auto callback = std::make_unique<ValidateResultCallbackImpl>(
       ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
   cert_validate_result_callback_ = *callback;
   cert_validation_result_ = Ssl::ValidateStatus::Pending;
-  cert_validation_alert_ = current_tls_alert;
   return callback;
 }
 

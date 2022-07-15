@@ -148,14 +148,14 @@ int SPIFFEValidator::doSynchronousVerifyCertChain(X509_STORE_CTX* store_ctx,
   STACK_OF(X509)* cert_chain = X509_STORE_CTX_get0_untrusted(store_ctx);
   X509_VERIFY_PARAM* verify_param = X509_STORE_CTX_get0_param(store_ctx);
   return verifyCertChainUsingTrustBundleStore(ssl_extended_info, leaf_cert, cert_chain,
-                                              verify_param, nullptr, nullptr)
+                                              verify_param, nullptr)
              ? 1
              : 0;
 }
 
 bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert, STACK_OF(X509)* cert_chain,
-    X509_VERIFY_PARAM* verify_param, std::string* error_details, uint8_t* /*out_alert*/) {
+    X509_VERIFY_PARAM* verify_param, std::string* error_details) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
@@ -225,9 +225,9 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
 ValidationResults SPIFFEValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
-    const Network::TransportSocketOptions* /*transport_socket_options*/, SSL_CTX& ssl_ctx,
-    const CertValidator::ExtraValidationContext& /*validation_context*/, bool /*is_server*/,
-    uint8_t current_tls_alert) {
+    const Network::TransportSocketOptionsConstSharedPtr& /*transport_socket_options*/,
+    SSL_CTX& ssl_ctx, const CertValidator::ExtraValidationContext& /*validation_context*/,
+    bool /*is_server*/) {
   if (sk_X509_num(&cert_chain) == 0) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(
@@ -240,11 +240,10 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
   std::string error_details;
   return verifyCertChainUsingTrustBundleStore(ssl_extended_info, *leaf_cert, &cert_chain,
-                                              SSL_CTX_get0_param(&ssl_ctx), &error_details,
-                                              &current_tls_alert)
+                                              SSL_CTX_get0_param(&ssl_ctx), &error_details)
              ? ValidationResults{ValidationResults::ValidationStatus::Successful, absl::nullopt,
                                  absl::nullopt}
-             : ValidationResults{ValidationResults::ValidationStatus::Failed, current_tls_alert,
+             : ValidationResults{ValidationResults::ValidationStatus::Failed, absl::nullopt,
                                  error_details};
 }
 
