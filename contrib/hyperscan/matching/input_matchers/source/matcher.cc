@@ -23,7 +23,7 @@ ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database,
 
 Matcher::Matcher(const std::vector<const char*>& expressions,
                  const std::vector<unsigned int>& flags, const std::vector<unsigned int>& ids,
-                 ThreadLocal::SlotAllocator& tls, bool som)
+                 ThreadLocal::SlotAllocator& tls, bool report_start_of_matching)
     : tls_(ThreadLocal::TypedSlot<ScratchThreadLocal>::makeUnique(tls)) {
   ASSERT(expressions.size() == flags.size());
   ASSERT(expressions.size() == ids.size());
@@ -32,7 +32,7 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
   compile(expressions, flags, ids, &database_);
 
   // Compile SOM database. The SOM database will report start of matching, works for replaceAll.
-  if (som) {
+  if (report_start_of_matching) {
     std::vector<unsigned int> som_flags = flags;
     for (unsigned int& som_flag : som_flags) {
       som_flag = som_flag | HS_FLAG_SOM_LEFTMOST;

@@ -57,11 +57,12 @@ TEST(BoundTest, Compare) {
 
 class MatcherTest : public ::testing::Test {
 protected:
-  void setup(const char* expression, unsigned int flag, bool som) {
+  void setup(const char* expression, unsigned int flag, bool report_start_of_matching) {
     std::vector<const char*> expressions{expression};
     std::vector<unsigned int> flags{flag};
     std::vector<unsigned int> ids{0};
-    matcher_ = std::make_unique<Matcher>(expressions, flags, ids, instance_, som);
+    matcher_ =
+        std::make_unique<Matcher>(expressions, flags, ids, instance_, report_start_of_matching);
   }
 
   void TearDown() override {

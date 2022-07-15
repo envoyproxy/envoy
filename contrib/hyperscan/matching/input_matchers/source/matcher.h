@@ -36,7 +36,8 @@ struct Bound {
 class Matcher : public Envoy::Regex::CompiledMatcher, public Envoy::Matcher::InputMatcher {
 public:
   Matcher(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
-          const std::vector<unsigned int>& ids, ThreadLocal::SlotAllocator& tls, bool som);
+          const std::vector<unsigned int>& ids, ThreadLocal::SlotAllocator& tls,
+          bool report_start_of_matching);
   ~Matcher() override {
     hs_free_database(database_);
     hs_free_database(som_database_);
