@@ -168,14 +168,11 @@ ConnectionManager::~ConnectionManager() = default;
 
   Network::FilterStatus ConnectionManager::onNewConnection() {
     std::string remote_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
-    std::string local_ip = read_callbacks_->connection().connectionInfoProvider().localAddress()->ip()->asString();
+    std::string local_ip = read_callbacks_->connection().connectionInfoProvider().localAddress()->ip()->addressAsString();
 
-    // fixme - we need to define it somewhere else
+    // fixme - we might need to define it somewhere else
     std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() + "@" + local_ip;
     
-    // fixme - sja3Hash or connectionID doesn't appear to be populated
-    // downstream_conn_id_ = read_callbacks_->connection().connectionInfoProvider().ja3Hash().data();
-    // also going to need a unique value for the connection - e.g base64(remoteIPport@host@uuid)
     Random::RandomGeneratorImpl random;
     std::string uuid = random.uuid();
     std::string downstream_conn_id = remote_address + "@" + uuid;
