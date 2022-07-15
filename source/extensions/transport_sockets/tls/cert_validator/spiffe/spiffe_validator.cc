@@ -161,7 +161,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
     }
-      error_details = "verify cert failed: cert precheck";
+    error_details = "verify cert failed: cert precheck";
     stats_.fail_verify_error_.inc();
     return false;
   }
@@ -171,7 +171,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
     }
-      error_details = "verify cert failed: no trust bundle store";
+    error_details = "verify cert failed: no trust bundle store";
     stats_.fail_verify_error_.inc();
     return false;
   }
@@ -180,7 +180,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
   bssl::UniquePtr<X509_STORE_CTX> new_store_ctx(X509_STORE_CTX_new());
   if (!X509_STORE_CTX_init(new_store_ctx.get(), trust_bundle, &leaf_cert, cert_chain) ||
       !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(new_store_ctx.get()), verify_param)) {
-      error_details = "verify cert failed: init and setup X509_STORE_CTX";
+    error_details = "verify cert failed: init and setup X509_STORE_CTX";
     stats_.fail_verify_error_.inc();
     return false;
   }
@@ -193,8 +193,8 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
     }
-      error_details = absl::StrCat("verify cert failed: ",
-                                    Utility::getX509VerificationErrorInfo(new_store_ctx.get()));
+    error_details = absl::StrCat("verify cert failed: ",
+                                 Utility::getX509VerificationErrorInfo(new_store_ctx.get()));
     stats_.fail_verify_error_.inc();
     return false;
   }
@@ -202,7 +202,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
   // Do SAN matching.
   const bool san_match = subject_alt_name_matchers_.empty() ? true : matchSubjectAltName(leaf_cert);
   if (!san_match) {
-      error_details = "verify cert failed: SAN match";
+    error_details = "verify cert failed: SAN match";
     stats_.fail_verify_san_.inc();
   }
   if (ssl_extended_info) {
