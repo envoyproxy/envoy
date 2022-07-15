@@ -724,6 +724,9 @@ message RouteAction {
 
     // HTTP status code - 404 Not Found.
     NOT_FOUND = 1;
+
+    // HTTP status code - 500 Internal Server Error.
+    INTERNAL_SERVER_ERROR = 2;
   }
 
   // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
