@@ -134,7 +134,6 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
-      expected_response_(config.http_health_check().response()),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
@@ -145,6 +144,10 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       random_generator_(random) {
   if (config.http_health_check().has_service_name_matcher()) {
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
+  }
+
+  if (config.http_health_check().has_response()) {
+    expected_response_ = config.http_health_check().response().value();
   }
 }
 

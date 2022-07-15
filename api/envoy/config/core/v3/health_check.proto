@@ -146,10 +146,9 @@ message HealthCheck {
     // <arch_overview_health_checking_identity>` for more information.
     type.matcher.v3.StringMatcher service_name_matcher = 11;
 
-    // The string to match anywhere in the first 1024 bytes of the response body.
-    // If left empty (the default value), the status code determines health. The
-    // response data can only be ASCII.
-    optional string response = 13
+    // An optional string to match anywhere in the first 1024 bytes of the response body.
+    // The response data can only be ASCII. If it is set, both the expected response check and status code determines health check.
+    google.protobuf.StringValue response = 13
         [(validate.rules).string = {max_bytes: 1024, pattern: "^[\x00-\x7F]+$"}];
   }
 
