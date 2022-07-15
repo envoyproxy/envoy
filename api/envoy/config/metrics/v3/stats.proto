@@ -120,7 +120,7 @@ message StatsMatcher {
   // limited by either an exclusion or an inclusion list of :ref:`StringMatcher
   // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>` protos:
   //
-  // * If `reject_all` is set to `true`, no stats will be instantiated. If `reject_all` is set to
+  // * If ``reject_all`` is set to `true`, no stats will be instantiated. If ``reject_all`` is set to
   //   `false`, all stats will be instantiated.
   //
   // * If an exclusion list is supplied, any stat name matching *any* of the StringMatchers in the
@@ -186,7 +186,7 @@ message StatsMatcher {
   oneof stats_matcher {
     option (validate.required) = true;
 
-    // If `reject_all` is true, then all stats are disabled. If `reject_all` is false, then all
+    // If ``reject_all`` is true, then all stats are disabled. If ``reject_all`` is false, then all
     // stats are enabled.
     bool reject_all = 1;
 
@@ -287,7 +287,7 @@ message TagSpecifier {
 // Specifies a matcher for stats and the buckets that matching stats should use.
 message HistogramBucketSettings {
   // The stats that this rule applies to. The match is applied to the original stat name
-  // before tag-extraction, for example `cluster.exampleclustername.upstream_cx_length_ms`.
+  // before tag-extraction, for example ``cluster.exampleclustername.upstream_cx_length_ms``.
   type.matcher.v3.StringMatcher match = 1 [(validate.rules).message = {required: true}];
 
   // Each value is the upper bound of a bucket. Each bucket must be greater than 0 and unique.
@@ -299,7 +299,7 @@ message HistogramBucketSettings {
   }];
 }
 
-// Stats configuration proto schema for built-in *envoy.stat_sinks.statsd* sink. This sink does not support
+// Stats configuration proto schema for built-in ``envoy.stat_sinks.statsd`` sink. This sink does not support
 // tagged metrics.
 // [#extension: envoy.stat_sinks.statsd]
 message StatsdSink {
@@ -348,7 +348,7 @@ message StatsdSink {
   string prefix = 3;
 }
 
-// Stats configuration proto schema for built-in *envoy.stat_sinks.dog_statsd* sink.
+// Stats configuration proto schema for built-in ``envoy.stat_sinks.dog_statsd`` sink.
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_v3_api_msg_config.metrics.v3.StatsConfig>`.
@@ -380,7 +380,7 @@ message DogStatsdSink {
   google.protobuf.UInt64Value max_bytes_per_datagram = 4 [(validate.rules).uint64 = {gt: 0}];
 }
 
-// Stats configuration proto schema for built-in *envoy.stat_sinks.hystrix* sink.
+// Stats configuration proto schema for built-in ``envoy.stat_sinks.hystrix`` sink.
 // The sink emits stats in `text/event-stream
 // <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
 // formatted stream for use by `Hystrix dashboard
@@ -401,7 +401,7 @@ message HystrixSink {
   // in the process). The sink then outputs the aggregate statistics across the
   // current rolling window to the event stream(s).
   //
-  // rolling_window(ms) = stats_flush_interval(ms) * num_of_buckets
+  // ``rolling_window(ms)`` = ``stats_flush_interval(ms)`` * ``num_of_buckets``
   //
   // More detailed explanation can be found in `Hystrix wiki
   // <https://github.com/Netflix/Hystrix/wiki/Metrics-and-Monitoring#hystrixrollingnumber>`_.

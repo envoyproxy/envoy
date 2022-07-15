@@ -974,7 +974,7 @@ void Filter::onResponseTimeout() {
   }
 
   onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,
-                         StreamInfo::ResponseCodeDetails::get().UpstreamTimeout);
+                         StreamInfo::ResponseCodeDetails::get().ResponseTimeout);
 }
 
 // Called when the per try timeout is hit but we didn't reset the request

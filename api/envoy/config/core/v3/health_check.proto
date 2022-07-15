@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Endpoint health status.
 enum HealthStatus {
-  // The health status is not known. This is interpreted by Envoy as *HEALTHY*.
+  // The health status is not known. This is interpreted by Envoy as ``HEALTHY``.
   UNKNOWN = 0;
 
   // Healthy.
@@ -43,11 +43,11 @@ enum HealthStatus {
   // `<https://aws.amazon.com/blogs/aws/elb-connection-draining-remove-instances-from-service-with-care/>`_
   // or
   // `<https://cloud.google.com/compute/docs/load-balancing/enabling-connection-draining>`_.
-  // This is interpreted by Envoy as *UNHEALTHY*.
+  // This is interpreted by Envoy as ``UNHEALTHY``.
   DRAINING = 3;
 
   // Health check timed out. This is part of HDS and is interpreted by Envoy as
-  // *UNHEALTHY*.
+  // ``UNHEALTHY``.
   TIMEOUT = 4;
 
   // Degraded.
@@ -96,7 +96,7 @@ message HealthCheck {
     string host = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Specifies the HTTP path that will be requested during health checking. For example
-    // */healthcheck*.
+    // ``/healthcheck``.
     string path = 2
         [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
@@ -260,15 +260,15 @@ message HealthCheck {
   google.protobuf.Duration interval_jitter = 3;
 
   // An optional jitter amount as a percentage of interval_ms. If specified,
-  // during every interval Envoy will add interval_ms *
-  // interval_jitter_percent / 100 to the wait time.
+  // during every interval Envoy will add ``interval_ms`` *
+  // ``interval_jitter_percent`` / 100 to the wait time.
   //
   // If interval_jitter_ms and interval_jitter_percent are both set, both of
   // them will be used to increase the wait time.
   uint32 interval_jitter_percent = 18;
 
   // The number of unhealthy health checks required before a host is marked
-  // unhealthy. Note that for *http* health checking if a host responds with a code not in
+  // unhealthy. Note that for ``http`` health checking if a host responds with a code not in
   // :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
   // or :ref:`retriable_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`,
   // this threshold is ignored and the host is considered immediately unhealthy.
@@ -316,7 +316,7 @@ message HealthCheck {
   // (including new hosts) when the cluster has received no traffic.
   //
   // This is useful for when we want to send frequent health checks with
-  // `no_traffic_interval` but then revert to lower frequency `no_traffic_healthy_interval` once
+  // ``no_traffic_interval`` but then revert to lower frequency ``no_traffic_healthy_interval`` once
   // a host in the cluster is marked as healthy.
   //
   // Once a cluster has been used for traffic routing, Envoy will shift back to using the
@@ -386,7 +386,7 @@ message HealthCheck {
   //      name: envoy.transport_sockets.tls
   //      config: { ... } # tls socket configuration
   //
-  // If this field is set, then for health checks it will supersede an entry of *envoy.transport_socket* in the
+  // If this field is set, then for health checks it will supersede an entry of ``envoy.transport_socket`` in the
   // :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>`.
   // This allows using different transport socket capabilities for health checking versus proxying to the
   // endpoint.

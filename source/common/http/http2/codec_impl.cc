@@ -945,10 +945,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
-      protocol_constraints_(stats, http2_options),
-      skip_dispatching_frames_for_closed_connection_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection")),
-      dispatching_(false), raised_goaway_(false),
+      protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
       delay_keepalive_timeout_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_delay_keepalive_timeout")),
       random_(random_generator),
@@ -1115,8 +1112,7 @@ ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
 }
 
 int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
-  ASSERT(!skip_dispatching_frames_for_closed_connection_ ||
-         connection_.state() == Network::Connection::State::Open);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
   StreamImpl* stream = getStream(stream_id);
   // If this results in buffering too much data, the watermark buffer will call
   // pendingRecvBufferHighWatermark, resulting in ++read_disable_count_
@@ -1183,8 +1179,7 @@ Status ConnectionImpl::protocolErrorForTest() {
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}, stream_id={}", connection_,
                  static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags), hd->stream_id);
-  ASSERT(!skip_dispatching_frames_for_closed_connection_ ||
-         connection_.state() == Network::Connection::State::Open);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
 
   current_stream_id_ = hd->stream_id;
   // Track all the frames without padding here, since this is the only callback we receive
@@ -1210,8 +1205,7 @@ enum GoAwayErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
 
 Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "recv frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
-  ASSERT(!skip_dispatching_frames_for_closed_connection_ ||
-         connection_.state() == Network::Connection::State::Open);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
 
   // onFrameReceived() is called with a complete HEADERS frame assembled from all the HEADERS
   // and CONTINUATION frames, but we track them separately: HEADERS frames in onBeginHeaders()
@@ -1808,8 +1802,7 @@ int ConnectionImpl::setAndCheckNghttp2CallbackStatus(Status&& status) {
   // Keep the error status that caused the original failure. Subsequent
   // error statuses are silently discarded.
   nghttp2_callback_status_.Update(std::move(status));
-  if (skip_dispatching_frames_for_closed_connection_ && nghttp2_callback_status_.ok() &&
-      connection_.state() != Network::Connection::State::Open) {
+  if (nghttp2_callback_status_.ok() && connection_.state() != Network::Connection::State::Open) {
     nghttp2_callback_status_ = codecProtocolError("Connection was closed while dispatching frames");
   }
 
@@ -2209,8 +2202,7 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
   // The client code explicitly does not currently support push promise.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
   ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE || frame->headers.cat == NGHTTP2_HCAT_HEADERS);
-  ASSERT(!skip_dispatching_frames_for_closed_connection_ ||
-         connection_.state() == Network::Connection::State::Open);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
   return saveHeader(frame, std::move(name), std::move(value));
 }
 
@@ -2281,8 +2273,7 @@ ServerConnectionImpl::ServerConnectionImpl(
 Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   // For a server connection, we should never get push promise frames.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
-  ASSERT(!skip_dispatching_frames_for_closed_connection_ ||
-         connection_.state() == Network::Connection::State::Open);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
   RETURN_IF_ERROR(trackInboundFrames(&frame->hd, frame->headers.padlen));
 
   if (frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
