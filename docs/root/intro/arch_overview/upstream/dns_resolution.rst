@@ -30,7 +30,7 @@ The c-ares based DNS Resolver emits the following stats rooted in the ``dns.care
     :widths: 1, 1, 2
 
     resolve_total, Count, Number of DNS queries
-    pending_resolutions, Counter, Number of pending DNS queries
+    pending_resolutions, Gauge, Number of pending DNS queries
     not_found, Counter, Number of DNS queries that returned NXDOMAIN or NODATA response
     timeout, Counter, Number of DNS queries that resulted in timeout
     get_addr_failure, Counter, Number of general failures during DNS quries
