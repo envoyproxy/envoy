@@ -6,6 +6,7 @@
 # 6. Fix cross-compilation (https://crrev.com/c/3735165).
 # 7. Fix build errors in SIMD IndexOf/includes (https://crrev.com/c/3749192).
 # 8. Fix build on arm64.
+# 9. Fix build on older versions of Linux.
 
 diff --git a/BUILD.bazel b/BUILD.bazel
 index 13f2a5bebf..2197568c48 100644
@@ -346,3 +347,19 @@ index be6b72d157..a71968fd10 100644
  #define CMP(a, b) _mm256_cmp_pd(a, b, _CMP_EQ_OQ)
  #define EXTRACT(x) base::bits::CountTrailingZeros32(x)
      VECTORIZED_LOOP_x86(__m256d, __m256d, _mm256_set1_pd, CMP,
+diff --git a/src/base/platform/platform-posix.cc b/src/base/platform/platform-posix.cc
+index 131ff9614e..6455f8757d 100644
+--- a/src/base/platform/platform-posix.cc
++++ b/src/base/platform/platform-posix.cc
+@@ -610,8 +610,9 @@ PlatformSharedMemoryHandle OS::CreateSharedMemoryHandleForTesting(size_t size) {
+       reinterpret_cast<memfd_create_t>(dlsym(RTLD_DEFAULT, "memfd_create"));
+   int fd = -1;
+   if (memfd_create) {
+-    fd = memfd_create("V8MemFDForTesting", MFD_CLOEXEC);
+-  } else {
++    fd = memfd_create("V8MemFDForTesting", 0);
++  }
++  if (fd == -1) {
+     char filename[] = "/tmp/v8_tmp_file_for_testing_XXXXXX";
+     fd = mkstemp(filename);
+     if (fd != -1) CHECK_EQ(0, unlink(filename));

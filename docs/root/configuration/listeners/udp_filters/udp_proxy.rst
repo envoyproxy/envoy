@@ -82,7 +82,9 @@ server listening on port 1235, allowing 9000 byte packets in both directions (i.
 frames or fragmented IP packets).
 
 .. literalinclude:: _include/udp-proxy.yaml
-    :language: yaml
+   :language: yaml
+   :linenos:
+   :caption: :download:`udp-proxy.yaml <_include/udp-proxy.yaml>`
 
 .. _config_udp_listener_filters_udp_proxy_stats:
 
