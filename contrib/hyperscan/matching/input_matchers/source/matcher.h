@@ -14,20 +14,15 @@ namespace Hyperscan {
 
 struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
   ScratchThreadLocal(const hs_database_t* database, const hs_database_t* som_database);
-  ~ScratchThreadLocal() override { hs_free_scratch(scratch_); }
+  ~ScratchThreadLocal() override;
 
   hs_scratch_t* scratch_{};
 };
 
 struct Bound {
-  Bound(uint64_t start, uint64_t end) : start_(start), end_(end) {}
+  Bound(uint64_t start, uint64_t end);
 
-  bool operator<(const Bound& other) const {
-    if (start_ == other.start_) {
-      return end_ > other.end_;
-    }
-    return start_ < other.start_;
-  }
+  bool operator<(const Bound& other) const;
 
   uint64_t start_;
   uint64_t end_;
@@ -38,10 +33,7 @@ public:
   Matcher(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
           const std::vector<unsigned int>& ids, ThreadLocal::SlotAllocator& tls,
           bool report_start_of_matching);
-  ~Matcher() override {
-    hs_free_database(database_);
-    hs_free_database(som_database_);
-  }
+  ~Matcher() override;
 
   // Envoy::Regex::CompiledMatcher
   bool match(absl::string_view value) const override;

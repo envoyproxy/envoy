@@ -21,6 +21,17 @@ ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database,
   }
 }
 
+ScratchThreadLocal::~ScratchThreadLocal() { hs_free_scratch(scratch_); }
+
+Bound::Bound(uint64_t start, uint64_t end) : start_(start), end_(end) {}
+
+bool Bound::operator<(const Bound& other) const {
+  if (start_ == other.start_) {
+    return end_ > other.end_;
+  }
+  return start_ < other.start_;
+}
+
 Matcher::Matcher(const std::vector<const char*>& expressions,
                  const std::vector<unsigned int>& flags, const std::vector<unsigned int>& ids,
                  ThreadLocal::SlotAllocator& tls, bool report_start_of_matching)
@@ -43,6 +54,11 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
   tls_->set([this](Event::Dispatcher&) {
     return std::make_shared<ScratchThreadLocal>(this->database_, this->som_database_);
   });
+}
+
+Matcher::~Matcher() {
+  hs_free_database(database_);
+  hs_free_database(som_database_);
 }
 
 bool Matcher::match(absl::string_view value) const {
