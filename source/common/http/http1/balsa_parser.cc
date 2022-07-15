@@ -33,13 +33,14 @@ bool isMethodValid(absl::string_view method) {
 
 } // anonymous namespace
 
-BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length)
-    : connection_(connection) {
+BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection) : connection_(connection) {
   ASSERT(connection_ != nullptr);
 
   framer_.set_balsa_headers(&headers_);
+  framer_.set_balsa_trailer(&trailers_);
   framer_.set_balsa_visitor(this);
-  framer_.set_max_header_length(max_header_length);
+  // Defer header length validation to ConnectionImpl.
+  framer_.set_max_header_length(std::numeric_limits<size_t>::max());
 
   switch (type) {
   case MessageType::Request:
@@ -47,7 +48,6 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
     break;
   case MessageType::Response:
     framer_.set_is_request(false);
-    framer_.set_balsa_trailer(&trailers_);
     break;
   }
 }

@@ -16,7 +16,7 @@ namespace Http1 {
 // to be used by ConnectionImpl.
 class BalsaParser : public Parser, public quiche::BalsaVisitorInterface {
 public:
-  BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length);
+  BalsaParser(MessageType type, ParserCallbacks* connection);
   ~BalsaParser() override = default;
 
   // Http1::Parser implementation
