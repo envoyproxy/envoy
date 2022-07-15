@@ -147,22 +147,21 @@ int SPIFFEValidator::doSynchronousVerifyCertChain(X509_STORE_CTX* store_ctx,
                                                   const Network::TransportSocketOptions*) {
   STACK_OF(X509)* cert_chain = X509_STORE_CTX_get0_untrusted(store_ctx);
   X509_VERIFY_PARAM* verify_param = X509_STORE_CTX_get0_param(store_ctx);
+  std::string error_details;
   return verifyCertChainUsingTrustBundleStore(ssl_extended_info, leaf_cert, cert_chain,
-                                              verify_param, nullptr)
+                                              verify_param, error_details)
              ? 1
              : 0;
 }
 
 bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert, STACK_OF(X509)* cert_chain,
-    X509_VERIFY_PARAM* verify_param, std::string* error_details) {
+    X509_VERIFY_PARAM* verify_param, std::string& error_details) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
     }
-    if (error_details != nullptr) {
-      *error_details = "verify cert failed: cert precheck";
-    }
+      error_details = "verify cert failed: cert precheck";
     stats_.fail_verify_error_.inc();
     return false;
   }
@@ -172,9 +171,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
     }
-    if (error_details != nullptr) {
-      *error_details = "verify cert failed: no trust bundle store";
-    }
+      error_details = "verify cert failed: no trust bundle store";
     stats_.fail_verify_error_.inc();
     return false;
   }
@@ -183,9 +180,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
   bssl::UniquePtr<X509_STORE_CTX> new_store_ctx(X509_STORE_CTX_new());
   if (!X509_STORE_CTX_init(new_store_ctx.get(), trust_bundle, &leaf_cert, cert_chain) ||
       !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(new_store_ctx.get()), verify_param)) {
-    if (error_details != nullptr) {
-      *error_details = "verify cert failed: init and setup X509_STORE_CTX";
-    }
+      error_details = "verify cert failed: init and setup X509_STORE_CTX";
     stats_.fail_verify_error_.inc();
     return false;
   }
@@ -198,10 +193,8 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
     }
-    if (error_details != nullptr) {
-      *error_details = absl::StrCat("verify cert failed: ",
+      error_details = absl::StrCat("verify cert failed: ",
                                     Utility::getX509VerificationErrorInfo(new_store_ctx.get()));
-    }
     stats_.fail_verify_error_.inc();
     return false;
   }
@@ -209,9 +202,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
   // Do SAN matching.
   const bool san_match = subject_alt_name_matchers_.empty() ? true : matchSubjectAltName(leaf_cert);
   if (!san_match) {
-    if (error_details != nullptr) {
-      *error_details = "verify cert failed: SAN match";
-    }
+      error_details = "verify cert failed: SAN match";
     stats_.fail_verify_san_.inc();
   }
   if (ssl_extended_info) {
@@ -240,7 +231,7 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
   std::string error_details;
   return verifyCertChainUsingTrustBundleStore(ssl_extended_info, *leaf_cert, &cert_chain,
-                                              SSL_CTX_get0_param(&ssl_ctx), &error_details)
+                                              SSL_CTX_get0_param(&ssl_ctx), error_details)
              ? ValidationResults{ValidationResults::ValidationStatus::Successful, absl::nullopt,
                                  absl::nullopt}
              : ValidationResults{ValidationResults::ValidationStatus::Failed, absl::nullopt,
