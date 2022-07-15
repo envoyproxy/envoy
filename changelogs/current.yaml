@@ -259,6 +259,7 @@ new_features:
     for Envoy (see detailed documentation :ref:`here <arch_overview_conn_pool>` but will also result in trying multiple addresses
     for resolvers doing only IPv4 or IPv6. This behavioral change can be temporarily disabled by setting runtime guard
     ``envoy.restart_features.remove_runtime_singleton`` to ``false``.
+- area: dns_resolver
   change: |
     added :ref:`GetAddrInfoDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig>`,
     a new DNS resolver that uses the system's ``getaddrinfo()`` function to resolve DNS. This was primarily added for use on Android
