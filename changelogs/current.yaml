@@ -39,6 +39,13 @@ behavior_changes:
     If there is no entry referred by the filter config name, the canonical filter name
     (e.g., *envoy.filters.http.buffer* for the HTTP buffer filter) will be used for the backwards
     compatibility.
+- area: router
+  change: |
+    Weighted cluster's :ref:`total_weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` is now
+    optional. If not set, Envoy will no longer validate that all weights add up to 100. The sum of
+    :ref:`weights <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.weight>`
+    across all entries in the clusters array must add up to the
+    :ref:`total_weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>`, when it's greater than 0.
 
 minor_behavior_changes:
 - area: thrift
@@ -313,6 +320,11 @@ new_features:
 - area: router
   change: |
     added :ref:`stat_prefix <envoy_v3_api_field_config.route.v3.Route.stat_prefix>` support to generate route level statistics.
+- area: router
+  change: |
+    Add an :ref:`option
+    <envoy_v3_api_enum_value_config.route.v3.RouteAction.ClusterNotFoundResponseCode.INTERNAL_SERVER_ERROR>` to return
+    status code 500 when the configured cluster is not found.
 - area: matching
   change : |
     added support for matching authenticated inputs in network and HTTP matching data.
@@ -349,3 +361,7 @@ deprecated:
   change: |
     :ref:`downstream_auth_password <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_password>` has been deprecated. Please use
     :ref:`downstream_auth_passwords <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_passwords>`.
+- area: lua
+  change: |
+    :ref:`inline_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` has been deprecated. Please use
+    :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`.
