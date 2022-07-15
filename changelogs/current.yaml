@@ -1,4 +1,4 @@
-date: Pending
+date: July 15, 2022
 
 behavior_changes:
 - area: tls-inspector
@@ -368,7 +368,7 @@ new_features:
     <envoy_v3_api_enum_value_config.route.v3.RouteAction.ClusterNotFoundResponseCode.INTERNAL_SERVER_ERROR>` to return
     status code 500 when the configured cluster is not found.
 - area: matching
-  change : |
+  change: |
     added support for matching authenticated inputs in network and HTTP matching data.
 - area: rbac
   change: |
@@ -423,3 +423,4 @@ deprecated:
   change: |
     deprecated :ref:`inline_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Please use
     :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`.
+
