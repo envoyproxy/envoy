@@ -156,7 +156,7 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
   }
 
   // Check if there is a response body.
-  bool has_response_body = !respond.http_respond.body().empty();
+  bool has_response_body = !respond.http_respond().has_body();
   test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
                                                                !has_response_body);
   if (has_response_body) {
