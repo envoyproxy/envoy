@@ -66,48 +66,42 @@ bool Matcher::match(absl::string_view value) const {
 }
 
 std::string Matcher::replaceAll(absl::string_view value, absl::string_view substitution) const {
-  // Find matched pair.
-  using Found = std::pair<unsigned long long, unsigned long long>;
-  std::vector<Found> founds;
+  // Find matched bounds.
+  std::vector<Bound> bounds;
   hs_scratch_t* scratch_ = tls_->get()->scratch_;
   hs_error_t err = hs_scan(
       som_database_, value.data(), value.size(), 0, scratch_,
       [](unsigned int, unsigned long long from, unsigned long long to, unsigned int,
          void* context) -> int {
-        std::vector<Found>* founds = static_cast<std::vector<Found>*>(context);
+        std::vector<Bound>* founds = static_cast<std::vector<Bound>*>(context);
         founds->push_back({from, to});
 
         // Continue searching.
         return 0;
       },
-      &founds);
+      &bounds);
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
     ENVOY_LOG_MISC(error, "unable to scan, error code {}", err);
     return std::string(value);
   }
 
-  // Sort founds. Make sure the longest length found in the front will appear first.
-  std::sort(founds.begin(), founds.end(), [](Found a, Found b) {
-    if (a.first == b.first) {
-      return a.second > b.second;
-    }
-    return a.first < b.first;
-  });
+  // Sort bounds. Make sure the longest length bound in the front will appear first.
+  std::sort(bounds.begin(), bounds.end());
 
   // Concatenate string and replace matched pair with substitution.
-  std::string result;
-  unsigned long long pos = 0;
-  for (auto& found : founds) {
-    if (found.first < pos) {
+  std::vector<absl::string_view> parts;
+  uint64_t pos = 0;
+  for (Bound& bound : bounds) {
+    if (bound.start_ < pos) {
       continue;
     }
 
-    result += std::string(value.substr(pos, found.first - pos));
-    result += std::string(substitution);
-    pos = found.second;
+    parts.emplace_back(value.substr(pos, bound.start_ - pos));
+    parts.emplace_back(substitution);
+    pos = bound.end_;
   }
-  result += std::string(value.substr(pos));
-  return result;
+  parts.emplace_back(value.substr(pos));
+  return absl::StrJoin(parts, "");
 }
 
 bool Matcher::match(absl::optional<absl::string_view> input) {

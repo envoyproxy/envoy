@@ -19,6 +19,20 @@ struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
   hs_scratch_t* scratch_{};
 };
 
+struct Bound {
+  Bound(uint64_t start, uint64_t end) : start_(start), end_(end) {}
+
+  bool operator<(const Bound& other) const {
+    if (start_ == other.start_) {
+      return end_ > other.end_;
+    }
+    return start_ < other.start_;
+  }
+
+  uint64_t start_;
+  uint64_t end_;
+};
+
 class Matcher : public Envoy::Regex::CompiledMatcher, public Envoy::Matcher::InputMatcher {
 public:
   Matcher(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
