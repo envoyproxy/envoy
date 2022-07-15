@@ -41,7 +41,7 @@ behavior_changes:
     compatibility.
 - area: router
   change: |
-    Weighted cluster's :ref:`total_weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` is now
+    weighted cluster's :ref:`total_weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` is now
     optional. If not set, Envoy will no longer validate that all weights add up to 100. The sum of
     :ref:`weights <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.weight>`
     across all entries in the clusters array must add up to the
@@ -322,7 +322,7 @@ new_features:
     added :ref:`stat_prefix <envoy_v3_api_field_config.route.v3.Route.stat_prefix>` support to generate route level statistics.
 - area: router
   change: |
-    Add an :ref:`option
+    added :ref:`INTERNAL_SERVER_ERROR option
     <envoy_v3_api_enum_value_config.route.v3.RouteAction.ClusterNotFoundResponseCode.INTERNAL_SERVER_ERROR>` to return
     status code 500 when the configured cluster is not found.
 - area: matching
@@ -359,9 +359,9 @@ deprecated:
     :ref:`google_re2 <envoy_v3_api_field_type.matcher.v3.RegexMatcher.google_re2>` has been deprecated. A default regex engine can be set using :ref:`default_regex_engine <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.default_regex_engine>`.
 - area: redis
   change: |
-    :ref:`downstream_auth_password <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_password>` has been deprecated. Please use
+    deprecated :ref:`downstream_auth_password <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_password>`. Please use
     :ref:`downstream_auth_passwords <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.downstream_auth_passwords>`.
 - area: lua
   change: |
-    :ref:`inline_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` has been deprecated. Please use
+    deprecated :ref:`inline_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Please use
     :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`.
