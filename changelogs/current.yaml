@@ -1,4 +1,4 @@
-date: Pending
+date: July 15, 2022
 
 behavior_changes:
 - area: tls-inspector
@@ -233,8 +233,6 @@ new_features:
     added :ref:`include_unroutable_families<envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families>` to the Apple DNS resolver.
 - area: dns_resolver
   change: |
-    added support for multiple addresses. This is most valuable when used in conjunction with :ref:`ALL <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.ALL>` enabling full happy eyeballs support for Envoy (see detailed documentation :ref:`here <arch_overview_conn_pool>` but will also result in trying multiple addresses for resolvers doing only IPv4 or IPv6. This behavioral change can be temporarily disabled by setting runtime guard ``envoy.restart_features.remove_runtime_singleton`` to false.
-  change: |
     added :ref:`GetAddrInfoDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig>`, a new DNS resolver that uses the system's getaddrinfo() function to resolve DNS. This was primarily added for use on Android but can also be used in other situations in which the system resolver is desired.
 - area: dubbo_proxy
   change: |
@@ -306,7 +304,7 @@ new_features:
   change: |
     added :ref:`internal upstream transport <envoy_v3_api_msg_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport>` for passing metadata and filter state across the user space sockets and the internal listeners.
 - area: router
-  change:
+  change: |
     added :ref:`keep_empty_value <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>` to allow keeping empty values in custom headers.
 - area: dubbo_proxy
   change: |
@@ -323,7 +321,7 @@ new_features:
     <envoy_v3_api_enum_value_config.route.v3.RouteAction.ClusterNotFoundResponseCode.INTERNAL_SERVER_ERROR>` to return
     status code 500 when the configured cluster is not found.
 - area: matching
-  change : |
+  change: |
     added support for matching authenticated inputs in network and HTTP matching data.
 - area: rbac
   change: |
@@ -349,11 +347,6 @@ deprecated:
     :ref:`multiple route config <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` first.
 - area: http
   change: |
-    deprecated ``envoy.reloadable_features.skip_dispatching_frames_for_closed_connection`` and legacy code paths.
-  change: |
-    deprecate the short name ``preserve_case`` for the header formatter extension in favor of the fully-qualified name
-    ``envoy.http.stateful_header_formatters.preserve_case``.
-  change: |
     deprecated ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place`` and legacy code paths.
 - area: matching
   change: |
@@ -366,3 +359,4 @@ deprecated:
   change: |
     :ref:`inline_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` has been deprecated. Please use
     :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`.
+
