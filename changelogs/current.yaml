@@ -328,6 +328,9 @@ new_features:
 - area: rbac
   change: |
     added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
+- area: http
+  change: |
+    added :ref:`treat_missing_header_as_empty <envoy_v3_api_field_config.route.v3.HeaderMatcher.treat_missing_header_as_empty>` to allow header match rule to treat the header value as empty and apply the match rule when the header is missing.
 - area: thrift
   change: |
     added ``validate_clusters`` in :ref:`RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration>` to override the default behavior of cluster validation.

@@ -2169,7 +2169,7 @@ message RateLimit {
 //   value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message HeaderMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.HeaderMatcher";
 
@@ -2263,6 +2263,34 @@ message HeaderMatcher {
   // * The regex ``\d{3}`` does not match the value *1234*, so it will match when inverted.
   // * The range [-10,0) will match the value -1, so it will not match when inverted.
   bool invert_match = 8;
+
+  // If specified, for any header match rule, if the header match rule specified header
+  // does not exist, this header value will be treated as empty. Defaults to false.
+  //
+  // Examples:
+  //
+  // * The header match rule specified header "header1" to range match of [0, 10],
+  //   :ref:`invert_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.invert_match>`
+  //   is set to true and :ref:`treat_missing_header_as_empty <envoy_v3_api_field_config.route.v3.HeaderMatcher.treat_missing_header_as_empty>`
+  //   is set to true; The "header1" header is not present. The match rule will
+  //   treat the "header1" as an empty header. The empty header does not match the range,
+  //   so it will match when inverted.
+  // * The header match rule specified header "header2" to range match of [0, 10],
+  //   :ref:`invert_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.invert_match>`
+  //   is set to true and :ref:`treat_missing_header_as_empty <envoy_v3_api_field_config.route.v3.HeaderMatcher.treat_missing_header_as_empty>`
+  //   is set to false; The "header2" header is not present and the header
+  //   matcher rule for "header2" will be ignored so it will not match.
+  // * The header match rule specified header "header3" to a string regex match
+  //   ``^$`` which means an empty string, and
+  //   :ref:`treat_missing_header_as_empty <envoy_v3_api_field_config.route.v3.HeaderMatcher.treat_missing_header_as_empty>`
+  //   is set to true; The "header3" header is not present.
+  //   The match rule will treat the "header3" header as an empty header so it will match.
+  // * The header match rule specified header "header4" to a string regex match
+  //   ``^$`` which means an empty string, and
+  //   :ref:`treat_missing_header_as_empty <envoy_v3_api_field_config.route.v3.HeaderMatcher.treat_missing_header_as_empty>`
+  //   is set to false; The "header4" header is not present.
+  //   The match rule for "header4" will be ignored so it will not match.
+  bool treat_missing_header_as_empty = 14;
 }
 
 // Query parameter matching treats the query string of a request's :path header
