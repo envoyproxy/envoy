@@ -24,6 +24,7 @@ Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
 #ifdef HYPERSCAN_DISABLED
   throw EnvoyException("X86_64 architecture is required for Hyperscan.");
 #else
+  // Hyperscan requires vectors of expressions, flags and IDs for matching database compilation.
   return [hyperscan_config, &factory_context]() {
     int size = hyperscan_config.regexes().size();
     std::vector<const char*> expressions;
