@@ -230,7 +230,7 @@ new_features:
   change: |
     added :ref:`GetAddrInfoDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig>`, a new DNS resolver that uses the system's getaddrinfo() function to resolve DNS. This was primarily added for use on Android but can also be used in other situations in which the system resolver is desired.
   change: |
-    added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <_arch_overview_dns_resolution:>`.    
+    added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
 - area: dubbo_proxy
   change: |
     added :ref:`dynamic routes discovery <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` support to dubbo proxy.
