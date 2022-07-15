@@ -393,19 +393,12 @@ new_features:
     When set to ``true``, path-parameters(`rfc1808 <https://datatracker.ietf.org/doc/html/rfc1808>`_) is ignored during path matching.
     added :ref:`ignore_path_parameters_in_path_matching <envoy_v3_api_field_config.route.v3.RouteConfiguration.ignore_path_parameters_in_path_matching>`.
     When set to ``true``, path-parameters(rfc1808) is ignored during path matching.
-- area: docs
-  change: |
-    added warning for single backtick use in API docs and cleaned up most of the current problems. This will become an error soon.
 - area: examples
   change: |
     fixed issues with documentation/compositions usage of ``docker-compose pull``.
 - area: examples
   change: |
     updated many examples and added dependency checking.
-- area: ci
-  change: |
-    merged the ``format`` and ``format_pre`` jobs, seperated the ``proto_format`` job. This is part of ongoing work to integrate and
-    optimize Envoy's dev tooling.
 
 deprecated:
 - area: dubbo_proxy
