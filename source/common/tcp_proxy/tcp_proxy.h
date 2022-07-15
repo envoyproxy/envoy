@@ -22,6 +22,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/network/hash_policy.h"
@@ -114,17 +116,16 @@ class TunnelingConfigHelperImpl : public TunnelingConfigHelper {
 public:
   TunnelingConfigHelperImpl(
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
-          config_message)
-      : hostname_(config_message.hostname()), use_post_(config_message.use_post()),
-        header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())) {}
-  const std::string& hostname() const override { return hostname_; }
+          config_message,
+      Server::Configuration::FactoryContext& context);
+  std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
 
 private:
-  const std::string hostname_;
   const bool use_post_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+  Formatter::FormatterPtr hostname_fmt_;
 };
 
 /**
@@ -356,7 +357,6 @@ public:
 
     return {};
   }
-
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
   }

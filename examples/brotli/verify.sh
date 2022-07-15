@@ -1,30 +1,38 @@
 #!/bin/bash -e
 
 export NAME=brotli
+export PORT_PROXY="${BROTLI_PORT_PROXY:-10200}"
+export PORT_STATS0="${BROTLI_PORT_PROXY:-10201}"
+export PORT_STATS1="${BROTLI_PORT_PROXY:-10202}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
-run_log "Test service: localhost:10000/file.json with compression"
+wait_for 10 bash -c "\
+         responds_with_header \
+         'content-encoding: br' \
+         https://localhost:${PORT_PROXY}/file.json -ki -H 'Accept-Encoding: br'"
+
+run_log "Test service: localhost:${PORT_PROXY}/file.json with compression"
 responds_with_header \
     "content-encoding: br" \
-    https://localhost:10000/file.json \
+    "https://localhost:${PORT_PROXY}/file.json" \
     -ki -H "Accept-Encoding: br"
 
-run_log "Test service: localhost:10000/file.txt without compression"
+run_log "Test service: localhost:${PORT_PROXY}/file.txt without compression"
 responds_without_header \
     "content-encoding: br" \
-    https://localhost:10000/file.txt \
+    "https://localhost:${PORT_PROXY}/file.txt" \
     -ki -H "Accept-Encoding: br"
 
-run_log "Test service: localhost:9901/stats/prometheus without compression"
+run_log "Test service: localhost:${PORT_STATS0}/stats/prometheus without compression"
 responds_without_header \
     "content-encoding: br" \
-    http://localhost:9901/stats/prometheus \
+    "http://localhost:${PORT_STATS0}/stats/prometheus" \
     -ki -H "Accept-Encoding: br"
 
-run_log "Test service: localhost:9902/stats/prometheus with compression"
+run_log "Test service: localhost:${PORT_STATS1}/stats/prometheus with compression"
 responds_with_header \
     "content-encoding: br" \
-    https://localhost:9902/stats/prometheus \
+    "https://localhost:${PORT_STATS1}/stats/prometheus" \
     -ki -H "Accept-Encoding: br"

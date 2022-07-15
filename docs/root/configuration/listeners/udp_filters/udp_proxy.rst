@@ -3,8 +3,8 @@
 UDP proxy
 =========
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
-* This filter should be configured with the name *envoy.filters.udp_listener.udp_proxy*
 
 Overview
 --------
@@ -82,7 +82,9 @@ server listening on port 1235, allowing 9000 byte packets in both directions (i.
 frames or fragmented IP packets).
 
 .. literalinclude:: _include/udp-proxy.yaml
-    :language: yaml
+   :language: yaml
+   :linenos:
+   :caption: :download:`udp-proxy.yaml <_include/udp-proxy.yaml>`
 
 .. _config_udp_listener_filters_udp_proxy_stats:
 
