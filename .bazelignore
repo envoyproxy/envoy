@@ -1,29 +1,6 @@
-# Dot files, disallow by default, and enable explicitly
-\.*
-!\.azure-pipelines
-!\.bazelci
-!\.bazelignore
-!\.bazelrc
-!\.bazelversion
-!\.clang-format
-!\.clang-tidy
-!\.coveragerc
-!\.devcontainer
-!\.dockerignore
-!\.flake8
-!\.gitattributes
-!\.github
-!\.gitignore
-!\.python-version
-!\.style.yapf
-!\.vscode
-!\.yapfignore
-!\.zuul
-!\.zuul.yaml
-
+# only directories can be ignored, and no globbing
 api
 examples/grpc-bridge/script
 tools/clang_tools
 tools/dev/src
-*~
-\#*
+.project
