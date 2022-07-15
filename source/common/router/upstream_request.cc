@@ -177,7 +177,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   maybeEndDecode(end_stream);
 
   awaiting_headers_ = false;
-  if (!parent_.config().upstream_logs_.empty()) {
+  if (!parent_.config().upstream_logs_.empty() || span_ != nullptr) {
     upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
   stream_info_.response_code_ = static_cast<uint32_t>(response_code);
@@ -204,7 +204,7 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   maybeEndDecode(true);
-  if (!parent_.config().upstream_logs_.empty()) {
+  if (!parent_.config().upstream_logs_.empty() || span_ != nullptr) {
     upstream_trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers);
   }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
