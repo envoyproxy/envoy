@@ -389,10 +389,6 @@ new_features:
     port number (if any) in host header is ignored during host matching.
 - area: router
   change: |
-    added :ref:`ignore_path_parameters_in_path_matching <envoy_v3_api_field_config.route.v3.RouteConfiguration.ignore_path_parameters_in_path_matching>`. When set to true, path-parameters(`rfc1808 <https://datatracker.ietf.org/doc/html/rfc1808>`_) is ignored during path matching.
-- area: http
-  change: |
-    added the support of :ref:`expected response health check <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response>` for http.
     added :ref:`ignore_path_parameters_in_path_matching <envoy_v3_api_field_config.route.v3.RouteConfiguration.ignore_path_parameters_in_path_matching>`.
     When set to ``true``, path-parameters(`rfc1808 <https://datatracker.ietf.org/doc/html/rfc1808>`_) is ignored during path matching.
     added :ref:`ignore_path_parameters_in_path_matching <envoy_v3_api_field_config.route.v3.RouteConfiguration.ignore_path_parameters_in_path_matching>`.
@@ -403,6 +399,9 @@ new_features:
 - area: examples
   change: |
     updated many examples and added dependency checking.
+- area: http
+  change: |
+    added the support of :ref:`expected response health check <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response>` for http.
 
 deprecated:
 - area: dubbo_proxy
