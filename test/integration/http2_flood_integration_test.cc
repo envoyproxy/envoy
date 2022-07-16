@@ -57,6 +57,10 @@ class Http2FloodMitigationTest
       public Http2RawFrameIntegrationTest {
 public:
   Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
+    // This test tracks the number of buffers created, and the tag extraction check uses some
+    // buffers, so disable it in this test.
+    skip_tag_extraction_rule_check_ = true;
+
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
@@ -1154,9 +1158,9 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   EXPECT_EQ(1, test_server_->counter("http2.rx_messaging_error")->value());
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.invalid.header.field"));
   // expect Downstream Protocol Error
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("DPE"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true), HasSubstr("http2.invalid.header.field"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true), HasSubstr("DPE"));
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamPingFlood) {
@@ -1279,9 +1283,9 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
       0,
       test_server_->counter("cluster.cluster_0.upstream_cx_destroy_local_with_active_rq")->value());
   // Expect a local reset due to upstream reset before a response.
-  EXPECT_THAT(waitForAccessLog(access_log_name_),
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true),
               HasSubstr("upstream_reset_before_response_started"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("UPE"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true), HasSubstr("UPE"));
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {

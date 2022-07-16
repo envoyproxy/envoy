@@ -97,7 +97,7 @@ modify different aspects of the server:
       :ref:`average success rate <envoy_v3_api_field_data.cluster.v3.OutlierEjectSuccessRate.cluster_average_success_rate>`,
       and :ref:`ejection threshold<envoy_v3_api_field_data.cluster.v3.OutlierEjectSuccessRate.cluster_success_rate_ejection_threshold>`
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
-      :ref/`interval<envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`.
+      :ref:`interval<envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`.
 
     - ``added_via_api`` flag -- ``false`` if the cluster was added via static configuration, ``true``
       if it was added via the :ref:`CDS<config_cluster_manager_cds>` api.
@@ -439,11 +439,16 @@ modify different aspects of the server:
 
   .. http:get:: /stats?filter=regex
 
-  Filters the returned stats to those with names matching the regular expression
-  ``regex``. Compatible with ``usedonly``. Performs partial matching by default, so
-  ``/stats?filter=server`` will return all stats containing the word ``server``.
-  Full-string matching can be specified with begin- and end-line anchors. (i.e.
-  ``/stats?filter=^server.concurrency$``)
+  Filters the returned stats to those with names matching the regular
+  expression ``regex``. Compatible with ``usedonly``. Performs partial
+  matching by default, so ``/stats?filter=server`` will return all stats
+  containing the word ``server``.  Full-string matching can be specified
+  with begin- and end-line anchors. (i.e.  ``/stats?filter=^server.concurrency$``)
+
+  By default, the regular expression is evaluated using the
+  `Google RE2 <https://github.com/google/re2>` engine. To switch
+  to std::regex using Ecmascript syntax, POST an admin :ref:`runtime <arch_overview_runtime>` request:
+  ``/runtime_modify?envoy.reloadable_features.admin_stats_filter_use_re2=false``
 
   .. http:get:: /stats?histogram_buckets=cumulative
 

@@ -86,13 +86,13 @@ public:
   }
 
   JwtAuthentication proto_config_;
+  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ExtractorConstPtr extractor_;
   std::shared_ptr<FilterConfigImpl> filter_config_;
   MockJwksFetcher* raw_fetcher_;
   JwksFetcherPtr fetcher_;
   AuthenticatorPtr auth_;
   ::google::jwt_verify::JwksPtr jwks_;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ProtobufWkt::Struct out_extracted_data_;
   NiceMock<Tracing::MockSpan> parent_span_;
 };

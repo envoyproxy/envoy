@@ -35,10 +35,9 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
         throw EnvoyException("STRICT_DNS clusters must NOT have a custom resolver name set");
       }
 
-      const std::string& url =
-          fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
-      resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.mainThreadDispatcher(),
-                                                     url, locality_lb_endpoint, lb_endpoint));
+      resolve_targets.emplace_back(
+          new ResolveTarget(*this, factory_context.mainThreadDispatcher(), socket_address.address(),
+                            socket_address.port_value(), locality_lb_endpoint, lb_endpoint));
     }
   }
   resolve_targets_ = std::move(resolve_targets);
@@ -85,14 +84,15 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
 }
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
-    StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher, const std::string& url,
+    StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher, const std::string& dns_address,
+    const uint32_t dns_port,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint)
     : parent_(parent), locality_lb_endpoints_(locality_lb_endpoint), lb_endpoint_(lb_endpoint),
-      dns_address_(Network::Utility::hostFromTcpUrl(url)),
+      dns_address_(dns_address),
       hostname_(lb_endpoint_.endpoint().hostname().empty() ? dns_address_
                                                            : lb_endpoint_.endpoint().hostname()),
-      port_(Network::Utility::portFromTcpUrl(url)),
+      port_(dns_port),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {

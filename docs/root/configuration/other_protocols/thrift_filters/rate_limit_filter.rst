@@ -4,8 +4,8 @@ Rate limit
 ==========
 
 * Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.filters.ratelimit.v3.RateLimit``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.ratelimit.v3.RateLimit>`
-* This filter should be configured with the name *envoy.filters.thrift.rate_limit*.
 
 The Thrift rate limit filter will call the rate limit service when the request's route has one or
 more :ref:`rate limit configurations

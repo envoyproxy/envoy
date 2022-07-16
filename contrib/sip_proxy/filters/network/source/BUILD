@@ -107,6 +107,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "metadata_lib",
+    srcs = ["metadata.cc"],
     hdrs = [
         "metadata.h",
         "operation.h",

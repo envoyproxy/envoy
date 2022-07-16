@@ -39,18 +39,12 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
     const uint16_t retry_count = data_provider.ConsumeIntegralInRange<uint16_t>(0, 3);
     DnsMessageParser message_parser(true, api->timeSource(), retry_count, random, histogram);
-    uint64_t offset = data_provider.ConsumeIntegralInRange<uint64_t>(0, query.size());
 
-    const uint8_t fuzz_function = data_provider.ConsumeIntegralInRange<uint8_t>(0, 1);
-    if (fuzz_function == 0) {
-      DnsQueryContextPtr query_context =
-          std::make_unique<DnsQueryContext>(local, peer, counters, retry_count);
-      bool result = message_parser.parseDnsObject(query_context, query_buffer);
-      UNREFERENCED_PARAMETER(result);
-    } else {
-      DnsQueryRecordPtr ptr = message_parser.parseDnsQueryRecord(query_buffer, offset);
-      UNREFERENCED_PARAMETER(ptr);
-    }
+    DnsQueryContextPtr query_context =
+        std::make_unique<DnsQueryContext>(local, peer, counters, retry_count);
+    bool result = message_parser.parseDnsObject(query_context, query_buffer);
+    UNREFERENCED_PARAMETER(result);
+
     query_buffer->drain(query_buffer->length());
   }
 }

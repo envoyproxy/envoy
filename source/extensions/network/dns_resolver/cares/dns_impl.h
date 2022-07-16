@@ -115,6 +115,7 @@ private:
 
   private:
     void startResolutionImpl(int family);
+    bool isResponseWithNoRecords(int status);
 
     // Holds the availability of non-loopback network interfaces for the system.
     struct AvailableInterfaces {
@@ -130,8 +131,6 @@ private:
     // or Auto: perform a second resolution if the first one fails. If dns_lookup_family_ is All:
     // perform resolutions on both families concurrently.
     bool dual_resolution_ = false;
-    // Whether or not to lookup both V4 and V6 address.
-    bool lookup_all_ = false;
     // The number of outstanding pending resolutions. This should always be 0 or 1 for all lookup
     // types other than All. For all, this can be be 0-2 as both queries are issued in parallel.
     // This is used mostly for assertions but is used in the ARES_EDESTRUCTION path to make sure
@@ -141,6 +140,7 @@ private:
     const DnsLookupFamily dns_lookup_family_;
     // Queried for at construction time.
     const AvailableInterfaces available_interfaces_;
+    const bool accept_nodata_;
   };
 
   struct AresOptions {

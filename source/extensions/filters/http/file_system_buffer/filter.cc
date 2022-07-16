@@ -31,6 +31,10 @@ bool FileSystemBufferFilter::initPerRouteConfig() {
   config_.emplace(config_chain);
   request_state_.setConfig(config_->request());
   response_state_.setConfig(config_->response());
+  if (config_->request().behavior().bypass() && config_->response().behavior().bypass()) {
+    // It's okay to not have an AsyncFileManager if the filter is bypassed.
+    return true;
+  }
   return config_->hasAsyncFileManager();
 }
 
@@ -389,6 +393,36 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
   // If there's more data in memory than there should be, put some into storage.
   if (state.memory_used_ > state.config_->memoryBufferBytesLimit() &&
       state.storage_used_ < state.config_->storageBufferBytesLimit()) {
+    if (!state.async_file_handle_) {
+      // File isn't open yet - open it and then check again if we still need to store data.
+      ENVOY_STREAM_LOG(debug, "memory buffer exceeded - creating buffer file", callbacks);
+      // We can't use getSafeDispatcher here because we need to close the file if the filter
+      // was deleted before the callback, not just do nothing.
+      cancel_in_flight_async_action_ = config_->asyncFileManager().createAnonymousFile(
+          config_->storageBufferPath(), [this, me = std::weak_ptr(shared_from_this()),
+                                         dispatcher = &request_callbacks_->dispatcher(),
+                                         &state](absl::StatusOr<AsyncFileHandle> file_handle) {
+            dispatcher->post([this, me = std::move(me), &state, file_handle]() {
+              if (!me.lock()) {
+                // If we opened a file but the filter went away in the meantime, close the file
+                // to avoid leaving a dangling file handle.
+                if (file_handle.ok()) {
+                  file_handle.value()->close([](absl::Status) {}).IgnoreError();
+                }
+                return;
+              }
+              if (!file_handle.ok()) {
+                filterError(fmt::format("{} failed to create buffer file: {}", filterName(),
+                                        file_handle.status().ToString()));
+                return;
+              }
+              state.async_file_handle_ = std::move(file_handle.value());
+              cancel_in_flight_async_action_ = nullptr;
+              onStateChange();
+            });
+          });
+      return true;
+    }
     auto latest_memory_fragment = std::find_if(state.buffer_.rbegin(), state.buffer_.rend(),
                                                [](auto& p) { return p->isMemory(); });
     Fragment* fragment = latest_memory_fragment->get();
@@ -396,36 +430,11 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
     state.storage_used_ += size;
     state.storage_consumed_ += size;
     state.memory_used_ -= size;
-
-    if (!state.async_file_handle_) {
-      ENVOY_STREAM_LOG(debug, "sending buffer fragment (size={}) to new storage", callbacks, size);
-      auto cancel_open = config_->asyncFileManager().createAnonymousFile(
-          config_->storageBufferPath(), [this, fragment, &state, offset = state.storage_offset_](
-                                            absl::StatusOr<AsyncFileHandle> file_handle) {
-            // No need to check weak_ptr here, because for the filter to be destroyed
-            // the callback will either have been cancelled or will block the destructor until
-            // completed.
-            if (!file_handle.ok()) {
-              getSafeDispatch()([this, status = file_handle.status()]() {
-                filterError(fmt::format("{} failed to create buffer file: {}", filterName(),
-                                        status.ToString()));
-              });
-              return;
-            }
-            state.async_file_handle_ = std::move(file_handle.value());
-            auto to_storage = fragment->toStorage(state.async_file_handle_, offset,
-                                                  getSafeDispatch(), getOnFileActionCompleted());
-            ASSERT(to_storage.ok());
-            cancel_in_flight_async_action_ = to_storage.value();
-          });
-      cancel_in_flight_async_action_ = cancel_open;
-    } else {
-      ENVOY_STREAM_LOG(debug, "sending buffer fragment (size={}) to storage", callbacks, size);
-      auto to_storage = fragment->toStorage(state.async_file_handle_, state.storage_offset_,
-                                            getSafeDispatch(), getOnFileActionCompleted());
-      ASSERT(to_storage.ok());
-      cancel_in_flight_async_action_ = to_storage.value();
-    }
+    ENVOY_STREAM_LOG(debug, "sending buffer fragment (size={}) to storage", callbacks, size);
+    auto to_storage = fragment->toStorage(state.async_file_handle_, state.storage_offset_,
+                                          getSafeDispatch(), getOnFileActionCompleted());
+    ASSERT(to_storage.ok());
+    cancel_in_flight_async_action_ = to_storage.value();
     state.storage_offset_ += size;
     return true;
   }
@@ -433,8 +442,8 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
 }
 
 std::function<void(absl::Status)> FileSystemBufferFilter::getOnFileActionCompleted() {
-  // Async file callbacks run in the other thread and are either cancelled before they are run, or
-  // block the filter destructor until they are finished, so are safe to capture 'this'.
+  // This callback is only run via getSafeDispatch, so is safe to capture 'this' -
+  // it won't be called if the filter has been deleted.
   return [this](absl::Status status) {
     cancel_in_flight_async_action_ = nullptr;
     if (status.ok()) {

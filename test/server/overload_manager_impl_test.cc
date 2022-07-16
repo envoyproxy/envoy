@@ -234,8 +234,8 @@ protected:
 
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory3_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory4_;
+  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Duration> factory3_;
+  FakeResourceMonitorFactory<Envoy::ProtobufWkt::StringValue> factory4_;
   FakeProactiveResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory5_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;

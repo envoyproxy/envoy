@@ -5,6 +5,7 @@ package envoy.config.listener.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
@@ -32,13 +33,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// Listener list collections. Entries are *Listener* resources or references.
+// The additional address the listener is listening on.
+// [#not-implemented-hide:]
+message AdditionalAddress {
+  core.v3.Address address = 1;
+}
+
+// Listener list collections. Entries are ``Listener`` resources or references.
 // [#not-implemented-hide:]
 message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -88,6 +95,11 @@ message Listener {
 
       // If specified, the listener will use the exact connection balancer.
       ExactBalance exact_balance = 1;
+
+      // The listener will use the connection balancer according to ``type_url``. If ``type_url`` is invalid,
+      // Envoy will not attempt to balance active connections between worker threads.
+      // [#extension-category: envoy.network.connection_balance]
+      core.v3.TypedExtensionConfig extend_balance = 2;
     }
   }
 
@@ -106,11 +118,18 @@ message Listener {
   // The address that the listener should listen on. In general, the address must be unique, though
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
   // Linux as the actual port will be allocated by the OS.
-  core.v3.Address address = 2 [(validate.rules).message = {required: true}];
+  // Required unless ``api_listener`` or ``listener_specifier`` is populated.
+  core.v3.Address address = 2;
+
+  // The additional addresses the listener should listen on. The addresses must be unique across all
+  // listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in a single listener,
+  // all addresses use the same protocol, and multiple internal addresses are not supported.
+  // [#not-implemented-hide:]
+  repeated AdditionalAddress additional_addresses = 33;
 
   // Optional prefix to use on listener stats. If empty, the stats will be rooted at
-  // `listener.<address as string>.`. If non-empty, stats will be rooted at
-  // `listener.<stat_prefix>.`.
+  // ``listener.<address as string>.``. If non-empty, stats will be rooted at
+  // ``listener.<stat_prefix>.``.
   string stat_prefix = 28;
 
   // A list of filter chains to consider for this listener. The
@@ -141,7 +160,7 @@ message Listener {
   xds.type.matcher.v3.Matcher filter_chain_matcher = 32
       [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  // If a connection is redirected using *iptables*, the port on which the proxy
+  // If a connection is redirected using ``iptables``, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
   // true, the listener hands off redirected connections to the listener associated with the
   // original destination address. If there is no listener associated with the original destination
@@ -179,7 +198,7 @@ message Listener {
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
   // the accepted socket is closed without a connection being created unless
-  // `continue_on_listener_filters_timeout` is set to true. Specify 0 to disable the
+  // ``continue_on_listener_filters_timeout`` is set to true. Specify 0 to disable the
   // timeout. If not specified, a default timeout of 15s is used.
   google.protobuf.Duration listener_filters_timeout = 15;
 
@@ -194,24 +213,24 @@ message Listener {
 
   // Whether the listener should be set as a transparent socket.
   // When this flag is set to true, connections can be redirected to the listener using an
-  // *iptables* *TPROXY* target, in which case the original source and destination addresses and
+  // ``iptables`` ``TPROXY`` target, in which case the original source and destination addresses and
   // ports are preserved on accepted connections. This flag should be used in combination with
   // :ref:`an original_dst <config_listener_filters_original_dst>` :ref:`listener filter
   // <envoy_v3_api_field_config.listener.v3.Listener.listener_filters>` to mark the connections' local addresses as
   // "restored." This can be used to hand off each redirected connection to another listener
   // associated with the connection's destination address. Direct connections to the socket without
-  // using *TPROXY* cannot be distinguished from connections redirected using *TPROXY* and are
+  // using ``TPROXY`` cannot be distinguished from connections redirected using ``TPROXY`` and are
   // therefore treated as if they were redirected.
   // When this flag is set to false, the listener's socket is explicitly reset as non-transparent.
-  // Setting this flag requires Envoy to run with the *CAP_NET_ADMIN* capability.
+  // Setting this flag requires Envoy to run with the ``CAP_NET_ADMIN`` capability.
   // When this flag is not set (default), the socket is not modified, i.e. the transparent option
   // is neither set nor reset.
   google.protobuf.BoolValue transparent = 10;
 
-  // Whether the listener should set the *IP_FREEBIND* socket option. When this
+  // Whether the listener should set the ``IP_FREEBIND`` socket option. When this
   // flag is set to true, listeners can be bound to an IP address that is not
   // configured on the system running Envoy. When this flag is set to false, the
-  // option *IP_FREEBIND* is disabled on the socket. When this flag is not set
+  // option ``IP_FREEBIND`` is disabled on the socket. When this flag is not set
   // (default), the socket is not modified, i.e. the option is neither enabled
   // nor disabled.
   google.protobuf.BoolValue freebind = 11;
@@ -276,10 +295,10 @@ message Listener {
   // enable the balance config in Y1 and Y2 to balance the connections among the workers.
   ConnectionBalanceConfig connection_balance_config = 20;
 
-  // Deprecated. Use `enable_reuse_port` instead.
+  // Deprecated. Use ``enable_reuse_port`` instead.
   bool reuse_port = 21 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and
+  // When this flag is set to true, listeners set the ``SO_REUSEPORT`` socket option and
   // create one socket for each worker thread. This makes inbound connections
   // distribute among worker threads roughly evenly in cases where there are a high number
   // of connections. When this flag is set to false, all worker threads share one socket. This field

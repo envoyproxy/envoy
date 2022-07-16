@@ -4,6 +4,7 @@
 #include <string>
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -16,10 +17,13 @@ std::string Utility::sanitizeStatsName(absl::string_view name) {
   if (absl::StartsWith(name, ".")) {
     name.remove_prefix(1);
   }
-  std::string stats_name = std::string(name);
-  std::replace(stats_name.begin(), stats_name.end(), ':', '_');
-  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
-  return stats_name;
+
+  return absl::StrReplaceAll(name, {
+                                       {"://", "_"},
+                                       {":/", "_"},
+                                       {":", "_"},
+                                       {absl::string_view("\0", 1), "_"},
+                                   });
 }
 
 absl::optional<StatName> Utility::findTag(const Metric& metric, StatName find_tag_name) {

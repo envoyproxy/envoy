@@ -80,7 +80,7 @@ getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostCons
   if (options && options->serverNameOverride().has_value()) {
     sni = options->serverNameOverride().value();
   }
-  if (sni.empty()) {
+  if (sni.empty() || !host->address() || !host->address()->ip()) {
     return absl::nullopt;
   }
   return {{"https", sni, host->address()->ip()->port()}};
@@ -196,12 +196,17 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      Config::ScopedResume maybe_resume_eds_leds;
+      Config::ScopedResume maybe_resume_eds_leds_sds;
       if (cm_.adsMux()) {
-        const auto eds_type_url =
-            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-        maybe_resume_eds_leds = cm_.adsMux()->pause({eds_type_url, leds_type_url});
+
+        std::vector<std::string> paused_xds_types{
+            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>()};
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.combine_sds_requests")) {
+          paused_xds_types.push_back(
+              Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
+        }
+        maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
       }
       initializeSecondaryClusters();
     }
@@ -1843,12 +1848,27 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     TimeSource& source, ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& quic_info) {
-  Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache;
 
+  Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache;
   if (alternate_protocol_options.has_value()) {
+    // If there is configuration for an alternate protocols cache, always create one.
     alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(
         alternate_protocol_options.value(), dispatcher);
+  } else if (!alternate_protocol_options.has_value() &&
+             (protocols.size() == 2 ||
+              (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2)) &&
+             Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+    // If there is no configuration for an alternate protocols cache, still
+    // create one if there's an HTTP/2 upstream (either explicitly, or for mixed
+    // HTTP/1.1 and HTTP/2 pools) to track the max concurrent streams across
+    // connections.
+    envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
+    default_options.set_name(host->cluster().name());
+    alternate_protocols_cache =
+        alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
   }
+
   absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
       getOrigin(transport_socket_options, host);
   if (protocols.size() == 3 &&
@@ -1874,7 +1894,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   if (protocols.size() >= 2) {
     if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+            "envoy.reloadable_features.allow_concurrency_for_alpn_pool") &&
+        origin.has_value()) {
       ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
       envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
       default_options.set_name(host->cluster().name());
@@ -1890,7 +1911,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state);
+                                         priority, options, transport_socket_options, state, origin,
+                                         alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {

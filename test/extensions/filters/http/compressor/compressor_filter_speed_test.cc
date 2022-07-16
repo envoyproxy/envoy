@@ -223,43 +223,44 @@ static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImp
 
 // SPELLCHECKER(off)
 /*
-Running ./bazel-bin/test/extensions/filters/http/common/compressor/compressor_filter_speed_test
-Run on (8 X 2300 MHz CPU s)
+You can sepcify "--benchmark_filter=Gzip" to select compressor to benchmark.
+Running ./bazel-bin/test/extensions/filters/http/compressor/compressor_filter_speed_test
+Run on (112 X 1784.9 MHz CPU s)
 CPU Caches:
-L1 Data 32K (x4)
-L1 Instruction 32K (x4)
-L2 Unified 262K (x4)
-L3 Unified 6291K (x1)
-Load Average: 1.82, 1.72, 1.74
+  L1 Data 48 KiB (x56)
+  L1 Instruction 32 KiB (x56)
+  L2 Unified 1280 KiB (x56)
+  L3 Unified 43008 KiB (x2)
+Load Average: 0.32, 0.52, 0.70
 ***WARNING*** Library was built as DEBUG. Timings may be affected.
-------------------------------------------------------------
-Benchmark                  Time             CPU   Iterations
-------------------------------------------------------------
-....
-compressFull/0/manual_time              14.1 ms         14.3 ms           48
-compressFull/1/manual_time              7.06 ms         7.22 ms          104
-compressFull/2/manual_time              5.17 ms         5.33 ms          123
-compressFull/3/manual_time              15.4 ms         15.5 ms           45
-compressFull/4/manual_time              10.1 ms         10.3 ms           69
-compressFull/5/manual_time              15.8 ms         16.0 ms           40
-compressFull/6/manual_time              15.3 ms         15.5 ms           42
-compressFull/7/manual_time              9.91 ms         10.1 ms           71
-compressFull/8/manual_time              15.8 ms         16.0 ms           45
-compressChunks16384/0/manual_time       13.4 ms         13.5 ms           52
-compressChunks16384/1/manual_time       6.33 ms         6.48 ms          111
-compressChunks16384/2/manual_time       5.09 ms         5.27 ms          147
-compressChunks16384/3/manual_time       15.1 ms         15.3 ms           46
-compressChunks16384/4/manual_time       9.61 ms         9.78 ms           71
-compressChunks16384/5/manual_time       14.5 ms         14.6 ms           47
-compressChunks16384/6/manual_time       14.0 ms         14.1 ms           48
-compressChunks16384/7/manual_time       9.20 ms         9.36 ms           76
-compressChunks16384/8/manual_time       14.5 ms         14.6 ms           48
-compressChunks8192/0/manual_time        14.3 ms         14.5 ms           50
-compressChunks8192/1/manual_time        6.80 ms         6.96 ms          100
-compressChunks8192/2/manual_time        5.21 ms         5.36 ms          135
-compressChunks8192/3/manual_time        14.9 ms         15.0 ms           47
-compressChunks8192/4/manual_time        9.71 ms         9.87 ms           68
-compressChunks8192/5/manual_time        15.9 ms         16.1 ms           45
+------------------------------------------------------------------------------------
+Benchmark                                          Time             CPU   Iterations
+------------------------------------------------------------------------------------
+compressFullWithGzip/0/manual_time              15.6 ms         16.2 ms           45
+compressFullWithGzip/1/manual_time              7.46 ms         8.01 ms           94
+compressFullWithGzip/2/manual_time              5.67 ms         6.22 ms          124
+compressFullWithGzip/3/manual_time              16.7 ms         17.3 ms           42
+compressFullWithGzip/4/manual_time              10.9 ms         11.4 ms           64
+compressFullWithGzip/5/manual_time              17.9 ms         18.5 ms           39
+compressFullWithGzip/6/manual_time              16.7 ms         17.2 ms           42
+compressFullWithGzip/7/manual_time              10.9 ms         11.4 ms           64
+compressFullWithGzip/8/manual_time              18.0 ms         18.5 ms           39
+compressChunks16384WithGzip/0/manual_time       14.6 ms         15.2 ms           47
+compressChunks16384WithGzip/1/manual_time       7.08 ms         7.65 ms           99
+compressChunks16384WithGzip/2/manual_time       5.49 ms         6.06 ms          127
+compressChunks16384WithGzip/3/manual_time       15.7 ms         16.3 ms           45
+compressChunks16384WithGzip/4/manual_time       10.3 ms         10.9 ms           68
+compressChunks16384WithGzip/5/manual_time       16.9 ms         17.4 ms           41
+compressChunks16384WithGzip/6/manual_time       15.7 ms         16.3 ms           44
+compressChunks16384WithGzip/7/manual_time       10.3 ms         10.9 ms           68
+compressChunks16384WithGzip/8/manual_time       16.8 ms         17.4 ms           41
+compressChunks8192WithGzip/0/manual_time        15.7 ms         16.3 ms           45
+compressChunks8192WithGzip/1/manual_time        7.56 ms         8.16 ms           93
+compressChunks8192WithGzip/2/manual_time        5.90 ms         6.51 ms          118
+compressChunks8192WithGzip/3/manual_time        16.9 ms         17.4 ms           42
+compressChunks8192WithGzip/4/manual_time        11.0 ms         11.6 ms           64
+compressChunks8192WithGzip/5/manual_time        18.2 ms         18.8 ms           38
+compressChunks8192WithGzip/6/manual_time        16.9 ms         17.5 ms           42
 ....
 */
 // SPELLCHECKER(on)

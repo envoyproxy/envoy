@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 50]
+// [#next-free-field: 51]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -187,7 +187,7 @@ message HttpConnectionManager {
     // If not specified, no tracing will be performed.
     //
     // .. attention::
-    //   Please be aware that *envoy.tracers.opencensus* provider can only be configured once
+    //   Please be aware that ``envoy.tracers.opencensus`` provider can only be configured once
     //   in Envoy lifetime.
     //   Any attempts to reconfigure it or to use different configurations for different HCM filters
     //   will be rejected.
@@ -280,13 +280,13 @@ message HttpConnectionManager {
   // path will be visible internally if a transformation is enabled. Any path rewrites that the
   // router performs (e.g. :ref:`regex_rewrite
   // <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>` or :ref:`prefix_rewrite
-  // <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`) will apply to the *:path* header
+  // <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`) will apply to the ``:path`` header
   // destined for the upstream.
   //
-  // Note: access logging and tracing will show the original *:path* header.
+  // Note: access logging and tracing will show the original ``:path`` header.
   message PathNormalizationOptions {
     // [#not-implemented-hide:] Normalization applies internally before any processing of requests by
-    // HTTP filters, routing, and matching *and* will affect the forwarded *:path* header. Defaults
+    // HTTP filters, routing, and matching *and* will affect the forwarded ``:path`` header. Defaults
     // to :ref:`NormalizePathRFC3986
     // <envoy_v3_api_msg_type.http.v3.PathTransformation.Operation.NormalizePathRFC3986>`. When not
     // specified, this value may be overridden by the runtime variable
@@ -297,7 +297,7 @@ message HttpConnectionManager {
 
     // [#not-implemented-hide:] Normalization only applies internally before any processing of
     // requests by HTTP filters, routing, and matching. These will be applied after full
-    // transformation is applied. The *:path* header before this transformation will be restored in
+    // transformation is applied. The ``:path`` header before this transformation will be restored in
     // the router filter and sent upstream unless it was mutated by a filter. Defaults to no
     // transformations.
     // Multiple actions can be applied in the same Transformation, forming a sequential
@@ -320,36 +320,36 @@ message HttpConnectionManager {
   // [#next-free-field: 7]
   message ProxyStatusConfig {
     // If true, the details field of the Proxy-Status header is not populated with stream_info.response_code_details.
-    // This value defaults to `false`, i.e. the `details` field is populated by default.
+    // This value defaults to ``false``, i.e. the ``details`` field is populated by default.
     bool remove_details = 1;
 
     // If true, the details field of the Proxy-Status header will not contain
-    // connection termination details. This value defaults to `false`, i.e. the
-    // `details` field will contain connection termination details by default.
+    // connection termination details. This value defaults to ``false``, i.e. the
+    // ``details`` field will contain connection termination details by default.
     bool remove_connection_termination_details = 2;
 
     // If true, the details field of the Proxy-Status header will not contain an
-    // enumeration of the Envoy ResponseFlags. This value defaults to `false`,
-    // i.e. the `details` field will contain a list of ResponseFlags by default.
+    // enumeration of the Envoy ResponseFlags. This value defaults to ``false``,
+    // i.e. the ``details`` field will contain a list of ResponseFlags by default.
     bool remove_response_flags = 3;
 
     // If true, overwrites the existing Status header with the response code
     // recommended by the Proxy-Status spec.
-    // This value defaults to `false`, i.e. the HTTP response code is not
+    // This value defaults to ``false``, i.e. the HTTP response code is not
     // overwritten.
     bool set_recommended_response_code = 4;
 
     // The name of the proxy as it appears at the start of the Proxy-Status
     // header.
     //
-    // If neither of these values are set, this value defaults to `server_name`,
+    // If neither of these values are set, this value defaults to ``server_name``,
     // which itself defaults to "envoy".
     oneof proxy_name {
-      // If `use_node_id` is set, Proxy-Status headers will use the Envoy's node
+      // If ``use_node_id`` is set, Proxy-Status headers will use the Envoy's node
       // ID as the name of the proxy.
       bool use_node_id = 5;
 
-      // If `literal_proxy_name` is set, Proxy-Status headers will use this
+      // If ``literal_proxy_name`` is set, Proxy-Status headers will use this
       // value as the name of the proxy.
       string literal_proxy_name = 6;
     }
@@ -403,6 +403,10 @@ message HttpConnectionManager {
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
+  // [#comment:TODO: The following fields are ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present:
+  // 1. :ref:`allow_chunked_length <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.allow_chunked_length>`]
   config.core.v3.Http1ProtocolOptions http_protocol_options = 8;
 
   // Additional HTTP/2 settings that are passed directly to the HTTP/2 codec.
@@ -414,7 +418,7 @@ message HttpConnectionManager {
   config.core.v3.Http3ProtocolOptions http3_protocol_options = 44;
 
   // An optional override that the connection manager will write to the server
-  // header in responses. If not set, the default is *envoy*.
+  // header in responses. If not set, the default is ``envoy``.
   string server_name = 10
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
@@ -587,7 +591,7 @@ message HttpConnectionManager {
   // has mutated the request headers. While :ref:`use_remote_address
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
   // will also suppress XFF addition, it has consequences for logging and other
-  // Envoy uses of the remote address, so *skip_xff_append* should be used
+  // Envoy uses of the remote address, so ``skip_xff_append`` should be used
   // when only an elision of XFF addition is intended.
   bool skip_xff_append = 21;
 
@@ -621,8 +625,8 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
   // is APPEND_FORWARD or SANITIZE_SET and the client connection is mTLS. It specifies the fields in
   // the client certificate to be forwarded. Note that in the
-  // :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header, *Hash* is always set, and
-  // *By* is always set when the client certificate presents the URI type Subject Alternative Name
+  // :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header, ``Hash`` is always set, and
+  // ``By`` is always set when the client certificate presents the URI type Subject Alternative Name
   // value.
   SetCurrentClientCertDetails set_current_client_cert_details = 17;
 
@@ -636,7 +640,7 @@ message HttpConnectionManager {
   // :ref:`use_remote_address
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
   // is true and represent_ipv4_remote_address_as_ipv4_mapped_ipv6 is true and the remote address is
-  // an IPv4 address, the address will be mapped to IPv6 before it is appended to *x-forwarded-for*.
+  // an IPv4 address, the address will be mapped to IPv6 before it is appended to ``x-forwarded-for``.
   // This is useful for testing compatibility of upstream services that parse the header value. For
   // example, 50.0.0.1 is represented as ::FFFF:50.0.0.1. See `IPv4-Mapped IPv6 Addresses
   // <https://tools.ietf.org/html/rfc4291#section-2.5.5.2>`_ for details. This will also affect the
@@ -650,7 +654,7 @@ message HttpConnectionManager {
   repeated UpgradeConfig upgrade_configs = 23;
 
   // Should paths be normalized according to RFC 3986 before any processing of
-  // requests by HTTP filters or routing? This affects the upstream *:path* header
+  // requests by HTTP filters or routing? This affects the upstream ``:path`` header
   // as well. For paths that fail this check, Envoy will respond with 400 to
   // paths that are malformed. This defaults to false currently but will default
   // true in the future. When not specified, this value may be overridden by the
@@ -660,13 +664,19 @@ message HttpConnectionManager {
   // for details of normalization.
   // Note that Envoy does not perform
   // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
+  // [#comment:TODO: This field is ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present.]
   google.protobuf.BoolValue normalize_path = 30;
 
   // Determines if adjacent slashes in the path are merged into one before any processing of
-  // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
-  // setting this option, incoming requests with path `//dir///file` will not match against route
-  // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
+  // requests by HTTP filters or routing. This affects the upstream ``:path`` header as well. Without
+  // setting this option, incoming requests with path ``//dir///file`` will not match against route
+  // with ``prefix`` match set to ``/dir``. Defaults to ``false``. Note that slash merging is not part of
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
+  // [#comment:TODO: This field is ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present.]
   bool merge_slashes = 33;
 
   // Action to take when request URL path contains escaped slash sequences (%2F, %2f, %5C and %5c).
@@ -674,6 +684,9 @@ message HttpConnectionManager {
   // runtime variable.
   // The :ref:`http_connection_manager.path_with_escaped_slashes_action_sampling<config_http_conn_man_runtime_path_with_escaped_slashes_action_enabled>` runtime
   // variable can be used to apply the action to a portion of all requests.
+  // [#comment:TODO: This field is ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present.]
   PathWithEscapedSlashesAction path_with_escaped_slashes_action = 45;
 
   // The configuration of the request ID extension. This includes operations such as
@@ -704,10 +717,10 @@ message HttpConnectionManager {
   // local port. This affects the upstream host header unless the method is
   // CONNECT in which case if no filter adds a port the original port will be restored before headers are
   // sent upstream.
-  // Without setting this option, incoming requests with host `example:443` will not match against
-  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
+  // Without setting this option, incoming requests with host ``example:443`` will not match against
+  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to ``example``. Defaults to ``false``. Note that port removal is not part
   // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
-  // Only one of `strip_matching_host_port` or `strip_any_host_port` can be set.
+  // Only one of ``strip_matching_host_port`` or ``strip_any_host_port`` can be set.
   bool strip_matching_host_port = 39
       [(udpa.annotations.field_migrate).oneof_promotion = "strip_port_mode"];
 
@@ -716,10 +729,10 @@ message HttpConnectionManager {
     // of request by HTTP filters or routing.
     // This affects the upstream host header unless the method is CONNECT in
     // which case if no filter adds a port the original port will be restored before headers are sent upstream.
-    // Without setting this option, incoming requests with host `example:443` will not match against
-    // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
+    // Without setting this option, incoming requests with host ``example:443`` will not match against
+    // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to ``example``. Defaults to ``false``. Note that port removal is not part
     // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
-    // Only one of `strip_matching_host_port` or `strip_any_host_port` can be set.
+    // Only one of ``strip_matching_host_port`` or ``strip_any_host_port`` can be set.
     bool strip_any_host_port = 42;
   }
 
@@ -737,14 +750,14 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.override_stream_error_on_invalid_http_message>` or the new HTTP/2 option
   // :ref:`override_stream_error_on_invalid_http_message
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>`
-  // *not* the deprecated but similarly named :ref:`stream_error_on_invalid_http_messaging
+  // ``not`` the deprecated but similarly named :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
   google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
 
   // [#not-implemented-hide:] Path normalization configuration. This includes
   // configurations for transformations (e.g. RFC 3986 normalization or merge
   // adjacent slashes) and the policy to apply them. The policy determines
-  // whether transformations affect the forwarded *:path* header. RFC 3986 path
+  // whether transformations affect the forwarded ``:path`` header. RFC 3986 path
   // normalization is enabled by default and the default policy is that the
   // normalized header will be forwarded. See :ref:`PathNormalizationOptions
   // <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.PathNormalizationOptions>`
@@ -754,17 +767,41 @@ message HttpConnectionManager {
   // Determines if trailing dot of the host should be removed from host/authority header before any
   // processing of request by HTTP filters or routing.
   // This affects the upstream host header.
-  // Without setting this option, incoming requests with host `example.com.` will not match against
-  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to `example.com`. Defaults to `false`.
+  // Without setting this option, incoming requests with host ``example.com.`` will not match against
+  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to ``example.com``. Defaults to ``false``.
   // When the incoming request contains a host/authority header that includes a port number,
   // setting this option will strip a trailing dot, if present, from the host section,
-  // leaving the port as is (e.g. host value `example.com.:443` will be updated to `example.com:443`).
+  // leaving the port as is (e.g. host value ``example.com.:443`` will be updated to ``example.com:443``).
   bool strip_trailing_host_dot = 47;
 
   // Proxy-Status HTTP response header configuration.
   // If this config is set, the Proxy-Status HTTP response header field is
   // populated. By default, it is not.
   ProxyStatusConfig proxy_status_config = 49;
+
+  // Configuration options for Header Validation (UHV).
+  // UHV is an extensible mechanism for checking validity of HTTP requests as well as providing
+  // normalization for request attributes, such as URI path.
+  // If the typed_header_validation_config is present it overrides the following options:
+  // ``normalize_path``, ``merge_slashes``, ``path_with_escaped_slashes_action``
+  // ``http_protocol_options.allow_chunked_length``.
+  //
+  // The default UHV checks the following:
+  //
+  // #. HTTP/1 header map validity according to `RFC 7230 section 3.2<https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_
+  // #. Syntax of HTTP/1 request target URI and response status
+  // #. HTTP/2 header map validity according to `RFC 7540 section 8.1.2<https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2`_
+  // #. Syntax of HTTP/2 pseudo headers
+  // #. HTTP/3 header map validity according to `RFC 9114 section 4.3 <https://www.rfc-editor.org/rfc/rfc9114.html>`_
+  // #. Syntax of HTTP/3 pseudo headers
+  // #. Syntax of ``Content-Length`` and ``Transfer-Encoding``
+  // #. Validation of HTTP/1 requests with both ``Content-Length`` and ``Transfer-Encoding`` headers
+  // #. Normalization of the URI path according to `Normalization and Comparison <https://datatracker.ietf.org/doc/html/rfc3986#section-6>`_
+  //    without `case normalization <https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1>`_
+  //
+  // [#not-implemented-hide:]
+  // [#extension-category: envoy.http.header_validators]
+  config.core.v3.TypedExtensionConfig typed_header_validation_config = 50;
 }
 
 // The configuration to customize local reply returned by Envoy.
@@ -823,11 +860,11 @@ message ResponseMapper {
   // The new response status code if specified.
   google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
-  // The new local reply body text if specified. It will be used in the `%LOCAL_REPLY_BODY%`
-  // command operator in the `body_format`.
+  // The new local reply body text if specified. It will be used in the ``%LOCAL_REPLY_BODY%``
+  // command operator in the ``body_format``.
   config.core.v3.DataSource body = 3;
 
-  // A per mapper `body_format` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>`.
+  // A per mapper ``body_format`` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>`.
   // It will be used when this mapper is matched.
   config.core.v3.SubstitutionFormatString body_format_override = 4;
 

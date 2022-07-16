@@ -12,7 +12,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/mat
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Consistent Hashing Matcher]
-// [#extension: envoy.matching.input_matchers.consistent_hashing]
+// [#extension: envoy.matching.matchers.consistent_hashing]
 
 // The consistent hashing matchers computes a consistent hash from the input and matches if the resulting hash
 // is within the configured threshold.

@@ -17,9 +17,7 @@ TrafficRoutingAssistantHandler::TrafficRoutingAssistantHandler(
     ConnectionManager& parent, Event::Dispatcher& dispatcher,
     const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
     Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
-    : parent_(parent),
-      traffic_routing_assistant_map_(std::make_shared<TrafficRoutingAssistantMap>()),
-      stream_info_(std::move(stream_info)) {
+    : parent_(parent), stream_info_(std::move(stream_info)) {
 
   if (config.has_grpc_service()) {
     const std::chrono::milliseconds timeout =
@@ -30,33 +28,32 @@ TrafficRoutingAssistantHandler::TrafficRoutingAssistantHandler(
   }
 }
 
-void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(const std::string& type,
-                                                                   const std::string& key,
-                                                                   const std::string& val) {
-  if ((*traffic_routing_assistant_map_)[type][key] != val) {
-    (*traffic_routing_assistant_map_)[type].emplace(std::make_pair(key, val));
+void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
+    const std::string& type, const std::string& key, const std::string& val,
+    const absl::optional<TraContextMap> context) {
+  if (cache_manager_[type][key] != val) {
+    cache_manager_.insertCache(type, key, val);
     if (traClient()) {
       traClient()->updateTrafficRoutingAssistant(
-          type, absl::flat_hash_map<std::string, std::string>{std::make_pair(key, val)},
+          type, absl::flat_hash_map<std::string, std::string>{std::make_pair(key, val)}, context,
           Tracing::NullSpan::instance(), stream_info_);
     }
   }
 }
 
 QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
-    const std::string& type, const std::string& key,
+    const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
-  if ((*traffic_routing_assistant_map_)[type].find(key) !=
-      (*traffic_routing_assistant_map_)[type].end()) {
-    host = (*traffic_routing_assistant_map_)[type][key];
+  if (cache_manager_.contains(type, key)) {
+    host = cache_manager_[type][key];
     return QueryStatus::Continue;
   }
 
-  if (activetrans.metadata()->queryMap()[type]) {
+  if (activetrans.metadata()->affinityIteration()->query()) {
     parent_.pushIntoPendingList(type, key, activetrans, [&]() {
       if (traClient()) {
-        traClient()->retrieveTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
-                                                     stream_info_);
+        traClient()->retrieveTrafficRoutingAssistant(type, key, context,
+                                                     Tracing::NullSpan::instance(), stream_info_);
       }
     });
     host = "";
@@ -66,11 +63,11 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
   return QueryStatus::Stop;
 }
 
-void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(const std::string& type,
-                                                                   const std::string& key) {
-  (*traffic_routing_assistant_map_)[type].erase(key);
+void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(
+    const std::string& type, const std::string& key, const absl::optional<TraContextMap> context) {
+  cache_manager_[type].erase(key);
   if (traClient()) {
-    traClient()->deleteTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
+    traClient()->deleteTrafficRoutingAssistant(type, key, context, Tracing::NullSpan::instance(),
                                                stream_info_);
   }
 }
@@ -87,11 +84,11 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
                                               const absl::any& resp) {
   switch (type) {
   case TrafficRoutingAssistant::ResponseType::CreateResp: {
-    ENVOY_LOG(trace, "=== CreateResp");
+    ENVOY_LOG(trace, "TRA === CreateResp");
     break;
   }
   case TrafficRoutingAssistant::ResponseType::UpdateResp: {
-    ENVOY_LOG(trace, "=== UpdateResp");
+    ENVOY_LOG(trace, "TRA === UpdateResp");
     break;
   }
   case TrafficRoutingAssistant::ResponseType::RetrieveResp: {
@@ -100,12 +97,12 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
             envoy::extensions::filters::network::sip_proxy::tra::v3alpha::RetrieveResponse>(resp)
             .data();
     for (const auto& item : resp_data) {
-      ENVOY_LOG(trace, "=== RetrieveResp {} {}={}", message_type, item.first, item.second);
+      ENVOY_LOG(trace, "TRA === RetrieveResp {} {}={}", message_type, item.first, item.second);
       if (!item.second.empty()) {
         parent_.onResponseHandleForPendingList(
             message_type, item.first,
             [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
-              (*traffic_routing_assistant_map_)[message_type].emplace(item);
+              cache_manager_[message_type].emplace(item.first, item.second);
               metadata->setDestination(item.second);
               return parent_.continueHandling(metadata, decoder_event_handler);
             });
@@ -115,7 +112,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
       parent_.onResponseHandleForPendingList(
           message_type, item.first,
           [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
-            metadata->nextAffinity();
+            metadata->nextAffinityIteration();
             parent_.continueHandling(metadata, decoder_event_handler);
           });
     }
@@ -123,18 +120,18 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
     break;
   }
   case TrafficRoutingAssistant::ResponseType::DeleteResp: {
-    ENVOY_LOG(trace, "=== DeleteLskpmcResp");
+    ENVOY_LOG(trace, "TRA === DeleteResp");
     break;
   }
   case TrafficRoutingAssistant::ResponseType::SubscribeResp: {
-    ENVOY_LOG(trace, "=== SubscribeLskpmcResp");
-    auto lskpmcs =
+    ENVOY_LOG(trace, "TRA === SubscribeResp");
+    auto data =
         absl::any_cast<
             envoy::extensions::filters::network::sip_proxy::tra::v3alpha::SubscribeResponse>(resp)
             .data();
-    for (auto& item : lskpmcs) {
-      ENVOY_LOG(debug, "tra update {}: {}={}", message_type, item.first, item.second);
-      (*traffic_routing_assistant_map_)[message_type].emplace(item);
+    for (auto& item : data) {
+      ENVOY_LOG(debug, "TRA UPDATE {}: {}={}", message_type, item.first, item.second);
+      cache_manager_[message_type].emplace(item.first, item.second);
     }
   }
   default:
@@ -150,6 +147,10 @@ void TrafficRoutingAssistantHandler::doSubscribe(
         is_subscribe_map_.find(aff.key_name()) == is_subscribe_map_.end()) {
       subscribeTrafficRoutingAssistant(aff.key_name());
       is_subscribe_map_[aff.key_name()] = true;
+    }
+
+    if (aff.cache().max_cache_item() > 0) {
+      cache_manager_.initCache(aff.key_name(), aff.cache().max_cache_item());
     }
   }
 }
@@ -183,11 +184,25 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManager::continueHandling(const std::string& key) {
+void ConnectionManager::continueHandling(const std::string& key, bool try_next_affinity) {
   onResponseHandleForPendingList(
       "connection_pending", key,
       [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
-        continueHandling(metadata, decoder_event_handler);
+        if (try_next_affinity) {
+          metadata->nextAffinityIteration();
+          if (metadata->affinityIteration() != metadata->affinity().end()) {
+            metadata->setState(State::HandleAffinity);
+            continueHandling(metadata, decoder_event_handler);
+          } else {
+            // When onPoolFailure, continueHandling with try_next_affinity, but there is no next
+            // affinity, need throw exception and response with 503.
+            auto ex = AppException(AppExceptionType::InternalError,
+                                   fmt::format("envoy can't establish connection to {}", key));
+            sendLocalReply(*(metadata), ex, false);
+          }
+        } else {
+          continueHandling(metadata, decoder_event_handler);
+        }
       });
 }
 
@@ -199,11 +214,17 @@ void ConnectionManager::continueHandling(MessageMetadataSharedPtr metadata,
   } catch (const AppException& ex) {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
     sendLocalReply(*(decoder_->metadata()), ex, false);
+
+    absl::string_view k = decoder_->metadata()->transactionId().value();
+    if (transactions_.find(k) != transactions_.end()) {
+      transactions_[k]->setLocalResponseSent(true);
+    }
+
+    decoder_->complete();
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
 
-    // Transport/protocol mismatch (including errors in automatic detection). Just hang up
-    // since we don't know how to encode a response.
+    // Still unaware how to handle this, just close the connection
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -215,7 +236,7 @@ void ConnectionManager::dispatch() {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
     sendLocalReply(*(decoder_->metadata()), ex, false);
 
-    std::string&& k = std::string(decoder_->metadata()->transactionId().value());
+    absl::string_view k = decoder_->metadata()->transactionId().value();
     if (transactions_.find(k) != transactions_.end()) {
       transactions_[k]->setLocalResponseSent(true);
     }
@@ -224,8 +245,7 @@ void ConnectionManager::dispatch() {
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
 
-    // Transport/protocol mismatch (including errors in automatic detection). Just hang up
-    // since we don't know how to encode a response.
+    // Still unaware how to handle this, just close the connection
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -241,6 +261,12 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
 
   metadata.setEP(Utility::localAddress(context_));
   const DirectResponse::ResponseType result = response.encode(metadata, buffer);
+
+  ENVOY_CONN_LOG(
+      debug, "send local reply {} --> {} bytes {}\n{}", read_callbacks_->connection(),
+      read_callbacks_->connection().connectionInfoProvider().localAddress()->asStringView(),
+      read_callbacks_->connection().connectionInfoProvider().remoteAddress()->asStringView(),
+      buffer.length(), buffer.toString());
 
   read_callbacks_->connection().write(buffer, end_stream);
   if (end_stream) {
@@ -260,6 +286,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   default:
     PANIC("not reached");
   }
+  stats_.counterFromElements("", "local-generated-response").inc();
 }
 
 void ConnectionManager::doDeferredTransDestroy(ConnectionManager::ActiveTrans& trans) {
@@ -302,7 +329,9 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  ENVOY_LOG(trace, "new decoder filter");
+  stats_.request_active_.inc();
+  stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
+
   std::string&& k = std::string(metadata->transactionId().value());
   // if (metadata->methodType() == MethodType::Ack) {
   if (transactions_.find(k) != transactions_.end()) {
@@ -362,10 +391,11 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
 
   encoder->encode(metadata_, buffer);
 
-  ENVOY_STREAM_LOG(info, "send response {}\n{}", parent_, buffer.length(), buffer.toString());
+  ENVOY_STREAM_LOG(debug, "send response {}\n{}", parent_, buffer.length(), buffer.toString());
   cm.read_callbacks_->connection().write(buffer, false);
 
   cm.stats_.response_.inc();
+  cm.stats_.counterFromElements(methodStr[metadata_->methodType()], "response_proxied").inc();
 
   return FilterStatus::Continue;
 }

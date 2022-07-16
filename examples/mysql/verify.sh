@@ -2,13 +2,15 @@
 
 export NAME=mysql
 export DELAY=10
+export PORT_ADMIN="${MYSQL_PORT_ADMIN:-11300}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
 _mysql () {
     local mysql_client
-    mysql_client=(docker run --network envoymesh mysql:5.7 mysql -h proxy -P 1999 -u root)
+    # TODO(phlax): pin mysql client
+    mysql_client=(docker run --network mysql_default mysql:5.7 mysql -h proxy -P 1999 -u root)
     "${mysql_client[@]}" "${@}"
 }
 
@@ -23,9 +25,9 @@ _mysql -e "SELECT COUNT(*) from test.test;" | grep 1
 run_log "Check mysql egress stats"
 responds_with \
     egress_mysql \
-    "http://localhost:8001/stats?filter=egress_mysql"
+    "http://localhost:${PORT_ADMIN}/stats?filter=egress_mysql"
 
 run_log "Check mysql TCP stats"
 responds_with \
     mysql_tcp \
-    "http://localhost:8001/stats?filter=mysql_tcp"
+    "http://localhost:${PORT_ADMIN}/stats?filter=mysql_tcp"

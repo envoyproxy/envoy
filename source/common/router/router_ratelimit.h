@@ -13,6 +13,8 @@
 
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/types/optional.h"
 
@@ -91,6 +93,27 @@ public:
                           const std::string& local_service_cluster,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
+};
+
+/**
+ * Action for masked remote address rate limiting.
+ */
+class MaskedRemoteAddressAction : public RateLimit::DescriptorProducer {
+public:
+  MaskedRemoteAddressAction(
+      const envoy::config::route::v3::RateLimit::Action::MaskedRemoteAddress& action)
+      : v4_prefix_mask_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v4_prefix_mask_len, 32)),
+        v6_prefix_mask_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v6_prefix_mask_len, 128)) {}
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const uint32_t v4_prefix_mask_len_;
+  const uint32_t v6_prefix_mask_len_;
 };
 
 /**

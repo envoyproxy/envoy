@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package test.integration.filters;
 
-import "validate/validate.proto";
-
 message InspectDataListenerFilterConfig {
   uint64 max_read_bytes = 1;
   bool close_connection = 2;

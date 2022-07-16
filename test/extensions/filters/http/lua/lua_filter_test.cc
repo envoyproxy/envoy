@@ -17,6 +17,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -82,7 +83,7 @@ public:
   // test cases, the existing configuration methods must be compatible.
   void setup(const std::string& lua_code) {
     envoy::extensions::filters::http::lua::v3::Lua proto_config;
-    proto_config.set_inline_code(lua_code);
+    proto_config.mutable_default_source_code()->set_inline_string(lua_code);
     envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
     setupConfig(proto_config, per_route_proto_config);
     setupFilter();
@@ -99,7 +100,7 @@ public:
 
   void setupFilter() {
     Event::SimulatedTimeSystem test_time;
-    test_time.setSystemTime(std::chrono::milliseconds(1583879145572));
+    test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
 
     filter_ = std::make_unique<TestFilter>(config_, test_time.timeSystem());
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -124,8 +125,8 @@ public:
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<FilterConfigPerRoute> per_route_config_;
   std::unique_ptr<TestFilter> filter_;
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   envoy::config::core::v3::Metadata metadata_;
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
@@ -227,7 +228,7 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   NiceMock<Api::MockApi> api;
 
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
-  proto_config.set_inline_code(SCRIPT);
+  proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
 
   EXPECT_THROW_WITH_MESSAGE(FilterConfig(proto_config, tls, cluster_manager, api),
                             Filters::Common::Lua::LuaException,
@@ -1119,6 +1120,9 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
 
 // HTTP call followed by immediate response.
 TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.lua_respond_with_send_local_reply", "false"}});
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -1447,6 +1451,9 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncInvalidAsynchronousFlag) {
 // This is also a regression test for https://github.com/envoyproxy/envoy/issues/3570 which runs
 // the request flow 2000 times and does a GC at the end to make sure we don't leak memory.
 TEST_F(LuaHttpFilterTest, ImmediateResponse) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.lua_respond_with_send_local_reply", "false"}});
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:respond(
@@ -1463,7 +1470,7 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   setup(SCRIPT);
 
   // Perform a GC and snap bytes currently used by the runtime.
-  auto script_config = config_->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
+  auto script_config = config_->perLuaCodeSetup();
   script_config->runtimeGC();
   const uint64_t mem_use_at_start = script_config->runtimeBytesUsed();
 
@@ -1495,6 +1502,38 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   //       within 2x.
   script_config->runtimeGC();
   EXPECT_TRUE(script_config->runtimeBytesUsed() < mem_use_at_start * 2);
+}
+
+TEST_F(LuaHttpFilterTest, ImmediateResponseWithSendLocalReply) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:respond(
+        {[":status"] = "503"},
+        "nope")
+
+      -- Should not run
+      local foo = nil
+      foo["bar"] = "baz"
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([](Http::Code code, absl::string_view body,
+                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                          const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                          absl::string_view details) {
+        EXPECT_EQ(Http::Code::ServiceUnavailable, code);
+        EXPECT_EQ("nope", body);
+        EXPECT_EQ(modify_headers, nullptr);
+        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(details, "lua_response");
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 }
 
 // Respond with bad status.
@@ -1758,6 +1797,39 @@ TEST_F(LuaHttpFilterTest, GetRequestedServerName) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo.example.com")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Verify that binary values could also be extracted from dynamicMetadata() in LUA filter.
+TEST_F(LuaHttpFilterTest, GetDynamicMetadataBinaryData) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local metadata = request_handle:streamInfo():dynamicMetadata():get("envoy.pp")
+      local bin_data = metadata["bin_data"]
+      local data_length = string.len(metadata["bin_data"])
+      local hex_table = { }
+      for idx = 1, data_length do
+        hex_table[#hex_table + 1] = string.format("\\x%02x", string.byte(bin_data, idx))
+      end
+      request_handle:logTrace('Hex Data: ' .. table.concat(hex_table, ''))
+    end
+  )EOF"};
+
+  ProtobufWkt::Value metadata_value;
+  constexpr uint8_t buffer[] = {'h', 'e', 0x00, 'l', 'l', 'o'};
+  metadata_value.set_string_value(reinterpret_cast<char const*>(buffer), sizeof(buffer));
+  ProtobufWkt::Struct metadata;
+  metadata.mutable_fields()->insert({"bin_data", metadata_value});
+  (*stream_info_.metadata_.mutable_filter_metadata())["envoy.pp"] = metadata;
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  // Hex values for the buffer data
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("Hex Data: \\x68\\x65\\x00\\x6c\\x6c\\x6f")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -2135,7 +2207,7 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
 // Test whether the route configuration can properly disable the Lua filter.
 TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
-  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  proto_config.mutable_default_source_code()->set_inline_string(ADD_HEADERS_SCRIPT);
   envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
   per_route_proto_config.set_disabled(true);
 
@@ -2144,7 +2216,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
 
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
 
-  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(nullptr));
 
   Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/"}};
@@ -2152,7 +2224,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_1, true));
   EXPECT_EQ("world", request_headers_1.get_("hello"));
 
-  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/"}};
@@ -2175,7 +2247,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   )EOF"};
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
-  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  proto_config.mutable_default_source_code()->set_inline_string(ADD_HEADERS_SCRIPT);
   envoy::config::core::v3::DataSource source1, source2;
   source1.set_inline_string(SCRIPT_FOR_ROUTE_ONE);
   source2.set_inline_string(SCRIPT_FOR_ROUTE_TWO);
@@ -2188,7 +2260,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
@@ -2205,7 +2277,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
   )EOF"};
 
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
-  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  proto_config.mutable_default_source_code()->set_inline_string(ADD_HEADERS_SCRIPT);
   envoy::config::core::v3::DataSource source1;
   source1.set_inline_string(SCRIPT_FOR_ROUTE_ONE);
   proto_config.mutable_source_codes()->insert({"route_one.lua", source1});
@@ -2217,7 +2289,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
@@ -2297,6 +2369,42 @@ TEST_F(LuaHttpFilterTest, Timestamp_DefaultsToMilliseconds_WhenNoFormatSet) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, TimestampString) {
+  const std::string SCRIPT{R"EOF(
+      function envoy_on_request(request_handle)
+        request_handle:logTrace(request_handle:timestampString(EnvoyTimestampResolution.MILLISECOND))
+        request_handle:logTrace(request_handle:timestampString(EnvoyTimestampResolution.MICROSECOND))
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572237")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, TimestampString_DefaultsToMilliseconds) {
+  const std::string SCRIPT{R"EOF(
+      function envoy_on_request(request_handle)
+        request_handle:logTrace(request_handle:timestampString())
+        request_handle:logTrace(request_handle:timestampString("invalid_format"))
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572")));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::err,
+                        HasSubstr("timestamp format must be MILLISECOND or MICROSECOND.")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 

@@ -60,15 +60,22 @@ public:
    */
   size_t numberOfNeededTlvTypes() const;
 
+  /**
+   * Filter configuration that determines if we should pass-through requests without
+   * proxy protocol. Should only be configured to true for trusted downstreams.
+   */
+  bool allowRequestsWithoutProxyProtocol() const;
+
 private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
+  const bool allow_requests_without_proxy_protocol_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
 enum ProxyProtocolVersion { Unknown = 0, V1 = 1, V2 = 2 };
 
-enum class ReadOrParseState { Done, TryAgainLater, Error };
+enum class ReadOrParseState { Done, TryAgainLater, Error, SkipFilter };
 
 /**
  * Implementation the PROXY Protocol listener filter
@@ -100,7 +107,7 @@ private:
   /**
    * Helper function that attempts to read the proxy header
    * (delimited by \r\n if V1 format, or with length if V2)
-   * @return bool true valid header, false if more data is needed or socket errors occurred.
+   * @return ReadOrParseState
    */
   ReadOrParseState readProxyHeader(Network::ListenerFilterBuffer& buffer);
 

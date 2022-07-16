@@ -4,8 +4,8 @@ Rate limit
 ==========
 
 * Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>`
-* This filter should be configured with the name *envoy.filters.http.ratelimit*.
 
 The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
 has one or more :ref:`rate limit configurations<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`
@@ -137,6 +137,23 @@ Rate limit descriptors are extensible with custom descriptors. For example, :ref
               "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
               descriptor_key: my_descriptor_name
               text: request.method
+
+:ref:`HTTP matching input functions <arch_overview_matching_api>` are supported as descriptor producers:
+
+.. code-block:: yaml
+
+  actions:
+      - extension:
+            name: custom
+            typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: x-header-name
+
+The above example produces an entry with the key ``custom`` and the value of
+the request header ``x-header-name``. If the header is absent, then the
+descriptor entry is not produced, and no descriptor is generated. If the header
+value is present but is an empty string, then the descriptor is generated but
+no entry is added.
 
 Statistics
 ----------

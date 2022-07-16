@@ -60,7 +60,7 @@ public:
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Http::RequestEncoder& request_encoder,
-                   Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+                   Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
                    absl::optional<Http::Protocol>) override;
 
   class Callbacks {
@@ -77,7 +77,7 @@ public:
     virtual void onFailure() {
       ASSERT(conn_pool_ != nullptr);
       conn_pool_->callbacks_->onGenericPoolFailure(
-          ConnectionPool::PoolFailureReason::RemoteConnectionFailure, host_);
+          ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "", host_);
     }
 
   protected:

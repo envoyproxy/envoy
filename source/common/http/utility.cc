@@ -513,14 +513,15 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
 }
 
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
-  auto status = Utility::getResponseStatusNoThrow(headers);
+  auto status = Utility::getResponseStatusOrNullopt(headers);
   if (!status.has_value()) {
-    throw CodecClientException(":status must be specified and a valid unsigned long");
+    IS_ENVOY_BUG("No status in headers");
+    return 0;
   }
   return status.value();
 }
 
-absl::optional<uint64_t> Utility::getResponseStatusNoThrow(const ResponseHeaderMap& headers) {
+absl::optional<uint64_t> Utility::getResponseStatusOrNullopt(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
@@ -1129,7 +1130,7 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
   return route_retry_policy;
 }
 
-bool Utility::isSafeRequest(Http::RequestHeaderMap& request_headers) {
+bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
   absl::string_view method = request_headers.getMethodValue();
   return method == Http::Headers::get().MethodValues.Get ||
          method == Http::Headers::get().MethodValues.Head ||

@@ -126,7 +126,7 @@ std::string ConfigHelper::tcpProxyConfig() {
         name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-          stat_prefix: tcp_stats
+          stat_prefix: tcpproxy_stats
           cluster: cluster_0
 )EOF");
 }
@@ -881,6 +881,7 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    ASSERT(!old_options.has_auto_config());
     old_options.MergeFrom(protocol_options);
     protocol_options.CopyFrom(old_options);
   }
@@ -1529,7 +1530,7 @@ void ConfigHelper::adjustUpstreamTimeoutForTsan(
   uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
   auto* timeout = route->mutable_timeout();
   // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
-  // upstream_response_timeout.
+  // response_timeout.
   timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
 }
 

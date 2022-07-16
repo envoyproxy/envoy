@@ -210,6 +210,7 @@ public:
     callbacks_->startUpstreamResponse(transport, protocol);
   }
   ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override {
+    callbacks_->streamInfo().addBytesSent(buffer.length());
     return callbacks_->upstreamData(buffer);
   }
   MessageMetadataSharedPtr responseMetadata() override { return callbacks_->responseMetadata(); }
@@ -237,7 +238,16 @@ public:
   bool passthroughSupported() const override { return passthrough_supported_; }
 
   // RequestOwner
-  Tcp::ConnectionPool::UpstreamCallbacks& upstreamCallbacks() override { return *this; }
+  Tcp::ConnectionPool::UpstreamCallbacks& upstreamCallbacks() override {
+    ASSERT(callbacks_ != nullptr);
+    ASSERT(upstream_request_ != nullptr);
+
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    upstream_info->setUpstreamHost(upstream_request_->upstream_host_);
+    callbacks_->streamInfo().setUpstreamInfo(std::move(upstream_info));
+
+    return *this;
+  }
   Buffer::OwnedImpl& buffer() override { return upstream_request_buffer_; }
   Event::Dispatcher& dispatcher() override { return callbacks_->dispatcher(); }
   void addSize(uint64_t size) override { request_size_ += size; }

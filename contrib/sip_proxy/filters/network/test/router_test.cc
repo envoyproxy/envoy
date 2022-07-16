@@ -159,7 +159,15 @@ public:
     metadata_->setMsgType(msg_type);
     metadata_->setTransactionId("<branch=cluster>");
     metadata_->setEP("10.0.0.1");
-    metadata_->addParam("ep", "10.0.0.1");
+    metadata_->affinity().emplace_back("Route", "ep", "ep", false, false);
+    metadata_->addMsgHeader(
+        HeaderType::Route,
+        "Route: "
+        "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+        "sip:scscf-internal.cncs.svc.cluster.local:5060;ep=10.0.0.1>");
+    metadata_->addMsgHeader(HeaderType::From, "User.0001@10.0.0.1:5060");
+    metadata_->parseHeader(HeaderType::Route);
+    metadata_->resetAffinityIteration();
     if (set_destination) {
       metadata_->setDestination("10.0.0.1");
     }
@@ -221,6 +229,7 @@ public:
         "SIP/2.0 200 OK\x0d\x0a"
         "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
         "CSeq: 1 INVITE\x0d\x0a"
+        "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
         "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
         "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
         "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
@@ -236,10 +245,10 @@ public:
 
     initializeMetadata(msg_type, MethodType::Ok200, false);
 
-    EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _))
+    EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
         .WillRepeatedly(
-            Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
-                       std::string& host) -> QueryStatus {
+            Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+                       SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
               host = "10.0.0.11";
               return QueryStatus::Pending;
             }));
@@ -416,8 +425,13 @@ TEST_F(SipRouterTest, NoTcpConnPoolEmptyDest) {
   initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Request);
-  metadata_->resetParam();
-  metadata_->addParam("ep", "");
+  metadata_->addMsgHeader(HeaderType::Route,
+                          "Route: "
+                          "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;"
+                          "x-suri=sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->parseHeader(HeaderType::Route);
+  metadata_->affinity().emplace_back("Route", "ep", "ep", false, false);
+  metadata_->resetAffinityIteration();
 
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
@@ -433,12 +447,17 @@ TEST_F(SipRouterTest, QueryPending) {
   initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Request);
-  metadata_->resetParam();
-  metadata_->addParam("lskpmc", "S1F1");
-  EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _))
+  metadata_->addMsgHeader(HeaderType::Route,
+                          "Route: "
+                          "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;"
+                          "x-suri=sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->parseHeader(HeaderType::Route);
+  metadata_->affinity().emplace_back("Route", "lskpmc", "S1F1", false, false);
+  metadata_->resetAffinityIteration();
+  EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
       .WillRepeatedly(
-          Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
-                     std::string& host) -> QueryStatus {
+          Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+                     SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
             host = "10.0.0.11";
             return QueryStatus::Pending;
           }));
@@ -450,12 +469,13 @@ TEST_F(SipRouterTest, QueryStop) {
   initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Request);
-  metadata_->resetParam();
-  metadata_->addParam("lskpmc", "S1F1");
-  EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _))
+  metadata_->affinity().clear();
+  metadata_->affinity().emplace_back("Route", "lskpmc", "S1F1", false, false);
+  metadata_->resetAffinityIteration();
+  EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
       .WillRepeatedly(
-          Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
-                     std::string& host) -> QueryStatus {
+          Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+                     SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
             host = "10.0.0.11";
             return QueryStatus::Stop;
           }));
@@ -477,7 +497,7 @@ TEST_F(SipRouterTest, CallNoRoute) {
   initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Request);
-  metadata_->resetParam();
+  metadata_->affinity().clear();
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
   try {
@@ -494,7 +514,7 @@ TEST_F(SipRouterTest, CallNoCluster) {
   initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Request);
-  metadata_->resetParam();
+  metadata_->affinity().clear();
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
@@ -558,8 +578,16 @@ TEST_F(SipRouterTest, DestNotEqualToHost) {
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillOnce(ReturnRef(cluster_name_));
   EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
-  metadata_->resetDestinationList();
-  metadata_->addDestination("ep", "192.168.1.1");
+
+  metadata_->listHeader(HeaderType::Route).clear();
+  metadata_->addMsgHeader(
+      HeaderType::Route,
+      "Route: "
+      "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+      "sip:scscf-internal.cncs.svc.cluster.local:5060;ep=192.168.0.1>");
+  metadata_->parseHeader(HeaderType::Route);
+
+  metadata_->resetAffinityIteration();
 
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   destroyRouter();
@@ -583,9 +611,8 @@ TEST_F(SipRouterTest, CallWithExistingConnection) {
   transaction_info_ptr->getUpstreamRequest("10.0.0.1")
       ->setConnectionState(ConnectionState::NotConnected);
 
-  metadata_->resetDestinationList();
-  metadata_->addDestination("ep", "10.0.0.1");
-  metadata_->setDestIter(metadata_->destinationList().begin());
+  metadata_->affinity().emplace_back("Route", "ep", "ep", false, false);
+  metadata_->resetAffinityIteration();
 
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
       .WillOnce(
@@ -618,7 +645,6 @@ TEST_F(SipRouterTest, CallWithExistingConnectionDefaultLoadBalance) {
       ->setConnectionState(ConnectionState::NotConnected);
 
   // initializeMetadata(MsgType::Request);
-  metadata_->resetDestinationList();
   metadata_->resetDestination();
 
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
@@ -649,8 +675,8 @@ TEST_F(SipRouterTest, NextAffinityAfterPoolFailure) {
   initializeTransaction();
   initializeMetadata(MsgType::Response);
   startRequest();
-  metadata_->addDestination("ep", "10.0.0.2");
-  metadata_->setDestIter(metadata_->destinationList().begin());
+  metadata_->affinity().emplace_back("Route", "ep", "ep", false, false);
+  metadata_->resetAffinityIteration();
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
@@ -668,7 +694,6 @@ TEST_F(SipRouterTest, NewConnectionFailure) {
             return nullptr;
           }));
   initializeMetadata(MsgType::Response);
-  metadata_->resetParam();
   startRequest(FilterStatus::Continue);
 }
 
@@ -677,7 +702,6 @@ TEST_F(SipRouterTest, UpstreamCloseMidResponse) {
   initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Request);
-  metadata_->resetParam();
   startRequest();
   connectUpstream();
 
@@ -718,10 +742,12 @@ TEST_F(SipRouterTest, RouteMatch) {
   auto matcher_ptr = std::make_shared<RouteMatcher>(config);
 
   // Match domain
-  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
-      .emplace_back("Route: "
-                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
-                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->addMsgHeader(
+      HeaderType::Route,
+      "Route: "
+      "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+      "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -745,10 +771,12 @@ TEST_F(SipRouterTest, RouteEmptyDomain) {
   auto matcher_ptr = std::make_shared<RouteMatcher>(config);
 
   // Match domain
-  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
-      .emplace_back("Route: "
-                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
-                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->addMsgHeader(
+      HeaderType::Route,
+      "Route: "
+      "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+      "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_EQ(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -772,10 +800,12 @@ TEST_F(SipRouterTest, RouteDefaultDomain) {
   auto matcher_ptr = std::make_shared<RouteMatcher>(config);
 
   // Match domain
-  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
-      .emplace_back("Route: "
-                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
-                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->addMsgHeader(
+      HeaderType::Route,
+      "Route: "
+      "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+      "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_EQ(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -799,10 +829,12 @@ TEST_F(SipRouterTest, RouteEmptyHeader) {
   auto matcher_ptr = std::make_shared<RouteMatcher>(config);
 
   // Match domain
-  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
-      .emplace_back("Route: "
-                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
-                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->addMsgHeader(
+      HeaderType::Route,
+      "Route: "
+      "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+      "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -826,9 +858,10 @@ TEST_F(SipRouterTest, RouteNoRouteHeaderUsingTopLine) {
   auto matcher_ptr = std::make_shared<RouteMatcher>(config);
 
   // Match domain
-  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::TopLine])
-      .emplace_back("INVITE sip:User.0000@scscf-internal.cncs.svc.cluster.local;ep=127.0.0.1 "
-                    "SIP/2.0\x0d\x0a");
+  metadata_->addMsgHeader(HeaderType::TopLine,
+                          "INVITE sip:User.0000@scscf-internal.cncs.svc.cluster.local;ep=127.0.0.1 "
+                          "SIP/2.0\x0d\x0a");
+  metadata_->parseHeader(HeaderType::TopLine);
 
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -849,6 +882,7 @@ TEST_F(SipRouterTest, RouteUsingEmptyTopLine) {
   TestUtility::loadFromYaml(yaml, config);
 
   initializeMetadata(MsgType::Request);
+  metadata_->listHeader(HeaderType::Route).clear();
   auto matcher_ptr = std::make_shared<RouteMatcher>(config);
 
   EXPECT_EQ(nullptr, matcher_ptr->route(*metadata_));
@@ -894,10 +928,12 @@ TEST_F(SipRouterTest, RouteHeaderHostDomain) {
   auto matcher_ptr = std::make_shared<RouteMatcher>(config);
 
   // Match domain
-  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
-      .emplace_back("Route: "
-                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
-                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->addMsgHeader(
+      HeaderType::Route,
+      "Route: "
+      "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+      "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -921,10 +957,12 @@ TEST_F(SipRouterTest, RouteHeaderWildcardDomain) {
   auto matcher_ptr = std::make_shared<RouteMatcher>(config);
 
   // Match domain
-  absl::get<VectorHeader>(metadata_->msgHeaderList()[HeaderType::Route])
-      .emplace_back("Route: "
-                    "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
-                    "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->addMsgHeader(
+      HeaderType::Route,
+      "Route: "
+      "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
+      "sip:scscf-internal.cncs.svc.cluster.local:5060>");
+  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }

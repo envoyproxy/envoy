@@ -174,7 +174,7 @@ The following table shows the available Docker images
    * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
      - Release binary with symbols stripped on top of a distroless base.
      - |DOCKER_IMAGE_TAG_NAME|
-     -
+     - |DOCKER_IMAGE_TAG_NAME|
      -
      -
    * - `envoyproxy/envoy-windows <https://hub.docker.com/r/envoyproxy/envoy-windows/tags/>`_
@@ -218,7 +218,7 @@ The following table shows the available Docker images
      -
      -
      - latest
-     -
+     - latest
    * - `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
      - Release binary with debug symbols on top of an Ubuntu Bionic base.
      -

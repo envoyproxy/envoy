@@ -3,12 +3,14 @@
 #include <map>
 #include <string>
 
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/common/config/utility.h"
 #include "source/extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/auto_transport_impl.h"
@@ -136,7 +138,8 @@ ConfigImpl::ConfigImpl(
       stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
       transport_(lookupTransport(config.transport())), proto_(lookupProtocol(config.protocol())),
       payload_passthrough_(config.payload_passthrough()),
-      max_requests_per_connection_(config.max_requests_per_connection().value()) {
+      max_requests_per_connection_(config.max_requests_per_connection().value()),
+      header_keys_preserve_case_(config.header_keys_preserve_case()) {
 
   if (config.thrift_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");
@@ -169,6 +172,10 @@ ConfigImpl::ConfigImpl(
   } else {
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
         config.route_config(), context_.getServerFactoryContext());
+  }
+
+  for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
+    access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
 }
 

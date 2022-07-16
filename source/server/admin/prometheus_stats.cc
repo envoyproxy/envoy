@@ -48,10 +48,22 @@ std::string sanitizeValue(const absl::string_view value) {
  * not show it if we only wanted used metrics.
  */
 template <class StatType>
-static bool shouldShowMetric(const StatType& metric, const bool used_only,
-                             const absl::optional<std::regex>& regex) {
-  return ((!used_only || metric.used()) &&
-          (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
+static bool shouldShowMetric(const StatType& metric, const StatsParams& params) {
+  // This duplicates logic in StatsRequest::populateStatsFromScopes, but differs
+  // in one subtle way: in Prometheus we only use metric.name() for filtering,
+  // not rendering, so we only construct the name if there's a filter.
+  if (params.used_only_ && !metric.used()) {
+    return false;
+  }
+  if (params.filter_ != nullptr) {
+    if (!std::regex_search(metric.name(), *params.filter_)) {
+      return false;
+    }
+  } else if (params.re2_filter_ != nullptr &&
+             !re2::RE2::PartialMatch(metric.name(), *params.re2_filter_)) {
+    return false;
+  }
+  return true;
 }
 
 /*
@@ -121,11 +133,9 @@ uint64_t outputStatType(
 
   for (const auto& metric : metrics) {
     ASSERT(&global_symbol_table == &metric->constSymbolTable());
-
-    if (!shouldShowMetric(*metric, params.used_only_, params.filter_)) {
+    if (!shouldShowMetric(*metric, params)) {
       continue;
     }
-
     groups[metric->tagExtractedStatName()].push_back(metric.get());
   }
 

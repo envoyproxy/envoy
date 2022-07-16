@@ -4,7 +4,11 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+exports_files([
+    "sections.yaml",
+])
+
 filegroup(
     name = "changelogs",
-    srcs = glob(["*.yaml"]),
+    srcs = glob(["*.*.*.yaml"]) + ["current.yaml"],
 )

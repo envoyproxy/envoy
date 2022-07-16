@@ -7,7 +7,9 @@ Configuration
 -------------------------
 
 Access logs are configured as part of the :ref:`HTTP connection manager config
-<config_http_conn_man>`, :ref:`TCP Proxy <config_network_filters_tcp_proxy>` or :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`.
+<config_http_conn_man>`, :ref:`TCP Proxy <config_network_filters_tcp_proxy>`,
+:ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>` or
+:ref:`Thrift Proxy <config_network_filters_thrift_proxy>`.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
 
@@ -127,7 +129,7 @@ The following command operators are supported:
 .. _config_access_log_format_start_time:
 
 %START_TIME%
-  HTTP
+  HTTP/THRIFT
     Request start time including milliseconds.
 
   TCP
@@ -174,7 +176,7 @@ The following command operators are supported:
     Not implemented (0).
 
 %BYTES_RECEIVED%
-  HTTP
+  HTTP/THRIFT
     Body bytes received.
 
   TCP
@@ -251,7 +253,7 @@ The following command operators are supported:
     Not implemented (0).
 
 %BYTES_SENT%
-  HTTP
+  HTTP/THRIFT
     Body bytes sent. For WebSocket connection it will also include response header bytes.
 
   TCP
@@ -345,7 +347,7 @@ The following command operators are supported:
   Renders a numeric value in typed JSON logs.
 
 %DURATION%
-  HTTP
+  HTTP/THRIFT
     Total duration in milliseconds of the request from the start time to the last byte out.
 
   TCP
@@ -657,6 +659,39 @@ The following command operators are supported:
       %DYNAMIC_METADATA(udp.proxy:datagrams_sent)%
       %DYNAMIC_METADATA(udp.proxy:datagrams_received)%\n
 
+  THRIFT
+    For :ref:`Thrift Proxy <config_network_filters_thrift_proxy>`,
+    NAMESPACE should be always set to "thrift.proxy", optional KEYs are as follows:
+
+    * ``method``: Name of the method.
+    * ``cluster_name``: Name of the cluster.
+    * ``passthrough``: Passthrough support for the request and response.
+    * ``request:transport_type``: The transport type of the request.
+    * ``request:protocol_type``: The protocol type of the request.
+    * ``request:message_type``: The message type of the request.
+    * ``response:transport_type``: The transport type of the response.
+    * ``response:protocol_type``: The protocol type of the response.
+    * ``response:message_type``: The message type of the response.
+    * ``response:reply_type``: The reply type of the response.
+
+    Recommended access log format for Thrift proxy:
+
+    .. code-block:: none
+
+      [%START_TIME%] %DYNAMIC_METADATA(thrift.proxy:method)%
+      %DYNAMIC_METADATA(thrift.proxy:cluster)%
+      %DYNAMIC_METADATA(thrift.proxy:request:transport_type)%
+      %DYNAMIC_METADATA(thrift.proxy:request:protocol_type)%
+      %DYNAMIC_METADATA(thrift.proxy:request:message_type)%
+      %DYNAMIC_METADATA(thrift.proxy:response:transport_type)%
+      %DYNAMIC_METADATA(thrift.proxy:response:protocol_type)%
+      %DYNAMIC_METADATA(thrift.proxy:response:message_type)%
+      %DYNAMIC_METADATA(thrift.proxy:response:reply_type)%
+      %BYTES_RECEIVED%
+      %BYTES_SENT%
+      %DURATION%
+      %UPSTREAM_HOST%\n
+
   .. note::
 
     For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
@@ -688,7 +723,7 @@ The following command operators are supported:
     * %CLUSTER_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
     * %CLUSTER_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
 
-  TCP/UDP
+  TCP/UDP/THRIFT
     Not implemented ("-").
 
   .. note::
@@ -701,6 +736,40 @@ The following command operators are supported:
   .. note::
 
    CLUSTER_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
+
+.. _config_access_log_format_upstream_host_metadata:
+
+%UPSTREAM_METADATA(NAMESPACE:KEY*):Z%
+  HTTP/TCP
+    :ref:`Upstream host Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
+    lookup key in the namespace with the option of specifying nested keys separated by ':',
+    and Z is an optional parameter denoting string truncation up to Z characters long. The data
+    will be logged as a JSON string. For example, for the following upstream host metadata:
+
+    ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+
+    * %UPSTREAM_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_key)% will log: ``foo``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``bar``
+    * %UPSTREAM_METADATA(com.unknown_filter)% will log: ``-``
+    * %UPSTREAM_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
+    * %UPSTREAM_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
+
+  UDP/THRIFT
+    Not implemented ("-").
+
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored.
+
+  .. note::
+
+   UPSTREAM_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
 .. _config_access_log_format_filter_state:
 
@@ -724,106 +793,99 @@ The following command operators are supported:
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
-%REQUESTED_SERVER_NAME%
+%UPSTREAM_FILTER_STATE(KEY:F):Z%
   HTTP
-    String value set on ssl connection socket for Server Name Indication (SNI)
-  TCP
+    Extracts filter state from upstream components like cluster or transport socket extensions.
+
+    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
+    look up the filter state object. The serialized proto will be logged as JSON string if possible.
+    If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
+    Z is an optional parameter denoting string truncation up to Z characters long.
+    F is an optional parameter used to indicate which method FilterState uses for serialization.
+    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
+    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+
+  TCP/UDP
+    Not implemented.
+
+  .. note::
+
+    This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`
+
+%REQUESTED_SERVER_NAME%
+  HTTP/TCP/THRIFT
     String value set on ssl connection socket for Server Name Indication (SNI)
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_LOCAL_URI_SAN%
-  HTTP
-    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_PEER_URI_SAN%
-  HTTP
-    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_LOCAL_SUBJECT%
-  HTTP
-    The subject present in the local certificate used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The subject present in the local certificate used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_PEER_SUBJECT%
-  HTTP
-    The subject present in the peer certificate used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The subject present in the peer certificate used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_PEER_ISSUER%
-  HTTP
-    The issuer present in the peer certificate used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The issuer present in the peer certificate used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_TLS_SESSION_ID%
-  HTTP
-    The session ID for the established downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The session ID for the established downstream TLS connection.
   UDP
     Not implemented (0).
 
 %DOWNSTREAM_TLS_CIPHER%
-  HTTP
-    The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_TLS_VERSION%
-  HTTP
-    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_PEER_FINGERPRINT_256%
-  HTTP
-    The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_PEER_FINGERPRINT_1%
-  HTTP
-    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_PEER_SERIAL%
-  HTTP
-    The serial number of the client certificate used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The serial number of the client certificate used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
 %DOWNSTREAM_PEER_CERT%
-  HTTP
-    The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
@@ -831,9 +893,7 @@ The following command operators are supported:
 .. _config_access_log_format_downstream_peer_cert_v_start:
 
 %DOWNSTREAM_PEER_CERT_V_START%
-  HTTP
-    The validity start date of the client certificate used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The validity start date of the client certificate used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
@@ -844,9 +904,7 @@ The following command operators are supported:
 .. _config_access_log_format_downstream_peer_cert_v_end:
 
 %DOWNSTREAM_PEER_CERT_V_END%
-  HTTP
-    The validity end date of the client certificate used to establish the downstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The validity end date of the client certificate used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
@@ -855,49 +913,37 @@ The following command operators are supported:
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 %UPSTREAM_PEER_SUBJECT%
-  HTTP
-    The subject present in the peer certificate used to establish the upstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The subject present in the peer certificate used to establish the upstream TLS connection.
   UDP
     Not implemented ("-").
 
 %UPSTREAM_PEER_ISSUER%
-  HTTP
-    The issuer present in the peer certificate used to establish the upstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The issuer present in the peer certificate used to establish the upstream TLS connection.
   UDP
     Not implemented ("-").
 
 %UPSTREAM_TLS_SESSION_ID%
-  HTTP
-    The session ID for the established upstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The session ID for the established upstream TLS connection.
   UDP
     Not implemented (0).
 
 %UPSTREAM_TLS_CIPHER%
-  HTTP
-    The OpenSSL name for the set of ciphers used to establish the upstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The OpenSSL name for the set of ciphers used to establish the upstream TLS connection.
   UDP
     Not implemented ("-").
 
 %UPSTREAM_TLS_VERSION%
-  HTTP
-    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the upstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the upstream TLS connection.
   UDP
     Not implemented ("-").
 
 %UPSTREAM_PEER_CERT%
-  HTTP
-    The server certificate in the URL-encoded PEM format used to establish the upstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The server certificate in the URL-encoded PEM format used to establish the upstream TLS connection.
   UDP
     Not implemented ("-").
@@ -905,9 +951,7 @@ The following command operators are supported:
 .. _config_access_log_format_upstream_peer_cert_v_start:
 
 %UPSTREAM_PEER_CERT_V_START%
-  HTTP
-    The validity start date of the upstream server certificate used to establish the upstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The validity start date of the upstream server certificate used to establish the upstream TLS connection.
   UDP
     Not implemented ("-").
@@ -918,9 +962,7 @@ The following command operators are supported:
 .. _config_access_log_format_upstream_peer_cert_v_end:
 
 %UPSTREAM_PEER_CERT_V_END%
-  HTTP
-    The validity end date of the upstream server certificate used to establish the upstream TLS connection.
-  TCP
+  HTTP/TCP/THRIFT
     The validity end date of the upstream server certificate used to establish the upstream TLS connection.
   UDP
     Not implemented ("-").
@@ -935,7 +977,7 @@ The following command operators are supported:
   The body text for the requests rejected by the Envoy.
 
 %FILTER_CHAIN_NAME%
-  The network filter chain name of the downstream connection.
+  The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

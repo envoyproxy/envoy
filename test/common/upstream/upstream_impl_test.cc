@@ -3366,7 +3366,7 @@ public:
     return parent_.createProtocolOptionsConfig(msg);
   }
   std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
-  std::string configType() override { return ""; };
+  std::set<std::string> configTypes() override { return {}; };
 
   TestFilterConfigFactoryBase& parent_;
 };
@@ -3399,7 +3399,7 @@ public:
     return parent_.createProtocolOptionsConfig(msg);
   }
   std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
-  std::string configType() override { return ""; };
+  std::set<std::string> configTypes() override { return {}; };
 
   TestFilterConfigFactoryBase& parent_;
 };

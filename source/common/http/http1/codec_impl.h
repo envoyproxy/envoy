@@ -197,6 +197,7 @@ public:
    * @return Network::Connection& the backing network connection.
    */
   Network::Connection& connection() { return connection_; }
+  const Network::Connection& connection() const { return connection_; }
 
   /**
    * Called when the active encoder has completed encoding the outbound half of the stream.
@@ -230,6 +231,7 @@ public:
   virtual void maybeAddSentinelBufferFragment(Buffer::Instance&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
+  virtual bool sendFullyQualifiedUrl() const { return codec_settings_.send_fully_qualified_url_; }
   HeaderKeyFormatterOptConstRef formatter() const {
     return makeOptRefFromPtr(encode_only_header_key_formatter_.get());
   }
@@ -256,11 +258,8 @@ protected:
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
-  // ParserCallbacks.
   // This must be protected because it is called through ServerConnectionImpl::sendProtocolError.
-  Status onMessageBegin() override;
-  // Connection specific callback method.
-  virtual Status onMessageBeginBase() PURE;
+  Status onMessageBeginImpl();
 
   /**
    * Get memory used to represent HTTP headers or trailers currently being parsed.
@@ -344,18 +343,32 @@ private:
   void onDispatch(const Buffer::Instance& data);
 
   // ParserCallbacks.
-  Status onHeaderField(const char* data, size_t length) override;
-  Status onHeaderValue(const char* data, size_t length) override;
-  Envoy::StatusOr<ParserStatus> onHeadersComplete() override;
+  CallbackResult onMessageBegin() override;
+  CallbackResult onUrl(const char* data, size_t length) override;
+  CallbackResult onStatus(const char* data, size_t length) override;
+  CallbackResult onHeaderField(const char* data, size_t length) override;
+  CallbackResult onHeaderValue(const char* data, size_t length) override;
+  CallbackResult onHeadersComplete() override;
   void bufferBody(const char* data, size_t length) override;
-  StatusOr<ParserStatus> onMessageComplete() override;
-  int setAndCheckCallbackStatus(Http::Status&& status) override;
-  int setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) override;
-
-  // Connection specific callback methods.
-  virtual Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() PURE;
-  virtual ParserStatus onMessageCompleteBase() PURE;
+  CallbackResult onMessageComplete() override;
   void onChunkHeader(bool is_final_chunk) override;
+
+  // Internal implementations of ParserCallbacks methods,
+  // and virtual methods for connection-specific implementations.
+  virtual Status onMessageBeginBase() PURE;
+  virtual Status onUrlBase(const char* data, size_t length) PURE;
+  virtual Status onStatusBase(const char* data, size_t length) PURE;
+  Status onHeaderFieldImpl(const char* data, size_t length);
+  Status onHeaderValueImpl(const char* data, size_t length);
+  StatusOr<CallbackResult> onHeadersCompleteImpl();
+  virtual StatusOr<CallbackResult> onHeadersCompleteBase() PURE;
+  StatusOr<CallbackResult> onMessageCompleteImpl();
+  virtual CallbackResult onMessageCompleteBase() PURE;
+
+  // These helpers wrap *Impl() calls in the overrides of non-void
+  // ParserCallbacks methods.
+  CallbackResult setAndCheckCallbackStatus(Status&& status);
+  CallbackResult setAndCheckCallbackStatusOr(StatusOr<CallbackResult>&& statusor);
 
   /**
    * Push the accumulated body through the filter pipeline.
@@ -453,7 +466,7 @@ protected:
   };
   ActiveRequest* activeRequest() { return active_request_.get(); }
   // ConnectionImpl
-  ParserStatus onMessageCompleteBase() override;
+  CallbackResult onMessageCompleteBase() override;
   // Add the size of the request_url to the reported header size when processing request headers.
   uint32_t getHeadersSize() override;
 
@@ -470,8 +483,8 @@ private:
   Status handlePath(RequestHeaderMap& headers, absl::string_view method);
 
   // ParserCallbacks.
-  Status onUrl(const char* data, size_t length) override;
-  Status onStatus(const char*, size_t) override { return okStatus(); }
+  Status onUrlBase(const char* data, size_t length) override;
+  Status onStatusBase(const char*, size_t) override { return okStatus(); }
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override;
@@ -485,7 +498,7 @@ private:
     return *bytes_meter_before_stream_;
   }
   Status onMessageBeginBase() override;
-  Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
+  Envoy::StatusOr<CallbackResult> onHeadersCompleteBase() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
@@ -551,7 +564,8 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
-                       const uint32_t max_response_headers_count);
+                       const uint32_t max_response_headers_count,
+                       bool passing_through_proxy = false);
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
 
@@ -566,9 +580,16 @@ private:
 
   bool cannotHaveBody();
 
+  bool sendFullyQualifiedUrl() const override {
+    // Send fully qualified URLs either if the parent connection is configured to do so or this
+    // stream is passing through a proxy and the underlying transport is plaintext.
+    return ConnectionImpl::sendFullyQualifiedUrl() ||
+           (passing_through_proxy_ && !connection().ssl());
+  }
+
   // ParserCallbacks.
-  Status onUrl(const char*, size_t) override { return okStatus(); }
-  Status onStatus(const char* data, size_t length) override;
+  Status onUrlBase(const char*, size_t) override { return okStatus(); }
+  Status onStatusBase(const char* data, size_t length) override;
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
@@ -582,10 +603,10 @@ private:
     return *bytes_meter_before_stream_;
   }
   Status onMessageBeginBase() override { return okStatus(); }
-  Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
+  Envoy::StatusOr<CallbackResult> onHeadersCompleteBase() override;
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
-  ParserStatus onMessageCompleteBase() override;
+  CallbackResult onMessageCompleteBase() override;
   void onResetStream(StreamResetReason reason) override;
   Status sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
@@ -637,6 +658,10 @@ private:
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.
   static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
+
+  // True if the upstream connection is pointed at an HTTP/1.1 proxy, and
+  // plaintext HTTP should be sent with fully qualified URLs.
+  bool passing_through_proxy_ = false;
 };
 
 } // namespace Http1

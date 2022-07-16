@@ -22,7 +22,6 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -543,17 +542,17 @@ class GuardDogActionsTest : public GuardDogTestBase {
 protected:
   GuardDogActionsTest()
       : log_factory_("LogFactory", events_), register_log_factory_(log_factory_),
-        assert_factory_("AssertFactory"), register_assert_factory_(assert_factory_) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-  }
+        assert_factory_("AssertFactory"), register_assert_factory_(assert_factory_) {}
 
   std::vector<std::string> getActionsConfig() {
     return {
         R"EOF(
         {
           "config": {
-            "name": "AssertFactory"
+            "name": "AssertFactory",
+            "typed_config": {
+              "@type": "type.googleapis.com/google.protobuf.Empty"
+            }
           },
           "event": "MULTIKILL"
         }
@@ -561,7 +560,10 @@ protected:
         R"EOF(
         {
           "config": {
-            "name": "AssertFactory"
+            "name": "AssertFactory",
+            "typed_config": {
+              "@type": "type.googleapis.com/google.protobuf.Empty"
+            }
           },
           "event": "KILL"
         }
@@ -569,7 +571,10 @@ protected:
         R"EOF(
         {
           "config": {
-            "name": "LogFactory"
+            "name": "LogFactory",
+            "typed_config": {
+              "@type": "type.googleapis.com/google.protobuf.Struct"
+            }
           },
           "event": "MEGAMISS"
         }
@@ -577,7 +582,10 @@ protected:
         R"EOF(
         {
           "config": {
-            "name": "LogFactory"
+            "name": "LogFactory",
+            "typed_config": {
+              "@type": "type.googleapis.com/google.protobuf.Struct"
+            }
           },
           "event": "MISS"
         }
@@ -592,14 +600,13 @@ protected:
 
   std::vector<std::string> actions_;
   std::vector<std::string> events_;
-  RecordGuardDogActionFactory<Envoy::ProtobufWkt::Empty> log_factory_;
+  RecordGuardDogActionFactory<Envoy::ProtobufWkt::Struct> log_factory_;
   Registry::InjectFactory<Configuration::GuardDogActionFactory> register_log_factory_;
   AssertGuardDogActionFactory<Envoy::ProtobufWkt::Empty> assert_factory_;
   Registry::InjectFactory<Configuration::GuardDogActionFactory> register_assert_factory_;
   NiceMock<Stats::MockStore> fake_stats_;
   WatchDogSharedPtr first_dog_;
   WatchDogSharedPtr second_dog_;
-  TestScopedRuntime scoped_runtime_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogActionsTest,

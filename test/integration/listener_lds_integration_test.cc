@@ -35,7 +35,12 @@ protected:
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
+  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat
+    // 'listener_manager.lds.grpc.lds_cluster.streams_closed_1' and stat_prefix 'lds_cluster'.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
   ~ListenerIntegrationTest() override { resetConnections(); }
 
@@ -737,7 +742,12 @@ public:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
-)EOF") {}
+)EOF") {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat
+    // 'listener_manager.lds.grpc.lds_cluster.streams_closed_1' and stat_prefix 'lds_cluster'.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
   void createLdsStream() {
     AssertionResult result =
@@ -945,6 +955,43 @@ TEST_P(ListenerFilterIntegrationTest, MixNoInspectDataFilterAndInspectDataFilter
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
   tcp_client->close();
+}
+
+TEST_P(ListenerFilterIntegrationTest, InspectDataFiltersClientCloseConnectionWithFewData) {
+// This is required `EV_FEATURE_EARLY_CLOSE` feature for libevent, and this feature is
+// only supported with `epoll`. But `MacOS` uses the `kqueue`.
+// https://libevent.org/doc/event_8h.html#a98f643f9c9063a4cbf410f519eb61e55
+#if !defined(__APPLE__)
+  config_helper_.addListenerFilter(R"EOF(
+      name: inspect_data1
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.InspectDataListenerFilterConfig
+        max_read_bytes: 10
+        close_connection: false
+        )EOF");
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->set_continue_on_listener_filters_timeout(false);
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_listener_filters_timeout()
+        ->MergeFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(1000000));
+    bootstrap.mutable_static_resources()->mutable_listeners(0)->set_stat_prefix("listener_0");
+  });
+
+  std::string data = "hello";
+  initialize();
+  enableHalfClose(true);
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  auto result = tcp_client->write(data, true);
+  // The connection could be closed when writing or after write.
+  if (result == true) {
+    tcp_client->waitForDisconnect();
+  }
+  test_server_->waitForCounterEq("listener.listener_0.downstream_listener_filter_remote_close", 1);
+#endif
 }
 
 // Only update the order of listener filters, ensure the listener filters

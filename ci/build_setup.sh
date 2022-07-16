@@ -99,7 +99,7 @@ BAZEL_BUILD_OPTIONS=(
   "--noshow_loading_progress"
   "--repository_cache=${BUILD_DIR}/repository_cache"
   "--experimental_repository_cache_hardlinks"
-  "--ui_event_filters=-info"
+  "--action_env=CLANG_FORMAT"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 

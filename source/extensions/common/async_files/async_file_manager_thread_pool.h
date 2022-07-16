@@ -30,17 +30,18 @@ public:
       const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
       Api::OsSysCalls& posix);
   ~AsyncFileManagerThreadPool() ABSL_LOCKS_EXCLUDED(queue_mutex_) override;
-  std::function<void()>
+  CancelFunction
   createAnonymousFile(absl::string_view path,
                       std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
-  std::function<void()>
+  CancelFunction
   openExistingFile(absl::string_view filename, Mode mode,
                    std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
-  std::function<void()> unlink(absl::string_view filename,
-                               std::function<void(absl::Status)> on_complete) override;
+  CancelFunction unlink(absl::string_view filename,
+                        std::function<void(absl::Status)> on_complete) override;
   std::string describe() const override;
   Api::OsSysCalls& posix() const { return posix_; }
 
+#ifdef O_TMPFILE
   // The first time we try to open an anonymous file, these values are used to capture whether
   // opening with O_TMPFILE works. If it does not, the first open is retried using 'mkstemp',
   // and all subsequent tries are redirected down that path. If it works, the first try is
@@ -50,6 +51,7 @@ public:
   // different capabilities.
   std::once_flag once_flag_;
   bool supports_o_tmpfile_;
+#endif // O_TMPFILE
 
 private:
   std::function<void()> enqueue(std::shared_ptr<AsyncFileAction> action)

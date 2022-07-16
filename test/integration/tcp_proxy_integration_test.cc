@@ -304,9 +304,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   EXPECT_EQ(upstream_pauses, upstream_resumes);
 
   uint32_t downstream_pauses =
-      test_server_->counter("tcp.tcp_stats.downstream_flow_control_paused_reading_total")->value();
+      test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_paused_reading_total")
+          ->value();
   uint32_t downstream_resumes =
-      test_server_->counter("tcp.tcp_stats.downstream_flow_control_resumed_reading_total")->value();
+      test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_resumed_reading_total")
+          ->value();
   EXPECT_EQ(downstream_pauses, downstream_resumes);
 }
 
@@ -369,15 +371,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
 
   ASSERT_TRUE(tcp_client->write(data, true, true, std::chrono::milliseconds(30000)));
 
-  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
+  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 1);
   ASSERT_TRUE(fake_upstream_connection->readDisable(false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
 
-  EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 1);
-  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 0);
+  EXPECT_EQ(test_server_->counter("tcp.tcpproxy_stats.upstream_flush_total")->value(), 1);
+  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 0);
 }
 
 // Test that Envoy doesn't crash or assert when shutting down with an upstream flush active
@@ -400,7 +402,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 
   ASSERT_TRUE(tcp_client->write(data, true));
 
-  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
+  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 1);
   test_server_.reset();
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -494,6 +496,55 @@ TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
                                        "UPSTREAM_WIRE_BYTES_RECEIVED=5"
                                        "\r?.*",
                                        ip_port_regex, ip_regex)));
+}
+
+// Verifies that access log value for `UPSTREAM_TRANSPORT_FAILURE_REASON` matches the failure
+// message when there is an upstream transport failure.
+TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  useListenerAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_TRANSPORT_FAILURE_REASON%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  // Ensure we don't get an upstream connection.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* lb_endpoint =
+        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
+  });
+
+  config_helper_.skipPortUsageValidation();
+  enableHalfClose(false);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  tcp_client->waitForDisconnect();
+
+  // Guarantee client is done writing to the log.
+  auto log_result = waitForAccessLog(access_log_path);
+
+  EXPECT_THAT(log_result, testing::StartsWith("delayed_connect_error:"));
 }
 
 // Make sure no bytes are logged when no data is sent.
@@ -1263,9 +1314,9 @@ void TcpProxySslIntegrationTest::setupConnections() {
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
   context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
-  ssl_client_ =
-      dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          context_->createTransportSocket(nullptr), nullptr);
+  ssl_client_ = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      context_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
 
   // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
@@ -1385,9 +1436,9 @@ class MysqlIntegrationTest : public TcpProxyIntegrationTest {
 public:
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
-      Network::TransportSocketFactoryPtr factory =
+      Network::DownstreamTransportSocketFactoryPtr factory =
           upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
-                        : Network::Test::createRawBufferSocketFactory();
+                        : Network::Test::createRawBufferDownstreamSocketFactory();
       auto endpoint = upstream_address_fn_(i);
       fake_upstreams_.emplace_back(
           new FakeMysqlUpstream(std::move(factory), endpoint, upstreamConfig()));

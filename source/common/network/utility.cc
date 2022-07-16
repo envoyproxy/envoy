@@ -72,47 +72,6 @@ bool Utility::urlIsUnixScheme(absl::string_view url) { return absl::StartsWith(u
 
 namespace {
 
-std::string hostFromUrl(const std::string& url, absl::string_view scheme,
-                        absl::string_view scheme_name) {
-  if (!absl::StartsWith(url, scheme)) {
-    throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
-  }
-
-  const size_t colon_index = url.find(':', scheme.size());
-
-  if (colon_index == std::string::npos) {
-    throw EnvoyException(absl::StrCat("malformed url: ", url));
-  }
-
-  return url.substr(scheme.size(), colon_index - scheme.size());
-}
-
-uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
-                     absl::string_view scheme_name) {
-  if (!absl::StartsWith(url, scheme)) {
-    throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
-  }
-
-  const size_t colon_index = url.find(':', scheme.size());
-
-  if (colon_index == std::string::npos) {
-    throw EnvoyException(absl::StrCat("malformed url: ", url));
-  }
-
-  const size_t rcolon_index = url.rfind(':');
-  if (colon_index != rcolon_index) {
-    throw EnvoyException(absl::StrCat("malformed url: ", url));
-  }
-
-  try {
-    return std::stoi(url.substr(colon_index + 1));
-  } catch (const std::invalid_argument& e) {
-    throw EnvoyException(e.what());
-  } catch (const std::out_of_range& e) {
-    throw EnvoyException(e.what());
-  }
-}
-
 Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::InstancePtr& buffer,
                                        IoHandle::RecvMsgOutput& output, IoHandle& handle,
                                        const Address::Instance& local_address) {
@@ -129,22 +88,6 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
 }
 
 } // namespace
-
-std::string Utility::hostFromTcpUrl(const std::string& url) {
-  return hostFromUrl(url, TCP_SCHEME, "TCP");
-}
-
-uint32_t Utility::portFromTcpUrl(const std::string& url) {
-  return portFromUrl(url, TCP_SCHEME, "TCP");
-}
-
-std::string Utility::hostFromUdpUrl(const std::string& url) {
-  return hostFromUrl(url, UDP_SCHEME, "UDP");
-}
-
-uint32_t Utility::portFromUdpUrl(const std::string& url) {
-  return portFromUrl(url, UDP_SCHEME, "UDP");
-}
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
                                                                      uint16_t port, bool v6only) {
@@ -514,11 +457,14 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
                                        envoy::config::core::v3::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {
     proto_address.mutable_pipe()->set_path(address.asString());
-  } else {
-    ASSERT(address.type() == Address::Type::Ip);
+  } else if (address.type() == Address::Type::Ip) {
     auto* socket_address = proto_address.mutable_socket_address();
     socket_address->set_address(address.ip()->addressAsString());
     socket_address->set_port_value(address.ip()->port());
+  } else {
+    ASSERT(address.type() == Address::Type::EnvoyInternal);
+    auto* internal_address = proto_address.mutable_envoy_internal_address();
+    internal_address->set_server_listener_name(address.envoyInternalAddress()->addressId());
   }
 }
 

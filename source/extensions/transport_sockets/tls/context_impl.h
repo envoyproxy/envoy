@@ -63,7 +63,7 @@ struct TlsContext {
 class ContextImpl : public virtual Envoy::Ssl::Context,
                     protected Logger::Loggable<Logger::Id::config> {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options);
+  virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptionsConstSharedPtr& options);
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -81,7 +81,7 @@ public:
 
   static int sslSocketIndex();
   // Ssl::Context
-  size_t daysUntilFirstCertExpires() const override;
+  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
@@ -146,7 +146,8 @@ public:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
                     TimeSource& time_source);
 
-  bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options) override;
+  bssl::UniquePtr<SSL>
+  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) override;
 
 private:
   int newSessionKey(SSL_SESSION* session);

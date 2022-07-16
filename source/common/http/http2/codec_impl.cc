@@ -183,6 +183,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
   }
+  stream_manager_.defer_processing_segment_size_ = parent.connection_.bufferLimit();
 }
 
 void ConnectionImpl::StreamImpl::destroy() {
@@ -299,9 +300,15 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
     // configurable if necessary.
     // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
-    modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
-    if (!headers.Path()) {
-      modified_headers->setPath("/");
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
+      modified_headers->removeScheme();
+      modified_headers->removePath();
+      modified_headers->removeProtocol();
+    } else {
+      modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
+      if (!headers.Path()) {
+        modified_headers->setPath("/");
+      }
     }
     encodeHeadersBase(*modified_headers, end_stream);
   } else {
@@ -402,8 +409,8 @@ void ConnectionImpl::StreamImpl::processBufferedData() {
     decodeData();
   }
 
-  if (stream_manager_.trailers_buffered_ && continueProcessingBufferedData()) {
-    ASSERT(!stream_manager_.body_buffered_);
+  if (stream_manager_.trailers_buffered_ && !stream_manager_.body_buffered_ &&
+      continueProcessingBufferedData()) {
     decodeTrailers();
     ASSERT(!stream_manager_.trailers_buffered_);
   }
@@ -446,13 +453,15 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
     ASSERT(read_disable_count_ > 0);
     --read_disable_count_;
     if (!buffersOverrun()) {
-      scheduleProcessingOfBufferedData();
-      grantPeerAdditionalStreamWindow();
+      scheduleProcessingOfBufferedData(false);
+      if (shouldAllowPeerAdditionalStreamWindow()) {
+        grantPeerAdditionalStreamWindow();
+      }
     }
   }
 }
 
-void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData() {
+void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData(bool schedule_next_iteration) {
   if (defer_processing_backedup_streams_ && stream_manager_.hasBufferedBodyOrTrailers()) {
     if (!process_buffered_data_callback_) {
       process_buffered_data_callback_ = parent_.connection_.dispatcher().createSchedulableCallback(
@@ -461,7 +470,11 @@ void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData() {
 
     // We schedule processing to occur in another callback to avoid
     // reentrant and deep call stacks.
-    process_buffered_data_callback_->scheduleCallbackCurrentIteration();
+    if (schedule_next_iteration) {
+      process_buffered_data_callback_->scheduleCallbackNextIteration();
+    } else {
+      process_buffered_data_callback_->scheduleCallbackCurrentIteration();
+    }
   }
 }
 
@@ -502,19 +515,47 @@ void ConnectionImpl::StreamImpl::decodeData() {
     return;
   }
 
-  // Any buffered data will be consumed.
+  // Some buffered body will be consumed. If there remains buffered body after
+  // this call, set this to true.
   stream_manager_.body_buffered_ = false;
 
+  bool already_drained_data = false;
   // It's possible that we are waiting to send a deferred reset, so only raise data if local
   // is not complete.
   if (!deferred_reset_) {
-    decoder().decodeData(*pending_recv_data_, sendEndStream());
+    // We should decode data in chunks only if we have defer processing enabled
+    // with a non-zero defer_processing_segment_size, and the buffer holds more
+    // data than the defer_processing_segment_size. Otherwise, push the
+    // entire buffer through.
+    const bool decode_data_in_chunk =
+        defer_processing_backedup_streams_ && stream_manager_.decodeAsChunks() &&
+        pending_recv_data_->length() > stream_manager_.defer_processing_segment_size_;
+
+    if (decode_data_in_chunk) {
+      Buffer::OwnedImpl chunk_buffer;
+      // TODO(kbaichoo): Consider implementing an approximate move for chunking.
+      chunk_buffer.move(*pending_recv_data_, stream_manager_.defer_processing_segment_size_);
+
+      // With the current implementation this should always be true,
+      // though this can change with approximation.
+      stream_manager_.body_buffered_ = true;
+      ASSERT(pending_recv_data_->length() > 0);
+
+      decoder().decodeData(chunk_buffer, sendEndStream());
+      already_drained_data = true;
+
+      if (!buffersOverrun()) {
+        scheduleProcessingOfBufferedData(true);
+      }
+    } else {
+      // Send the entire buffer through.
+      decoder().decodeData(*pending_recv_data_, sendEndStream());
+    }
   }
 
-  // TODO(kbaichoo): If dumping buffered data, we should do so in default read
-  // size chunks rather than dumping the entire buffer, which can have fairness
-  // issues.
-  pending_recv_data_->drain(pending_recv_data_->length());
+  if (!already_drained_data) {
+    pending_recv_data_->drain(pending_recv_data_->length());
+  }
 }
 
 void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
@@ -904,10 +945,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
-      protocol_constraints_(stats, http2_options),
-      skip_dispatching_frames_for_closed_connection_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection")),
-      dispatching_(false), raised_goaway_(false),
+      protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
       delay_keepalive_timeout_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_delay_keepalive_timeout")),
       random_(random_generator),
@@ -1057,20 +1095,24 @@ const ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) c
   return const_cast<ConnectionImpl*>(this)->getStream(stream_id);
 }
 
-ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
+ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id) {
   StreamImpl* stream;
   if (use_new_codec_wrapper_) {
     stream = static_cast<StreamImpl*>(adapter_->GetStreamUserData(stream_id));
   } else {
     stream = static_cast<StreamImpl*>(nghttp2_session_get_stream_user_data(session_, stream_id));
   }
+  return stream;
+}
+
+ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   SLOW_ASSERT(stream != nullptr || !slowContainsStreamId(stream_id));
   return stream;
 }
 
 int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
-  ASSERT(!skip_dispatching_frames_for_closed_connection_ ||
-         connection_.state() == Network::Connection::State::Open);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
   StreamImpl* stream = getStream(stream_id);
   // If this results in buffering too much data, the watermark buffer will call
   // pendingRecvBufferHighWatermark, resulting in ++read_disable_count_
@@ -1137,8 +1179,7 @@ Status ConnectionImpl::protocolErrorForTest() {
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}, stream_id={}", connection_,
                  static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags), hd->stream_id);
-  ASSERT(!skip_dispatching_frames_for_closed_connection_ ||
-         connection_.state() == Network::Connection::State::Open);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
 
   current_stream_id_ = hd->stream_id;
   // Track all the frames without padding here, since this is the only callback we receive
@@ -1164,8 +1205,7 @@ enum GoAwayErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
 
 Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "recv frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
-  ASSERT(!skip_dispatching_frames_for_closed_connection_ ||
-         connection_.state() == Network::Connection::State::Open);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
 
   // onFrameReceived() is called with a complete HEADERS frame assembled from all the HEADERS
   // and CONTINUATION frames, but we track them separately: HEADERS frames in onBeginHeaders()
@@ -1341,7 +1381,7 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
                  stream_id);
 
   // Set details of error_code in the stream whenever we have one.
-  StreamImpl* stream = getStream(stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (stream != nullptr) {
     stream->setDetails(Http2ResponseCodeDetails::get().errorDetails(error_code));
   }
@@ -1762,8 +1802,7 @@ int ConnectionImpl::setAndCheckNghttp2CallbackStatus(Status&& status) {
   // Keep the error status that caused the original failure. Subsequent
   // error statuses are silently discarded.
   nghttp2_callback_status_.Update(std::move(status));
-  if (skip_dispatching_frames_for_closed_connection_ && nghttp2_callback_status_.ok() &&
-      connection_.state() != Network::Connection::State::Open) {
+  if (nghttp2_callback_status_.ok() && connection_.state() != Network::Connection::State::Open) {
     nghttp2_callback_status_ = codecProtocolError("Connection was closed while dispatching frames");
   }
 
@@ -2163,8 +2202,7 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
   // The client code explicitly does not currently support push promise.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
   ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE || frame->headers.cat == NGHTTP2_HCAT_HEADERS);
-  ASSERT(!skip_dispatching_frames_for_closed_connection_ ||
-         connection_.state() == Network::Connection::State::Open);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
   return saveHeader(frame, std::move(name), std::move(value));
 }
 
@@ -2235,8 +2273,7 @@ ServerConnectionImpl::ServerConnectionImpl(
 Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   // For a server connection, we should never get push promise frames.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
-  ASSERT(!skip_dispatching_frames_for_closed_connection_ ||
-         connection_.state() == Network::Connection::State::Open);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
   RETURN_IF_ERROR(trackInboundFrames(&frame->hd, frame->headers.padlen));
 
   if (frame->headers.cat != NGHTTP2_HCAT_REQUEST) {

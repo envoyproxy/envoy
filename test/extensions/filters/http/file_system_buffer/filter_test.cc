@@ -47,16 +47,18 @@ protected:
   // A file is only opened by the filter if it's going to chain a write immediately afterwards,
   // so we combine completing the open and expecting the write, which allows for simplified control
   // of the handle.
-  MockAsyncFileHandle completeCreateFileAndExpectWrite(absl::string_view content, off_t offset) {
-    auto handle = std::make_shared<MockAsyncFileContext>(mock_async_file_manager_);
-    expectWrite(handle, content, offset);
+  MockAsyncFileHandle completeCreateFileAndExpectWrite(absl::string_view content) {
+    auto handle =
+        std::make_shared<testing::StrictMock<MockAsyncFileContext>>(mock_async_file_manager_);
+    expectWriteWithPosition(handle, content, 0);
     mock_async_file_manager_->nextActionCompletes(absl::StatusOr<AsyncFileHandle>{handle});
     return handle;
   }
-  void expectWrite(MockAsyncFileHandle handle, absl::string_view content, off_t offset) {
+  void expectWriteWithPosition(MockAsyncFileHandle handle, absl::string_view content,
+                               off_t offset) {
     EXPECT_CALL(*handle, write(BufferStringEqual(std::string(content)), offset, _));
   }
-  void completeWrite(size_t length) {
+  void completeWriteOfSize(size_t length) {
     mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>{length});
   }
   void expectRead(MockAsyncFileHandle handle, off_t offset, size_t size) {
@@ -167,6 +169,19 @@ TEST_F(FileSystemBufferFilterTest, PassesRequestHeadersThroughOnNoBody) {
 
 TEST_F(FileSystemBufferFilterTest, PassesResponseHeadersThroughOnNoBody) {
   createFilterFromYaml(minimal_config); // Default filter config.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+}
+
+TEST_F(FileSystemBufferFilterTest, FullyBypassingAllowsUnspecifiedManager) {
+  createFilterFromYaml(R"(
+    request:
+      behavior:
+        bypass: {}
+    response:
+      behavior:
+        bypass: {}
+  )");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
 }
 
@@ -334,17 +349,11 @@ TEST_F(FileSystemBufferFilterTest,
   EXPECT_EQ(response_sent_on_, "");
   expectAsyncFileCreated();
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data2, false));
-  std::cout << "A" << std::endl;
-  auto handle = completeCreateFileAndExpectWrite("wor", 0);
-  std::cout << "B" << std::endl;
-  expectWrite(handle, "ld", 3);
-  std::cout << "C" << std::endl;
-  completeWrite(3); // "wor"
-  std::cout << "D" << std::endl;
+  auto handle = completeCreateFileAndExpectWrite("wor");
+  expectWriteWithPosition(handle, "ld", 3);
+  completeWriteOfSize(3); // "wor"
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data3, true));
-  std::cout << "E" << std::endl;
-  completeWrite(2); // "ld"
-  std::cout << "F" << std::endl;
+  completeWriteOfSize(2); // "ld"
   EXPECT_EQ(response_sent_on_, "");
   expectRead(handle, 0, 3); // "wor"
   sendResponseLowWatermark();
@@ -482,15 +491,14 @@ TEST_F(FileSystemBufferFilterTest, ResponseSlowsWhenDiskWriteTakesTooLongAndWate
   std::function<void(absl::StatusOr<size_t>)> complete_write2;
   // Data should have been chopped into memory_buffer_bytes_limit_ sized pieces, which are written
   // in reverse order so that the one that will be usable first stays in memory longer.
-  // data2 gets written first as it was queued to be written before data3 arrived.
-  auto handle = completeCreateFileAndExpectWrite("hello ", 0);
-  expectWrite(handle, "m!", 6);
-  completeWrite(6); // "hello "
+  auto handle = completeCreateFileAndExpectWrite("m!");
+  expectWriteWithPosition(handle, "banana tea", 2);
+  completeWriteOfSize(2); // "m!"
   EXPECT_EQ(outerWatermarkAfterIntercepting() + 1, response_source_watermark_);
-  expectWrite(handle, "banana tea", 8);
-  completeWrite(2);  // "m!"
-  completeWrite(10); // "banana tea"
-  // Should have sent a low watermark event on "banana tea" being written - now below high watermark
+  expectWriteWithPosition(handle, "hello ", 12);
+  completeWriteOfSize(10); // "banana tea"
+  completeWriteOfSize(6);  // "hello "
+  // Should have sent a low watermark event on "hello " being written - now below high watermark
   // threshold.
   EXPECT_EQ(outerWatermarkAfterIntercepting(), response_source_watermark_);
   // Just destroying the filter before reading back, since that's not part of this test case.
@@ -517,10 +525,10 @@ TEST_F(FileSystemBufferFilterTest, BufferingToDiskBothWaysWorksAsExpected) {
   expectAsyncFileCreated();
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(request_body, false));
-  auto request_handle = completeCreateFileAndExpectWrite("uvwxyz1234", 0);
-  expectWrite(request_handle, "klmnopqrst", 10);
-  completeWrite(10);
-  completeWrite(10);
+  auto request_handle = completeCreateFileAndExpectWrite("uvwxyz1234");
+  expectWriteWithPosition(request_handle, "klmnopqrst", 10);
+  completeWriteOfSize(10);
+  completeWriteOfSize(10);
   expectRead(request_handle, 10, 10);
   Buffer::OwnedImpl empty_buffer("");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty_buffer, true));
@@ -534,8 +542,8 @@ TEST_F(FileSystemBufferFilterTest, BufferingToDiskBothWaysWorksAsExpected) {
   expectAsyncFileCreated();
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->encodeData(response_body, false));
-  auto response_handle = completeCreateFileAndExpectWrite("UVWXYZ1234", 0);
-  completeWrite(10);
+  auto response_handle = completeCreateFileAndExpectWrite("UVWXYZ1234");
+  completeWriteOfSize(10);
   expectRead(response_handle, 0, 10);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(empty_buffer, true));
   completeRead("UVWXYZ1234");
@@ -629,7 +637,7 @@ TEST_F(FileSystemBufferFilterTest, FailedFileWriteOutputsError) {
   Buffer::OwnedImpl request_body{"12345678901234567890"};
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(request_body, false));
-  auto handle = completeCreateFileAndExpectWrite("1234567890", 0);
+  auto handle = completeCreateFileAndExpectWrite("1234567890");
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::InternalServerError, "buffer filter error", _, _, _));
   // Fail the queued write.
@@ -653,8 +661,8 @@ TEST_F(FileSystemBufferFilterTest, FailedFileReadOutputsError) {
   Buffer::OwnedImpl request_body{"12345678901234567890"};
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(request_body, false));
-  auto handle = completeCreateFileAndExpectWrite("1234567890", 0);
-  completeWrite(10);
+  auto handle = completeCreateFileAndExpectWrite("1234567890");
+  completeWriteOfSize(10);
   Buffer::OwnedImpl empty_buffer{""};
   expectRead(handle, 0, 10);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty_buffer, true));
@@ -685,6 +693,34 @@ TEST_F(FileSystemBufferFilterTest, FilterDestroyedWhileFileActionIsInFlightIsOka
   destroyFilter();
 }
 
+TEST_F(FileSystemBufferFilterTest, BufferConsumedWhileFileOpeningPreventsWrite) {
+  createFilterFromYaml(R"(
+    manager_config:
+      thread_pool:
+        thread_count: 1
+    request:
+      memory_buffer_bytes_limit: 10
+      behavior:
+        fully_buffer: {}
+  )");
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  expectAsyncFileCreated();
+  Buffer::OwnedImpl request_body{"12345678901234567890"};
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->decodeData(request_body, false));
+  // File creation should have been requested as buffer is over limit.
+  Buffer::OwnedImpl empty_buffer{""};
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty_buffer, true));
+  // Buffer should now be emptied, file creation is still in flight.
+
+  // Complete the file-opening without expecting a write.
+  auto handle =
+      std::make_shared<testing::StrictMock<MockAsyncFileContext>>(mock_async_file_manager_);
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<AsyncFileHandle>{handle});
+  // There should be no action on the file handle other than the default expected close().
+}
+
 TEST_F(FileSystemBufferFilterTest, FilterDestroyedWhileFileActionIsInDispatcherIsOkay) {
   createFilterFromYaml(R"(
     manager_config:
@@ -701,7 +737,7 @@ TEST_F(FileSystemBufferFilterTest, FilterDestroyedWhileFileActionIsInDispatcherI
   Buffer::OwnedImpl request_body{"12345678901234567890"};
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(request_body, false));
-  completeCreateFileAndExpectWrite("1234567890", 0);
+  completeCreateFileAndExpectWrite("1234567890");
   std::function<void()> intercepted_dispatcher_callback;
   // Our default mock dispatcher behavior calls the callback immediately - here we intercept
   // one so we can call it after a 'realistic' delay during which something else happened to
@@ -710,7 +746,7 @@ TEST_F(FileSystemBufferFilterTest, FilterDestroyedWhileFileActionIsInDispatcherI
       .WillOnce([&intercepted_dispatcher_callback](std::function<void()> fn) {
         intercepted_dispatcher_callback = fn;
       });
-  completeWrite(10);
+  completeWriteOfSize(10);
   destroyFilter();
   // Callback called from dispatcher after filter was destroyed and its pointer invalidated,
   // should not cause a crash.

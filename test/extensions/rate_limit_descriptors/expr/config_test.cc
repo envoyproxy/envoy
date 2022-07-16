@@ -47,8 +47,7 @@ actions:
       "@type": type.googleapis.com/google.protobuf.Value
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(setupTest(yaml), EnvoyException,
-                          "Rate limit descriptor extension not found: .*");
+  EXPECT_THROW_WITH_REGEX(setupTest(yaml), EnvoyException, ".*'custom'.*");
 }
 
 TEST_F(RateLimitPolicyEntryTest, ExpressionUnset) {

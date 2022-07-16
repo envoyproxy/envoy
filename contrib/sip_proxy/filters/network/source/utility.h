@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/transport_socket_config.h"
@@ -159,6 +161,112 @@ public:
         ->ip()
         ->addressAsString();
   }
+};
+
+/**
+ * flat_hash_map with size limitation.
+ * @tparam max_size: the maximum size of the hash map, default is 1024.
+ */
+template <typename K, typename V> class Cache {
+public:
+  Cache(unsigned int max_size = 1024)
+      : max_size_(max_size), ring_buffer_(max_size_), it_(ring_buffer_.begin()) {}
+
+  Cache(const Cache&) = delete;
+  Cache(const Cache&&) = delete;
+  Cache& operator=(const Cache&) = delete;
+  virtual ~Cache() = default;
+
+  void emplace(const K& key, const V& value) {
+    if (contains(key)) {
+      if (it_ != cache_[key].it_) {
+        ring_buffer_.erase(cache_[key].it_);
+        auto new_it = ring_buffer_.insert(it_, key);
+        cache_[key].it_ = new_it;
+      }
+      cache_[key].value_ = value;
+    } else {
+      if (!it_->empty()) {
+        cache_.erase(*it_);
+      }
+
+      *it_ = key;
+
+      Data d{value, it_};
+      cache_.emplace(key, d);
+
+      ++it_;
+    }
+
+    if (it_ == ring_buffer_.end()) {
+      it_ = ring_buffer_.begin();
+    }
+  }
+
+  bool contains(const K& key) { return cache_.find(key) != cache_.end(); }
+
+  void erase(const K& key) {
+    if (contains(key)) {
+      *(cache_[key].it_) = "";
+      cache_.erase(key);
+    }
+  }
+
+  V& operator[](const K& key) {
+    if (contains(key)) {
+      return cache_[key].value_;
+    } else {
+      return default_value_;
+    }
+  }
+
+private:
+  struct Data {
+    V value_;
+    typename std::list<K>::iterator it_;
+  };
+
+  unsigned int max_size_;
+  std::map<K, Data> cache_;
+  std::list<K> ring_buffer_;
+  typename std::list<K>::iterator it_;
+
+  V default_value_{};
+};
+
+template <typename T, typename K, typename V> class CacheManager {
+public:
+  /**
+   * @brief Construct a new Cache Manager object
+   *
+   * @param max_size: the maximum size of each cache type, default is 1024.
+   */
+  CacheManager(unsigned int max_size = 1024) : max_size_(max_size) {}
+
+  void initCache(const T& type, unsigned int max_size = 1024) { caches_.emplace(type, max_size); }
+
+  void insertCache(const T& type, const K& key, const V& value) {
+    if (caches_.find(type) != caches_.end()) {
+      // TODO if (caches_.contains(type)) {
+      caches_[type].emplace(key, value);
+    } else {
+      caches_.emplace(type, max_size_);
+      caches_[type].emplace(key, value);
+    }
+  }
+
+  bool contains(const T& type, const K& key) {
+    // TODO return caches_.contains(type) && caches_[type].contains(key);
+    return caches_.find(type) != caches_.end() && caches_[type].contains(key);
+  }
+  V& at(const T& type, const K& key) { return caches_[type][key]; }
+  Cache<K, V>& at(const T& type) { return caches_[type]; }
+  Cache<K, V>& operator[](const T& type) { return caches_[type]; }
+
+private:
+  // Maximum size of each cache type.
+  unsigned int max_size_;
+  std::map<T, Cache<K, V>> caches_;
 };
 
 } // namespace SipProxy

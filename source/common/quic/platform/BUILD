@@ -46,6 +46,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quic_core_flags_list_lib",
         "@com_github_google_quiche//:quic_core_protocol_flags_list_lib",
     ],
@@ -85,12 +86,8 @@ envoy_quiche_platform_impl_cc_library(
     tags = ["nofips"],
     deps = [
         ":quiche_flags_impl_lib",
-        "//envoy/api:io_error_interface",
         "//source/common/common:assert_lib",
-        "//source/server:backtrace_lib",
         "@com_github_google_quiche//:quic_platform_export",
-        "@com_github_google_quiche//:quic_platform_ip_address_family",
-        "@com_github_google_quiche//:quiche_common_platform",
         "@com_google_absl//absl/container:btree",
     ],
 )
@@ -112,34 +109,13 @@ envoy_quiche_platform_impl_cc_library(
 )
 
 envoy_quiche_platform_impl_cc_library(
-    name = "quiche_error_code_wrappers_impl_lib",
-    hdrs = [
-        "quiche_error_code_wrappers_impl.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
     name = "quiche_stack_trace_impl_lib",
     hdrs = [
         "quiche_stack_trace_impl.h",
     ],
     tags = ["nofips"],
     deps = [
-        "@com_github_google_quiche//:quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_server_stats_impl_lib",
-    hdrs = [
-        "quiche_server_stats_impl.h",
-    ],
-    tags = ["nofips"],
-    deps = [
+        "//source/server:backtrace_lib",
         "@com_github_google_quiche//:quiche_common_platform_export",
     ],
 )
@@ -178,4 +154,11 @@ envoy_quiche_platform_impl_cc_library(
     hdrs = ["quiche_lower_case_string_impl.h"],
     tags = ["nofips"],
     deps = ["//envoy/http:header_map_interface"],
+)
+
+envoy_quiche_platform_impl_cc_library(
+    name = "quiche_export_impl_lib",
+    hdrs = ["quiche_export_impl.h"],
+    external_deps = ["abseil_base"],
+    tags = ["nofips"],
 )

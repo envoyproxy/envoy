@@ -114,7 +114,7 @@ message ApiConfigSource {
   // A list of config validators that will be executed when a new update is
   // received from the ApiConfigSource. Note that each validator handles a
   // specific xDS service type, and only the validators corresponding to the
-  // type url (in `:ref: DiscoveryResponse` or `:ref: DeltaDiscoveryResponse`)
+  // type url (in ``:ref: DiscoveryResponse`` or ``:ref: DeltaDiscoveryResponse``)
   // will be invoked.
   // If the validator returns false or throws an exception, the config will be rejected by
   // the client, and a NACK will be sent.
@@ -168,24 +168,24 @@ message PathConfigSource {
   //
   // .. note::
   //
-  //   If `watched_directory` is *not* configured, Envoy will watch the file path for *moves.*
+  //   If ``watched_directory`` is *not* configured, Envoy will watch the file path for *moves*.
   //   This is because in general only moves are atomic. The same method of swapping files as is
   //   demonstrated in the :ref:`runtime documentation <config_runtime_symbolic_link_swap>` can be
-  //   used here also. If `watched_directory` is configured, no watch will be placed directly on
-  //   this path. Instead, the configured `watched_directory` will be used to trigger reloads of
+  //   used here also. If ``watched_directory`` is configured, no watch will be placed directly on
+  //   this path. Instead, the configured ``watched_directory`` will be used to trigger reloads of
   //   this path. This is required in certain deployment scenarios. See below for more information.
   string path = 1 [(validate.rules).string = {min_len: 1}];
 
-  // If configured, this directory will be watched for *moves.* When an entry in this directory is
-  // moved to, the `path` will be reloaded. This is required in certain deployment scenarios.
+  // If configured, this directory will be watched for *moves*. When an entry in this directory is
+  // moved to, the ``path`` will be reloaded. This is required in certain deployment scenarios.
   //
   // Specifically, if trying to load an xDS resource using a
   // `Kubernetes ConfigMap <https://kubernetes.io/docs/concepts/configuration/configmap/>`_, the
   // following configuration might be used:
   // 1. Store xds.yaml inside a ConfigMap.
-  // 2. Mount the ConfigMap to `/config_map/xds`
-  // 3. Configure path `/config_map/xds/xds.yaml`
-  // 4. Configure watched directory `/config_map/xds`
+  // 2. Mount the ConfigMap to ``/config_map/xds``
+  // 3. Configure path ``/config_map/xds/xds.yaml``
+  // 4. Configure watched directory ``/config_map/xds``
   //
   // The above configuration will ensure that Envoy watches the owning directory for moves which is
   // required due to how Kubernetes manages ConfigMap symbolic links during atomic updates.
@@ -203,7 +203,7 @@ message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ConfigSource";
 
   // Authorities that this config source may be used for. An authority specified in a xdstp:// URL
-  // is resolved to a *ConfigSource* prior to configuration fetch. This field provides the
+  // is resolved to a ``ConfigSource`` prior to configuration fetch. This field provides the
   // association between authority name and configuration source.
   // [#not-implemented-hide:]
   repeated xds.core.v3.Authority authorities = 7;
@@ -211,7 +211,7 @@ message ConfigSource {
   oneof config_source_specifier {
     option (validate.required) = true;
 
-    // Deprecated in favor of `path_config_source`. Use that field instead.
+    // Deprecated in favor of ``path_config_source``. Use that field instead.
     string path = 1 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Local filesystem path configuration source.
@@ -269,7 +269,7 @@ message ExtensionConfigSource {
 
   // Optional default configuration to use as the initial configuration if
   // there is a failure to receive the initial extension configuration or if
-  // `apply_default_config_without_warming` flag is set.
+  // ``apply_default_config_without_warming`` flag is set.
   google.protobuf.Any default_config = 2;
 
   // Use the default config as the initial configuration without warming and

@@ -17,6 +17,32 @@ enum class FilterStatus {
   StopIteration
 };
 
+enum class DecoderEvent {
+  TransportBegin,
+  TransportEnd,
+  PassthroughData,
+  MessageBegin,
+  MessageEnd,
+  StructBegin,
+  StructEnd,
+  FieldBegin,
+  FieldEnd,
+  BoolValue,
+  ByteValue,
+  DoubleValue,
+  Int16Value,
+  Int32Value,
+  Int64Value,
+  StringValue,
+  ListBegin,
+  ListEnd,
+  SetBegin,
+  SetEnd,
+  MapBegin,
+  MapEnd,
+  ContinueDecode
+};
+
 class DecoderEventHandler {
 public:
   virtual ~DecoderEventHandler() = default;
