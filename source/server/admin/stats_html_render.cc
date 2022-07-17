@@ -36,8 +36,10 @@ const char EnvoyFavicon[] =
 const char AdminHtmlTableBegin[] = R"(
   <table class='home-table'>
     <thead>
-      <th class='home-data'>Command</th>
-      <th class='home-data'>Description</th>
+      <tr>
+        <th class='home-data'>Command</th>
+        <th class='home-data'>Description</th>
+      </tr>
     </thead>
     <tbody>
 )";
@@ -54,9 +56,11 @@ namespace Server {
 
 StatsHtmlRender::StatsHtmlRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : StatsTextRender(params), response_(response) {
+    : StatsTextRender(params) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-  response_.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
+  response.add("<!DOCTYPE html>\n");
+  response.add("<html lang='en'>\n");
+  response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
   response.add("<body>\n");
 }
 
@@ -67,6 +71,7 @@ void StatsHtmlRender::finalize(Buffer::Instance& response) {
     response.add("</pre>\n");
   }
   response.add("</body>\n");
+  response.add("</html>");
 }
 
 void StatsHtmlRender::startPre(Buffer::Instance& response) {
@@ -125,7 +130,7 @@ void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHan
   } else {
     // Render an explicit visible submit as a link (for GET) or button (for POST).
     const char* button_style = handler.mutates_server_state_ ? "" : " class='button-as-link'";
-    response.addFragments({"\n<tr class='vert-space'></tr>\n<tr", row_class,
+    response.addFragments({"\n<tr class='vert-space'><td></td><td></td></tr>\n<tr", row_class,
                            ">\n  <td class='home-data'><form action='", path, "' method='", method,
                            "' id='", path, "' class='home-form'>\n    <button", button_style, ">",
                            path, "</button>\n  </form></td>\n  <td class='home-data'>",
@@ -135,8 +140,8 @@ void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHan
   for (const Admin::ParamDescriptor& param : handler.params_) {
     std::string id = absl::StrCat("param-", index_, "-", absl::StrReplaceAll(path, {{"/", "-"}}),
                                   "-", param.id_);
-    response.addFragments({"<tr", row_class, ">\n  <td id='", id, "' class='option'>"});
-    input(response, param.id_, path, param.type_, query, param.enum_choices_);
+    response.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
+    input(response, id, path, param.type_, query, param.enum_choices_);
     response.addFragments({"</td>\n  <td class='home-data'>", "<label for='", id, "'>",
                            Html::Utility::sanitize(param.help_), "</label></td>\n</tr>\n"});
   }
@@ -166,7 +171,7 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
   switch (type) {
   case Admin::ParamDescriptor::Type::Boolean:
     response.addFragments({"<input type='checkbox' name='", id, "' id='", id, "' form='", path, "'",
-                           on_change, value.empty() ? "" : " checked/>"});
+                           on_change, value.empty() ? ">" : " checked/>"});
     break;
   case Admin::ParamDescriptor::Type::String:
     response.addFragments({"<input type='text' name='", id, "' id='", id, "' form='", path, "'",

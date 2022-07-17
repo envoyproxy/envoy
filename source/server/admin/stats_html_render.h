@@ -67,7 +67,6 @@ public:
   void setSubmitOnChange(bool submit_on_change) { submit_on_change_ = submit_on_change; }
 
 private:
-  Buffer::Instance& response_;
   int index_{0}; // Used to alternate row-group background color
   bool submit_on_change_{false};
   bool has_pre_{false};
