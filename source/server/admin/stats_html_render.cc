@@ -133,10 +133,12 @@ void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHan
   }
 
   for (const Admin::ParamDescriptor& param : handler.params_) {
-    response.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
+    std::string id = absl::StrCat("param-", index_, "-", absl::StrReplaceAll(path, {{"/", "-"}}),
+                                  "-", param.id_);
+    response.addFragments({"<tr", row_class, ">\n  <td id='", id, "' class='option'>"});
     input(response, param.id_, path, param.type_, query, param.enum_choices_);
-    response.addFragments({"</td>\n  <td class='home-data'>", Html::Utility::sanitize(param.help_),
-                           "</td>\n</tr>\n"});
+    response.addFragments({"</td>\n  <td class='home-data'>", "<label for='", id, "'>",
+                           Html::Utility::sanitize(param.help_), "</label></td>\n</tr>\n"});
   }
 }
 
