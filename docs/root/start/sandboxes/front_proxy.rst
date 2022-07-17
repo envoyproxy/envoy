@@ -43,8 +43,8 @@ Change to the ``examples/front-proxy`` directory.
 
     $ pwd
     envoy/examples/front-proxy
-    $ docker-compose build --pull
-    $ docker-compose up -d
+    $ docker-compose pull
+    $ docker-compose up --build -d
     $ docker-compose ps
 
               Name                         Command               State                                         Ports
