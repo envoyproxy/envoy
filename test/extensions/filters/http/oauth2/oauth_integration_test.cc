@@ -89,6 +89,8 @@ resources:
   }
 
   virtual void setOauthConfig() {
+    // This config is same as when the 'auth_type: "URL_ENCODED_BODY"' is set as it's the default
+    // value
     config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
 name: oauth
 typed_config:
@@ -128,7 +130,6 @@ typed_config:
     - oauth2-resource
     - http://example.com
     - https://example.com
-    auth_type: "URL_ENCODED_BODY"
 )EOF"));
   }
 
@@ -213,7 +214,6 @@ typed_config:
 };
 
 class OauthIntegrationTestWithBasicAuth : public OauthIntegrationTest {
-  // This config is same as when the 'auth_type: "BASIC_AUTH"' is set as it's the default value
   void setOauthConfig() override {
     config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
 name: oauth
@@ -254,6 +254,7 @@ typed_config:
     - oauth2-resource
     - http://example.com
     - https://example.com
+    auth_type: "BASIC_AUTH"
 )EOF"));
   }
 
