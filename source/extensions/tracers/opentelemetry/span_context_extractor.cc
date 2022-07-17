@@ -17,6 +17,10 @@ const Http::LowerCaseString& openTelemetryPropagationHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "traceparent");
 }
 
+const Http::LowerCaseString& openTelemetryTraceStateHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "tracestate");
+}
+
 // See https://www.w3.org/TR/trace-context/#traceparent-header
 constexpr int kTraceparentHeaderSize = 55; // 2 + 1 + 32 + 1 + 16 + 1 + 2
 constexpr int kVersionHexSize = 2;
@@ -87,7 +91,20 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   // See https://w3c.github.io/trace-context/#trace-flags.
   char decoded_trace_flags = absl::HexStringToBytes(trace_flags).front();
   bool sampled = (decoded_trace_flags & 1);
-  SpanContext span_context(version, trace_id, parent_id, sampled);
+
+  // If a tracestate header is received without an accompanying traceparent header,
+  // it is invalid and MUST be discarded.
+  // See https://www.w3.org/TR/trace-context/#processing-model-for-working-with-trace-context
+  absl::string_view tracestate = "";
+  // TODO: what if tracestate is in multiple headers? Spec says we should combine, but Envoy
+  // currently only surfaces the first seen.
+  auto tracestate_header = trace_context_.getByKey(openTelemetryTraceStateHeader());
+  if (tracestate_header.has_value()) {
+    // If there is tracestate content, we want to store that in the OTLP span.
+    tracestate = tracestate_header.value();
+  }
+
+  SpanContext span_context(version, trace_id, parent_id, sampled, tracestate);
   return span_context;
 }
 
