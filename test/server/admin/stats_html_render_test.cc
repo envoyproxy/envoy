@@ -58,7 +58,9 @@ TEST_F(StatsHtmlRenderTest, RenderTableEnd) {
 TEST_F(StatsHtmlRenderTest, RenderUrlHandlerNoQuery) {
   renderer_.urlHandler(response_, handler_, query_params_);
   std::string out = response_.toString();
-  EXPECT_THAT(out, HasSubstr("<input type='checkbox' name='param' id='param' form='prefix'"));
+  EXPECT_THAT(
+      out,
+      HasSubstr("<input type='checkbox' name='param' id='param-1-prefix-param' form='prefix'"));
   EXPECT_THAT(out, Not(HasSubstr(" checked/>")));
   EXPECT_THAT(out, HasSubstr("help text"));
   EXPECT_THAT(out, HasSubstr("param help"));
@@ -71,7 +73,9 @@ TEST_F(StatsHtmlRenderTest, RenderUrlHandlerWithQuery) {
   query_params_["param"] = "on";
   renderer_.urlHandler(response_, handler_, query_params_);
   std::string out = response_.toString();
-  EXPECT_THAT(out, HasSubstr("<input type='checkbox' name='param' id='param' form='prefix'"));
+  EXPECT_THAT(
+      out,
+      HasSubstr("<input type='checkbox' name='param' id='param-1-prefix-param' form='prefix'"));
   EXPECT_THAT(out, HasSubstr(" checked/>"));
   EXPECT_THAT(out, HasSubstr("help text"));
   EXPECT_THAT(out, HasSubstr("param help"));

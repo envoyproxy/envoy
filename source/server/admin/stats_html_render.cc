@@ -125,8 +125,8 @@ void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHan
   // page from accidentally mutating all the server state by GETting all the hrefs.
   const char* method = handler.mutates_server_state_ ? "post" : "get";
   if (submit_on_change_) {
-    response.addFragments({"\n<form action='", path, "' method='", method, "' id='", path,
-                           "' class='home-form'></form>\n"});
+    response.addFragments({"\n<tr><td><form action='", path, "' method='", method, "' id='", path,
+                           "' class='home-form'></form></td><td></td></tr>\n"});
   } else {
     // Render an explicit visible submit as a link (for GET) or button (for POST).
     const char* button_style = handler.mutates_server_state_ ? "" : " class='button-as-link'";
@@ -141,19 +141,20 @@ void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHan
     std::string id = absl::StrCat("param-", index_, "-", absl::StrReplaceAll(path, {{"/", "-"}}),
                                   "-", param.id_);
     response.addFragments({"<tr", row_class, ">\n  <td class='option'>"});
-    input(response, id, path, param.type_, query, param.enum_choices_);
+    input(response, id, param.id_, path, param.type_, query, param.enum_choices_);
     response.addFragments({"</td>\n  <td class='home-data'>", "<label for='", id, "'>",
                            Html::Utility::sanitize(param.help_), "</label></td>\n</tr>\n"});
   }
 }
 
 void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
-                            absl::string_view path, Admin::ParamDescriptor::Type type,
+                            absl::string_view name, absl::string_view path,
+                            Admin::ParamDescriptor::Type type,
                             OptRef<const Http::Utility::QueryParams> query,
                             const std::vector<absl::string_view>& enum_choices) {
   std::string value;
   if (query.has_value()) {
-    auto iter = query->find(std::string(id));
+    auto iter = query->find(std::string(name));
     if (iter != query->end()) {
       value = iter->second;
     }
@@ -170,16 +171,16 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
 
   switch (type) {
   case Admin::ParamDescriptor::Type::Boolean:
-    response.addFragments({"<input type='checkbox' name='", id, "' id='", id, "' form='", path, "'",
-                           on_change, value.empty() ? ">" : " checked/>"});
+    response.addFragments({"<input type='checkbox' name='", name, "' id='", id, "' form='", path,
+                           "'", on_change, value.empty() ? ">" : " checked/>"});
     break;
   case Admin::ParamDescriptor::Type::String:
-    response.addFragments({"<input type='text' name='", id, "' id='", id, "' form='", path, "'",
+    response.addFragments({"<input type='text' name='", name, "' id='", id, "' form='", path, "'",
                            on_change, value_tag(value), " />"});
     break;
   case Admin::ParamDescriptor::Type::Enum:
     response.addFragments(
-        {"\n    <select name='", id, "' id='", id, "' form='", path, "'", on_change, ">\n"});
+        {"\n    <select name='", name, "' id='", id, "' form='", path, "'", on_change, ">\n"});
     for (absl::string_view choice : enum_choices) {
       std::string sanitized = Html::Utility::sanitize(choice);
       absl::string_view selected = (value == sanitized) ? " selected" : "";

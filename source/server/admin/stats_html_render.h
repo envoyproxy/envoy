@@ -52,8 +52,9 @@ public:
   void urlHandler(Buffer::Instance&, const Admin::UrlHandler& handler,
                   OptRef<const Http::Utility::QueryParams> query);
 
-  void input(Buffer::Instance&, absl::string_view id, absl::string_view path,
-             Admin::ParamDescriptor::Type type, OptRef<const Http::Utility::QueryParams> query,
+  void input(Buffer::Instance&, absl::string_view id, absl::string_view name,
+             absl::string_view path, Admin::ParamDescriptor::Type type,
+             OptRef<const Http::Utility::QueryParams> query,
              const std::vector<absl::string_view>& enum_choices);
 
   // By default, editing parameters does not cause a form-submit -- you have
