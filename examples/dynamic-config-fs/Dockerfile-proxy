@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-dev:latest
+FROM envoyproxy/envoy:v1.22.0
 
 COPY ./envoy.yaml /etc/envoy.yaml
 COPY ./configs /var/lib/envoy

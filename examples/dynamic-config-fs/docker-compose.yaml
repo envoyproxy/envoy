@@ -1,21 +1,13 @@
 version: "3.8"
 services:
-
   proxy:
-    build:
-      context: .
-      dockerfile: Dockerfile-proxy
-    depends_on:
-    - service1
-    - service2
+    image: envoyproxy/envoy:v1.22.0
+    command: [ "/usr/local/bin/envoy", "-c /etc/envoy.yaml" ]
+    volumes:
+      - "./envoy.yaml:/etc/envoy.yaml"
+      - "./configs/cds.yaml:/var/lib/envoy/cds.yaml"
+      - "./configs/lds.yaml:/var/lib/envoy/lds.yaml"
     ports:
-    - 10000:10000
-    - 19000:19000
+      - 10000:10000
+      - 19000:19000
 
-  service1:
-    image: jmalloc/echo-server
-    hostname: service1
-
-  service2:
-    image: jmalloc/echo-server
-    hostname: service2

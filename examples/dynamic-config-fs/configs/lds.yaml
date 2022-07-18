@@ -25,4 +25,11 @@ resources:
             - match:
                 prefix: "/"
               route:
-                cluster: example_proxy_cluster
+                weighted_clusters:
+                  clusters:
+                    - name: v1
+                      weight: 50
+                    - name: v2
+                      weight: 20
+                    - name: v3
+                      weight: 30

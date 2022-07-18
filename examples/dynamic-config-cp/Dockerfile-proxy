@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-dev:latest
+FROM envoyproxy/envoy-dev:v1.22.0
 
 COPY ./envoy.yaml /etc/envoy.yaml
 RUN chmod go+r /etc/envoy.yaml
