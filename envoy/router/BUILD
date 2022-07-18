@@ -64,7 +64,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":internal_redirect_interface",
-        ":router_url_template_interface",
+        ":router_pattern_template_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/common:conn_pool_interface",
         "//envoy/common:matchers_interface",
@@ -147,13 +147,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "router_url_template_interface",
-    hdrs = ["url_template.h"],
+    name = "router_pattern_template_interface",
+    hdrs = ["pattern_template.h"],
     deps = [
         "//envoy/config:typed_config_interface",
         "//source/common/common:minimal_logger_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

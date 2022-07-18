@@ -15,6 +15,7 @@ UpstreamRequest::UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& po
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
       request_complete_(false), response_started_(false), response_complete_(false),
+      draining_(false), response_underflow_(false), charged_response_timing_(false),
       close_downstream_on_error_(close_downstream_on_error) {}
 
 UpstreamRequest::~UpstreamRequest() {
@@ -135,7 +136,6 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
 
   const auto status = callbacks.upstreamData(data);
   if (status == ThriftFilters::ResponseStatus::Complete) {
-    ENVOY_LOG(debug, "response complete");
 
     stats_.recordUpstreamResponseSize(cluster, response_size_);
 
@@ -166,9 +166,14 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     if (callbacks.responseMetadata()->isDraining()) {
       ENVOY_LOG(debug, "got draining signal");
       stats_.incCloseDrain(cluster);
+      // ResetStream triggers a local connection failure. However, we want to
+      // keep the downstream connection after the upstream connection, i.e.,
+      // `conn_data->connection()`, is closed. Therefore, introduce a new flag
+      // `draining_` to hint that we got a draining signal and not to close the
+      //  downstream connection.
+      draining_ = true;
       resetStream();
     }
-
     onResponseComplete();
   } else if (status == ThriftFilters::ResponseStatus::Reset) {
     // Note: invalid responses are not accounted in the response size histogram.
@@ -200,6 +205,7 @@ bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream
     // Response is incomplete, but no more data is coming.
     ENVOY_LOG(debug, "response underflow");
     onResponseComplete();
+    response_underflow_ = true;
     onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     return true;
   }
@@ -264,6 +270,7 @@ void UpstreamRequest::onRequestComplete() {
 }
 
 void UpstreamRequest::onResponseComplete() {
+  ENVOY_LOG(debug, "response complete");
   chargeResponseTiming();
   response_complete_ = true;
   conn_state_ = nullptr;
@@ -272,6 +279,21 @@ void UpstreamRequest::onResponseComplete() {
 
 void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
   upstream_host_ = host;
+}
+
+static Upstream::Outlier::Result
+poolFailureReasonToResult(ConnectionPool::PoolFailureReason reason) {
+  switch (reason) {
+  case ConnectionPool::PoolFailureReason::Overflow:
+    FALLTHRU;
+  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+    FALLTHRU;
+  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    return Upstream::Outlier::Result::LocalOriginConnectFailed;
+  case ConnectionPool::PoolFailureReason::Timeout:
+    return Upstream::Outlier::Result::LocalOriginTimeout;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
@@ -288,45 +310,38 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     close_downstream = false;
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-    upstream_host_->outlierDetector().putResult(
-        Upstream::Outlier::Result::LocalOriginConnectFailed);
-    // Should only happen if we closed the connection, due to an error condition, in which case
-    // we've already handled any possible downstream response.
-    parent_.resetDownstreamConnection();
-    break;
+    FALLTHRU;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    FALLTHRU;
   case ConnectionPool::PoolFailureReason::Timeout:
-    if (reason == ConnectionPool::PoolFailureReason::Timeout) {
-      upstream_host_->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
-    } else if (reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
-      upstream_host_->outlierDetector().putResult(
-          Upstream::Outlier::Result::LocalOriginConnectFailed);
-    }
-    stats_.incResponseLocalException(parent_.cluster());
+    upstream_host_->outlierDetector().putResult(poolFailureReasonToResult(reason));
 
-    // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
-    if (response_started_) {
-      ENVOY_LOG(debug, "reset downstream connection for a partial response");
-      // Error occurred after a partial response, propagate the reset to the downstream.
+    // Error occurred after a partial or underflow response, propagate the reset to the
+    // downstream.
+    if (response_underflow_ || (response_started_ && !draining_ && !response_complete_)) {
+      ENVOY_LOG(debug, "reset downstream connection for a partial or underflow response");
       parent_.resetDownstreamConnection();
-    } else {
+    } else if (!draining_ && !response_complete_) {
       close_downstream = close_downstream_on_error_;
+      stats_.incResponseLocalException(parent_.cluster());
       parent_.sendLocalReply(
-          AppException(
-              AppExceptionType::InternalError,
-              fmt::format("connection failure: {} '{}'",
-                          reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure
-                              ? "remote connection failure"
-                              : "timeout",
-                          (upstream_host_ != nullptr) ? upstream_host_->address()->asString()
-                                                      : "to upstream")),
+          AppException(AppExceptionType::InternalError,
+                       fmt::format("connection failure: {} '{}'",
+                                   PoolFailureReasonNames::get().fromReason(reason),
+                                   (upstream_host_ && upstream_host_->address())
+                                       ? upstream_host_->address()->asString()
+                                       : "to upstream")),
           close_downstream);
     }
     break;
   }
 
-  ENVOY_LOG(debug, "upstream reset complete reason {} (close_downstream={})",
-            static_cast<int>(reason), close_downstream);
+  ENVOY_LOG(debug,
+            "upstream reset complete. reason={}, close_downstream={}, response_started={}, "
+            "response_complete={}, draining={}, response_underflow={}",
+            PoolFailureReasonNames::get().fromReason(reason), close_downstream,
+            static_cast<bool>(response_started_), static_cast<bool>(response_complete_),
+            static_cast<bool>(draining_), static_cast<bool>(response_underflow_));
   return close_downstream;
 }
 

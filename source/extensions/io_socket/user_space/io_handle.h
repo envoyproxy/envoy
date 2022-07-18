@@ -11,9 +11,6 @@ namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
 
-using FilterStateObjects =
-    std::vector<std::pair<std::string, std::shared_ptr<StreamInfo::FilterState::Object>>>;
-
 // Shared state between peering user space IO handles.
 class PassthroughState {
 public:
@@ -21,10 +18,10 @@ public:
 
   /**
    * Initialize the passthrough state from the downstream. This should be
-   * called exactly once before `mergeInto`.
+   * called at most once before `mergeInto`.
    */
   virtual void initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                          std::unique_ptr<FilterStateObjects> filter_state_objects) PURE;
+                          const StreamInfo::FilterState::Objects& filter_state_objects) PURE;
 
   /**
    * Merge the passthrough state into a recipient stream metadata and its

@@ -38,7 +38,7 @@ message GrpcService {
     // <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>`.
     string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // The `:authority` header in the grpc request. If this field is not set, the authority header value will be `cluster_name`.
+    // The ``:authority`` header in the grpc request. If this field is not set, the authority header value will be ``cluster_name``.
     // Note that this authority does not override the SNI. The SNI is provided by the transport socket of the cluster.
     string authority = 2
         [(validate.rules).string =
