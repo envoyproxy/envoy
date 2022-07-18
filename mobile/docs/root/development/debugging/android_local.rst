@@ -17,7 +17,7 @@ Setting up the environment
 Before we start, you'll need to download Android Studio and the `Bazel plugin <https://plugins.jetbrains.com/plugin/9185-bazel>`_, you can find it in Preferences -> Plugins
 .
 
-1. Go `here <https://developer.android.com/studio/>`_ and install Android Studio.
+1. Go `here <https://developer.android.com/studio/>`_ and install Android Studio
 2. Install the bazel plugin
 
 Adding Envoy-Mobile Project into Android Studio
@@ -51,16 +51,8 @@ Entering a debugging session
 
 With the project ready, you can now start debugging with Android Studio.
 
-1. Compile your envoy-mobile with debug symbols to the architecture of the device or emulator you are about to run.
-
-For example:
-::
-
-    $ ./bazelw build android_dist --config=android --fat_apk_cpu=x86 -c dbg
-
-Android supported archs are `arm64_v8a`, `armeabi-v7a`, `x86`, `x86_64`.
-
-2. From Android Studio select the `Example App x86 (Debug)` configuration and hit the debug icon. Note: if you don't see this option go to "Add configuration" and it'll be there on the Bazel category, just select it and hit Ok.
+1. From Android Studio select either `Example App (Debug) [x86]` or `Example App (Debug) [arm64]` configuration. Note: the `x86` configuration doesn't work on ARM machines (i.e., M1 Macbooks).
+2. Hit the debug icon. Note: if you don't see this option go to "Add configuration" and it'll be there on the Bazel category, just select it and hit Ok.
 3. Optionally you could create symbolic breakpoints before running by going to the Debugger tab.
 
 Your environment should look like this at this point:
