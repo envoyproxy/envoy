@@ -1318,6 +1318,7 @@ envoy_cc_test(
         "fails_on_clang_cl",
         "fails_on_windows",
     ],
+    external_deps = ["abseil_time"],
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",

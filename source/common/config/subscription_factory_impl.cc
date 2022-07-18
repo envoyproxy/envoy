@@ -1,5 +1,6 @@
 #include "source/common/config/subscription_factory_impl.h"
 
+#include "envoy/config/config_updated_listener.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 
 #include "source/common/config/custom_config_validators_impl.h"
@@ -15,6 +16,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/config/listeners/config_saver.h"
+#include <memory>
 
 namespace Envoy {
 namespace Config {
@@ -74,6 +77,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       CustomConfigValidatorsPtr custom_config_validators =
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
+      // TODO(abeyad): create through factory instead.
+      ConfigUpdatedListenerList config_listeners;
+      config_listeners.emplace_back(std::make_unique<ConfigSaver>(dispatcher_, api_.fileSystem()));
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
@@ -92,8 +98,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                 ->createUncachedRawAsyncClient(),
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source),
-            api_config_source.set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
+            std::move(config_listeners));
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,

@@ -9,6 +9,7 @@
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/config_updated_listener.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
@@ -360,6 +361,8 @@ ClusterManagerImpl::ClusterManagerImpl(
         std::make_unique<Config::CustomConfigValidatorsImpl>(
             validation_context.dynamicValidationVisitor(), server,
             dyn_resources.ads_config().config_validators());
+    // TODO(abeyad): add ConfigSaver
+    Config::ConfigUpdatedListenerList config_listeners;
 
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
@@ -416,7 +419,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            std::move(custom_config_validators), std::move(config_listeners));
       }
     }
   } else {

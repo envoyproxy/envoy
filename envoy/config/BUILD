@@ -104,3 +104,11 @@ envoy_cc_library(
         "//source/common/protobuf",
     ],
 )
+
+envoy_cc_library(
+    name = "config_updated_listener_interface",
+    hdrs = ["config_updated_listener.h"],
+    deps = [
+        ":subscription_interface",
+    ],
+)

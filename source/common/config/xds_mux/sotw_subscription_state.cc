@@ -72,6 +72,7 @@ void SotwSubscriptionState::handleGoodResponse(
   // support passing of decoded resources. This would also avoid a resource copy above.
   callbacks().onConfigUpdate(non_heartbeat_resources, message.version_info());
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
+  // TODO(abeyad): Add support for calling the Config::UpdateListener registered listeners.
   last_good_version_info_ = message.version_info();
   last_good_nonce_ = message.nonce();
   ENVOY_LOG(debug, "Config update for {} (version {}) accepted with {} resources", typeUrl(),

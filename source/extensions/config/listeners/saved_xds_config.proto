@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package Envoy.Extensions.Config;
+
+import "google/protobuf/timestamp.proto";
+import "envoy/service/discovery/v3/discovery.proto";
+
+// TODO(abeyad): add comments and "not-implemented-hide" annotations.
+message SavedXdsConfig {
+  message XdsServerSavedConfig {
+    message ResourceList {
+      repeated envoy.service.discovery.v3.Resource resources = 1;
+    };
+
+    // Maps the type URL to the resources for that type.
+    map<string, ResourceList> per_type_resources = 1; 
+  };
+
+  // Maps server ID to xDS config from that server.
+  // TODO(abeyad): Don't want the IP address as the key but rather the Cluster ID *or* the host name
+  // (e.g. `trafficdirector.google.com`).
+  map<string, XdsServerSavedConfig> per_server_config = 1;
+  
+  google.protobuf.Timestamp saved_date = 2;
+};

@@ -1,6 +1,7 @@
 #include <memory>
 #include <string>
 
+#include "absl/time/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
@@ -811,6 +812,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.client_cert.update_rejected")->value());
+  absl::SleepFor(absl::Milliseconds(5000));
 }
 
 // To test a static cluster with sds. SDS send a bad client secret first.
