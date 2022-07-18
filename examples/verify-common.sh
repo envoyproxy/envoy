@@ -150,7 +150,7 @@ wait_for () {
     local i=1 returns=1 seconds="$1"
     shift
     while ((i<=seconds)); do
-        if "$@"; then
+        if "${@}" &> /dev/null; then
             returns=0
             break
         else
@@ -158,6 +158,9 @@ wait_for () {
             ((i++))
         fi
     done
+    if [[ "$returns" != 0 ]]; then
+        echo "Wait (${seconds}) failed: ${*}" >&2
+    fi
     return "$returns"
 }
 
@@ -171,3 +174,11 @@ fi
 if [[ -z "$MANUAL" ]]; then
     bring_up_example
 fi
+
+
+# These allow the functions to be used in subshells, e.g. in `wait_for`
+export -f responds_with
+export -f responds_without
+export -f responds_with_header
+export -f responds_without_header
+export -f _curl

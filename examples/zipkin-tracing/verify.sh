@@ -13,9 +13,13 @@ responds_with \
     "Hello from behind Envoy (service 1)!" \
     "http://localhost:${PORT_PROXY}/trace/1"
 
-run_log "Test dashboard"
 # this could do with using the healthcheck and waiting
-sleep 20
+wait_for 30 bash -c "\
+         responds_with \
+         '<!doctype html>' \
+         http://localhost:${PORT_ADMIN}/zipkin/"
+
+run_log "Test dashboard"
 responds_with \
     "<!doctype html>" \
     "http://localhost:${PORT_ADMIN}/zipkin/"
