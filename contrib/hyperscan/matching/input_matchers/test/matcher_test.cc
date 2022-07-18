@@ -50,9 +50,9 @@ TEST(ThreadLocalTest, RaceScratchCreation) {
 
 // Verify that comparing works correctly for bounds.
 TEST(BoundTest, Compare) {
-  EXPECT_TRUE(Bound(1, 1) < Bound(2, 1));
-  EXPECT_TRUE(Bound(1, 2) < Bound(2, 1));
-  EXPECT_TRUE(Bound(2, 2) < Bound(2, 1));
+  EXPECT_LT(Bound(1, 1), Bound(2, 1));
+  EXPECT_LT(Bound(1, 2), Bound(2, 1));
+  EXPECT_LT(Bound(2, 2), Bound(2, 1));
 }
 
 class MatcherTest : public ::testing::Test {
