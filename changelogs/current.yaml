@@ -2,13 +2,13 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: tls
-  change: |
-    Change TLS transport socket and QUIC transport socket to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
 - area: http
   change: |
     Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
     This behavior change can be reverted by setting the ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` runtime flag to false.
+- area: tls
+  change: |
+    Change TLS transport socket and QUIC transport socket to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
