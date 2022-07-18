@@ -46,8 +46,8 @@ public:
 class PerFilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
                                          public Network::DrainDecision {
 public:
-  explicit PerFilterChainFactoryContextImpl(
-      Configuration::DownstreamFactoryContext& parent_context);
+  explicit PerFilterChainFactoryContextImpl(Configuration::DownstreamFactoryContext& parent_context,
+                                            Init::Manager& init_manager);
 
   // DrainDecision
   bool drainClose() const override;
@@ -58,6 +58,7 @@ public:
 
   // Configuration::FactoryContext
   Network::DrainDecision& drainDecision() override;
+  Init::Manager& initManager() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
@@ -71,6 +72,7 @@ public:
 private:
   Configuration::DownstreamFactoryContext& parent_context_;
   Stats::ScopeSharedPtr filter_chain_scope_;
+  Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };
 
@@ -141,6 +143,7 @@ public:
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   Network::DrainDecision& drainDecision() override;
+  Init::Manager& initManager() override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
 
@@ -163,12 +166,13 @@ public:
       absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
                           Network::DrainableFilterChainSharedPtr, MessageUtil, MessageUtil>;
   FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
-                         Configuration::DownstreamFactoryContext& factory_context, Init::Manager&)
-      : addresses_(addresses), parent_context_(factory_context) {}
+                         Configuration::DownstreamFactoryContext& factory_context,
+                         Init::Manager& init_manager)
+      : addresses_(addresses), parent_context_(factory_context), init_manager_(init_manager) {}
 
   FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
-                         Configuration::DownstreamFactoryContext& factory_context, Init::Manager&,
-                         const FilterChainManagerImpl& parent_manager);
+                         Configuration::DownstreamFactoryContext& factory_context,
+                         Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager);
 
   // FilterChainFactoryContextCreator
   Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
@@ -349,6 +353,11 @@ private:
   // Reference to the previous generation of filter chain manager to share the filter chains.
   // Caution: only during warm up could the optional have value.
   absl::optional<const FilterChainManagerImpl*> origin_{nullptr};
+
+  // For FilterChainFactoryContextCreator
+  // init manager owned by the corresponding listener. The reference is valid when building the
+  // filter chain.
+  Init::Manager& init_manager_;
 
   // Matcher selecting the filter chain name.
   Matcher::MatchTreePtr<Network::MatchingData> matcher_;

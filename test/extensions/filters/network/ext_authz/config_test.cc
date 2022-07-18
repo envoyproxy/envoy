@@ -40,7 +40,8 @@ void expectCorrectProto() {
   testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
   EXPECT_CALL(context, getServerFactoryContext())
       .WillRepeatedly(testing::ReturnRef(server_context));
-  EXPECT_CALL(context.mock_server_context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+  EXPECT_CALL(context.mock_server_context_.cluster_manager_.async_client_manager_,
+              factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));

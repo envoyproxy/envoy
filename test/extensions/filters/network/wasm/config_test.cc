@@ -29,10 +29,13 @@ protected:
   WasmNetworkFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
     ON_CALL(context_.mock_server_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(context_.mock_server_context_, scope()).WillByDefault(ReturnRef(stats_store_));
-    ON_CALL(context_.mock_downstream_context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
+    ON_CALL(context_.mock_downstream_context_, listenerMetadata())
+        .WillByDefault(ReturnRef(listener_metadata_));
     ON_CALL(context_.mock_server_context_, initManager()).WillByDefault(ReturnRef(init_manager_));
-    ON_CALL(context_.mock_server_context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(context_.mock_server_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.mock_server_context_, clusterManager())
+        .WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(context_.mock_server_context_, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(dispatcher_));
   }
 
   void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
@@ -88,7 +91,8 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
     Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
     EXPECT_CALL(init_watcher_, ready());
     context_.mock_server_context_.initManager().initialize(init_watcher_);
-    EXPECT_EQ(context_.mock_server_context_.initManager().state(), Init::Manager::State::Initialized);
+    EXPECT_EQ(context_.mock_server_context_.initManager().state(),
+              Init::Manager::State::Initialized);
     Network::MockConnection connection;
     EXPECT_CALL(connection, addFilter(_)).WillOnce([&context](Network::FilterSharedPtr filter) {
       context = std::static_pointer_cast<Envoy::Extensions::Common::Wasm::Context>(filter);

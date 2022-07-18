@@ -257,6 +257,8 @@ public:
    * for this listener.
    */
   virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
+
+  virtual Init::Manager& initManager() PURE;
 };
 
 /**

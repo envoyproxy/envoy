@@ -229,7 +229,9 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
-  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed())
+      .Times(2)
+      .WillRepeatedly(Return(true));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
@@ -253,7 +255,9 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, Ok) {
-  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(false));
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed())
+      .Times(2)
+      .WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -265,7 +269,9 @@ TEST_F(HealthCheckFilterPassThroughTest, Ok) {
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
-  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(false));
+  EXPECT_CALL(context_.mock_server_context_, healthCheckFailed())
+      .Times(2)
+      .WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);

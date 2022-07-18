@@ -246,6 +246,7 @@ Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener
 bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
+Init::Manager& ListenerFactoryContextBaseImpl::initManager() { PANIC("not implemented"); }
 
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
@@ -786,6 +787,7 @@ Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
 bool PerListenerFactoryContextImpl::isQuicListener() const {
   return listener_factory_context_base_->isQuicListener();
 }
+Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 bool ListenerImpl::createNetworkFilterChain(
     Network::Connection& connection,
     const std::vector<Network::FilterFactoryCb>& filter_factories) {

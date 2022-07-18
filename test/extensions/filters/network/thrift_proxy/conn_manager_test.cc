@@ -89,8 +89,8 @@ public:
 class ThriftConnectionManagerTest : public testing::Test {
 public:
   ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {
-    route_config_provider_manager_ =
-        std::make_unique<Router::RouteConfigProviderManagerImpl>(context_.mock_server_context_.admin_);
+    route_config_provider_manager_ = std::make_unique<Router::RouteConfigProviderManagerImpl>(
+        context_.mock_server_context_.admin_);
     ON_CALL(*context_.mock_server_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
   }

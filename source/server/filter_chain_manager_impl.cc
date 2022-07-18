@@ -76,15 +76,18 @@ public:
 } // namespace
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
-    Configuration::DownstreamFactoryContext& parent_context)
+    Configuration::DownstreamFactoryContext& parent_context, Init::Manager& init_manager)
     : parent_context_(parent_context),
-      filter_chain_scope_(parent_context.listenerScope().createScope("")) {}
+      filter_chain_scope_(parent_context.listenerScope().createScope("")),
+      init_manager_(init_manager) {}
 
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
 }
 
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }
+
+Init::Manager& PerFilterChainFactoryContextImpl::initManager() { return init_manager_; }
 
 const envoy::config::core::v3::Metadata&
 PerFilterChainFactoryContextImpl::listenerMetadata() const {
@@ -117,9 +120,10 @@ bool PerFilterChainFactoryContextImpl::isQuicListener() const {
 
 FilterChainManagerImpl::FilterChainManagerImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
-    Configuration::DownstreamFactoryContext& factory_context, Init::Manager&,
+    Configuration::DownstreamFactoryContext& factory_context, Init::Manager& init_manager,
     const FilterChainManagerImpl& parent_manager)
-    : addresses_(addresses), parent_context_(factory_context), origin_(&parent_manager) {}
+    : addresses_(addresses), parent_context_(factory_context), origin_(&parent_manager),
+      init_manager_(init_manager) {}
 
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
@@ -762,7 +766,7 @@ Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilter
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
-  return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_);
+  return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_, init_manager_);
 }
 
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
@@ -771,6 +775,8 @@ FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
                                        Stats::Scope& listener_scope, bool is_quic)
     : server_(server), config_(config), drain_decision_(drain_decision),
       listener_scope_(listener_scope), is_quic_(is_quic) {}
+
+Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
 
 ProtobufMessage::ValidationVisitor& FactoryContextImpl::messageValidationVisitor() {
   return server_.messageValidationContext().staticValidationVisitor();

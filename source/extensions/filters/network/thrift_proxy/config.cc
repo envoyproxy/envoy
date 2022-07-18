@@ -172,7 +172,7 @@ ConfigImpl::ConfigImpl(
     }
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
         config.trds(), context_.getServerFactoryContext(), stats_prefix_,
-        context_.getServerFactoryContext().initManager());
+        context_.getDownstreamFactoryContext()->initManager());
   } else {
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
         config.route_config(), context_.getServerFactoryContext());

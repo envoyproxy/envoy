@@ -106,10 +106,9 @@ MockFilterConfigFactory::MockFilterConfigFactory()
 
 MockFilterConfigFactory::~MockFilterConfigFactory() = default;
 
-FilterFactoryCb
-MockFilterConfigFactory::createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
-                                                           const std::string& stat_prefix,
-                                                           Server::Configuration::ServerFactoryContext&) {
+FilterFactoryCb MockFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const ProtobufWkt::Struct& proto_config, const std::string& stat_prefix,
+    Server::Configuration::ServerFactoryContext&) {
   config_struct_ = proto_config;
   config_stat_prefix_ = stat_prefix;
 

@@ -47,19 +47,21 @@ void UberFilterFuzzer::fuzzerSetup() {
       .WillByDefault(Return("fake_cluster"));
 
   // Prepare time source for filters such as local_ratelimit filter.
-//FIXME  factory_context_.mock_server_context_.prepareSimulatedSystemTime();
+  // FIXME  factory_context_.mock_server_context_.prepareSimulatedSystemTime();
 
   // Prepare address for filters such as ext_authz filter.
   pipe_addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
 
   // Set featureEnabled for mongo_proxy
-  ON_CALL(factory_context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
+  ON_CALL(factory_context_.mock_server_context_.runtime_loader_.snapshot_,
+          featureEnabled("mongo.proxy_enabled", 100))
       .WillByDefault(Return(true));
   ON_CALL(factory_context_.mock_server_context_.runtime_loader_.snapshot_,
           featureEnabled("mongo.connection_logging_enabled", 100))
       .WillByDefault(Return(true));
-  ON_CALL(factory_context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled("mongo.logging_enabled", 100))
+  ON_CALL(factory_context_.mock_server_context_.runtime_loader_.snapshot_,
+          featureEnabled("mongo.logging_enabled", 100))
       .WillByDefault(Return(true));
 
   // Set featureEnabled for thrift_proxy
@@ -78,7 +80,8 @@ void UberFilterFuzzer::fuzzerSetup() {
   // variations here, however the fuzz test fails without this change and the overall change is
   // large enough as it is so this will be revisited.
   ON_CALL(factory_context_.mock_server_context_.cluster_manager_, getThreadLocalCluster(_))
-      .WillByDefault(Return(&factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_));
+      .WillByDefault(
+          Return(&factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_));
 }
 
 UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.simulatedTimeSystem()) {
@@ -132,7 +135,8 @@ void UberFilterFuzzer::fuzz(
     case test::extensions::filters::network::Action::kAdvanceTime: {
       time_source_.advanceTimeAndRun(
           std::chrono::milliseconds(action.advance_time().milliseconds()),
-          factory_context_.mock_server_context_.mainThreadDispatcher(), Event::Dispatcher::RunType::NonBlock);
+          factory_context_.mock_server_context_.mainThreadDispatcher(),
+          Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default: {

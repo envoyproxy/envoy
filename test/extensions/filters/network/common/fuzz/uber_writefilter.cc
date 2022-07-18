@@ -45,12 +45,14 @@ void UberWriteFilterFuzzer::fuzzerSetup() {
   factory_context_.prepareSimulatedSystemTime();
 
   // Set featureEnabled for mongo_proxy
-  ON_CALL(factory_context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
+  ON_CALL(factory_context_.mock_server_context_.runtime_loader_.snapshot_,
+          featureEnabled("mongo.proxy_enabled", 100))
       .WillByDefault(Return(true));
   ON_CALL(factory_context_.mock_server_context_.runtime_loader_.snapshot_,
           featureEnabled("mongo.connection_logging_enabled", 100))
       .WillByDefault(Return(true));
-  ON_CALL(factory_context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled("mongo.logging_enabled", 100))
+  ON_CALL(factory_context_.mock_server_context_.runtime_loader_.snapshot_,
+          featureEnabled("mongo.logging_enabled", 100))
       .WillByDefault(Return(true));
 
   // Set featureEnabled for thrift_proxy
@@ -103,7 +105,8 @@ void UberWriteFilterFuzzer::fuzz(
     case test::extensions::filters::network::WriteAction::kAdvanceTime: {
       time_source_.advanceTimeAndRun(
           std::chrono::milliseconds(action.advance_time().milliseconds()),
-          factory_context_.mock_server_context_.mainThreadDispatcher(), Event::Dispatcher::RunType::NonBlock);
+          factory_context_.mock_server_context_.mainThreadDispatcher(),
+          Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default: {

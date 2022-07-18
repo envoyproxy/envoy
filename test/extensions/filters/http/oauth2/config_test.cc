@@ -61,7 +61,8 @@ config:
   TestUtility::loadFromYaml(yaml, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  auto& secret_manager = context.mock_server_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  auto& secret_manager =
+      context.mock_server_context_.cluster_manager_.cluster_manager_factory_.secretManager();
   ON_CALL(secret_manager,
           findStaticGenericSecretProvider(failed_secret_name == "token" ? "hmac" : "token"))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
@@ -115,7 +116,8 @@ config:
   context.mock_server_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
-  auto& secret_manager = context.mock_server_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  auto& secret_manager =
+      context.mock_server_context_.cluster_manager_.cluster_manager_factory_.secretManager();
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));

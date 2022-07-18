@@ -14,10 +14,10 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/guard_dog.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_component_factory.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/worker.h"
 #include "test/mocks/server/worker_factory.h"
 #include "test/test_common/environment.h"
@@ -82,9 +82,9 @@ protected:
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-               Server::Configuration::FactoryContext&)
-                -> std::vector<Network::FilterFactoryCb> {
+            [this](
+                const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
+                Server::Configuration::FactoryContext&) -> std::vector<Network::FilterFactoryCb> {
               return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
                   filters, server_context_);
             }));
@@ -143,18 +143,17 @@ protected:
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillOnce(Invoke(
-            [raw_listener, need_init](
-                const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
-                Server::Configuration::FactoryContext& factory_context)
-                -> std::vector<Network::FilterFactoryCb> {
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &factory_context;
-              if (need_init) {
-                factory_context.getServerFactoryContext().initManager().add(notifier->target_);
-              }
-              return {[notifier](Network::FilterManager&) -> void {}};
-            }));
+        .WillOnce(Invoke([raw_listener, need_init](
+                             const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                             Server::Configuration::FactoryContext& factory_context)
+                             -> std::vector<Network::FilterFactoryCb> {
+          std::shared_ptr<ListenerHandle> notifier(raw_listener);
+          raw_listener->context_ = &factory_context;
+          if (need_init) {
+            factory_context.getServerFactoryContext().initManager().add(notifier->target_);
+          }
+          return {[notifier](Network::FilterManager&) -> void {}};
+        }));
 
     return raw_listener;
   }
@@ -170,18 +169,18 @@ protected:
     EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
 
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillOnce(Invoke(
-            [raw_listener, need_init](
-                const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
-                Server::Configuration::FactoryContext& filter_chain_factory_context)
-                -> std::vector<Network::FilterFactoryCb> {
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &filter_chain_factory_context;
-              if (need_init) {
-                filter_chain_factory_context.getServerFactoryContext().initManager().add(notifier->target_);
-              }
-              return {[notifier](Network::FilterManager&) -> void {}};
-            }));
+        .WillOnce(Invoke([raw_listener, need_init](
+                             const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                             Server::Configuration::FactoryContext& filter_chain_factory_context)
+                             -> std::vector<Network::FilterFactoryCb> {
+          std::shared_ptr<ListenerHandle> notifier(raw_listener);
+          raw_listener->context_ = &filter_chain_factory_context;
+          if (need_init) {
+            filter_chain_factory_context.getServerFactoryContext().initManager().add(
+                notifier->target_);
+          }
+          return {[notifier](Network::FilterManager&) -> void {}};
+        }));
 
     return raw_listener;
   }

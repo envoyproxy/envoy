@@ -178,7 +178,8 @@ rules:
     ON_CALL(context.mock_server_context_, mainThreadDispatcher())
         .WillByDefault(ReturnRef(server_context.mainThreadDispatcher()));
     ON_CALL(context.mock_server_context_, api()).WillByDefault(ReturnRef(server_context.api()));
-    ON_CALL(context.mock_server_context_, threadLocal()).WillByDefault(ReturnRef(server_context.threadLocal()));
+    ON_CALL(context.mock_server_context_, threadLocal())
+        .WillByDefault(ReturnRef(server_context.threadLocal()));
 
     JwtAuthentication proto_config;
     TestUtility::loadFromYaml(config, proto_config);

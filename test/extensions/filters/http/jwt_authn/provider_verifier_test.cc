@@ -33,7 +33,8 @@ ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
 class ProviderVerifierTest : public testing::Test {
 public:
   ProviderVerifierTest() {
-    mock_factory_ctx_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters({"pubkey_cluster"});
+    mock_factory_ctx_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"pubkey_cluster"});
   }
 
   void createVerifier() {
@@ -123,8 +124,9 @@ TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
                      .setTimeout(std::chrono::milliseconds(5 * 1000))
                      .setParentSpan(parent_span_)
                      .setChildSpanName("JWT Remote PubKey Fetch");
-  EXPECT_CALL(mock_factory_ctx_.mock_server_context_.cluster_manager_.thread_local_cluster_.async_client_,
-              send_(_, _, Eq(options)));
+  EXPECT_CALL(
+      mock_factory_ctx_.mock_server_context_.cluster_manager_.thread_local_cluster_.async_client_,
+      send_(_, _, Eq(options)));
 
   auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},

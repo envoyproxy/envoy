@@ -6,8 +6,8 @@
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"

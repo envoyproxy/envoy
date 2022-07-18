@@ -144,8 +144,8 @@ public:
   createFilterFactoryFromProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
                                     Server::Configuration::FactoryContext& context) override {
     return [&](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(
-          StartTlsSwitchFilter::newInstance(context.getServerFactoryContext().clusterManager(), upstream_callbacks_));
+      filter_manager.addReadFilter(StartTlsSwitchFilter::newInstance(
+          context.getServerFactoryContext().clusterManager(), upstream_callbacks_));
     };
   }
 

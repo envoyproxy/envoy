@@ -961,7 +961,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
       .WillRepeatedly(Invoke(&context_.mock_server_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -984,7 +985,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
       .WillRepeatedly(Invoke(&context_.mock_server_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1007,7 +1009,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
       .WillRepeatedly(Invoke(&context_.mock_server_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1031,7 +1034,8 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
       .WillRepeatedly(Invoke(&context_.mock_server_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1054,7 +1058,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
       .WillRepeatedly(Invoke(&context_.mock_server_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1080,7 +1085,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
       .WillRepeatedly(Invoke(&context_.mock_server_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
@@ -1106,7 +1112,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
       .WillRepeatedly(Invoke(&context_.mock_server_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
@@ -1132,7 +1139,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
       .WillRepeatedly(Invoke(&context_.mock_server_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
@@ -2456,7 +2464,8 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefault) {
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
               featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
       .WillOnce(Return(true));
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .WillOnce(Return(0));
@@ -2484,7 +2493,8 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
               featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .WillOnce(Return(3));
@@ -2526,7 +2536,8 @@ TEST_F(HttpConnectionManagerConfigTest,
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
               featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
       .WillOnce(Return(true));
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
   // When configuration value is not the IMPLEMENTATION_SPECIFIC_DEFAULT the runtime override should
   // not even be considered.
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
@@ -2554,14 +2565,16 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
       .WillRepeatedly(Invoke(&context_.mock_server_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.path_with_escaped_slashes_action_enabled",
                              An<const envoy::type::v3::FractionalPercent&>()))
       .WillOnce(Return(false));
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .Times(0);
@@ -2588,14 +2601,16 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionSetAndDisabl
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
       .WillRepeatedly(Invoke(&context_.mock_server_context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.path_with_escaped_slashes_action_enabled",
                              An<const envoy::type::v3::FractionalPercent&>()))
       .WillOnce(Return(false));
-  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_, getInteger(_, _))
+      .Times(AnyNumber());
   EXPECT_CALL(context_.mock_server_context_.runtime_loader_.snapshot_,
               getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
       .Times(0);
@@ -2613,9 +2628,10 @@ public:
   HcmUtilityTest() {
     // Although different Listeners will have separate FactoryContexts,
     // those contexts must share the same SingletonManager.
-    ON_CALL(context_two_.server_factory_context_, singletonManager()).WillByDefault([&]() -> Singleton::Manager& {
-      return *context_one_.server_factory_context_.singleton_manager_;
-    });
+    ON_CALL(context_two_.server_factory_context_, singletonManager())
+        .WillByDefault([&]() -> Singleton::Manager& {
+          return *context_one_.server_factory_context_.singleton_manager_;
+        });
   }
   NiceMock<Server::Configuration::MockFactoryContext> context_one_;
   NiceMock<Server::Configuration::MockFactoryContext> context_two_;

@@ -48,7 +48,8 @@ TEST(RateLimitFilterConfigTest, CorrectProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_CALL(context.mock_server_context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
+  EXPECT_CALL(context.mock_server_context_.cluster_manager_.async_client_manager_,
+              getOrCreateRawAsyncClient(_, _, _, _))
       .WillOnce(Invoke(
           [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool, Grpc::CacheOption) {
             return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();

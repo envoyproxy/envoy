@@ -92,7 +92,8 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+        EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+                    tcpConnPool(_, _))
             .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
@@ -103,7 +104,8 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+                  tcpConnPool(_, _))
           .WillRepeatedly(Return(absl::nullopt));
     }
 
@@ -126,7 +128,8 @@ public:
             ->addOption(
                 Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
       }
-      filter_ = std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
+      filter_ =
+          std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -193,7 +196,8 @@ TEST_F(TcpProxyTest, HalfCloseProxy) {
 // Test with an explicitly configured upstream.
 TEST_F(TcpProxyTest, ExplicitFactory) {
   // Explicitly configure an HTTP upstream, to test factory creation.
-  auto& info = factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_;
+  auto& info =
+      factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_;
   info->upstream_config_ = absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto generic_config;
   info->upstream_config_.value().mutable_typed_config()->PackFrom(generic_config);
@@ -215,7 +219,8 @@ TEST_F(TcpProxyTest, ExplicitFactory) {
 
 // Test nothing bad happens if an invalid factory is configured.
 TEST_F(TcpProxyTest, BadFactory) {
-  auto& info = factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_;
+  auto& info =
+      factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_;
   info->upstream_config_ = absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
   // The HTTP Generic connection pool is not a valid type for TCP upstreams.
   envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
@@ -235,12 +240,13 @@ TEST_F(TcpProxyTest, BadFactory) {
       std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
 
   ON_CALL(*upstream_hosts_.at(0), cluster())
-      .WillByDefault(
-          ReturnPointee(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_));
+      .WillByDefault(ReturnPointee(factory_context_.mock_server_context_.cluster_manager_
+                                       .thread_local_cluster_.cluster_.info_));
   EXPECT_CALL(*upstream_connections_.at(0), dispatcher())
       .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
 
-  filter_ = std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
   EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -295,8 +301,8 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
   raiseEventUpstreamConnected(1);
 
-  EXPECT_EQ(0U, factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_cx_connect_attempts_exceeded")
+  EXPECT_EQ(0U, factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
   EXPECT_EQ(2U, filter_->getStreamInfo().attemptCount().value());
 }
@@ -334,8 +340,8 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamRemoteFail) {
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   raiseEventUpstreamConnected(1);
 
-  EXPECT_EQ(0U, factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_cx_connect_attempts_exceeded")
+  EXPECT_EQ(0U, factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
 }
 
@@ -348,8 +354,8 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamTimeout) {
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
   raiseEventUpstreamConnected(1);
 
-  EXPECT_EQ(0U, factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_cx_connect_attempts_exceeded")
+  EXPECT_EQ(0U, factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
 }
 
@@ -513,7 +519,8 @@ TEST_F(TcpProxyTest, RouteWithMetadataMatch) {
       {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
 
   configure(config);
-  filter_ = std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -553,7 +560,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
         k0: v0
 )EOF";
 
-  factory_context_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters({"cluster1", "cluster2"});
+  factory_context_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"cluster1", "cluster2"});
   config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
   ProtobufWkt::Value v0, v1, v2;
@@ -562,7 +570,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
   v2.set_string_value("v2");
   HashedValue hv0(v0), hv1(v1), hv2(v2);
 
-  filter_ = std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   // Expect filter to try to open a connection to cluster1.
@@ -570,7 +579,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.mock_server_context_.api_.random_, random()).WillOnce(Return(0));
-    EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+    EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _))
         .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -594,7 +604,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.mock_server_context_.api_.random_, random()).WillOnce(Return(2));
-    EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+    EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _))
         .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -628,12 +639,14 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadata) {
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
       .WillOnce(ReturnRef(metadata));
 
-  filter_ = std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   Upstream::LoadBalancerContext* context;
 
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -665,7 +678,8 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
             k1: from_config
 )EOF";
 
-  factory_context_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters({"cluster1"});
+  factory_context_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"cluster1"});
   config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
   ProtobufWkt::Value v0, v1, v2;
@@ -682,12 +696,14 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
       .WillOnce(ReturnRef(metadata));
 
-  filter_ = std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   Upstream::LoadBalancerContext* context;
 
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -711,7 +727,8 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
 
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
   configure(defaultConfig());
-  filter_ = std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -745,11 +762,12 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   configure(accessLogConfig("%RESPONSE_FLAGS%"));
-  factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(
-      0, 0, 0, 0, 0);
+  factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->resetResourceManager(0, 0, 0, 0, 0);
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
-  filter_ = std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -1141,20 +1159,24 @@ TEST_F(TcpProxyTest, PickClusterOnUpstreamFailure) {
 
   // The random number lead into picking the first one in the weighted clusters.
   EXPECT_CALL(factory_context_.mock_server_context_.api_.random_, random()).WillOnce(Return(0));
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_0"))
-      .WillOnce(Return(&factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_));
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_0"))
+      .WillOnce(
+          Return(&factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_));
 
   setup(1, config);
 
   // The random number lead into picking the second cluster.
   EXPECT_CALL(factory_context_.mock_server_context_.api_.random_, random()).WillOnce(Return(1));
 
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_1"))
-      .WillOnce(Return(&factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_));
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_1"))
+      .WillOnce(
+          Return(&factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_));
 
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
-  EXPECT_EQ(0U, factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_cx_connect_attempts_exceeded")
+  EXPECT_EQ(0U, factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
 }
 
@@ -1169,11 +1191,13 @@ TEST_F(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
   EXPECT_CALL(factory_context_.mock_server_context_.api_.random_, random()).WillOnce(Return(0));
 
   // The first cluster is requested 2 times.
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_0"))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_0"))
       // Invoked on new connection. Null is returned which would trigger on demand.
       .WillOnce(Return(nullptr))
       // Invoked in the callback of on demand look up. The cluster is ready upon callback.
-      .WillOnce(Return(&factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_))
+      .WillOnce(
+          Return(&factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_))
       .RetiresOnSaturation();
 
   Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
@@ -1195,7 +1219,8 @@ TEST_F(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
   // random() is raised in the cluster pick. `fake_cluster_1` will be picked.
   EXPECT_CALL(factory_context_.mock_server_context_.api_.random_, random()).WillOnce(Return(1));
 
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_1"))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_1"))
       // Invoked on connect attempt. Null is returned which would trigger on demand.
       .WillOnce(Return(nullptr))
       .RetiresOnSaturation();
@@ -1206,8 +1231,8 @@ TEST_F(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
       }));
 
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
-  EXPECT_EQ(0U, factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_cx_connect_attempts_exceeded")
+  EXPECT_EQ(0U, factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));
@@ -1240,7 +1265,8 @@ TEST_F(TcpProxyTest, OdcdsCancelIfConnectionClose) {
 
   // To trigger the on demand request, we enforce the first call to getThreadLocalCluster returning
   // no cluster.
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster"))
       .WillOnce(Return(nullptr))
       .RetiresOnSaturation();
 
@@ -1261,9 +1287,11 @@ TEST_F(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
 
   // To trigger the on demand request, we enforce the first call to getThreadLocalCluster returning
   // no cluster.
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster"))
       .WillOnce(Return(nullptr))
-      .WillOnce(Return(&factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_))
+      .WillOnce(
+          Return(&factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_))
       .RetiresOnSaturation();
 
   Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
@@ -1294,7 +1322,8 @@ TEST_F(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
   auto config = onDemandConfig();
   mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
 
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster"))
       .WillOnce(Return(nullptr))
       .RetiresOnSaturation();
 

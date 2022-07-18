@@ -399,6 +399,7 @@ class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBa
                                         public FilterConfigProviderManager<FactoryCb, FactoryCtx>,
                                         public Singleton::Instance {
 public:
+  virtual Server::Configuration::DownstreamFactoryContext& getDownstreamFactoryContext(FactoryCtx& ctx) PURE;
   DynamicFilterConfigProviderPtr<FactoryCb> createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, FactoryCtx& factory_context,
@@ -424,7 +425,7 @@ public:
     // Otherwise, mark ready immediately and start the subscription on initialization. A default
     // config is expected in the latter case.
     if (!config_source.apply_default_config_without_warming()) {
-      server_factory_context.initManager().add(subscription->initTarget());
+      getDownstreamFactoryContext(factory_context).initManager().add(subscription->initTarget());
     }
     absl::flat_hash_set<std::string> require_type_urls;
     for (const auto& type_url : config_source.type_urls()) {
@@ -446,7 +447,7 @@ public:
 
     // Ensure the subscription starts if it has not already.
     if (config_source.apply_default_config_without_warming()) {
-      server_factory_context.initManager().add(provider->initTarget());
+      getDownstreamFactoryContext(factory_context).initManager().add(provider->initTarget());
     }
     applyLastOrDefaultConfig(subscription, *provider, filter_config_name);
     return provider;
@@ -516,6 +517,9 @@ class HttpFilterConfigProviderManagerImpl
 public:
   absl::string_view statPrefix() const override { return "http_filter."; }
 
+  Server::Configuration::DownstreamFactoryContext& getDownstreamFactoryContext(Server::Configuration::FactoryContext& ctx) override {
+    return *ctx.getDownstreamFactoryContext();
+  }
 protected:
   bool
   isTerminalFilter(Server::Configuration::NamedHttpFilterConfigFactory* default_factory,
@@ -539,6 +543,9 @@ class TcpListenerFilterConfigProviderManagerImpl
           TcpListenerDynamicFilterConfigProviderImpl> {
 public:
   absl::string_view statPrefix() const override { return "tcp_listener_filter."; }
+  Server::Configuration::DownstreamFactoryContext& getDownstreamFactoryContext(Server::Configuration::ListenerFactoryContext& ctx) override {
+    return ctx;
+  }
 };
 
 // UDP listener filter
@@ -549,6 +556,9 @@ class UdpListenerFilterConfigProviderManagerImpl
           UdpListenerDynamicFilterConfigProviderImpl> {
 public:
   absl::string_view statPrefix() const override { return "udp_listener_filter."; }
+  Server::Configuration::DownstreamFactoryContext& getDownstreamFactoryContext(Server::Configuration::ListenerFactoryContext& ctx) override {
+    return ctx;
+  }
 };
 
 } // namespace Filter

@@ -51,9 +51,10 @@ public:
     ON_CALL(init_manager_, initialize(_))
         .WillByDefault(Invoke(
             [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
-    //ON_CALL(factory_context_.admin_.mock_server_context_, concurrency()).WillByDefault(Return(0));
+    // ON_CALL(factory_context_.admin_.mock_server_context_,
+    // concurrency()).WillByDefault(Return(0));
 
-    //ON_CALL(factory_context_, listenerConfig()).WillByDefault(ReturnRef(listener_config_));
+    // ON_CALL(factory_context_, listenerConfig()).WillByDefault(ReturnRef(listener_config_));
   }
 
   virtual ~FilterConfigDiscoveryTestBase() = default;
@@ -78,9 +79,8 @@ public:
   }
 
   // Create listener filter config provider callbacks.
-  DynamicFilterConfigProviderPtr<FactoryCb> createProvider(FactoryCtx& ctx,
-                                                           std::string name, bool warm,
-                                                           bool default_configuration,
+  DynamicFilterConfigProviderPtr<FactoryCb> createProvider(FactoryCtx& ctx, std::string name,
+                                                           bool warm, bool default_configuration,
                                                            bool last_filter_config = true) {
     EXPECT_CALL(init_manager_, add(_));
     envoy::config::core::v3::ExtensionConfigSource config_source;
@@ -94,11 +94,11 @@ public:
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, ctx, "xds.", last_filter_config, getFilterType(),
-        getMatcher());
+        config_source, name, ctx, "xds.", last_filter_config, getFilterType(), getMatcher());
   }
 
-  void setup(FactoryCtx& ctx, bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
+  void setup(FactoryCtx& ctx, bool warm = true, bool default_configuration = false,
+             bool last_filter_config = true) {
     provider_ = createProvider(ctx, "foo", warm, default_configuration, last_filter_config);
     callbacks_ =
         factory_context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
@@ -397,7 +397,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProviders) {
   InSequence s;
   TypeParam config_discovery_test;
   config_discovery_test.setup(config_discovery_test.getCtx());
-  const auto provider2 = config_discovery_test.createProvider(config_discovery_test.getCtx(), "foo", true, false);
+  const auto provider2 =
+      config_discovery_test.createProvider(config_discovery_test.getCtx(), "foo", true, false);
   EXPECT_EQ("foo", provider2->name());
   EXPECT_EQ(absl::nullopt, provider2->config());
   const auto response = config_discovery_test.createResponse("1", "foo");
@@ -417,7 +418,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
   InSequence s;
   TypeParam config_discovery_test;
   config_discovery_test.setup(config_discovery_test.getCtx());
-  const auto provider2 = config_discovery_test.createProvider(config_discovery_test.getCtx(), "foo", true, false);
+  const auto provider2 =
+      config_discovery_test.createProvider(config_discovery_test.getCtx(), "foo", true, false);
 
   // Create a response with a random type AddBodyFilterConfig not matching with providers.
   auto add_body_filter_config = test::integration::filters::AddBodyFilterConfig();

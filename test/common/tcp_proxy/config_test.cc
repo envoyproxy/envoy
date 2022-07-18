@@ -516,14 +516,16 @@ public:
     cluster: fake_cluster
     )EOF";
 
-    factory_context_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    factory_context_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
   void initializeFilter() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_ = std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
+    filter_ =
+        std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -544,7 +546,8 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
       std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999));
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
   EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
@@ -563,14 +566,16 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
 class TcpProxyHashingTest : public testing::Test {
 public:
   void setup(const std::string& yaml) {
-    factory_context_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    factory_context_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
   void initializeFilter() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_ = std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
+    filter_ =
+        std::make_unique<Filter>(config_, factory_context_.mock_server_context_.cluster_manager_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -601,7 +606,8 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
 
   // Ensure there is no remote address (MockStreamInfo sets one by default), and expect no hash.
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
         EXPECT_FALSE(context->computeHashKey().has_value());
         return absl::nullopt;
@@ -611,7 +617,8 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
   // Set remote address, and expect a hash.
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
         EXPECT_TRUE(context->computeHashKey().has_value());
         return absl::nullopt;
@@ -633,7 +640,8 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
   initializeFilter();
 
   // Expect no hash when filter state is unset.
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
         EXPECT_FALSE(context->computeHashKey().has_value());
         return absl::nullopt;
@@ -644,7 +652,8 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
   connection_.stream_info_.filter_state_->setData("foo", std::make_unique<HashableObj>(),
                                                   StreamInfo::FilterState::StateType::ReadOnly,
                                                   StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(31337, context->computeHashKey().value());
         return absl::nullopt;

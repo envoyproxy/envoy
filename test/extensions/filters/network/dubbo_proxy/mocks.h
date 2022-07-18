@@ -275,8 +275,7 @@ public:
 template <class ConfigProto> class MockFactoryBase : public NamedDubboFilterConfigFactory {
 public:
   FilterFactoryCb
-  createFilterFactoryFromProto(
-                               const Protobuf::Message& proto_config,
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::ServerFactoryContext& context) override {
     const auto& typed_config = dynamic_cast<const ConfigProto&>(proto_config);

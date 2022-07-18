@@ -122,6 +122,7 @@ public:
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const envoy::config::listener::v3::Listener& config,
                                  Server::DrainManagerPtr drain_manager);
+  Init::Manager& initManager() override;
   Network::DrainDecision& drainDecision() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
@@ -177,6 +178,7 @@ public:
 
   // FactoryContext
   Network::DrainDecision& drainDecision() override;
+  Init::Manager& initManager() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
