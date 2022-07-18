@@ -27,7 +27,7 @@ envoy_cc_library(
         "io_uring_impl.h",
     ],
     external_deps = ["uring"],
-    tags = ["nocompdb"],
+    target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":io_uring_interface",
     ],

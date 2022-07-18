@@ -101,7 +101,8 @@ def envoy_cc_library(
         strip_include_prefix = None,
         include_prefix = None,
         textual_hdrs = None,
-        defines = []):
+        defines = [],
+        target_compatible_with = None):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
 
@@ -127,6 +128,7 @@ def envoy_cc_library(
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,
         defines = defines,
+        target_compatible_with = target_compatible_with,
     )
 
     # Intended for usage by external consumers. This allows them to disambiguate
@@ -140,6 +142,7 @@ def envoy_cc_library(
         deps = [":" + name],
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,
+        target_compatible_with = target_compatible_with,
     )
 
 # Used to specify a library that only builds on POSIX
