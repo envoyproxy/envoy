@@ -26,12 +26,6 @@ using OnDemandUpdateMetadataPtr = std::unique_ptr<OnDemandUpdateMetadata>;
 class CertificateProvider {
 public:
   struct Capabilites {
-    /* whether or not a provider provides a trusted ca cert for validation */
-    bool provide_trusted_ca = false;
-
-    /* Whether or not a provider provides identity certpairs */
-    bool provide_identity_certs = false;
-
     /* whether or not a provider supports generating identity certificates on demand */
     bool provide_on_demand_identity_certs = false;
   };
@@ -46,6 +40,8 @@ public:
   virtual const std::string trustedCA(const std::string& cert_name) const PURE;
 
   /**
+   * Certificate provider instance which used to get tls certificates
+   * should provide at least one tls certificate.
    * @return Identity certificates used for handshake
    */
   virtual std::vector<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate*>

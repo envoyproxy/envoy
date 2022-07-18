@@ -704,8 +704,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
-  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates &&
-      !config.certProviderCaps().provide_on_demand_identity_certs) {
+  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
 
@@ -806,8 +805,7 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
   // case that different Envoy instances each have their own certs. All certificates in a
   // ServerContextImpl context are hashed together, since they all constitute a match on a filter
   // chain for resumption purposes.
-  if (!capabilities_.provides_certificates &&
-      !cert_provider_caps_.provide_on_demand_identity_certs) {
+  if (!capabilities_.provides_certificates) {
     for (const auto& ctx : tls_contexts_) {
       X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
       RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
