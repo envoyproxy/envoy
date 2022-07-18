@@ -40,6 +40,7 @@ build --java_language_version=8
 # Override PGV validation with NOP functions
 build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
 
+build:dbg --compilation_mode=dbg
 # Enable source map for debugging in IDEs
 build:dbg --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 
