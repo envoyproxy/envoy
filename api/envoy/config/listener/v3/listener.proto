@@ -34,7 +34,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Listener :ref:`configuration overview <config_listeners>`
 
 // The additional address the listener is listening on.
-// [#not-implemented-hide:]
 message AdditionalAddress {
   core.v3.Address address = 1;
 }
@@ -124,7 +123,6 @@ message Listener {
   // The additional addresses the listener should listen on. The addresses must be unique across all
   // listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in a single listener,
   // all addresses use the same protocol, and multiple internal addresses are not supported.
-  // [#not-implemented-hide:]
   repeated AdditionalAddress additional_addresses = 33;
 
   // Optional prefix to use on listener stats. If empty, the stats will be rooted at
