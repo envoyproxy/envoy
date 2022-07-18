@@ -76,7 +76,8 @@ public:
     auto store = stats_store_.createScope("dns_scope");
     ON_CALL(listener_factory_.server_factory_context_, scope()).WillByDefault(ReturnRef(*store));
     ON_CALL(listener_factory_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(listener_factory_.server_factory_context_, random()).WillByDefault(ReturnRef(random_));
+    ON_CALL(listener_factory_.server_factory_context_.api_, randomGenerator())
+        .WillByDefault(ReturnRef(random_));
     ON_CALL(random_, random()).WillByDefault(Return(3));
 
     resolver_ = std::make_shared<Network::MockDnsResolver>();

@@ -179,7 +179,8 @@ ConfigImpl::ConfigImpl(
   }
 
   for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
-    access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
+    access_logs_.emplace_back(
+        AccessLog::AccessLogFactory::fromProto(log_config, context.getServerFactoryContext()));
   }
 }
 

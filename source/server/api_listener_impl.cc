@@ -23,7 +23,7 @@ ApiListenerImplBase::ApiListenerImplBase(const envoy::config::listener::v3::List
       address_(Network::Address::resolveProtoAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(parent_.server_.stats().createScope(fmt::format("listener.api.{}.", name_))),
-      downstream_factory_context_(parent_.server_, config_, *this, *listener_scope_,
+      downstream_factory_context_(parent_.server_, config_, *this, *listener_scope_, *global_scope_,
                                   isQuic(config)),
       factory_context_(parent_.server_.serverFactoryContext(), downstream_factory_context_),
       read_callbacks_(SyntheticReadCallbacks(*this)) {}

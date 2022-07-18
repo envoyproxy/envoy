@@ -44,7 +44,7 @@ public:
       Server::Configuration::ListenerFactoryContext& context) override {
     const auto& message = MessageUtil::downcastAndValidate<
         const test::integration::filters::TestTcpListenerFilterConfig&>(
-        proto_config, context.getServerFactoryContext().messageValidationVisitor());
+        proto_config, context.messageValidationVisitor());
     return [listener_filter_matcher,
             message](Network::ListenerFilterManager& filter_manager) -> void {
       filter_manager.addAcceptFilter(

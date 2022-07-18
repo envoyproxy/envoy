@@ -37,9 +37,8 @@ void expectCorrectProto() {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
   EXPECT_CALL(context, getServerFactoryContext())
-      .WillRepeatedly(testing::ReturnRef(server_context));
+      .WillRepeatedly(testing::ReturnRef(context.mock_server_context_));
   EXPECT_CALL(context.mock_server_context_.cluster_manager_.async_client_manager_,
               factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
@@ -54,9 +53,8 @@ void expectCorrectProto() {
 
 TEST(ExtAuthzFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
   EXPECT_CALL(context, getServerFactoryContext())
-      .WillRepeatedly(testing::ReturnRef(server_context));
+      .WillRepeatedly(testing::ReturnRef(context.mock_server_context_));
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz config;
   config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
   EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(config, context),

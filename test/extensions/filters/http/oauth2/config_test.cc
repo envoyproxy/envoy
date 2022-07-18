@@ -112,7 +112,7 @@ config:
   OAuth2Config factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
-  Server::Configuration::MockFactoryContext context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   context.mock_server_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
@@ -122,7 +122,7 @@ config:
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
-  EXPECT_CALL(context.mock_server_context_, messageValidationVisitor());
+  EXPECT_CALL(context.mock_downstream_context_, messageValidationVisitor());
   EXPECT_CALL(context.mock_server_context_, clusterManager());
   EXPECT_CALL(context.mock_server_context_, scope());
   EXPECT_CALL(context.mock_server_context_, timeSource());

@@ -71,7 +71,7 @@ public:
                                Server::Configuration::FactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(
-            proto_config, context.getServerFactoryContext().messageValidationVisitor()),
+            proto_config, context.messageValidationVisitor()),
         stats_prefix, context.getServerFactoryContext());
   }
 
@@ -96,7 +96,7 @@ public:
                                Server::Configuration::FactoryContext& context) override {
     return createDownstreamFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(
-            proto_config, context.getServerFactoryContext().messageValidationVisitor()),
+            proto_config, context.messageValidationVisitor()),
         stats_prefix, context);
   }
 

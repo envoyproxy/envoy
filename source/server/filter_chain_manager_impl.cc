@@ -77,7 +77,7 @@ public:
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::DownstreamFactoryContext& parent_context, Init::Manager& init_manager)
-    : parent_context_(parent_context),
+    : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
       filter_chain_scope_(parent_context.listenerScope().createScope("")),
       init_manager_(init_manager) {}
 
@@ -106,6 +106,8 @@ envoy::config::core::v3::TrafficDirection PerFilterChainFactoryContextImpl::dire
 ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
 }
+
+Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
 
 Configuration::ServerFactoryContext&
 PerFilterChainFactoryContextImpl::getServerFactoryContext() const {
@@ -772,11 +774,14 @@ Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilter
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
                                        const envoy::config::listener::v3::Listener& config,
                                        Network::DrainDecision& drain_decision,
-                                       Stats::Scope& listener_scope, bool is_quic)
+                                       Stats::Scope& listener_scope, Stats::Scope& global_scope,
+                                       bool is_quic)
     : server_(server), config_(config), drain_decision_(drain_decision),
-      listener_scope_(listener_scope), is_quic_(is_quic) {}
+      listener_scope_(listener_scope), global_scope_(global_scope), is_quic_(is_quic) {}
 
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
+
+Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
 
 ProtobufMessage::ValidationVisitor& FactoryContextImpl::messageValidationVisitor() {
   return server_.messageValidationContext().staticValidationVisitor();

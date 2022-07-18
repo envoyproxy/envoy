@@ -59,6 +59,7 @@ public:
   // Configuration::FactoryContext
   Network::DrainDecision& drainDecision() override;
   Init::Manager& initManager() override;
+  Stats::Scope& scope() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
@@ -70,7 +71,9 @@ public:
   void startDraining() override { is_draining_.store(true); }
 
 private:
+  // The scope that has empty prefix.
   Configuration::DownstreamFactoryContext& parent_context_;
+  Stats::ScopeSharedPtr scope_;
   Stats::ScopeSharedPtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
@@ -133,7 +136,7 @@ class FactoryContextImpl : public Configuration::DownstreamFactoryContext {
 public:
   FactoryContextImpl(Server::Instance& server, const envoy::config::listener::v3::Listener& config,
                      Network::DrainDecision& drain_decision, Stats::Scope& listener_scope,
-                     bool is_quic);
+                     Stats::Scope& global_scope, bool is_quic);
 
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
 
@@ -144,6 +147,7 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override;
   Network::DrainDecision& drainDecision() override;
   Init::Manager& initManager() override;
+  Stats::Scope& scope() override;
   Stats::Scope& listenerScope() override;
   bool isQuicListener() const override;
 
@@ -152,6 +156,7 @@ private:
   const envoy::config::listener::v3::Listener& config_;
   Network::DrainDecision& drain_decision_;
   Stats::Scope& listener_scope_;
+  Stats::Scope& global_scope_;
   bool is_quic_;
 };
 

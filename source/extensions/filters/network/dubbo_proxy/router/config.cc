@@ -14,9 +14,10 @@ namespace Router {
 
 DubboFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::dubbo_proxy::router::v3::Router&, const std::string&,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::FactoryContext& context) {
   return [&context](DubboFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addFilter(std::make_shared<Router>(context.clusterManager()));
+    callbacks.addFilter(
+        std::make_shared<Router>(context.getServerFactoryContext().clusterManager()));
   };
 }
 

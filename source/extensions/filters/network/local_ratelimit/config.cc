@@ -15,7 +15,7 @@ Network::FilterFactoryCb LocalRateLimitConfigFactory::createFilterFactoryFromPro
     Server::Configuration::FactoryContext& base_context) {
   Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   ConfigSharedPtr filter_config(
-      std::make_shared<Config>(proto_config, context.mainThreadDispatcher(), context.scope(),
+      std::make_shared<Config>(proto_config, context.mainThreadDispatcher(), base_context.scope(),
                                context.runtime(), context.singletonManager()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Filter>(filter_config));

@@ -89,14 +89,14 @@ private:
 
 // class ConfigImpl.
 ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
-                       Server::Configuration::ServerFactoryContext& context,
+                       Server::Configuration::FactoryContext& base_context,
                        Router::RouteConfigProviderManager& route_config_provider_manager)
-    : context_(context), stats_prefix_(fmt::format("dubbo.{}.", config.stat_prefix())),
-      stats_(DubboFilterStats::generateStats(stats_prefix_, context_.scope())),
+    : context_(base_context), stats_prefix_(fmt::format("dubbo.{}.", config.stat_prefix())),
+      stats_(DubboFilterStats::generateStats(stats_prefix_, base_context.scope())),
       serialization_type_(
           SerializationTypeMapper::lookupSerializationType(config.serialization_type())),
       protocol_type_(ProtocolTypeMapper::lookupProtocolType(config.protocol_type())) {
-
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   if (config.has_drds()) {
     if (config.route_config_size() > 0) {
       throw EnvoyException("both drds and route_config is present in DubboProxy");
@@ -110,20 +110,20 @@ ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
       }
     }
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
-        config.drds(), context_, stats_prefix_, context_.initManager());
+        config.drds(), context, stats_prefix_, context.initManager());
   } else if (config.has_multiple_route_config()) {
     if (config.route_config_size() > 0) {
       throw EnvoyException("both mutiple_route_config and route_config is present in DubboProxy");
     }
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        config.multiple_route_config(), context_);
+        config.multiple_route_config(), context);
   } else {
     envoy::extensions::filters::network::dubbo_proxy::v3::MultipleRouteConfiguration
         multiple_route_config;
 
     *multiple_route_config.mutable_route_config() = config.route_config();
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        multiple_route_config, context_);
+        multiple_route_config, context);
   }
 
   if (config.dubbo_filters().empty()) {

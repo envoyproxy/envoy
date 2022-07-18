@@ -20,7 +20,7 @@ ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoT
   Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
 
   auto stats =
-      std::make_shared<const RouterStats>(stat_prefix, context.scope(), context.localInfo());
+      std::make_shared<const RouterStats>(stat_prefix, base_context.scope(), context.localInfo());
   auto shadow_writer = std::make_shared<ShadowWriterImpl>(
       context.clusterManager(), *stats, context.mainThreadDispatcher(), context.threadLocal());
   bool close_downstream_on_error =

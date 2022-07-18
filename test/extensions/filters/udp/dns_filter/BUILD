@@ -41,7 +41,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "//test/mocks/server:instance_mocks",
-        "//test/mocks/server:listener_factory_context_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",

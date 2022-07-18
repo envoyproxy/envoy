@@ -254,7 +254,7 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createDownstreamFilterFactoryF
 
   auto message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.extension_config().typed_config(),
-      context.getServerFactoryContext().messageValidationVisitor(), factory);
+      context.messageValidationVisitor(), factory);
   auto filter_factory = factory.createFilterFactoryFromProto(*message, prefix, context);
 
   MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());

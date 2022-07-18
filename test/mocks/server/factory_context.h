@@ -24,6 +24,7 @@ public:
   MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, (), (const));
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
@@ -34,6 +35,7 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, listenerTypedMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
+  MOCK_METHOD(Stats::Scope&, scope, ());
 
   MOCK_METHOD(const Network::ListenerConfig&, listenerConfig, (), (const));
 
@@ -45,6 +47,7 @@ public:
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<MockDrainManager> drain_manager_;
+  testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
@@ -63,12 +66,15 @@ public:
         .WillByDefault(testing::ReturnRef(mock_server_context_));
     ON_CALL(*this, getDownstreamFactoryContext())
         .WillByDefault(Return(OptRef<DownstreamFactoryContext>{mock_downstream_context_}));
+    ON_CALL(mock_downstream_context_, getServerFactoryContext())
+        .WillByDefault(ReturnRef(mock_server_context_));
   }
+
+  operator ServerFactoryContext&() { return this->getServerFactoryContext(); }
 
   MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, ());
   MOCK_METHOD(OptRef<DownstreamFactoryContext>, getDownstreamFactoryContext, ());
 
-  testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   NiceMock<MockServerFactoryContext> mock_server_context_;
   NiceMock<MockListenerFactoryContext> mock_downstream_context_;
 };

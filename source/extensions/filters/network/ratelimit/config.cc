@@ -26,7 +26,7 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
   ASSERT(!proto_config.domain().empty());
   ASSERT(proto_config.descriptors_size() > 0);
 
-  ConfigSharedPtr filter_config(new Config(proto_config, context.scope(), context.runtime()));
+  ConfigSharedPtr filter_config(new Config(proto_config, base_context.scope(), context.runtime()));
   const std::chrono::milliseconds timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
   Envoy::Config::Utility::checkTransportVersion(proto_config.rate_limit_service());

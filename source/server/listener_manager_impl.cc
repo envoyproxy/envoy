@@ -97,7 +97,7 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
             proto_config);
 
     auto message = Config::Utility::translateToFactoryConfig(
-        proto_config, factory_context.getServerFactoryContext().messageValidationVisitor(),
+        proto_config, factory_context.messageValidationVisitor(),
         factory);
     Config::Utility::validateTerminalFilters(
         filters[i].name(), factory.name(), "network",
@@ -155,7 +155,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
           Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
               proto_config);
       const auto message = Config::Utility::translateToFactoryConfig(
-          proto_config, context.getServerFactoryContext().messageValidationVisitor(), factory);
+          proto_config, context.messageValidationVisitor(), factory);
       const auto callback = factory.createListenerFilterFactoryFromProto(
           *message, createListenerFilterMatcher(proto_config), context);
       auto filter_config_provider =
@@ -191,7 +191,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
             proto_config);
 
     auto message = Config::Utility::translateToFactoryConfig(
-        proto_config, context.getServerFactoryContext().messageValidationVisitor(), factory);
+        proto_config, context.messageValidationVisitor(), factory);
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;

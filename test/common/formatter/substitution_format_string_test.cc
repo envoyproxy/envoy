@@ -32,7 +32,7 @@ public:
   std::string body_;
 
   envoy::config::core::v3::SubstitutionFormatString config_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestEmptyIsInvalid) {

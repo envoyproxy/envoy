@@ -82,11 +82,11 @@ protected:
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [this](
+            [](
                 const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-                Server::Configuration::FactoryContext&) -> std::vector<Network::FilterFactoryCb> {
+                Server::Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
               return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-                  filters, server_context_);
+                  filters, context);
             }));
     ON_CALL(listener_factory_, getTcpListenerConfigProviderManager())
         .WillByDefault(Return(&tcp_listener_config_provider_manager_));
@@ -150,7 +150,7 @@ protected:
           std::shared_ptr<ListenerHandle> notifier(raw_listener);
           raw_listener->context_ = &factory_context;
           if (need_init) {
-            factory_context.getServerFactoryContext().initManager().add(notifier->target_);
+            factory_context.getDownstreamFactoryContext()->initManager().add(notifier->target_);
           }
           return {[notifier](Network::FilterManager&) -> void {}};
         }));
@@ -176,7 +176,7 @@ protected:
           std::shared_ptr<ListenerHandle> notifier(raw_listener);
           raw_listener->context_ = &filter_chain_factory_context;
           if (need_init) {
-            filter_chain_factory_context.getServerFactoryContext().initManager().add(
+            filter_chain_factory_context.getDownstreamFactoryContext()->initManager().add(
                 notifier->target_);
           }
           return {[notifier](Network::FilterManager&) -> void {}};
@@ -349,7 +349,6 @@ protected:
   std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{
       std::make_shared<DumbInternalListenerRegistry>()};
 
-  NiceMock<Configuration::MockFactoryContext> server_context_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();

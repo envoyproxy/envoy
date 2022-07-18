@@ -33,7 +33,7 @@ TEST(GcpAuthnFilterConfigTest, GcpAuthnFilterWithCorrectProto) {
   GcpAuthnFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context.mock_server_context_, messageValidationVisitor());
+  EXPECT_CALL(context.mock_downstream_context_, messageValidationVisitor());
   GcpAuthnFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(filter_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;

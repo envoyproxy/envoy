@@ -43,31 +43,30 @@ namespace {
 
 class FilterConfigDiscoveryTestBase {
 public:
-  FilterConfigDiscoveryTestBase() {
-    // For server_factory_context
+  FilterConfigDiscoveryTestBase() : init_manager_(factory_context_.mock_downstream_context_.init_manager_) {
+    ON_CALL(factory_context_.mock_server_context_, scope()).WillByDefault(ReturnRef(scope_));
     ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     }));
     ON_CALL(init_manager_, initialize(_))
         .WillByDefault(Invoke(
             [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
-    // ON_CALL(factory_context_.admin_.mock_server_context_,
-    // concurrency()).WillByDefault(Return(0));
+    ON_CALL(factory_context_.mock_server_context_.admin_, concurrency()).WillByDefault(Return(0));
 
-    // ON_CALL(factory_context_, listenerConfig()).WillByDefault(ReturnRef(listener_config_));
+    ON_CALL(factory_context_.mock_downstream_context_, listenerConfig()).WillByDefault(ReturnRef(listener_config_));
   }
 
   virtual ~FilterConfigDiscoveryTestBase() = default;
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
   Event::SimulatedTimeSystem time_system_;
-  NiceMock<Init::MockManager> init_manager_;
-  NiceMock<Server::Configuration::MockListenerFactoryContext> listener_context_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockListenerFactoryContext>& listener_context_{factory_context_.mock_downstream_context_};
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
   NiceMock<Network::MockListenerConfig> listener_config_;
+  NiceMock<Init::MockManager>& init_manager_;
 };
 
 // Common base ECDS test class for HTTP filter, and TCP/UDP listener filter.
@@ -101,8 +100,8 @@ public:
              bool last_filter_config = true) {
     provider_ = createProvider(ctx, "foo", warm, default_configuration, last_filter_config);
     callbacks_ =
-        factory_context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
-    EXPECT_CALL(*factory_context_.server_factory_context_.cluster_manager_.subscription_factory_
+        factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_;
+    EXPECT_CALL(*factory_context_.mock_server_context_.cluster_manager_.subscription_factory_
                      .subscription_,
                 start(_));
     if (!warm) {

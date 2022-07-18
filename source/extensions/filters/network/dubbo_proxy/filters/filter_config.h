@@ -35,7 +35,7 @@ public:
    */
   virtual DubboFilters::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
-                               Server::Configuration::ServerFactoryContext& context) PURE;
+                               Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.dubbo_proxy.filters"; }
 };

@@ -693,7 +693,7 @@ public:
 
 private:
   Network::FilterFactoryCb commonFilterFactory(Configuration::FactoryContext& context) {
-    context.getServerFactoryContext().scope().counterFromString("bar").inc();
+    context.scope().counterFromString("bar").inc();
     return [](Network::FilterManager&) -> void {};
   }
 };
@@ -1403,7 +1403,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-// Tests that when listener tears down, server's initManager is notified.
+// Tests that when listener tears down, initManager is notified.
 TEST_P(ListenerManagerImplTest, ListenerTeardownNotifiesServerInitManager) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
 
@@ -1441,7 +1441,7 @@ filter_chains: {}
   Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
   { // Add and remove a listener before starting workers.
     ListenerHandle* listener_foo = expectListenerCreate(true, true);
-    EXPECT_CALL(*server_.server_factory_context_, initManager())
+    EXPECT_CALL(server_, initManager())
         .WillOnce(ReturnRef(server_init_mgr));
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1"));
@@ -1489,7 +1489,7 @@ static_listeners:
   // Now add new version listener foo after workers start, note it's fine that server_init_mgr is
   // initialized, as no target will be added to it.
   time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
-  EXPECT_CALL(*server_.server_factory_context_, initManager())
+  EXPECT_CALL(server_, initManager())
       .Times(0); // No target added to server init manager.
   server_init_watcher.expectReady().Times(0);
   {

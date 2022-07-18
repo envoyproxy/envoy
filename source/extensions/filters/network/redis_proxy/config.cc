@@ -42,8 +42,9 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
           context.timeSource());
 
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
-      proto_config, context.scope(), base_context.getDownstreamFactoryContext()->drainDecision(),
-      context.runtime(), context.api()));
+      proto_config, base_context.scope(),
+      base_context.getDownstreamFactoryContext()->drainDecision(), context.runtime(),
+      context.api()));
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());

@@ -15,7 +15,6 @@
 #include "hot_restart.h"
 #include "instance.h"
 #include "listener_component_factory.h"
-#include "listener_factory_context.h"
 #include "listener_manager.h"
 #include "main.h"
 #include "options.h"

@@ -40,12 +40,12 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
         std::vector<std::string>(proto_config.commands().begin(), proto_config.commands().end());
   }
 
-  auto stats = std::make_shared<MongoStats>(context.scope(), stat_prefix, commands);
+  auto stats = std::make_shared<MongoStats>(base_context.scope(), stat_prefix, commands);
   const bool emit_dynamic_metadata = proto_config.emit_dynamic_metadata();
   return [stat_prefix, &base_context, &context, access_log, fault_config, emit_dynamic_metadata,
           stats](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
-        stat_prefix, context.scope(), context.runtime(), access_log, fault_config,
+        stat_prefix, base_context.scope(), context.runtime(), access_log, fault_config,
         base_context.getDownstreamFactoryContext()->drainDecision(),
         context.mainThreadDispatcher().timeSource(), emit_dynamic_metadata, stats));
   };

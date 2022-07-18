@@ -259,6 +259,7 @@ public:
   virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
 
   virtual Init::Manager& initManager() PURE;
+  virtual Stats::Scope& scope() PURE;
 };
 
 /**
@@ -289,8 +290,12 @@ public:
     }
     return getServerFactoryContext().messageValidationVisitor();
   }
-
-  operator ServerFactoryContext&() { return this->getServerFactoryContext(); }
+  virtual Stats::Scope& scope() {
+    if (getDownstreamFactoryContext().has_value()) {
+      return getDownstreamFactoryContext()->scope();
+    }
+    return getServerFactoryContext().scope();
+  }
 };
 
 // For legacy naming.

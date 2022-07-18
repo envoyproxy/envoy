@@ -226,6 +226,8 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
       is_quic_(config.udp_listener_config().has_quic_options()) {}
 
+Stats::Scope& ListenerFactoryContextBaseImpl::scope() { return *global_scope_; }
+
 const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listenerMetadata() const {
   return metadata_;
 };
@@ -762,6 +764,9 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
 }
 
 Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() { PANIC("not implemented"); }
+Stats::Scope& PerListenerFactoryContextImpl::scope() {
+  return listener_factory_context_base_->scope();
+}
 const envoy::config::core::v3::Metadata& PerListenerFactoryContextImpl::listenerMetadata() const {
   return listener_factory_context_base_->listenerMetadata();
 };

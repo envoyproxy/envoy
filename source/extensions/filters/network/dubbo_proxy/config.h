@@ -41,7 +41,7 @@ public:
   using DubboProxyConfig = envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy;
   using DubboFilterConfig = envoy::extensions::filters::network::dubbo_proxy::v3::DubboFilter;
 
-  ConfigImpl(const DubboProxyConfig& config, Server::Configuration::ServerFactoryContext& context,
+  ConfigImpl(const DubboProxyConfig& config, Server::Configuration::FactoryContext& context,
              Router::RouteConfigProviderManager& route_config_provider_manager);
   ~ConfigImpl() override = default;
 
@@ -61,7 +61,7 @@ public:
 private:
   void registerFilter(const DubboFilterConfig& proto_config);
 
-  Server::Configuration::ServerFactoryContext& context_;
+  Server::Configuration::FactoryContext& context_;
   const std::string stats_prefix_;
   DubboFilterStats stats_;
   const SerializationType serialization_type_;

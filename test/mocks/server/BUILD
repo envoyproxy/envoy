@@ -252,16 +252,6 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
-    name = "listener_factory_context_mocks",
-    srcs = ["listener_factory_context.cc"],
-    hdrs = ["listener_factory_context.h"],
-    deps = [
-        "//envoy/server:listener_manager_interface",
-        "//test/mocks/server:factory_context_mocks",
-    ],
-)
-
-envoy_cc_mock(
     name = "health_checker_factory_context_mocks",
     srcs = ["health_checker_factory_context.cc"],
     hdrs = ["health_checker_factory_context.h"],
@@ -329,7 +319,6 @@ envoy_cc_mock(
         "//test/mocks/server:hot_restart_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:listener_component_factory_mocks",
-        "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/server:listener_manager_mocks",
         "//test/mocks/server:main_mocks",
         "//test/mocks/server:options_mocks",

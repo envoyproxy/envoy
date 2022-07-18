@@ -283,9 +283,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     FilterConfigProviderManager& filter_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(
-          stats_prefix_, context_.getServerFactoryContext().scope())),
+          stats_prefix_, context_.getDownstreamFactoryContext()->scope())),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats(
-          stats_prefix_, context_.getServerFactoryContext().scope())),
+          stats_prefix_, context_.getDownstreamFactoryContext()->scope())),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
       internal_address_config_(createInternalAddressConfig(config)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
@@ -301,7 +301,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
           config.http_protocol_options(),
-          context.getServerFactoryContext().messageValidationVisitor(),
+          context.messageValidationVisitor(),
           config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -418,7 +418,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           fmt::format("Original IP detection extension not found: '{}'", extension_config.name()));
     }
 
-    auto extension = factory->createExtension(extension_config.typed_config(), context_);
+    auto extension = factory->createExtension(extension_config.typed_config(),
+                                              context_.getServerFactoryContext());
     if (!extension) {
       throw EnvoyException(fmt::format("Original IP detection extension could not be created: '{}'",
                                        extension_config.name()));
@@ -666,7 +667,7 @@ void HttpConnectionManagerConfig::processFilter(
     return;
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      proto_config, context_.getServerFactoryContext().messageValidationVisitor(), *factory);
+      proto_config, context_.messageValidationVisitor(), *factory);
   Http::FilterFactoryCb callback =
       factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
   dependency_manager.registerFilter(factory->name(), *factory->dependencies());
@@ -713,18 +714,20 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          const Buffer::Instance& data,
                                          Http::ServerConnectionCallbacks& callbacks) {
   auto& server_factory_context = context_.getServerFactoryContext();
+  Server::Configuration::DownstreamFactoryContext& downstream_factory_context =
+      *context_.getDownstreamFactoryContext();
   switch (codec_type_) {
   case CodecType::HTTP1: {
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection,
-        Http::Http1::CodecStats::atomicGet(http1_codec_stats_, server_factory_context.scope()),
+        Http::Http1::CodecStats::atomicGet(http1_codec_stats_, downstream_factory_context.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
         headersWithUnderscoresAction());
   }
   case CodecType::HTTP2: {
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
-        Http::Http2::CodecStats::atomicGet(http2_codec_stats_, server_factory_context.scope()),
+        Http::Http2::CodecStats::atomicGet(http2_codec_stats_, downstream_factory_context.scope()),
         server_factory_context.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
@@ -732,7 +735,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 #ifdef ENVOY_ENABLE_QUIC
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks,
-        Http::Http3::CodecStats::atomicGet(http3_codec_stats_, server_factory_context.scope()),
+        Http::Http3::CodecStats::atomicGet(http3_codec_stats_, downstream_factory_context.scope()),
         http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
         headersWithUnderscoresAction());
 #else
@@ -741,7 +744,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 #endif
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, server_factory_context.scope(),
+        connection, data, callbacks, downstream_factory_context.scope(),
         server_factory_context.api().randomGenerator(), http1_codec_stats_, http2_codec_stats_,
         http1_settings_, http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
         headersWithUnderscoresAction());

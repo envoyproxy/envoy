@@ -113,12 +113,15 @@ public:
     EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(testing::AnyNumber());
 
     upstream_locality_.set_zone("to_az");
-    context_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
-    ON_CALL(*context_.mock_server_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-            address())
+    context_.mock_server_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
+    ON_CALL(
+        *context_.mock_server_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+        address())
         .WillByDefault(Return(host_address_));
-    ON_CALL(*context_.mock_server_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-            locality())
+    ON_CALL(
+        *context_.mock_server_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+        locality())
         .WillByDefault(ReturnRef(upstream_locality_));
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
@@ -148,19 +151,19 @@ public:
 
     EXPECT_CALL(context_.mock_server_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
                 newStream(_, _, _))
-        .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                             Http::ConnectionPool::Callbacks& callbacks,
-                             const Http::ConnectionPool::Instance::StreamOptions&)
-                             -> Http::ConnectionPool::Cancellable* {
-          response_decoder = &decoder;
-          EXPECT_CALL(encoder.stream_, connectionLocalAddress())
-              .WillRepeatedly(ReturnRef(upstream_local_address1_));
-          callbacks.onPoolReady(
-              encoder,
-              context_.mock_server_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-              stream_info_, Http::Protocol::Http10);
-          return nullptr;
-        }));
+        .WillOnce(
+            Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                       const Http::ConnectionPool::Instance::StreamOptions&)
+                       -> Http::ConnectionPool::Cancellable* {
+              response_decoder = &decoder;
+              EXPECT_CALL(encoder.stream_, connectionLocalAddress())
+                  .WillRepeatedly(ReturnRef(upstream_local_address1_));
+              callbacks.onPoolReady(encoder,
+                                    context_.mock_server_context_.cluster_manager_
+                                        .thread_local_cluster_.conn_pool_.host_,
+                                    stream_info_, Http::Protocol::Http10);
+              return nullptr;
+            }));
     expectResponseTimerCreate();
 
     Http::TestRequestHeaderMapImpl headers(request_headers_init);
@@ -193,19 +196,19 @@ public:
 
     EXPECT_CALL(context_.mock_server_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
                 newStream(_, _, _))
-        .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                             Http::ConnectionPool::Callbacks& callbacks,
-                             const Http::ConnectionPool::Instance::StreamOptions&)
-                             -> Http::ConnectionPool::Cancellable* {
-          response_decoder = &decoder;
-          EXPECT_CALL(encoder1.stream_, connectionLocalAddress())
-              .WillRepeatedly(ReturnRef(upstream_local_address1_));
-          callbacks.onPoolReady(
-              encoder1,
-              context_.mock_server_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-              stream_info_, Http::Protocol::Http10);
-          return nullptr;
-        }));
+        .WillOnce(
+            Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                       const Http::ConnectionPool::Instance::StreamOptions&)
+                       -> Http::ConnectionPool::Cancellable* {
+              response_decoder = &decoder;
+              EXPECT_CALL(encoder1.stream_, connectionLocalAddress())
+                  .WillRepeatedly(ReturnRef(upstream_local_address1_));
+              callbacks.onPoolReady(encoder1,
+                                    context_.mock_server_context_.cluster_manager_
+                                        .thread_local_cluster_.conn_pool_.host_,
+                                    stream_info_, Http::Protocol::Http10);
+              return nullptr;
+            }));
     expectPerTryTimerCreate();
     expectResponseTimerCreate();
 
@@ -225,22 +228,22 @@ public:
     NiceMock<Http::MockRequestEncoder> encoder2;
     EXPECT_CALL(context_.mock_server_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
                 newStream(_, _, _))
-        .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                             Http::ConnectionPool::Callbacks& callbacks,
-                             const Http::ConnectionPool::Instance::StreamOptions&)
-                             -> Http::ConnectionPool::Cancellable* {
-          response_decoder = &decoder;
-          EXPECT_CALL(context_.mock_server_context_.cluster_manager_.thread_local_cluster_
-                          .conn_pool_.host_->outlier_detector_,
-                      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
-          EXPECT_CALL(encoder2.stream_, connectionLocalAddress())
-              .WillRepeatedly(ReturnRef(upstream_local_address2_));
-          callbacks.onPoolReady(
-              encoder2,
-              context_.mock_server_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-              stream_info_, Http::Protocol::Http10);
-          return nullptr;
-        }));
+        .WillOnce(
+            Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                       const Http::ConnectionPool::Instance::StreamOptions&)
+                       -> Http::ConnectionPool::Cancellable* {
+              response_decoder = &decoder;
+              EXPECT_CALL(context_.mock_server_context_.cluster_manager_.thread_local_cluster_
+                              .conn_pool_.host_->outlier_detector_,
+                          putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
+              EXPECT_CALL(encoder2.stream_, connectionLocalAddress())
+                  .WillRepeatedly(ReturnRef(upstream_local_address2_));
+              callbacks.onPoolReady(encoder2,
+                                    context_.mock_server_context_.cluster_manager_
+                                        .thread_local_cluster_.conn_pool_.host_,
+                                    stream_info_, Http::Protocol::Http10);
+              return nullptr;
+            }));
     expectPerTryTimerCreate();
     router_->retry_state_->callback_();
 

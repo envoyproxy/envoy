@@ -14,7 +14,7 @@ Network::FilterFactoryCb ConnectionLimitConfigFactory::createFilterFactoryFromPr
     const envoy::extensions::filters::network::connection_limit::v3::ConnectionLimit& proto_config,
     Server::Configuration::FactoryContext& base_context) {
   Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
-  ConfigSharedPtr filter_config(new Config(proto_config, context.scope(), context.runtime()));
+  ConfigSharedPtr filter_config(new Config(proto_config, base_context.scope(), context.runtime()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Filter>(filter_config));
   };

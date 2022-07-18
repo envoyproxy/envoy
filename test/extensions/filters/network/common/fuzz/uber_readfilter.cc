@@ -46,9 +46,6 @@ void UberFilterFuzzer::fuzzerSetup() {
   ON_CALL(read_filter_callbacks_->connection_, requestedServerName())
       .WillByDefault(Return("fake_cluster"));
 
-  // Prepare time source for filters such as local_ratelimit filter.
-  // FIXME  factory_context_.mock_server_context_.prepareSimulatedSystemTime();
-
   // Prepare address for filters such as ext_authz filter.
   pipe_addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();

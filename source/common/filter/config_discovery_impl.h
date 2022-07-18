@@ -399,7 +399,8 @@ class FilterConfigProviderManagerImpl : public FilterConfigProviderManagerImplBa
                                         public FilterConfigProviderManager<FactoryCb, FactoryCtx>,
                                         public Singleton::Instance {
 public:
-  virtual Server::Configuration::DownstreamFactoryContext& getDownstreamFactoryContext(FactoryCtx& ctx) PURE;
+  virtual Server::Configuration::DownstreamFactoryContext&
+  getDownstreamFactoryContext(FactoryCtx& ctx) PURE;
   DynamicFilterConfigProviderPtr<FactoryCb> createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, FactoryCtx& factory_context,
@@ -517,9 +518,11 @@ class HttpFilterConfigProviderManagerImpl
 public:
   absl::string_view statPrefix() const override { return "http_filter."; }
 
-  Server::Configuration::DownstreamFactoryContext& getDownstreamFactoryContext(Server::Configuration::FactoryContext& ctx) override {
+  Server::Configuration::DownstreamFactoryContext&
+  getDownstreamFactoryContext(Server::Configuration::FactoryContext& ctx) override {
     return *ctx.getDownstreamFactoryContext();
   }
+
 protected:
   bool
   isTerminalFilter(Server::Configuration::NamedHttpFilterConfigFactory* default_factory,
@@ -543,7 +546,8 @@ class TcpListenerFilterConfigProviderManagerImpl
           TcpListenerDynamicFilterConfigProviderImpl> {
 public:
   absl::string_view statPrefix() const override { return "tcp_listener_filter."; }
-  Server::Configuration::DownstreamFactoryContext& getDownstreamFactoryContext(Server::Configuration::ListenerFactoryContext& ctx) override {
+  Server::Configuration::DownstreamFactoryContext&
+  getDownstreamFactoryContext(Server::Configuration::ListenerFactoryContext& ctx) override {
     return ctx;
   }
 };
@@ -556,7 +560,8 @@ class UdpListenerFilterConfigProviderManagerImpl
           UdpListenerDynamicFilterConfigProviderImpl> {
 public:
   absl::string_view statPrefix() const override { return "udp_listener_filter."; }
-  Server::Configuration::DownstreamFactoryContext& getDownstreamFactoryContext(Server::Configuration::ListenerFactoryContext& ctx) override {
+  Server::Configuration::DownstreamFactoryContext&
+  getDownstreamFactoryContext(Server::Configuration::ListenerFactoryContext& ctx) override {
     return ctx;
   }
 };

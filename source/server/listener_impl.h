@@ -124,6 +124,7 @@ public:
                                  Server::DrainManagerPtr drain_manager);
   Init::Manager& initManager() override;
   Network::DrainDecision& drainDecision() override;
+  Stats::Scope& scope() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
@@ -179,6 +180,7 @@ public:
   // FactoryContext
   Network::DrainDecision& drainDecision() override;
   Init::Manager& initManager() override;
+  Stats::Scope& scope() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;

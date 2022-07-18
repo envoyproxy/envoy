@@ -509,7 +509,9 @@ public:
 // Verify that http response on filter chain 1 and default filter chain have "Connection: close"
 // header when these 2 filter chains are deleted during the listener update.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
+  std::cerr << "HERE-\n";
   inplaceInitialize(/*add_default_filter_chain=*/true);
+  std::cerr << "HERE1-\n";
 
   auto codec_client_1 = createHttpCodec("alpn1");
   auto codec_client_0 = createHttpCodec("alpn0");
@@ -523,23 +525,31 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
         listener->mutable_filter_chains()->RemoveLast();
         listener->clear_default_filter_chain();
       });
+  std::cerr << "HRE1-\n";
 
   new_config_helper.setLds("1");
+  std::cerr << "HE1-\n";
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
+  std::cerr << "E1-\n";
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+  std::cerr << "E1-\n";
 
   test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
   test_server_->waitForGaugeGe("http.hcm1.downstream_cx_active", 1);
+  std::cerr << "E-\n";
 
   expectResponseHeaderConnectionClose(*codec_client_1, true);
   expectResponseHeaderConnectionClose(*codec_client_default, true);
+  std::cerr << "-\n";
 
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
   expectConnectionServed();
+  std::cerr << "asd-\n";
 
   codec_client_1->close();
   test_server_->waitForGaugeDestroyed("http.hcm1.downstream_cx_active");
+  std::cerr << "ad-\n";
   codec_client_0->close();
   codec_client_default->close();
 }
