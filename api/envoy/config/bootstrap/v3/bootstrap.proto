@@ -315,7 +315,7 @@ message Bootstrap {
 
   // Global map of CertificateProvider instances. These instances are referred to by name in the
   // :ref:`CommonTlsContext.CertificateProviderInstance.instance_name
-  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProviderInstance.instance_name>`
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateProviderPluginInstance.instance_name>`
   // field.
   map<string, core.v3.TypedExtensionConfig> certificate_provider_instances = 25;
 
