@@ -59,7 +59,7 @@ public:
   PatternTemplatePredicate() = default;
 
   absl::string_view name() const override {
-    return "envoy.pattern_template.pattern_template_predicates";
+    return "envoy.pattern_template.pattern_template_predicate";
   }
   std::string category() const override { return "envoy.pattern_template"; }
 
