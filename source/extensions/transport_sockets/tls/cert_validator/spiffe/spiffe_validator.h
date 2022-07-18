@@ -75,7 +75,7 @@ private:
   bool verifyCertChainUsingTrustBundleStore(Ssl::SslExtendedSocketInfo* ssl_extended_info,
                                             X509& leaf_cert, STACK_OF(X509)* cert_chain,
                                             X509_VERIFY_PARAM* verify_param,
-                                            std::string* error_details);
+                                            std::string& error_details);
 
   bool allow_expired_certificate_{false};
   std::vector<bssl::UniquePtr<X509>> ca_certs_;
