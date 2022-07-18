@@ -27,6 +27,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -46,13 +48,15 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: "format | ./WORKSPACE | **/*.bzl"
+        key: "proto_format | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
 
     - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -80,6 +84,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
@@ -100,9 +106,17 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+    - task: Cache@2
+      inputs:
+        key: "dependencies | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -424,6 +438,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
@@ -468,21 +484,6 @@ stages:
         itemPattern: "docker/envoy*.tar"
         targetPath: $(Build.StagingDirectory)
     - bash: ./ci/do_ci.sh verify_examples
-      env:
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        NO_BUILD_SETUP: 1
-  - job: examples_build
-    dependsOn: []
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "docker"
-        itemPattern: "docker/envoy*.tar"
-        targetPath: $(Build.StagingDirectory)
-    - bash: ./ci/do_ci.sh verify_build_examples
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         NO_BUILD_SETUP: 1
