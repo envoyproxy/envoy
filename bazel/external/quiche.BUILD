@@ -55,12 +55,26 @@ quiche_copts = select({
 test_suite(
     name = "ci_tests",
     tests = [
+        "http2_adapter_callback_visitor_test",
+        "http2_adapter_event_forwarder_test",
+        "http2_adapter_header_validator_test",
+        "http2_adapter_impl_comparison_test",
+        "http2_adapter_nghttp2_adapter_test",
+        "http2_adapter_nghttp2_data_provider_test",
+        "http2_adapter_nghttp2_session_test",
+        "http2_adapter_nghttp2_util_test",
+        "http2_adapter_oghttp2_adapter_test",
+        "http2_adapter_oghttp2_session_test",
+        "http2_adapter_oghttp2_util_test",
+        "http2_adapter_recording_http2_visitor_test",
+        "http2_adapter_window_manager_test",
         "http2_platform_api_test",
         "quiche_balsa_balsa_frame_test",
         "quiche_balsa_balsa_headers_test",
         "quiche_balsa_header_properties_test",
         "quiche_balsa_simple_buffer_test",
         "quiche_common_test",
+        "spdy_core_header_block_test",
     ],
 )
 
@@ -1636,7 +1650,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_base",
     hdrs = [
-        "quiche/quic/platform/api/quic_bug_tracker.h",
         "quiche/quic/platform/api/quic_client_stats.h",
         "quiche/quic/platform/api/quic_exported_stats.h",
         "quiche/quic/platform/api/quic_flag_utils.h",
@@ -1651,6 +1664,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":quic_platform_bug_tracker",
         ":quic_platform_server_stats",
         ":quic_platform_stack_trace",
         ":quiche_common_buffer_allocator_lib",
@@ -1660,6 +1674,19 @@ envoy_cc_library(
         ":quiche_common_platform_server_stats",
         ":quiche_common_platform_testvalue",
         "@envoy//source/common/quic/platform:quic_base_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_platform_bug_tracker",
+    hdrs = [
+        "quiche/quic/platform/api/quic_bug_tracker.h",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform_bug_tracker",
     ],
 )
 
@@ -1721,10 +1748,14 @@ envoy_cc_test_library(
 
 envoy_cc_library(
     name = "quic_platform_ip_address_family",
+    srcs = ["quiche/quic/platform/api/quic_ip_address_family.cc"],
     hdrs = ["quiche/quic/platform/api/quic_ip_address_family.h"],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_bug_tracker",
+    ],
 )
 
 envoy_cc_library(
@@ -3242,6 +3273,32 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_core_io_socket_lib",
+    srcs = select({
+        "@envoy//bazel:windows_x86_64": [],
+        "//conditions:default": ["quiche/quic/core/io/socket_posix.cc"],
+    }),
+    hdrs = ["quiche/quic/core/io/socket.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_types_lib",
+        ":quic_platform_ip_address_family",
+        ":quic_platform_socket_address",
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_logging",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_lru_cache_lib",
     hdrs = ["quiche/quic/core/quic_lru_cache.h"],
     repository = "@envoy",
@@ -4188,6 +4245,7 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":quic_core_io_socket_lib",
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
         ":quic_platform",
@@ -5483,6 +5541,7 @@ envoy_cc_library(
         ":quiche_balsa_header_properties_lib",
         ":quiche_balsa_http_validation_policy_lib",
         ":quiche_balsa_noop_balsa_visitor_lib",
+        ":quiche_common_platform",
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",

@@ -264,6 +264,53 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestParamUnescapePlus) {
       R"({"id":"20","theme":"Children"})");
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
+  HttpIntegrationTest::initialize();
+
+  // json_name = "search[decoded]", "search%5Bdecoded%5D" should work
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf?shelf.search%5Bdecoded%5D=Google"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      "", {R"(shelf { search_decoded: "Google" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"},
+          {"content-type", "application/json"},
+      },
+      R"({"id":"20","theme":"Children"})");
+
+  // json_name = "search[decoded]", "search[decoded]" should work
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf?shelf.search[decoded]=Google"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      "", {R"(shelf { search_decoded: "Google" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"},
+          {"content-type", "application/json"},
+      },
+      R"({"id":"20","theme":"Children"})");
+
+  // json_name = "search%5Bencoded%5D", "search[encode]" should fail.
+  // It is tested in test case "DecodedQueryParameterWithEncodedJsonName"
+  // in json_transcoder_filter_test.cc.
+
+  // json_name = "search%5Bencoded%5D", "search%5Bencoded%5D" should work.
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf?shelf.search%5Bencoded%5D=Google"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      "", {R"(shelf { search_encoded: "Google" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"},
+          {"content-type", "application/json"},
+      },
+      R"({"id":"20","theme":"Children"})");
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParams) {
   HttpIntegrationTest::initialize();
   // 1. Binding theme='Children' in CreateShelfRequest

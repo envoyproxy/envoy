@@ -242,9 +242,7 @@ envoy_cc_library(
         "//source/common/http/matching:inputs_lib",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
-        "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -307,7 +305,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/match_wrapper:config",
+        "//source/common/http/match_delegate:config",
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
@@ -353,6 +351,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/common:hashable_interface",
         "//envoy/http:hash_policy_interface",
+        "//source/common/common:matchers_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )

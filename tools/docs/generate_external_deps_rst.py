@@ -78,7 +78,7 @@ def render_version(version):
 
 
 def render_title(title):
-    underline = '~' * len(title)
+    underline = '-' * len(title)
     return f'\n{title}\n{underline}\n\n'
 
 
@@ -133,8 +133,11 @@ def main():
 
     # Generate per-use category RST with CSV tables.
     for category, exts in use_categories.items():
-        content = ''
+        content = f"External dependencies: ``{category or 'core'}``"
+        content += f"\n{'=' * len(content)}\n\n"
         for ext_name, deps in sorted(exts.items()):
+            if not deps:
+                continue
             if ext_name != 'core':
                 content += render_title(ext_name)
             output_path = pathlib.Path(security_rst_root, f'external_dep_{category}.rst')
@@ -142,7 +145,7 @@ def main():
                                  [csv_row(dep) for dep in sorted(deps, key=lambda d: d.sort_name)])
         output_path.write_text(content)
 
-    with tarfile.open(output_filename, "w") as tar:
+    with tarfile.open(output_filename, "w:gz") as tar:
         tar.add(generated_rst_dir, arcname=".")
 
 

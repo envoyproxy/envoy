@@ -135,6 +135,14 @@ TagNameValues::TagNameValues() {
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
+  // listener.<address|stat_prefix>.(worker_<id>.)*
+  // listener_manager.(worker_<id>.)*
+  // server.(worker_<id>.)*
+  addRe2(
+      WORKER_ID,
+      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)\.|server\.|listener_manager\.)(worker_(\d+)\.))",
+      "");
+
   // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
   addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>|<TAG_VALUE>)\.))", "", "admin");
 
@@ -149,8 +157,14 @@ TagNameValues::TagNameValues() {
   // match.
   addRe2(RDS_ROUTE_CONFIG, R"(^http\.<TAG_VALUE>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
 
-  // listener_manager.(worker_<id>.)*
-  addRe2(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
+  // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
+  addTokenized(ROUTE, "vhost.*.route.$.**");
+
+  // thrift.(<stat_prefix>.)*
+  addTokenized(THRIFT_PREFIX, "thrift.$.**");
+
+  // redis.(<stat_prefix>.)*
+  addTokenized(REDIS_PREFIX, "redis.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

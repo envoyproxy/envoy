@@ -102,7 +102,7 @@ private:
 
 class FilterChainImpl : public Network::DrainableFilterChain {
 public:
-  FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+  FilterChainImpl(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                   std::vector<Network::FilterFactoryCb>&& filters_factory,
                   std::chrono::milliseconds transport_socket_connect_timeout,
                   absl::string_view name)
@@ -111,7 +111,7 @@ public:
         transport_socket_connect_timeout_(transport_socket_connect_timeout), name_(name) {}
 
   // Network::FilterChain
-  const Network::TransportSocketFactory& transportSocketFactory() const override {
+  const Network::DownstreamTransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
   }
   std::chrono::milliseconds transportSocketConnectTimeout() const override {
@@ -132,7 +132,7 @@ public:
 
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
-  const Network::TransportSocketFactoryPtr transport_socket_factory_;
+  const Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
   const std::chrono::milliseconds transport_socket_connect_timeout_;
   const std::string name_;
@@ -199,12 +199,12 @@ public:
   using FcContextMap =
       absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
                           Network::DrainableFilterChainSharedPtr, MessageUtil, MessageUtil>;
-  FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
+  FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager)
-      : address_(address), parent_context_(factory_context), init_manager_(init_manager) {}
+      : addresses_(addresses), parent_context_(factory_context), init_manager_(init_manager) {}
 
-  FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
+  FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager);
 
@@ -379,7 +379,7 @@ private:
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
 
-  const Network::Address::InstanceConstSharedPtr address_;
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addresses_;
   // This is the reference to a factory context which all the generations of listener share.
   Configuration::FactoryContext& parent_context_;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;

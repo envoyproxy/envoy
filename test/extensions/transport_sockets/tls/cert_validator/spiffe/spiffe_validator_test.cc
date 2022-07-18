@@ -239,7 +239,7 @@ TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
 
   TestSslExtendedSocketInfo info;
-  EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), &info, *cert, nullptr));
+  EXPECT_FALSE(validator().doSynchronousVerifyCertChain(store_ctx.get(), &info, *cert, nullptr));
   EXPECT_EQ(1, stats().fail_verify_error_.value());
   EXPECT_EQ(info.certificateValidationStatus(), Envoy::Ssl::ClientValidationStatus::Failed);
 }
@@ -262,7 +262,7 @@ typed_config:
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
   X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
-  EXPECT_TRUE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+  EXPECT_TRUE(validator().doSynchronousVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
   // Different trust domain so should be rejected.
   cert = readCertFromFile(TestEnvironment::substitute(
@@ -270,7 +270,7 @@ typed_config:
 
   store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
-  EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+  EXPECT_FALSE(validator().doSynchronousVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
   // Does not have san.
   cert = readCertFromFile(TestEnvironment::substitute(
@@ -278,7 +278,7 @@ typed_config:
 
   store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
-  EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+  EXPECT_FALSE(validator().doSynchronousVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
   EXPECT_EQ(2, stats().fail_verify_error_.value());
 }
@@ -304,13 +304,13 @@ typed_config:
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
   X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
-  EXPECT_TRUE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+  EXPECT_TRUE(validator().doSynchronousVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
   cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"));
   store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
-  EXPECT_TRUE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+  EXPECT_TRUE(validator().doSynchronousVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
   // Trust domain matches but it has expired.
   cert = readCertFromFile(TestEnvironment::substitute(
@@ -318,7 +318,7 @@ typed_config:
       "}}/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_cert.pem"));
   store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
-  EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+  EXPECT_FALSE(validator().doSynchronousVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
   // Does not have san.
   cert = readCertFromFile(TestEnvironment::substitute(
@@ -326,7 +326,7 @@ typed_config:
 
   store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
-  EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+  EXPECT_FALSE(validator().doSynchronousVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
   EXPECT_EQ(2, stats().fail_verify_error_.value());
 }
@@ -352,7 +352,7 @@ typed_config:
       "}}/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_cert.pem"));
   X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
-  EXPECT_TRUE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+  EXPECT_TRUE(validator().doSynchronousVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
   EXPECT_EQ(0, stats().fail_verify_error_.value());
 }
@@ -382,7 +382,7 @@ typed_config:
     matcher.set_prefix("spiffe://lyft.com/");
     setSanMatchers({matcher});
     initialize(config);
-    EXPECT_TRUE(validator().doVerifyCertChain(store_ctx.get(), &info, *cert, nullptr));
+    EXPECT_TRUE(validator().doSynchronousVerifyCertChain(store_ctx.get(), &info, *cert, nullptr));
     EXPECT_EQ(info.certificateValidationStatus(), Envoy::Ssl::ClientValidationStatus::Validated);
   }
   {
@@ -390,7 +390,7 @@ typed_config:
     matcher.set_prefix("spiffe://example.com/");
     setSanMatchers({matcher});
     initialize(config);
-    EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), &info, *cert, nullptr));
+    EXPECT_FALSE(validator().doSynchronousVerifyCertChain(store_ctx.get(), &info, *cert, nullptr));
     EXPECT_EQ(1, stats().fail_verify_error_.value());
     EXPECT_EQ(info.certificateValidationStatus(), Envoy::Ssl::ClientValidationStatus::Failed);
     stats().fail_verify_error_.reset();
@@ -423,7 +423,7 @@ typed_config:
 
   X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), intermediates));
-  EXPECT_TRUE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+  EXPECT_TRUE(validator().doSynchronousVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
   sk_X509_pop_free(intermediates, X509_free);
 }

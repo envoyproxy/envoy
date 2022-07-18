@@ -19,27 +19,40 @@ builtin:
 - envoy.matching.inputs.server_name
 - envoy.matching.inputs.transport_protocol
 - envoy.matching.inputs.application_protocol
+- envoy.matching.inputs.uri_san
+- envoy.matching.inputs.dns_san
+- envoy.matching.inputs.subject
+- envoy.regex_engines.google_re2
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
 # labels intended to make clear the trust that operators may place in
 # extensions.
 security_postures:
-# This extension is hardened against untrusted downstream traffic. It
-# assumes that the upstream is trusted.
-- robust_to_untrusted_downstream
-# This extension is hardened against both untrusted downstream and upstream
-# traffic.
-- robust_to_untrusted_downstream_and_upstream
-# This extension is not hardened and should only be used in deployments
-# where both the downstream and upstream are trusted.
-- requires_trusted_downstream_and_upstream
-# This is functionally equivalent to
-# requires_trusted_downstream_and_upstream, but acts as a placeholder to
-# allow us to identify extensions that need classifying.
-- unknown
-# Not relevant to data plane threats, e.g. stats sinks.
-- data_plane_agnostic
+- name: robust_to_untrusted_downstream
+  description: |
+    This extension is intended to be robust against untrusted downstream traffic. It
+    assumes that the upstream is trusted.
+- name: robust_to_untrusted_downstream_and_upstream
+  description: |
+    This extension is intended to be robust against both untrusted downstream and
+    upstream traffic.
+- name: requires_trusted_downstream_and_upstream
+  description: |
+    This extension is not hardened and should only be used in deployments
+    where both the downstream and upstream are trusted.
+- name: unknown
+  # This is functionally equivalent to
+  # requires_trusted_downstream_and_upstream, but acts as a placeholder to
+  # allow us to identify extensions that need classifying.
+  description: |
+    This extension has an unknown security posture and should only be
+    used in deployments where both the downstream and upstream are
+    trusted.
+- name: data_plane_agnostic
+  # Not relevant to data plane threats, e.g. stats sinks.
+  description: |
+    This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
 
 # Extension categories as defined by factories
 categories:
@@ -50,7 +63,6 @@ categories:
 - envoy.compression.decompressor
 - envoy.config.validators
 - envoy.filters.http
-- envoy.filters.http.cache
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
@@ -58,6 +70,7 @@ categories:
 - envoy.grpc_credentials
 - envoy.guarddog_actions
 - envoy.health_checkers
+- envoy.http.cache
 - envoy.http.header_validators
 - envoy.http.stateful_header_formatters
 - envoy.internal_redirect_predicates
@@ -69,6 +82,7 @@ categories:
 - envoy.quic.proof_source
 - envoy.quic.server.crypto_stream
 - envoy.rate_limit_descriptors
+- envoy.regex_engines
 - envoy.request_id
 - envoy.resource_monitors
 - envoy.retry_host_predicates
@@ -86,6 +100,7 @@ categories:
 - envoy.wasm.runtime
 - envoy.common.key_value
 - envoy.network.dns_resolver
+- envoy.network.connection_balance
 - envoy.rbac.matchers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
@@ -94,11 +109,13 @@ categories:
 - envoy.matching.network.custom_matchers
 
 status_values:
-# This extension is stable and is expected to be production usable.
-- stable
-# This extension is functional but has not had substantial production burn
-# time, use only with this caveat.
-- alpha
-# This extension is work-in-progress. Functionality is incomplete and it is
-# not intended for production use.
-- wip
+- name: stable
+  # This extension is stable and is expected to be production usable.
+  description:
+- name: alpha
+  description: |
+    This extension is functional but has not had substantial production burn time,
+    use only with this caveat.
+- name: wip
+  description: |
+    This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.

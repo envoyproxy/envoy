@@ -23,9 +23,11 @@ envoy_entry_point(
     args = [
         "--extensions_build_config=$(location :extensions_build_config)",
         "--path=%s" % PATH,
+        "-b shellcheck:$(location @com_github_aignas_rules_shellcheck//:shellcheck)",
     ],
     data = [
         ":extensions_build_config",
+        "@com_github_aignas_rules_shellcheck//:shellcheck",
     ],
     pkg = "envoy.code.check",
 )

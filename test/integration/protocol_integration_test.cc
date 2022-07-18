@@ -106,6 +106,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterNotFound) { testRouterNotFound()
 
 TEST_P(ProtocolIntegrationTest, RouterVirtualClusters) { testRouterVirtualClusters(); }
 
+TEST_P(ProtocolIntegrationTest, RouterStats) { testRouteStats(); }
+
 // Change the default route to be restrictive, and send a POST to an alternate route.
 TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
   testRouterNotFoundWithBody();
@@ -541,7 +543,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("missing_required_header"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
@@ -2733,19 +2735,15 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  if (downstreamProtocol() == Http::CodecType::HTTP1) {
-    // Because CONNECT requests for HTTP/1 do not include a path, they will fail
-    // to find a route match and return a 404.
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_EQ("404", response->headers().getStatusValue());
-    EXPECT_TRUE(response->complete());
-  } else {
-    ASSERT_TRUE(response->waitForReset());
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  }
+  // Because CONNECT requests do not include a path, they will fail
+  // to find a route match and return a 404.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+  EXPECT_TRUE(response->complete());
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ExtendedConnectIsBlocked) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_rfc_connect", "false");
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
@@ -2785,7 +2783,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "sni.lyft.com"}});
 
-  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
   EXPECT_FALSE(codec_client_->disconnected());
 }
 

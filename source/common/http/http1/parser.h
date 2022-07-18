@@ -128,18 +128,15 @@ public:
   virtual CallbackResult pause() PURE;
 
   // Returns a ParserStatus representing the internal state of the parser.
-  virtual ParserStatus getStatus() PURE;
+  virtual ParserStatus getStatus() const PURE;
 
   // Returns an integer representing the status code stored in the parser structure. For responses
   // only.
   // TODO(asraa): Return Envoy::Http::Code.
   virtual uint16_t statusCode() const PURE;
 
-  // Returns an integer representing the HTTP major version.
-  virtual int httpMajor() const PURE;
-
-  // Returns an integer representing the HTTP minor version.
-  virtual int httpMinor() const PURE;
+  // Returns whether HTTP version is 1.1.
+  virtual bool isHttp11() const PURE;
 
   // Returns the number of bytes in the body. absl::nullopt if no Content-Length header
   virtual absl::optional<uint64_t> contentLength() const PURE;

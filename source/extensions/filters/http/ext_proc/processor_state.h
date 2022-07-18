@@ -87,7 +87,6 @@ public:
   ProcessorState& operator=(const ProcessorState&) = delete;
 
   CallbackState callbackState() const { return callback_state_; }
-  void setCallbackState(CallbackState state) { callback_state_ = state; }
   void setPaused(bool paused) { paused_ = paused; }
 
   bool completeBodyAvailable() const { return complete_body_available_; }
@@ -108,8 +107,9 @@ public:
   void setHeaders(Http::RequestOrResponseHeaderMap* headers) { headers_ = headers; }
   void setTrailers(Http::HeaderMap* trailers) { trailers_ = trailers; }
 
-  void startMessageTimer(Event::TimerCb cb, std::chrono::milliseconds timeout);
-  void cleanUpTimer() const;
+  void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
+                            CallbackState callback_state);
+  void onFinishProcessorCall(CallbackState next_state = CallbackState::Idle);
 
   // Idempotent methods for watermarking the body
   virtual void requestWatermark() PURE;

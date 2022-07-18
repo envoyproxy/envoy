@@ -80,7 +80,7 @@ getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostCons
   if (options && options->serverNameOverride().has_value()) {
     sni = options->serverNameOverride().value();
   }
-  if (sni.empty()) {
+  if (sni.empty() || !host->address() || !host->address()->ip()) {
     return absl::nullopt;
   }
   return {{"https", sni, host->address()->ip()->port()}};
@@ -196,12 +196,17 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      Config::ScopedResume maybe_resume_eds_leds;
+      Config::ScopedResume maybe_resume_eds_leds_sds;
       if (cm_.adsMux()) {
-        const auto eds_type_url =
-            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-        maybe_resume_eds_leds = cm_.adsMux()->pause({eds_type_url, leds_type_url});
+
+        std::vector<std::string> paused_xds_types{
+            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>()};
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.combine_sds_requests")) {
+          paused_xds_types.push_back(
+              Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
+        }
+        maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
       }
       initializeSecondaryClusters();
     }
@@ -1888,7 +1893,6 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
-    // TODO(alyssar) remove the origin check #21345
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_concurrency_for_alpn_pool") &&
         origin.has_value()) {

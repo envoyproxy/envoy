@@ -457,11 +457,14 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
                                        envoy::config::core::v3::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {
     proto_address.mutable_pipe()->set_path(address.asString());
-  } else {
-    ASSERT(address.type() == Address::Type::Ip);
+  } else if (address.type() == Address::Type::Ip) {
     auto* socket_address = proto_address.mutable_socket_address();
     socket_address->set_address(address.ip()->addressAsString());
     socket_address->set_port_value(address.ip()->port());
+  } else {
+    ASSERT(address.type() == Address::Type::EnvoyInternal);
+    auto* internal_address = proto_address.mutable_envoy_internal_address();
+    internal_address->set_server_listener_name(address.envoyInternalAddress()->addressId());
   }
 }
 

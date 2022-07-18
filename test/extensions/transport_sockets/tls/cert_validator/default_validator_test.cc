@@ -177,10 +177,10 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
                                                  /*subject_alt_name_matchers=*/{}),
             Envoy::Ssl::ClientValidationStatus::NotValidated);
   bssl::UniquePtr<X509> cert(X509_new());
-  EXPECT_EQ(default_validator->doVerifyCertChain(/*store_ctx=*/nullptr,
-                                                 /*ssl_extended_info=*/nullptr,
-                                                 /*leaf_cert=*/*cert,
-                                                 /*transport_socket_options=*/nullptr),
+  EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/nullptr,
+                                                            /*ssl_extended_info=*/nullptr,
+                                                            /*leaf_cert=*/*cert,
+                                                            /*transport_socket_options=*/nullptr),
             0);
 }
 

@@ -15,8 +15,11 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
   // The filters to exclude in this general fuzzer. For some of them dedicated fuzzer
   // exists. See #20737 or #21141.
   static const absl::flat_hash_set<absl::string_view> exclusion_list = {
-      "envoy.ext_proc", "envoy.filters.http.alternate_protocols_cache",
-      "envoy.filters.http.composite", "envoy.filters.http.ext_proc",
+      "envoy.ext_proc",
+      "envoy.filters.http.alternate_protocols_cache",
+      "envoy.filters.http.composite",
+      "envoy.filters.http.ext_proc",
+      "envoy.ext_authz",
       "envoy.filters.http.ext_authz"};
 
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {

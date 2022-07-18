@@ -594,7 +594,11 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   initialize();
   client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(2);
   uint32_t old_port = lookupPort("http");
-  codec_client_ = makeHttpConnection(old_port);
+  auto options = std::make_shared<Network::Socket::Options>();
+  auto option = std::make_shared<Network::MockSocketOption>();
+  options->push_back(option);
+  EXPECT_CALL(*option, setOption(_, _)).Times(3u);
+  codec_client_ = makeHttpConnection(makeClientConnectionWithOptions(old_port, options));
 
   // Make sure that the port migration config is plumbed through.
   EXPECT_EQ(2u, quic::test::QuicSentPacketManagerPeer::GetNumPtosForPathDegrading(
@@ -612,6 +616,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
 
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   auto old_self_addr = quic_connection_->self_address();
+  EXPECT_CALL(*option, setOption(_, _)).Times(3u);
   quic_connection_->OnPathDegradingDetected();
   ASSERT_TRUE(quic_connection_->waitForPathResponse());
   auto self_addr = quic_connection_->self_address();

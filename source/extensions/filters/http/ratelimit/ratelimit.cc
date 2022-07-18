@@ -172,6 +172,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            empty_stat_name,
                                            empty_stat_name,
+                                           empty_stat_name,
                                            false};
     httpContext().codeStats().chargeResponseStat(info, false);
     if (config_->enableXEnvoyRateLimitedHeader()) {
@@ -269,8 +270,7 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
     vh_rate_limits_ = VhRateLimitOptions::Include;
   } else {
     const auto* specific_per_route_config =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-            "envoy.filters.http.ratelimit", route);
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
     if (specific_per_route_config != nullptr) {
       switch (specific_per_route_config->virtualHostRateLimits()) {
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:

@@ -11,8 +11,6 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -248,8 +246,8 @@ message FilterChain {
   core.v3.Metadata metadata = 5;
 
   // Optional custom transport socket implementation to use for downstream connections.
-  // To setup TLS, set a transport socket with name `envoy.transport_sockets.tls` and
-  // :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` in the `typed_config`.
+  // To setup TLS, set a transport socket with name ``envoy.transport_sockets.tls`` and
+  // :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` in the ``typed_config``.
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.
   // [#extension-category: envoy.transport_sockets.downstream]
@@ -264,7 +262,7 @@ message FilterChain {
   // Note: :ref:`filter_chain_matcher
   // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
   // requires that filter chains are uniquely named within a listener.
-  string name = 7 [(xds.annotations.v3.field_status).work_in_progress = true];
+  string name = 7;
 
   // [#not-implemented-hide:] The configuration to specify whether the filter chain will be built on-demand.
   // If this field is not empty, the filter chain will be built on-demand.
@@ -357,7 +355,6 @@ message ListenerFilter {
     // Configuration source specifier for an extension configuration discovery
     // service. In case of a failure and without the default configuration, the
     // listener closes the connections.
-    // [#not-implemented-hide:]
     core.v3.ExtensionConfigSource config_discovery = 5;
   }
 

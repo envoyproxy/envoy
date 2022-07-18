@@ -26,6 +26,9 @@ BBR
 BIDIRECTIONAL
 BSON
 BPF
+Bdecoded
+Bencoded
+GiB
 Repick
 TRA
 btree
@@ -269,6 +272,7 @@ OSI
 OSS
 OSX
 OT
+OTLP
 OU
 OVFL
 PAYLOADLEN
@@ -311,6 +315,7 @@ RFC
 RHS
 RLE
 RLS
+RLQS
 RNG
 RPC
 RSA
@@ -1259,6 +1264,7 @@ tokenizing
 toolchain
 traceid
 traceparent
+tracestate
 transcode
 transcoded
 transcoder
@@ -1370,4 +1376,5 @@ ElastiCache
 pinterest
 NSS
 SSLKEYLOGFILE
-
+DLB
+PCIE
