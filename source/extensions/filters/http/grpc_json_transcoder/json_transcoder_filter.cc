@@ -418,8 +418,8 @@ JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& messa
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
 
 void JsonTranscoderFilter::initPerRouteConfig() {
-  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<JsonTranscoderConfig>(
-      "envoy.filters.http.grpc_json_transcoder", decoder_callbacks_->route());
+  const auto* route_local =
+      Http::Utility::resolveMostSpecificPerFilterConfig<JsonTranscoderConfig>(decoder_callbacks_);
 
   per_route_config_ = route_local ? route_local : &config_;
 }
@@ -488,7 +488,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
           absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
       return Http::FilterHeadersStatus::StopIteration;
     }
-    if (checkIfTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
+    if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
@@ -511,7 +511,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   } else if (end_stream) {
     request_in_.finish();
 
-    if (checkIfTranscoderFailed(RcDetails::get().GrpcTranscodeFailedEarly)) {
+    if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailedEarly)) {
       return Http::FilterHeadersStatus::StopIteration;
     }
 
@@ -558,7 +558,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
     readToBuffer(*transcoder_->RequestOutput(), data);
   }
 
-  if (checkIfTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
+  if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
   return Http::FilterDataStatus::Continue;
@@ -656,12 +656,14 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   }
 
   readToBuffer(*transcoder_->ResponseOutput(), data);
+  if (checkAndRejectIfResponseTranscoderFailed()) {
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
 
   if (!method_->descriptor_->server_streaming() && !end_stream) {
     // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
-  // TODO(lizan): Check ResponseStatus
 
   return Http::FilterDataStatus::Continue;
 }
@@ -689,6 +691,9 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
   if (!method_->response_type_is_http_body_) {
     Buffer::OwnedImpl data;
     readToBuffer(*transcoder_->ResponseOutput(), data);
+    if (checkAndRejectIfResponseTranscoderFailed()) {
+      return;
+    }
     if (data.length()) {
       encoder_callbacks_->addEncodedData(data, true);
     }
@@ -738,7 +743,7 @@ void JsonTranscoderFilter::setEncoderFilterCallbacks(
   encoder_callbacks_ = &callbacks;
 }
 
-bool JsonTranscoderFilter::checkIfTranscoderFailed(const std::string& details) {
+bool JsonTranscoderFilter::checkAndRejectIfRequestTranscoderFailed(const std::string& details) {
   const auto& request_status = transcoder_->RequestStatus();
   if (!request_status.ok()) {
     ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
@@ -750,6 +755,25 @@ bool JsonTranscoderFilter::checkIfTranscoderFailed(const std::string& details) {
         absl::StrCat(
             details, "{",
             StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(request_status.code())),
+            "}"));
+
+    return true;
+  }
+  return false;
+}
+
+bool JsonTranscoderFilter::checkAndRejectIfResponseTranscoderFailed() {
+  const auto& response_status = transcoder_->ResponseStatus();
+  if (!response_status.ok()) {
+    ENVOY_LOG(debug, "Transcoding response error {}", response_status.ToString());
+    error_ = true;
+    encoder_callbacks_->sendLocalReply(
+        Http::Code::BadGateway,
+        absl::string_view(response_status.message().data(), response_status.message().size()),
+        nullptr, absl::nullopt,
+        absl::StrCat(
+            RcDetails::get().GrpcTranscodeFailed, "{",
+            StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(response_status.code())),
             "}"));
 
     return true;

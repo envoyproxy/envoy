@@ -20,12 +20,12 @@ class InternalClientConnectionFactory : public Network::ClientConnectionFactory,
                                         Logger::Loggable<Logger::Id::connection> {
 public:
   std::string name() const override { return "envoy_internal"; }
-  Network::ClientConnectionPtr
-  createClientConnection(Event::Dispatcher& dispatcher,
-                         Network::Address::InstanceConstSharedPtr address,
-                         Network::Address::InstanceConstSharedPtr source_address,
-                         Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  Network::ClientConnectionPtr createClientConnection(
+      Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr address,
+      Network::Address::InstanceConstSharedPtr source_address,
+      Network::TransportSocketPtr&& transport_socket,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options) override;
   // The slot is owned by the internal listener registry extension. Once that extension is
   // initialized, this slot is available. The ClientConnectionFactory has two potential user cases.
   // 1. The per worker thread connection handler populates the per worker listener registry.

@@ -30,12 +30,26 @@ const uint64_t DefaultMinimumContentLength = 30;
 
 // Default content types will be used if any is provided by the user.
 const std::vector<std::string>& defaultContentEncoding() {
-  CONSTRUCT_ON_FIRST_USE(
-      std::vector<std::string>,
-      {"text/html", "text/plain", "text/css", "application/javascript", "application/x-javascript",
-       "text/javascript", "text/x-javascript", "text/ecmascript", "text/js", "text/jscript",
-       "text/x-js", "application/ecmascript", "application/x-json", "application/xml",
-       "application/json", "image/svg+xml", "text/xml", "application/xhtml+xml"});
+  CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {"text/html",
+                                                    "text/plain",
+                                                    "text/css",
+                                                    "application/javascript",
+                                                    "application/x-javascript",
+                                                    "text/javascript",
+                                                    "text/x-javascript",
+                                                    "text/ecmascript",
+                                                    "text/js",
+                                                    "text/jscript",
+                                                    "text/x-js",
+                                                    "application/ecmascript",
+                                                    "application/x-json",
+                                                    "application/xml",
+                                                    "application/json",
+                                                    "image/svg+xml",
+                                                    "text/xml",
+                                                    "application/xhtml+xml",
+                                                    "application/grpc-web",
+                                                    "application/grpc-web+proto"});
 }
 
 // List of CompressorFilterConfig objects registered for a stream.

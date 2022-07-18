@@ -42,6 +42,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::ReturnRefOfCopy;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -130,7 +131,7 @@ public:
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return socket_factories_;
     }
-    bool bindToPort() override { return bind_to_port_; }
+    bool bindToPort() const override { return bind_to_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
     }
@@ -308,7 +309,7 @@ public:
       listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(local_address_);
     } else {
       EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
-          .WillRepeatedly(ReturnRef(address));
+          .WillRepeatedly(ReturnRefOfCopy(address));
       listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(address);
     }
     EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))
@@ -2301,55 +2302,6 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
                   &new_listener_callbacks, nullptr, mock_connection_balancer, nullptr,
                   Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
                   overridden_filter_chain_manager);
-  handler_->addListener(old_listener_tag, *new_test_listener, runtime_);
-  ASSERT_EQ(new_listener_callbacks, nullptr)
-      << "new listener should be inplace added and callback should not change";
-
-  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  current_handler->incNumConnections();
-
-  EXPECT_CALL(*mock_connection_balancer, pickTargetHandler(_))
-      .WillOnce(ReturnRef(*current_handler));
-  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
-  EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _));
-  EXPECT_CALL(*mock_connection_balancer, unregisterHandler(_));
-  old_listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
-  EXPECT_EQ(0UL, handler_->numConnections());
-  EXPECT_CALL(*old_listener, onDestroy());
-}
-
-TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdateWithoutUdpInplaceSupport) {
-  runtime_.mergeValues(
-      {{"envoy.reloadable_features.udp_listener_updates_filter_chain_in_place", "false"}});
-  InSequence s;
-  uint64_t old_listener_tag = 1;
-  uint64_t new_listener_tag = 2;
-  Network::TcpListenerCallbacks* old_listener_callbacks;
-  Network::BalancedConnectionHandler* current_handler;
-
-  auto old_listener = new NiceMock<Network::MockListener>();
-  auto mock_connection_balancer = std::make_shared<Network::MockConnectionBalancer>();
-
-  TestListener* old_test_listener =
-      addListener(old_listener_tag, true, false, "test_listener", old_listener,
-                  &old_listener_callbacks, nullptr, mock_connection_balancer, &current_handler);
-  EXPECT_CALL(old_test_listener->socketFactory(), localAddress())
-      .WillRepeatedly(ReturnRef(local_address_));
-  handler_->addListener(absl::nullopt, *old_test_listener, runtime_);
-  ASSERT_NE(old_test_listener, nullptr);
-
-  Network::TcpListenerCallbacks* new_listener_callbacks = nullptr;
-
-  auto overridden_filter_chain_manager =
-      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
-  TestListener* new_test_listener =
-      addListener(new_listener_tag, true, false, "test_listener", /* Network::Listener */ nullptr,
-                  &new_listener_callbacks, nullptr, mock_connection_balancer, nullptr,
-                  Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
-                  overridden_filter_chain_manager);
-  EXPECT_CALL(new_test_listener->socketFactory(), socketType())
-      .WillOnce(Return(Network::Socket::Type::Stream));
   handler_->addListener(old_listener_tag, *new_test_listener, runtime_);
   ASSERT_EQ(new_listener_callbacks, nullptr)
       << "new listener should be inplace added and callback should not change";

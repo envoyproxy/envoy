@@ -1,5 +1,5 @@
-Hyperscan matcher configuration
-===============================
+Hyperscan matcher
+=================
 
 .. toctree::
   :glob:

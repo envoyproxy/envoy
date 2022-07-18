@@ -22,7 +22,7 @@ class TestPauseFilter;
 
 namespace Network {
 
-class HappyEyeballsConnectionImpl;
+class MultiConnectionBaseImpl;
 
 /**
  * Utility functions for the connection implementation.
@@ -187,7 +187,7 @@ protected:
   bool bind_error_{false};
 
 private:
-  friend class HappyEyeballsConnectionImpl;
+  friend class MultiConnectionBaseImpl;
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
 
@@ -262,11 +262,14 @@ public:
                        const Address::InstanceConstSharedPtr& remote_address,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsConstSharedPtr& transport_options);
+
   ClientConnectionImpl(Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsConstSharedPtr& transport_options);
 
   // Network::ClientConnection
   void connect() override;
