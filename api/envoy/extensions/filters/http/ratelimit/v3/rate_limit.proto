@@ -52,10 +52,10 @@ message RateLimit {
   uint32 stage = 2 [(validate.rules).uint32 = {lte: 10}];
 
   // The type of requests the filter should apply to. The supported
-  // types are *internal*, *external* or *both*. A request is considered internal if
+  // types are ``internal``, ``external`` or ``both``. A request is considered internal if
   // :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is set to true. If
   // :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is not set or false, a
-  // request is considered external. The filter defaults to *both*, and it will apply to all request
+  // request is considered external. The filter defaults to ``both``, and it will apply to all request
   // types.
   string request_type = 3
       [(validate.rules).string = {in: "internal" in: "external" in: "both" in: ""}];
@@ -158,7 +158,7 @@ message RateLimitConfig {
     }
 
     // The following descriptor entry is appended when a header contains a key that matches the
-    // *header_name*:
+    // ``header_name``:
     //
     // .. code-block:: cpp
     //
@@ -247,7 +247,7 @@ message RateLimitConfig {
       // only happen if the value in the metadata is of type string.
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
 
-      // An optional value to use if *metadata_key* is empty. If not set and
+      // An optional value to use if ``metadata_key`` is empty. If not set and
       // no value is present under the metadata_key then no descriptor is generated.
       string default_value = 3;
 
