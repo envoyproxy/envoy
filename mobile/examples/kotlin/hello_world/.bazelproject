@@ -13,6 +13,7 @@ directories:
 
 import_run_configurations:
   examples/kotlin/hello_world/tools/android-studio-run-configurations/run_configuration_example_debug_x86.xml
+  examples/kotlin/hello_world/tools/android-studio-run-configurations/run_configuration_example_debug_arm64.xml
 
 targets:
   //examples/kotlin/hello_world:hello_envoy_kt
