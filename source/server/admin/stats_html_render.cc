@@ -128,12 +128,21 @@ void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHan
     response.addFragments({"\n<tr><td><form action='", path, "' method='", method, "' id='", path,
                            "' class='home-form'></form></td><td></td></tr>\n"});
   } else {
-    // Render an explicit visible submit as a link (for GET) or button (for POST).
-    const char* button_style = handler.mutates_server_state_ ? "" : " class='button-as-link'";
     response.addFragments({"\n<tr class='vert-space'><td></td><td></td></tr>\n<tr", row_class,
-                           ">\n  <td class='home-data'><form action='", path, "' method='", method,
-                           "' id='", path, "' class='home-form'>\n    <button", button_style, ">",
-                           path, "</button>\n  </form></td>\n  <td class='home-data'>",
+                           ">\n  <td class='home-data'>"});
+    if (!handler.mutates_server_state_ && handler.params_.empty()) {
+      // GET requests without parameters can be simple links rather than forms with
+      // buttons that are rendered as links. This simplification improves the
+      // usability of the page with screen-readers.
+      response.addFragments({"<a href='", path, "'>", path, "</a>"});
+    } else {
+      // Render an explicit visible submit as a link (for GET) or button (for POST).
+      const char* button_style = handler.mutates_server_state_ ? "" : " class='button-as-link'";
+      response.addFragments({"<form action='", path, "' method='", method, "' id='", path,
+                             "' class='home-form'>\n    <button", button_style, ">", path,
+                             "</button>\n  </form>"});
+    }
+    response.addFragments({"</td>\n  <td class='home-data'>",
                            Html::Utility::sanitize(handler.help_text_), "</td>\n</tr>\n"});
   }
 
