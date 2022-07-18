@@ -9,7 +9,7 @@ minor_behavior_changes:
 bug_fixes:
 - area: matching
   change: |
-    Fixed bootstrap crash when config contains stats_config configuration.
+    fixed bootstrap crash when config contains ``stats_config`` configuration.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
