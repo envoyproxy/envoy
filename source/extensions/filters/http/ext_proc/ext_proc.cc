@@ -709,7 +709,7 @@ static ProcessingMode allDisabledMode() {
 
 void Filter::mergePerRouteConfig() {
   auto&& merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
-      FilterName, decoder_callbacks_->route(),
+      decoder_callbacks_,
       [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
   if (!merged_config) {
     return;

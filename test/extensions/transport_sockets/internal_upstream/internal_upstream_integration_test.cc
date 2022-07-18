@@ -30,23 +30,23 @@ public:
       auto* cluster = static_resources->mutable_clusters()->Add();
       cluster->set_name("internal_upstream");
       // Insert internal upstream transport.
-      TestUtility::loadFromYaml(R"EOF(
-      name: envoy.transport_sockets.internal_upstream
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
-        passthrough_metadata:
-        - name: host_metadata
-          kind: { host: {}}
-        - name: cluster_metadata
-          kind: { cluster: {}}
-        passthrough_filter_state_objects:
-        - name: internal_state
-        transport_socket:
-          name: envoy.transport_sockets.raw_buffer
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
-      )EOF",
-                                *cluster->mutable_transport_socket());
+      if (use_transport_socket_) {
+        TestUtility::loadFromYaml(R"EOF(
+        name: envoy.transport_sockets.internal_upstream
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
+          passthrough_metadata:
+          - name: host_metadata
+            kind: { host: {}}
+          - name: cluster_metadata
+            kind: { cluster: {}}
+          transport_socket:
+            name: envoy.transport_sockets.raw_buffer
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+        )EOF",
+                                  *cluster->mutable_transport_socket());
+      }
       // Insert internal address endpoint.
       cluster->clear_load_assignment();
       auto* load_assignment = cluster->mutable_load_assignment();
@@ -113,12 +113,13 @@ public:
       "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
       header_name: internal-header
       state_name: internal_state
-      read_only: false
+      shared: true
     )EOF");
     HttpIntegrationTest::initialize();
   }
 
   bool add_metadata_{true};
+  bool use_transport_socket_{true};
 };
 
 TEST_F(InternalUpstreamIntegrationTest, BasicFlow) {
@@ -151,6 +152,27 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlowMissing) {
       {":path", "/"},
       {":scheme", "http"},
       {":authority", "host.com"},
+  });
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+  EXPECT_THAT(waitForAccessLog(access_log_name_), ::testing::HasSubstr("-,-,-"));
+}
+
+TEST_F(InternalUpstreamIntegrationTest, BasicFlowWithoutTransportSocket) {
+  use_transport_socket_ = false;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host.com"},
+      {"internal-header", "FOO"},
   });
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);

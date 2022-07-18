@@ -42,6 +42,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::ReturnRefOfCopy;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -100,15 +101,19 @@ public:
       // Network::UdpListenerConfig
       Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
       Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
-      Network::UdpListenerWorkerRouter& listenerWorkerRouter() override {
-        return *listener_worker_router_;
+      Network::UdpListenerWorkerRouter&
+      listenerWorkerRouter(const Network::Address::Instance& address) override {
+        auto iter = listener_worker_router_map_.find(address.asString());
+        EXPECT_NE(iter, listener_worker_router_map_.end());
+        return *iter->second;
       }
       const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
 
       const envoy::config::listener::v3::UdpListenerConfig config_;
       std::unique_ptr<Network::ActiveUdpListenerFactory> listener_factory_;
       std::unique_ptr<Network::UdpPacketWriterFactory> writer_factory_;
-      Network::UdpListenerWorkerRouterPtr listener_worker_router_;
+      absl::flat_hash_map<std::string, Network::UdpListenerWorkerRouterPtr>
+          listener_worker_router_map_;
     };
 
     // A helper to get the reference of listen socket factory.
@@ -126,7 +131,7 @@ public:
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return socket_factories_;
     }
-    bool bindToPort() override { return bind_to_port_; }
+    bool bindToPort() const override { return bind_to_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
     }
@@ -175,7 +180,7 @@ public:
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
     envoy::config::core::v3::TrafficDirection direction_;
-    Network::UdpListenerCallbacks* udp_listener_callbacks_{};
+    absl::flat_hash_map<std::string, Network::UdpListenerCallbacks*> udp_listener_callback_map_{};
   };
 
   class TestListener : public TestListenerBase {
@@ -301,9 +306,11 @@ public:
     if (address == nullptr) {
       EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
           .WillRepeatedly(ReturnRef(local_address_));
+      listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(local_address_);
     } else {
       EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
-          .WillRepeatedly(ReturnRef(address));
+          .WillRepeatedly(ReturnRefOfCopy(address));
+      listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(address);
     }
     EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))
         .WillOnce(Return(listeners_.back()->sockets_[0]));
@@ -319,15 +326,23 @@ public:
           }));
     } else {
       EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
-          .WillOnce(Invoke(
-              [listener, &test_listener = listeners_.back()](
-                  Network::SocketSharedPtr&&, Network::UdpListenerCallbacks& udp_listener_callbacks,
-                  const envoy::config::core::v3::UdpSocketConfig&) -> Network::UdpListener* {
-                test_listener->udp_listener_callbacks_ = &udp_listener_callbacks;
+          .WillOnce(
+              Invoke([listener, &test_listener = listeners_.back()](
+                         Network::SocketSharedPtr&& socket,
+                         Network::UdpListenerCallbacks& udp_listener_callbacks,
+                         const envoy::config::core::v3::UdpSocketConfig&) -> Network::UdpListener* {
+                test_listener->udp_listener_callback_map_.emplace(
+                    socket->connectionInfoProvider().localAddress()->asString(),
+                    &udp_listener_callbacks);
                 return dynamic_cast<Network::UdpListener*>(listener);
               }));
-      listeners_.back()->udp_listener_config_->listener_worker_router_ =
-          std::make_unique<Network::UdpListenerWorkerRouterImpl>(1);
+      if (address == nullptr) {
+        listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
+            local_address_->asString(), std::make_unique<Network::UdpListenerWorkerRouterImpl>(1));
+      } else {
+        listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
+            address->asString(), std::make_unique<Network::UdpListenerWorkerRouterImpl>(1));
+      }
     }
 
     if (balanced_connection_handler != nullptr) {
@@ -344,22 +359,22 @@ public:
       std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
       absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr>& connection_balancers,
       absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**>& listener_callbacks_map,
-      bool disable_listener = false) {
-    if (connection_balancers.empty()) {
+      bool disable_listener = false,
+      Network::Socket::Type socket_type = Network::Socket::Type::Stream) {
+    if (connection_balancers.empty() && socket_type == Network::Socket::Type::Stream) {
       for (auto& address : addresses) {
         connection_balancers.emplace(address->asString(),
                                      std::make_shared<Network::NopConnectionBalancerImpl>());
       }
     }
     auto test_listener = std::make_unique<TestMultiAddressesListener>(
-        *this, tag, bind_to_port, hand_off_restored_destination_connections, name,
-        Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false, access_log_,
-        connection_balancers, nullptr, ENVOY_TCP_BACKLOG_SIZE, false, mock_listeners.size());
+        *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
+        std::chrono::milliseconds(15000), false, access_log_, connection_balancers, nullptr,
+        ENVOY_TCP_BACKLOG_SIZE, false, mock_listeners.size());
     TestMultiAddressesListener* test_listener_raw_ptr = test_listener.get();
     listeners_.emplace_back(std::move(test_listener));
 
-    EXPECT_CALL(listeners_.back()->socketFactory(0), socketType())
-        .WillOnce(Return(Network::Socket::Type::Stream));
+    EXPECT_CALL(listeners_.back()->socketFactory(0), socketType()).WillOnce(Return(socket_type));
     for (std::vector<Network::Listener*>::size_type i = 0; i < mock_listeners.size(); i++) {
       EXPECT_CALL(listeners_.back()->socketFactory(i), localAddress())
           .WillRepeatedly(ReturnRef(addresses[i]));
@@ -367,17 +382,35 @@ public:
           .WillOnce(Return(listeners_.back()->sockets_[i]));
       test_listener_raw_ptr->sockets_[i]->connection_info_provider_->setLocalAddress(addresses[i]);
 
-      EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
-          .WillOnce(Invoke([i, &mock_listeners, &listener_callbacks_map](
-                               Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
-                               Runtime::Loader&, bool, bool) -> Network::Listener* {
-            auto listener_callbacks_iter = listener_callbacks_map.find(
-                socket->connectionInfoProvider().localAddress()->asString());
-            EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
-            *listener_callbacks_iter->second = &cb;
-            return mock_listeners[i];
-          }))
-          .RetiresOnSaturation();
+      if (socket_type == Network::Socket::Type::Stream) {
+        EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
+            .WillOnce(
+                Invoke([i, &mock_listeners, &listener_callbacks_map](
+                           Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
+                           Runtime::Loader&, bool, bool) -> Network::Listener* {
+                  auto listener_callbacks_iter = listener_callbacks_map.find(
+                      socket->connectionInfoProvider().localAddress()->asString());
+                  EXPECT_NE(listener_callbacks_iter, listener_callbacks_map.end());
+                  *listener_callbacks_iter->second = &cb;
+                  return mock_listeners[i];
+                }))
+            .RetiresOnSaturation();
+      } else {
+        EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
+            .WillOnce(Invoke(
+                [i, &mock_listeners, &test_listener = listeners_.back()](
+                    Network::SocketSharedPtr&& socket,
+                    Network::UdpListenerCallbacks& udp_listener_callbacks,
+                    const envoy::config::core::v3::UdpSocketConfig&) -> Network::UdpListener* {
+                  test_listener->udp_listener_callback_map_.emplace(
+                      socket->connectionInfoProvider().localAddress()->asString(),
+                      &udp_listener_callbacks);
+                  return dynamic_cast<Network::UdpListener*>(mock_listeners[i]);
+                }))
+            .RetiresOnSaturation();
+        listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
+            addresses[i]->asString(), std::make_unique<Network::MockUdpListenerWorkerRouter>());
+      }
 
       if (disable_listener) {
         EXPECT_CALL(*static_cast<Network::MockListener*>(mock_listeners[i]), disable());
@@ -2197,10 +2230,51 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilter) {
 
   // Make sure these calls don't crash.
   Network::UdpRecvData data;
-  test_listener->udp_listener_callbacks_->onData(std::move(data));
-  test_listener->udp_listener_callbacks_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
+  test_listener->udp_listener_callback_map_.find(local_address_->asString())
+      ->second->onData(std::move(data));
+  test_listener->udp_listener_callback_map_.find(local_address_->asString())
+      ->second->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
 
   EXPECT_CALL(*listener, onDestroy());
+}
+
+TEST_F(ConnectionHandlerTest, UdpListenerWorkerRouterWithMultipleAddresses) {
+  auto listener1 = new NiceMock<Network::MockUdpListener>();
+  auto listener2 = new NiceMock<Network::MockUdpListener>();
+  std::vector<Network::Listener*> mock_listeners;
+  mock_listeners.emplace_back(listener1);
+  mock_listeners.emplace_back(listener2);
+  Network::Address::InstanceConstSharedPtr address1(
+      new Network::Address::Ipv4Instance("127.0.0.1", 80, nullptr));
+  Network::Address::InstanceConstSharedPtr address2(
+      new Network::Address::Ipv4Instance("127.0.0.2", 80, nullptr));
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses;
+  addresses.emplace_back(address1);
+  addresses.emplace_back(address2);
+
+  // Using empty map here since those are useless for UDP.
+  absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map;
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
+
+  TestMultiAddressesListener* test_listener = addMultiAddrsListener(
+      1, false, false, "test_listener", mock_listeners, addresses, connection_balancers,
+      listener_callbacks_map, false, Network::Socket::Type::Datagram);
+
+  auto udp_listener_worker_router1 = static_cast<Network::MockUdpListenerWorkerRouter*>(
+      test_listener->udp_listener_config_->listener_worker_router_map_.find(address1->asString())
+          ->second.get());
+  auto udp_listener_worker_router2 = static_cast<Network::MockUdpListenerWorkerRouter*>(
+      test_listener->udp_listener_config_->listener_worker_router_map_.find(address2->asString())
+          ->second.get());
+  EXPECT_CALL(*udp_listener_worker_router1, registerWorkerForListener(_));
+  EXPECT_CALL(*udp_listener_worker_router2, registerWorkerForListener(_));
+
+  handler_->addListener(absl::nullopt, *test_listener, runtime_);
+
+  EXPECT_CALL(*udp_listener_worker_router1, unregisterWorkerForListener(_));
+  EXPECT_CALL(*udp_listener_worker_router2, unregisterWorkerForListener(_));
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*listener2, onDestroy());
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
@@ -2228,55 +2302,6 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
                   &new_listener_callbacks, nullptr, mock_connection_balancer, nullptr,
                   Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
                   overridden_filter_chain_manager);
-  handler_->addListener(old_listener_tag, *new_test_listener, runtime_);
-  ASSERT_EQ(new_listener_callbacks, nullptr)
-      << "new listener should be inplace added and callback should not change";
-
-  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  current_handler->incNumConnections();
-
-  EXPECT_CALL(*mock_connection_balancer, pickTargetHandler(_))
-      .WillOnce(ReturnRef(*current_handler));
-  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
-  EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _));
-  EXPECT_CALL(*mock_connection_balancer, unregisterHandler(_));
-  old_listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
-  EXPECT_EQ(0UL, handler_->numConnections());
-  EXPECT_CALL(*old_listener, onDestroy());
-}
-
-TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdateWithoutUdpInplaceSupport) {
-  runtime_.mergeValues(
-      {{"envoy.reloadable_features.udp_listener_updates_filter_chain_in_place", "false"}});
-  InSequence s;
-  uint64_t old_listener_tag = 1;
-  uint64_t new_listener_tag = 2;
-  Network::TcpListenerCallbacks* old_listener_callbacks;
-  Network::BalancedConnectionHandler* current_handler;
-
-  auto old_listener = new NiceMock<Network::MockListener>();
-  auto mock_connection_balancer = std::make_shared<Network::MockConnectionBalancer>();
-
-  TestListener* old_test_listener =
-      addListener(old_listener_tag, true, false, "test_listener", old_listener,
-                  &old_listener_callbacks, nullptr, mock_connection_balancer, &current_handler);
-  EXPECT_CALL(old_test_listener->socketFactory(), localAddress())
-      .WillRepeatedly(ReturnRef(local_address_));
-  handler_->addListener(absl::nullopt, *old_test_listener, runtime_);
-  ASSERT_NE(old_test_listener, nullptr);
-
-  Network::TcpListenerCallbacks* new_listener_callbacks = nullptr;
-
-  auto overridden_filter_chain_manager =
-      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
-  TestListener* new_test_listener =
-      addListener(new_listener_tag, true, false, "test_listener", /* Network::Listener */ nullptr,
-                  &new_listener_callbacks, nullptr, mock_connection_balancer, nullptr,
-                  Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
-                  overridden_filter_chain_manager);
-  EXPECT_CALL(new_test_listener->socketFactory(), socketType())
-      .WillOnce(Return(Network::Socket::Type::Stream));
   handler_->addListener(old_listener_tag, *new_test_listener, runtime_);
   ASSERT_EQ(new_listener_callbacks, nullptr)
       << "new listener should be inplace added and callback should not change";

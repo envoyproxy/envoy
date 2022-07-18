@@ -1,7 +1,10 @@
 #!/bin/bash -e
 
 export NAME=skywalking
-export DELAY=200
+export DELAY=10
+export PORT_PROXY="${SKYWALKING_PORT_PROXY:-11900}"
+export PORT_ADMIN="${SKYWALKING_PORT_ADMIN:-11901}"
+export PORT_UI="${SKYWALKING_PORT_UI:-11902}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -9,22 +12,22 @@ export DELAY=200
 run_log "Test connection"
 responds_with \
     "Hello from behind Envoy (service 1)!" \
-    http://localhost:8000/trace/1
+    "http://localhost:${PORT_PROXY}/trace/1"
 
 run_log "Test stats"
 responds_with \
     "tracing.skywalking.segments_sent: 1" \
-    http://localhost:8001/stats
+    "http://localhost:${PORT_ADMIN}/stats"
 
 run_log "Test dashboard"
 responds_with \
     "<!DOCTYPE html>" \
-    http://localhost:8080
+    "http://localhost:${PORT_UI}"
 
 run_log "Test OAP Server"
 responds_with \
     "getEndpoints" \
-    http://localhost:8080/graphql \
+    "http://localhost:${PORT_UI}/graphql" \
     -X POST \
     -H "Content-Type:application/json" \
     -d "{ \"query\": \"query queryEndpoints(\$serviceId: ID!, \$keyword: String!) {
@@ -38,7 +41,7 @@ responds_with \
 
 responds_with \
     "currentTimestamp" \
-    http://localhost:8080/graphql \
+    "http://localhost:${PORT_UI}/graphql" \
     -X POST \
     -H "Content-Type:application/json" \
     -d "{ \"query\": \"query queryOAPTimeInfo {

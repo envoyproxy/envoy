@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/transport_socket_config.h"

@@ -10,6 +10,7 @@
 #include "source/common/network/matching/data_impl.h"
 #include "source/common/network/matching/inputs.h"
 #include "source/common/network/socket_interface.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/server/configuration_impl.h"
 
@@ -194,10 +195,10 @@ bool PerFilterChainFactoryContextImpl::isQuicListener() const {
 }
 
 FilterChainManagerImpl::FilterChainManagerImpl(
-    const Network::Address::InstanceConstSharedPtr& address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
     Configuration::FactoryContext& factory_context, Init::Manager& init_manager,
     const FilterChainManagerImpl& parent_manager)
-    : address_(address), parent_context_(factory_context), origin_(&parent_manager),
+    : addresses_(addresses), parent_context_(factory_context), origin_(&parent_manager),
       init_manager_(init_manager) {}
 
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
@@ -220,17 +221,19 @@ void FilterChainManagerImpl::addFilterChains(
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' contains "
-                                       "unimplemented fields",
-                                       address_->asString(), filter_chain->name()));
+      throw EnvoyException(fmt::format(
+          "error adding listener '{}': filter chain '{}' contains "
+          "unimplemented fields",
+          absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain->name()));
     }
     if (!filter_chain_matcher) {
       const auto& matching_iter = filter_chains.find(filter_chain_match);
       if (matching_iter != filter_chains.end()) {
-        throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' has "
-                                         "the same matching rules defined as '{}'",
-                                         address_->asString(), filter_chain->name(),
-                                         matching_iter->second));
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': filter chain '{}' has "
+                        "the same matching rules defined as '{}'",
+                        absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()),
+                        filter_chain->name(), matching_iter->second));
       }
       filter_chains.insert({filter_chain_match, filter_chain->name()});
     }
@@ -250,14 +253,14 @@ void FilterChainManagerImpl::addFilterChains(
       if (filter_chain->name().empty()) {
         throw EnvoyException(fmt::format(
             "error adding listener '{}': \"name\" field is required when using a listener matcher",
-            address_->asString()));
+            absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
       }
       auto [_, inserted] =
           filter_chains_by_name.try_emplace(filter_chain->name(), filter_chain_impl);
       if (!inserted) {
-        throw EnvoyException(
-            fmt::format("error adding listener '{}': \"name\" field is duplicated with value '{}'",
-                        address_->asString(), filter_chain->name()));
+        throw EnvoyException(fmt::format(
+            "error adding listener '{}': \"name\" field is duplicated with value '{}'",
+            absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain->name()));
       }
       if (filter_chain->has_filter_chain_match()) {
         ENVOY_LOG(debug, "filter chain match in chain '{}' is ignored", filter_chain->name());
@@ -288,7 +291,7 @@ void FilterChainManagerImpl::addFilterChains(
           throw EnvoyException(
               fmt::format("error adding listener '{}': partial wildcards are not supported in "
                           "\"server_names\"",
-                          address_->asString()));
+                          absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
         }
         server_names.push_back(absl::AsciiStrToLower(server_name));
       }
@@ -512,9 +515,10 @@ void FilterChainManagerImpl::addFilterChainForSourcePorts(
     // If we got here and found already configured branch, then it means that this FilterChainMatch
     // is a duplicate, and that there is some overlap in the repeated fields with already processed
     // FilterChainMatches.
-    throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                     "overlapping matching rules are defined",
-                                     address_->asString()));
+    throw EnvoyException(
+        fmt::format("error adding listener '{}': multiple filter chains with "
+                    "overlapping matching rules are defined",
+                    absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
   }
 }
 

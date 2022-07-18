@@ -5,9 +5,9 @@ services:
       context: .
       dockerfile: Dockerfile-zstd
     ports:
-      - "9901:9901"
-      - "9902:9902"
-      - "10000:10000"
+    - "${PORT_PROXY:-10000}:10000"
+    - "${PORT_ADMIN0:-9901}:9901"
+    - "${PORT_ADMIN1:-9902}:9902"
 
   service:
     build:
