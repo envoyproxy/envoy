@@ -1460,7 +1460,6 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
   ProtobufWkt::Any source_any;
   source_any.PackFrom(src_duration);
   ProtobufWkt::Duration dst_duration;
-  // Expects unpack succeeds.
   EXPECT_TRUE(MessageUtil::unpackToNoThrow(source_any, dst_duration).ok());
   // Source and destination are expected to be equal.
   EXPECT_EQ(src_duration, dst_duration);
