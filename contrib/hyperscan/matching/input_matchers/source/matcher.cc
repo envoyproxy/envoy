@@ -75,7 +75,7 @@ bool Matcher::match(absl::string_view value) const {
       },
       &matched);
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
-    ENVOY_LOG_MISC(error, "unable to scan, error code {}", err);
+    IS_ENVOY_BUG(fmt::format("unable to scan, error code {}", err));
   }
 
   return matched;
@@ -97,7 +97,7 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
       },
       &bounds);
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
-    ENVOY_LOG_MISC(error, "unable to scan, error code {}", err);
+    IS_ENVOY_BUG(fmt::format("unable to scan, error code {}", err));
     return std::string(value);
   }
 
