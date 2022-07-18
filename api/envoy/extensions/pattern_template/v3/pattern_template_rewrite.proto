@@ -12,7 +12,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/pat
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Pattern Template Matcher]
-// [#extension: envoy.pattern_template]
+// [#extension: envoy.pattern_template.pattern_template_predicate]
 // Indicates that during forwarding, portions of the path that match the
 // pattern should be rewritten, even allowing the substitution of variables
 // from the match pattern into the new path as specified by the rewrite template.
