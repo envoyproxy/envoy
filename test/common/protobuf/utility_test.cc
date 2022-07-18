@@ -1460,10 +1460,9 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
   ProtobufWkt::Any source_any;
   source_any.PackFrom(src_duration);
   ProtobufWkt::Duration dst_duration;
-  auto error_msg = MessageUtil::unpackToNoThrow(source_any, dst_duration);
-  // No error message was returned.
-  EXPECT_FALSE(error_msg.has_value());
-  // source and destination are equal.
+  // Expects unpack succeeds.
+  EXPECT_TRUE(MessageUtil::unpackToNoThrow(source_any, dst_duration).ok());
+  // Source and destination are expected to be equal.
   EXPECT_EQ(src_duration, dst_duration);
 }
 
@@ -1474,9 +1473,9 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
-  auto error_msg = MessageUtil::unpackToNoThrow(source_any, dst);
-  ASSERT_TRUE(error_msg.has_value());
-  EXPECT_THAT(error_msg.value(),
+  auto status = MessageUtil::unpackToNoThrow(source_any, dst);
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status.message(),
               testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
                                      "\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
 }

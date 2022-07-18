@@ -364,10 +364,10 @@ public:
    * @param any_message source google.protobuf.Any message.
    * @param message destination to unpack to.
    *
-   * @return erro message if the message does not unpack.
+   * @return ProtobufUtil::Status.
    */
-  static absl::optional<std::string> unpackToNoThrow(const ProtobufWkt::Any& any_message,
-                                                     Protobuf::Message& message);
+  static ProtobufUtil::Status unpackToNoThrow(const ProtobufWkt::Any& any_message,
+                                              Protobuf::Message& message);
 
   /**
    * Convert from google.protobuf.Any to bytes as std::string
