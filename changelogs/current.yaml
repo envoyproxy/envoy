@@ -7,7 +7,9 @@ minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: matching
+  change: |
+    Fixed bootstrap crash when config contains `stats_config` configuration.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

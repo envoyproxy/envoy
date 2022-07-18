@@ -37,5 +37,41 @@ TEST_P(RegexEngineIntegrationTest, GoogleRE2) {
   EXPECT_NO_THROW(Regex::Utility::parseRegex(matcher));
 };
 
+class RegexEngineIntegrationTestWithStatsMatcher
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public BaseIntegrationTest {
+public:
+  RegexEngineIntegrationTestWithStatsMatcher() : BaseIntegrationTest(GetParam(), config()) {}
+
+  static std::string config() {
+    return absl::StrCat(ConfigHelper::baseConfigNoListeners(), R"EOF(
+stats_config:
+  histogram_bucket_settings:
+  - match:
+      safe_regex:
+        regex: "^.*_size$"
+    buckets: [1, 64, 128]
+
+default_regex_engine:
+  name: envoy.regex_engines.google_re2
+  typed_config:
+    '@type': type.googleapis.com/envoy.extensions.regex_engines.v3.GoogleRE2
+    )EOF");
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RegexEngineIntegrationTestWithStatsMatcher,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(RegexEngineIntegrationTestWithStatsMatcher, GoogleRE2) {
+  initialize();
+
+  envoy::type::matcher::v3::RegexMatcher matcher;
+  *matcher.mutable_regex() = ".*";
+
+  EXPECT_NO_THROW(Regex::Utility::parseRegex(matcher));
+};
+
 } // namespace
 } // namespace Envoy
