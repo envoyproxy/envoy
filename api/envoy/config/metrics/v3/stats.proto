@@ -299,7 +299,7 @@ message HistogramBucketSettings {
   }];
 }
 
-// Stats configuration proto schema for built-in *envoy.stat_sinks.statsd* sink. This sink does not support
+// Stats configuration proto schema for built-in ``envoy.stat_sinks.statsd`` sink. This sink does not support
 // tagged metrics.
 // [#extension: envoy.stat_sinks.statsd]
 message StatsdSink {
@@ -348,7 +348,7 @@ message StatsdSink {
   string prefix = 3;
 }
 
-// Stats configuration proto schema for built-in *envoy.stat_sinks.dog_statsd* sink.
+// Stats configuration proto schema for built-in ``envoy.stat_sinks.dog_statsd`` sink.
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_v3_api_msg_config.metrics.v3.StatsConfig>`.
@@ -380,7 +380,7 @@ message DogStatsdSink {
   google.protobuf.UInt64Value max_bytes_per_datagram = 4 [(validate.rules).uint64 = {gt: 0}];
 }
 
-// Stats configuration proto schema for built-in *envoy.stat_sinks.hystrix* sink.
+// Stats configuration proto schema for built-in ``envoy.stat_sinks.hystrix`` sink.
 // The sink emits stats in `text/event-stream
 // <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
 // formatted stream for use by `Hystrix dashboard
@@ -401,7 +401,7 @@ message HystrixSink {
   // in the process). The sink then outputs the aggregate statistics across the
   // current rolling window to the event stream(s).
   //
-  // rolling_window(ms) = stats_flush_interval(ms) * num_of_buckets
+  // ``rolling_window(ms)`` = ``stats_flush_interval(ms)`` * ``num_of_buckets``
   //
   // More detailed explanation can be found in `Hystrix wiki
   // <https://github.com/Netflix/Hystrix/wiki/Metrics-and-Monitoring#hystrixrollingnumber>`_.

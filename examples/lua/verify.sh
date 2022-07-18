@@ -10,7 +10,7 @@ export PORT_WEB="${LUA_PORT_WEB:-11231}"
 
 run_log "Test connection"
 responds_with \
-    foo \
+    "Foo: bar" \
     "http://localhost:${PORT_PROXY}"
 
 # TODO(phlax): Add some docs/tests for web service
