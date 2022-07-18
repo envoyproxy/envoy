@@ -32,7 +32,7 @@ message StringMatcher {
     //
     // Examples:
     //
-    // * *abc* only matches the value *abc*.
+    // * ``abc`` only matches the value ``abc``.
     string exact = 1;
 
     // The input string must have the prefix specified here.
@@ -40,7 +40,7 @@ message StringMatcher {
     //
     // Examples:
     //
-    // * *abc* matches the value *abc.xyz*
+    // * ``abc`` matches the value ``abc.xyz``
     string prefix = 2 [(validate.rules).string = {min_len: 1}];
 
     // The input string must have the suffix specified here.
@@ -48,7 +48,7 @@ message StringMatcher {
     //
     // Examples:
     //
-    // * *abc* matches the value *xyz.abc*
+    // * ``abc`` matches the value ``xyz.abc``
     string suffix = 3 [(validate.rules).string = {min_len: 1}];
 
     // The input string must match the regular expression specified here.
@@ -59,13 +59,13 @@ message StringMatcher {
     //
     // Examples:
     //
-    // * *abc* matches the value *xyz.abc.def*
+    // * ``abc`` matches the value ``xyz.abc.def``
     string contains = 7 [(validate.rules).string = {min_len: 1}];
   }
 
   // If true, indicates the exact/prefix/suffix/contains matching should be case insensitive. This
   // has no effect for the safe_regex match.
-  // For example, the matcher *data* will match both input string *Data* and *data* if set to true.
+  // For example, the matcher ``data`` will match both input string ``Data`` and ``data`` if set to true.
   bool ignore_case = 6;
 }
 
