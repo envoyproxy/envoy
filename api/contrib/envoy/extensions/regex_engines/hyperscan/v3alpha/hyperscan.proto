@@ -21,29 +21,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // `pattern support <https://intel.github.io/hyperscan/dev-reference/compilation.html#pattern-support>`_.
 // The syntax is not compatible with the default RE2 regex engine. Depending on configured
 // expressions, swapping regex engine may cause match rules to no longer be valid.
-// [#next-free-field: 7]
 message Hyperscan {
-  reserved 4;
-
-  // Matching will be performed case-insensitively.
-  //
-  // The expression may still use PCRE tokens (notably `(?i)` and `(?-i)`) to switch
-  // case-insensitive matching on and off.
-  bool case_insensitive = 1;
-
-  // Matching a `.` will include newlines.
-  bool dot_includes_newlines = 2;
-
-  // `^` and `$` anchors match any newlines in data.
-  bool multiline = 3;
-
-  // Treat the pattern as a sequence of UTF-8 characters.
-  bool utf8 = 5;
-
-  // Use Unicode properties for character classes.
-  //
-  // This option instructs Hyperscan to use Unicode properties, rather than the default ASCII
-  // interpretations, for character mnemonics like `\w` and `\s` as well as the POSIX character
-  // classes. It is only meaningful in conjunction with `utf8`.
-  bool unicode_property_escapes = 6;
 }

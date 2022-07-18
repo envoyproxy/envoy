@@ -1,5 +1,3 @@
-#include <memory>
-
 #ifndef HYPERSCAN_DISABLED
 #include "source/common/thread_local/thread_local_impl.h"
 
@@ -15,7 +13,7 @@ namespace Hyperscan {
 
 class EngineTest : public ::testing::Test {
 protected:
-  void setup() { engine_ = std::make_shared<HyperscanEngine>(0, instance_); }
+  void setup() { engine_ = std::make_shared<HyperscanEngine>(instance_); }
 
   void TearDown() override {
     instance_.shutdownGlobalThreading();

@@ -11,11 +11,10 @@ namespace Hyperscan {
 
 class HyperscanEngine : public Envoy::Regex::Engine {
 public:
-  HyperscanEngine(unsigned int flag, ThreadLocal::SlotAllocator& tls);
+  explicit HyperscanEngine(ThreadLocal::SlotAllocator& tls);
   Envoy::Regex::CompiledMatcherPtr matcher(const std::string& regex) const override;
 
 private:
-  unsigned int flag_{};
   ThreadLocal::SlotAllocator& tls_;
 };
 

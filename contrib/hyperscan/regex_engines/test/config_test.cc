@@ -8,18 +8,10 @@ namespace Extensions {
 namespace Regex {
 namespace Hyperscan {
 
-constexpr absl::string_view yaml_string = R"EOF(
-{}
-)EOF";
-
 class ConfigTest : public ::testing::Test {
 protected:
-  void setup(const std::string& param = "") {
+  void setup() {
     envoy::extensions::regex_engines::hyperscan::v3alpha::Hyperscan config;
-    if (!param.empty()) {
-      TestUtility::loadFromYaml(fmt::format(std::string(yaml_string), param), config);
-    }
-
     Config factory;
     engine_ = factory.createEngine(config, context_);
   }
@@ -31,7 +23,7 @@ protected:
 #ifdef HYPERSCAN_DISABLED
 // Verify that incompatible architecture will cause a throw.
 TEST_F(ConfigTest, IncompatibleArchitecture) {
-  EXPECT_THROW_WITH_MESSAGE(setup(""), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(setup(), EnvoyException,
                             "X86_64 architecture is required for Hyperscan.");
 }
 #else
@@ -43,16 +35,6 @@ TEST_F(ConfigTest, Regex) {
 
   EXPECT_TRUE(matcher->match("/asdf/1"));
   EXPECT_FALSE(matcher->match("/ASDF/1"));
-};
-
-// Verify that matching will be performed case-insensitively.
-TEST_F(ConfigTest, RegexWithParam) {
-  setup("case_insensitive: true");
-
-  Envoy::Regex::CompiledMatcherPtr matcher = engine_->matcher("^/asdf/.+");
-
-  EXPECT_TRUE(matcher->match("/asdf/1"));
-  EXPECT_TRUE(matcher->match("/ASDF/1"));
 };
 #endif
 
