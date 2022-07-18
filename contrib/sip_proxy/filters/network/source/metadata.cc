@@ -128,6 +128,10 @@ void MessageMetadata::addXEnvoyOriginIngressHeader(IngressID ingress_id) {
   addNewMsgHeader(HeaderType::XEnvoyOriginIngress, ingress_id.toHeaderValue());
 }
 
+void MessageMetadata::removeXEnvoyOriginIngressHeader() {
+  removeMsgHeader(HeaderType::XEnvoyOriginIngress);
+}
+
 void MessageMetadata::addNewMsgHeader(HeaderType type,  absl::string_view value) {
   if (new_headers_pos_ == 0) {
     // place new headers before the content headers
@@ -141,6 +145,15 @@ void MessageMetadata::addNewMsgHeader(HeaderType type,  absl::string_view value)
   setOperation(
     Operation(OperationType::Insert, new_headers_pos_, 
     InsertOperationValue(std::move(header))));
+}
+
+void MessageMetadata::removeMsgHeader(HeaderType type) {
+  auto init_removal_pos = raw_msg_.find(HeaderTypes::get().header2Str(type).data());
+  auto end_removal_pos = raw_msg_.find("\r\n", init_removal_pos);
+  if ((init_removal_pos != std::string::npos) && (end_removal_pos != std::string::npos)) {
+    auto len_removal = end_removal_pos - init_removal_pos;
+    setOperation(Operation(OperationType::Delete, init_removal_pos, DeleteOperationValue(len_removal)));
+  }
 }
 
 void MessageMetadata::addEPOperation(

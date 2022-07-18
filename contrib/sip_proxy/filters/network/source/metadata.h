@@ -179,7 +179,9 @@ public:
   };
 
   void addXEnvoyOriginIngressHeader(IngressID ingress_id);
+  void removeXEnvoyOriginIngressHeader();
   void addNewMsgHeader(HeaderType type,  absl::string_view value);
+  void removeMsgHeader(HeaderType type);
 
   void addEPOperation(
       size_t raw_offset, absl::string_view& header, HeaderType type,

@@ -293,9 +293,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   // - move this somewhere more appropriate??
   // - only add the header if does not already exist - / need to revisit this - see security considerations
   // - only add the header if the outbound-transactions feature is enabled for the cluster (may need to move this to the router where we have the route config)
-  if (metadata->msgType() == MsgType::Request)  {
-    metadata->addXEnvoyOriginIngressHeader(callbacks_->ingressID());
-  }
+  metadata->addXEnvoyOriginIngressHeader(callbacks_->ingressID());
   
   if (upstream_request_ != nullptr) {
     return FilterStatus::Continue;
@@ -786,6 +784,9 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
     ENVOY_LOG(debug, "Got upstream request from host={},cluster={}. For downstream-connection={}",
               parent_.getUpstreamHost()->hostname(),  parent_.route()->routeEntry()->clusterName(), downstream_conn_id);
+
+    // remove the X-Envoy-Origin-Ingress header before pushing it
+    metadata->removeXEnvoyOriginIngressHeader();
 
     // pass the destination and route, so responses to this request have affinity 
     // to upstream host where we recvd this request from
