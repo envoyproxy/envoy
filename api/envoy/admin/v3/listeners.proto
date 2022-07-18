@@ -15,7 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Listeners]
 
-// Admin endpoint uses this wrapper for `/listeners` to display listener status information.
+// Admin endpoint uses this wrapper for ``/listeners`` to display listener status information.
 // See :ref:`/listeners <operations_admin_interface_listeners>` for more information.
 message Listeners {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.Listeners";

@@ -14,11 +14,12 @@ services:
       context: .
       dockerfile: Dockerfile-envoy
     ports:
-    - "80-81:80"
-    - "8081:8081"
+    - "${PORT_PROXY0:-80}-${PORT_PROXY0:-81}:80"
+    - "${PORT_ADMIN:-8081}:8081"
 
   http_service:
-    image: flask_service:python-3.10-slim-bullseye
+    build:
+      context: ../shared/service
     volumes:
     - ./service.py:/code/service.py
 
@@ -28,5 +29,3 @@ services:
       dockerfile: Dockerfile-lrs
     volumes:
     - /go/src/github.com/envoyproxy/envoy/examples/load-reporting-service
-    ports:
-    - "18000:18000"

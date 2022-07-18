@@ -32,8 +32,8 @@ Change to the ``examples/wasm-cc`` folder in the Envoy repo, and start the compo
 
     $ pwd
     envoy/examples/wasm-cc
-    $ docker-compose build --pull
-    $ docker-compose up -d
+    $ docker-compose pull
+    $ docker-compose up --build -d
     $ docker-compose ps
 
         Name                     Command                State             Ports

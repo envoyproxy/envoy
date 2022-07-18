@@ -20,7 +20,7 @@ Following are supported JWT alg:
 Configuration
 -------------
 
-This filter should be configured with the name *envoy.filters.http.jwt_authn*.
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication``.
 
 This HTTP :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>` has two fields:
 

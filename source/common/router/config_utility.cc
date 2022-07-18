@@ -143,6 +143,8 @@ Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
     return Http::Code::ServiceUnavailable;
   case envoy::config::route::v3::RouteAction::NOT_FOUND:
     return Http::Code::NotFound;
+  case envoy::config::route::v3::RouteAction::INTERNAL_SERVER_ERROR:
+    return Http::Code::InternalServerError;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

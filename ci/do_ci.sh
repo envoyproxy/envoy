@@ -8,7 +8,7 @@ set -e
 build_setup_args=""
 if [[ "$1" == "format" || "$1" == "fix_proto_format" || "$1" == "check_proto_format" || "$1" == "docs" ||  \
           "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" \
-          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "verify_build_examples" \
+          || "$1" == "deps" || "$1" == "verify_examples" \
           || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
 fi
@@ -450,23 +450,6 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@"
   exit 0
-elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
-  # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
-  # build when compiled with Clang 5. Revisit when Coverity Scan explicitly
-  # supports Clang 5. Until this issue is resolved, run Coverity Scan with
-  # the GCC toolchain.
-  setup_gcc_toolchain
-  echo "bazel Coverity Scan build"
-  echo "Building..."
-  /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel build --action_env=LD_PRELOAD "${BAZEL_BUILD_OPTIONS[@]}" \
-    -c opt "${ENVOY_BUILD_TARGET}"
-  # tar up the coverity results
-  tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz -C "${ENVOY_BUILD_DIR}" cov-int
-  # Copy the Coverity results somewhere that we can access outside of the container.
-  cp -f \
-     "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
-     "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   setup_clang_toolchain
   FUZZ_TEST_TARGETS=("$(bazel query "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
@@ -488,6 +471,7 @@ elif [[ "$CI_TARGET" == "check_proto_format" ]]; then
   echo "Run protoxform test"
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
         --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
         //tools/protoprint:protoprint_test
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check
   exit 0
@@ -513,7 +497,12 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
 
   echo "check dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check -- -v warn
+  # Using todays date as an action_env expires the NIST cache daily, which is the update frequency
+  TODAY_DATE=$(date -u -I"date")
+  export TODAY_DATE
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
+        --action_env=TODAY_DATE \
+        -- -v warn
 
   # Run pip requirements tests
   echo "check pip..."
@@ -521,7 +510,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  run_ci_verify "*" "wasm-cc|win32-front-proxy|shared"
+  run_ci_verify "*" "win32-front-proxy|shared"
   exit 0
 elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
@@ -531,9 +520,6 @@ elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     fi
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
     exit 0
-elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
-  run_ci_verify wasm-cc
-  exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
   exit 1

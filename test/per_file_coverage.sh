@@ -69,6 +69,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/health_checkers/redis:95.7"
 "source/extensions/io_socket:96.2"
 "source/extensions/io_socket/user_space:96.2"
+"source/extensions/network/dns_resolver/getaddrinfo:96.3"
 "source/extensions/rate_limit_descriptors:95.5"
 "source/extensions/rate_limit_descriptors/expr:95.5"
 "source/extensions/stat_sinks/common:96.4"

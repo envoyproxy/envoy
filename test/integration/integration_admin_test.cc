@@ -330,10 +330,11 @@ TEST_P(IntegrationAdminTest, Admin) {
   auto listeners = test_server_->server().listenerManager().listeners();
   auto listener_it = listeners.cbegin();
   for (; listener_it != listeners.end(); ++listener_it) {
-    EXPECT_THAT(response->body(),
-                HasSubstr(fmt::format(
-                    "{}::{}", listener_it->get().name(),
-                    listener_it->get().listenSocketFactory().localAddress()->asString())));
+    for (auto& socket_factory : listener_it->get().listenSocketFactories()) {
+      EXPECT_THAT(response->body(),
+                  HasSubstr(fmt::format("{}::{}", listener_it->get().name(),
+                                        socket_factory->localAddress()->asString())));
+    }
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/listeners?format=json", response));
@@ -352,6 +353,21 @@ TEST_P(IntegrationAdminTest, Admin) {
               socket_address->getString("address"));
     EXPECT_EQ(listener_it->get().listenSocketFactory().localAddress()->ip()->port(),
               socket_address->getInteger("port_value"));
+
+    std::vector<Json::ObjectSharedPtr> additional_local_addresses =
+        (*listener_info_it)->getObjectArray("additional_local_addresses");
+    for (std::vector<Json::ObjectSharedPtr>::size_type i = 0; i < additional_local_addresses.size();
+         i++) {
+      auto socket_address = additional_local_addresses[i]->getObject("socket_address");
+      EXPECT_EQ(listener_it->get()
+                    .listenSocketFactories()[i + 1]
+                    ->localAddress()
+                    ->ip()
+                    ->addressAsString(),
+                socket_address->getString("address"));
+      EXPECT_EQ(listener_it->get().listenSocketFactories()[i + 1]->localAddress()->ip()->port(),
+                socket_address->getInteger("port_value"));
+    }
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
