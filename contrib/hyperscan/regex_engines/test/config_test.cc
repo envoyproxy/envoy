@@ -47,7 +47,7 @@ TEST_F(ConfigTest, Regex) {
 
 // Verify that matching will be performed case-insensitively.
 TEST_F(ConfigTest, RegexWithParam) {
-  setup("caseless: true");
+  setup("case_insensitive: true");
 
   Envoy::Regex::CompiledMatcherPtr matcher = engine_->matcher("^/asdf/.+");
 
