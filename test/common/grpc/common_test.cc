@@ -55,6 +55,13 @@ TEST(GrpcContextTest, GetGrpcStatusWithFallbacks) {
 
   NiceMock<StreamInfo::MockStreamInfo> info_without_code;
   EXPECT_FALSE(Common::getGrpcStatus(no_status_trailers, no_status_headers, info_without_code));
+
+  NiceMock<StreamInfo::MockStreamInfo> info_with_local_reply;
+  EXPECT_CALL(info, localReplyGrpcStatus())
+      .WillRepeatedly(testing::Return(Status::FailedPrecondition));
+  EXPECT_CALL(info, responseCode()).WillRepeatedly(testing::Return(400));
+  EXPECT_EQ(Status::FailedPrecondition,
+            Common::getGrpcStatus(no_status_trailers, no_status_headers, info).value());
 }
 
 TEST(GrpcContextTest, GetGrpcMessage) {

@@ -90,10 +90,14 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::ResponseTra
   // in order:
   //   1. trailers gRPC status, if it exists.
   //   2. headers gRPC status, if it exists.
-  //   3. Inferred from info HTTP status, if it exists.
-  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
+  //   3. gRPC status set by local reply, if it exists.
+  //   4. Inferred from info HTTP status, if it exists.
+  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 4> optional_statuses = {{
       {Grpc::Common::getGrpcStatus(trailers, allow_user_defined)},
       {Grpc::Common::getGrpcStatus(headers, allow_user_defined)},
+      {info.localReplyGrpcStatus()
+           ? absl::optional<Grpc::Status::GrpcStatus>(info.localReplyGrpcStatus())
+           : absl::nullopt},
       {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
                                  Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
                            : absl::nullopt},

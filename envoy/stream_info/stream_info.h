@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/http/request_id_extension.h"
@@ -461,6 +462,11 @@ public:
   virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 
   /**
+   * @param status the gRPC status set from the local reply.
+   */
+  virtual void setLocalReplyGrpcStatus(Grpc::Status::GrpcStatus status) PURE;
+
+  /**
    * @param connection_termination_details the termination details string to set for this
    * connection.
    */
@@ -518,6 +524,11 @@ public:
    * @return the response code.
    */
   virtual absl::optional<uint32_t> responseCode() const PURE;
+
+  /**
+   * @return the gRPC status set in the local reply.
+   */
+  virtual absl::optional<Grpc::Status::GrpcStatus> localReplyGrpcStatus() const PURE;
 
   /**
    * @return the response code details.
