@@ -282,6 +282,17 @@ public:
     alternate_getifaddrs_ = alternate_getifaddrs;
   }
 
+  /**
+   * @see man getaddrinfo
+   */
+  virtual SysCallIntResult getaddrinfo(const char* node, const char* service, const addrinfo* hints,
+                                       addrinfo** res) PURE;
+
+  /**
+   * @see man freeaddrinfo
+   */
+  virtual void freeaddrinfo(addrinfo* res) PURE;
+
 protected:
   absl::optional<AlternateGetifaddrs> alternate_getifaddrs_{};
 };

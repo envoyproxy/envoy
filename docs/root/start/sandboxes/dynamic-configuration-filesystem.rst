@@ -31,8 +31,8 @@ This should also start two upstream ``HTTP`` echo servers, ``service1`` and ``se
 
     $ pwd
     envoy/examples/dynamic-config-fs
-    $ docker-compose build --pull
-    $ docker-compose up -d
+    $ docker-compose pull
+    $ docker-compose up --build -d
     $ docker-compose ps
 
            Name                            Command                State                     Ports

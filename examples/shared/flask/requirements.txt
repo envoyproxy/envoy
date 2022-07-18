@@ -8,9 +8,9 @@ click==8.0.4 \
     --hash=sha256:6a7a62563bbfabfda3a38f3023a1db4a35978c0abd76f6c9605ecd6554d6d9b1 \
     --hash=sha256:8458d7b1287c5fb128c90e23381cf99dcde74beaf6c7ff6384ce84d6fe090adb
     # via flask
-flask==2.1.2 \
-    --hash=sha256:315ded2ddf8a6281567edb27393010fe3406188bafbfe65a3339d5787d89e477 \
-    --hash=sha256:fad5b446feb0d6db6aec0c3184d16a8c1f6c3e464b511649c8918a9be100b4fe
+flask==2.1.3 \
+    --hash=sha256:15972e5017df0575c3d6c090ba168b6db90259e620ac8d7ea813a396bad5b6cb \
+    --hash=sha256:9013281a7402ad527f8fd56375164f3aa021ecfaff89bfe3825346c24f87e04c
     # via -r requirements.in
 itsdangerous==2.1.1 \
     --hash=sha256:7b7d3023cd35d9cb0c1fd91392f8c95c6fa02c59bf8ad64b8849be3401b95afb \
