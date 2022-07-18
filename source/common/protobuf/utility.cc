@@ -562,15 +562,15 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
   }
 }
 
-ProtobufUtil::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
-                                                  Protobuf::Message& message) {
+absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
+                                          Protobuf::Message& message) {
   if (!any_message.UnpackTo(&message)) {
-    return ProtobufUtil::Status(google::protobuf::util::StatusCode::kInternal,
-                                "Unable to unpack as " + message.GetDescriptor()->full_name() +
-                                    ": " + any_message.DebugString());
+    return {absl::StatusCode::kInternal, "Unable to unpack as " +
+                                             message.GetDescriptor()->full_name() + ": " +
+                                             any_message.DebugString()};
   }
   // Ok Status is returned if `UnpackTo` succeeded.
-  return ProtobufUtil::OkStatus();
+  return absl::OkStatus();
 }
 
 void MessageUtil::jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest) {

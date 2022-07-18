@@ -35,6 +35,7 @@
 #include "test/proto/sensitive.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -1460,7 +1461,7 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
   ProtobufWkt::Any source_any;
   source_any.PackFrom(src_duration);
   ProtobufWkt::Duration dst_duration;
-  EXPECT_TRUE(MessageUtil::unpackToNoThrow(source_any, dst_duration).ok());
+  EXPECT_THAT(MessageUtil::unpackToNoThrow(source_any, dst_duration), StatusHelpers::IsOk());
   // Source and destination are expected to be equal.
   EXPECT_EQ(src_duration, dst_duration);
 }
@@ -1473,8 +1474,8 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
   auto status = MessageUtil::unpackToNoThrow(source_any, dst);
-  EXPECT_FALSE(status.ok());
-  EXPECT_THAT(status.message(),
+  EXPECT_EQ(status.code(), ProtobufUtil::StatusCode::kInternal);
+  EXPECT_THAT(std::string(status.message()),
               testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
                                      "\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
 }

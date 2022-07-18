@@ -14,6 +14,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/singleton/const_singleton.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/str_join.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
@@ -364,10 +365,10 @@ public:
    * @param any_message source google.protobuf.Any message.
    * @param message destination to unpack to.
    *
-   * @return ProtobufUtil::Status.
+   * @return absl::Status
    */
-  static ProtobufUtil::Status unpackToNoThrow(const ProtobufWkt::Any& any_message,
-                                              Protobuf::Message& message);
+  static absl::Status unpackToNoThrow(const ProtobufWkt::Any& any_message,
+                                      Protobuf::Message& message);
 
   /**
    * Convert from google.protobuf.Any to bytes as std::string
