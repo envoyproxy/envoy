@@ -4,8 +4,8 @@ gRPC HTTP/1.1 bridge
 ====================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v3 API reference <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`
-* This filter should be configured with the name *envoy.filters.http.grpc_http1_bridge*.
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.grpc_http1_bridge.v3.Config``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.grpc_http1_bridge.v3.Config>`
 
 This is a simple filter which enables the bridging of an HTTP/1.1 client which does not support
 response trailers to a compliant gRPC server. It works by doing the following:

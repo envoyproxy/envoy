@@ -147,7 +147,7 @@ pkg_files(
         "root/**/*.rst",
         "root/**/*.svg",
         "root/**/*.yaml",
-    ]),
+    ]) + ["root/_pygments/style.py"],
     strip_prefix = "/docs/root",
 )
 
