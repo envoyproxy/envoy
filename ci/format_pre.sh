@@ -51,10 +51,11 @@ bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 CURRENT=spelling
 "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
 
-# TODO(phlax): move these to bazel rules
-CURRENT=check_format_test
-"${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
-
+# TODO(phlax): move clang/buildifier checks to bazel rules (/aspects)
+if [[ -n "$AZP_BRANCH" ]]; then
+    CURRENT=check_format_test
+    "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
+fi
 
 fix_format () {
     echo "Fixing format..."
@@ -72,9 +73,13 @@ if [[ "${#FAILED[@]}" -ne "0" ]]; then
     done
     if [[ $(git status --porcelain) ]]; then
         git diff > "$DIFF_OUTPUT"
-        echo
-        echo "Diff file with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline."
-        echo
+        echo >&2
+        echo "Applying the following diff should fix (some) problems" >&2
+        echo >&2
+        cat "$DIFF_OUTPUT" >&2
+        echo >&2
+        echo "Diff file with (some) fixes will be uploaded. Please check the artefacts for this PR run in the azure pipeline." >&2
+        echo >&2
     fi
     exit 1
 fi

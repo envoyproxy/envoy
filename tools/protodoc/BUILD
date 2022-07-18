@@ -1,6 +1,7 @@
+load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
-load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_jinja_env", "envoy_py_data")
 
@@ -15,9 +16,10 @@ py_binary(
     deps = [":protodoc"],
 )
 
-envoy_proto_library(
+py_proto_library(
     name = "manifest_proto",
     srcs = ["manifest.proto"],
+    deps = ["@com_google_protobuf//:protobuf_python"],
 )
 
 envoy_py_data(
@@ -32,11 +34,9 @@ py_binary(
     data = ["@envoy_api//:v3_proto_set"],
     deps = [
         requirement("envoy.base.utils"),
-        ":manifest_proto_py_proto",
+        ":manifest_proto",
         ":protodoc_manifest_untyped",
-        "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
-        "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
-        "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
+        "@com_google_protobuf//:protobuf_python",
     ],
 )
 
@@ -109,7 +109,6 @@ py_binary(
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
-        "@com_google_protobuf//:protobuf_python",
         requirement("envoy.code.check"),
     ],
 )

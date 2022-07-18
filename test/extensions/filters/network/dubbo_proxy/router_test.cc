@@ -484,7 +484,7 @@ TEST_F(DubboRouterTest, ClusterMaintenanceMode) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
         EXPECT_FALSE(end_stream);
       }));
-  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
+  EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, NoHealthyHosts) {
@@ -505,7 +505,7 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
         EXPECT_FALSE(end_stream);
       }));
 
-  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
+  EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, PoolConnectionFailureWithOnewayMessage) {
@@ -537,7 +537,7 @@ TEST_F(DubboRouterTest, NoRoute) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
         EXPECT_FALSE(end_stream);
       }));
-  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
+  EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, NoCluster) {
@@ -556,7 +556,7 @@ TEST_F(DubboRouterTest, NoCluster) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
         EXPECT_FALSE(end_stream);
       }));
-  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
+  EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRequest) {

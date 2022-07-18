@@ -3,6 +3,8 @@
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -77,7 +79,8 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
 
 ScopedRouteInfo::ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration config_proto,
                                  ConfigConstSharedPtr route_config)
-    : config_proto_(config_proto), route_config_(route_config) {
+    : config_proto_(config_proto), route_config_(route_config),
+      config_hash_(MessageUtil::hash(config_proto)) {
   // TODO(stevenzzzz): Maybe worth a KeyBuilder abstraction when there are more than one type of
   // Fragment.
   for (const auto& fragment : config_proto_.key().fragments()) {

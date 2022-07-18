@@ -219,8 +219,8 @@ TEST_F(CompressorFilterTest, DefaultConfigValues) {
   EXPECT_EQ(30, config_->requestDirectionConfig().minimumLength());
   EXPECT_EQ(false, config_->responseDirectionConfig().disableOnEtagHeader());
   EXPECT_EQ(false, config_->responseDirectionConfig().removeAcceptEncodingHeader());
-  EXPECT_EQ(18, config_->responseDirectionConfig().contentTypeValues().size());
-  EXPECT_EQ(18, config_->requestDirectionConfig().contentTypeValues().size());
+  EXPECT_EQ(20, config_->responseDirectionConfig().contentTypeValues().size());
+  EXPECT_EQ(20, config_->requestDirectionConfig().contentTypeValues().size());
 }
 
 TEST_F(CompressorFilterTest, CompressRequest) {

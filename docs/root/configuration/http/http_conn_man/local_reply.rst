@@ -19,7 +19,7 @@ The local response content returned by Envoy can be customized. A list of :ref:`
 
 Example of a LocalReplyConfig
 
-.. code-block::
+.. code-block:: yaml
 
   mappers:
   - filter:
@@ -53,7 +53,7 @@ Optionally, content-type can be modified further via :ref:`content_type <envoy_v
 
 Example of a LocalReplyConfig with ``body_format`` field.
 
-.. code-block::
+.. code-block:: yaml
 
   mappers:
   - filter:

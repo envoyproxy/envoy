@@ -100,6 +100,11 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
   }
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathTemplate: {
+    route = std::make_shared<PathTemplateRouteEntryImpl>(vhost, route_config, optional_http_filters,
+                                                         factory_context, validator);
+    break;
+  }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // throw the error below.
   }
@@ -522,7 +527,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       total_cluster_weight_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 100UL)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 0UL)),
       request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
                                                       route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
@@ -568,7 +573,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   // the criteria from the route.
   if (route.route().cluster_specifier_case() ==
       envoy::config::route::v3::RouteAction::ClusterSpecifierCase::kWeightedClusters) {
-    ASSERT(total_cluster_weight_ > 0);
 
     uint64_t total_weight = 0UL;
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
@@ -581,10 +585,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
 
-    if (total_weight != total_cluster_weight_) {
+    if (total_cluster_weight_ > 0 && total_weight != total_cluster_weight_) {
       throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
                                        total_cluster_weight_));
     }
+
+    total_cluster_weight_ = total_weight;
   } else if (route.route().cluster_specifier_case() ==
              envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
                  kInlineClusterSpecifierPlugin) {
@@ -1372,6 +1378,35 @@ void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
   if (cfg) {
     cb(*cfg);
   }
+}
+
+PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    const OptionalHttpFilters& optional_http_filters,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator)
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      path_template_(route.match().path_template()),
+      path_matcher_(Matchers::PathMatcher::createPattern(path_template_, !case_sensitive_)) {}
+
+void PathTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
+                                                   bool insert_envoy_original_path) const {
+  finalizePathHeader(headers, path_template_, insert_envoy_original_path);
+}
+
+absl::optional<std::string> PathTemplateRouteEntryImpl::currentUrlPathAfterRewrite(
+    const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_template_);
+}
+
+RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                        const StreamInfo::StreamInfo& stream_info,
+                                                        uint64_t random_value) const {
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
+      path_matcher_->match(headers.getPathValue())) {
+    return clusterEntry(headers, random_value);
+  }
+  return nullptr;
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(

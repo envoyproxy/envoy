@@ -508,14 +508,6 @@ void transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers);
 void transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers, absl::string_view upgrade);
 
 /**
- * The non template implementation of resolveMostSpecificPerFilterConfig. see
- * resolveMostSpecificPerFilterConfig for docs.
- */
-const Router::RouteSpecificFilterConfig*
-resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
-                                          const Router::RouteConstSharedPtr& route);
-
-/**
  * Retrieves the route specific config. Route specific config can be in a few
  * places, that are checked in order. The first config found is returned. The
  * order is:
@@ -526,28 +518,21 @@ resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
  * To use, simply:
  *
  *     const auto* config =
- *         Utility::resolveMostSpecificPerFilterConfig<ConcreteType>(FILTER_NAME,
- * stream_callbacks_.route());
+ *         Utility::resolveMostSpecificPerFilterConfig<ConcreteType>(stream_callbacks_);
  *
  * See notes about config's lifetime below.
  *
- * @param filter_name The name of the filter who's route config should be
- * fetched.
- * @param route The route to check for route configs. nullptr routes will
- * result in nullptr being returned.
+ * @param callbacks The stream filter callbacks to check for route configs.
  *
  * @return The route config if found. nullptr if not found. The returned
- * pointer's lifetime is the same as the route parameter.
+ * pointer's lifetime is the same as the matched route.
  */
 template <class ConfigType>
-const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_name,
-                                                     const Router::RouteConstSharedPtr& route) {
+const ConfigType* resolveMostSpecificPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-  if (!route) {
-    return nullptr;
-  }
-  return dynamic_cast<const ConfigType*>(route->mostSpecificPerFilterConfig(filter_name));
+  ASSERT(callbacks != nullptr);
+  return dynamic_cast<const ConfigType*>(callbacks->mostSpecificPerFilterConfig());
 }
 
 /**
@@ -562,24 +547,23 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_n
  */
 template <class ConfigType>
 absl::optional<ConfigType>
-getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteConstSharedPtr& route,
+getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
                          std::function<void(ConfigType&, const ConfigType&)> reduce) {
   static_assert(std::is_copy_constructible<ConfigType>::value,
                 "ConfigType must be copy constructible");
+  ASSERT(callbacks != nullptr);
 
   absl::optional<ConfigType> merged;
 
-  if (route) {
-    route->traversePerFilterConfig(
-        filter_name, [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
-          const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-          if (!merged) {
-            merged.emplace(*typed_cfg);
-          } else {
-            reduce(merged.value(), *typed_cfg);
-          }
-        });
-  }
+  callbacks->traversePerFilterConfig(
+      [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
+        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+        if (!merged) {
+          merged.emplace(*typed_cfg);
+        } else {
+          reduce(merged.value(), *typed_cfg);
+        }
+      });
 
   return merged;
 }

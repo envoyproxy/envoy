@@ -19,6 +19,11 @@ exports_files([
     "exported_symbols.txt",
 ])
 
+sh_library(
+    name = "volatile_env",
+    srcs = ["volatile_env.sh"],
+)
+
 genrule(
     name = "gnu_build_id",
     outs = ["gnu_build_id.ldscript"],
@@ -316,6 +321,11 @@ selects.config_setting_group(
         ":disable_http3_setting",
         ":boringssl_fips",
     ],
+)
+
+config_setting(
+    name = "disable_admin_html",
+    values = {"define": "admin_html=disabled"},
 )
 
 config_setting(

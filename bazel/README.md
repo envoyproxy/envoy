@@ -370,6 +370,16 @@ target from [`cc_binary`](https://docs.bazel.build/versions/master/be/c-cpp.html
 or pass [`--strip=always`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--strip)
 instead.
 
+# Running the built Envoy binary on the host system
+
+After Envoy is built, it can be executed via CLI.
+
+For example, if Envoy was built using the `bazel build -c opt //source/exe:envoy-static` command, then it can be executed from the project's root directory by running:
+
+```console
+$(bazel info bazel-genfiles)/source/exe/envoy-static --config-path /path/to/your/envoy/config.yaml
+```
+
 # Testing Envoy with Bazel
 
 All the Envoy tests can be built and run with:
@@ -665,6 +675,7 @@ The following optional features can be disabled on the Bazel build command-line:
   tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
 * http3/quic with --//bazel:http3=False
+* admin HTML home page with `--define=admin_html=disabled`
 
 ## Enabling optional features
 
@@ -998,5 +1009,5 @@ slower cache performance on macOS due to slow disk performance on Docker for Mac
 Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
 
 ```
---remote_http_cache=http://127.0.0.1:28080/
+--remote_cache=http://127.0.0.1:28080/
 ```
