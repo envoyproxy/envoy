@@ -6,7 +6,6 @@ Development Tools
 .. toctree::
   :maxdepth: 2
 
-  tulsi
   intellij
 
 This documentation outlines additional tools that may prove useful when
