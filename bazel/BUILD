@@ -302,6 +302,27 @@ config_setting(
 )
 
 bool_flag(
+    name = "guarddog",
+    build_setting_default = True,
+    visibility = ["//visibility:private"],
+)
+
+config_setting(
+    name = "disable_guarddog_setting",
+    flag_values = {
+        ":guarddog": "False",
+    },
+    visibility = ["//visibility:private"],
+)
+
+selects.config_setting_group(
+    name = "disable_guarddog",
+    match_any = [
+        ":disable_guarddog_setting",
+    ],
+)
+
+bool_flag(
     name = "http3",
     build_setting_default = True,
     visibility = ["//visibility:private"],

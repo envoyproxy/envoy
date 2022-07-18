@@ -21,6 +21,7 @@ load(
     _envoy_select_admin_html = "envoy_select_admin_html",
     _envoy_select_admin_no_html = "envoy_select_admin_no_html",
     _envoy_select_boringssl = "envoy_select_boringssl",
+    _envoy_select_enable_guarddog = "envoy_select_enable_guarddog",
     _envoy_select_enable_http3 = "envoy_select_enable_http3",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
@@ -212,6 +213,7 @@ envoy_select_admin_html = _envoy_select_admin_html
 envoy_select_admin_no_html = _envoy_select_admin_no_html
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_google_grpc = _envoy_select_google_grpc
+envoy_select_enable_guarddog = _envoy_select_enable_guarddog
 envoy_select_enable_http3 = _envoy_select_enable_http3
 envoy_select_hot_restart = _envoy_select_hot_restart
 envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests

@@ -55,7 +55,9 @@
 #include "source/server/admin/utils.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/connection_handler_impl.h"
+#ifdef ENVOY_ENABLE_GUARDDOG
 #include "source/server/guarddog_impl.h"
+#endif
 #include "source/server/listener_hooks.h"
 #include "source/server/ssl_context_manager.h"
 
@@ -731,12 +733,14 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     bootstrap_extension->onServerInitialized();
   }
 
+#ifdef ENVOY_ENABLE_GUARDDOG
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   main_thread_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
       stats_store_, config_.mainThreadWatchdogConfig(), *api_, "main_thread");
   worker_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
       stats_store_, config_.workerWatchdogConfig(), *api_, "workers");
+#endif
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
@@ -902,13 +906,17 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
+#ifdef ENVOY_ENABLE_GUARDDOG
   auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
                                                          "main_thread", *dispatcher_);
+#endif
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
+#ifdef ENVOY_ENABLE_GUARDDOG
   main_thread_guard_dog_->stopWatching(watchdog);
   watchdog.reset();
+#endif
 
   terminate();
 }

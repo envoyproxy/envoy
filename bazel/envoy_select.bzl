@@ -45,6 +45,13 @@ def envoy_select_enable_http3(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if the guard dog is enabled in the current build.
+def envoy_select_enable_guarddog(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_guarddog": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if hot restart is enabled in the current build.
 def envoy_select_hot_restart(xs, repository = ""):
     return select({

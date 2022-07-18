@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_guarddog",
     "envoy_select_enable_http3",
     "envoy_select_hot_restart",
 )
@@ -577,7 +578,6 @@ envoy_cc_library(
         ":active_raw_udp_listener_config",
         ":configuration_lib",
         ":connection_handler_lib",
-        ":guarddog_lib",
         ":listener_hooks_lib",
         ":listener_manager_lib",
         ":ssl_context_manager_lib",
@@ -633,7 +633,7 @@ envoy_cc_library(
         "//source/server/admin:admin_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_guarddog([":guarddog_lib"]),
 )
 
 envoy_cc_library(
