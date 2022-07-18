@@ -89,8 +89,8 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
       som_database_, value.data(), value.size(), 0, scratch_,
       [](unsigned int, unsigned long long from, unsigned long long to, unsigned int,
          void* context) -> int {
-        std::vector<Bound>* founds = static_cast<std::vector<Bound>*>(context);
-        founds->push_back({from, to});
+        std::vector<Bound>* bounds = static_cast<std::vector<Bound>*>(context);
+        bounds->push_back({from, to});
 
         // Continue searching.
         return 0;
