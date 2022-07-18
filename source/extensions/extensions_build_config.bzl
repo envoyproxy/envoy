@@ -353,7 +353,7 @@ EXTENSIONS = {
     #
     # Pattern Template
     #
-    "envoy.pattern_template": "//source/extensions/pattern_template:config",
+    "envoy.pattern_template.pattern_template_predicate": "//source/extensions/pattern_template:config",
 
     #
     # Header Validators
