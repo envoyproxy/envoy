@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+import "google/protobuf/duration.proto";
+
+message SetRouteFilterConfig {
+  string cluster_override = 1;
+  google.protobuf.Duration idle_timeout_override = 2;
+}
