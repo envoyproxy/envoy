@@ -312,10 +312,10 @@ message RedisProxy {
 
   // If a username is provided an ACL style AUTH command will be required with a username and password.
   // Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
-  // AUTH command <https://redis.io/commands/auth>`_ with this username and the *downstream_auth_password*
+  // AUTH command <https://redis.io/commands/auth>`_ with this username and the ``downstream_auth_password``
   // before enabling any other command. If an AUTH command's username and password matches this username
-  // and the *downstream_auth_password* , an "OK" response will be returned to the client. If the AUTH
-  // command username or password does not match this username or the *downstream_auth_password*, then an
+  // and the ``downstream_auth_password`` , an "OK" response will be returned to the client. If the AUTH
+  // command username or password does not match this username or the ``downstream_auth_password``, then an
   // "WRONGPASS invalid username-password pair" error will be returned. If any other command is received before AUTH when this
   // password is set, then a "NOAUTH Authentication required." error response will be sent to the
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
