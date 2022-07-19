@@ -68,12 +68,12 @@ message DiscoveryRequest {
   repeated string resource_names = 3;
 
   // [#not-implemented-hide:]
-  // Alternative to *resource_names* field that allows specifying dynamic
+  // Alternative to ``resource_names`` field that allows specifying dynamic
   // parameters along with each resource name. Clients that populate this
   // field must be able to handle responses from the server where resources
   // are wrapped in a Resource message.
   // Note that it is legal for a request to have some resources listed
-  // in *resource_names* and others in *resource_locators*.
+  // in ``resource_names`` and others in ``resource_locators``.
   repeated ResourceLocator resource_locators = 7;
 
   // Type of the resource that is being requested, e.g.
@@ -90,7 +90,7 @@ message DiscoveryRequest {
   string response_nonce = 5;
 
   // This is populated when the previous :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`
-  // failed to update configuration. The *message* field in *error_details* provides the Envoy
+  // failed to update configuration. The ``message`` field in ``error_details`` provides the Envoy
   // internal exception related to the failure. It is only intended for consumption during manual
   // debugging, the string provided is not guaranteed to be stable across Envoy versions.
   google.rpc.Status error_detail = 6;
@@ -180,9 +180,9 @@ message DeltaDiscoveryRequest {
   config.core.v3.Node node = 1;
 
   // Type of the resource that is being requested, e.g.
-  // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This does not need to be set if
-  // resources are only referenced via *xds_resource_subscribe* and
-  // *xds_resources_unsubscribe*.
+  // ``type.googleapis.com/envoy.api.v2.ClusterLoadAssignment``. This does not need to be set if
+  // resources are only referenced via ``xds_resource_subscribe`` and
+  // ``xds_resources_unsubscribe``.
   string type_url = 2;
 
   // DeltaDiscoveryRequests allow the client to add or remove individual
@@ -212,17 +212,17 @@ message DeltaDiscoveryRequest {
   repeated string resource_names_unsubscribe = 4;
 
   // [#not-implemented-hide:]
-  // Alternative to *resource_names_subscribe* field that allows specifying dynamic parameters
+  // Alternative to ``resource_names_subscribe`` field that allows specifying dynamic parameters
   // along with each resource name.
   // Note that it is legal for a request to have some resources listed
-  // in *resource_names_subscribe* and others in *resource_locators_subscribe*.
+  // in ``resource_names_subscribe`` and others in ``resource_locators_subscribe``.
   repeated ResourceLocator resource_locators_subscribe = 8;
 
   // [#not-implemented-hide:]
-  // Alternative to *resource_names_unsubscribe* field that allows specifying dynamic parameters
+  // Alternative to ``resource_names_unsubscribe`` field that allows specifying dynamic parameters
   // along with each resource name.
   // Note that it is legal for a request to have some resources listed
-  // in *resource_names_unsubscribe* and others in *resource_locators_unsubscribe*.
+  // in ``resource_names_unsubscribe`` and others in ``resource_locators_unsubscribe``.
   repeated ResourceLocator resource_locators_unsubscribe = 9;
 
   // Informs the server of the versions of the resources the xDS client knows of, to enable the
@@ -242,7 +242,7 @@ message DeltaDiscoveryRequest {
   string response_nonce = 6;
 
   // This is populated when the previous :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`
-  // failed to update configuration. The *message* field in *error_details*
+  // failed to update configuration. The ``message`` field in ``error_details``
   // provides the Envoy internal exception related to the failure.
   google.rpc.Status error_detail = 7;
 }
@@ -346,13 +346,13 @@ message Resource {
   }
 
   // The resource's name, to distinguish it from others of the same type of resource.
-  // Only one of *name* or *resource_name* may be set.
+  // Only one of ``name`` or ``resource_name`` may be set.
   string name = 3;
 
-  // Alternative to the *name* field, to be used when the server supports
+  // Alternative to the ``name`` field, to be used when the server supports
   // multiple variants of the named resource that are differentiated by
   // dynamic parameter constraints.
-  // Only one of *name* or *resource_name* may be set.
+  // Only one of ``name`` or ``resource_name`` may be set.
   ResourceName resource_name = 8;
 
   // The aliases are a list of other names that this resource can go by.

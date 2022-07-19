@@ -75,7 +75,7 @@ message UdpProxyConfig {
   google.protobuf.Duration idle_timeout = 3;
 
   // Use the remote downstream IP address as the sender IP address when sending packets to upstream hosts.
-  // This option requires Envoy to be run with the *CAP_NET_ADMIN* capability on Linux.
+  // This option requires Envoy to be run with the ``CAP_NET_ADMIN`` capability on Linux.
   // And the IPv6 stack must be enabled on Linux kernel.
   // This option does not preserve the remote downstream port.
   // If this option is enabled, the IP address of sent datagrams will be changed to the remote downstream IP address.

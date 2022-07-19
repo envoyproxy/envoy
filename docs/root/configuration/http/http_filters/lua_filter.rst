@@ -56,8 +56,8 @@ API.
 Configuration
 -------------
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
-* This filter should be configured with the name *envoy.filters.http.lua*.
 
 A simple example of configuring Lua HTTP filter that contains only :ref:`default source code
 <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>` is as follow:
@@ -514,6 +514,8 @@ timestamp()
 High resolution timestamp function. *format* is an optional enum parameter to indicate the format of the timestamp.
 *EnvoyTimestampResolution.MILLISECOND* is supported
 The function returns timestamp in milliseconds since epoch by default if format is not set.
+
+.. _config_http_filters_lua_stream_handle_api_timestamp_string:
 
 timestampString()
 ^^^^^^^^^^^^^^^^^

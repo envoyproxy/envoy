@@ -4,8 +4,8 @@
 OAuth2
 ======
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2>`
-* This filter should be configured with the name *envoy.filters.http.oauth2*.
 
 The OAuth filter's flow involves:
 
