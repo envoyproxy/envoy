@@ -1458,6 +1458,20 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
+// Validate that the pending resolutions stat is reset.
+TEST_P(DnsImplTest, PendingResolutions) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {{"201.134.56.7"}}, {}, absl::nullopt));
+
+  checkStats(0 /*resolve_total*/, 1 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/);
+}
+
 TEST_P(DnsImplTest, WithNoRecord) {
   EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Only));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
