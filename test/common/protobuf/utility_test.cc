@@ -1474,7 +1474,7 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
   auto status = MessageUtil::unpackToNoThrow(source_any, dst);
-  EXPECT_FALSE(status.ok());
+  EXPECT_TRUE(absl::IsInternal(status));
   EXPECT_THAT(std::string(status.message()),
               testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
                                      "\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
