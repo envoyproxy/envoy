@@ -533,6 +533,7 @@ public:
    * Parameters for createClusterInfo().
    */
   struct CreateClusterInfoParams {
+    Server::Configuration::ServerFactoryContext& server_context_;
     Server::Admin& admin_;
     Runtime::Loader& runtime_;
     const envoy::config::cluster::v3::Cluster& cluster_;
@@ -546,7 +547,6 @@ public:
     Singleton::Manager& singleton_manager_;
     ThreadLocal::SlotAllocator& tls_;
     ProtobufMessage::ValidationVisitor& validation_visitor_;
-    Api::Api& api_;
     const Server::Options& options_;
     AccessLog::AccessLogManager& access_log_manager_;
   };

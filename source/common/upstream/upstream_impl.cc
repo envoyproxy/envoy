@@ -801,7 +801,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
-    const envoy::config::cluster::v3::Cluster& config,
+    Server::Configuration::ServerFactoryContext&, const envoy::config::cluster::v3::Cluster& config,
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
     bool added_via_api, Server::Configuration::TransportSocketFactoryContext& factory_context)
@@ -1081,6 +1081,7 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
 }
 
 ClusterImplBase::ClusterImplBase(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, TimeSource& time_source)
@@ -1101,8 +1102,8 @@ ClusterImplBase::ClusterImplBase(
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = factory_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
-      new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
-                          std::move(socket_matcher), std::move(stats_scope), added_via_api,
+      new ClusterInfoImpl(server_context, cluster, factory_context.clusterManager().bindConfig(),
+                          runtime, std::move(socket_matcher), std::move(stats_scope), added_via_api,
                           factory_context),
       [&dispatcher](const ClusterInfoImpl* self) {
         ENVOY_LOG(trace, "Schedule destroy cluster info {}", self->name());
