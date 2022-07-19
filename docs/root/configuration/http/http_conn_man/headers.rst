@@ -577,15 +577,15 @@ used to delimit variable names.
 All HTTP :ref:`Command Operators <config_access_log_command_operators>` used for access logging may be specified
 in Custom request/response headers. However, depending where a particular Command Operator is used, the context needed for
 the Operator may not be available and the produced output is empty string. For example, the following configuration
-uses %RESPONSE_CODE% operator to modify request headers using code from the response.
+uses ``%RESPONSE_CODE%`` operator to modify request headers using code from the response.
 The output is an empty string, because request headers are modified
 before the request is sent upstream and the response is not received yet.
 
-    .. code-block:: none
+.. code-block:: yaml
 
-      request_headers_to_add:
-        - header:
-            key: "response-code"
-            value: "%RESPONSE_CODE%"
-          append: true
+   request_headers_to_add:
+     - header:
+         key: "response-code"
+         value: "%RESPONSE_CODE%"
+       append: true
 
