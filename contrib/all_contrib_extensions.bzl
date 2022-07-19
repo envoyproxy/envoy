@@ -9,12 +9,14 @@ def envoy_contrib_linux_x86_64_constraints():
 
 ARM64_SKIP_CONTRIB_TARGETS = [
     "envoy.tls.key_providers.cryptomb",
+    "envoy.tls.key_providers.qat",
     "envoy.matching.input_matchers.hyperscan",
     "envoy.network.connection_balance.dlb",
     "envoy.regex_engines.hyperscan",
 ]
 PPC_SKIP_CONTRIB_TARGETS = [
     "envoy.tls.key_providers.cryptomb",
+    "envoy.tls.key_providers.qat",
     "envoy.matching.input_matchers.hyperscan",
     "envoy.network.connection_balance.dlb",
     "envoy.regex_engines.hyperscan",

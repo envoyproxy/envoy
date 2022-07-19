@@ -1,5 +1,5 @@
-Hyperscan regex engine configuration
-====================================
+Hyperscan regex engine
+======================
 
 .. toctree::
   :glob:
