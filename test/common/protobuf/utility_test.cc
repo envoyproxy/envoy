@@ -1461,7 +1461,7 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
   ProtobufWkt::Any source_any;
   source_any.PackFrom(src_duration);
   ProtobufWkt::Duration dst_duration;
-  EXPECT_THAT(MessageUtil::unpackToNoThrow(source_any, dst_duration), StatusHelpers::IsOk());
+  EXPECT_OK(MessageUtil::unpackToNoThrow(source_any, dst_duration));
   // Source and destination are expected to be equal.
   EXPECT_EQ(src_duration, dst_duration);
 }
@@ -1474,7 +1474,7 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
   auto status = MessageUtil::unpackToNoThrow(source_any, dst);
-  EXPECT_EQ(status.code(), ProtobufUtil::StatusCode::kInternal);
+  EXPECT_FALSE(status.ok());
   EXPECT_THAT(std::string(status.message()),
               testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
                                      "\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
