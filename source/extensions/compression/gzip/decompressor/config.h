@@ -42,7 +42,7 @@ private:
 };
 
 class GzipDecompressorLibraryFactory
-    : public Common::Decompressor::DecompressorLibraryFactoryBase<
+    : public Compression::Common::Decompressor::DecompressorLibraryFactoryBase<
           envoy::extensions::compression::gzip::decompressor::v3::Gzip> {
 public:
   GzipDecompressorLibraryFactory() : DecompressorLibraryFactoryBase(gzipExtensionName()) {}
