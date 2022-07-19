@@ -22,7 +22,7 @@ removed_config_or_runtime:
 new_features:
 - area: header_formatters
   change: |
-    all access log formatters can be used as custom request/response headers. Custom header's syntax is parsed using access logger's parser and 
+    all access log formatters can be used as custom request/response headers. Custom header's syntax is parsed using access logger's parser and
     header values are obtained using access log's substitution formatters. This feature can be reversed by setting runtime guard
     ``envoy.reloadable_features.unified_header_formatter`` to false.
 - area: listener
