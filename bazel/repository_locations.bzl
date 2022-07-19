@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "3.19.4"
+PROTOBUF_VERSION = "3.20.1"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,10 +8,11 @@ PROTOBUF_VERSION = "3.19.4"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "95584939e733bdd6ffb8245616b2071f565cd4c28163b6c21c8f936a9ee20861",
-    linux_x86_64 = "058d29255a08f8661c8096c92961f3676218704cbd516d3916ec468e139cbd87",
-    osx_x86_64 = "d8b55cf1e887917dd43c447d77bd5bd213faff1e18ac3a176b35558d86f7ffff",
-    win64 = "828d2bdfe410e988cfc46462bcabd34ffdda8cc172867989ec647eadc55b03b5",
+    linux_aarch_64 = "8a5a51876259f934cd2acc2bc59dba0e9a51bd631a5c37a4b9081d6e4dbc7591",
+    linux_x86_64 = "3a0e900f9556fbcac4c3a913a00d07680f0fdf6b990a341462d822247b265562",
+    osx_aarch_64 = "b362acae78542872bb6aac8dba73aaf0dc6e94991b8b0a065d6c3e703fec2a8b",
+    osx_x86_64 = "b4f36b18202d54d343a66eebc9f8ae60809a2a96cc2d1b378137550bbe4cf33c",
+    win64 = "897bf86b9c989f91c4171c7f99e3886fedfceb077a94dd150f1401cfe922cd46",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -712,11 +713,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "ba0650be1b169d24908eeddbe6107f011d8df0da5b1a5a4449a913b10e578faf",
+        sha256 = "3a400163728db996e8e8d21c7dfb3c239df54d0813270f086c4030addeae2fad",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-all-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2022-01-28",
+        release_date = "2022-04-22",
         cpe = "cpe:2.3:a:google:protobuf:*",
     ),
     grpc_httpjson_transcoding = dict(
