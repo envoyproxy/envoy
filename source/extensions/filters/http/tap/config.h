@@ -22,7 +22,7 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
       const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& base_context) override;
 };
 
 } // namespace TapFilter

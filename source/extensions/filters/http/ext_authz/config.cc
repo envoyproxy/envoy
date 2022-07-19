@@ -21,7 +21,8 @@ namespace ExtAuthz {
 
 Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   const auto filter_config =
       std::make_shared<FilterConfig>(proto_config, context.scope(), context.runtime(),
                                      context.httpContext(), stats_prefix, context.bootstrap());
@@ -78,7 +79,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 Router::RouteSpecificFilterConfigConstSharedPtr
 ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::FactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<FilterConfigPerRoute>(proto_config);
 }
 

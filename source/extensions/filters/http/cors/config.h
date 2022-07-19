@@ -21,7 +21,7 @@ public:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cors::v3::Cors& proto_config,
       const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& base_context) override;
 };
 
 } // namespace Cors

@@ -13,7 +13,8 @@ namespace RouterFilter {
 
 Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::router::v3::Router& proto_config,
-    const std::string& stat_prefix, Server::Configuration::ServerFactoryContext& context) {
+    const std::string& stat_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   Stats::StatNameManagedStorage prefix(stat_prefix, context.scope().symbolTable());
   Router::FilterConfigSharedPtr filter_config(new Router::FilterConfig(
       prefix.statName(), context,

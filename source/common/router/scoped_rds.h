@@ -30,7 +30,7 @@ namespace ScopedRoutesConfigProviderUtil {
 Envoy::Config::ConfigProviderPtr create(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config,
-    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
+    Server::Configuration::FactoryContext& factory_context, Init::Manager& init_manager,
     const std::string& stat_prefix,
     Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager);
 
@@ -48,7 +48,7 @@ class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigPr
 public:
   InlineScopedRoutesConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,
                                    std::string name,
-                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                   Server::Configuration::FactoryContext& factory_context,
                                    ScopedRoutesConfigProviderManager& config_provider_manager,
                                    envoy::config::core::v3::ConfigSource rds_config_source,
                                    envoy::extensions::filters::network::http_connection_manager::
@@ -116,7 +116,7 @@ public:
       const std::string& name,
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
           ScopeKeyBuilder& scope_key_builder,
-      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
       envoy::config::core::v3::ConfigSource rds_config_source,
       RouteConfigProviderManager& route_config_provider_manager,
       ScopedRoutesConfigProviderManager& config_provider_manager);
@@ -224,7 +224,7 @@ private:
   ScopedRouteMap scoped_route_map_;
 
   // For creating RDS subscriptions.
-  Server::Configuration::ServerFactoryContext& factory_context_;
+  Server::Configuration::FactoryContext& factory_context_;
   const std::string name_;
   // Stats must outlive subscription.
   Stats::ScopeSharedPtr scope_;
@@ -280,18 +280,18 @@ public:
   // Envoy::Config::ConfigProviderManager
   Envoy::Config::ConfigProviderPtr
   createXdsConfigProvider(const Protobuf::Message& config_source_proto,
-                          Server::Configuration::ServerFactoryContext& factory_context,
+                          Server::Configuration::FactoryContext& factory_context,
                           Init::Manager& init_manager, const std::string& stat_prefix,
                           const Envoy::Config::ConfigProviderManager::OptionalArg& optarg) override;
   Envoy::Config::ConfigProviderPtr
-  createStaticConfigProvider(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+  createStaticConfigProvider(const Protobuf::Message&, Server::Configuration::FactoryContext&,
                              const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
     PANIC("SRDS supports delta updates and requires the use of the createStaticConfigProvider() "
           "overload that accepts a config proto set as an argument.");
   }
   Envoy::Config::ConfigProviderPtr createStaticConfigProvider(
       std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
-      Server::Configuration::ServerFactoryContext& factory_context,
+      Server::Configuration::FactoryContext& factory_context,
       const Envoy::Config::ConfigProviderManager::OptionalArg& optarg) override;
 
   RouteConfigProviderManager& routeConfigProviderManager() {

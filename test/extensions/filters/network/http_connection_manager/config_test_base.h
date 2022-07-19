@@ -64,7 +64,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::http_connection_manager::FilterDependencyTestFilter&, const std::string&,
-      Server::Configuration::ServerFactoryContext&) override {
+      Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<Http::PassThroughDecoderFilter>());
     };

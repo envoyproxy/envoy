@@ -37,7 +37,7 @@ withhold_grpc_frames: true
 
 TEST(ReverseBridgeFilterFactoryTest, ReverseBridgeFilterRouteSpecificConfig) {
   Config config_factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   ProtobufTypes::MessagePtr proto_config = config_factory.createEmptyRouteConfigProto();
   EXPECT_TRUE(proto_config.get());

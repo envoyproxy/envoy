@@ -10,7 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Compressor {
 
-Http::FilterFactoryCb CompressorFilterFactory::createDownstreamFilterFactoryFromProtoTyped(
+Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(

@@ -19,7 +19,8 @@ namespace RateLimitFilter {
 
 Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    const std::string&, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   ASSERT(!proto_config.domain().empty());
   FilterConfigSharedPtr filter_config(new FilterConfig(proto_config, context.localInfo(),
                                                        context.scope(), context.runtime(),
@@ -39,7 +40,7 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
 Router::RouteSpecificFilterConfigConstSharedPtr
 RateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::FactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<FilterConfigPerRoute>(proto_config);
 }
 

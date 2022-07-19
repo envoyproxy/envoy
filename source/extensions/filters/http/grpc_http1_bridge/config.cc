@@ -11,10 +11,11 @@ namespace GrpcHttp1Bridge {
 
 Http::FilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& factory_context) {
-  return [&factory_context, proto_config](Http::FilterChainFactoryCallbacks& callbacks) {
+    const std::string&, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
+  return [&context, proto_config](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(
-        std::make_shared<Http1BridgeFilter>(factory_context.grpcContext(), proto_config));
+        std::make_shared<Http1BridgeFilter>(context.grpcContext(), proto_config));
   };
 }
 

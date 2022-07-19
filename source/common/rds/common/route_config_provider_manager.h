@@ -34,7 +34,7 @@ public:
    */
   virtual RouteConfigProviderSharedPtr
   createRdsRouteConfigProvider(const Rds& rds,
-                               Server::Configuration::ServerFactoryContext& factory_context,
+                               Server::Configuration::FactoryContext& factory_context,
                                const std::string& stat_prefix, Init::Manager& init_manager) PURE;
 
   /**
@@ -43,9 +43,9 @@ public:
    * @param route_config supplies the RouteConfiguration for this route
    * @param factory_context is the context to use for the route config provider.
    */
-  virtual RouteConfigProviderPtr createStaticRouteConfigProvider(
-      const RouteConfiguration& route_config,
-      Server::Configuration::ServerFactoryContext& factory_context) PURE;
+  virtual RouteConfigProviderPtr
+  createStaticRouteConfigProvider(const RouteConfiguration& route_config,
+                                  Server::Configuration::FactoryContext& factory_context) PURE;
 };
 
 } // namespace Common

@@ -22,10 +22,10 @@ private:
   Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ProtoConfig& proto_config,
                                     const std::string& stats_prefix,
-                                    Server::Configuration::ServerFactoryContext& context) override;
+                                    Server::Configuration::FactoryContext& base_context) override;
   Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfigTyped(const PerRouteProtoConfig& proto_config,
-                                       Server::Configuration::ServerFactoryContext&,
+                                       Server::Configuration::FactoryContext&,
                                        ProtobufMessage::ValidationVisitor&) override;
 };
 

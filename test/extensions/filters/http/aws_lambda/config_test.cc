@@ -86,7 +86,7 @@ TEST(AwsLambdaFilterConfigTest, ValidPerRouteConfigCreatesFilter) {
   LambdaPerRouteConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
   auto route_specific_config_ptr = factory.createRouteSpecificFilterConfig(
@@ -124,7 +124,7 @@ TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithInvalidARNThrows) {
   LambdaPerRouteConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
   EXPECT_THROW(factory.createRouteSpecificFilterConfig(
@@ -143,7 +143,7 @@ TEST(AwsLambdaFilterConfigTest, AsynchrnousPerRouteConfig) {
   LambdaPerRouteConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
   auto route_specific_config_ptr = factory.createRouteSpecificFilterConfig(

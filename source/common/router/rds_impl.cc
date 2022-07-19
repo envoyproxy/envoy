@@ -25,7 +25,7 @@ namespace Router {
 RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::FactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
     const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager) {
   OptionalHttpFilters optional_http_filters;
@@ -58,7 +58,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
 
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::config::route::v3::RouteConfiguration& config, Rds::ConfigTraits& config_traits,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::FactoryContext& factory_context,
     Rds::RouteConfigProviderManager& route_config_provider_manager)
     : base_(config, config_traits, factory_context, route_config_provider_manager),
       route_config_provider_manager_(route_config_provider_manager) {}
@@ -77,12 +77,12 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     RouteConfigUpdatePtr&& config_update,
     std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>&& resource_decoder,
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-    const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
+    const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
     const std::string& stat_prefix, Rds::RouteConfigProviderManager& route_config_provider_manager)
     : Rds::RdsRouteConfigSubscription(std::move(config_update), std::move(resource_decoder),
                                       rds.config_source(), rds.route_config_name(),
-                                      manager_identifier, factory_context, stat_prefix + "rds.",
-                                      "RDS", route_config_provider_manager),
+                                      manager_identifier, factory_context.getServerFactoryContext(),
+                                      stat_prefix + "rds.", "RDS", route_config_provider_manager),
       config_update_info_(static_cast<RouteConfigUpdateReceiver*>(
           Rds::RdsRouteConfigSubscription::config_update_info_.get())) {}
 
@@ -144,7 +144,7 @@ void RdsRouteConfigSubscription::updateOnDemand(const std::string& aliases) {
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
-    Server::Configuration::ServerFactoryContext& factory_context)
+    Server::Configuration::FactoryContext& factory_context)
     : base_(subscription, factory_context), config_update_info_(subscription->routeConfigUpdate()),
       factory_context_(factory_context) {
   // The subscription referenced by the 'base_' and by 'this' is the same.
@@ -207,11 +207,14 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
   // determine if the RdsRouteConfigProviderImpl instance is still valid.
-  factory_context_.mainThreadDispatcher().post([this,
-                                                maybe_still_alive =
-                                                    std::weak_ptr<bool>(still_alive_),
-                                                alias, &thread_local_dispatcher,
-                                                route_config_updated_cb]() -> void {
+  factory_context_.getServerFactoryContext().mainThreadDispatcher().post([this,
+                                                                          maybe_still_alive =
+                                                                              std::weak_ptr<bool>(
+                                                                                  still_alive_),
+                                                                          alias,
+                                                                          &thread_local_dispatcher,
+                                                                          route_config_updated_cb]()
+                                                                             -> void {
     if (maybe_still_alive.lock()) {
       subscription().updateOnDemand(alias);
       config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
@@ -225,7 +228,7 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& ad
 Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     const OptionalHttpFilters& optional_http_filters,
-    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     Init::Manager& init_manager) {
   auto provider = manager_.addDynamicProvider(
       rds, rds.route_config_name(), init_manager,
@@ -235,7 +238,10 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
             proto_traits_, factory_context, optional_http_filters);
         auto resource_decoder = std::make_unique<
             Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::route::v3::RouteConfiguration>>(
-            factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
+            factory_context.getServerFactoryContext()
+                .messageValidationContext()
+                .dynamicValidationVisitor(),
+            "name");
         auto subscription = std::make_shared<RdsRouteConfigSubscription>(
             std::move(config_update), std::move(resource_decoder), rds, manager_identifier,
             factory_context, stat_prefix, manager_);
@@ -250,7 +256,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
 RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigProvider(
     const envoy::config::route::v3::RouteConfiguration& route_config,
     const OptionalHttpFilters& optional_http_filters,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::FactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   auto provider = manager_.addStaticProvider(
       [&optional_http_filters, &factory_context, &validator, &route_config, this]() {

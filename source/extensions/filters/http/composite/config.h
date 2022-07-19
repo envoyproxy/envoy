@@ -27,7 +27,7 @@ public:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::composite::v3::Composite& proto_config,
       const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& base_context) override;
 
   Server::Configuration::MatchingRequirementsPtr matchingRequirements() override {
     auto requirements = std::make_unique<

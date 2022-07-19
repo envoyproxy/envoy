@@ -20,7 +20,7 @@
 #include "source/common/rds/static_route_config_provider_impl.h"
 
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -46,7 +46,9 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext>& server_factory_context_{
+      factory_context_.mock_server_context_};
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
 };
 
@@ -54,7 +56,7 @@ class TestConfig : public Config {
 public:
   TestConfig() = default;
   TestConfig(const envoy::config::route::v3::RouteConfiguration& rc,
-             Server::Configuration::ServerFactoryContext&, bool)
+             Server::Configuration::FactoryContext&, bool)
       : rc_(rc) {}
   const std::string* route(const std::string& name) const {
     for (const auto& virtual_host_config : rc_.virtual_hosts()) {
@@ -73,7 +75,7 @@ class RdsConfigUpdateReceiverTest : public RdsTestBase {
 public:
   void setup() {
     config_update_ = std::make_unique<RouteConfigUpdateReceiverImpl>(config_traits_, proto_traits_,
-                                                                     server_factory_context_);
+                                                                     factory_context_);
   }
 
   const std::string* route(const std::string& path) {
@@ -156,7 +158,7 @@ public:
     envoy::extensions::filters::network::thrift_proxy::v3::Trds rds;
     rds.mutable_config_source()->set_path("dummy");
     rds.set_route_config_name("test_route");
-    return manager_.createRdsRouteConfigProvider(rds, server_factory_context_, "test_listener.",
+    return manager_.createRdsRouteConfigProvider(rds, factory_context_, "test_listener.",
                                                  outer_init_manager_);
   }
 
@@ -167,7 +169,7 @@ name: foo
 virtual_hosts: null
 )EOF",
                               route_config);
-    return manager_.createStaticRouteConfigProvider(route_config, server_factory_context_);
+    return manager_.createStaticRouteConfigProvider(route_config, factory_context_);
   }
 
   template <class RouteConfiguration = envoy::config::route::v3::RouteConfiguration>

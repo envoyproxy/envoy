@@ -98,7 +98,7 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     ExceptionUtil::throwEnvoyException(fmt::format("tx create_ldb_queue {}", errorDetails(errno)));
   }
 
-  const int num = context.options().concurrency();
+  const int num = context.getServerFactoryContext().options().concurrency();
   if (num > 32) {
     ExceptionUtil::throwEnvoyException(
         "Dlb connection balanncer only supports up to 32 worker threads, "

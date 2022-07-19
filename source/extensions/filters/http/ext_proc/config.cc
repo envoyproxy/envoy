@@ -10,7 +10,8 @@ namespace ExternalProcessing {
 
 Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   const uint32_t message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const auto filter_config = std::make_shared<FilterConfig>(
@@ -29,7 +30,7 @@ Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterFactoryFromPro
 Router::RouteSpecificFilterConfigConstSharedPtr
 ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::FactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<FilterConfigPerRoute>(proto_config);
 }
 

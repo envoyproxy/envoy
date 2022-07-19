@@ -82,7 +82,7 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyRouteProto) {
 
 TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
   BufferFilterFactory factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   EXPECT_TRUE(proto_config.get());

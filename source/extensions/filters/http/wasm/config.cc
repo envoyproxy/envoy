@@ -13,7 +13,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Wasm {
 
-Http::FilterFactoryCb WasmFilterConfig::createDownstreamFilterFactoryFromProtoTyped(
+Http::FilterFactoryCb WasmFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
   context.getServerFactoryContext().api().customStatNamespaces().registerStatNamespace(

@@ -15,7 +15,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -91,7 +91,7 @@ public:
 
 private:
   RouterCheckTool(
-      std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
+      std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
       std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
       Api::ApiPtr api, Coverage coverage);
 
@@ -182,7 +182,7 @@ private:
   std::vector<std::pair<std::string, std::vector<std::string>>> tests_;
 
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
-  std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context_;
+  std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context_;
   std::unique_ptr<Router::ConfigImpl> config_;
   std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
   Api::ApiPtr api_;

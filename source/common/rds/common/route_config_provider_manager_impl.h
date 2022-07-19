@@ -40,14 +40,17 @@ public:
       : manager_(admin, absl::AsciiStrToLower(getRdsName()) + "_routes", proto_traits_) {}
 
   // RouteConfigProviderManager
-  RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
-      const Rds& rds, Server::Configuration::ServerFactoryContext& factory_context,
-      const std::string& stat_prefix, Init::Manager& init_manager) override {
+  RouteConfigProviderSharedPtr
+  createRdsRouteConfigProvider(const Rds& rds, Server::Configuration::FactoryContext& base_context,
+                               const std::string& stat_prefix,
+                               Init::Manager& init_manager) override {
+    Server::Configuration::ServerFactoryContext& factory_context =
+        base_context.getServerFactoryContext();
     return manager_.addDynamicProvider(
         rds, rds.route_config_name(), init_manager,
-        [&factory_context, &rds, &stat_prefix, this](uint64_t manager_identifier) {
+        [&factory_context, &rds, &stat_prefix, &base_context, this](uint64_t manager_identifier) {
           auto config_update = std::make_unique<RouteConfigUpdateReceiverImpl>(
-              config_traits_, proto_traits_, factory_context);
+              config_traits_, proto_traits_, base_context);
           auto resource_decoder =
               std::make_unique<Envoy::Config::OpaqueResourceDecoderImpl<RouteConfiguration>>(
                   factory_context.messageValidationContext().dynamicValidationVisitor(),
@@ -57,15 +60,15 @@ public:
               rds.route_config_name(), manager_identifier, factory_context,
               stat_prefix + absl::AsciiStrToLower(getRdsName()) + ".",
               absl::AsciiStrToUpper(getRdsName()), manager_);
-          auto provider = std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription),
-                                                                       factory_context);
+          auto provider =
+              std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription), base_context);
           return std::make_pair(provider, &provider->subscription().initTarget());
         });
   }
 
-  RouteConfigProviderPtr createStaticRouteConfigProvider(
-      const RouteConfiguration& route_config,
-      Server::Configuration::ServerFactoryContext& factory_context) override {
+  RouteConfigProviderPtr
+  createStaticRouteConfigProvider(const RouteConfiguration& route_config,
+                                  Server::Configuration::FactoryContext& factory_context) override {
     return manager_.addStaticProvider([&factory_context, &route_config, this]() {
       return std::make_unique<StaticRouteConfigProviderImpl>(route_config, config_traits_,
                                                              factory_context, manager_);

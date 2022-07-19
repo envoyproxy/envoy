@@ -285,9 +285,10 @@ private:
 
 Http::FilterFactoryCb GrpcStatsFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& factory_context) {
+    const std::string&, Server::Configuration::FactoryContext& factory_context) {
 
-  ConfigConstSharedPtr config = std::make_shared<const Config>(proto_config, factory_context);
+  ConfigConstSharedPtr config =
+      std::make_shared<const Config>(proto_config, factory_context.getServerFactoryContext());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<GrpcStatsFilter>(config));

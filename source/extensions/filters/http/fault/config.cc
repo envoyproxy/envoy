@@ -13,7 +13,8 @@ namespace Fault {
 
 Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   FaultFilterConfigSharedPtr filter_config(new FaultFilterConfig(
       config, context.runtime(), stats_prefix, context.scope(), context.timeSource()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -24,7 +25,7 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
 Router::RouteSpecificFilterConfigConstSharedPtr
 FaultFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::FactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const Fault::FaultSettings>(config);
 }
 

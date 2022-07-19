@@ -19,11 +19,11 @@ Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyp
     Server::Configuration::FactoryContext& context) {
 
   SquashFilterConfigSharedPtr config = std::make_shared<SquashFilterConfig>(
-      SquashFilterConfig(proto_config, context.clusterManager()));
+      SquashFilterConfig(proto_config, context.getServerFactoryContext().clusterManager()));
 
   return [&context, config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
-        std::make_shared<SquashFilter>(config, context.clusterManager()));
+        std::make_shared<SquashFilter>(config, context.getServerFactoryContext().clusterManager()));
   };
 }
 

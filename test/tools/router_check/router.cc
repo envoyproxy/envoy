@@ -131,14 +131,13 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   TestUtility::loadFromFile(router_config_file, route_config, *api);
   assignUniqueRouteNames(route_config);
   assignRuntimeFraction(route_config);
-  auto factory_context =
-      std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
+  auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(
       route_config, Router::OptionalHttpFilters(), *factory_context,
       ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
     ProtobufMessage::StrictValidationVisitorImpl visitor;
-    visitor.setRuntime(factory_context->runtime_loader_);
+    visitor.setRuntime(factory_context->mock_server_context_.runtime_loader_);
     MessageUtil::checkForUnexpectedFields(route_config, visitor);
   }
 
@@ -211,12 +210,12 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 }
 
 RouterCheckTool::RouterCheckTool(
-    std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
+    std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
     Api::ApiPtr api, Coverage coverage)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
-  ON_CALL(factory_context_->runtime_loader_.snapshot_,
+  ON_CALL(factory_context_->mock_server_context_.runtime_loader_.snapshot_,
           featureEnabled(_, testing::An<const envoy::type::v3::FractionalPercent&>(),
                          testing::An<uint64_t>()))
       .WillByDefault(testing::Invoke(this, &RouterCheckTool::runtimeMock));
@@ -247,7 +246,8 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
     auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
         nullptr, Network::Utility::getCanonicalIpv4LoopbackAddress());
     Envoy::StreamInfo::StreamInfoImpl stream_info(
-        Envoy::Http::Protocol::Http11, factory_context_->mainThreadDispatcher().timeSource(),
+        Envoy::Http::Protocol::Http11,
+        factory_context_->getServerFactoryContext().mainThreadDispatcher().timeSource(),
         connection_info_provider);
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =

@@ -28,10 +28,10 @@ class ConfigImpl : public Config, Logger::Loggable<Logger::Id::config> {
 public:
   ConfigImpl(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
-      Server::Configuration::ServerFactoryContext& context, bool validate_clusters_default) {
+      Server::Configuration::FactoryContext& context, bool validate_clusters_default) {
     absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
     if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)) {
-      validation_clusters = context.clusterManager().clusters();
+      validation_clusters = context.getServerFactoryContext().clusterManager().clusters();
     }
     route_matcher_ = std::make_unique<RouteMatcher>(config, validation_clusters);
   }

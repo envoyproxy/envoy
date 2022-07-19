@@ -206,7 +206,7 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
 }
 
 SingleRouteMatcherImpl::SingleRouteMatcherImpl(const RouteConfig& config,
-                                               Server::Configuration::ServerFactoryContext&)
+                                               Server::Configuration::FactoryContext&)
     : interface_matcher_(config.interface()), group_(config.group()), version_(config.version()) {
   using envoy::extensions::filters::network::dubbo_proxy::v3::RouteMatch;
 
@@ -281,7 +281,7 @@ RouteConstSharedPtr SingleRouteMatcherImpl::route(const MessageMetadata& metadat
 }
 
 RouteConfigImpl::RouteConfigImpl(const RouteConfigList& route_config_list,
-                                 Server::Configuration::ServerFactoryContext& context, bool) {
+                                 Server::Configuration::FactoryContext& context, bool) {
   for (const auto& route_config : route_config_list) {
     route_matcher_list_.emplace_back(
         std::make_unique<SingleRouteMatcherImpl>(route_config, context));

@@ -153,7 +153,8 @@ public:
 class Utility {
 public:
   static const std::string& localAddress(Server::Configuration::FactoryContext& context) {
-    return context.getTransportSocketFactoryContext()
+    return context.getServerFactoryContext()
+        .getTransportSocketFactoryContext()
         .localInfo()
         .address()
         ->ip()

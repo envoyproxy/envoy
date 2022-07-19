@@ -35,7 +35,8 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
 
 Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-    const std::string& stat_prefix, Server::Configuration::ServerFactoryContext& context) {
+    const std::string& stat_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
 
   const auto arn = parseArn(proto_config.arn());
   if (!arn) {
@@ -57,7 +58,7 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
   FilterSettings filter_settings{*arn, getInvocationMode(proto_config),
                                  proto_config.payload_passthrough()};
 
-  FilterStats stats = generateStats(stat_prefix, context.scope());
+  FilterStats stats = generateStats(stat_prefix, base_context.scope());
   return [stats, signer, filter_settings](Http::FilterChainFactoryCallbacks& cb) {
     auto filter = std::make_shared<Filter>(filter_settings, stats, signer);
     cb.addStreamFilter(filter);
@@ -67,7 +68,7 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
 Router::RouteSpecificFilterConfigConstSharedPtr
 AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::FactoryContext&, ProtobufMessage::ValidationVisitor&) {
 
   const auto arn = parseArn(proto_config.invoke_config().arn());
   if (!arn) {

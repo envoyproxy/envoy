@@ -62,7 +62,7 @@ public:
    * @throw EnvoyException if the new config can't be applied of.
    */
   virtual ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
-                                            Server::Configuration::ServerFactoryContext& context,
+                                            Server::Configuration::FactoryContext& context,
                                             bool validate_clusters_default) const PURE;
 };
 

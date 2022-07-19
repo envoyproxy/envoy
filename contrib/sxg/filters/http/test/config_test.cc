@@ -26,11 +26,12 @@ void expectCreateFilter(std::string yaml, bool is_sds_config) {
   FilterFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
-  Server::Configuration::MockFactoryContext context;
-  context.cluster_manager_.initializeClusters({"foo"}, {});
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.mock_server_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for certificate and private_key.
-  auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
+  auto& secret_manager =
+      context.mock_server_context_.cluster_manager_.cluster_manager_factory_.secretManager();
   if (is_sds_config) {
     ON_CALL(secret_manager, findOrCreateGenericSecretProvider(_, _, _))
         .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
@@ -40,12 +41,12 @@ void expectCreateFilter(std::string yaml, bool is_sds_config) {
         .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
             envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
   }
-  EXPECT_CALL(context, messageValidationVisitor());
-  EXPECT_CALL(context, clusterManager());
-  EXPECT_CALL(context, scope());
-  EXPECT_CALL(context, timeSource());
-  EXPECT_CALL(context, api());
-  EXPECT_CALL(context, getTransportSocketFactoryContext());
+  EXPECT_CALL(context.mock_downstream_context_, messageValidationVisitor());
+  EXPECT_CALL(context.mock_server_context_, clusterManager());
+  EXPECT_CALL(context.mock_downstream_context_, scope());
+  EXPECT_CALL(context.mock_server_context_, timeSource());
+  EXPECT_CALL(context.mock_server_context_, api());
+  EXPECT_CALL(context.mock_server_context_, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -69,7 +70,8 @@ validity_url: "/.sxg/validity.msg"
   TestUtility::loadFromYaml(yaml, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
+  auto& secret_manager =
+      context.mock_server_context_.cluster_manager_.cluster_manager_factory_.secretManager();
   ON_CALL(secret_manager, findStaticGenericSecretProvider(
                               failed_secret_name == "private_key" ? "certificate" : "private_key"))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(

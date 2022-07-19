@@ -37,7 +37,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
-      const std::string&, Server::Configuration::ServerFactoryContext&) override;
+      const std::string&, Server::Configuration::FactoryContext&) override;
 };
 
 } // namespace GrpcStats

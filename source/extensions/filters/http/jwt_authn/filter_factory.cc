@@ -40,7 +40,8 @@ void validateJwtConfig(const JwtAuthentication& proto_config, Api::Api& api) {
 
 Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
     const JwtAuthentication& proto_config, const std::string& prefix,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   validateJwtConfig(proto_config, context.api());
   auto filter_config = std::make_shared<FilterConfigImpl>(proto_config, prefix, context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -51,8 +52,7 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
 Envoy::Router::RouteSpecificFilterConfigConstSharedPtr
 FilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& per_route,
-    Envoy::Server::Configuration::ServerFactoryContext&,
-    Envoy::ProtobufMessage::ValidationVisitor&) {
+    Envoy::Server::Configuration::FactoryContext&, Envoy::ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<PerRouteFilterConfig>(per_route);
 }
 

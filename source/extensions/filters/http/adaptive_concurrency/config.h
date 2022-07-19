@@ -23,7 +23,7 @@ public:
       const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
           proto_config,
       const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& base_context) override;
 };
 
 } // namespace AdaptiveConcurrency

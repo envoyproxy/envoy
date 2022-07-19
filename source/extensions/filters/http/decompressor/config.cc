@@ -10,7 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Decompressor {
 
-Http::FilterFactoryCb DecompressorFilterFactory::createDownstreamFilterFactoryFromProtoTyped(
+Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
   Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();

@@ -60,7 +60,7 @@ public:
   static RouteConfigProviderSharedPtr create(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           config,
-      Server::Configuration::ServerFactoryContext& factory_context,
+      Server::Configuration::FactoryContext& factory_context,
       ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
       const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager);
 };
@@ -72,7 +72,7 @@ class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
   StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
                                 Rds::ConfigTraits& config_traits,
-                                Server::Configuration::ServerFactoryContext& factory_context,
+                                Server::Configuration::FactoryContext& factory_context,
                                 Rds::RouteConfigProviderManager& route_config_provider_manager);
   ~StaticRouteConfigProviderImpl() override;
 
@@ -101,8 +101,8 @@ public:
       RouteConfigUpdatePtr&& config_update,
       std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>&& resource_decoder,
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-      const uint64_t manager_identifier,
-      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
+      const std::string& stat_prefix,
       Rds::RouteConfigProviderManager& route_config_provider_manager);
   ~RdsRouteConfigSubscription() override;
 
@@ -145,7 +145,7 @@ class RdsRouteConfigProviderImpl : public RouteConfigProvider,
                                    Logger::Loggable<Logger::Id::router> {
 public:
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
-                             Server::Configuration::ServerFactoryContext& factory_context);
+                             Server::Configuration::FactoryContext& factory_context);
 
   RdsRouteConfigSubscription& subscription();
 
@@ -164,7 +164,7 @@ private:
   Rds::RdsRouteConfigProviderImpl base_;
 
   RouteConfigUpdatePtr& config_update_info_;
-  Server::Configuration::ServerFactoryContext& factory_context_;
+  Server::Configuration::FactoryContext& factory_context_;
   std::list<UpdateOnDemandCallback> config_update_callbacks_;
   // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
   // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
@@ -190,13 +190,13 @@ public:
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       const OptionalHttpFilters& optional_http_filters,
-      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) override;
 
   RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
                                   const OptionalHttpFilters& optional_http_filters,
-                                  Server::Configuration::ServerFactoryContext& factory_context,
+                                  Server::Configuration::FactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator) override;
 
 private:

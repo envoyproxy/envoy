@@ -23,12 +23,11 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
   Envoy::Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& per_route,
-      Envoy::Server::Configuration::ServerFactoryContext&,
+      Envoy::Server::Configuration::FactoryContext&,
       Envoy::ProtobufMessage::ValidationVisitor&) override;
 };
 

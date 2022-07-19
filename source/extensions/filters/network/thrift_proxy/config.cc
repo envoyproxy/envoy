@@ -171,11 +171,11 @@ ConfigImpl::ConfigImpl(
       }
     }
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
-        config.trds(), context_.getServerFactoryContext(), stats_prefix_,
+        config.trds(), context_, stats_prefix_,
         context_.getDownstreamFactoryContext()->initManager());
   } else {
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context_.getServerFactoryContext());
+        config.route_config(), context_);
   }
 
   for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {

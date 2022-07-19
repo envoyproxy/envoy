@@ -54,8 +54,8 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
 
   // Setup the config parsing.
   Api::ApiPtr api(Api::createApiForTest());
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
-  ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ON_CALL(factory_context.mock_server_context_, api()).WillByDefault(ReturnRef(*api));
   ConfigImpl config(proto_config, OptionalHttpFilters(), factory_context,
                     ProtobufMessage::getNullValidationVisitor(), true);
 

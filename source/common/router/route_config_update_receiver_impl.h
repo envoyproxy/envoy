@@ -26,7 +26,7 @@ public:
 
   Rds::ConfigConstSharedPtr createNullConfig() const override;
   Rds::ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
-                                         Server::Configuration::ServerFactoryContext& context,
+                                         Server::Configuration::FactoryContext& context,
                                          bool validate_clusters_default) const override;
 
 private:
@@ -37,10 +37,11 @@ private:
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
   RouteConfigUpdateReceiverImpl(Rds::ProtoTraits& proto_traits,
-                                Server::Configuration::ServerFactoryContext& factory_context,
+                                Server::Configuration::FactoryContext& factory_context,
                                 const OptionalHttpFilters& optional_http_filters)
-      : config_traits_(optional_http_filters,
-                       factory_context.messageValidationContext().dynamicValidationVisitor()),
+      : config_traits_(optional_http_filters, factory_context.getServerFactoryContext()
+                                                  .messageValidationContext()
+                                                  .dynamicValidationVisitor()),
         base_(config_traits_, proto_traits, factory_context), last_vhds_config_hash_(0ul),
         vhds_virtual_hosts_(
             std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),

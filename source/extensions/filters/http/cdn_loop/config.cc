@@ -23,7 +23,7 @@ using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::ParsedCdnId;
 
 Http::FilterFactoryCb CdnLoopFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
-    const std::string& /*stats_prefix*/, Server::Configuration::ServerFactoryContext& /*context*/) {
+    const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& /*context*/) {
   StatusOr<ParsedCdnId> context = parseCdnId(ParseContext(config.cdn_id()));
   if (!context.ok() || !context->context().atEnd()) {
     throw EnvoyException(fmt::format("Provided cdn_id \"{}\" is not a valid CDN identifier: {}",

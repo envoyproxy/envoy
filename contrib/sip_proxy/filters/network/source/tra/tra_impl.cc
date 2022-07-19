@@ -182,8 +182,11 @@ ClientPtr traClient(Event::Dispatcher& dispatcher, Server::Configuration::Factor
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   return std::make_unique<SipProxy::TrafficRoutingAssistant::GrpcClientImpl>(
-      context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-          grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled),
+      context.getServerFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .getOrCreateRawAsyncClient(grpc_service, context.scope(), true,
+                                     Grpc::CacheOption::CacheWhenRuntimeEnabled),
       dispatcher, timeout);
 }
 

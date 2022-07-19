@@ -17,8 +17,9 @@ namespace Envoy {
 class SetResponseCodeFilterConfig {
 public:
   SetResponseCodeFilterConfig(const std::string& prefix, uint32_t code, const std::string& body,
-                              Server::Configuration::ServerFactoryContext& context)
-      : prefix_(prefix), code_(code), body_(body), tls_slot_(context.threadLocal()) {}
+                              Server::Configuration::FactoryContext& context)
+      : prefix_(prefix), code_(code), body_(body),
+        tls_slot_(context.getServerFactoryContext().threadLocal()) {}
 
   const std::string prefix_;
   const uint32_t code_;
@@ -52,7 +53,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
-      const std::string&, Server::Configuration::ServerFactoryContext& context) override {
+      const std::string&, Server::Configuration::FactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
         proto_config.prefix(), proto_config.code(), proto_config.body(), context);
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

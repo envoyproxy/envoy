@@ -99,7 +99,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::StopAndContinueConfig& proto_config, const std::string&,
-      Server::Configuration::ServerFactoryContext&) override {
+      Server::Configuration::FactoryContext&) override {
     bool set_scope_tacked_object = proto_config.install_scope_tracked_object();
     return [set_scope_tacked_object](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(

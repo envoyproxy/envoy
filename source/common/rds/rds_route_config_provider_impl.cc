@@ -5,9 +5,10 @@ namespace Rds {
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
-    Server::Configuration::ServerFactoryContext& factory_context)
+    Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)),
-      config_update_info_(subscription_->routeConfigUpdate()), tls_(factory_context.threadLocal()) {
+      config_update_info_(subscription_->routeConfigUpdate()),
+      tls_(factory_context.getServerFactoryContext().threadLocal()) {
 
   auto initial_config = config_update_info_->parsedConfiguration();
   ASSERT(initial_config);

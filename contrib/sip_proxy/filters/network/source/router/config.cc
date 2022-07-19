@@ -18,8 +18,8 @@ SipFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoType
   UNREFERENCED_PARAMETER(proto_config);
 
   return [&context, stat_prefix](SipFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addDecoderFilter(
-        std::make_shared<Router>(context.clusterManager(), stat_prefix, context.scope(), context));
+    callbacks.addDecoderFilter(std::make_shared<Router>(
+        context.getServerFactoryContext().clusterManager(), stat_prefix, context.scope(), context));
   };
 }
 

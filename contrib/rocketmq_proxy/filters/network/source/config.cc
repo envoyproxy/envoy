@@ -24,7 +24,7 @@ Network::FilterFactoryCb RocketmqProxyFilterConfigFactory::createFilterFactoryFr
   std::shared_ptr<ConfigImpl> filter_config = std::make_shared<ConfigImpl>(proto_config, context);
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-        *filter_config, context.mainThreadDispatcher().timeSource()));
+        *filter_config, context.getServerFactoryContext().mainThreadDispatcher().timeSource()));
   };
 }
 

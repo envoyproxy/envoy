@@ -18,7 +18,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -52,9 +52,9 @@ parseHttpConnectionManagerFromYaml(const std::string& yaml_string) {
 class RdsTestBase : public testing::Test {
 public:
   RdsTestBase() {
-    // For server_factory_context
-    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
-    ON_CALL(server_factory_context_, messageValidationContext())
+    // For factory_context
+    ON_CALL(factory_context_.mock_server_context_, scope()).WillByDefault(ReturnRef(scope_));
+    ON_CALL(factory_context_.mock_server_context_, messageValidationContext())
         .WillByDefault(ReturnRef(validation_context_));
     EXPECT_CALL(validation_context_, dynamicValidationVisitor())
         .WillRepeatedly(ReturnRef(validation_visitor_));
@@ -73,7 +73,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Init::MockManager> outer_init_manager_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   Envoy::Config::SubscriptionCallbacks* rds_callbacks_{};
@@ -83,11 +83,11 @@ public:
 class RdsImplTest : public RdsTestBase {
 public:
   RdsImplTest() {
-    EXPECT_CALL(server_factory_context_.admin_.config_tracker_, add_("routes", _));
-    route_config_provider_manager_ =
-        std::make_unique<RouteConfigProviderManagerImpl>(server_factory_context_.admin_);
+    EXPECT_CALL(factory_context_.mock_server_context_.admin_.config_tracker_, add_("routes", _));
+    route_config_provider_manager_ = std::make_unique<RouteConfigProviderManagerImpl>(
+        factory_context_.mock_server_context_.admin_);
   }
-  ~RdsImplTest() override { server_factory_context_.thread_local_.shutdownThread(); }
+  ~RdsImplTest() override { factory_context_.mock_server_context_.thread_local_.shutdownThread(); }
 
   void setup(const std::string& override_config = "") {
     std::string config_yaml = R"EOF(
@@ -111,11 +111,13 @@ http_filters:
     }
     EXPECT_CALL(outer_init_manager_, add(_));
     rds_ = RouteConfigProviderUtil::create(
-        parseHttpConnectionManagerFromYaml(config_yaml), server_factory_context_,
-        validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
-    rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
-    EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-                start(_));
+        parseHttpConnectionManagerFromYaml(config_yaml), factory_context_, validation_visitor_,
+        outer_init_manager_, "foo.", *route_config_provider_manager_);
+    rds_callbacks_ =
+        factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_;
+    EXPECT_CALL(
+        *factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.subscription_,
+        start(_));
     outer_init_manager_.initialize(init_watcher_);
   }
 
@@ -142,7 +144,7 @@ http_filters:
     )EOF";
 
   EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                               server_factory_context_, validation_visitor_,
+                                               factory_context_, validation_visitor_,
                                                outer_init_manager_, "foo.",
                                                *route_config_provider_manager_),
                EnvoyException);
@@ -169,8 +171,8 @@ http_filters:
 
   EXPECT_THROW_WITH_MESSAGE(
       RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                      server_factory_context_, validation_visitor_,
-                                      outer_init_manager_, "foo.", *route_config_provider_manager_),
+                                      factory_context_, validation_visitor_, outer_init_manager_,
+                                      "foo.", *route_config_provider_manager_),
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
@@ -196,15 +198,14 @@ http_filters:
   is_optional: true
     )EOF";
 
-  RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                  server_factory_context_, validation_visitor_, outer_init_manager_,
-                                  "foo.", *route_config_provider_manager_);
+  RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml), factory_context_,
+                                  validation_visitor_, outer_init_manager_, "foo.",
+                                  *route_config_provider_manager_);
 }
 
 TEST_F(RdsImplTest, DestroyDuringInitialize) {
   InSequence s;
   setup();
-  // EXPECT_CALL(server_factory_context_, scope());
   EXPECT_CALL(init_watcher_, ready());
   rds_.reset();
 }
@@ -287,7 +288,9 @@ TEST_F(RdsImplTest, Basic) {
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
 
   // Make sure we don't lookup/verify clusters.
-  EXPECT_CALL(server_factory_context_.cluster_manager_, getThreadLocalCluster(Eq("bar"))).Times(0);
+  EXPECT_CALL(factory_context_.mock_server_context_.cluster_manager_,
+              getThreadLocalCluster(Eq("bar")))
+      .Times(0);
   rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
@@ -689,10 +692,11 @@ rds:
   testing::MockFunction<void(bool)> mock_callback;
   {
     auto rds = RouteConfigProviderUtil::create(
-        parseHttpConnectionManagerFromYaml(rds_config), server_factory_context_,
-        validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
+        parseHttpConnectionManagerFromYaml(rds_config), factory_context_, validation_visitor_,
+        outer_init_manager_, "foo.", *route_config_provider_manager_);
 
-    EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+    EXPECT_CALL(factory_context_.mock_server_context_.dispatcher_, post(_))
+        .WillOnce(SaveArg<0>(&post_cb));
     rds->requestVirtualHostsUpdate(
         "testing", local_thread_dispatcher,
         std::make_shared<Http::RouteConfigUpdatedCallback>(
@@ -717,13 +721,13 @@ TEST_F(RdsImplTest, RdsRouteConfigProviderImplSubscriptionSetup) {
 class RdsRouteConfigSubscriptionTest : public RdsTestBase {
 public:
   RdsRouteConfigSubscriptionTest() {
-    EXPECT_CALL(server_factory_context_.admin_.config_tracker_, add_("routes", _));
-    route_config_provider_manager_ =
-        std::make_unique<RouteConfigProviderManagerImpl>(server_factory_context_.admin_);
+    EXPECT_CALL(factory_context_.mock_server_context_.admin_.config_tracker_, add_("routes", _));
+    route_config_provider_manager_ = std::make_unique<RouteConfigProviderManagerImpl>(
+        factory_context_.mock_server_context_.admin_);
   }
 
   ~RdsRouteConfigSubscriptionTest() override {
-    server_factory_context_.thread_local_.shutdownThread();
+    factory_context_.mock_server_context_.thread_local_.shutdownThread();
   }
 
   RouteConfigProviderManagerImplPtr route_config_provider_manager_;
@@ -747,7 +751,7 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
       TestUtility::parseYaml<envoy::extensions::filters::network::http_connection_manager::v3::Rds>(
           rds_config);
   const auto route_config_provider = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds, OptionalHttpFilters(), server_factory_context_, "stat_prefix", outer_init_manager_);
+      rds, OptionalHttpFilters(), factory_context_, "stat_prefix", outer_init_manager_);
   RdsRouteConfigSubscription& subscription =
       (dynamic_cast<RdsRouteConfigProviderImpl*>(route_config_provider.get()))->subscription();
   init_watcher_.expectReady(); // The parent_init_target_ will call once.
@@ -759,7 +763,8 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
   EXPECT_EQ(init_vhds, nullptr);
   EXPECT_EQ(noop_init_manager, nullptr);
   // Now mark local_init_target_ ready by forcing an update failure.
-  auto* rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  auto* rds_callbacks_ =
+      factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_;
   EnvoyException e("test");
   rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                        &e);
@@ -776,18 +781,19 @@ public:
     rds_.set_route_config_name("foo_route_config");
     rds_.mutable_config_source()->set_path("foo_path");
     provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(
-        rds_, OptionalHttpFilters(), server_factory_context_, "foo_prefix.", outer_init_manager_);
-    rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+        rds_, OptionalHttpFilters(), factory_context_, "foo_prefix.", outer_init_manager_);
+    rds_callbacks_ =
+        factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
   RouteConfigProviderManagerImplTest() {
-    EXPECT_CALL(server_factory_context_.admin_.config_tracker_, add_("routes", _));
-    route_config_provider_manager_ =
-        std::make_unique<RouteConfigProviderManagerImpl>(server_factory_context_.admin_);
+    EXPECT_CALL(factory_context_.mock_server_context_.admin_.config_tracker_, add_("routes", _));
+    route_config_provider_manager_ = std::make_unique<RouteConfigProviderManagerImpl>(
+        factory_context_.mock_server_context_.admin_);
   }
 
   ~RouteConfigProviderManagerImplTest() override {
-    server_factory_context_.thread_local_.shutdownThread();
+    factory_context_.mock_server_context_.thread_local_.shutdownThread();
   }
 
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds_;
@@ -804,9 +810,8 @@ parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
 
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
   UniversalStringMatcher universal_name_matcher;
-  auto message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
-          universal_name_matcher);
+  auto message_ptr = factory_context_.mock_server_context_.admin_.config_tracker_
+                         .config_tracker_callbacks_["routes"](universal_name_matcher);
   const auto& route_config_dump =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
 
@@ -832,13 +837,13 @@ virtual_hosts:
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
   // Only static route.
-  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  factory_context_.mock_server_context_.cluster_manager_.initializeClusters({"baz"}, {});
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
-          parseRouteConfigurationFromV3Yaml(config_yaml), OptionalHttpFilters(),
-          server_factory_context_, validation_visitor_);
-  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
-      universal_name_matcher);
+          parseRouteConfigurationFromV3Yaml(config_yaml), OptionalHttpFilters(), factory_context_,
+          validation_visitor_);
+  message_ptr = factory_context_.mock_server_context_.admin_.config_tracker_
+                    .config_tracker_callbacks_["routes"](universal_name_matcher);
   const auto& route_config_dump2 =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(
@@ -862,8 +867,9 @@ dynamic_route_configs:
 
   // Static + dynamic.
   setup();
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_));
+  EXPECT_CALL(
+      *factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.subscription_,
+      start(_));
   outer_init_manager_.initialize(init_watcher_);
 
   const std::string response1_json = R"EOF(
@@ -885,8 +891,8 @@ dynamic_route_configs:
 
   EXPECT_CALL(init_watcher_, ready());
   rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
-  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
-      universal_name_matcher);
+  message_ptr = factory_context_.mock_server_context_.admin_.config_tracker_
+                    .config_tracker_callbacks_["routes"](universal_name_matcher);
   const auto& route_config_dump3 =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(
@@ -919,8 +925,8 @@ dynamic_route_configs:
   MockStringMatcher mock_name_matcher;
   EXPECT_CALL(mock_name_matcher, match("foo")).WillOnce(Return(true));
   EXPECT_CALL(mock_name_matcher, match("foo_route_config")).WillOnce(Return(false));
-  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
-      mock_name_matcher);
+  message_ptr = factory_context_.mock_server_context_.admin_.config_tracker_
+                    .config_tracker_callbacks_["routes"](mock_name_matcher);
   const auto& route_config_dump4 =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(
@@ -943,8 +949,8 @@ static_route_configs:
 
   EXPECT_CALL(mock_name_matcher, match("foo")).WillOnce(Return(false));
   EXPECT_CALL(mock_name_matcher, match("foo_route_config")).WillOnce(Return(true));
-  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
-      mock_name_matcher);
+  message_ptr = factory_context_.mock_server_context_.admin_.config_tracker_
+                    .config_tracker_callbacks_["routes"](mock_name_matcher);
   const auto& route_config_dump5 =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(
@@ -981,12 +987,12 @@ virtual_hosts:
 )EOF");
   const auto decoded_resources = TestUtility::decodeResources({route_config});
 
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      decoded_resources.refvec_, "1");
+  factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_
+      ->onConfigUpdate(decoded_resources.refvec_, "1");
 
   RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
-          rds_, OptionalHttpFilters(), server_factory_context_, "foo_prefix", outer_init_manager_);
+          rds_, OptionalHttpFilters(), factory_context_, "foo_prefix", outer_init_manager_);
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
@@ -1003,10 +1009,10 @@ virtual_hosts:
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderSharedPtr provider3 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
-          rds2, OptionalHttpFilters(), server_factory_context_, "foo_prefix", outer_init_manager_);
+          rds2, OptionalHttpFilters(), factory_context_, "foo_prefix", outer_init_manager_);
   EXPECT_NE(provider3, provider_);
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      decoded_resources.refvec_, "provider3");
+  factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_
+      ->onConfigUpdate(decoded_resources.refvec_, "provider3");
   UniversalStringMatcher universal_name_matcher;
   EXPECT_EQ(2UL, route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
                      ->dynamic_route_configs()
@@ -1039,14 +1045,14 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
 
   EXPECT_FALSE(provider_->configInfo().has_value());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> mock_factory_context2;
+  NiceMock<Server::Configuration::MockFactoryContext> mock_server_context2;
 
   Init::WatcherImpl real_watcher("real", []() {});
   Init::ManagerImpl real_init_manager("real");
 
   RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
-          rds_, OptionalHttpFilters(), mock_factory_context2, "foo_prefix", real_init_manager);
+          rds_, OptionalHttpFilters(), mock_server_context2, "foo_prefix", real_init_manager);
 
   EXPECT_FALSE(provider2->configInfo().has_value());
 
@@ -1066,8 +1072,8 @@ virtual_hosts:
 )EOF");
     const auto decoded_resources = TestUtility::decodeResources({route_config});
 
-    server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-        decoded_resources.refvec_, "1");
+    factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_
+        ->onConfigUpdate(decoded_resources.refvec_, "1");
 
     EXPECT_TRUE(provider_->configInfo().has_value());
     EXPECT_TRUE(provider2->configInfo().has_value());
@@ -1077,33 +1083,35 @@ virtual_hosts:
 
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
   setup();
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_));
+  EXPECT_CALL(
+      *factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.subscription_,
+      start(_));
   outer_init_manager_.initialize(init_watcher_);
   EXPECT_CALL(init_watcher_, ready());
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate({}, "");
+  factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_
+      ->onConfigUpdate({}, "");
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   setup();
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_));
+  EXPECT_CALL(
+      *factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.subscription_,
+      start(_));
   outer_init_manager_.initialize(init_watcher_);
   envoy::config::route::v3::RouteConfiguration route_config;
   const auto decoded_resources = TestUtility::decodeResources({route_config, route_config});
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
-      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-          decoded_resources.refvec_, ""),
+      factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_
+          ->onConfigUpdate(decoded_resources.refvec_, ""),
       EnvoyException, "Unexpected RDS resource length: 2");
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/7939
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDumpAfterConfigRejected) {
   UniversalStringMatcher universal_name_matcher;
-  auto message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
-          universal_name_matcher);
+  auto message_ptr = factory_context_.mock_server_context_.admin_.config_tracker_
+                         .config_tracker_callbacks_["routes"](universal_name_matcher);
   const auto& route_config_dump =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
 
@@ -1120,8 +1128,9 @@ dynamic_route_configs:
 
   // dynamic.
   setup();
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_));
+  EXPECT_CALL(
+      *factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.subscription_,
+      start(_));
   outer_init_manager_.initialize(init_watcher_);
 
   const std::string response1_yaml = R"EOF(
@@ -1158,8 +1167,8 @@ resources:
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
       EnvoyException, "Only a single wildcard domain is permitted in route foo_route_config");
 
-  message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
-      universal_name_matcher);
+  message_ptr = factory_context_.mock_server_context_.admin_.config_tracker_
+                    .config_tracker_callbacks_["routes"](universal_name_matcher);
   const auto& route_config_dump3 =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(

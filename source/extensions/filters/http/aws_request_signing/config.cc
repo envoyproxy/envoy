@@ -16,7 +16,8 @@ namespace AwsRequestSigningFilter {
 
 Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
@@ -27,7 +28,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
       config.service_name(), config.region(), credentials_provider,
       context.mainThreadDispatcher().timeSource(), matcher_config);
   auto filter_config =
-      std::make_shared<FilterConfigImpl>(std::move(signer), stats_prefix, context.scope(),
+      std::make_shared<FilterConfigImpl>(std::move(signer), stats_prefix, base_context.scope(),
                                          config.host_rewrite(), config.use_unsigned_payload());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);

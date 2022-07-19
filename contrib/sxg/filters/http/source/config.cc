@@ -39,9 +39,10 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
   const auto& certificate = proto_config.certificate();
   const auto& private_key = proto_config.private_key();
 
-  auto& cluster_manager = context.clusterManager();
+  auto& cluster_manager = context.getServerFactoryContext().clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
-  auto& transport_socket_factory = context.getTransportSocketFactoryContext();
+  auto& transport_socket_factory =
+      context.getServerFactoryContext().getTransportSocketFactoryContext();
   auto secret_provider_certificate =
       secretsProvider(certificate, secret_manager, transport_socket_factory);
   if (secret_provider_certificate == nullptr) {
@@ -53,10 +54,12 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
     throw EnvoyException("invalid private_key secret configuration");
   }
 
-  auto secret_reader = std::make_shared<SDSSecretReader>(
-      secret_provider_certificate, secret_provider_private_key, context.api());
-  auto config = std::make_shared<FilterConfig>(proto_config, context.timeSource(), secret_reader,
-                                               stat_prefix, context.scope());
+  auto secret_reader =
+      std::make_shared<SDSSecretReader>(secret_provider_certificate, secret_provider_private_key,
+                                        context.getServerFactoryContext().api());
+  auto config =
+      std::make_shared<FilterConfig>(proto_config, context.getServerFactoryContext().timeSource(),
+                                     secret_reader, stat_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     const EncoderPtr encoder = std::make_unique<EncoderImpl>(config);
     callbacks.addStreamFilter(std::make_shared<Filter>(config, encoder));

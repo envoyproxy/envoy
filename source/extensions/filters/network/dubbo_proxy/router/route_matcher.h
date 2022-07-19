@@ -142,8 +142,7 @@ public:
   };
 
   using RouteConfig = envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration;
-  SingleRouteMatcherImpl(const RouteConfig& config,
-                         Server::Configuration::ServerFactoryContext& context);
+  SingleRouteMatcherImpl(const RouteConfig& config, Server::Configuration::FactoryContext& context);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 
@@ -166,10 +165,10 @@ public:
   using MultipleRouteConfig =
       envoy::extensions::filters::network::dubbo_proxy::v3::MultipleRouteConfiguration;
   RouteConfigImpl(const RouteConfigList& route_config_list,
-                  Server::Configuration::ServerFactoryContext& context,
+                  Server::Configuration::FactoryContext& context,
                   bool validate_clusters_default = false);
   RouteConfigImpl(const MultipleRouteConfig& multiple_route_config,
-                  Server::Configuration::ServerFactoryContext& context,
+                  Server::Configuration::FactoryContext& context,
                   bool validate_clusters_default = false)
       : RouteConfigImpl(multiple_route_config.route_config(), context, validate_clusters_default) {}
 

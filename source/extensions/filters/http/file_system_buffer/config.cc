@@ -21,7 +21,8 @@ FileSystemBufferFilterFactory::FileSystemBufferFilterFactory()
 Http::FilterFactoryCb FileSystemBufferFilterFactory::createFilterFactoryFromProtoTyped(
     const ProtoFileSystemBufferFilterConfig& config,
     const std::string& stats_prefix ABSL_ATTRIBUTE_UNUSED,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   auto factory = AsyncFileManagerFactory::singleton(&context.singletonManager());
   auto manager = config.has_manager_config() ? factory->getAsyncFileManager(config.manager_config())
                                              : std::shared_ptr<AsyncFileManager>();
@@ -36,7 +37,8 @@ Http::FilterFactoryCb FileSystemBufferFilterFactory::createFilterFactoryFromProt
 Router::RouteSpecificFilterConfigConstSharedPtr
 FileSystemBufferFilterFactory::createRouteSpecificFilterConfigTyped(
     const ProtoFileSystemBufferFilterConfig& config,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::FactoryContext& base_context, ProtobufMessage::ValidationVisitor&) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   auto factory = AsyncFileManagerFactory::singleton(&context.singletonManager());
   auto manager = config.has_manager_config() ? factory->getAsyncFileManager(config.manager_config())
                                              : std::shared_ptr<AsyncFileManager>();

@@ -20,7 +20,7 @@ namespace {
 
 TEST(DynamicForwardProxyFilterFactoryTest, RouteSpecificConfig) {
   DynamicForwardProxyFilterFactory factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   EXPECT_TRUE(proto_config.get());

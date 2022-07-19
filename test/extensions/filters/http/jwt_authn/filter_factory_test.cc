@@ -75,7 +75,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, ProviderWithoutIssuer) {
 
 TEST(HttpJwtAuthnFilterFactoryTest, EmptyPerRouteConfig) {
   PerRouteConfig per_route;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterFactory factory;
   EXPECT_THROW(factory.createRouteSpecificFilterConfig(per_route, context,
                                                        context.messageValidationVisitor()),
@@ -84,7 +84,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, EmptyPerRouteConfig) {
 
 TEST(HttpJwtAuthnFilterFactoryTest, WrongPerRouteConfigType) {
   JwtAuthentication per_route;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterFactory factory;
   EXPECT_THROW(factory.createRouteSpecificFilterConfig(per_route, context,
                                                        context.messageValidationVisitor()),
@@ -95,7 +95,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, DisabledPerRouteConfig) {
   PerRouteConfig per_route;
   per_route.set_disabled(true);
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterFactory factory;
   auto base_ptr = factory.createRouteSpecificFilterConfig(per_route, context,
                                                           context.messageValidationVisitor());
@@ -109,7 +109,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, GoodPerRouteConfig) {
   PerRouteConfig per_route;
   per_route.set_requirement_name("name");
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterFactory factory;
   auto base_ptr = factory.createRouteSpecificFilterConfig(per_route, context,
                                                           context.messageValidationVisitor());

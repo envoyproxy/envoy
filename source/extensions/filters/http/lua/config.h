@@ -22,11 +22,11 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::lua::v3::Lua& proto_config, const std::string&,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& base_context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::lua::v3::LuaPerRoute& proto_config,
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::FactoryContext& base_context,
       ProtobufMessage::ValidationVisitor& validator) override;
 };
 

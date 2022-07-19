@@ -9,7 +9,7 @@
 #include "test/common/router/route_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/factory_context.h"
 
 namespace Envoy {
 namespace Router {
@@ -138,7 +138,7 @@ bool validateConfig(const test::common::router::RouteTestCase& input) {
 // TODO(htuch): figure out how to generate via a genrule from config_impl_test the full corpus.
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   static NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  static NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  static NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   try {
     if (!validateConfig(input)) {

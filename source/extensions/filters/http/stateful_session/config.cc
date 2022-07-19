@@ -11,7 +11,8 @@ namespace StatefulSession {
 
 Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProtoTyped(
     const ProtoConfig& proto_config, const std::string&,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, context));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -21,8 +22,9 @@ Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProto
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 StatefulSessionFactoryConfig::createRouteSpecificFilterConfigTyped(
-    const PerRouteProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
+    const PerRouteProtoConfig& proto_config, Server::Configuration::FactoryContext& base_context,
     ProtobufMessage::ValidationVisitor&) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   return std::make_shared<PerRouteStatefulSession>(proto_config, context);
 }
 

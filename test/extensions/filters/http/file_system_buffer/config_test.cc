@@ -62,7 +62,7 @@ public:
 
   std::shared_ptr<const FileSystemBufferFilterConfig>
   makeRouteConfig(const ProtoFileSystemBufferFilterConfig& route_proto_config) {
-    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    NiceMock<Server::Configuration::MockFactoryContext> context;
     return std::dynamic_pointer_cast<const FileSystemBufferFilterConfig>(
         factory()->createRouteSpecificFilterConfig(route_proto_config, context,
                                                    ProtobufMessage::getNullValidationVisitor()));

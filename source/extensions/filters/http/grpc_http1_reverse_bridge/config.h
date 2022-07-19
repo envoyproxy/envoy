@@ -21,13 +21,13 @@ public:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig& config,
       const std::string& stat_prefix,
-      Envoy::Server::Configuration::ServerFactoryContext& context) override;
+      Envoy::Server::Configuration::FactoryContext& base_context) override;
 
 private:
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute&
           proto_config,
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::FactoryContext& base_context,
       ProtobufMessage::ValidationVisitor& validator) override;
 };
 } // namespace GrpcHttp1ReverseBridge

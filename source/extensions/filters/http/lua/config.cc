@@ -13,7 +13,8 @@ namespace Lua {
 
 Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::lua::v3::Lua& proto_config, const std::string&,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   FilterConfigConstSharedPtr filter_config(new FilterConfig{
       proto_config, context.threadLocal(), context.clusterManager(), context.api()});
   auto& time_source = context.mainThreadDispatcher().timeSource();
@@ -25,8 +26,9 @@ Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
 Router::RouteSpecificFilterConfigConstSharedPtr
 LuaFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<FilterConfigPerRoute>(proto_config, context);
+    Server::Configuration::FactoryContext& base_context, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<FilterConfigPerRoute>(proto_config,
+                                                base_context.getServerFactoryContext());
 }
 
 /**

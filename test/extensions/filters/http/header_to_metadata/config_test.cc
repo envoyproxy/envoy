@@ -137,7 +137,7 @@ request_rules:
   HeaderToMetadataProtoConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   HeaderToMetadataConfig factory;
 
   const auto route_config = factory.createRouteSpecificFilterConfig(

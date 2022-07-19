@@ -13,7 +13,7 @@ namespace GrpcHttp1ReverseBridge {
 
 Http::FilterFactoryCb Config::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig& config,
-    const std::string&, Server::Configuration::ServerFactoryContext&) {
+    const std::string&, Server::Configuration::FactoryContext&) {
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(
         config.content_type(), config.withhold_grpc_frames(), config.response_size_header()));
@@ -23,7 +23,7 @@ Http::FilterFactoryCb Config::createFilterFactoryFromProtoTyped(
 Router::RouteSpecificFilterConfigConstSharedPtr Config::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute&
         proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::FactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<FilterConfigPerRoute>(proto_config);
 }
 

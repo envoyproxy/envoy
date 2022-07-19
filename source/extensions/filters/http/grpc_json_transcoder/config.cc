@@ -14,7 +14,8 @@ namespace GrpcJsonTranscoder {
 Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    const std::string&, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   JsonTranscoderConfigSharedPtr filter_config =
       std::make_shared<JsonTranscoderConfig>(proto_config, context.api());
 
@@ -27,8 +28,8 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 GrpcJsonTranscoderFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-
+    Server::Configuration::FactoryContext& base_context, ProtobufMessage::ValidationVisitor&) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   return std::make_shared<JsonTranscoderConfig>(proto_config, context.api());
 }
 

@@ -81,7 +81,7 @@ class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
                    const OptionalHttpFilters& optional_http_filters,
-                   Server::Configuration::ServerFactoryContext& factory_context,
+                   Server::Configuration::FactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator);
 
   const RouteSpecificFilterConfig* get(const std::string& name) const;
@@ -90,7 +90,7 @@ private:
   RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                                   const OptionalHttpFilters& optional_http_filters,
-                                  Server::Configuration::ServerFactoryContext& factory_context,
+                                  Server::Configuration::FactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);
 
   absl::node_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
@@ -197,7 +197,7 @@ public:
   VirtualHostImpl(
       const envoy::config::route::v3::VirtualHost& virtual_host,
       const OptionalHttpFilters& optional_http_filters, const ConfigImpl& global_route_config,
-      Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+      Server::Configuration::FactoryContext& factory_context, Stats::Scope& scope,
       ProtobufMessage::ValidationVisitor& validator,
       const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters);
 
@@ -509,7 +509,7 @@ public:
    */
   RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
                      const OptionalHttpFilters& optional_http_filters,
-                     Server::Configuration::ServerFactoryContext& factory_context,
+                     Server::Configuration::FactoryContext& factory_context,
                      ProtobufMessage::ValidationVisitor& validator);
 
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
@@ -776,7 +776,7 @@ public:
   class WeightedClusterEntry : public DynamicRouteEntry {
   public:
     WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
-                         Server::Configuration::ServerFactoryContext& factory_context,
+                         Server::Configuration::FactoryContext& factory_context,
                          ProtobufMessage::ValidationVisitor& validator,
                          const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
                          const OptionalHttpFilters& optional_http_filters);
@@ -1008,7 +1008,7 @@ public:
   PathTemplateRouteEntryImpl(const VirtualHostImpl& vhost,
                              const envoy::config::route::v3::Route& route,
                              const OptionalHttpFilters& optional_http_filters,
-                             Server::Configuration::ServerFactoryContext& factory_context,
+                             Server::Configuration::FactoryContext& factory_context,
                              ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
@@ -1040,7 +1040,7 @@ class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
   PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
                        const OptionalHttpFilters& optional_http_filters,
-                       Server::Configuration::ServerFactoryContext& factory_context,
+                       Server::Configuration::FactoryContext& factory_context,
                        ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
@@ -1072,7 +1072,7 @@ class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
   PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
                      const OptionalHttpFilters& optional_http_filters,
-                     Server::Configuration::ServerFactoryContext& factory_context,
+                     Server::Configuration::FactoryContext& factory_context,
                      ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
@@ -1104,7 +1104,7 @@ class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
   RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
                       const OptionalHttpFilters& optional_http_filters,
-                      Server::Configuration::ServerFactoryContext& factory_context,
+                      Server::Configuration::FactoryContext& factory_context,
                       ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
@@ -1136,7 +1136,7 @@ class ConnectRouteEntryImpl : public RouteEntryImplBase {
 public:
   ConnectRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
                         const OptionalHttpFilters& optional_http_filters,
-                        Server::Configuration::ServerFactoryContext& factory_context,
+                        Server::Configuration::FactoryContext& factory_context,
                         ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
@@ -1166,7 +1166,7 @@ public:
   PathSeparatedPrefixRouteEntryImpl(const VirtualHostImpl& vhost,
                                     const envoy::config::route::v3::Route& route,
                                     const OptionalHttpFilters& optional_http_filters,
-                                    Server::Configuration::ServerFactoryContext& factory_context,
+                                    Server::Configuration::FactoryContext& factory_context,
                                     ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
@@ -1195,7 +1195,7 @@ private:
 struct RouteActionContext {
   const VirtualHostImpl& vhost;
   const OptionalHttpFilters& optional_http_filters;
-  Server::Configuration::ServerFactoryContext& factory_context;
+  Server::Configuration::FactoryContext& factory_context;
 };
 
 // Action used with the matching tree to specify route to use for an incoming stream.
@@ -1230,7 +1230,7 @@ public:
   RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
                const OptionalHttpFilters& optional_http_filters,
                const ConfigImpl& global_http_config,
-               Server::Configuration::ServerFactoryContext& factory_context,
+               Server::Configuration::FactoryContext& factory_context,
                ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
   RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
@@ -1272,7 +1272,7 @@ class ConfigImpl : public Config {
 public:
   ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
              const OptionalHttpFilters& optional_http_filters,
-             Server::Configuration::ServerFactoryContext& factory_context,
+             Server::Configuration::FactoryContext& factory_context,
              ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default);
 
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };

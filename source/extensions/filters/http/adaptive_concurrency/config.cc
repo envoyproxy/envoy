@@ -14,8 +14,8 @@ namespace AdaptiveConcurrency {
 
 Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency& config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
-
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   auto acc_stats_prefix = stats_prefix + "adaptive_concurrency.";
 
   std::shared_ptr<Controller::ConcurrencyController> controller;
@@ -26,12 +26,12 @@ Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromP
       Controller::GradientControllerConfig(config.gradient_controller_config(), context.runtime());
   controller = std::make_shared<Controller::GradientController>(
       std::move(gradient_controller_config), context.mainThreadDispatcher(), context.runtime(),
-      acc_stats_prefix + "gradient_controller.", context.scope(), context.api().randomGenerator(),
-      context.timeSource());
+      acc_stats_prefix + "gradient_controller.", base_context.scope(),
+      context.api().randomGenerator(), context.timeSource());
 
   AdaptiveConcurrencyFilterConfigSharedPtr filter_config(
       new AdaptiveConcurrencyFilterConfig(config, context.runtime(), std::move(acc_stats_prefix),
-                                          context.scope(), context.timeSource()));
+                                          base_context.scope(), context.timeSource()));
 
   return [filter_config, controller](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(

@@ -51,7 +51,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::HeaderToFilterStateFilterConfig& proto_config,
-      const std::string&, Server::Configuration::ServerFactoryContext&) override {
+      const std::string&, Server::Configuration::FactoryContext&) override {
     return [=](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<HeaderToFilterStateFilter>(
           proto_config.header_name(), proto_config.state_name(), proto_config.read_only(),

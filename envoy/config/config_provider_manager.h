@@ -53,7 +53,7 @@ public:
    */
   virtual ConfigProviderPtr
   createXdsConfigProvider(const Protobuf::Message& config_source_proto,
-                          Server::Configuration::ServerFactoryContext& factory_context,
+                          Server::Configuration::FactoryContext& factory_context,
                           Init::Manager& init_manager, const std::string& stat_prefix,
                           const OptionalArg& optarg) PURE;
 
@@ -66,7 +66,7 @@ public:
    */
   virtual ConfigProviderPtr
   createStaticConfigProvider(const Protobuf::Message& config_proto,
-                             Server::Configuration::ServerFactoryContext& factory_context,
+                             Server::Configuration::FactoryContext& factory_context,
                              const OptionalArg& optarg) {
     UNREFERENCED_PARAMETER(config_proto);
     UNREFERENCED_PARAMETER(factory_context);
@@ -84,7 +84,7 @@ public:
    */
   virtual ConfigProviderPtr
   createStaticConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,
-                             Server::Configuration::ServerFactoryContext& factory_context,
+                             Server::Configuration::FactoryContext& factory_context,
                              const OptionalArg& optarg) {
     UNREFERENCED_PARAMETER(config_protos);
     UNREFERENCED_PARAMETER(factory_context);

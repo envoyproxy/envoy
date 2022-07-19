@@ -22,6 +22,7 @@
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -105,7 +106,9 @@ protected:
   NiceMock<Init::MockManager> context_init_manager_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   // server_factory_context_ is used by rds
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext>& server_factory_context_{
+      factory_context_.mock_server_context_};
   RouteConfigProviderManagerPtr route_config_provider_manager_;
   ScopedRoutesConfigProviderManagerPtr config_provider_manager_;
 
@@ -155,7 +158,7 @@ scoped_routes:
 
   EXPECT_THROW_WITH_REGEX(
       ScopedRoutesConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(hcm_config),
-                                             server_factory_context_, context_init_manager_, "foo.",
+                                             factory_context_, context_init_manager_, "foo.",
                                              *config_provider_manager_),
       EnvoyException, "Fetching routes via RDS \\(route_configuration_name\\) is not supported");
 }
@@ -179,8 +182,8 @@ scoped_routes:
 
   EXPECT_THROW_WITH_MESSAGE(
       Envoy::Config::ConfigProviderPtr provider = ScopedRoutesConfigProviderUtil::create(
-          parseHttpConnectionManagerFromYaml(hcm_config), server_factory_context_,
-          context_init_manager_, "foo.", *config_provider_manager_),
+          parseHttpConnectionManagerFromYaml(hcm_config), factory_context_, context_init_manager_,
+          "foo.", *config_provider_manager_),
       EnvoyException, "You must specify a route_configuration with inline scoped routes.");
 }
 
@@ -222,7 +225,7 @@ scoped_routes:
 )EOF");
   Envoy::Config::ConfigProviderPtr provider = ScopedRoutesConfigProviderUtil::create(
       parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes")),
-      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+      factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
   ASSERT_THAT(provider->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(provider->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"addr", "foo-key"}})
@@ -276,7 +279,7 @@ scoped_routes:
 )EOF");
   Envoy::Config::ConfigProviderPtr inline_config_provider = ScopedRoutesConfigProviderUtil::create(
       parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes")),
-      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+      factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
   UniversalStringMatcher universal_matcher;
   ProtobufTypes::MessagePtr message =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
@@ -389,7 +392,7 @@ scope_key_builder:
         scoped_routes_config;
     TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
     provider_ = config_provider_manager_->createXdsConfigProvider(
-        scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "foo.",
+        scoped_routes_config.scoped_rds(), factory_context_, context_init_manager_, "foo.",
         ScopedRoutesConfigProviderManagerOptArg(
             scoped_routes_config.name(), scoped_routes_config.rds_config_source(),
             scoped_routes_config.scope_key_builder(), optional_http_filters));
@@ -1181,7 +1184,7 @@ dynamic_scoped_route_configs:
   Envoy::Config::ConfigProviderPtr inline_config = ScopedRoutesConfigProviderUtil::create(
       parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_base_config_yaml, "foo-scoped-routes",
                                                           inline_scoped_route_configs_yaml)),
-      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+      factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
           universal_matcher);
@@ -1228,8 +1231,7 @@ route_configuration_name: static-foo-route-config
 key:
   fragments: { string_key: "172.30.30.10" }
 )EOF"),
-                   server_factory_context_,
-                   Envoy::Config::ConfigProviderManager::NullOptionalArg()),
+                   factory_context_, Envoy::Config::ConfigProviderManager::NullOptionalArg()),
                ".*");
 }
 

@@ -21,12 +21,11 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::FactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
 };
 

@@ -13,7 +13,8 @@ namespace DynamicForwardProxy {
 
 Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    const std::string&, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context);
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
@@ -26,7 +27,7 @@ Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromP
 Router::RouteSpecificFilterConfigConstSharedPtr
 DynamicForwardProxyFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::FactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const ProxyPerRouteConfig>(config);
 }
 

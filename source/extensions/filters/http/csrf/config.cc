@@ -13,7 +13,8 @@ namespace Csrf {
 
 Http::FilterFactoryCb CsrfFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   CsrfFilterConfigSharedPtr config =
       std::make_shared<CsrfFilterConfig>(policy, stats_prefix, context.scope(), context.runtime());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -24,7 +25,8 @@ Http::FilterFactoryCb CsrfFilterFactory::createFilterFactoryFromProtoTyped(
 Router::RouteSpecificFilterConfigConstSharedPtr
 CsrfFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::FactoryContext& base_context, ProtobufMessage::ValidationVisitor&) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   return std::make_shared<const Csrf::CsrfPolicy>(policy, context.runtime());
 }
 

@@ -45,9 +45,9 @@ TEST(Factory, RouteSpecificFilterConfig) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(context.mock_server_context_.dispatcher_, createTimer_(_)).Times(0);
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
@@ -73,9 +73,9 @@ TEST(Factory, RouteSpecificFilterConfigDisabledByDefault) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(context.mock_server_context_.dispatcher_, createTimer_(_)).Times(0);
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
@@ -95,9 +95,9 @@ TEST(Factory, RouteSpecificFilterConfigDefault) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(context.mock_server_context_.dispatcher_, createTimer_(_)).Times(0);
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
@@ -120,7 +120,7 @@ TEST(Factory, PerRouteConfigNoLimits) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
                                                        ProtobufMessage::getNullValidationVisitor()),
                EnvoyException);

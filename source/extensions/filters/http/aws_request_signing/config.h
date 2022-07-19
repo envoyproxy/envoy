@@ -24,7 +24,7 @@ private:
       const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning&
           proto_config,
       const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& base_context) override;
 };
 
 } // namespace AwsRequestSigningFilter

@@ -23,10 +23,10 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
       const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& base_context) override;
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
-      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
+      Server::Configuration::FactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace LocalRateLimitFilter

@@ -63,7 +63,6 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
                                        empty_proto_route_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   StatefulSessionFactoryConfig factory;
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
@@ -71,18 +70,18 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);
 
-  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(proto_route_config, server_context,
+  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(proto_route_config, context,
                                                           context.messageValidationVisitor()));
-  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(disabled_config, server_context,
+  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(disabled_config, context,
                                                           context.messageValidationVisitor()));
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createRouteSpecificFilterConfig(not_exist_config, server_context,
+      factory.createRouteSpecificFilterConfig(not_exist_config, context,
                                               context.messageValidationVisitor()),
       EnvoyException,
       "Didn't find a registered implementation for name: 'envoy.http.stateful_session.not_exist'");
 
   EXPECT_NO_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context));
-  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(empty_proto_route_config, server_context,
+  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(empty_proto_route_config, context,
                                                           context.messageValidationVisitor()));
 }
 

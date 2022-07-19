@@ -70,7 +70,7 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
 RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
     const envoy::config::route::v3::Route& route_config, const VirtualHostImpl& vhost,
     const OptionalHttpFilters& optional_http_filters,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::FactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
 
@@ -470,7 +470,7 @@ const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return cu
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        const OptionalHttpFilters& optional_http_filters,
-                                       Server::Configuration::ServerFactoryContext& factory_context,
+                                       Server::Configuration::FactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
       prefix_rewrite_(route.route().prefix_rewrite()),
@@ -502,7 +502,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                            grpc_timeout_header_offset)),
       max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
       grpc_timeout_offset_(PROTOBUF_GET_OPTIONAL_MS(route.route(), grpc_timeout_offset)),
-      loader_(factory_context.runtime()), runtime_(loadRuntimeData(route.match())),
+      loader_(factory_context.getServerFactoryContext().runtime()),
+      runtime_(loadRuntimeData(route.match())),
       scheme_redirect_(route.redirect().scheme_redirect()),
       host_redirect_(route.redirect().host_redirect()),
       port_redirect_(route.redirect().port_redirect()
@@ -515,8 +516,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
-      retry_policy_(
-          buildRetryPolicy(vhost.retryPolicy(), route.route(), validator, factory_context)),
+      retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(), validator,
+                                     factory_context.getServerFactoryContext())),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
       rate_limit_policy_(route.route().rate_limits(), validator),
@@ -538,11 +539,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       route_tracing_(parseRouteTracing(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(
-          route, factory_context.api(),
+          route, factory_context.getServerFactoryContext().api(),
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
                           validator),
-      route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
+      route_name_(route.name()),
+      time_source_(factory_context.getServerFactoryContext().mainThreadDispatcher().timeSource()),
       random_value_header_name_(route.route().weighted_clusters().header_name()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -589,8 +591,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   } else if (route.route().cluster_specifier_case() ==
              envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
                  kInlineClusterSpecifierPlugin) {
-    cluster_specifier_plugin_ = getClusterSpecifierPluginByTheProto(
-        route.route().inline_cluster_specifier_plugin(), validator, factory_context);
+    cluster_specifier_plugin_ =
+        getClusterSpecifierPluginByTheProto(route.route().inline_cluster_specifier_plugin(),
+                                            validator, factory_context.getServerFactoryContext());
   } else if (route.route().has_cluster_specifier_plugin()) {
     cluster_specifier_plugin_ =
         vhost_.globalRouteConfig().clusterSpecifierPlugin(route.route().cluster_specifier_plugin());
@@ -617,8 +620,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false);
 
   if (route.route().has_cors()) {
-    cors_policy_ =
-        std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(
+        route.route().cors(), factory_context.getServerFactoryContext().runtime());
   }
   for (const auto& upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
@@ -662,8 +665,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
   if (!route.stat_prefix().empty()) {
     route_stats_context_ = std::make_unique<RouteStatsContextImpl>(
-        factory_context.scope(), factory_context.routerContext().routeStatNames(), vhost.statName(),
-        route.stat_prefix());
+        factory_context.getServerFactoryContext().scope(),
+        factory_context.getServerFactoryContext().routerContext().routeStatNames(),
+        vhost.statName(), route.stat_prefix());
   }
 
   if (route.route().has_early_data_policy()) {
@@ -1318,12 +1322,12 @@ void RouteEntryImplBase::traversePerFilterConfig(
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const RouteEntryImplBase* parent, const std::string& runtime_key,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::FactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator,
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
     const OptionalHttpFilters& optional_http_filters)
     : DynamicRouteEntry(parent, validateWeightedClusterSpecifier(cluster).name()),
-      runtime_key_(runtime_key), loader_(factory_context.runtime()),
+      runtime_key_(runtime_key), loader_(factory_context.getServerFactoryContext().runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
       request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add(),
                                                       cluster.request_headers_to_remove())),
@@ -1378,7 +1382,7 @@ void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
 PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
     const OptionalHttpFilters& optional_http_filters,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::FactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
       path_template_(route.match().path_template()),
@@ -1404,11 +1408,11 @@ RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(const Http::RequestHeade
   return nullptr;
 }
 
-PrefixRouteEntryImpl::PrefixRouteEntryImpl(
-    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
-    const OptionalHttpFilters& optional_http_filters,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator)
+PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
+                                           const envoy::config::route::v3::Route& route,
+                                           const OptionalHttpFilters& optional_http_filters,
+                                           Server::Configuration::FactoryContext& factory_context,
+                                           ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
       prefix_(route.match().prefix()),
       path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
@@ -1436,7 +1440,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
 PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        const OptionalHttpFilters& optional_http_filters,
-                                       Server::Configuration::ServerFactoryContext& factory_context,
+                                       Server::Configuration::FactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
       path_(route.match().path()),
@@ -1463,11 +1467,11 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
   return nullptr;
 }
 
-RegexRouteEntryImpl::RegexRouteEntryImpl(
-    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
-    const OptionalHttpFilters& optional_http_filters,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator)
+RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
+                                         const envoy::config::route::v3::Route& route,
+                                         const OptionalHttpFilters& optional_http_filters,
+                                         Server::Configuration::FactoryContext& factory_context,
+                                         ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
       regex_str_(route.match().safe_regex().regex()),
       path_matcher_(Matchers::PathMatcher::createSafeRegex(route.match().safe_regex())) {
@@ -1501,11 +1505,11 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
   return nullptr;
 }
 
-ConnectRouteEntryImpl::ConnectRouteEntryImpl(
-    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
-    const OptionalHttpFilters& optional_http_filters,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator)
+ConnectRouteEntryImpl::ConnectRouteEntryImpl(const VirtualHostImpl& vhost,
+                                             const envoy::config::route::v3::Route& route,
+                                             const OptionalHttpFilters& optional_http_filters,
+                                             Server::Configuration::FactoryContext& factory_context,
+                                             ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator) {}
 
 void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1533,7 +1537,7 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
 PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
     const OptionalHttpFilters& optional_http_filters,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::FactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
       prefix_(route.match().path_separated_prefix()),
@@ -1568,13 +1572,15 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
 VirtualHostImpl::VirtualHostImpl(
     const envoy::config::route::v3::VirtualHost& virtual_host,
     const OptionalHttpFilters& optional_http_filters, const ConfigImpl& global_route_config,
-    Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+    Server::Configuration::FactoryContext& factory_context, Stats::Scope& scope,
     ProtobufMessage::ValidationVisitor& validator,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters)
     : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
       vcluster_scope_(Stats::Utility::scopeFromStatNames(
-          scope, {stat_name_storage_.statName(),
-                  factory_context.routerContext().virtualClusterStatNames().vcluster_})),
+          scope, {stat_name_storage_.statName(), factory_context.getServerFactoryContext()
+                                                     .routerContext()
+                                                     .virtualClusterStatNames()
+                                                     .vcluster_})),
       rate_limit_policy_(virtual_host.rate_limits(), validator),
       global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
@@ -1587,8 +1593,9 @@ VirtualHostImpl::VirtualHostImpl(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
       include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
-      virtual_cluster_catch_all_(*vcluster_scope_,
-                                 factory_context.routerContext().virtualClusterStatNames()) {
+      virtual_cluster_catch_all_(
+          *vcluster_scope_,
+          factory_context.getServerFactoryContext().routerContext().virtualClusterStatNames()) {
   switch (virtual_host.require_tls()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::VirtualHost::NONE:
@@ -1628,7 +1635,7 @@ VirtualHostImpl::VirtualHostImpl(
     RouteActionContext context{*this, optional_http_filters, factory_context};
     RouteActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Http::HttpMatchingData, RouteActionContext> factory(
-        context, factory_context, validation_visitor);
+        context, factory_context.getServerFactoryContext(), validation_visitor);
 
     matcher_ = factory.create(virtual_host.matcher())();
 
@@ -1645,13 +1652,14 @@ VirtualHostImpl::VirtualHostImpl(
   }
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
-    virtual_clusters_.push_back(
-        VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
-                            factory_context.routerContext().virtualClusterStatNames()));
+    virtual_clusters_.push_back(VirtualClusterEntry(
+        virtual_cluster, *vcluster_scope_,
+        factory_context.getServerFactoryContext().routerContext().virtualClusterStatNames()));
   }
 
   if (virtual_host.has_cors()) {
-    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context.runtime());
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(
+        virtual_host.cors(), factory_context.getServerFactoryContext().runtime());
   }
 }
 
@@ -1700,14 +1708,17 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
 RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& route_config,
                            const OptionalHttpFilters& optional_http_filters,
                            const ConfigImpl& global_route_config,
-                           Server::Configuration::ServerFactoryContext& factory_context,
+                           Server::Configuration::FactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator, bool validate_clusters)
-    : vhost_scope_(factory_context.scope().scopeFromStatName(
-          factory_context.routerContext().virtualClusterStatNames().vhost_)),
+    : vhost_scope_(
+          factory_context.scope().scopeFromStatName(factory_context.getServerFactoryContext()
+                                                        .routerContext()
+                                                        .virtualClusterStatNames()
+                                                        .vhost_)),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()) {
   absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
   if (validate_clusters) {
-    validation_clusters = factory_context.clusterManager().clusters();
+    validation_clusters = factory_context.getServerFactoryContext().clusterManager().clusters();
   }
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
@@ -1909,7 +1920,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 
 ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                        const OptionalHttpFilters& optional_http_filters,
-                       Server::Configuration::ServerFactoryContext& factory_context,
+                       Server::Configuration::FactoryContext& factory_context,
                        ProtobufMessage::ValidationVisitor& validator,
                        bool validate_clusters_default)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
@@ -1929,7 +1940,8 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
   // Initialize all cluster specifier plugins before creating route matcher. Because the route may
   // reference it by name.
   for (const auto& plugin_proto : config.cluster_specifier_plugins()) {
-    auto plugin = getClusterSpecifierPluginByTheProto(plugin_proto, validator, factory_context);
+    auto plugin = getClusterSpecifierPluginByTheProto(plugin_proto, validator,
+                                                      factory_context.getServerFactoryContext());
     cluster_specifier_plugins_.emplace(plugin_proto.extension().name(), std::move(plugin));
   }
 
@@ -1967,7 +1979,7 @@ RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
 RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFilterConfig(
     const std::string& name, const ProtobufWkt::Any& typed_config,
     const OptionalHttpFilters& optional_http_filters,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::FactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
   Server::Configuration::NamedHttpFilterConfigFactory* factory = nullptr;
@@ -2017,7 +2029,7 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
     const OptionalHttpFilters& optional_http_filters,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::FactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   for (const auto& it : typed_configs) {
     const auto& name = it.first;

@@ -7,9 +7,10 @@ namespace Rds {
 
 RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
     ConfigTraits& config_traits, ProtoTraits& proto_traits,
-    Server::Configuration::ServerFactoryContext& factory_context)
-    : config_traits_(config_traits), proto_traits_(proto_traits), factory_context_(factory_context),
-      time_source_(factory_context.timeSource()),
+    Server::Configuration::FactoryContext& factory_context)
+    : config_traits_(config_traits), proto_traits_(proto_traits),
+      factory_context_(factory_context.getServerFactoryContext(), {}),
+      time_source_(factory_context.getServerFactoryContext().timeSource()),
       route_config_proto_(proto_traits_.createEmptyProto()), last_config_hash_(0ull),
       config_(config_traits_.createNullConfig()) {}
 

@@ -41,7 +41,7 @@ Rds::ConfigConstSharedPtr ConfigTraitsImpl::createNullConfig() const {
 
 Rds::ConfigConstSharedPtr
 ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
-                               Server::Configuration::ServerFactoryContext& factory_context,
+                               Server::Configuration::FactoryContext& factory_context,
                                bool validate_clusters_default) const {
   ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
   return std::make_shared<ConfigImpl>(

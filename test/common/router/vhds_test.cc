@@ -15,7 +15,7 @@
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -82,7 +82,7 @@ vhds:
   }
 
   ProtoTraitsImpl proto_traits_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   const std::string context_ = "vhds_test";
@@ -134,8 +134,8 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      decoded_resources.refvec_, removed_resources, "1");
+  factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_
+      ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1");
 
   EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
   EXPECT_TRUE(messageDifferencer_.Equals(
@@ -194,8 +194,8 @@ vhds:
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      decoded_resources.refvec_, removed_resources, "1");
+  factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_
+      ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1");
   EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
 
   config_update_info->onRdsUpdate(updated_route_config, "2");

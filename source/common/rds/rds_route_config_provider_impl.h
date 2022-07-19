@@ -21,7 +21,7 @@ class RdsRouteConfigProviderImpl : public RouteConfigProvider,
                                    Logger::Loggable<Logger::Id::router> {
 public:
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
-                             Server::Configuration::ServerFactoryContext& factory_context);
+                             Server::Configuration::FactoryContext& factory_context);
 
   ~RdsRouteConfigProviderImpl() override;
 

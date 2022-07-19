@@ -37,7 +37,7 @@ envoy_cc_test_library(
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/exe:platform_impl_lib",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:test_runtime_lib",

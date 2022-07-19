@@ -6,13 +6,15 @@
 #include "envoy/rds/route_config_update_receiver.h"
 #include "envoy/server/factory_context.h"
 
+#include "source/server/filter_factory_context_impl.h"
+
 namespace Envoy {
 namespace Rds {
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
   RouteConfigUpdateReceiverImpl(ConfigTraits& config_traits, ProtoTraits& proto_traits,
-                                Server::Configuration::ServerFactoryContext& factory_context);
+                                Server::Configuration::FactoryContext& factory_context);
 
   uint64_t getHash(const Protobuf::Message& rc) const { return MessageUtil::hash(rc); }
   bool checkHash(uint64_t new_hash) const { return (new_hash != last_config_hash_); }
@@ -32,7 +34,7 @@ public:
 private:
   ConfigTraits& config_traits_;
   ProtoTraits& proto_traits_;
-  Server::Configuration::ServerFactoryContext& factory_context_;
+  Server::Configuration::FilterFactoryContextImpl factory_context_;
   TimeSource& time_source_;
   ProtobufTypes::MessagePtr route_config_proto_;
   uint64_t last_config_hash_;

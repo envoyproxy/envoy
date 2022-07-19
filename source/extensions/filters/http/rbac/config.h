@@ -23,11 +23,11 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
       const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& base_context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& proto_config,
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::FactoryContext& base_context,
       ProtobufMessage::ValidationVisitor& validator) override;
 };
 

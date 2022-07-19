@@ -4,6 +4,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/router/config_impl.h"
 
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
@@ -88,9 +89,9 @@ static RouteConfiguration genRouteConfig(benchmark::State& state,
 static void bmRouteTableSize(benchmark::State& state, RouteMatch::PathSpecifierCase match_type) {
   // Setup router for benchmarking.
   Api::ApiPtr api = Api::createApiForTest();
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
+  ON_CALL(factory_context.mock_server_context_, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config.
   ConfigImpl config(genRouteConfig(state, match_type), OptionalHttpFilters(), factory_context,

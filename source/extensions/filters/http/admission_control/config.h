@@ -22,7 +22,7 @@ public:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& proto_config,
       const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& base_context) override;
 };
 
 } // namespace AdmissionControl

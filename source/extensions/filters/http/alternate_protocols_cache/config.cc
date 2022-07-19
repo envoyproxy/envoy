@@ -14,7 +14,8 @@ namespace AlternateProtocolsCache {
 Http::FilterFactoryCb AlternateProtocolsCacheFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
         proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    const std::string&, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocol_cache_manager_factory(
       context.singletonManager(), context.threadLocal(), {context});
   FilterConfigSharedPtr filter_config(

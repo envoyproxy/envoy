@@ -92,7 +92,7 @@ matcher_tree:
   *config.mutable_matcher() = matcher_proto;
 
   Stats::IsolatedStoreImpl store;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(std::make_shared<RoleBasedAccessControlFilterConfig>(
                    config, "test", store, context, ProtobufMessage::getStrictValidationVisitor()),
                Envoy::EnvoyException);
@@ -106,7 +106,7 @@ matcher_tree:
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   EXPECT_TRUE(proto_config.get());

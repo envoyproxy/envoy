@@ -16,7 +16,7 @@ namespace SetMetadataFilter {
 
 Http::FilterFactoryCb SetMetadataConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext&) {
+    const std::string&, Server::Configuration::FactoryContext&) {
   ConfigSharedPtr filter_config(std::make_shared<Config>(proto_config));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

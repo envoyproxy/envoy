@@ -14,9 +14,10 @@ namespace BandwidthLimitFilter {
 
 Http::FilterFactoryCb BandwidthLimitFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    const std::string&, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   FilterConfigSharedPtr filter_config = std::make_shared<FilterConfig>(
-      proto_config, context.scope(), context.runtime(), context.timeSource());
+      proto_config, base_context.scope(), context.runtime(), context.timeSource());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<BandwidthLimiter>(filter_config));
   };
@@ -25,8 +26,9 @@ Http::FilterFactoryCb BandwidthLimitFilterConfig::createFilterFactoryFromProtoTy
 Router::RouteSpecificFilterConfigConstSharedPtr
 BandwidthLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const FilterConfig>(proto_config, context.scope(), context.runtime(),
+    Server::Configuration::FactoryContext& base_context, ProtobufMessage::ValidationVisitor&) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
+  return std::make_shared<const FilterConfig>(proto_config, base_context.scope(), context.runtime(),
                                               context.timeSource(), true);
 }
 

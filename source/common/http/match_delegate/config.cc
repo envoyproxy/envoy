@@ -243,7 +243,7 @@ void DelegatingStreamFilter::setEncoderFilterCallbacks(
   encoder_filter_->setEncoderFilterCallbacks(callbacks);
 }
 
-Envoy::Http::FilterFactoryCb MatchDelegateConfig::createDownstreamFilterFactoryFromProtoTyped(
+Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
     const std::string& prefix, Server::Configuration::FactoryContext& context) {
 

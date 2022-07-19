@@ -39,9 +39,12 @@ public:
 
   // Config
   RocketmqFilterStats& stats() override { return stats_; }
-  Upstream::ClusterManager& clusterManager() override { return context_.clusterManager(); }
+  Upstream::ClusterManager& clusterManager() override {
+    return context_.getServerFactoryContext().clusterManager();
+  }
   Router::RouterPtr createRouter() override {
-    return std::make_unique<Router::RouterImpl>(context_.clusterManager());
+    return std::make_unique<Router::RouterImpl>(
+        context_.getServerFactoryContext().clusterManager());
   }
   bool developMode() const override { return develop_mode_; }
 

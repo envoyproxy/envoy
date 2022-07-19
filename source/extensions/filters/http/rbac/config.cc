@@ -13,8 +13,8 @@ namespace RBACFilter {
 
 Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
-
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(
       proto_config, stats_prefix, context.scope(), context, context.messageValidationVisitor());
 
@@ -26,10 +26,10 @@ Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFac
 Router::RouteSpecificFilterConfigConstSharedPtr
 RoleBasedAccessControlFilterConfigFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::FactoryContext& base_context,
     ProtobufMessage::ValidationVisitor& validator) {
   return std::make_shared<const RoleBasedAccessControlRouteSpecificFilterConfig>(
-      proto_config, context, validator);
+      proto_config, base_context.getServerFactoryContext(), validator);
 }
 
 /**

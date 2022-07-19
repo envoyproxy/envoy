@@ -15,7 +15,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -87,7 +87,7 @@ public:
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
   }
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ProtobufMessage::NullValidationVisitorImpl any_validation_visitor_;
   std::unique_ptr<ConfigImpl> config_;
   Http::TestRequestHeaderMapImpl header_;
@@ -116,7 +116,7 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  factory_context_.mock_server_context_.cluster_manager_.initializeClusters({"www2"}, {});
   setupTest(yaml);
 
   EXPECT_EQ(0U, config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info_, 0)
@@ -139,7 +139,7 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  factory_context_.mock_server_context_.cluster_manager_.initializeClusters({"www2"}, {});
   setupTest(yaml);
   auto route = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info_, 0);
   auto* route_entry = route->routeEntry();
@@ -165,7 +165,7 @@ virtual_hosts:
         - remote_address: {}
   )EOF";
 
-  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  factory_context_.mock_server_context_.cluster_manager_.initializeClusters({"www2"}, {});
   setupTest(yaml);
   auto route = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info_, 0);
   auto* route_entry = route->routeEntry();
@@ -200,7 +200,7 @@ virtual_hosts:
     - destination_cluster: {}
   )EOF";
 
-  factory_context_.cluster_manager_.initializeClusters({"www2test"}, {});
+  factory_context_.mock_server_context_.cluster_manager_.initializeClusters({"www2test"}, {});
   setupTest(yaml);
   auto route = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info_, 0);
   auto* route_entry = route->routeEntry();
@@ -245,7 +245,7 @@ virtual_hosts:
         - source_cluster: {}
   )EOF";
 
-  factory_context_.cluster_manager_.initializeClusters({"www2test"}, {});
+  factory_context_.mock_server_context_.cluster_manager_.initializeClusters({"www2test"}, {});
   setupTest(yaml);
   auto route = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info_, 0);
   auto* route_entry = route->routeEntry();

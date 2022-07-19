@@ -9,7 +9,8 @@ namespace Cache {
 
 Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   HttpCacheFactory* const http_cache_factory =
       Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(type);
@@ -20,10 +21,10 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
 
   auto cache = http_cache_factory->getCache(config, context);
 
-  return [config, stats_prefix, &context,
+  return [config, stats_prefix, &base_context, &context,
           cache](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<CacheFilter>(config, stats_prefix, context.scope(),
-                                                            context.timeSource(), *cache));
+    callbacks.addStreamFilter(std::make_shared<CacheFilter>(
+        config, stats_prefix, base_context.scope(), context.timeSource(), *cache));
   };
 }
 

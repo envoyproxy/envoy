@@ -433,15 +433,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRouteConfig:
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
-        config, context_.getServerFactoryContext(), context_.messageValidationVisitor(),
+        config, context_, context_.messageValidationVisitor(),
         context_.getDownstreamFactoryContext()->initManager(), stats_prefix_,
         route_config_provider_manager_);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kScopedRoutes:
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
-        config, context_.getServerFactoryContext(),
-        context_.getDownstreamFactoryContext()->initManager(), stats_prefix_,
+        config, context_, context_.getDownstreamFactoryContext()->initManager(), stats_prefix_,
         scoped_routes_config_provider_manager_);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::

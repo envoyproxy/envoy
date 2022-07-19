@@ -16,7 +16,7 @@ class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
   StaticRouteConfigProviderImpl(const Protobuf::Message& route_config_proto,
                                 ConfigTraits& config_traits,
-                                Server::Configuration::ServerFactoryContext& factory_context,
+                                Server::Configuration::FactoryContext& factory_context,
                                 RouteConfigProviderManager& route_config_provider_manager);
 
   ~StaticRouteConfigProviderImpl() override;
