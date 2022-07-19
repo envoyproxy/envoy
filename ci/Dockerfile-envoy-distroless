@@ -1,4 +1,4 @@
-FROM gcr.io/distroless/base-debian11@sha256:d65ac1a65a4d82a48ebd0a22aea2acdd95d7abeeda245dfee932ec0018c781f4
+FROM gcr.io/distroless/base-debian11:nonroot@sha256:49d2923f35d66b8402487a7c01bc62a66d8279cd42e89c11b64cdce8d5826c03
 
 ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 

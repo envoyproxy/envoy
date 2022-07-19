@@ -13,7 +13,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* ci: fix disk space issue that have prevented publication.
+* docker: update Docker images (``distroless`` -> ``49d2923f35d6``) to resolve CVE issues in container packages.
 
 Removed Config or Runtime
 -------------------------
