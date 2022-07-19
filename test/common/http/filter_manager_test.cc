@@ -206,7 +206,7 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   EXPECT_CALL(*encoder_filter, onLocalReply(_));
   EXPECT_CALL(filter_manager_callbacks_, resetStream());
   decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
-                                             absl::nullopt, "details");
+                                             Grpc::Status::Internal, "details");
 
   // The reason for the response (in this case the reset) will still be tracked
   // but as no response is sent the response code will remain absent.
