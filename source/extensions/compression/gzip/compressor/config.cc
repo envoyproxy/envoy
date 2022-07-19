@@ -83,7 +83,7 @@ Envoy::Compression::Compressor::CompressorPtr GzipCompressorFactory::createCompr
 Envoy::Compression::Compressor::CompressorFactoryPtr
 GzipCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(
     const envoy::extensions::compression::gzip::compressor::v3::Gzip& proto_config,
-    Server::Configuration::ServerFactoryContext&) {
+    Server::Configuration::FactoryContext&) {
   return std::make_unique<GzipCompressorFactory>(proto_config);
 }
 

@@ -117,7 +117,7 @@ public:
   TunnelingConfigHelperImpl(
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
           config_message,
-      Server::Configuration::ServerFactoryContext& context);
+      Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
@@ -135,10 +135,10 @@ class OnDemandConfig {
 public:
   OnDemandConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand&
                      on_demand_message,
-                 Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope)
-      : odcds_(context.clusterManager().allocateOdCdsApi(on_demand_message.odcds_config(),
-                                                         OptRef<xds::core::v3::ResourceLocator>(),
-                                                         context.messageValidationVisitor())),
+                 Server::Configuration::FactoryContext& context, Stats::Scope& scope)
+      : odcds_(context.getServerFactoryContext().clusterManager().allocateOdCdsApi(
+            on_demand_message.odcds_config(), OptRef<xds::core::v3::ResourceLocator>(),
+            context.messageValidationVisitor())),
         lookup_timeout_(std::chrono::milliseconds(
             PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
         stats_(generateStats(scope)) {}
@@ -170,7 +170,7 @@ public:
   class SharedConfig {
   public:
     SharedConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
-                 Server::Configuration::ServerFactoryContext& context);
+                 Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
@@ -208,7 +208,7 @@ public:
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
 
   Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
-         Server::Configuration::ServerFactoryContext& context);
+         Server::Configuration::FactoryContext& context);
 
   /**
    * Find out which cluster an upstream connection should be opened to based on the

@@ -32,7 +32,8 @@ Envoy::Compression::Compressor::CompressorPtr ZstdCompressorFactory::createCompr
 Envoy::Compression::Compressor::CompressorFactoryPtr
 ZstdCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(
     const envoy::extensions::compression::zstd::compressor::v3::Zstd& proto_config,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   return std::make_unique<ZstdCompressorFactory>(proto_config, context.mainThreadDispatcher(),
                                                  context.api(), context.threadLocal());
 }

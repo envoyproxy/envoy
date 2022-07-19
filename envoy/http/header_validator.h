@@ -81,7 +81,7 @@ class HeaderValidatorFactoryConfig : public Config::TypedFactory {
 public:
   virtual HeaderValidatorFactorySharedPtr
   createFromProto(const Protobuf::Message& config,
-                  Server::Configuration::ServerFactoryContext& context) PURE;
+                  Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.http.header_validators"; }
 };

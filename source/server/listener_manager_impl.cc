@@ -97,8 +97,7 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
             proto_config);
 
     auto message = Config::Utility::translateToFactoryConfig(
-        proto_config, factory_context.messageValidationVisitor(),
-        factory);
+        proto_config, factory_context.messageValidationVisitor(), factory);
     Config::Utility::validateTerminalFilters(
         filters[i].name(), factory.name(), "network",
         factory.isTerminalFilterByProto(*message, factory_context), i == filters.size() - 1);

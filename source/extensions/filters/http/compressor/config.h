@@ -13,16 +13,15 @@ namespace Compressor {
 /**
  * Config registration for the compressor filter. @see NamedHttpFilterConfigFactory.
  */
-class CompressorFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::compressor::v3::Compressor> {
+class CompressorFilterFactory : public Common::DownstreamFactoryBase<
+                                    envoy::extensions::filters::http::compressor::v3::Compressor> {
 public:
-  CompressorFilterFactory() : FactoryBase("envoy.filters.http.compressor") {}
+  CompressorFilterFactory() : DownstreamFactoryBase("envoy.filters.http.compressor") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  Http::FilterFactoryCb createDownstreamFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 DECLARE_FACTORY(CompressorFilterFactory);

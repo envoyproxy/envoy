@@ -51,7 +51,7 @@ public:
 private:
   Envoy::Compression::Decompressor::DecompressorFactoryPtr createDecompressorFactoryFromProtoTyped(
       const envoy::extensions::compression::zstd::decompressor::v3::Zstd& proto_config,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& context) override;
 };
 
 DECLARE_FACTORY(ZstdDecompressorLibraryFactory);

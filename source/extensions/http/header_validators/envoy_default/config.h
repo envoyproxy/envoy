@@ -19,7 +19,7 @@ class HeaderValidatorFactoryConfig : public ::Envoy::Http::HeaderValidatorFactor
 public:
   ::Envoy::Http::HeaderValidatorFactorySharedPtr
   createFromProto(const Protobuf::Message& config,
-                  Server::Configuration::ServerFactoryContext& context) override;
+                  Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

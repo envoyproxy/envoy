@@ -300,8 +300,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
-          config.http_protocol_options(),
-          context.messageValidationVisitor(),
+          config.http_protocol_options(), context.messageValidationVisitor(),
           config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -418,8 +417,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           fmt::format("Original IP detection extension not found: '{}'", extension_config.name()));
     }
 
-    auto extension = factory->createExtension(extension_config.typed_config(),
-                                              context_.getServerFactoryContext());
+    auto extension = factory->createExtension(extension_config.typed_config(), context_);
     if (!extension) {
       throw EnvoyException(fmt::format("Original IP detection extension could not be created: '{}'",
                                        extension_config.name()));

@@ -20,7 +20,7 @@ class XffIPDetectionFactory : public Envoy::Http::OriginalIPDetectionFactory {
 public:
   Envoy::Http::OriginalIPDetectionSharedPtr
   createExtension(const Protobuf::Message& message,
-                  Server::Configuration::ServerFactoryContext& context) override;
+                  Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::http::original_ip_detection::xff::v3::XffConfig>();

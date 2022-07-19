@@ -69,10 +69,9 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(
-        MessageUtil::downcastAndValidate<const ConfigProto&>(
-            proto_config, context.messageValidationVisitor()),
-        stats_prefix, context.getServerFactoryContext());
+    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                                 proto_config, context.messageValidationVisitor()),
+                                             stats_prefix, context.getServerFactoryContext());
   }
 
 protected:
@@ -95,8 +94,8 @@ public:
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
     return createDownstreamFilterFactoryFromProtoTyped(
-        MessageUtil::downcastAndValidate<const ConfigProto&>(
-            proto_config, context.messageValidationVisitor()),
+        MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
+                                                             context.messageValidationVisitor()),
         stats_prefix, context);
   }
 

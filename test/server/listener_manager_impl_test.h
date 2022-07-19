@@ -82,11 +82,11 @@ protected:
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [](
-                const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-                Server::Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
-              return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-                  filters, context);
+            [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
+               Server::Configuration::FactoryContext& context)
+                -> std::vector<Network::FilterFactoryCb> {
+              return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(filters,
+                                                                                      context);
             }));
     ON_CALL(listener_factory_, getTcpListenerConfigProviderManager())
         .WillByDefault(Return(&tcp_listener_config_provider_manager_));

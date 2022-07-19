@@ -43,7 +43,8 @@ namespace {
 
 class FilterConfigDiscoveryTestBase {
 public:
-  FilterConfigDiscoveryTestBase() : init_manager_(factory_context_.mock_downstream_context_.init_manager_) {
+  FilterConfigDiscoveryTestBase()
+      : init_manager_(factory_context_.mock_downstream_context_.init_manager_) {
     ON_CALL(factory_context_.mock_server_context_, scope()).WillByDefault(ReturnRef(scope_));
     ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
@@ -53,7 +54,8 @@ public:
             [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
     ON_CALL(factory_context_.mock_server_context_.admin_, concurrency()).WillByDefault(Return(0));
 
-    ON_CALL(factory_context_.mock_downstream_context_, listenerConfig()).WillByDefault(ReturnRef(listener_config_));
+    ON_CALL(factory_context_.mock_downstream_context_, listenerConfig())
+        .WillByDefault(ReturnRef(listener_config_));
   }
 
   virtual ~FilterConfigDiscoveryTestBase() = default;
@@ -61,7 +63,8 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  NiceMock<Server::Configuration::MockListenerFactoryContext>& listener_context_{factory_context_.mock_downstream_context_};
+  NiceMock<Server::Configuration::MockListenerFactoryContext>& listener_context_{
+      factory_context_.mock_downstream_context_};
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
@@ -101,9 +104,9 @@ public:
     provider_ = createProvider(ctx, "foo", warm, default_configuration, last_filter_config);
     callbacks_ =
         factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.callbacks_;
-    EXPECT_CALL(*factory_context_.mock_server_context_.cluster_manager_.subscription_factory_
-                     .subscription_,
-                start(_));
+    EXPECT_CALL(
+        *factory_context_.mock_server_context_.cluster_manager_.subscription_factory_.subscription_,
+        start(_));
     if (!warm) {
       EXPECT_CALL(init_watcher_, ready());
     }

@@ -21,7 +21,7 @@ RequestIDExtensionSharedPtr RequestIDExtensionFactory::fromProto(
 
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), context.messageValidationVisitor(), *factory);
-  return factory->createExtensionInstance(*message, context);
+  return factory->createExtensionInstance(*message, base_context);
 }
 
 } // namespace Http

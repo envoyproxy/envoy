@@ -10,9 +10,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Decompressor {
 
-Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyped(
+Http::FilterFactoryCb DecompressorFilterFactory::createDownstreamFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
+  Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   const std::string decompressor_library_type{TypeUtil::typeUrlToDescriptorFullName(
       proto_config.decompressor_library().typed_config().type_url())};
   Compression::Decompressor::NamedDecompressorLibraryConfigFactory* const
@@ -27,9 +28,9 @@ Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyp
       proto_config.decompressor_library().typed_config(), context.messageValidationVisitor(),
       *decompressor_library_factory);
   Compression::Decompressor::DecompressorFactoryPtr decompressor_factory =
-      decompressor_library_factory->createDecompressorFactoryFromProto(*message, context);
+      decompressor_library_factory->createDecompressorFactoryFromProto(*message, base_context);
   DecompressorFilterConfigSharedPtr filter_config = std::make_shared<DecompressorFilterConfig>(
-      proto_config, stats_prefix, context.scope(), context.runtime(),
+      proto_config, stats_prefix, base_context.scope(), context.runtime(),
       std::move(decompressor_factory));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<DecompressorFilter>(filter_config));

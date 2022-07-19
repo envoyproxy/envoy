@@ -1937,7 +1937,7 @@ public:
 
   Http::RequestIDExtensionSharedPtr
   createExtensionInstance(const Protobuf::Message& config,
-                          Server::Configuration::ServerFactoryContext& context) override {
+                          Server::Configuration::FactoryContext& context) override {
     const auto& custom_config = MessageUtil::downcastAndValidate<
         const test::http_connection_manager::CustomRequestIDExtension&>(
         config, context.messageValidationVisitor());
@@ -2094,7 +2094,7 @@ namespace {
 class OriginalIPDetectionExtensionNotCreatedFactory : public Http::OriginalIPDetectionFactory {
 public:
   Http::OriginalIPDetectionSharedPtr
-  createExtension(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&) override {
+  createExtension(const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
     return nullptr;
   }
 

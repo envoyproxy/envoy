@@ -12,8 +12,9 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
-::Envoy::Http::HeaderValidatorFactorySharedPtr HeaderValidatorFactoryConfig::createFromProto(
-    const Protobuf::Message& message, Server::Configuration::ServerFactoryContext& context) {
+::Envoy::Http::HeaderValidatorFactorySharedPtr
+HeaderValidatorFactoryConfig::createFromProto(const Protobuf::Message& message,
+                                              Server::Configuration::FactoryContext& context) {
   auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
       dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
   const auto& proto_config =

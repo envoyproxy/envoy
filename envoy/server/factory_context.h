@@ -134,12 +134,7 @@ public:
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
-   * @return the init manager of the particular context. This can be used for extensions that need
-   *         to initialize after cluster manager init but before the server starts listening.
-   *         All extensions should register themselves during configuration load. initialize()
-   *         will be called on  each registered target after cluster manager init but before the
-   *         server starts listening. Once all targets have initialized and invoked their callbacks,
-   *         the server will start listening.
+   * @return the init manager of the server.
    */
   virtual Init::Manager& initManager() PURE;
 };
@@ -258,7 +253,20 @@ public:
    */
   virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
 
+  /**
+   * @return the init manager of the particular context. This can be used for extensions that need
+   *         to initialize after cluster manager init but before the server starts listening.
+   *         All extensions should register themselves during configuration load. initialize()
+   *         will be called on  each registered target after cluster manager init but before the
+   *         server starts listening. Once all targets have initialized and invoked their callbacks,
+   *         the server will start listening.
+   */
   virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the scope for this listener.
+   * Stats created with this scope will be destroyed if the listener is reloaded.
+   */
   virtual Stats::Scope& scope() PURE;
 };
 
@@ -290,6 +298,10 @@ public:
     }
     return getServerFactoryContext().messageValidationVisitor();
   }
+
+  /* @return the best scope available.
+   * If there's a downstream context, that scope is prefered.
+   */
   virtual Stats::Scope& scope() {
     if (getDownstreamFactoryContext().has_value()) {
       return getDownstreamFactoryContext()->scope();

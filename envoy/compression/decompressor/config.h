@@ -14,7 +14,7 @@ public:
 
   virtual DecompressorFactoryPtr
   createDecompressorFactoryFromProto(const Protobuf::Message& config,
-                                     Server::Configuration::ServerFactoryContext& context) PURE;
+                                     Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.compression.decompressor"; }
 };

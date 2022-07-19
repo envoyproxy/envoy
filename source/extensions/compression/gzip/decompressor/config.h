@@ -50,7 +50,7 @@ public:
 private:
   Envoy::Compression::Decompressor::DecompressorFactoryPtr createDecompressorFactoryFromProtoTyped(
       const envoy::extensions::compression::gzip::decompressor::v3::Gzip& proto_config,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& context) override;
 };
 
 DECLARE_FACTORY(GzipDecompressorLibraryFactory);
