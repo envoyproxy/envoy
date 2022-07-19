@@ -1,5 +1,5 @@
-Sip filiter
-===========
+SIP proxy
+=========
 
 .. toctree::
   :glob:

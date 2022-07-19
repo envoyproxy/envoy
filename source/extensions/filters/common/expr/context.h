@@ -71,6 +71,7 @@ constexpr absl::string_view URISanLocalCertificate = "uri_san_local_certificate"
 constexpr absl::string_view URISanPeerCertificate = "uri_san_peer_certificate";
 constexpr absl::string_view DNSSanLocalCertificate = "dns_san_local_certificate";
 constexpr absl::string_view DNSSanPeerCertificate = "dns_san_peer_certificate";
+constexpr absl::string_view SHA256PeerCertificateDigest = "sha256_peer_certificate_digest";
 
 // Source properties
 // New symbols must be added to WrapperFieldValues.
@@ -123,6 +124,7 @@ public:
       CelValue::CreateStringView(URISanPeerCertificate),
       CelValue::CreateStringView(DNSSanLocalCertificate),
       CelValue::CreateStringView(DNSSanPeerCertificate),
+      CelValue::CreateStringView(SHA256PeerCertificateDigest),
   }};
   const ContainerBackedListImpl Upstream{{
       CelValue::CreateStringView(Address),
@@ -136,6 +138,7 @@ public:
       CelValue::CreateStringView(URISanPeerCertificate),
       CelValue::CreateStringView(DNSSanLocalCertificate),
       CelValue::CreateStringView(DNSSanPeerCertificate),
+      CelValue::CreateStringView(SHA256PeerCertificateDigest),
   }};
   const ContainerBackedListImpl Peer{{
       CelValue::CreateStringView(Address),

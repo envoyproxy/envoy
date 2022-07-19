@@ -1,5 +1,5 @@
-Cryptomb private key providers
-==============================
+CryptoMb private key provider
+=============================
 
 .. toctree::
   :glob:

@@ -50,15 +50,15 @@ message ExtAuthz {
 
   //  Changes filter's behaviour on errors:
   //
-  //  1. When set to true, the filter will *accept* client request even if the communication with
+  //  1. When set to true, the filter will ``accept`` client request even if the communication with
   //  the authorization service has failed, or if the authorization service has returned a HTTP 5xx
   //  error.
   //
-  //  2. When set to false, ext-authz will *reject* client requests and return a *Forbidden*
+  //  2. When set to false, ext-authz will ``reject`` client requests and return a ``Forbidden``
   //  response if the communication with the authorization service has failed, or if the
   //  authorization service has returned a HTTP 5xx error.
   //
-  // Note that errors can be *always* tracked in the :ref:`stats
+  // Note that errors can be ``always`` tracked in the :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
 
@@ -70,11 +70,11 @@ message ExtAuthz {
   // Clears route cache in order to allow the external authorization service to correctly affect
   // routing decisions. Filter clears all cached routes when:
   //
-  // 1. The field is set to *true*.
+  // 1. The field is set to ``true``.
   //
   // 2. The status returned from the authorization service is a HTTP 200 or gRPC 0.
   //
-  // 3. At least one *authorization response header* is added to the client request, or is used for
+  // 3. At least one ``authorization response header`` is added to the client request, or is used for
   // altering another client request header.
   //
   bool clear_route_cache = 6;
@@ -84,9 +84,9 @@ message ExtAuthz {
   type.v3.HttpStatus status_on_error = 7;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
-  // ext_authz service. :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` is passed as an opaque *protobuf::Struct*.
+  // ext_authz service. :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` is passed as an opaque ``protobuf::Struct``.
   //
-  // For example, if the *jwt_authn* filter is used and :ref:`payload_in_metadata
+  // For example, if the ``jwt_authn`` filter is used and :ref:`payload_in_metadata
   // <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>` is set,
   // then the following will pass the jwt payload to the authorization server.
   //
@@ -98,9 +98,9 @@ message ExtAuthz {
   repeated string metadata_context_namespaces = 8;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
-  // ext_authz service. :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` is passed as an *protobuf::Any*.
+  // ext_authz service. :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` is passed as an ``protobuf::Any``.
   //
-  // It works in a way similar to `metadata_context_namespaces` but allows envoy and external authz server to share the protobuf message definition
+  // It works in a way similar to ``metadata_context_namespaces`` but allows envoy and external authz server to share the protobuf message definition
   // in order to do a safe parsing.
   //
   repeated string typed_metadata_context_namespaces = 16;
@@ -133,7 +133,7 @@ message ExtAuthz {
   bool include_peer_certificate = 10;
 
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
-  // emitted statistics between configured *ext_authz* filters in an HTTP filter chain. For example:
+  // emitted statistics between configured ``ext_authz`` filters in an HTTP filter chain. For example:
   //
   // .. code-block:: yaml
   //
@@ -161,12 +161,12 @@ message BufferSettings {
       "envoy.config.filter.http.ext_authz.v2.BufferSettings";
 
   // Sets the maximum size of a message body that the filter will hold in memory. Envoy will return
-  // *HTTP 413* and will *not* initiate the authorization process when buffer reaches the number
+  // ``HTTP 413`` and will *not* initiate the authorization process when buffer reaches the number
   // set in this field. Note that this setting will have precedence over :ref:`failure_mode_allow
   // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`.
   uint32 max_request_bytes = 1 [(validate.rules).uint32 = {gt: 0}];
 
-  // When this field is true, Envoy will buffer the message until *max_request_bytes* is reached.
+  // When this field is true, Envoy will buffer the message until ``max_request_bytes`` is reached.
   // The authorization request will be dispatched and no 413 HTTP error will be returned by the
   // filter.
   bool allow_partial_message = 2;
@@ -216,7 +216,7 @@ message HttpService {
   // Sets the HTTP server URI which the authorization requests must be sent to.
   config.core.v3.HttpUri server_uri = 1;
 
-  // Sets a prefix to the value of authorization request header *Path*.
+  // Sets a prefix to the value of authorization request header ``Path``.
   string path_prefix = 2;
 
   // Settings used for controlling authorization request metadata.
@@ -270,9 +270,9 @@ message AuthorizationResponse {
 
   // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`. is set, authorization
   // response headers that have a correspondent match will be added to the client's response. Note
-  // that when this list is *not* set, all the authorization response headers, except *Authority
-  // (Host)* will be in the response to the client. When a header is included in this list, *Path*,
-  // *Status*, *Content-Length*, *WWWAuthenticate* and *Location* are automatically added.
+  // that when this list is *not* set, all the authorization response headers, except ``Authority
+  // (Host)`` will be in the response to the client. When a header is included in this list, ``Path``,
+  // ``Status``, ``Content-Length``, ``WWWAuthenticate`` and ``Location`` are automatically added.
   type.matcher.v3.ListStringMatcher allowed_client_headers = 2;
 
   // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`. is set, authorization

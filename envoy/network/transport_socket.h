@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/listen_socket.h"
@@ -234,10 +235,27 @@ public:
    */
   virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
 
+  // Information for use by the http_11_proxy transport socket.
+  struct Http11ProxyInfo {
+    Http11ProxyInfo(std::string hostname, Network::Address::InstanceConstSharedPtr address)
+        : hostname(hostname), proxy_address(address) {}
+    // The hostname of the original request, to be used in CONNECT request if
+    // the underlying transport is TLS.
+    std::string hostname;
+    // The address of the proxy, where connections should be routed to.
+    Network::Address::InstanceConstSharedPtr proxy_address;
+  };
+
   /**
-   * @return filter state from the downstream request or connection.
+   * @return any proxy information if sending to an intermediate proxy over HTTP/1.1.
    */
-  virtual const StreamInfo::FilterStateSharedPtr& filterState() const PURE;
+  virtual OptRef<const Http11ProxyInfo> http11ProxyInfo() const PURE;
+
+  /**
+   * @return filter state objects from the downstream request or connection
+   * that are marked as shared with the upstream connection.
+   */
+  virtual const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;

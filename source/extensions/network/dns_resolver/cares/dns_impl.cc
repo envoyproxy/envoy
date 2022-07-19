@@ -455,7 +455,7 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
   if (rc.return_value_ != 0) {
-    ENVOY_LOG_EVENT(debug, "cares_getiffaddrs_error",
+    ENVOY_LOG_EVENT(debug, "cares_getifaddrs_error",
                     "dns resolution for {} could not obtain interface information with error={}",
                     dns_name_, rc.errno_);
     // Maintain no-op behavior if the system encountered an error while providing interface
@@ -493,7 +493,8 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 }
 
 // c-ares DNS resolver factory
-class CaresDnsResolverFactory : public DnsResolverFactory {
+class CaresDnsResolverFactory : public DnsResolverFactory,
+                                public Logger::Loggable<Logger::Id::dns> {
 public:
   std::string name() const override { return std::string(CaresDnsResolver); }
 
@@ -521,6 +522,29 @@ public:
     }
     return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, resolvers);
   }
+
+  void initialize() override {
+    // Initialize c-ares library in case first time.
+    absl::MutexLock lock(&mutex_);
+    if (!ares_library_initialized_) {
+      ares_library_initialized_ = true;
+      ENVOY_LOG(info, "c-ares library initialized.");
+      ares_library_init(ARES_LIB_INIT_ALL);
+    }
+  }
+  void terminate() override {
+    // Cleanup c-ares library if initialized.
+    absl::MutexLock lock(&mutex_);
+    if (ares_library_initialized_) {
+      ares_library_initialized_ = false;
+      ENVOY_LOG(info, "c-ares library cleaned up.");
+      ares_library_cleanup();
+    }
+  }
+
+private:
+  bool ares_library_initialized_ ABSL_GUARDED_BY(mutex_){false};
+  absl::Mutex mutex_;
 };
 
 // Register the CaresDnsResolverFactory

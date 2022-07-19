@@ -11,3 +11,4 @@ Contrib Extensions
   cryptomb/cryptomb
   hyperscan/hyperscan
   dlb/dlb
+  qat/qat

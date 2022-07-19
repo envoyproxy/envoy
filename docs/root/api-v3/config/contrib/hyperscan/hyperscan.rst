@@ -1,5 +1,5 @@
-Hyperscan matching
-==================
+Hyperscan matcher
+=================
 
 .. toctree::
   :glob:

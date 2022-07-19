@@ -472,7 +472,7 @@ public:
             std::make_shared<Network::TransportSocketOptionsImpl>(
                 absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn}),
             nullptr),
-        nullptr);
+        nullptr, nullptr);
     return makeHttpConnection(std::move(ssl_conn));
   }
 
