@@ -856,7 +856,7 @@ public:
                            const DnsResolver::ResolutionStatus resolution_status =
                                DnsResolver::ResolutionStatus::Success,
                            const bool getifaddrs_supported = true,
-                           const bool getiffaddrs_success = true) {
+                           const bool getifaddrs_success = true) {
     server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
     server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
@@ -866,7 +866,7 @@ public:
 
     EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(getifaddrs_supported));
     if (getifaddrs_supported) {
-      if (getiffaddrs_success) {
+      if (getifaddrs_success) {
         EXPECT_CALL(os_sys_calls, getifaddrs(_))
             .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
               for (uint32_t i = 0; i < ifaddrs.size(); i++) {
@@ -1716,12 +1716,12 @@ TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterAllV6) {
   testFilterAddresses({"1.2.3.4:80"}, DnsLookupFamily::All, {"201.134.56.7"});
 }
 
-TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterIfGetiffaddrsIsNotSupported) {
+TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterIfGetifaddrsIsNotSupported) {
   testFilterAddresses({}, DnsLookupFamily::All, {"201.134.56.7", "1::2"},
                       DnsResolver::ResolutionStatus::Success, false /* getifaddrs_supported */);
 }
 
-TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterIfThereIsAGetiffaddrsFailure) {
+TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterIfThereIsAGetifaddrsFailure) {
   testFilterAddresses({}, DnsLookupFamily::All, {"201.134.56.7", "1::2"},
                       DnsResolver::ResolutionStatus::Success, true /* getifaddrs_supported */,
                       false /* getifaddrs_success */);
