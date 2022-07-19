@@ -214,6 +214,9 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
 
+  ASSERT_TRUE(filter_manager_->streamInfo().localReplyGrpcStatus().has_value());
+  EXPECT_EQ(filter_manager_->streamInfo().localReplyGrpcStatus().value(), Grpc::Status::Internal);
+
   filter_manager_->destroyFilters();
 }
 
