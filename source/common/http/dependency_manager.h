@@ -5,9 +5,7 @@
 #include "absl/status/status.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
-namespace HttpConnectionManager {
+namespace Http {
 
 /**
  * Validation for an http filter chain based on the factory-level
@@ -47,7 +45,5 @@ private:
       filter_chain_;
 };
 
-} // namespace HttpConnectionManager
-} // namespace NetworkFilters
-} // namespace Extensions
+} // namespace Http
 } // namespace Envoy
