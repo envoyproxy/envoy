@@ -791,7 +791,7 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcardWithPNA) {
   EXPECT_EQ(decoder_callbacks_.stream_info_.responseCodeDetails().value(), "cors_response");
 }
 
-TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcardWithPNAWithRuntimeGuard) {
+TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcardWithoutPNA) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "OPTIONS"},
       {"origin", "test-host"},
@@ -807,6 +807,38 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcardWithPNAWithRuntimeG
   };
 
   cors_policy_->allow_private_network_access_ = false;
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
+  EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
+  ASSERT_TRUE(decoder_callbacks_.stream_info_.responseCodeDetails().has_value());
+  EXPECT_EQ(decoder_callbacks_.stream_info_.responseCodeDetails().value(), "cors_response");
+}
+
+TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcardWithInvalidPNA) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "OPTIONS"},
+      {"origin", "test-host"},
+      {"access-control-request-method", "GET"},
+      {"access-control-request-private-network", "invalid"}};
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"access-control-allow-origin", "test-host"},
+      {"access-control-allow-methods", "GET"},
+      {"access-control-allow-headers", "content-type"},
+      {"access-control-max-age", "0"},
+  };
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
