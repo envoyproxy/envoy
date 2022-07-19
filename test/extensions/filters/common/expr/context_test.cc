@@ -516,11 +516,16 @@ TEST(Context, ConnectionAttributes) {
   EXPECT_CALL(*downstream_ssl_info, subjectPeerCertificate())
       .WillRepeatedly(ReturnRef(subject_peer));
   EXPECT_CALL(*upstream_ssl_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject_peer));
+  const std::string peer_certificate_digest = "c58ccaf8e9276ebd095652e56e89c7d56e92e6c0";
+  EXPECT_CALL(*downstream_ssl_info, sha256PeerCertificateDigest())
+      .WillRepeatedly(ReturnRef(peer_certificate_digest));
+  EXPECT_CALL(*upstream_ssl_info, sha256PeerCertificateDigest())
+      .WillRepeatedly(ReturnRef(peer_certificate_digest));
 
-  EXPECT_EQ(11, connection.size());
+  EXPECT_EQ(12, connection.size());
   EXPECT_FALSE(connection.empty());
 
-  EXPECT_EQ(11, upstream.size());
+  EXPECT_EQ(12, upstream.size());
   EXPECT_FALSE(connection.empty());
 
   EXPECT_EQ(2, source.size());
@@ -655,6 +660,13 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
+    auto value = connection[CelValue::CreateStringView(SHA256PeerCertificateDigest)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(peer_certificate_digest, value.value().StringOrDie().value());
+  }
+
+  {
     auto value = connection[CelValue::CreateStringView(ID)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsUint64());
@@ -715,6 +727,13 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(subject_peer, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(SHA256PeerCertificateDigest)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(peer_certificate_digest, value.value().StringOrDie().value());
   }
 
   {
