@@ -1025,6 +1025,7 @@ TEST_F(Http1ServerConnectionImplTest, RejectInvalidMethod) {
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
 }
 
 TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
@@ -2118,7 +2119,8 @@ class Http1ClientConnectionImplTest : public Http1CodecTestBase {
 public:
   void initialize() {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_,
+        /* passing_through_proxy=*/false);
   }
 
   void readDisableOnRequestEncoder(RequestEncoder* request_encoder, bool disable) {
@@ -2561,6 +2563,8 @@ TEST_F(Http1ClientConnectionImplTest, NoContentLengthResponse) {
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  InSequence s;
 
   Buffer::OwnedImpl expected_data1("Hello World");
   EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data1), false));
@@ -3476,6 +3480,99 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAlloc
 
   // Check contents for corresponding downstream request
   EXPECT_THAT(ostream.contents(), testing::HasSubstr("Dumping corresponding downstream request:"));
+}
+
+// Test the URL validation logic of the Parser. This is executed as soon as the
+// first line of the request is parsed. Note that the additional URL parsing
+// code in ServerConnectionImpl::handlePath() is intentionally not exercised in
+// this test. Http1Settings members like `allow_absolute_url` do not matter as
+// they are not passed on to the Parser.
+
+// SPELLCHECKER(off)
+const char* kValidFirstLines[] = {
+    "GET http://www.somewhere.com HTTP/1.1\r\n",
+    "GET scheme://$,www]][-_..!~\'(&=+.com/path HTTP/1.1\r\n",
+    "GET foo:///www.this.is.not.host.but.path.com HTTP/1.1\r\n",
+    "GET http://www/* HTTP/1.1\r\n",
+    "GET http://www?query HTTP/1.1\r\n",
+    "GET http://www*?query HTTP/1.1\r\n",
+    "GET http://?query?more##fragment??more#? HTTP/1.1\r\n",
+    "GET http://@ HTTP/1.1\r\n",
+    "GET http://@www@]@[]@?#?# HTTP/1.1\r\n",
+    "GET http://* HTTP/1.1\r\n",
+    "GET /path HTTP/1.1\r\n",
+    "GET /path?query HTTP/1.1\r\n",
+    "GET * HTTP/1.1\r\n",
+    "GET ** HTTP/1.1\r\n",
+    "GET *path@@/foo?# HTTP/1.1\r\n",
+    "GET /@@path& HTTP/1.1\r\n",
+    "GET http://host://this.is.path.com HTTP/1.1\r\n",
+    "CONNECT www.somewhere.com HTTP/1.1\r\n",
+    "CONNECT http://there.is.no.scheme.com HTTP/1.1\r\n",
+};
+
+const char* kInvalidFirstLines[] = {
+    "GET www.somewhere.com HTTP/1.1\r\n",
+    "GET http11://www.somewhere.com HTTP/1.1\r\n",
+    "GET 0ttp:/\r\n",
+    "GET http:/www.somewhere.com HTTP/1.1\r\n",
+    "GET http:://www.somewhere.com HTTP/1.1\r\n",
+    "GET http/somewhere HTTP/1.1\r\n",
+    "GET http://www@@ HTTP/1.1\r\n",
+    "GET http://www@w@w@@ HTTP/1.1\r\n",
+    "GET http://www@]@[]@# HTTP/1.1\r\n",
+    "GET http://www.hash#mark.com HTTP/1.1\r\n",
+    "GET # HTTP/1.1\r\n",
+    "GET ? HTTP/1.1\r\n",
+    "GET ?query HTTP/1.1\r\n",
+    "GET ?#query#@@ HTTP/1.1\r\n",
+    "GET @ HTTP/1.1\r\n",
+};
+// SPELLCHECKER(on)
+
+TEST_F(Http1ServerConnectionImplTest, ParseUrl) {
+  for (const char* valid_first_line : kValidFirstLines) {
+    initialize();
+
+    StrictMock<MockRequestDecoder> decoder;
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    Buffer::OwnedImpl buffer(valid_first_line);
+    auto status = codec_->dispatch(buffer);
+
+    EXPECT_EQ(Protocol::Http11, codec_->protocol());
+    EXPECT_TRUE(status.ok()) << valid_first_line;
+    EXPECT_EQ("", status.message());
+    EXPECT_EQ("", response_encoder->getStream().responseDetails());
+  }
+
+  for (const char* invalid_first_line : kInvalidFirstLines) {
+    initialize();
+
+    InSequence sequence;
+
+    StrictMock<MockRequestDecoder> decoder;
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, _));
+
+    Buffer::OwnedImpl buffer(invalid_first_line);
+    auto status = codec_->dispatch(buffer);
+
+    EXPECT_EQ(Protocol::Http11, codec_->protocol());
+    EXPECT_TRUE(isCodecProtocolError(status)) << invalid_first_line;
+    EXPECT_EQ("http/1.1 protocol error: HPE_INVALID_URL", status.message());
+    EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
+  }
 }
 
 } // namespace Http

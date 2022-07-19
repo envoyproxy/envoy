@@ -166,6 +166,7 @@ public:
         "Route: "
         "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
         "sip:scscf-internal.cncs.svc.cluster.local:5060;ep=10.0.0.1>");
+    metadata_->addMsgHeader(HeaderType::From, "User.0001@10.0.0.1:5060");
     metadata_->parseHeader(HeaderType::Route);
     metadata_->resetAffinityIteration();
     if (set_destination) {
@@ -232,6 +233,7 @@ public:
         "SIP/2.0 200 OK\x0d\x0a"
         "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
         "CSeq: 1 INVITE\x0d\x0a"
+        "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
         "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
         "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
         "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
@@ -247,10 +249,10 @@ public:
 
     initializeMetadata(msg_type, MethodType::Ok200, false);
 
-    EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _))
+    EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
         .WillRepeatedly(
-            Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
-                       std::string& host) -> QueryStatus {
+            Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+                       SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
               host = "10.0.0.11";
               return QueryStatus::Pending;
             }));
@@ -458,10 +460,10 @@ TEST_F(SipRouterTest, QueryPending) {
   metadata_->parseHeader(HeaderType::Route);
   metadata_->affinity().emplace_back("Route", "lskpmc", "S1F1", false, false);
   metadata_->resetAffinityIteration();
-  EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _))
+  EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
       .WillRepeatedly(
-          Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
-                     std::string& host) -> QueryStatus {
+          Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+                     SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
             host = "10.0.0.11";
             return QueryStatus::Pending;
           }));
@@ -476,10 +478,10 @@ TEST_F(SipRouterTest, QueryStop) {
   metadata_->affinity().clear();
   metadata_->affinity().emplace_back("Route", "lskpmc", "S1F1", false, false);
   metadata_->resetAffinityIteration();
-  EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _))
+  EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
       .WillRepeatedly(
-          Invoke([&](const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
-                     std::string& host) -> QueryStatus {
+          Invoke([&](const std::string&, const std::string&, const absl::optional<TraContextMap>,
+                     SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
             host = "10.0.0.11";
             return QueryStatus::Stop;
           }));

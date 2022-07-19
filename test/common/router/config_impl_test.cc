@@ -3867,6 +3867,27 @@ virtual_hosts:
             config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
 }
 
+TEST_F(RouteMatcherTest, ClusterNotFoundResponseCodeConfig500) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: "not_found"
+          cluster_not_found_response_code: INTERNAL_SERVER_ERROR
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+
+  EXPECT_EQ("not_found", config.route(headers, 0)->routeEntry()->clusterName());
+  EXPECT_EQ(Http::Code::InternalServerError,
+            config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
+}
+
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCodeConfig404) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -6117,28 +6138,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, WeightedClustersSumOFWeightsNotEqualToMax) {
-  std::string yaml = R"EOF(
-virtual_hosts:
-  - name: www2
-    domains: ["www.lyft.com"]
-    routes:
-      - match: { prefix: "/" }
-        route:
-          weighted_clusters:
-            clusters:
-              - name: cluster1
-                weight: 3
-              - name: cluster2
-                weight: 3
-              - name: cluster3
-                weight: 3
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Sum of weights in the weighted_cluster should add up to 100");
-
-  yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]

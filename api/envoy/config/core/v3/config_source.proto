@@ -168,7 +168,7 @@ message PathConfigSource {
   //
   // .. note::
   //
-  //   If ``watched_directory`` is *not* configured, Envoy will watch the file path for *moves.*
+  //   If ``watched_directory`` is *not* configured, Envoy will watch the file path for *moves*.
   //   This is because in general only moves are atomic. The same method of swapping files as is
   //   demonstrated in the :ref:`runtime documentation <config_runtime_symbolic_link_swap>` can be
   //   used here also. If ``watched_directory`` is configured, no watch will be placed directly on
@@ -176,7 +176,7 @@ message PathConfigSource {
   //   this path. This is required in certain deployment scenarios. See below for more information.
   string path = 1 [(validate.rules).string = {min_len: 1}];
 
-  // If configured, this directory will be watched for *moves.* When an entry in this directory is
+  // If configured, this directory will be watched for *moves*. When an entry in this directory is
   // moved to, the ``path`` will be reloaded. This is required in certain deployment scenarios.
   //
   // Specifically, if trying to load an xDS resource using a
@@ -203,7 +203,7 @@ message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ConfigSource";
 
   // Authorities that this config source may be used for. An authority specified in a xdstp:// URL
-  // is resolved to a *ConfigSource* prior to configuration fetch. This field provides the
+  // is resolved to a ``ConfigSource`` prior to configuration fetch. This field provides the
   // association between authority name and configuration source.
   // [#not-implemented-hide:]
   repeated xds.core.v3.Authority authorities = 7;

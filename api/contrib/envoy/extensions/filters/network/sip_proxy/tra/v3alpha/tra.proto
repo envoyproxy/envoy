@@ -90,6 +90,8 @@ message TraServiceResponse {
 
 message CreateRequest {
   map<string, string> data = 1;
+
+  map<string, string> context = 2;
 }
 
 message CreateResponse {
@@ -97,6 +99,8 @@ message CreateResponse {
 
 message UpdateRequest {
   map<string, string> data = 1;
+
+  map<string, string> context = 2;
 }
 
 message UpdateResponse {
@@ -104,6 +108,8 @@ message UpdateResponse {
 
 message RetrieveRequest {
   string key = 1;
+
+  map<string, string> context = 2;
 }
 
 message RetrieveResponse {
@@ -112,6 +118,8 @@ message RetrieveResponse {
 
 message DeleteRequest {
   string key = 1;
+
+  map<string, string> context = 2;
 }
 
 message DeleteResponse {

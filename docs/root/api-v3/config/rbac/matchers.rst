@@ -1,10 +1,10 @@
 .. _api-v3_config_rbac_matchers:
 
-RBAC Matchers
+RBAC matchers
 =============
 
 .. toctree::
   :glob:
   :maxdepth: 2
 
-  matchers/matchers
+  matchers/upstream/upstream

@@ -3,9 +3,9 @@
 Cache filter
 ============
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.cache.v3.CacheConfig>`
 * :ref:`v3 SimpleHTTPCache API reference <envoy_v3_api_msg_extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig>`
-* This filter should be configured with the name ``envoy.filters.http.cache``.
 * This filter doesn't support virtual host-specific configurations.
 
 The HTTP Cache filter implements most of the complexity of HTTP caching semantics.
