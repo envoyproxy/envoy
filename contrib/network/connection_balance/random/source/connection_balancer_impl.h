@@ -1,7 +1,5 @@
 #pragma once
 
-#include <memory>
-
 #include "envoy/common/random_generator.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/registry/registry.h"

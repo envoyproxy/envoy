@@ -15,5 +15,18 @@ envoy_cc_test(
     deps = [
         "//contrib/network/connection_balance/random/source:config",
         "//test/mocks/server:factory_context_mocks",
+            "//envoy/registry",
+        "//test/test_common:registry_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "connection_balance_test",
+    srcs = ["connection_balance_test.cc"],
+    
+    deps = [
+        "//contrib/network/connection_balance/random/source:config",
+        "//envoy/registry",
+        "//test/test_common:registry_lib",
     ],
 )

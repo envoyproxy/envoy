@@ -1,13 +1,5 @@
 #include "contrib/network/connection_balance/random/source/connection_balancer_impl.h"
 
-#include <bits/types/FILE.h>
-#include <sys/eventfd.h>
-#include <unistd.h>
-
-#include <algorithm>
-#include <cstdlib>
-#include <memory>
-
 namespace Envoy {
 namespace Extensions {
 namespace Random {
