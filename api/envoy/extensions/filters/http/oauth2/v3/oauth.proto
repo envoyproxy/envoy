@@ -65,11 +65,11 @@ message OAuth2Credentials {
 // [#next-free-field: 12]
 message OAuth2Config {
   enum AuthType {
-    // The client_id and client_secret will be sent in the URL encoded request body.
+    // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
     // This type should only be used when Auth server does not support Basic authentication.
     URL_ENCODED_BODY = 0;
 
-    // The client_id and client_secret will be sent using HTTP Basic authentication scheme.
+    // The ``client_id`` and ``client_secret`` will be sent using HTTP Basic authentication scheme.
     BASIC_AUTH = 1;
   }
 
@@ -111,7 +111,7 @@ message OAuth2Config {
   // RFC: https://tools.ietf.org/html/rfc8707
   repeated string resources = 10;
 
-  // Defines how client_id and client_secret are sent in OAuth client to OAuth server requests.
+  // Defines how ``client_id`` and ``client_secret`` are sent in OAuth client to OAuth server requests.
   // RFC https://datatracker.ietf.org/doc/html/rfc6749#section-2.3.1
   AuthType auth_type = 11 [(validate.rules).enum = {defined_only: true}];
 }
