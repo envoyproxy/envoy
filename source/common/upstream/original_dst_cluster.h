@@ -70,6 +70,7 @@ public:
       return {};
     }
 
+    Network::Address::InstanceConstSharedPtr filterStateOverrideHost(LoadBalancerContext* context);
     Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
 
   private:
