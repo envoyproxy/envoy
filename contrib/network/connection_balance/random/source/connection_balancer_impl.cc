@@ -14,19 +14,16 @@ namespace Random {
 
 void RandomConnectionBalancerImpl::registerHandler(
     Envoy::Network::BalancedConnectionHandler& handler) {
-  absl::MutexLock lock(&lock_);
   handlers_.push_back(&handler);
 }
 
 void RandomConnectionBalancerImpl::unregisterHandler(
     Envoy::Network::BalancedConnectionHandler& handler) {
-  absl::MutexLock lock(&lock_);
   handlers_.erase(std::find(handlers_.begin(), handlers_.end(), &handler));
 }
 
 Envoy::Network::BalancedConnectionHandler&
 RandomConnectionBalancerImpl::pickTargetHandler(Envoy::Network::BalancedConnectionHandler&) {
-  absl::MutexLock lock(&lock_);
   int index = random_.random() % handlers_.size();
   return *handlers_[index];
 }

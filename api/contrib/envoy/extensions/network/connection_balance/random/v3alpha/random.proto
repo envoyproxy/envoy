@@ -10,6 +10,8 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/network/connection_balance/random/v3alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
+// [#protodoc-title: Random connection balancer configuration]
+// Random :ref:`configuration overview <config_connection_balance_random>`.
 // [#extension: envoy.network.connection_balance.random]
 
 // Random connection balancer balances connections randomly, which is a replacement of Exact connection balancer to ensure all threads work on Windows.

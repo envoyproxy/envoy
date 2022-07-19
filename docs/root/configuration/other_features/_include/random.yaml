@@ -1,0 +1,7 @@
+static_resources:
+  listeners:
+  - connection_balance_config:
+      extend_balance:
+        name: envoy.network.connection_balance.random
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.connection_balance.random.v3alpha.Random

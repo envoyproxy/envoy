@@ -15,8 +15,8 @@ namespace Extensions {
 namespace Random {
 /**
  * Implementation of connection balancer that does random balancing. It is a replacement for
- * Exact connection balancer on Windows to ensure all work threads work, faster than Exact
- * connection balancer.
+ * Exact connection balancer on Windows to ensure all worker threads work. It is faster than
+ * the Exact connection balancer.
  */
 class RandomConnectionBalancerImpl : public Envoy::Network::ConnectionBalancer {
 public:
@@ -29,8 +29,7 @@ public:
   pickTargetHandler(Envoy::Network::BalancedConnectionHandler& current_handler) override;
 
 private:
-  absl::Mutex lock_;
-  std::vector<Network::BalancedConnectionHandler*> handlers_ ABSL_GUARDED_BY(lock_);
+  std::vector<Network::BalancedConnectionHandler*> handlers_;
   Envoy::Random::RandomGenerator& random_;
 };
 
