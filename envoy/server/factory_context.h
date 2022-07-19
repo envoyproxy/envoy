@@ -271,7 +271,7 @@ public:
 };
 
 /**
- * Context for downstream network and HTTP filters.
+ * Context for HTTP filters and downstream network filters.
  */
 class FilterFactoryContext {
 public:
