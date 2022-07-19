@@ -45,7 +45,7 @@ fi
 
 pip3 install slackclient
 # https://github.com/actions/virtual-environments/blob/main/images/macos/macos-12-Readme.md#xcode
-sudo xcode-select --switch /Applications/Xcode_13.2.1.app
+sudo xcode-select --switch /Applications/Xcode_13.4.app
 
 if [[ "${1:-}" == "--android" ]]; then
   # Download and set up ndk 21 after GitHub update

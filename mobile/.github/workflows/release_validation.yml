@@ -24,6 +24,6 @@ jobs:
       # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
       - run: unzip bazel-bin/library/swift/Envoy.xcframework.zip -d examples/swift/swiftpm/Packages || true
         name: 'Unzip xcframework'
-      - run: xcodebuild -project examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj -scheme EnvoySwiftPMExample -destination platform="iOS Simulator,name=iPhone 13 Pro Max,OS=15.2"
+      - run: xcodebuild -project examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj -scheme EnvoySwiftPMExample -destination platform="iOS Simulator,name=iPhone 13 Pro Max,OS=15.5"
         name: 'Build app'
       # TODO(jpsim): Run app and inspect logs to validate
