@@ -292,7 +292,7 @@ public:
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket->connectionInfoProvider().localAddress(), source_address_,
-        Network::Test::createRawBufferSocket(), nullptr);
+        Network::Test::createRawBufferSocket(), nullptr, nullptr);
     upstream_listener_ =
         dispatcher_->createListener(std::move(socket), listener_callbacks_, runtime_, true, false);
     client_connection_ = client_connection.get();

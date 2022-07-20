@@ -6,37 +6,41 @@ services:
       context: .
       dockerfile: Dockerfile-proxy-https-http
     ports:
-    - "10000:10000"
+    - "${PORT_PROXY0:-10000}:10000"
 
   proxy-https-to-https:
     build:
       context: .
       dockerfile: Dockerfile-proxy-https-https
     ports:
-    - "10001:10000"
+    - "${PORT_PROXY1:-10001}:10000"
 
   proxy-http-to-https:
     build:
       context: .
       dockerfile: Dockerfile-proxy-http-https
     ports:
-    - "10002:10000"
+    - "${PORT_PROXY2:-10002}:10000"
 
   proxy-https-passthrough:
     build:
       context: .
       dockerfile: Dockerfile-proxy-https-passthrough
     ports:
-    - "10003:10000"
+    - "${PORT_PROXY3:-10003}:10000"
 
   service-http:
-    image: mendhak/http-https-echo
+    build:
+      context: .
+      dockerfile: Dockerfile-echo
     hostname: service-http
     environment:
     - HTTPS_PORT=0
 
   service-https:
-    image: mendhak/http-https-echo
+    build:
+      context: .
+      dockerfile: Dockerfile-echo
     hostname: service-https
     environment:
     - HTTP_PORT=0

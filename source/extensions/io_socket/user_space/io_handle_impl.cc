@@ -378,31 +378,27 @@ Api::SysCallIntResult IoHandleImpl::shutdown(int how) {
   return {0, 0};
 }
 
-void PassthroughStateImpl::initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                                      std::unique_ptr<FilterStateObjects> filter_state_objects) {
+void PassthroughStateImpl::initialize(
+    std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+    const StreamInfo::FilterState::Objects& filter_state_objects) {
   ASSERT(state_ == State::Created);
   metadata_ = std::move(metadata);
-  filter_state_objects_ = std::move(filter_state_objects);
+  filter_state_objects_ = filter_state_objects;
   state_ = State::Initialized;
 }
 void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata,
                                      StreamInfo::FilterState& filter_state) {
-  ASSERT(state_ == State::Initialized);
+  ASSERT(state_ == State::Created || state_ == State::Initialized);
   if (metadata_) {
     metadata.MergeFrom(*metadata_);
   }
-  if (filter_state_objects_) {
-    for (const auto& [name, object] : *filter_state_objects_) {
-      try {
-        filter_state.setData(name, object, StreamInfo::FilterState::StateType::Mutable,
-                             StreamInfo::FilterState::LifeSpan::Connection);
-      } catch (const EnvoyException& e) {
-        ENVOY_LOG(trace, "Failed to set data for '{}': {}", name, e.what());
-      }
-    }
+  for (const auto& object : filter_state_objects_) {
+    // This should not throw as stream info is new and filter objects are uniquely named.
+    filter_state.setData(object.name_, object.data_, object.state_type_,
+                         StreamInfo::FilterState::LifeSpan::Connection, object.stream_sharing_);
   }
   metadata_ = nullptr;
-  filter_state_objects_ = nullptr;
+  filter_state_objects_.clear();
   state_ = State::Done;
 }
 } // namespace UserSpace

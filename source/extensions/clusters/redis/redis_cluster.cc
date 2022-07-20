@@ -19,6 +19,7 @@ Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_p
 } // namespace
 
 RedisCluster::RedisCluster(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
@@ -27,8 +28,8 @@ RedisCluster::RedisCluster(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
     ClusterSlotUpdateCallBackSharedPtr lb_factory)
-    : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api,
+    : Upstream::BaseDynamicClusterImpl(server_context, cluster, runtime, factory_context,
+                                       std::move(stats_scope), added_via_api,
                                        factory_context.mainThreadDispatcher().timeSource()),
       cluster_manager_(cluster_manager),
       cluster_refresh_rate_(std::chrono::milliseconds(
@@ -569,6 +570,7 @@ RedisCluster::ClusterSlotsRequest RedisCluster::ClusterSlotsRequest::instance_;
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 RedisClusterFactory::createClusterWithConfig(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
@@ -581,7 +583,7 @@ RedisClusterFactory::createClusterWithConfig(
   // in the future
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     return std::make_pair(std::make_shared<RedisCluster>(
-                              cluster, proto_config,
+                              server_context, cluster, proto_config,
                               NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
                               context.clusterManager(), context.runtime(), context.api(),
                               selectDnsResolver(cluster, context), socket_factory_context,
@@ -591,7 +593,7 @@ RedisClusterFactory::createClusterWithConfig(
   auto lb_factory =
       std::make_shared<RedisClusterLoadBalancerFactory>(context.api().randomGenerator());
   return std::make_pair(std::make_shared<RedisCluster>(
-                            cluster, proto_config,
+                            server_context, cluster, proto_config,
                             NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
                             context.clusterManager(), context.runtime(), context.api(),
                             selectDnsResolver(cluster, context), socket_factory_context,

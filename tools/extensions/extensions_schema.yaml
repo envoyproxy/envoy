@@ -22,6 +22,7 @@ builtin:
 - envoy.matching.inputs.uri_san
 - envoy.matching.inputs.dns_san
 - envoy.matching.inputs.subject
+- envoy.regex_engines.google_re2
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose

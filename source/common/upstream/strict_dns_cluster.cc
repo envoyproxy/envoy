@@ -9,12 +9,14 @@ namespace Envoy {
 namespace Upstream {
 
 StrictDnsClusterImpl::StrictDnsClusterImpl(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                             added_via_api, factory_context.mainThreadDispatcher().timeSource()),
+    : BaseDynamicClusterImpl(server_context, cluster, runtime, factory_context,
+                             std::move(stats_scope), added_via_api,
+                             factory_context.mainThreadDispatcher().timeSource()),
       load_assignment_(cluster.load_assignment()), local_info_(factory_context.localInfo()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
@@ -196,13 +198,14 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 StrictDnsClusterFactory::createClusterImpl(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopeSharedPtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
   return std::make_pair(std::make_shared<StrictDnsClusterImpl>(
-                            cluster, context.runtime(), selected_dns_resolver,
+                            server_context, cluster, context.runtime(), selected_dns_resolver,
                             socket_factory_context, std::move(stats_scope), context.addedViaApi()),
                         nullptr);
 }

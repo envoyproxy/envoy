@@ -571,7 +571,11 @@ public:
                 released(Ref(upstream_connection_)));
 
     if (is_drain) {
-      EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+      EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush))
+          .WillOnce(Invoke([&](Network::ConnectionCloseType) -> void {
+            // Simulate the upstream connection being closed.
+            upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+          }));
     }
 
     upstream_callbacks_->onUpstreamData(buffer, false);
@@ -1727,7 +1731,8 @@ TEST_F(ThriftRouterTest, UpstreamDraining) {
   Stats::MockStore cluster_scope;
   expectStatCalls(cluster_scope);
   EXPECT_CALL(cluster_scope, counter("thrift.upstream_cx_drain_close")).Times(AtLeast(1));
-
+  // Keep the downstream connection.
+  EXPECT_CALL(callbacks_, resetDownstreamConnection()).Times(0);
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
   completeRequest();

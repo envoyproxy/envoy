@@ -61,9 +61,7 @@ public:
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
-    ON_CALL(file_system_, fileReadToEnd(StrEq("/etc/envoy/lightstep_access_token")))
-        .WillByDefault(Return("access_token"));
-    ON_CALL(file_system_, fileReadToEnd(StrNe("/etc/envoy/lightstep_access_token")))
+    ON_CALL(file_system_, fileReadToEnd(_))
         .WillByDefault(Invoke([&](const std::string& file) -> std::string {
           return api_->fileSystem().fileReadToEnd(file);
         }));
@@ -192,6 +190,10 @@ void testMerge() {
 }
 
 uint32_t run(const std::string& directory) {
+  // In the default startup process, we will inject regex engine before initializing config.
+  // While in the ConfigTest, these kind of bootstrap injections will not take place, so we must
+  // register regex engine in advance.
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   uint32_t num_tested = 0;
   Api::ApiPtr api = Api::createApiForTest();
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {

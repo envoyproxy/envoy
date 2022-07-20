@@ -24,7 +24,6 @@ static_resources:
               cors:
                 allow_origin_string_match:
                 - safe_regex:
-                    google_re2: {}
                     regex: \*
                 filter_enabled:
                   default_value:
@@ -83,7 +82,6 @@ static_resources:
                         denominator: HUNDRED
                     additional_origins:
                     - safe_regex:
-                        google_re2: {}
                         regex: .*
               - match:
                   prefix: "/"
