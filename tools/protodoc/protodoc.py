@@ -125,7 +125,7 @@ def format_external_link(text, ref):
     return '`%s <%s>`_' % (text, ref)
 
 
-def format_header(style, text):
+def format_header(style, text, is_file=False):
     """Format RST header.
 
     Args:
@@ -135,6 +135,8 @@ def format_header(style, text):
     Returns:
         RST formatted header.
     """
+    if is_file:
+        text = f"{text} (proto)"
     return '%s\n%s\n\n' % (text, style * len(text))
 
 
@@ -221,10 +223,10 @@ def format_header_from_file(style, source_code_info, proto_name):
         formatted_extension = format_extension(extension)
     if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
         return anchor + format_header(
-            style, source_code_info.file_level_annotations[
-                annotations.DOC_TITLE_ANNOTATION]) + "\n\n" + formatted_extension, stripped_comment
+            style, source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION],
+            True) + "\n\n" + formatted_extension, stripped_comment
     return anchor + format_header(
-        style, proto_name) + "\n\n" + formatted_extension, stripped_comment
+        style, proto_name, True) + "\n\n" + formatted_extension, stripped_comment
 
 
 def format_field_type_as_json(type_context, field):
@@ -236,12 +238,12 @@ def format_field_type_as_json(type_context, field):
     Return: RST formatted pseudo-JSON string representation of field type.
     """
     if type_name_from_fqn(field.type_name) in type_context.map_typenames:
-        return '"{...}"'
+        return "{...}"
     if field.label == field.LABEL_REPEATED:
-        return '[]'
+        return "[]"
     if field.type == field.TYPE_MESSAGE:
-        return '"{...}"'
-    return '"..."'
+        return "{...}"
+    return "..."
 
 
 def format_message_as_json(type_context, msg):
@@ -261,7 +263,8 @@ def format_message_as_json(type_context, msg):
         lines.append('"%s": %s' % (field.name, format_field_type_as_json(type_context, field)))
 
     if lines:
-        return '.. code-block:: json\n\n  {\n' + ',\n'.join(indent_lines(4, lines)) + '\n  }\n\n'
+        return '.. code-block:: json\n  :force:\n\n  {\n' + ',\n'.join(
+            indent_lines(4, lines)) + '\n  }\n\n'
     return ""
 
 

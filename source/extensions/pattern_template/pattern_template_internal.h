@@ -1,5 +1,5 @@
-#ifndef SOURCE_EXTENSIONS_PATTERN_TEMPLATE_MATCHING_PATTERN_TEMPLATE_MATCHING_INTERNAL_H
-#define SOURCE_EXTENSIONS_PATTERN_TEMPLATE_MATCHING_PATTERN_TEMPLATE_MATCHING_INTERNAL_H
+#ifndef SOURCE_EXTENSIONS_PATTERN_TEMPLATE_MATCHING_PATTERN_TEMPLATE_INTERNAL_H
+#define SOURCE_EXTENSIONS_PATTERN_TEMPLATE_MATCHING_PATTERN_TEMPLATE_INTERNAL_H
 
 #include <optional>
 #include <string>
@@ -8,12 +8,15 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/statusor.h"
+#include "absl/status/status.h"
+#include "absl/types/variant.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/variant.h"
 #include "re2/re2.h"
 
 namespace Envoy {
+namespace Extensions {
 namespace PatternTemplate {
 
 namespace PatternTemplateInternal {
@@ -88,8 +91,8 @@ std::string toRegexPattern(const struct ParsedUrlPattern& pattern);
 inline re2::StringPiece toStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
 
 } // namespace PatternTemplateInternal
-
 } // namespace PatternTemplate
+} // namespace Extensions
 } // namespace Envoy
 
-#endif // SOURCE_EXTENSIONS_PATTERN_TEMPLATE_MATCHING_PATTERN_TEMPLATE_MATCHING_INTERNAL_H
+#endif // SOURCE_EXTENSIONS_PATTERN_TEMPLATE_MATCHING_PATTERN_TEMPLATE_INTERNAL_H

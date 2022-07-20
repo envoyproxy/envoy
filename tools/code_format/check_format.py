@@ -265,7 +265,10 @@ class FormatChecker:
 
     # Obtain all the lines in a given file.
     def read_lines(self, path):
-        return self.read_file(path).split('\n')
+        with open(path) as f:
+            for l in f:
+                yield l[:-1]
+        yield ""
 
     # Read a UTF-8 encoded file as a str.
     def read_file(self, path):
@@ -988,6 +991,7 @@ class FormatChecker:
         for owned in owned_directories:
             if owned.startswith(dir_name) or dir_name.startswith(owned):
                 found = True
+                break
         if not found:
             error_messages.append(
                 "New directory %s appears to not have owners in CODEOWNERS" % dir_name)

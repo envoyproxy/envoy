@@ -12,8 +12,19 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "config_test",
-    srcs = ["config_test.cc"],
+    name = "match_config_test",
+    srcs = ["match_config_test.cc"],
+    extension_names = ["envoy.url_template"],
+    deps = [
+        "//source/common/stream_info:filter_state_lib",
+        "//source/extensions/pattern_template:config",
+        "//test/mocks/server:factory_context_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "rewrite_config_test",
+    srcs = ["rewrite_config_test.cc"],
     extension_names = ["envoy.url_template"],
     deps = [
         "//source/common/stream_info:filter_state_lib",

@@ -8,8 +8,8 @@ that Envoy is deployed for. The filter's main job is to follow the instructions 
 configured :ref:`route table <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`. In addition to forwarding and
 redirection, the filter also handles retry, statistics, etc.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.router.v3.Router``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.router.v3.Router>`
-* This filter should be configured with the name *envoy.filters.http.router*.
 
 .. _config_http_filters_router_headers_consumed:
 

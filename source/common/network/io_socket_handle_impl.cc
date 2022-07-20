@@ -638,7 +638,7 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
 
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(interface_addresses);
-  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+  RELEASE_ASSERT(!rc.return_value_, fmt::format("getifaddrs error: {}", rc.errno_));
 
   absl::optional<std::string> selected_interface_name{};
   for (const auto& interface_address : interface_addresses) {
