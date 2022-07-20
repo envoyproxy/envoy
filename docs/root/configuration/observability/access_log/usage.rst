@@ -579,7 +579,10 @@ The following command operators are supported:
   multiple instances or between restarts.
 
 %GRPC_STATUS%
-  gRPC status code which is easy to interpret with text message corresponding with number.
+  enum string(camel case, like InvalidArgument) of `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>`.
+
+%GRPC_STATUS_SNAKE_STRING%
+  enum string(snake case, like INVALID_ARGUMENT) of `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>`.
 
 %GRPC_STATUS_NUMBER%
   gRPC status code.

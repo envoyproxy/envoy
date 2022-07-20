@@ -1096,7 +1096,7 @@ typed_config:
   path: /dev/null
   log_format:
     text_format_source:
-      inline_string: "%GRPC_STATUS% %GRPC_STATUS_NUMBER%\n"
+      inline_string: "%GRPC_STATUS% %GRPC_STATUS_NUMBER% %GRPC_STATUS_SNAKE_STRING%\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -1104,7 +1104,7 @@ typed_config:
     EXPECT_CALL(*file_, write(_));
     response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-    EXPECT_EQ("OK 0\n", output_);
+    EXPECT_EQ("OK 0 OK\n", output_);
     response_trailers_.remove(Http::Headers::get().GrpcStatus);
   }
   {
@@ -1112,7 +1112,7 @@ typed_config:
     EXPECT_CALL(*file_, write(_));
     response_headers_.addCopy(Http::Headers::get().GrpcStatus, "1");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-    EXPECT_EQ("Canceled 1\n", output_);
+    EXPECT_EQ("Canceled 1 CANCELLED\n", output_);
     response_headers_.remove(Http::Headers::get().GrpcStatus);
   }
   {
@@ -1120,7 +1120,7 @@ typed_config:
     EXPECT_CALL(*file_, write(_));
     response_headers_.addCopy(Http::Headers::get().GrpcStatus, "-1");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-    EXPECT_EQ("-1 -1\n", output_);
+    EXPECT_EQ("-1 -1 -1\n", output_);
     response_headers_.remove(Http::Headers::get().GrpcStatus);
   }
 }
