@@ -228,6 +228,9 @@ removed_config_or_runtime:
 - area: conn pool
   change: |
     removed ``envoy.reloadable_features.conn_pool_delete_when_idle`` and legacy code paths.
+- area: router
+  change: |
+    removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
 - area: runtime
   change: |
     removed ``envoy.restart_features.no_runtime_singleton`` and replaced with ``envoy.restart_features.remove_runtime_singleton``.
