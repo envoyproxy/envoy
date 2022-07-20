@@ -470,11 +470,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     // Listener level traffic direction overrides the operation name
     switch (context.direction()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-    case envoy::config::core::v3::UNSPECIFIED: {
+    case envoy::config::core::v3::UNSPECIFIED:
       // Continuing legacy behavior; if unspecified, we treat this as ingress.
       tracing_operation_name = Tracing::OperationName::Ingress;
       break;
-    }
     case envoy::config::core::v3::INBOUND:
       tracing_operation_name = Tracing::OperationName::Ingress;
       break;
@@ -596,20 +595,18 @@ Http::ServerConnectionPtr
 HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          const Buffer::Instance& data,
                                          Http::ServerConnectionCallbacks& callbacks) {
-  switch (codec_type_) {
+  switch (codec_type_)
   case CodecType::HTTP1: {
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
         headersWithUnderscoresAction());
-  }
-  case CodecType::HTTP2: {
+  case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
         context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction());
-  }
   case CodecType::HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
@@ -626,7 +623,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+    PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) {
