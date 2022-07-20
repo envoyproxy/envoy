@@ -1,4 +1,4 @@
-#include "source/extensions/pattern_template/pattern_template_matching_internal.h"
+#include "source/extensions/pattern_template/pattern_template_internal.h"
 
 #include <optional>
 #include <string>
@@ -21,6 +21,7 @@
 #include "re2/re2.h"
 
 namespace Envoy {
+namespace Extensions {
 namespace PatternTemplate {
 
 namespace PatternTemplateInternal {
@@ -378,6 +379,6 @@ std::string toRegexPattern(const struct ParsedUrlPattern& pattern) {
 }
 
 } // namespace PatternTemplateInternal
-
 } // namespace PatternTemplate
+} // namespace Extensions
 } // namespace Envoy
