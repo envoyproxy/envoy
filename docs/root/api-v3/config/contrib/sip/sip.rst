@@ -1,3 +1,6 @@
+SIP proxy
+=========
+
 .. toctree::
   :glob:
   :maxdepth: 2

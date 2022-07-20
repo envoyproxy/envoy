@@ -478,6 +478,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "filter_state_dst_address_lib",
+    srcs = ["filter_state_dst_address.cc"],
+    hdrs = ["filter_state_dst_address.h"],
+    deps = [
+        "//envoy/network:address_interface",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "upstream_server_name_lib",
     srcs = ["upstream_server_name.cc"],
     hdrs = ["upstream_server_name.h"],

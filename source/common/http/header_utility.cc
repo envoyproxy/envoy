@@ -36,7 +36,8 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 //   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
 //   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
 HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config)
-    : name_(config.name()), invert_match_(config.invert_match()) {
+    : name_(config.name()), invert_match_(config.invert_match()),
+      treat_missing_as_empty_(config.treat_missing_header_as_empty()) {
   switch (config.header_match_specifier_case()) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     header_match_type_ = HeaderMatchType::Value;
@@ -137,7 +138,7 @@ HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::Lowe
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderData& header_data) {
   const auto header_value = getAllOfHeaderAsString(request_headers, header_data.name_);
 
-  if (!header_value.result().has_value()) {
+  if (!header_value.result().has_value() && !header_data.treat_missing_as_empty_) {
     if (header_data.invert_match_) {
       return header_data.header_match_type_ == HeaderMatchType::Present && header_data.present_;
     } else {
@@ -145,7 +146,10 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
     }
   }
 
-  const auto value = header_value.result().value();
+  // If the header does not have value and the result is not returned in the
+  // code above, it means treat_missing_as_empty_ is set to true and we should
+  // treat the header value as empty.
+  const auto value = header_value.result().has_value() ? header_value.result().value() : "";
   bool match;
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:

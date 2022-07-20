@@ -16,8 +16,8 @@ will include the name of the matched policy that caused the deny in the format o
 (policy_name will be ``none`` if no policy matched), this helps to distinguish the deny from Envoy RBAC
 filter and the upstream backend.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`
-* This filter should be configured with the name *envoy.filters.http.rbac*.
 
 Per-Route Configuration
 -----------------------
