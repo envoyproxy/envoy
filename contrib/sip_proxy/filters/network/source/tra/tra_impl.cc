@@ -61,7 +61,7 @@ void GrpcClientImpl::createTrafficRoutingAssistant(
   }
 
   return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Create",
-                     request, context, parent_span, stream_info);
+                     request, parent_span, stream_info);
 }
 
 void GrpcClientImpl::updateTrafficRoutingAssistant(
@@ -82,7 +82,7 @@ void GrpcClientImpl::updateTrafficRoutingAssistant(
   }
 
   return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Update",
-                     request, context, parent_span, stream_info);
+                     request, parent_span, stream_info);
 }
 
 void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
@@ -102,7 +102,7 @@ void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
   }
 
   return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Retrieve",
-                     request, context, parent_span, stream_info);
+                     request, parent_span, stream_info);
 }
 
 void GrpcClientImpl::deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
@@ -121,7 +121,7 @@ void GrpcClientImpl::deleteTrafficRoutingAssistant(const std::string& type, cons
   }
 
   return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Delete",
-                     request, context, parent_span, stream_info);
+                     request, parent_span, stream_info);
 }
 
 void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
@@ -149,8 +149,7 @@ void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
 void GrpcClientImpl::sendRequest(
     const std::string& method,
     envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest& request,
-    absl::optional<TraContextMap> context, Tracing::Span& parent_span,
-    const StreamInfo::StreamInfo& stream_info) {
+    Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
 
   const auto& service_method =
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method);
