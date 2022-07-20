@@ -1382,7 +1382,7 @@ PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      // TODO(silverstar194) Implement path temnplate matcher
+      // TODO(silverstar194) Implement path template matcher
       path_template_(""),
       path_matcher_(Matchers::PathMatcher::createPattern(path_template_, !case_sensitive_)) {}
 
