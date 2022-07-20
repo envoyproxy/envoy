@@ -112,6 +112,8 @@ private:
                                  const Network::TransportSocketOptions* transport_socket_options,
                                  std::string* error_details, uint8_t* out_alert);
 
+  void onVerifyError(Ssl::SslExtendedSocketInfo* ssl_extended_info, absl::string_view error);
+
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;
   TimeSource& time_source_;
