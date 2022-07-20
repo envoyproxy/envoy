@@ -922,11 +922,6 @@ TEST_P(Http1ServerConnectionImplTest, Http11AbsoluteEnabledNoOp) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http11InvalidRequest) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   // Invalid because www.somewhere.com is not an absolute path nor an absolute url
@@ -1794,14 +1789,7 @@ TEST_P(Http1ServerConnectionImplTest, DoubleRequest) {
 
 TEST_P(Http1ServerConnectionImplTest, RequestWithTrailersDropped) { expectTrailersTest(false); }
 
-TEST_P(Http1ServerConnectionImplTest, RequestWithTrailersKept) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
-  expectTrailersTest(true);
-}
+TEST_P(Http1ServerConnectionImplTest, RequestWithTrailersKept) { expectTrailersTest(true); }
 
 TEST_P(Http1ServerConnectionImplTest, IgnoreUpgradeH2c) {
   initialize();
@@ -2926,11 +2914,6 @@ TEST_P(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejected) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
   testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
@@ -2938,11 +2921,6 @@ TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejected) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   // Construct partial headers with a long field name that exceeds the default limit of 60KiB.
   std::string long_string = "bigfield" + std::string(60 * 1024, 'q');
   testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
@@ -2951,11 +2929,6 @@ TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_P(Http1ServerConnectionImplTest, ManyTrailersRejected) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   // Send a request with 101 headers.
   testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n",
                           "http/1.1 protocol error: trailers count exceeds limit", true);
@@ -3020,11 +2993,6 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
   testRequestHeadersExceedLimit(long_string, "http/1.1 protocol error: headers size exceeds limit",
@@ -3032,11 +3000,6 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejectedBeyondMaxConfigurable) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   max_request_headers_kb_ = 8192;
   std::string long_string = "big: " + std::string(8193 * 1024, 'q') + "\r\n";
   testRequestHeadersExceedLimit(long_string, "http/1.1 protocol error: headers size exceeds limit",
@@ -3324,11 +3287,6 @@ TEST_P(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Utf8Path) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   MockRequestDecoder decoder;
@@ -3358,11 +3316,6 @@ TEST_P(Http1ServerConnectionImplTest, Utf8Path) {
 
 // Tests that incomplete response headers of 80 kB header value fails.
 TEST_P(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -3382,11 +3335,6 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
 
 // Tests that incomplete response headers with a 80 kB header field fails.
 TEST_P(Http1ClientConnectionImplTest, ResponseHeadersWithLargeFieldRejected) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
