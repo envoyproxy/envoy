@@ -36,7 +36,7 @@ struct ZlibDecompressorStats {
 /**
  * Implementation of decompressor's interface.
  */
-class ZlibDecompressorImpl : public Zlib::Base,
+class ZlibDecompressorImpl : public Common::Base,
                              public Envoy::Compression::Decompressor::Decompressor,
                              public Logger::Loggable<Logger::Id::decompression> {
 public:

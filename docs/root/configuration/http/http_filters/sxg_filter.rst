@@ -4,8 +4,8 @@
 SXG
 ======
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.sxg.v3alpha.SXG``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.sxg.v3alpha.SXG>`
-* This filter should be configured with the name *envoy.filters.http.sxg*.
 
 .. attention::
 
