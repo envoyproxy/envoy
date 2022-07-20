@@ -375,7 +375,11 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
     return WasmResult::SerializationFailure;
   case CelValue::Type::kMap: {
     const auto& map = *value.MapOrDie();
-    const auto& keys = *map.ListKeys();
+    auto keys_list = map.ListKeys();
+    if (!keys_list.ok()) {
+      return WasmResult::SerializationFailure;
+    }
+    const auto& keys = *keys_list.value();
     std::vector<std::pair<std::string, std::string>> pairs(map.size(), std::make_pair("", ""));
     for (auto i = 0; i < map.size(); i++) {
       if (serializeValue(keys[i], &pairs[i].first) != WasmResult::Ok) {
