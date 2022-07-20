@@ -3,10 +3,12 @@ expression {
     function: "_==_"
     args {
       ident_expr {
-        name: "request"
+        name: "response"
       }
+    }
+    args {
       ident_expr {
-        name: "request"
+        name: "response"
       }
     }
   }
