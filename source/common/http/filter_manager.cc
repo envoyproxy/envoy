@@ -783,7 +783,6 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
   }
 }
 
-
 void FilterManager::disarmRequestTimeout() { filter_manager_callbacks_.disarmRequestTimeout(); }
 
 std::list<ActiveStreamEncoderFilterPtr>::iterator
