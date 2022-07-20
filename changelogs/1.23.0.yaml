@@ -207,6 +207,9 @@ removed_config_or_runtime:
 - area: ext_authz
   change: |
     removed ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` and legacy code paths.
+- area: hcm
+  change: |
+    removed ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding`` and legacy code paths.
 - area: http
   change: |
     removed ``envoy.reloadable_features.correct_scheme_and_xfp`` and legacy code paths.
