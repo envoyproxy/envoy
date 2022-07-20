@@ -334,33 +334,25 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
         !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(ctx.get()),
                                 SSL_CTX_get0_param(&ssl_ctx))) {
       OPENSSL_PUT_ERROR(SSL, ERR_R_X509_LIB);
-      if (ssl_extended_info) {
-        ssl_extended_info->setCertificateValidationStatus(
-            Envoy::Ssl::ClientValidationStatus::Failed);
-      }
-      stats_.fail_verify_error_.inc();
-      std::string error = "verify cert failed: init and setup X509_STORE_CTX";
-      ENVOY_LOG(debug, error);
+      const std::string error = "verify cert failed: init and setup X509_STORE_CTX";
+      onVerifyError(ssl_extended_info, error);
       return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
     }
     const bool verify_succeeded = (X509_verify_cert(ctx.get()) == 1);
-    if (ssl_extended_info) {
-      ssl_extended_info->setCertificateValidationStatus(
-          verify_succeeded ? Envoy::Ssl::ClientValidationStatus::Validated
-                           : Envoy::Ssl::ClientValidationStatus::Failed);
-    }
 
     if (!verify_succeeded) {
-      stats_.fail_verify_error_.inc();
       const std::string error =
           absl::StrCat("verify cert failed: ", Utility::getX509VerificationErrorInfo(ctx.get()));
-      ENVOY_LOG(debug, error);
+      onVerifyError(ssl_extended_info, error);
       if (allow_untrusted_certificate_) {
         return ValidationResults{ValidationResults::ValidationStatus::Successful, absl::nullopt,
                                  absl::nullopt};
       }
       return {ValidationResults::ValidationStatus::Failed,
               SSL_alert_from_verify_result(X509_STORE_CTX_get_error(ctx.get())), error};
+    }
+    if (ssl_extended_info) {
+      ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Validated);
     }
   }
   std::string error_details;
@@ -371,6 +363,15 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
                                        absl::nullopt, absl::nullopt}
                    : ValidationResults{ValidationResults::ValidationStatus::Failed, tls_alert,
                                        error_details};
+}
+
+void DefaultCertValidator::onVerifyError(Ssl::SslExtendedSocketInfo* ssl_extended_info, absl::string_view error) {
+  if (ssl_extended_info) {
+        ssl_extended_info->setCertificateValidationStatus(
+            Envoy::Ssl::ClientValidationStatus::Failed);
+      }
+      stats_.fail_verify_error_.inc();
+      ENVOY_LOG(debug, error);
 }
 
 bool DefaultCertValidator::verifySubjectAltName(X509* cert,

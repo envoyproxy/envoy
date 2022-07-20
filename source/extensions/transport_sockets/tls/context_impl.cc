@@ -163,9 +163,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     for (auto ctx : ssl_contexts) {
       if (verify_mode != SSL_VERIFY_NONE) {
         if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
-          // TODO(danzh) do not set SSL_VERIFY_NONE, instead, retain the state
-          // in ContextImpl and let boring SSL always call the verify callback
-          // which checks the state before doing actual verification.
+          // TODO(danzh) Envoy's use of SSL_VERIFY_NONE does not quite match the actual semantics as a client. As a client, SSL_VERIFY_NONE means to verify the certificate (which will fail without trust anchors), save the result in the session ticket, but otherwise continue with the handshake. But Envoy actually wants it to accept all certificates. The disadvantage of using SSL_VERIFY_NONE is that it records the verify_result, which Envoy never queries but gets saved in session tickets, and tries to find an anchor that isn't there. And also it differs from server side behavior of SSL_VERIFY_NONE which won't even request client certs.
+          // So, instead, we should configure a callback to skip validation and always supply the callback to boring SSL.
           SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
           SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
         } else {
