@@ -20,7 +20,7 @@ Envoy::Network::ConnectionBalancerSharedPtr
 DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     const Protobuf::Message&, Server::Configuration::FactoryContext& context) {
 #ifdef DLB_DISABLED
-  context.localInfo();
+  context.getServerFactoryContext().localInfo();
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
   dlb_resources_t rsrcs;
