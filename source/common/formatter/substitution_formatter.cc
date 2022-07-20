@@ -372,11 +372,17 @@ SubstitutionFormatParser::getKnownFormatters() {
            return std::make_unique<GrpcStatusFormatter>("grpc-status", "",
                                                         absl::optional<size_t>());
          }}},
+       {"GRPC_STATUS_SNAKE_STRING",
+        {CommandSyntaxChecker::COMMAND_ONLY,
+         [](const std::string&, const absl::optional<size_t>&) {
+           return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(),
+                                                        GrpcStatusFormatter::SNAKE_STRING);
+         }}},
        {"GRPC_STATUS_NUMBER",
         {CommandSyntaxChecker::COMMAND_ONLY,
          [](const std::string&, const absl::optional<size_t>&) {
            return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(),
-                                                        true);
+                                                        GrpcStatusFormatter::NUMBER);
          }}},
        {"REQUEST_HEADERS_BYTES",
         {CommandSyntaxChecker::COMMAND_ONLY,
@@ -1686,9 +1692,8 @@ HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_head
 
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
                                          const std::string& alternative_header,
-                                         absl::optional<size_t> max_length, bool format_as_number)
-    : HeaderFormatter(main_header, alternative_header, max_length),
-      format_as_number_(format_as_number) {}
+                                         absl::optional<size_t> max_length, Format format)
+    : HeaderFormatter(main_header, alternative_header, max_length), format_(format) {}
 
 absl::optional<std::string>
 GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
@@ -1700,14 +1705,29 @@ GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
   if (!grpc_status.has_value()) {
     return absl::nullopt;
   }
-  if (format_as_number_) {
+  switch (format_) {
+  case CAMEL_STRING: {
+    const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
+    if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
+      return std::to_string(grpc_status.value());
+    }
+    return grpc_status_message;
+  }
+  case SNAKE_STRING: {
+    const auto grpc_status_message =
+        absl::StatusCodeToString(static_cast<absl::StatusCode>(grpc_status.value()));
+    if (grpc_status_message == EMPTY_STRING) {
+      return std::to_string(grpc_status.value());
+    }
+    return grpc_status_message;
+  }
+  case NUMBER: {
     return std::to_string(grpc_status.value());
   }
-  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
-  if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
-    return std::to_string(grpc_status.value());
+  default:
+    throw EnvoyException("Only camel string, snake string and number are "
+                         "supported in grpc status access log format.");
   }
-  return grpc_status_message;
 }
 
 ProtobufWkt::Value
@@ -1720,16 +1740,31 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
   if (!grpc_status.has_value()) {
     return unspecifiedValue();
   }
-  if (format_as_number_) {
+
+  switch (format_) {
+  case CAMEL_STRING: {
+    const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
+    if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
+      return ValueUtil::stringValue(std::to_string(grpc_status.value()));
+    }
+    return ValueUtil::stringValue(grpc_status_message);
+  }
+  case SNAKE_STRING: {
+    const auto grpc_status_message =
+        absl::StatusCodeToString(static_cast<absl::StatusCode>(grpc_status.value()));
+    if (grpc_status_message == EMPTY_STRING) {
+      return ValueUtil::stringValue(std::to_string(grpc_status.value()));
+    }
+    return ValueUtil::stringValue(grpc_status_message);
+  }
+  case NUMBER: {
     return ValueUtil::numberValue(grpc_status.value());
   }
-  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
-  if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
-    return ValueUtil::stringValue(std::to_string(grpc_status.value()));
+  default:
+    throw EnvoyException("Only camel string, snake string and number are "
+                         "supported in grpc status access log format.");
   }
-  return ValueUtil::stringValue(grpc_status_message);
 }
-
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
                                      const std::vector<std::string>& path,
                                      absl::optional<size_t> max_length,

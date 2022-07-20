@@ -2401,8 +2401,83 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
   }
 }
 
+TEST(SubstitutionFormatterTest, GrpcStatusSnakeStringFormatterTest) {
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
+                                GrpcStatusFormatter::Format::SNAKE_STRING);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  std::array<std::string, 17> grpc_statuses{"OK",
+                                            "CANCELLED",
+                                            "UNKNOWN",
+                                            "INVALID_ARGUMENT",
+                                            "DEADLINE_EXCEEDED",
+                                            "NOT_FOUND",
+                                            "ALREADY_EXISTS",
+                                            "PERMISSION_DENIED",
+                                            "RESOURCE_EXHAUSTED",
+                                            "FAILED_PRECONDITION",
+                                            "ABORTED",
+                                            "OUT_OF_RANGE",
+                                            "UNIMPLEMENTED",
+                                            "INTERNAL",
+                                            "UNAVAILABLE",
+                                            "DATA_LOSS",
+                                            "UNAUTHENTICATED"};
+  for (size_t i = 0; i < grpc_statuses.size(); ++i) {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
+    EXPECT_EQ(grpc_statuses[i], formatter.format(request_header, response_header, response_trailer,
+                                                 stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
+    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
+                                              stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::stringValue("-1")));
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::stringValue("42738")));
+    response_trailer.clear();
+  }
+  {
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::stringValue("-1")));
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::stringValue("42738")));
+    response_header.clear();
+  }
+}
+
 TEST(SubstitutionFormatterTest, GrpcStatusNumberFormatterTest) {
-  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(), true);
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
+                                GrpcStatusFormatter::Format::NUMBER);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
