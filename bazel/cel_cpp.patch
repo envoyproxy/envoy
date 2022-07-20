@@ -7,7 +7,7 @@ index f0470bd..77997d4 100644
  class Data {};
  
 +#pragma GCC diagnostic push
-+#pragma GCC diagnostic ignored "-Wunused"
++#pragma GCC diagnostic ignored "-Wattributes"
 +
  // Empty base class indicating class must be stored directly in the handle and
  // not allocated separately on the heap.
