@@ -13,6 +13,7 @@
 
 #include "source/common/http/headers.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -22,8 +23,13 @@ namespace Upstream {
 
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
+    // Check if filter state override is present, if yes use it before headers and local address.
+    Network::Address::InstanceConstSharedPtr dst_host = filterStateOverrideHost(context);
+
     // Check if override host header is present, if yes use it otherwise check local address.
-    Network::Address::InstanceConstSharedPtr dst_host = requestOverrideHost(context);
+    if (dst_host == nullptr) {
+      dst_host = requestOverrideHost(context);
+    }
 
     if (dst_host == nullptr) {
       const Network::Connection* connection = context->downstreamConnection();
@@ -79,6 +85,21 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 }
 
 Network::Address::InstanceConstSharedPtr
+OriginalDstCluster::LoadBalancer::filterStateOverrideHost(LoadBalancerContext* context) {
+  const auto* conn = context->downstreamConnection();
+  if (!conn) {
+    return nullptr;
+  }
+  const auto* dst_address =
+      conn->streamInfo().filterState().getDataReadOnly<Network::DestinationAddress>(
+          Network::DestinationAddress::key());
+  if (!dst_address) {
+    return nullptr;
+  }
+  return dst_address->address();
+}
+
+Network::Address::InstanceConstSharedPtr
 OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* context) {
   if (!http_header_name_.has_value()) {
     return nullptr;
@@ -107,11 +128,12 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
 }
 
 OriginalDstCluster::OriginalDstCluster(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api,
-                      factory_context.mainThreadDispatcher().timeSource()),
+    : ClusterImplBase(server_context, config, runtime, factory_context, std::move(stats_scope),
+                      added_via_api, factory_context.mainThreadDispatcher().timeSource()),
       dispatcher_(factory_context.mainThreadDispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
@@ -192,6 +214,7 @@ void OriginalDstCluster::cleanup() {
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 OriginalDstClusterFactory::createClusterImpl(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopeSharedPtr&& stats_scope) {
@@ -206,9 +229,9 @@ OriginalDstClusterFactory::createClusterImpl(
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
-  auto new_cluster =
-      std::make_shared<OriginalDstCluster>(cluster, context.runtime(), socket_factory_context,
-                                           std::move(stats_scope), context.addedViaApi());
+  auto new_cluster = std::make_shared<OriginalDstCluster>(
+      server_context, cluster, context.runtime(), socket_factory_context, std::move(stats_scope),
+      context.addedViaApi());
   auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }
