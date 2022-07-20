@@ -212,7 +212,6 @@ CODE_CONVENTION_REPLACEMENTS = {
 UNSORTED_FLAGS = {
     "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-    "envoy.reloadable_features.sanitize_http_header_referer",
 }
 
 LINE_NUMBER_RE = re.compile(r"^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$")
