@@ -1,0 +1,43 @@
+diff --git a/base/internal/data.h b/base/internal/data.h
+index f0470bd..5cc25b7 100644
+--- a/base/internal/data.h
++++ b/base/internal/data.h
+@@ -119,7 +119,7 @@ class InlineData /* : public Data */ {
+   constexpr explicit InlineData(uintptr_t metadata) : metadata_(metadata) {}
+ 
+  private:
+-  uintptr_t metadata_ ABSL_ATTRIBUTE_UNUSED = 0;
++  uintptr_t metadata_ ABSL_ATTRIBUTE_UNUSED;
+ };
+ 
+ static_assert(std::is_trivially_copyable_v<InlineData>,
+@@ -158,8 +158,7 @@ class HeapData /* : public Data */ {
+  private:
+   friend constexpr size_t HeapDataMetadataAndReferenceCountOffset();
+ 
+-  std::atomic<uintptr_t> metadata_and_reference_count_ ABSL_ATTRIBUTE_UNUSED =
+-      0;
++  std::atomic<uintptr_t> metadata_and_reference_count_ ABSL_ATTRIBUTE_UNUSED;
+ };
+ 
+ // Provides introspection for `Data`.
+diff --git a/base/memory_manager.cc b/base/memory_manager.cc
+index 9c2bd23..1b7b355 100644
+--- a/base/memory_manager.cc
++++ b/base/memory_manager.cc
+@@ -117,13 +117,13 @@ std::optional<ArenaBlock> ArenaBlockAllocate(size_t size,
+   pointer = VirtualAlloc(hint, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+   if (ABSL_PREDICT_FALSE(pointer == nullptr)) {
+     if (hint == nullptr) {
+-      return absl::nullopt;
++      return std::nullopt;
+     }
+     // Try again, without the hint.
+     pointer =
+         VirtualAlloc(nullptr, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+     if (pointer == nullptr) {
+-      return absl::nullopt;
++      return std::nullopt;
+     }
+   }
+ #endif
