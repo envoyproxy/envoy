@@ -20,7 +20,7 @@ static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
 DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
     const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config)
-    : root_scope_(context.getServerFactoryContext().scope()),
+    : root_scope_(context.scope()),
       cluster_manager_(context.getServerFactoryContext().clusterManager()),
       api_(context.getServerFactoryContext().api()),
       stats_(generateStats(config.stat_prefix(), root_scope_)),

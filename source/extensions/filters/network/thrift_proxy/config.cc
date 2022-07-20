@@ -137,8 +137,7 @@ ConfigImpl::ConfigImpl(
     Server::Configuration::FactoryContext& context,
     Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
-      stats_(ThriftFilterStats::generateStats(stats_prefix_,
-                                              context_.getServerFactoryContext().scope())),
+      stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
       transport_(lookupTransport(config.transport())), proto_(lookupProtocol(config.protocol())),
       payload_passthrough_(config.payload_passthrough()),
       max_requests_per_connection_(config.max_requests_per_connection().value()),

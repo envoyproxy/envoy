@@ -91,8 +91,9 @@ private:
 
 struct Config {
   Config(const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
-         Server::Configuration::ServerFactoryContext& context)
-      : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()),
+         Server::Configuration::FactoryContext& context)
+      : context_(context.getServerFactoryContext().grpcContext()),
+        emit_filter_state_(proto_config.emit_filter_state()),
         enable_upstream_stats_(proto_config.enable_upstream_stats()) {
 
     switch (proto_config.per_method_stat_specifier_case()) {
@@ -111,8 +112,9 @@ struct Config {
         const char* runtime_key = "envoy.deprecated_features.grpc_stats_filter_enable_"
                                   "stats_for_all_methods_by_default";
 
-        stats_for_all_methods_ = context.runtime().snapshot().deprecatedFeatureEnabled(
-            runtime_key, runtime_feature_default);
+        stats_for_all_methods_ =
+            context.getServerFactoryContext().runtime().snapshot().deprecatedFeatureEnabled(
+                runtime_key, runtime_feature_default);
 
         if (stats_for_all_methods_) {
           ENVOY_LOG_MISC(warn,
@@ -287,8 +289,7 @@ Http::FilterFactoryCb GrpcStatsFilterConfigFactory::createFilterFactoryFromProto
     const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
     const std::string&, Server::Configuration::FactoryContext& factory_context) {
 
-  ConfigConstSharedPtr config =
-      std::make_shared<const Config>(proto_config, factory_context.getServerFactoryContext());
+  ConfigConstSharedPtr config = std::make_shared<const Config>(proto_config, factory_context);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<GrpcStatsFilter>(config));

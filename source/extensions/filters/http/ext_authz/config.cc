@@ -24,7 +24,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
   Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   const auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, context.scope(), context.runtime(),
+      std::make_shared<FilterConfig>(proto_config, base_context.scope(), context.runtime(),
                                      context.httpContext(), stats_prefix, context.bootstrap());
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.
@@ -49,11 +49,12 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
 
     Config::Utility::checkTransportVersion(proto_config);
-    callback = [&context, filter_config, timeout_ms,
+    callback = [&context, &base_context, filter_config, timeout_ms,
                 proto_config](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-              proto_config.grpc_service(), context.scope(), true, Grpc::CacheOption::AlwaysCache),
+              proto_config.grpc_service(), base_context.scope(), true,
+              Grpc::CacheOption::AlwaysCache),
           std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };

@@ -25,7 +25,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
     Server::Configuration::FactoryContext& base_context) {
   Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   ConfigSharedPtr ext_authz_config =
-      std::make_shared<Config>(proto_config, context.scope(), context.bootstrap());
+      std::make_shared<Config>(proto_config, base_context.scope(), context.bootstrap());
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
   Envoy::Config::Utility::checkTransportVersion(proto_config);

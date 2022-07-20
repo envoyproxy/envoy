@@ -32,11 +32,11 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
 
   Envoy::Config::Utility::checkTransportVersion(proto_config.rate_limit_service());
-  return [proto_config, &context, timeout,
+  return [proto_config, &base_context, timeout,
           config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Filter>(
         config, Filters::Common::RateLimit::rateLimitClient(
-                    context, proto_config.rate_limit_service().grpc_service(), timeout)));
+                    base_context, proto_config.rate_limit_service().grpc_service(), timeout)));
   };
 }
 

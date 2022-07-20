@@ -124,7 +124,7 @@ config:
 
   EXPECT_CALL(context.mock_downstream_context_, messageValidationVisitor());
   EXPECT_CALL(context.mock_server_context_, clusterManager());
-  EXPECT_CALL(context.mock_server_context_, scope());
+  EXPECT_CALL(context.mock_downstream_context_, scope());
   EXPECT_CALL(context.mock_server_context_, timeSource());
   EXPECT_CALL(context.mock_server_context_, api());
   EXPECT_CALL(context.mock_server_context_, getTransportSocketFactoryContext());

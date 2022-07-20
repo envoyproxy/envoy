@@ -24,7 +24,7 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
   return [config, stats_prefix, &context, token_cache = std::move(token_cache)](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<GcpAuthnFilter>(
-        config, context.getServerFactoryContext(), stats_prefix,
+        config, context, stats_prefix,
         (token_cache != nullptr) ? &token_cache->tls.get()->cache() : nullptr));
   };
 }

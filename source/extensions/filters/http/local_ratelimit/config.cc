@@ -17,7 +17,7 @@ Http::FilterFactoryCb LocalRateLimitFilterConfig::createFilterFactoryFromProtoTy
     const std::string&, Server::Configuration::FactoryContext& base_context) {
   Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   FilterConfigSharedPtr filter_config = std::make_shared<FilterConfig>(
-      proto_config, context.localInfo(), context.mainThreadDispatcher(), context.scope(),
+      proto_config, context.localInfo(), context.mainThreadDispatcher(), base_context.scope(),
       context.runtime());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
@@ -30,7 +30,7 @@ LocalRateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     Server::Configuration::FactoryContext& base_context, ProtobufMessage::ValidationVisitor&) {
   Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   return std::make_shared<const FilterConfig>(proto_config, context.localInfo(),
-                                              context.mainThreadDispatcher(), context.scope(),
+                                              context.mainThreadDispatcher(), base_context.scope(),
                                               context.runtime(), true);
 }
 

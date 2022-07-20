@@ -16,7 +16,7 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
     const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
   Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   FaultFilterConfigSharedPtr filter_config(new FaultFilterConfig(
-      config, context.runtime(), stats_prefix, context.scope(), context.timeSource()));
+      config, context.runtime(), stats_prefix, base_context.scope(), context.timeSource()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };

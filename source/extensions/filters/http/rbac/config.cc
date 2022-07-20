@@ -16,7 +16,8 @@ Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFac
     const std::string& stats_prefix, Server::Configuration::FactoryContext& base_context) {
   Server::Configuration::ServerFactoryContext& context = base_context.getServerFactoryContext();
   auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(
-      proto_config, stats_prefix, context.scope(), context, context.messageValidationVisitor());
+      proto_config, stats_prefix, base_context.scope(), context,
+      context.messageValidationVisitor());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<RoleBasedAccessControlFilter>(config));

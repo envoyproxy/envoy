@@ -282,10 +282,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::HttpTracerManager& http_tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
-      stats_(Http::ConnectionManagerImpl::generateStats(
-          stats_prefix_, context_.getDownstreamFactoryContext()->scope())),
-      tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats(
-          stats_prefix_, context_.getDownstreamFactoryContext()->scope())),
+      stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
+      tracing_stats_(
+          Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
       internal_address_config_(createInternalAddressConfig(config)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),

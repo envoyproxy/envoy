@@ -61,12 +61,12 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   addUniqueClusters(unique_clusters, prefix_routes.catch_all_route());
 
   auto redis_command_stats =
-      Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
+      Common::Redis::RedisCommandStats::createRedisCommandStats(base_context.scope().symbolTable());
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
     Stats::ScopeSharedPtr stats_scope =
-        context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
+        base_context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, context.clusterManager(), Common::Redis::Client::ClientFactoryImpl::instance_,
         context.threadLocal(), proto_config.settings(), context.api(), std::move(stats_scope),
@@ -83,8 +83,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(
-          std::move(router), context.scope(), filter_config->stat_prefix_, context.timeSource(),
-          proto_config.latency_in_micros(), std::move(fault_manager));
+          std::move(router), base_context.scope(), filter_config->stat_prefix_,
+          context.timeSource(), proto_config.latency_in_micros(), std::move(fault_manager));
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
     Common::Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(
