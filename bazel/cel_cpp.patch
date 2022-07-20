@@ -1,8 +1,18 @@
 diff --git a/base/internal/data.h b/base/internal/data.h
-index f0470bd..5cc25b7 100644
+index f0470bd..33df202 100644
 --- a/base/internal/data.h
 +++ b/base/internal/data.h
-@@ -119,7 +119,7 @@ class InlineData /* : public Data */ {
+@@ -97,6 +97,9 @@ enum class DataLocality {
+ // at least `sizeof(void*)`.
+ class Data {};
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wno-unused"
++
+ // Empty base class indicating class must be stored directly in the handle and
+ // not allocated separately on the heap.
+ //
+@@ -119,7 +122,7 @@ class InlineData /* : public Data */ {
    constexpr explicit InlineData(uintptr_t metadata) : metadata_(metadata) {}
  
   private:
@@ -11,7 +21,7 @@ index f0470bd..5cc25b7 100644
  };
  
  static_assert(std::is_trivially_copyable_v<InlineData>,
-@@ -158,8 +158,7 @@ class HeapData /* : public Data */ {
+@@ -158,10 +161,11 @@ class HeapData /* : public Data */ {
   private:
    friend constexpr size_t HeapDataMetadataAndReferenceCountOffset();
  
@@ -20,7 +30,11 @@ index f0470bd..5cc25b7 100644
 +  std::atomic<uintptr_t> metadata_and_reference_count_ ABSL_ATTRIBUTE_UNUSED;
  };
  
++#pragma GCC diagnostic pop
++
  // Provides introspection for `Data`.
+ class Metadata final {
+  public:
 diff --git a/base/memory_manager.cc b/base/memory_manager.cc
 index 9c2bd23..1b7b355 100644
 --- a/base/memory_manager.cc
