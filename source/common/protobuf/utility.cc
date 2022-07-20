@@ -565,8 +565,8 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
 absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
                                           Protobuf::Message& message) {
   if (!any_message.UnpackTo(&message)) {
-    return absl::InternalError(absl::StrCat("Unable to unpack as " +
-                                            message.GetDescriptor()->full_name() + ": " +
+    return absl::InternalError(absl::StrCat("Unable to unpack as ",
+                                            message.GetDescriptor()->full_name(), ": ",
                                             any_message.DebugString()));
   }
   // Ok Status is returned if `UnpackTo` succeeded.
