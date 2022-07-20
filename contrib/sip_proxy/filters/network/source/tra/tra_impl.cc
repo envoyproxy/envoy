@@ -54,21 +54,8 @@ void GrpcClientImpl::createTrafficRoutingAssistant(
     (*request.mutable_create_request()->mutable_data())[item.first] = item.second;
   }
 
-  if (context.has_value()) {
-    for (auto& item : context.value()) {
-      (*request.mutable_retrieve_request()->mutable_context())[item.first] = item.second;
-    }
-  }
-
-  const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-      "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Create");
-
-  std::unique_ptr<AsyncRequestCallbacks> callback = std::make_unique<AsyncRequestCallbacks>(*this);
-  callback->request_ =
-      async_client_->send(service_method, request, *callback, parent_span,
-                          Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
-                              Http::AsyncClient::ParentContext{&stream_info}));
-  LinkedList::moveIntoList(std::move(callback), request_callbacks_);
+  return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Create",
+                     request, context, parent_span, stream_info);
 }
 
 void GrpcClientImpl::updateTrafficRoutingAssistant(
@@ -82,20 +69,8 @@ void GrpcClientImpl::updateTrafficRoutingAssistant(
     (*request.mutable_update_request()->mutable_data())[item.first] = item.second;
   }
 
-  if (context.has_value()) {
-    for (auto& item : context.value()) {
-      (*request.mutable_retrieve_request()->mutable_context())[item.first] = item.second;
-    }
-  }
-
-  const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-      "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Update");
-  std::unique_ptr<AsyncRequestCallbacks> callback = std::make_unique<AsyncRequestCallbacks>(*this);
-  callback->request_ =
-      async_client_->send(service_method, request, *callback, parent_span,
-                          Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
-                              Http::AsyncClient::ParentContext{&stream_info}));
-  LinkedList::moveIntoList(std::move(callback), request_callbacks_);
+  return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Update",
+                     request, context, parent_span, stream_info);
 }
 
 void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
@@ -108,20 +83,8 @@ void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
   request.set_type(type);
   request.mutable_retrieve_request()->set_key(key);
 
-  if (context.has_value()) {
-    for (auto& item : context.value()) {
-      (*request.mutable_retrieve_request()->mutable_context())[item.first] = item.second;
-    }
-  }
-
-  const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-      "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Retrieve");
-  std::unique_ptr<AsyncRequestCallbacks> callback = std::make_unique<AsyncRequestCallbacks>(*this);
-  callback->request_ =
-      async_client_->send(service_method, request, *callback, parent_span,
-                          Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
-                              Http::AsyncClient::ParentContext{&stream_info}));
-  LinkedList::moveIntoList(std::move(callback), request_callbacks_);
+  return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Retrieve",
+                     request, context, parent_span, stream_info);
 }
 
 void GrpcClientImpl::deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
@@ -133,20 +96,8 @@ void GrpcClientImpl::deleteTrafficRoutingAssistant(const std::string& type, cons
   request.set_type(type);
   request.mutable_delete_request()->set_key(key);
 
-  if (context.has_value()) {
-    for (auto& item : context.value()) {
-      (*request.mutable_retrieve_request()->mutable_context())[item.first] = item.second;
-    }
-  }
-
-  const auto& service_method = *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-      "envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Delete");
-  std::unique_ptr<AsyncRequestCallbacks> callback = std::make_unique<AsyncRequestCallbacks>(*this);
-  callback->request_ =
-      async_client_->send(service_method, request, *callback, parent_span,
-                          Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
-                              Http::AsyncClient::ParentContext{&stream_info}));
-  LinkedList::moveIntoList(std::move(callback), request_callbacks_);
+  return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Delete",
+                     request, context, parent_span, stream_info);
 }
 
 void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
@@ -154,7 +105,6 @@ void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
                                                       const StreamInfo::StreamInfo& stream_info) {
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest request;
 
-  UNREFERENCED_PARAMETER(parent_span);
   request.set_type(type);
   request.mutable_subscribe_request();
 
@@ -164,8 +114,38 @@ void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
   callback->stream_ = async_client_->start(service_method, *callback,
                                            Http::AsyncClient::StreamOptions().setParentContext(
                                                Http::AsyncClient::ParentContext{&stream_info}));
-  callback->stream_.sendMessage(request, false);
+  if (callback->stream_ == nullptr) {
+    onFailure(Grpc::Status::WellKnownGrpcStatus::Unavailable,
+              "Unable to establish new stream to tra server", parent_span);
+    return;
+  }
   LinkedList::moveIntoList(std::move(callback), stream_callbacks_);
+}
+
+void GrpcClientImpl::sendRequest(
+    const std::string& method,
+    envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest& request,
+    absl::optional<TraContextMap> context, Tracing::Span& parent_span,
+    const StreamInfo::StreamInfo& stream_info) {
+
+  if (context.has_value()) {
+    for (auto& item : context.value()) {
+      (*request.mutable_retrieve_request()->mutable_context())[item.first] = item.second;
+    }
+  }
+
+  const auto& service_method =
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method);
+  std::unique_ptr<AsyncRequestCallbacks> callback = std::make_unique<AsyncRequestCallbacks>(*this);
+  callback->request_ =
+      async_client_->send(service_method, request, *callback, parent_span,
+                          Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
+                              Http::AsyncClient::ParentContext{&stream_info}));
+  if (callback->request_ != nullptr) {
+    LinkedList::moveIntoList(std::move(callback), request_callbacks_);
+  }
+
+  // Already invoke `onFailure` asynchronously, no need to call it explicitly here.
 }
 
 void GrpcClientImpl::onSuccess(
