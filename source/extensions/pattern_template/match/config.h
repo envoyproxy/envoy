@@ -12,9 +12,6 @@ namespace Match {
 
 class PatternTemplateMatchPredicateFactory : public Router::PatternTemplateMatchPredicateFactory {
 public:
-  PatternTemplateMatchPredicateFactory(){};
-  ~PatternTemplateMatchPredicateFactory(){};
-
   Router::PatternTemplateMatchPredicateSharedPtr
   createUrlTemplateMatchPredicate(std::string url_pattern) override {
     return std::make_shared<PatternTemplateMatchPredicate>(url_pattern);

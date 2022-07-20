@@ -8,7 +8,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# Wildcard & Pattern Matching
+# Wildcard & Pattern Rewrites
 
 envoy_extension_package()
 
@@ -16,7 +16,6 @@ envoy_cc_library(
     name = "pattern_template_rewrite_lib",
     srcs = ["pattern_template_rewrite.cc"],
     hdrs = ["pattern_template_rewrite.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/router:router_pattern_template_interface",
         "//source/extensions/pattern_template:pattern_template_lib",

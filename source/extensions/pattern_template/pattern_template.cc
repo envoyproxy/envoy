@@ -117,7 +117,7 @@ parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) 
   return parsed_pattern;
 }
 
-absl::Status isValidPathTemplateMatchPattern(const std::string& path_template_match) {
+absl::Status isValidMatchPattern(const std::string& path_template_match) {
   return convertURLPatternSyntaxToRegex(path_template_match).status();
 }
 
@@ -129,10 +129,6 @@ absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
                                       std::string& capture_regex) {
   return parseRewritePattern(path_template_rewrite, capture_regex).status();
 }
-
-absl::Status is_valid_match_pattern(std::string match_pattern) {
-  return isValidPathTemplateMatchPattern(match_pattern);
-};
 
 } // namespace PatternTemplate
 } // namespace Extensions

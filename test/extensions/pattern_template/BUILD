@@ -14,10 +14,9 @@ envoy_package()
 envoy_extension_cc_test(
     name = "match_config_test",
     srcs = ["match_config_test.cc"],
-    extension_names = ["envoy.url_template"],
+    extension_names = ["envoy.pattern_template"],
     deps = [
-        "//source/common/stream_info:filter_state_lib",
-        "//source/extensions/pattern_template:config",
+        "//source/extensions/pattern_template/match:match:pattern_template_match_lib",
         "//test/mocks/server:factory_context_mocks",
     ],
 )
@@ -25,19 +24,9 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "rewrite_config_test",
     srcs = ["rewrite_config_test.cc"],
-    extension_names = ["envoy.url_template"],
+    extension_names = ["envoy.pattern_template"],
     deps = [
-        "//source/common/stream_info:filter_state_lib",
-        "//source/extensions/pattern_template:config",
+        "//source/extensions/pattern_template/rewrite:pattern_template_rewrite_lib",
         "//test/mocks/server:factory_context_mocks",
-    ],
-)
-
-envoy_extension_cc_test(
-    name = "matcher_test",
-    srcs = ["matcher_test.cc"],
-    extension_names = ["envoy.url_template"],
-    deps = [
-        "//source/extensions/pattern_template:pattern_template_matching",
     ],
 )

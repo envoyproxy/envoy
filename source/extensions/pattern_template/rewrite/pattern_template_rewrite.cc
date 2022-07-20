@@ -25,7 +25,7 @@ namespace Rewrite {
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-absl::Status PatternTemplateRewritePredicate::is_valid_rewrite_pattern(std::string match_pattern,
+absl::Status PatternTemplateRewritePredicate::isValidRewritePattern(std::string match_pattern,
                                                                 std::string rewrite_pattern) {
 
   if (!isValidPathTemplateRewritePattern(rewrite_pattern).ok()) {

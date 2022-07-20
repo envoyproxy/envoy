@@ -16,7 +16,6 @@ envoy_cc_library(
     name = "pattern_template_match_lib",
     srcs = ["pattern_template_match.cc"],
     hdrs = ["pattern_template_match.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/router:router_pattern_template_interface",
         "//source/extensions/pattern_template:pattern_template_lib",
