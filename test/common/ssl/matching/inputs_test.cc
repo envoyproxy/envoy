@@ -23,7 +23,7 @@ TEST(Authentication, UriSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, Matcher::InputValue());
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
@@ -36,7 +36,7 @@ TEST(Authentication, UriSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, Matcher::InputValue());
   }
 
   {
@@ -46,7 +46,7 @@ TEST(Authentication, UriSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo");
+    EXPECT_EQ(result.data_, Matcher::InputValue("foo"));
   }
 
   {
@@ -56,7 +56,7 @@ TEST(Authentication, UriSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo,bar");
+    EXPECT_EQ(result.data_, Matcher::InputValue("foo,bar"));
   }
 }
 
@@ -71,7 +71,7 @@ TEST(Authentication, DnsSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, Matcher::InputValue());
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
@@ -84,7 +84,7 @@ TEST(Authentication, DnsSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, Matcher::InputValue());
   }
 
   {
@@ -94,7 +94,7 @@ TEST(Authentication, DnsSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo");
+    EXPECT_EQ(result.data_, Matcher::InputValue("foo"));
   }
 
   {
@@ -104,7 +104,7 @@ TEST(Authentication, DnsSanInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo,bar");
+    EXPECT_EQ(result.data_, Matcher::InputValue("foo,bar"));
   }
 }
 
@@ -119,7 +119,7 @@ TEST(Authentication, SubjectInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, Matcher::InputValue());
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
@@ -131,7 +131,7 @@ TEST(Authentication, SubjectInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_EQ(result.data_, Matcher::InputValue());
   }
 
   {
@@ -139,7 +139,7 @@ TEST(Authentication, SubjectInput) {
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, "foo");
+    EXPECT_EQ(result.data_, Matcher::InputValue("foo"));
   }
 }
 
