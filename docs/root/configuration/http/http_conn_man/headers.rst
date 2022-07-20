@@ -589,3 +589,38 @@ before the request is sent upstream and the response is not received yet.
          value: "%RESPONSE_CODE%"
        append: true
 
+.. attention::
+
+  The following legacy header formatters are still supported, but will be deprecated in the future.
+  The equivalent information can be accessed using indicated substitutes.
+
+  %DYNAMIC_METADATA(["namespace", "key", ...])%
+    Populates the header with dynamic metadata available in a request
+    (e.g.: added by filters like the header-to-metadata filter).
+
+    This works both on request and response headers.
+
+    Use :ref:`%DYNAMIC_METADATA(namespace:key:…):Z%<config_access_log_format_dynamic_metadata>` instead.
+
+  %UPSTREAM_METADATA(["namespace", "key", ...])%
+    Populates the header with :ref:`EDS endpoint metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>` from the
+    upstream host selected by the router. Metadata may be selected from any namespace. In general,
+    metadata values may be strings, numbers, booleans, lists, nested structures, or null. Upstream
+    metadata values may be selected from nested structs by specifying multiple keys. Otherwise,
+    only string, boolean, and numeric values are supported. If the namespace or key(s) are not
+    found, or if the selected value is not a supported type, then no header is emitted. The
+    namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
+    parameters **do not** need to be escaped by doubling them.
+
+    Upstream metadata cannot be added to request headers as the upstream host has not been selected
+    when custom request headers are generated.
+
+    Use :ref:`%UPSTREAM_METADATA(namespace:key:…):Z%<config_access_log_format_upstream_host_metadata>` instead.
+
+  %PER_REQUEST_STATE(reverse.dns.data.name)%
+    Populates the header with values set on the stream info filterState() object. To be
+    usable in custom request/response headers, these values must be of type
+    Envoy::Router::StringAccessor. These values should be named in standard reverse DNS style,
+    identifying the organization that created the value and ending in a unique name for the data.
+
+    Use :ref:`%FILTER_STATE(reverse.dns.data.name:PLAIN):Z%<config_access_log_format_filter_state>` instead.
