@@ -15,10 +15,16 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: lightstep
+  change: |
+    removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
 
 new_features:
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
+- area: upstream
+  change: |
+    added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
 
 deprecated:

@@ -192,7 +192,6 @@ EXTENSIONS = {
     #
 
     "envoy.tracers.dynamic_ot":                         "//source/extensions/tracers/dynamic_ot:config",
-    "envoy.tracers.lightstep":                          "//source/extensions/tracers/lightstep:config",
     "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
