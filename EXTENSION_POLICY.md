@@ -152,7 +152,9 @@ the extension at sufficient scale as to make the build maintenance and other ove
 The definition of "sufficient scale" is up to the maintainers and can change at any time. The
 end-user sponsor *does not* have to author the extension, but the end-user sponsor will need to make
 an "on the record" attestation of their planned usage of the extension. This attestation should
-occur in a GitHub issue opened to discuss the new extension.
+occur in a GitHub issue opened to discuss the new extension. In this context "end user" has the
+same definition as the one specified in the [security policy](SECURITY.md#membership-criteria)
+membership criteria (point 1.3.5).
 
 **NOTE:** Contrib extensions are not eligible for Envoy security team coverage.
 
