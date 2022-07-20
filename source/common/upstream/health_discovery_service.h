@@ -47,8 +47,8 @@ public:
 class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
   static ClusterSharedPtr create();
-  HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
-             envoy::config::cluster::v3::Cluster cluster,
+  HdsCluster(Server::Configuration::ServerFactoryContext& server_context, Server::Admin& admin,
+             Runtime::Loader& runtime, envoy::config::cluster::v3::Cluster cluster,
              const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
              Ssl::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
@@ -89,6 +89,7 @@ protected:
 private:
   std::function<void()> initialization_complete_callback_;
 
+  Server::Configuration::ServerFactoryContext& server_context_;
   Runtime::Loader& runtime_;
   envoy::config::cluster::v3::Cluster cluster_;
   const envoy::config::core::v3::BindConfig& bind_config_;
@@ -148,8 +149,9 @@ struct HdsDelegateStats {
 class HdsDelegate : Grpc::AsyncStreamCallbacks<envoy::service::health::v3::HealthCheckSpecifier>,
                     Logger::Loggable<Logger::Id::upstream> {
 public:
-  HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
-              Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Envoy::Stats::Store& stats,
+  HdsDelegate(Server::Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
+              Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
+              Runtime::Loader& runtime, Envoy::Stats::Store& stats,
               Ssl::ContextManager& ssl_context_manager, ClusterInfoFactory& info_factory,
               AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
               const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
@@ -191,6 +193,7 @@ private:
   Grpc::AsyncStream<envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse>
       stream_{};
   Event::Dispatcher& dispatcher_;
+  Server::Configuration::ServerFactoryContext& server_context_;
   Runtime::Loader& runtime_;
   Envoy::Stats::Store& store_stats_;
   Ssl::ContextManager& ssl_context_manager_;
