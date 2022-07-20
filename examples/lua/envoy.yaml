@@ -39,7 +39,7 @@ static_resources:
                           response_handle:headers():add("header_key_2", "header_value_2")
                         end
           http_filters:
-          - name: envoy.filters.http.lua
+          - name: lua_filter_with_custom_name_0
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
               default_source_code:
