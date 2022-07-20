@@ -1,8 +1,9 @@
+#include "contrib/network/connection_balance/random/source/config.h"
+
 #include "envoy/registry/registry.h"
 
-#include "contrib/network/connection_balance/random/source/config.h"
-#include "contrib/network/connection_balance/random/source/connection_balancer_impl.h"
 #include "contrib/envoy/extensions/network/connection_balance/random/v3alpha/random.pb.h"
+#include "contrib/network/connection_balance/random/source/connection_balancer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

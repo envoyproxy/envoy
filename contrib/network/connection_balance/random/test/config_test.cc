@@ -1,6 +1,8 @@
-#include "test/mocks/server/factory_context.h"
 #include "envoy/registry/registry.h"
+
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+
 #include "contrib/network/connection_balance/random/source/config.h"
 #include "gtest/gtest.h"
 
