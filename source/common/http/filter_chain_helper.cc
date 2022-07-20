@@ -15,6 +15,7 @@
 namespace Envoy {
 namespace Http {
 
+// Allows graceful handling of missing configuration for ECDS.
 class MissingConfigFilter : public Http::PassThroughDecoderFilter {
 public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
@@ -58,7 +59,7 @@ void FilterChainHelper::processFilters(const FiltersList& filters, const std::st
                                        const std::string& filter_chain_type,
                                        FilterFactoriesList& filter_factories) {
   DependencyManager dependency_manager;
-  for (int32_t i = 0; i < filters.size(); i++) {
+  for (int i = 0; i < filters.size(); i++) {
     processFilter(filters[i], i, prefix, filter_chain_type, i == filters.size() - 1,
                   filter_factories, dependency_manager);
   }
