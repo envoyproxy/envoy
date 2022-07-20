@@ -166,39 +166,22 @@ void BalsaParser::OnBodyChunkInput(absl::string_view input) {
 void BalsaParser::OnHeaderInput(absl::string_view /*input*/) {}
 void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
 
-void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
+void BalsaParser::OnHeader(absl::string_view key, absl::string_view value) {
   if (status_ == ParserStatus::Error) {
     return;
   }
-  headers.ForEachHeader([this](const absl::string_view key, const absl::string_view value) {
-    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
-    if (status_ == ParserStatus::Error) {
-      return false;
-    }
-    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
-    if (status_ == ParserStatus::Error) {
-      return false;
-    }
-    return true;
-  });
+
+  status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
+
+  if (status_ == ParserStatus::Error) {
+    return;
+  }
+
+  status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
 }
 
-void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
-  if (status_ == ParserStatus::Error) {
-    return;
-  }
-  trailer.ForEachHeader([this](const absl::string_view key, const absl::string_view value) {
-    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
-    if (status_ == ParserStatus::Error) {
-      return false;
-    }
-    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
-    if (status_ == ParserStatus::Error) {
-      return false;
-    }
-    return true;
-  });
-}
+void BalsaParser::ProcessHeaders(const BalsaHeaders& /*headers*/) {}
+void BalsaParser::ProcessTrailers(const BalsaHeaders& /*trailer*/) {}
 
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
                                           absl::string_view method_input,

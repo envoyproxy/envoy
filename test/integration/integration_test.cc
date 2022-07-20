@@ -2390,6 +2390,9 @@ TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
 
   config_helper_.prependFilter(R"EOF(
     name: set-route-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SetRouteFilterConfig
+      cluster_override: cluster_override
     )EOF");
 
   setUpstreamCount(2);

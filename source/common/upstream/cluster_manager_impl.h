@@ -48,19 +48,18 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
-  ProdClusterManagerFactory(Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-                            ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-                            Ssl::ContextManager& ssl_context_manager,
-                            Event::Dispatcher& main_thread_dispatcher,
-                            const LocalInfo::LocalInfo& local_info,
-                            Secret::SecretManager& secret_manager,
-                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                            Http::Context& http_context, Grpc::Context& grpc_context,
-                            Router::Context& router_context,
-                            AccessLog::AccessLogManager& log_manager,
-                            Singleton::Manager& singleton_manager, const Server::Options& options,
-                            Quic::QuicStatNames& quic_stat_names, const Server::Instance& server)
-      : context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
+  ProdClusterManagerFactory(
+      Server::Configuration::ServerFactoryContext& server_context, Server::Admin& admin,
+      Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
+      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
+      Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
+      Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
+      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+      Router::Context& router_context, AccessLog::AccessLogManager& log_manager,
+      Singleton::Manager& singleton_manager, const Server::Options& options,
+      Quic::QuicStatNames& quic_stat_names, const Server::Instance& server)
+      : server_context_(server_context),
+        context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
                  singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
         validation_context_(validation_context), http_context_(http_context),
         grpc_context_(grpc_context), router_context_(router_context), admin_(admin), stats_(stats),
@@ -99,6 +98,7 @@ public:
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
 protected:
+  Server::Configuration::ServerFactoryContext& server_context_;
   Server::FactoryContextBaseImpl context_;
   ProtobufMessage::ValidationContext& validation_context_;
   Http::Context& http_context_;

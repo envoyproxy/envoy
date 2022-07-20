@@ -14,6 +14,7 @@ import sys
 import traceback
 import shutil
 import paths
+from functools import cached_property
 
 EXCLUDED_PREFIXES = (
     "./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
@@ -214,6 +215,11 @@ UNSORTED_FLAGS = {
     "envoy.reloadable_features.sanitize_http_header_referer",
 }
 
+LINE_NUMBER_RE = re.compile(r"^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$")
+VIRTUAL_INCLUDE_HEADERS_RE = re.compile(r"#include.*/_virtual_includes/")
+OWNER_RE = re.compile('@\S+')
+PROJECT_OWNERS_RE = re.compile(r'.*github.com.(.*)\)\)')
+
 
 class FormatChecker:
 
@@ -234,6 +240,10 @@ class FormatChecker:
             "./tools/clang_tools",
         ]
         self.include_dir_order = args.include_dir_order
+
+    @cached_property
+    def namespace_re(self):
+        return re.compile("^\s*namespace\s+%s\s*{" % self.namespace_check, re.MULTILINE)
 
     # Map a line transformation function across each line of a file,
     # writing the result lines as requested.
@@ -351,8 +361,7 @@ class FormatChecker:
 
         nolint = "NOLINT(namespace-%s)" % self.namespace_check.lower()
         text = self.read_file(file_path)
-        if not re.search("^\s*namespace\s+%s\s*{" % self.namespace_check, text, re.MULTILINE) and \
-                not nolint in text:
+        if not self.namespace_re.search(text) and not nolint in text:
             return [
                 "Unable to find %s namespace or %s for file: %s" %
                 (self.namespace_check, nolint, file_path)
@@ -593,7 +602,7 @@ class FormatChecker:
                     "term %s should be replaced with preferred term %s" %
                     (invalid_construct, valid_construct))
         # Do not include the virtual_includes headers.
-        if re.search("#include.*/_virtual_includes/", line):
+        if VIRTUAL_INCLUDE_HEADERS_RE.search(line):
             report_error("Don't include the virtual includes headers.")
 
         # Some errors cannot be fixed automatically, and actionable, consistent,
@@ -920,12 +929,7 @@ class FormatChecker:
     #   - "26,27c26"
     #   - "12,13d13"
     #   - "7a8,9"
-    def execute_command(
-        self,
-        command,
-        error_message,
-        file_path,
-        regex=re.compile(r"^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$")):
+    def execute_command(self, command, error_message, file_path, regex=LINE_NUMBER_RE):
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
@@ -1042,6 +1046,11 @@ class FormatChecker:
             self.check_owners(str(top_level), owned_directories, error_messages)
 
         dir_name = normalize_path(dir_name)
+
+        # TODO(phlax): improve class/process handling - this is required because if it
+        #   is not cached before the class is sent into the pool, it only caches on the
+        #   forked proc
+        self.namespace_re
 
         for file_name in names:
             result = pool.apply_async(
@@ -1176,12 +1185,11 @@ if __name__ == "__main__":
 
     def get_owners():
         with open('./OWNERS.md') as f:
-            EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*github.com.(.*)\)\)')
             maintainers = ["@UNOWNED"]
             for line in f:
                 if "Senior extension maintainers" in line:
                     return maintainers
-                m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
+                m = PROJECT_OWNERS_RE.search(line)
                 if m is not None:
                     maintainers.append("@" + m.group(1).lower())
 
@@ -1199,7 +1207,7 @@ if __name__ == "__main__":
                     m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
                     if m is not None and not line.startswith('#'):
                         owned.append(m.group(1).strip())
-                        owners = re.findall('@\S+', m.group(2).strip())
+                        owners = OWNER_RE.findall(m.group(2).strip())
                         if len(owners) < 2:
                             error_messages.append(
                                 "Extensions require at least 2 owners in CODEOWNERS:\n"
@@ -1228,7 +1236,7 @@ if __name__ == "__main__":
                             continue
 
                         owned.append(stripped_path)
-                        owners = re.findall('@\S+', m.group(2).strip())
+                        owners = OWNER_RE.findall(m.group(2).strip())
                         if len(owners) < 2:
                             error_messages.append(
                                 "Contrib extensions require at least 2 owners in CODEOWNERS:\n"

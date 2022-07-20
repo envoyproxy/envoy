@@ -64,7 +64,7 @@ invoking the build.
 IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
-Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the defualt GOPROXY in China.
+Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the default GOPROXY in China.
 
 ```bash
 IMAGE_NAME=envoyproxy/envoy-build-ubuntu go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
