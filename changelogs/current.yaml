@@ -6,94 +6,11 @@ behavior_changes:
   change: |
     Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
     This behavior change can be reverted by setting the ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` runtime flag to false.
-
-minor_behavior_changes:
-- area: thrift
-  change: |
-    keep downstream connection if the response is completed without underflow.
-- area: tls
-  change: |
-    if both :ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>` and :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>` are specified, the former (deprecated) field is ignored. Previously, setting both fields would result in an error.
-- area: tls
-  change: |
-    removed SHA-1 and RSA key transport cipher suites from the server-side defaults.
 - area: tls
   change: |
     Change TLS transport socket and QUIC transport socket to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
-    the listener filter tls inspector's stats ``connection_closed`` and ``read_error`` are removed. New stats are introduced for listener, ``downstream_peek_remote_close`` and ``read_error``, in :ref:`listener stats <config_listener_stats>`.
-- area: http
-  change: |
-    the behavior of the :ref:`timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
-    field has been modified to extend the timeout when *any* frame is received on the owning HTTP/2
-    connection. This negates the effect of head-of-line (HOL) blocking for slow connections. If
-    any frame is received the assumption is that the connection is working. This behavior change
-    can be reverted by setting ``envoy.reloadable_features.http2_delay_keepalive_timeout`` to false.
-- area: http
-  change: |
-    changing the behavior for CONNECT and upgrade requests over HTTP/1.1 to not delay close. This behavioral change
-    can be reverted by setting ``envoy.reloadable_features.no_delay_close_for_upgrades`` to false.
-- area: http
-  change: |
-    the :ref:`dynamo filter <config_http_filters_dynamo>` has been moved to :ref:`contrib images <install_contrib>`.
-- area: http-cache
-  change: |
-    http cache filter ``getCache`` interface changed from returning a reference to
-    returning a shared_ptr - any third-party implementations of this interface will need to be
-    updated accordingly. See changes to ``simple_http_cache.cc`` and ``simple_http_cache.h`` in
-    `PR21114 <https://github.com/envoyproxy/envoy/pull/21114>`_ for example.
-- area: lua
-  change: |
-    export symbols of LuaJit by default on Linux. This is useful in cases where you have a lua script
-    that loads shared object libraries, such as those installed via luarocks.
-- area: admin
-  change: |
-    changed default regex engine for ``/stats?filter=`` from std::regex to RE2, improving
-    filtering speed 20x.
-- area: skywalking
-  change: |
-    use request path as operation name of ENTRY/EXIT spans.
-- area: skywalking
-  change: |
-    use upstream host address as ``addressUsedAtClient`` in propagation header.
-- area: dns
-  change: |
-    allow propagating DNS responses with no records back to callers like strict_dns cluster,
-    guarded by ``envoy.reloadable_features.cares_accept_nodata``.
-- area: local_ratelimit
-  change: |
-    local_ratelimit will consume tokens of all matched descriptors sorted by tokens per second.
-    This behavioral change can be reverted by setting runtime guard
-    ``envoy.reloadable_features.http_local_ratelimit_match_all_descriptors`` to false.
-- area: router
-  change: |
-    get route config factories by the configuration proto full names by default. This behavior change
-    can be reverted by setting the ``envoy.reloadable_features.get_route_config_factory_by_type``
-    runtime flag to false.
-- area: lua
-  change: |
-    lua ``respond`` api will call ``sendLocalReply`` instead of ``encodeHeaders`` and ``encodeData``.
-    This means that encoder filters will be correctly invoked, including adding configured response
-    headers, etc. This behavioral change can be reverted by setting runtime guard
-    ``envoy.reloadable_features.lua_respond_with_send_local_reply`` to false.
-- area: logging
-  change: |
-    changed flag ``--log-format-escaped`` to only log one trailing newline per log line.
-- area: logging
-  change: |
-    changed category name for access log filter extensions to ``envoy.access_loggers.extension_filters``.
-- area: filter state
-  change: |
-    revert to respecting the life time of the filter state objects to be bound to the original stream and make sharing
-    filter state objects with the upstream info explicit via an extra flag in ``setData``.
-- area: tracers
-  change: |
-    remove unnecessary "spawnChild" annotations in OpenCensus tracer.
-- area: conn pool
-  change: |
-    changed HTTP/2 connection pooling and the :ref:`ALPN pool <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>` to remember the number of streams allowed by the endpoint and cap multiplexed streams for subsequent connections based on that. With that working, defaulted the ALPN pool to assume HTTP/2 will work, as it will only incur a latency hit once until the TLS handshake is complete, and then will cache that the effective stream limit is 1.  This behavioral change can be revered by setting ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` to false.
-- area: network
-  change: |
-    the :ref:`client ssl auth filter <config_network_filters_client_ssl_auth>` has been moved to :ref:`contrib images <install_contrib>`.
+
+minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
