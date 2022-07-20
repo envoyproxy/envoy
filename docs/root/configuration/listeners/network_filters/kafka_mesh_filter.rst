@@ -8,8 +8,8 @@ producers. Produce requests sent to this filter insance can be forwarded to one 
 clusters, depending on configured forwarding rules. Corresponding message versions from
 Kafka 3.2.0 are supported.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh>`
-* This filter should be configured with the name *envoy.filters.network.kafka_mesh*.
 
 .. attention::
 

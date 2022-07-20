@@ -9,6 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/network/address_impl.h"
+#include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/original_dst_cluster.h"
@@ -81,8 +82,8 @@ public:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
-    cluster_ = std::make_shared<OriginalDstCluster>(cluster_config, runtime_, factory_context,
-                                                    std::move(scope), false);
+    cluster_ = std::make_shared<OriginalDstCluster>(server_context_, cluster_config, runtime_,
+                                                    factory_context, std::move(scope), false);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -90,6 +91,7 @@ public:
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -677,6 +679,41 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   EXPECT_CALL(dispatcher_, post(_)).Times(0);
   HostConstSharedPtr host3 = lb.chooseHost(&lb_context3);
   EXPECT_EQ(host3, nullptr);
+}
+
+TEST_F(OriginalDstClusterTest, UseFilterState) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      use_http_header: true
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(cluster_);
+  Event::PostCb post_cb;
+
+  // Filter state takes priority over header override.
+  NiceMock<Network::MockConnection> connection;
+  connection.stream_info_.filterState()->setData(
+      Network::DestinationAddress::key(),
+      std::make_shared<Network::DestinationAddress>(
+          std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
+      StreamInfo::FilterState::StateType::ReadOnly);
+  TestLoadBalancerContext lb_context1(&connection, Http::Headers::get().EnvoyOriginalDstHost.get(),
+                                      "127.0.0.1:5555");
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
+  post_cb();
+  ASSERT_NE(host1, nullptr);
+  EXPECT_EQ("10.10.11.11:6666", host1->address()->asString());
 }
 
 } // namespace

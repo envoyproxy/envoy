@@ -57,13 +57,17 @@ services:
       context: .
       dockerfile: Dockerfile-elasticsearch
     healthcheck:
-      test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     environment:
       discovery.type: single-node
+      ingest.geoip.downloader.enabled: "false"
+      # NB: This setting is for demo purposes only, you are strongly advised to configure
+      #   Elasticsearch with security enabled
+      xpack.security.enabled: "false"
     ulimits:
       memlock:
         soft: -1
@@ -93,7 +97,7 @@ services:
       context: .
       dockerfile: Dockerfile-skywalking-ui
     healthcheck:
-      test: ["CMD-SHELL", 'curl --silent --fail curl http://localhost:8080/graphql -X POST -H "Content-Type:application/json" -d "{ \"query\": \"query version { version }\"}" || exit 1']
+      test: ["CMD-SHELL", 'curl --silent --fail http://localhost:8080/graphql -X POST -H "Content-Type:application/json" -d "{ \"query\": \"query version { version }\"}" || exit 1']
       interval: 5s
       timeout: 10s
       retries: 10

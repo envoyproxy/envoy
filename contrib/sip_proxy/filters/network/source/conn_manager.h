@@ -347,6 +347,7 @@ private:
 
   void dispatch();
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
+  void setLocalResponseSent(absl::string_view transaction_id);
   void doDeferredTransDestroy(ActiveTrans& trans);
   void resetAllTrans(bool local_reset);
 

@@ -54,4 +54,4 @@ static_resources:
             address:
               socket_address:
                 address: web_service
-                port_value: 80
+                port_value: 8080

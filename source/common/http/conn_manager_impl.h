@@ -298,6 +298,7 @@ private:
 
     void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
+    void refreshIdleTimeout();
 
     // All state for the stream. Put here for readability.
     struct State {
