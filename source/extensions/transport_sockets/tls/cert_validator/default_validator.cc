@@ -352,7 +352,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
               SSL_alert_from_verify_result(X509_STORE_CTX_get_error(ctx.get())), error};
     }
     if (ssl_extended_info) {
-      ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Validated);
+      ssl_extended_info->setCertificateValidationStatus(
+          Envoy::Ssl::ClientValidationStatus::Validated);
     }
   }
   std::string error_details;
@@ -365,13 +366,13 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
                                        error_details};
 }
 
-void DefaultCertValidator::onVerifyError(Ssl::SslExtendedSocketInfo* ssl_extended_info, absl::string_view error) {
+void DefaultCertValidator::onVerifyError(Ssl::SslExtendedSocketInfo* ssl_extended_info,
+                                         absl::string_view error) {
   if (ssl_extended_info) {
-        ssl_extended_info->setCertificateValidationStatus(
-            Envoy::Ssl::ClientValidationStatus::Failed);
-      }
-      stats_.fail_verify_error_.inc();
-      ENVOY_LOG(debug, error);
+    ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
+  }
+  stats_.fail_verify_error_.inc();
+  ENVOY_LOG(debug, error);
 }
 
 bool DefaultCertValidator::verifySubjectAltName(X509* cert,
