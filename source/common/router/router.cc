@@ -1816,9 +1816,9 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3) {
   }
 
   FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
-                                    *downstream_headers_, !config_.suppress_envoy_headers_,
-                                    grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
-  
+                                   *downstream_headers_, !config_.suppress_envoy_headers_,
+                                   grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
+
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() &&
