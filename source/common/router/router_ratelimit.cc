@@ -62,9 +62,9 @@ public:
     data.onRequestHeaders(headers);
     auto result = data_input_->get(data);
     if (!result.data_.isNull()) {
-      const auto value = result.data_.stringOrInt();
-      if (value && !value.value().isEmpty()) {
-        descriptor_entry = {descriptor_key_, value.value()};
+      const auto string_value = result.data_.stringOrInt();
+      if (string_value && !string_value->isEmpty()) {
+        descriptor_entry = {descriptor_key_, *string_value};
       }
       return true;
     }
