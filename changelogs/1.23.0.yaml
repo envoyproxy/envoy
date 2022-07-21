@@ -228,6 +228,9 @@ removed_config_or_runtime:
 - area: tcp_proxy
   change: |
     removed ``envoy.reloadable_features.new_tcp_connection_pool`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.sanitize_http_header_referer`` and legacy code paths.
 - area: conn pool
   change: |
     removed ``envoy.reloadable_features.conn_pool_delete_when_idle`` and legacy code paths.
