@@ -18,7 +18,6 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.proxy_120_103`` and legacy code paths.
-
 - area: lightstep
   change: |
     removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
@@ -32,31 +31,9 @@ new_features:
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
 - area: upstream
   change: |
-    added :ref:`internal upstream transport <envoy_v3_api_msg_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport>` for passing metadata and filter state across the user space sockets and the internal listeners.
-- area: router
-  change:
-    added :ref:`keep_empty_value <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>` to allow keeping empty values in custom headers.
-- area: dubbo_proxy
-  change: |
-    added :ref:`metadata_match <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.metadata_match>` support to the dubbo proxy.
-- area: network
-  change: |
-    extended conection balancer with :ref:`extend balance <envoy_v3_api_field_config.listener.v3.Listener.ConnectionBalanceConfig.extend_balance>`, and added :ref:`Dlb connection balancer <envoy_v3_api_msg_extensions.network.connection_balance.dlb.v3alpha.Dlb>` to use `DLB <https://www.intel.com/content/www/us/en/download/686372/intel-dynamic-load-balancer.html>`_ hardware to balance.
-- area: router
-  change: |
-    added :ref:`stat_prefix <envoy_v3_api_field_config.route.v3.Route.stat_prefix>` support to generate route level statistics.
-- area: matching
-  change : |
-    added support for matching authenticated inputs in network and HTTP matching data.
-- area: network
-  change: |
-    the :ref:`client ssl auth filter <config_network_filters_client_ssl_auth>` has been moved to :ref:`contrib images <install_contrib>`.
-- area: rbac
-  change: |
-    added :ref:`matcher <arch_overview_rbac_matcher>` for selecting connections and requests to different actions.
+    added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
 - area: health check
   change: |
     added :ref:`method <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.method>` support to configure http health check http method.
-    added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
 
 deprecated:
