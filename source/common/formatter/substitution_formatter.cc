@@ -367,16 +367,10 @@ SubstitutionFormatParser::getKnownFormatters() {
            return std::make_unique<LocalReplyBodyFormatter>();
          }}},
        {"GRPC_STATUS",
-        {CommandSyntaxChecker::COMMAND_ONLY,
-         [](const std::string&, const absl::optional<size_t>&) {
-           return std::make_unique<GrpcStatusFormatter>("grpc-status", "",
-                                                        absl::optional<size_t>());
-         }}},
-       {"GRPC_STATUS_SNAKE_STRING",
-        {CommandSyntaxChecker::COMMAND_ONLY,
-         [](const std::string&, const absl::optional<size_t>&) {
+        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](const std::string& format, const absl::optional<size_t>&) {
            return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(),
-                                                        GrpcStatusFormatter::SNAKE_STRING);
+                                                        GrpcStatusFormatter::parseFormat(format));
          }}},
        {"GRPC_STATUS_NUMBER",
         {CommandSyntaxChecker::COMMAND_ONLY,
@@ -1688,6 +1682,25 @@ HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_head
                                       const StreamInfo::StreamInfo&, absl::string_view) const {
   return ValueUtil::numberValue(
       extractHeadersByteSize(request_headers, response_headers, response_trailers));
+}
+
+GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
+  if (format.empty()) {
+    return GrpcStatusFormatter::CAMEL_STRING;
+  }
+
+  if (format == "CAMEL_STRING") {
+    return GrpcStatusFormatter::CAMEL_STRING;
+  }
+
+  if (format == "SNAKE_STRING") {
+    return GrpcStatusFormatter::SNAKE_STRING;
+  }
+  if (format == "NUMBER") {
+    return GrpcStatusFormatter::NUMBER;
+  }
+
+  throw EnvoyException("GrpcStatusFormatter only supports CAMEL_STRING, SNAKE_STRING or NUMBER.");
 }
 
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,

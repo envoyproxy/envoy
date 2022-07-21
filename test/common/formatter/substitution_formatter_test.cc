@@ -2340,8 +2340,9 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   }
 }
 
-TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
-  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>());
+TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
+                                GrpcStatusFormatter::Format::CAMEL_STRING);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -2401,7 +2402,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
   }
 }
 
-TEST(SubstitutionFormatterTest, GrpcStatusSnakeStringFormatterTest) {
+TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
                                 GrpcStatusFormatter::Format::SNAKE_STRING);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -2475,7 +2476,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusSnakeStringFormatterTest) {
   }
 }
 
-TEST(SubstitutionFormatterTest, GrpcStatusNumberFormatterTest) {
+TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
                                 GrpcStatusFormatter::Format::NUMBER);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;

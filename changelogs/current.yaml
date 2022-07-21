@@ -244,7 +244,7 @@ new_features:
     ``%UPSTREAM_PROTOCOL%``, ``%UPSTREAM_PEER_SUBJECT%``, ``%UPSTREAM_PEER_ISSUER%``, ``%UPSTREAM_TLS_SESSION_ID%``,
     ``%UPSTREAM_TLS_CIPHER%``, ``%UPSTREAM_TLS_VERSION%``, ``%UPSTREAM_PEER_CERT_V_START%``, ``%UPSTREAM_PEER_CERT_V_END%``,
     ``%UPSTREAM_PEER_CERT%`` and ``%UPSTREAM_FILTER_STATE%``.
-    support new command operator ``%GRPC_STATUS_SNAKE_STRING%``.
+    updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
 - area: open_telemetry
   change: |
     added :ref:`resource_attributes <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.resource_attributes>`

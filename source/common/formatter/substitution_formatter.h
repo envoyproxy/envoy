@@ -397,12 +397,13 @@ public:
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
 public:
   enum Format {
-    CAMEL_STRING = 0,
+    CAMEL_STRING,
     SNAKE_STRING,
     NUMBER,
   };
+
   GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,
-                      absl::optional<size_t> max_length, Format format = CAMEL_STRING);
+                      absl::optional<size_t> max_length, Format format);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&,
@@ -413,6 +414,8 @@ public:
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view) const override;
+
+  static Format parseFormat(absl::string_view format);
 
 private:
   const Format format_;
