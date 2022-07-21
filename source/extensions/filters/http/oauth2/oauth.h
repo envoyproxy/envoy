@@ -27,7 +27,7 @@ public:
 };
 
 /**
- * This is the enum class for authentication types used in client to auth server requests.
+ * Describes the authentication type used by the client when communicating with the auth server.
  */
 enum class AuthType { UrlEncodedBody, BasicAuth };
 

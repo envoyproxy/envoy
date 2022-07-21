@@ -22,10 +22,10 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 namespace {
-constexpr const char* GetAccessTokenBodyFormatString_01 =
+constexpr const char* UrlBodyTemplateWithCredentials =
     "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}";
 
-constexpr const char* GetAccessTokenBodyFormatString_02 =
+constexpr const char* UrlBodyTemplateWithoutCredentials =
     "grant_type=authorization_code&code={0}&redirect_uri={1}";
 
 } // namespace
@@ -37,20 +37,21 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   const auto encoded_secret = Http::Utility::PercentEncoding::encode(secret, ":/=&?");
   const auto encoded_cb_url = Http::Utility::PercentEncoding::encode(cb_url, ":/=&?");
 
+  const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
+  const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
+  const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
+
   Http::RequestMessagePtr request = createPostRequest();
   std::string body;
   switch (auth_type) {
   case AuthType::UrlEncodedBody:
-    body = fmt::format(GetAccessTokenBodyFormatString_01, auth_code, encoded_client_id,
-                       encoded_secret, encoded_cb_url);
+    body = fmt::format(UrlBodyTemplateWithCredentials, auth_code, encoded_client_id, encoded_secret,
+                       encoded_cb_url);
     break;
   case AuthType::BasicAuth:
-    const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
-    const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
-    const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
     request->headers().appendCopy(Http::CustomHeaders::get().Authorization,
                                   basic_auth_header_value);
-    body = fmt::format(GetAccessTokenBodyFormatString_02, auth_code, encoded_cb_url);
+    body = fmt::format(UrlBodyTemplateWithoutCredentials, auth_code, encoded_cb_url);
     break;
   }
 
