@@ -2,7 +2,7 @@
 #include "envoy/router/pattern_template.h"
 
 #include "source/common/stream_info/filter_state_impl.h"
-#include "source/extensions/pattern_template/config.h"
+#include "source/extensions/pattern_template/rewrite/config.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -14,11 +14,11 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace {
 
-class PatternTemplateConfigTest : public testing::Test {
+class PatternTemplateRewriteConfigTest : public testing::Test {
 protected:
-  PatternTemplateConfigTest() : filter_state_(StreamInfo::FilterState::LifeSpan::FilterChain) {
-    factory_ = Registry::FactoryRegistry<Router::PatternTemplatePredicateFactory>::getFactory(
-        "envoy.pattern_template.pattern_template_predicate");
+  PatternTemplateRewriteConfigTest() : filter_state_(StreamInfo::FilterState::LifeSpan::FilterChain) {
+    factory_ = Registry::FactoryRegistry<Router::PatternTemplatePredicateRewriteFactory>::getFactory(
+        "envoy.pattern_template.pattern_template_rewrite_predicate");
     config_ = factory_->createEmptyConfigProto();
   }
 
@@ -27,12 +27,12 @@ protected:
   ProtobufTypes::MessagePtr config_;
 };
 
-TEST_F(PatternTemplateConfigTest, EmptyCreation) {
+TEST_F(PatternTemplateRewriteConfigTest, EmptyCreation) {
   std::string current_route_name = "fake_current_route";
   // Create the predicate for the first time.
   {
     auto predicate =
-        factory_->createPatternTemplatePredicate("/url_pattern/{TEST}", "rewrite_pattern");
+        factory_->createUrlTemplateRewritePredicate("/url_pattern/{TEST}", "rewrite_pattern");
     ASSERT(predicate);
   }
 }

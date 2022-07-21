@@ -104,7 +104,7 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
     break;
   }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy: {
-    route = std::make_shared<PathMatchPolicyRouteEntryImpl>(vhost, route_config, optional_http_filters,
+    route = std::make_shared<PathTemplateRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                          factory_context, validator);
     break;
   }

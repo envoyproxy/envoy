@@ -25,6 +25,7 @@ Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Clust
 } // namespace
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
     Stats::Store& stats, ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
     Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
@@ -76,7 +77,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
       cluster_manager, stats, tls, std::move(dns_resolver), ssl_context_manager, runtime,
       dispatcher, log_manager, local_info, admin, singleton_manager,
       std::move(outlier_event_logger), added_via_api, validation_visitor, api, options);
-  return factory->create(cluster, context);
+  return factory->create(server_context, cluster, context);
 }
 
 Network::DnsResolverSharedPtr
@@ -105,7 +106,8 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
+ClusterFactoryImplBase::create(Server::Configuration::ServerFactoryContext& server_context,
+                               const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {
   auto stats_scope = generateStatsScope(cluster, context.stats());
   std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
@@ -117,7 +119,8 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
               context.api(), context.options(), context.logManager());
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      createClusterImpl(cluster, context, *transport_factory_context, std::move(stats_scope));
+      createClusterImpl(server_context, cluster, context, *transport_factory_context,
+                        std::move(stats_scope));
 
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.

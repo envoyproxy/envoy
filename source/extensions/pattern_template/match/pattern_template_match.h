@@ -21,9 +21,6 @@ public:
     explicit PatternTemplateMatchPredicate(std::string url_pattern)
       : matching_pattern_regex_(RE2(convertURLPatternSyntaxToRegex(url_pattern).value())) {}
 
-    PatternTemplateMatchPredicate(){};
-    ~PatternTemplateMatchPredicate(){};
-
     absl::string_view name() const override {
       return "envoy.pattern_template.pattern_template_match_predicate";
     }

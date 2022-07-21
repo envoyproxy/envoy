@@ -29,7 +29,7 @@ public:
   absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
                                              absl::string_view matched_path) const override;
 
-  static absl::Status is_valid_rewrite_pattern(std::string match_pattern,
+  static absl::Status isValidRewritePattern(std::string match_pattern,
                                                std::string rewrite_pattern);
 
 private:
