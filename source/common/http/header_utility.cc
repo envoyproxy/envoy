@@ -204,12 +204,8 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_102_103") &&
-      (response_headers.Status()->value() == "102" ||
-       response_headers.Status()->value() == "103")) {
-    return true;
-  }
-  return response_headers.Status()->value() == "100";
+  return response_headers.Status()->value() == "100" ||
+         response_headers.Status()->value() == "102" || response_headers.Status()->value() == "103";
 }
 
 bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {

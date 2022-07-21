@@ -15,11 +15,18 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.proxy_120_103`` and legacy code paths.
+
 - area: lightstep
   change: |
     removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
 
 new_features:
+- area: dns_resolver
+  change: |
+    added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
