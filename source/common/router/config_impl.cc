@@ -1382,9 +1382,11 @@ PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      // TODO(silverstar194) Implement path template matcher
       path_template_(""),
-      path_matcher_(Matchers::PathMatcher::createPattern(path_template_, !case_sensitive_)) {}
+      path_matcher_(Matchers::PathMatcher::createPattern(path_template_, !case_sensitive_)) {
+  // TODO(silverstar194) Implement path template matcher
+  throw absl::UnimplementedError("Path template matcher not implemented");
+}
 
 void PathTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                    bool insert_envoy_original_path) const {

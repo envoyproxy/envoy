@@ -40,5 +40,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * ``/**.mpd`` would match ``/content/123/india/dash/55/manifest.mpd``
 // [#not-implemented-hide:]
 message PatternTemplateMatchConfig {
-  string path_template = 1 [(validate.rules).string = {min_len: 1 max_len: 256 ignore_empty: true}];
+  string path_template = 1 [(validate.rules).string = {min_len: 1 max_len: 256}];
 }

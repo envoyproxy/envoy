@@ -1055,9 +1055,9 @@ message RouteAction {
   // before the rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
-  // Only one of :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
-  // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`
-  // or ``regex_rewrite`` may be specified.
+  // Only one of ``regex_rewrite``, :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
+  // or :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`
+  // may be specified.
   //
   // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
   //
