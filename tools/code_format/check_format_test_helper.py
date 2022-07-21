@@ -173,7 +173,7 @@ def run_checks():
     errors += check_unfixable_error("system_clock.cc", real_time_inject_error)
     errors += check_unfixable_error("steady_clock.cc", real_time_inject_error)
     errors += check_unfixable_error(
-        "unpack_to.cc", "Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
+        "unpack_to.cc", "Don't use UnpackTo() directly, use MessageUtil::unpackToNoThrow() instead")
     errors += check_unfixable_error(
         "condvar_wait_for.cc", "Don't use CondVar::waitFor(); use TimeSystem::waitFor() instead.")
     errors += check_unfixable_error("sleep.cc", real_time_inject_error)
