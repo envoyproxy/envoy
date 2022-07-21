@@ -31,7 +31,7 @@ public:
       return {MatchState::MatchComplete, on_no_match_};
     }
 
-    const auto result = doMatch(input.data_);
+    const auto result = doInputMatch(input.data_);
     if (result) {
       if (result->matcher_) {
         return result->matcher_->match(data);
@@ -58,7 +58,7 @@ protected:
   virtual absl::optional<OnMatch<DataType>> doMatch(absl::string_view data) PURE;
 
 private:
-  absl::optional<OnMatch<DataType>> doMatch(const InputValue& data) {
+  absl::optional<OnMatch<DataType>> doInputMatch(const InputValue& data) {
     switch (data.kind()) {
     case InputValue::Kind::Null:
     case InputValue::Kind::Any:
@@ -69,7 +69,7 @@ private:
       return doMatch(absl::StrCat(data.asInt()));
     case InputValue::Kind::List: {
       for (const auto& elt : data.asList()) {
-        const auto result = doMatch(elt);
+        const auto result = doInputMatch(elt);
         if (result) {
           return result;
         }

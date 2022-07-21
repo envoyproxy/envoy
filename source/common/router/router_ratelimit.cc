@@ -63,7 +63,7 @@ public:
     auto result = data_input_->get(data);
     if (!result.data_.isNull()) {
       const auto string_value = result.data_.stringOrInt();
-      if (string_value && !string_value->isEmpty()) {
+      if (string_value && !string_value->empty()) {
         descriptor_entry = {descriptor_key_, *string_value};
       }
       return true;

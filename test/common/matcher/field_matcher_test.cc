@@ -39,6 +39,7 @@ public:
 };
 
 const auto isFoo = [](const InputValue& v) { return v.kind() == InputValue::Kind::String && v.asString() == "foo"; };
+const auto isNotFoo = [](const InputValue& v) { return v.kind() != InputValue::Kind::String || v.asString() != "foo"; };
 
 TEST_F(FieldMatcherTest, SingleFieldMatcher) {
   EXPECT_EQ(createSingleMatcher("foo", isFoo)
@@ -60,7 +61,7 @@ TEST_F(FieldMatcherTest, SingleFieldMatcher) {
   EXPECT_TRUE(createSingleMatcher("foo", isFoo)
                   ->match(TestData())
                   .result());
-  EXPECT_FALSE(createSingleMatcher("foo", isFoo)
+  EXPECT_FALSE(createSingleMatcher("foo", isNotFoo)
                    ->match(TestData())
                    .result());
   EXPECT_TRUE(createSingleMatcher(absl::nullopt, [](auto v) { return v.isNull(); })

@@ -158,9 +158,14 @@ template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<D
 class InputValue {
 public:
   InputValue() {}
-  InputValue(absl::string_view data) : data_(absl::in_place_type<std::string>, data) {}
-  InputValue(int64_t data) : data_(data) {}
-  InputValue(std::vector<InputValue>&& data): data_(data) {}
+  explicit InputValue(absl::string_view data) : data_(absl::in_place_type<std::string>, data) {}
+  explicit InputValue(int64_t data) : data_(data) {}
+  explicit InputValue(std::vector<InputValue>&& data): data_(data) {}
+
+  using VariantType = absl::variant<absl::monostate, std::string, int64_t, std::vector<InputValue>, absl::any>;
+  static InputValue FromAny(absl::any&& data) {
+    return InputValue(VariantType(data));
+  }
 
   enum class Kind {
     // Null value (use when value is not present).
@@ -171,7 +176,7 @@ public:
     Int,
     // Dynamic list value (possibly heterogenous).
     List,
-    // Opaque type holder for coupled input and matcher combinations
+    // Opaque type holder for coupled input and matcher combinations.
     Any
   };
 
@@ -254,7 +259,8 @@ public:
   }
 
 private:
-  const absl::variant<absl::monostate, std::string, int64_t, std::vector<InputValue>, absl::any> data_;
+  explicit InputValue(VariantType&& data) : data_(data) {}
+  const VariantType data_;
 };
 
 // InputMatcher provides the interface for determining whether an input value matches.

@@ -17,7 +17,7 @@ TEST(ValueInputMatcher, TestMatch) {
   EXPECT_FALSE(matcher.match(InputValue()));
 }
 
-TEST(ValueInputMatcher, TestMatchInt) {
+TEST(ValueInputMatcher, TestMatchNonString) {
   envoy::type::matcher::v3::StringMatcher matcher_proto;
   matcher_proto.set_exact("42");
 
@@ -26,6 +26,8 @@ TEST(ValueInputMatcher, TestMatchInt) {
   EXPECT_TRUE(matcher.match(InputValue("42")));
   EXPECT_TRUE(matcher.match(InputValue(42)));
   EXPECT_FALSE(matcher.match(InputValue()));
+  EXPECT_FALSE(matcher.match(InputValue(std::vector<InputValue>{InputValue(42)})));
+  EXPECT_FALSE(matcher.match(InputValue(std::vector<InputValue>{InputValue("42")})));
 }
 
 } // namespace Matcher
