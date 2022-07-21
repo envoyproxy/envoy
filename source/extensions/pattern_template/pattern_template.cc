@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/extensions/pattern_template/rewrite/v3/pattern_template_rewrite.pb.h"
+#include "source/extensions/pattern_template/proto/pattern_template_rewrite_segments.pb.h"
 
 #include "source/common/http/path_utility.h"
 #include "source/extensions/pattern_template/pattern_template_internal.h"
@@ -83,9 +83,9 @@ parseRewritePatternHelper(absl::string_view pattern) {
   return result;
 }
 
-absl::StatusOr<envoy::extensions::pattern_template::rewrite::v3::PatternTemplateRewrite>
+absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments>
 parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) {
-  envoy::extensions::pattern_template::rewrite::v3::PatternTemplateRewrite parsed_pattern;
+  envoy::extensions::pattern_template::PatternTemplateRewriteSegments parsed_pattern;
   RE2 regex = RE2(ToStringPiece(capture_regex));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
