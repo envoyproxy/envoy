@@ -88,6 +88,7 @@ proto_library(
         "//contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha:pkg",
         "//contrib/envoy/extensions/network/connection_balance/dlb/v3alpha:pkg",
         "//contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha:pkg",
+        "//contrib/envoy/extensions/private_key_providers/qat/v3alpha:pkg",
         "//contrib/envoy/extensions/vcl/v3alpha:pkg",
         "//envoy/admin/v3:pkg",
         "//envoy/config/accesslog/v3:pkg",
