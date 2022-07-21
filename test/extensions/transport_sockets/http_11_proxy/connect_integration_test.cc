@@ -218,7 +218,6 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsAndEndpoints) {
                                    third_upstream_address);
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
-  std::cerr << "HERE WAITING ON UPSTREAM CONN TO " << third_upstream_address << "\n";
   // The request should be sent to fake upstream 2, due to the connect-proxy header.
   ASSERT_TRUE(fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   stripConnectUpgradeAndRespond();
