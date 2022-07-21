@@ -707,6 +707,13 @@ SipFilters::DecoderFilterCallbacks* UpstreamRequest::getDownstreamConnection(std
   return nullptr;
 }
 
+std::string UpstreamRequest::dumpDownstreamConnection() {
+  if (downstream_connection_info_ == nullptr) {
+    return "";
+  }
+  return downstream_connection_info_->dumpDownstreamConnection();
+}
+
 // Tcp::ConnectionPool::UpstreamCallbacks
 void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   UNREFERENCED_PARAMETER(end_stream);
@@ -751,6 +758,7 @@ void UpstreamRequest::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbac
   route_ = callbacks_->route();
   settings_ = callbacks_->settings();
   stats_ = &callbacks_->stats();
+  ENVOY_LOG(debug, "Downstream connection map dumped: \n{}\n", downstream_connection_info_->dumpDownstreamConnection());
 }
 
 void UpstreamRequest::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
@@ -778,7 +786,9 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
     auto downstream_conn_id = ingress_id->getDownstreamConnectionID();  
     auto downstream_conn = parent_.getDownstreamConnection(downstream_conn_id);
     if (downstream_conn == nullptr) {
-      ENVOY_LOG(debug, "no downstream connection found for: {}\n{}", downstream_conn_id, metadata->rawMsg());
+      ENVOY_LOG(debug, "No downstream connection found for: '{}'\n", downstream_conn_id);
+      ENVOY_LOG(debug, "Downstream connection map dumped: \n{}\n", parent_.dumpDownstreamConnection());
+      ENVOY_LOG(debug, "raw message failing to get a valid downstream connection: \n{}\n", metadata->rawMsg());
       return FilterStatus::StopIteration;
     }
 

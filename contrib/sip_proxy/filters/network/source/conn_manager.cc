@@ -180,6 +180,10 @@ ConnectionManager::~ConnectionManager() = default;
 
     downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
     ENVOY_LOG(info, "XXXXXXXXXXXXXXXXXX thread_id={}, downstream_connection_id={}, n-connections={}", thread_id, downstream_conn_id, downstream_connection_infos_->size());
+    
+    ENVOY_LOG(debug, "XXXXXXXXXXXXXXXXX Inserted into Downstream connection map {}: {}\n", 
+      downstream_connection_infos_, downstream_conn_id);
+
     return Network::FilterStatus::Continue; 
   }
 
@@ -346,8 +350,10 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   ENVOY_CONN_LOG(info, "received event {}", read_callbacks_->connection(), static_cast<int>(event));
   resetAllTrans(event == Network::ConnectionEvent::LocalClose);
 
-  if (local_ingress_id_.has_value()) {
+  if (local_ingress_id_.has_value() && ((event == Network::ConnectionEvent::RemoteClose) || (event == Network::ConnectionEvent::LocalClose))) {
       downstream_connection_infos_->deleteDownstreamConnection(local_ingress_id_->getDownstreamConnectionID());
+      ENVOY_LOG(debug, "XXXXXXXXXXXXXXXXX Deleted from Downstream connection map {}: {}\n", 
+          downstream_connection_infos_, local_ingress_id_->getDownstreamConnectionID());
   }
 }
 
@@ -764,6 +770,15 @@ bool DownstreamConnectionInfos::hasDownstreamConnection(std::string& conn_id) {
 
 SipFilters::DecoderFilterCallbacks& DownstreamConnectionInfos::getDownstreamConnection(std::string& conn_id) {
   return *(tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.at(conn_id));
+}
+
+std::string DownstreamConnectionInfos::dumpDownstreamConnection() {
+  std::stringstream output;
+  absl::flat_hash_map<std::string, std::shared_ptr<SipFilters::DecoderFilterCallbacks>> dc_map = tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_;
+  for (auto element = dc_map.begin(); element != dc_map.end(); element++) {
+    output << "   Downstream Connection ID: '" << element->first << "'; Downstream Connection pointer '" << element->second << "'\n";
+  }
+  return output.str();
 }
 
 } // namespace SipProxy
