@@ -18,7 +18,7 @@ import paths
 from functools import cached_property
 
 EXCLUDED_PREFIXES = (
-    "./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
+    "./.", "./generated/", "./thirdparty/", "./build", "./bazel-", "./tools/dev/src",
     "./source/extensions/extensions_build_config.bzl", "./contrib/contrib_build_config.bzl",
     "./bazel/toolchains/configs/", "./tools/testdata/check_format/", "./tools/pyformat/",
     "./third_party/", "./test/extensions/filters/http/wasm/test_data",
