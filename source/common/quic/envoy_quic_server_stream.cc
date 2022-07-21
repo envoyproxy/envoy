@@ -288,7 +288,7 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
       return;
     }
     quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
-    auto trailers = Http2HeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
+    auto trailers = http2HeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
         received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
         rst);
     if (trailers == nullptr) {

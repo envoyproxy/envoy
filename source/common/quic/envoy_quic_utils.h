@@ -101,7 +101,7 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 
 template <class T>
 std::unique_ptr<T>
-Http2HeaderBlockToEnvoyTrailers(const spdy::Http2HeaderBlock& header_block,
+http2HeaderBlockToEnvoyTrailers(const spdy::Http2HeaderBlock& header_block,
                                 uint32_t max_headers_allowed, HeaderValidator& validator,
                                 absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
   auto headers = T::create();
