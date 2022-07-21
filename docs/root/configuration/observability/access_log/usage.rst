@@ -579,9 +579,9 @@ The following command operators are supported:
   multiple instances or between restarts.
 
 %GRPC_STATUS(X)%
-  `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>` in the format X. X can be ``CAMEL_STRING``, ``SNAKE_STRING`` and ``NUMBER``.
+  `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>` in the optional parameter X. X can be ``CAMEL_STRING``, ``SNAKE_STRING`` and ``NUMBER``.
   For example for ``INVALID_ARGUMENT = 3``, it would be ``InvalidArgument`` for ``CAMEL_STRING``, ``INVALID_ARGUMENT`` for ``SNAKE_STRING`` and ``3`` for ``NUMBER``.
-   If X isn't provided, ``CAMEL_STRING`` will be used.
+  If X isn't provided, ``CAMEL_STRING`` will be used.
 
 %GRPC_STATUS_NUMBER%
   gRPC status code.
