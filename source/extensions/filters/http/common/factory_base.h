@@ -44,6 +44,7 @@ public:
                                             Server::Configuration::ServerFactoryContext&) {
     return false;
   }
+
 protected:
   CommonFactoryBase(const std::string& name) : name_(name) {}
 
@@ -57,8 +58,9 @@ protected:
   const std::string name_;
 };
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
-class FactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>, public Server::Configuration::NamedHttpFilterConfigFactory {
- public:
+class FactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
+                    public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
   FactoryBase(const std::string& name) : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
 
   Http::FilterFactoryCb
@@ -73,13 +75,15 @@ class FactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>, pub
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
-
 };
 
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
-class DualFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>, public Server::Configuration::NamedHttpFilterConfigFactory, public Server::Configuration::UpstreamHttpFilterConfigFactory {
- public:
-  DualFactoryBase(const std::string& name) : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
+class DualFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
+                        public Server::Configuration::NamedHttpFilterConfigFactory,
+                        public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  DualFactoryBase(const std::string& name)
+      : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
 
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,

@@ -560,7 +560,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     throw EnvoyException("Non-HTTP/3 codec configured on QUIC listener.");
   }
 
-  Http::FilterChainHelper<Server::Configuration::FactoryContext, Server::Configuration::NamedHttpFilterConfigFactory> helper(filter_config_provider_manager_, context_.getServerFactoryContext(), context_, stats_prefix_);
+  Http::FilterChainHelper<Server::Configuration::FactoryContext,
+                          Server::Configuration::NamedHttpFilterConfigFactory>
+      helper(filter_config_provider_manager_, context_.getServerFactoryContext(), context_,
+             stats_prefix_);
   helper.processFilters(config.http_filters(), "http", "http", filter_factories_);
 
   for (const auto& upgrade_config : config.upgrade_configs()) {

@@ -15,14 +15,15 @@ namespace BufferFilter {
  */
 class BufferFilterFactory
     : public Common::DualFactoryBase<envoy::extensions::filters::http::buffer::v3::Buffer,
-                                 envoy::extensions::filters::http::buffer::v3::BufferPerRoute> {
+                                     envoy::extensions::filters::http::buffer::v3::BufferPerRoute> {
 public:
   BufferFilterFactory() : DualFactoryBase("envoy.filters.http.buffer") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,
-      const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) override;
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::buffer::v3::BufferPerRoute&,

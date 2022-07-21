@@ -33,7 +33,6 @@ BufferFilterFactory::createRouteSpecificFilterConfigTyped(
   return std::make_shared<const BufferFilterSettings>(proto_config);
 }
 
-
 /**
  * Static registration for the buffer filter. @see RegisterFactory.
  */

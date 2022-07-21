@@ -132,7 +132,9 @@ public:
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
-  virtual bool isTerminalFilterByProto(const Protobuf::Message&, ServerFactoryContext&) { return false; }
+  virtual bool isTerminalFilterByProto(const Protobuf::Message&, ServerFactoryContext&) {
+    return false;
+  }
 };
 
 /**
@@ -166,7 +168,6 @@ using MatchingRequirementsPtr =
 class HttpFilterConfigFactoryBase : public ProtocolOptionsFactory {
 public:
   ~HttpFilterConfigFactoryBase() override = default;
-
 
   /**
    * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted
@@ -228,7 +229,10 @@ public:
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
-  virtual bool isTerminalFilterByProto(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&) { return false; }
+  virtual bool isTerminalFilterByProto(const Protobuf::Message&,
+                                       Server::Configuration::ServerFactoryContext&) {
+    return false;
+  }
 };
 
 class NamedHttpFilterConfigFactory : public virtual HttpFilterConfigFactoryBase {
@@ -243,10 +247,9 @@ public:
    * @param context supplies the filter's context.
    * @return Http::FilterFactoryCb the factory creation function.
    */
-  virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                             const std::string& stat_prefix,
-                                                             Server::Configuration::FactoryContext& context) PURE;
-
+  virtual Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
+                               Server::Configuration::FactoryContext& context) PURE;
 };
 
 class UpstreamHttpFilterConfigFactory : public virtual HttpFilterConfigFactoryBase {
@@ -261,9 +264,9 @@ public:
    * @param context supplies the filter's context.
    * @return Http::FilterFactoryCb the factory creation function.
    */
-  virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                             const std::string& stat_prefix,
-                                                             Server::Configuration::ServerFactoryContext& context) PURE;
+  virtual Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
+                               Server::Configuration::ServerFactoryContext& context) PURE;
 };
 
 } // namespace Configuration

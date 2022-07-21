@@ -185,8 +185,7 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::g
   auto it = subscriptions_.find(subscription_id);
   if (it == subscriptions_.end()) {
     auto subscription = std::make_shared<FilterConfigSubscription>(
-        config_source, name, server_context, stat_prefix, *this,
-        subscription_id);
+        config_source, name, server_context, stat_prefix, *this, subscription_id);
     subscriptions_.insert({subscription_id, std::weak_ptr<FilterConfigSubscription>(subscription)});
     return subscription;
   } else {
