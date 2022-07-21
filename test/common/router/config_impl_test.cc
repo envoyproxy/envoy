@@ -5081,26 +5081,6 @@ virtual_hosts:
       "RedirectActionValidationError.PrefixRewrite:.*value does not match regex pattern");
 }
 
-TEST_F(RouteMatcherTest, TestPathMatchPolicy) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: www2
-  domains: ["bar.*"]
-  routes:
-  - match:
-      path_match_policy: {}
-    route:
-      prefix_rewrite: /
-      regex_rewrite:
-        pattern:
-          regex: foo
-        substitution: bar
-      cluster: www2
-  )EOF";
-
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException);
-}
-
 TEST_F(RouteMatcherTest, TestPrefixAndRegexRewrites) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -5120,6 +5100,24 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Cannot specify both prefix_rewrite and regex_rewrite");
+}
+
+TEST_F(RouteMatcherTest, TestPatternRewriteConfigLoad) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: path_template_rewrite
+  domains: ["*"]
+  routes:
+  - match:
+      path_template: "/bar/{country}/{lang}"
+    route:
+      path_template_rewrite: "/bar/{lang}/{country}"
+      cluster: www2
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 }
 
 TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
