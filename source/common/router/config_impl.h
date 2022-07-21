@@ -27,8 +27,6 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/router/config_utility.h"
-#include "source/common/router/path_match_policy.h"
-#include "source/common/router/path_rewrite_policy.h"
 #include "source/common/router/header_formatter.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
@@ -461,6 +459,31 @@ private:
  * Implementation of InternalRedirectPolicy that reads from the proto
  * InternalRedirectPolicy of the RouteAction.
  */
+class PathMatchPolicyImpl : public PathMatchPolicy {
+public:
+  // Constructor that enables internal redirect with policy_config controlling the configurable
+  // behaviors.
+  PathMatchPolicyImpl(std::string url_pattern);
+
+  // Default constructor that disables internal redirect.
+  PathMatchPolicyImpl();
+
+  bool enabled() const override { return enabled_; }
+
+  PathMatchPredicateSharedPtr predicate() const override;
+
+  const std::string url_pattern_;
+
+private:
+  const bool enabled_;
+  PathMatchPredicateFactory* predicate_factory_;
+};
+
+
+/**
+ * Implementation of InternalRedirectPolicy that reads from the proto
+ * InternalRedirectPolicy of the RouteAction.
+ */
 class PathRewritePolicyImpl : public PathRewritePolicy {
 public:
   // Constructor that enables internal redirect with policy_config controlling the configurable
@@ -472,7 +495,7 @@ public:
 
   bool enabled() const override { return enabled_; }
 
-  PatnRewritePredicateSharedPtr predicate() const override;
+  PathRewritePredicateSharedPtr predicate() const override;
 
   const std::string url_pattern_;
   const std::string url_rewrite_pattern_;
@@ -593,7 +616,7 @@ public:
   const InternalRedirectPolicy& internalRedirectPolicy() const override {
     return internal_redirect_policy_;
   }
-  const PathMatchPolicy& pathMatchPolicy() const override {
+  const PathMatchPolicyImpl& pathMatchPolicy() const override {
     return pattern_template_match_policy_;
   }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
@@ -709,7 +732,7 @@ public:
     const InternalRedirectPolicy& internalRedirectPolicy() const override {
       return parent_->internalRedirectPolicy();
     }
-    const PathMatchPolicy& pathMatchPolicy() const override {
+    const PathMatchPolicyImpl& pathMatchPolicy() const override {
       return parent_->pathMatchPolicy();
     }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }

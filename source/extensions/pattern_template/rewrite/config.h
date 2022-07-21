@@ -21,8 +21,8 @@ public:
     return std::make_unique<envoy::extensions::pattern_template::rewrite::v3::PatternTemplateRewriteConfig>();
   }
 
-  std::string name() const override { return "envoy.pattern_template.pattern_template_rewrite_predicate"; }
-
+  std::string name() const override { return "envoy.path_rewrite_policy.pattern_template_rewrite_predicate"; }
+  std::string category() const override { return "envoy.path_rewrite_policy"; }
 };
 
 } // namespace Rewrite

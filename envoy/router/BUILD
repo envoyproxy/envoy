@@ -65,6 +65,7 @@ envoy_cc_library(
     deps = [
         ":internal_redirect_interface",
         ":router_path_match_policy_interface",
+        ":router_path_rewrite_policy_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/common:conn_pool_interface",
         "//envoy/common:matchers_interface",

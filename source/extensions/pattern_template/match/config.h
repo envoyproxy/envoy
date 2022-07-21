@@ -21,8 +21,8 @@ public:
     return std::make_unique<envoy::extensions::pattern_template::match::v3::PatternTemplateMatchConfig>();
   }
 
-  std::string name() const override { return "envoy.pattern_template.pattern_template_match_predicate"; }
-  std::string category() const override { return "envoy.pattern_template"; }
+  std::string name() const override { return "envoy.path_match_policy.pattern_template_match_predicate"; }
+  std::string category() const override { return "envoy.path_match_policy"; }
 };
 
 } // namespace Match
