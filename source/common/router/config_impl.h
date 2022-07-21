@@ -1012,7 +1012,10 @@ public:
                              ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override {  throw absl::UnimplementedError("Path template matcher not implemented"); }
+  const std::string& matcher() const override {
+    throw absl::UnimplementedError("Path template matcher not implemented");
+  }
+  
   PathMatchType matchType() const override { return PathMatchType::Pattern; }
 
   // Router::Matchable
