@@ -103,11 +103,10 @@ private:
     Http::FilterFactoryCb callback =
         factory->createFilterFactoryFromProto(*message, stats_prefix_, factory_context_);
     dependency_manager.registerFilter(factory->name(), *factory->dependencies());
-    //    bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
-    //    Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
-    //    filter_chain_type,
-    // FIXME                                             is_terminal,
-    // last_filter_in_current_config);
+    bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
+    Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
+                                             filter_chain_type, is_terminal,
+                                             last_filter_in_current_config);
     auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
         {factory->name(), callback}, proto_config.name());
     ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
