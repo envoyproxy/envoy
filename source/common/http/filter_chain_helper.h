@@ -37,10 +37,16 @@ public:
   static std::shared_ptr<UpstreamFilterConfigProviderManager>
   createSingletonUpstreamFilterConfigProviderManager(
       Server::Configuration::ServerFactoryContext& context);
+
+  // Our tooling checks say that throwing exceptions is not allowed in .h files, so work
+  // around the fact the template required moving code to the .h file with a
+  // static method.
+  static void throwError(std::string message);
 };
 
 template <class FilterCtx, class NeutralNamedHttpFilterFactory>
 class FilterChainHelper : Logger::Loggable<Logger::Id::config> {
+
 public:
   using FilterFactoriesList =
       std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
@@ -68,7 +74,7 @@ public:
     // TODO(auni53): Validate encode dependencies too.
     auto status = dependency_manager.validDecodeDependencies();
     if (!status.ok()) {
-      throw EnvoyException(std::string(status.message()));
+      FilterChainUtility::throwError(std::string(status.message()));
     }
   }
 
@@ -125,7 +131,7 @@ private:
     ENVOY_LOG(debug, "      dynamic filter name: {}", name);
     if (config_discovery.apply_default_config_without_warming() &&
         !config_discovery.has_default_config()) {
-      throw EnvoyException(fmt::format(
+      FilterChainUtility::throwError(fmt::format(
           "Error: filter config {} applied without warming but has no default config.", name));
     }
     for (const auto& type_url : config_discovery.type_urls()) {
@@ -133,7 +139,7 @@ private:
       auto* factory = Registry::FactoryRegistry<NeutralNamedHttpFilterFactory>::getFactoryByType(
           factory_type_url);
       if (factory == nullptr) {
-        throw EnvoyException(
+        FilterChainUtility::throwError(
             fmt::format("Error: no factory found for a required type URL {}.", factory_type_url));
       }
     }
