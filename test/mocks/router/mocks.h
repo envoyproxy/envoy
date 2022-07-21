@@ -164,14 +164,14 @@ public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };
 
-class MockPatternTemplatePolicy : public PatternTemplatePolicy {
+class MockPatternTemplateMatchPolicy : public PatternTemplateMatchPolicy {
 public:
-  MockPatternTemplatePolicy();
+  MockPatternTemplateMatchPolicy();
   MOCK_METHOD(bool, enabled, (), (const));
-  MOCK_METHOD(PatternTemplatePredicateSharedPtr, predicate, (), (const));
+  MOCK_METHOD(PatternTemplatePredicateMatchSharedPtr, predicate, (), (const));
 };
 
-class MockPatternTemplatePredicate : public PatternTemplatePredicate {
+class MockPatternTemplateMatchPredicate : public PatternTemplateMatchPredicate {
 public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };

@@ -13,12 +13,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_proto_library(
-    name = "pattern_template_rewrite_segements",
-    srcs = ["proto/pattern_template_rewrite_segments.proto"],
-    deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
-)
-
 envoy_cc_library(
     name = "pattern_template_lib",
     srcs = ["pattern_template.cc"],
@@ -30,9 +24,9 @@ envoy_cc_library(
     ],
     deps = [
         ":pattern_template_internal_cc",
-        ":pattern_template_rewrite_segements_cc_proto",
         "//envoy/router:router_pattern_template_interface",
         "//source/common/http:path_utility_lib",
+        "//source/extensions/pattern_template/proto:pattern_template_rewrite_segements_cc_proto",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -47,7 +41,7 @@ envoy_cc_library(
     srcs = ["pattern_template_internal.cc"],
     hdrs = ["pattern_template_internal.h"],
     deps = [
-        ":pattern_template_rewrite_segements_cc_proto",
+        "//source/extensions/pattern_template/proto:pattern_template_rewrite_segements_cc_proto",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/functional:function_ref",
@@ -65,7 +59,7 @@ envoy_cc_test(
     srcs = ["pattern_template_test.cc"],
     deps = [
         ":pattern_template",
-        ":pattern_template_rewrite_segements_cc_proto",
+        "//source/extensions/pattern_template/proto:pattern_template_rewrite_segements_cc_proto",
         "//test/test_common:status_utility_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -78,7 +72,7 @@ envoy_cc_test(
     srcs = ["pattern_template_internal_test.cc"],
     deps = [
         ":pattern_template_internal_cc",
-        ":pattern_template_rewrite_segements_cc_proto",
+        "//source/extensions/pattern_template/proto:pattern_template_rewrite_segements_cc_proto",
         "//test/test_common:status_utility_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",

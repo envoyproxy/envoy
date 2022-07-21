@@ -34,7 +34,7 @@
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
 
-#include "source/extensions/url_template/url_template_matching.h"
+#include "source/extensions/pattern_template/match/pattern_template_match.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
@@ -459,25 +459,25 @@ private:
  * Implementation of InternalRedirectPolicy that reads from the proto
  * InternalRedirectPolicy of the RouteAction.
  */
-class PatternTemplatePolicyImpl : public PatternTemplatePolicy {
+class PathRewritePolicyImpl : public PathRewritePolicy {
 public:
   // Constructor that enables internal redirect with policy_config controlling the configurable
   // behaviors.
-  PatternTemplatePolicyImpl(std::string url_pattern, std::string url_rewrite_pattern);
+  PathRewritePolicyImpl(std::string url_pattern, std::string url_rewrite_pattern);
 
   // Default constructor that disables internal redirect.
-  PatternTemplatePolicyImpl();
+  PathRewritePolicyImpl();
 
   bool enabled() const override { return enabled_; }
 
-  PatternTemplatePredicateSharedPtr predicate() const override;
+  PatnRewritePredicateSharedPtr predicate() const override;
 
   const std::string url_pattern_;
   const std::string url_rewrite_pattern_;
 
 private:
   const bool enabled_;
-  PatternTemplatePredicateFactory* predicate_factory_;
+  PathRewritePredicateFactory* predicate_factory_;
 };
 
 /**
@@ -591,8 +591,8 @@ public:
   const InternalRedirectPolicy& internalRedirectPolicy() const override {
     return internal_redirect_policy_;
   }
-  const PatternTemplatePolicy& patternTemplatePolicy() const override {
-    return pattern_template_policy_;
+  const PathMatchPolicy& pathMatchPolicy() const override {
+    return pattern_template_match_policy_;
   }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
@@ -707,8 +707,8 @@ public:
     const InternalRedirectPolicy& internalRedirectPolicy() const override {
       return parent_->internalRedirectPolicy();
     }
-    const PatternTemplatePolicy& patternTemplatePolicy() const override {
-      return parent_->patternTemplatePolicy();
+    const PathMatchPolicy& pathMatchPolicy() const override {
+      return parent_->pathMatchPolicy();
     }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
     const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
@@ -875,7 +875,7 @@ protected:
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
-  const PatternTemplatePolicyImpl pattern_template_policy_;
+  const PathMatchPolicyImpl path_match_policy_;
   std::string regex_rewrite_substitution_;
   std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
@@ -957,8 +957,8 @@ private:
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
 
-  PatternTemplatePolicyImpl
-  buildPatternTemplatePolicy(std::string path_template, std::string path_template_rewrite) const;
+  PathMatchPolicyImpl
+  buildPathMatchPolicy(std::string path_template, std::string path_template_rewrite) const;
 
   RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
                                                   const Http::HeaderMap& headers) const;
@@ -1038,11 +1038,11 @@ private:
 };
 
 /**
- * Route entry implementation for pattern path match routing.
+ * Route entry implementation for path match policy based routing.
  */
-class PathTemplateRouteEntryImpl : public RouteEntryImplBase {
+class PathMatchPolicyRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PathTemplateRouteEntryImpl(const VirtualHostImpl& vhost,
+  PathMatchPolicyRouteEntryImpl(const VirtualHostImpl& vhost,
                              const envoy::config::route::v3::Route& route,
                              const OptionalHttpFilters& optional_http_filters,
                              Server::Configuration::ServerFactoryContext& factory_context,
@@ -1050,7 +1050,7 @@ public:
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return match_pattern_; }
-  PathMatchType matchType() const override { return PathMatchType::Pattern; }
+  PathMatchType matchType() const override { return PathMatchType::Policy; }
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,

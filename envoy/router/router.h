@@ -20,7 +20,7 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
-#include "envoy/router/url_template.h"
+#include "envoy/router/path_match_policy.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -298,9 +298,9 @@ public:
  */
 enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
 
-class PatternTemplatePolicy {
+class PathMatchPolicyImpl {
 public:
-  virtual ~PatternTemplatePolicy() = default;
+  virtual ~PathMatchPolicyImpl() = default;
 
   /**
    * @return whether internal redirect is enabled on this route.
@@ -313,7 +313,7 @@ public:
    * responses, which should be the most common case.
    * @return a vector of newly constructed InternalRedirectPredicate instances.
    */
-  virtual PatternTemplatePredicateSharedPtr predicate() const PURE;
+  virtual PathMatchPredicateSharedPtr predicate() const PURE;
 };
 
 /**
@@ -782,7 +782,7 @@ enum class PathMatchType {
   Exact,
   Regex,
   PathSeparatedPrefix,
-  Pattern,
+  Policy,
 };
 
 /**
@@ -934,7 +934,7 @@ public:
    */
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
 
-  virtual const PatternTemplatePolicy& patternTemplatePolicy() const PURE;
+  virtual const PathMatchPolicy& pathMatchPolicy() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.

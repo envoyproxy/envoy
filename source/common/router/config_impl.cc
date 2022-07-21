@@ -48,8 +48,10 @@
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
-#include "source/extensions/url_template/url_template_matching.h"
-#include "source/extensions/url_template/config.h"
+#include "source/extensions/pattern_template/match/pattern_template_match.h"
+#include "source/extensions/pattern_template/match/config.h"
+#include "source/extensions/pattern_template/rewrite/pattern_template_rewrite.h"
+#include "source/extensions/pattern_template/rewrite/config.h"
 
 
 #include "absl/strings/match.h"
@@ -362,20 +364,22 @@ PathMatchPolicyImpl::PathMatchPolicyImpl() : enabled_(false){};
 PathMatchPolicyImpl::PathMatchPolicyImpl(const ProtobufWkt::Any& typed_config)
     : url_pattern_(url_pattern), url_rewrite_pattern_(url_rewrite_pattern), enabled_(true) {
 
-    // create matching predicate
-    if (!matching::PatternTemplatePredicate::is_valid_match_pattern(path_template).ok()) {
-      throw EnvoyException(fmt::format("path_template {} is invalid", path_template));
-    }
   absl::string_view name = "envoy.url_template.pattern_template_predicates";
-  auto* factory = Registry::FactoryRegistry<Router::PatternTemplatePredicateFactory>::getFactory(name);
+  auto* factory = Registry::FactoryRegistry<Router::PatternTemplateMatchPredicateFactory>::getFactory(name);
     ASSERT(factory); // factory not found
     ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
     Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config);
+
+    // validate with match input factory
+    if (!matching::PatternTemplateMatchPredicate::is_valid_match_pattern(path_template).ok()) {
+      throw EnvoyException(fmt::format("path_template {} is invalid", path_template));
+    }
+
     predicate_factory_ = factory;
 }
 
-PatternTemplatePredicateSharedPtr PatternTemplatePolicyImpl::predicate() const {
-  return predicate_factory_->createUrlTemplatePredicate(url_pattern_, url_rewrite_pattern_);
+PathMatchPredicateSharedPtr PathMatchPolicyImpl::predicate() const {
+  return predicate_factory_->createPathMatchPredicate(url_pattern_, url_rewrite_pattern_);
 }
 
 absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectResponseCodes(
@@ -666,7 +670,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (route.route().has_regex_rewrite()) {
-    if (!prefix_rewrite_.empty() || pattern_template_policy_.enabled()) {
+    if (!prefix_rewrite_.empty() || path_match_policy_.enabled()) {
       throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or path_template_rewrite");
     }
     auto rewrite_spec = route.route().regex_rewrite();
@@ -674,14 +678,14 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
-  if (pattern_template_policy_.enabled()) {
+  if (path_match_policy_.enabled()) {
     if (!prefix_rewrite_.empty() || route.route().has_regex_rewrite()) {
       throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or path_template_rewrite");
     }
   }
 
   if (!prefix_rewrite_.empty()) {
-    if (route.route().has_regex_rewrite() || pattern_template_policy_.enabled()) {
+    if (route.route().has_regex_rewrite() || path_match_policy_.enabled()) {
       throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or path_template_rewrite");
     }
   }
@@ -851,7 +855,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   // Handle path rewrite
   absl::optional<std::string> container;
   if (!getPathRewrite(headers, container).empty() || regex_rewrite_ != nullptr ||
-      pattern_template_policy_.enabled()) {
+      path_match_policy_.enabled()) {
     rewritePathHeader(headers, insert_envoy_original_path);
   }
 }
@@ -988,9 +992,9 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   }
 
   // complete pattern rewrite
-  if (pattern_template_policy_.enabled()) {
+  if (path_match_policy_.enabled()) {
     auto just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
-    return *std::move(pattern_template_policy_.predicate()->rewritePattern(just_path, matched_path));
+    return *std::move(path_match_policy_.predicate()->rewritePattern(just_path, matched_path));
   }
 
   // There are no rewrites configured.
@@ -1186,7 +1190,7 @@ InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
 PathRewritePolicyImpl
 RouteEntryImplBase::buildPathRewritePolicy(envoy::config::route::v3::RouteAction route) const {
   if (route.has_path_rewrite_policy()) {
-    if (!matching::PatternTemplatePredicate::is_valid_rewrite_pattern(path_template,
+    if (!matching::PatternTemplateMatchPredicate::is_valid_rewrite_pattern(path_template,
                                                                       path_template_rewrite)
              .ok()) {
       throw EnvoyException(
@@ -1199,16 +1203,16 @@ RouteEntryImplBase::buildPathRewritePolicy(envoy::config::route::v3::RouteAction
   }
 }
 
-PatternTemplatePolicyImpl
+PathMatchPolicyImpl
 RouteEntryImplBase::buildPathMatchPolicy(envoy::config::route::v3::RouteMatch route) const {
   // match + rewrite
   if (route.has_path_match_policy()) {
-    if (!matching::PatternTemplatePredicate::is_valid_match_pattern(path_template).ok()) {
+    if (!matching::PatternTemplateMatchPredicate::is_valid_match_pattern(path_template).ok()) {
       throw EnvoyException(fmt::format("path_template {} is invalid", path_template));
     }
     return PathMatchPolicyImpl(route.path_match_policy());
   }
-  return PatternTemplatePolicyImpl();
+  return PathMatchPolicyImpl();
 }
 
 DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::config::route::v3::Route& route) {
@@ -1457,19 +1461,19 @@ PathMatchPolicyRouteEntryImpl::PathMatchPolicyRouteEntryImpl(
 
 void PathMatchPolicyRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                    bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, pattern_template_policy_.predicate()->url_pattern_, insert_envoy_original_path);
+  finalizePathHeader(headers, path_match_policy_.predicate()->url_pattern_, insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathMatchPolicyRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, pattern_template_policy_.predicate()->url_pattern_);
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_match_policy_.predicate()->url_pattern_);
 }
 
 RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                         const StreamInfo::StreamInfo& stream_info,
                                                         uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      pattern_template_policy_.predicate()->match(headers.getPathValue())) {
+      path_match_policy_.predicate()->match(headers.getPathValue())) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
