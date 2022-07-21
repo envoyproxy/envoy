@@ -1004,8 +1004,9 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
-// Verify Listener warming is finished only on named RDS response for new routes
-// and does not get in to warming state for existing route names.
+// This test validates two cases.
+// 1. Verify Listener warming is finished only on named RDS response for new routes.
+// 2. Verify Listener does not get in to warming state for existing routes.
 TEST_P(AdsIntegrationTest, ListenerWarmingOnNamedResponse) {
   initialize();
 
@@ -1043,7 +1044,7 @@ TEST_P(AdsIntegrationTest, ListenerWarmingOnNamedResponse) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
   test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
 
-  // Update listener with routing config name change.
+  // Update listener with a new route.
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_1", "rds_test")},
       {buildListener("listener_0", "route_config_1", "rds_test")}, {}, "2");
