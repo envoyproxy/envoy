@@ -1009,5 +1009,5 @@ slower cache performance on macOS due to slow disk performance on Docker for Mac
 Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
 
 ```
---remote_http_cache=http://127.0.0.1:28080/
+--remote_cache=http://127.0.0.1:28080/
 ```

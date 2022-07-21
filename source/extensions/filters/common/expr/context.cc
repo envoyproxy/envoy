@@ -63,6 +63,10 @@ absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
     if (!ssl_info.dnsSansPeerCertificate().empty()) {
       return CelValue::CreateString(&ssl_info.dnsSansPeerCertificate()[0]);
     }
+  } else if (value == SHA256PeerCertificateDigest) {
+    if (!ssl_info.sha256PeerCertificateDigest().empty()) {
+      return CelValue::CreateString(&ssl_info.sha256PeerCertificateDigest());
+    }
   }
   return {};
 }

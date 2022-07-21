@@ -11,8 +11,8 @@ If enabled the buffer filter populates content-length header if it is not presen
 already. The behavior can be disabled using the runtime feature
 `envoy.reloadable_features.buffer_filter_populate_content_length`.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.buffer.v3.Buffer>`
-* This filter should be configured with the name *envoy.filters.http.buffer*.
 
 Per-Route Configuration
 -----------------------

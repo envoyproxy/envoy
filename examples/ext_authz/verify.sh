@@ -15,7 +15,12 @@ responds_with_header \
 run_log "Restart front-envoy with FRONT_ENVOY_YAML=config/http-service.yaml"
 "$DOCKER_COMPOSE" down
 FRONT_ENVOY_YAML=config/http-service.yaml "$DOCKER_COMPOSE" up -d
-sleep 10
+
+wait_for 15 bash -c "\
+         responds_with_header \
+         'HTTP/1.1 200 OK' \
+         -H 'Authorization: Bearer token1' \
+         http://localhost:${PORT_PROXY}/service"
 
 run_log "Test service responds with 403"
 responds_with_header \
@@ -31,7 +36,10 @@ responds_with_header \
 run_log "Restart front-envoy with FRONT_ENVOY_YAML=config/opa-service/v3.yaml"
 "$DOCKER_COMPOSE" down
 FRONT_ENVOY_YAML=config/opa-service/v3.yaml "$DOCKER_COMPOSE" up -d
-sleep 10
+wait_for 15 bash -c "\
+         responds_with_header \
+         'HTTP/1.1 200 OK' \
+         http://localhost:${PORT_PROXY}/service"
 
 run_log "Test OPA service responds with 200"
 responds_with_header \

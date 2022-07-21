@@ -256,9 +256,11 @@ var Search = {
     function renderApiVersionLabel(linkUrl) {
       const filtered = linkUrl
         .split("/")
-        .filter((part) => part.startsWith("api-v"));
+        .filter((part) => {
+            return part.startsWith("api-v") || part.startsWith("xds");
+        });
       return filtered.length === 1
-        ? '&nbsp;<sup class="api-version-label">' + filtered.pop() + "</sup>"
+        ? '&nbsp;<sup class="' + filtered[0] + '-version-label">' + filtered[0] + "</sup>"
         : "";
     }
 

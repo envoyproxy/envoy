@@ -68,8 +68,8 @@ public:
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
-                  cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
-                  dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+                  server_context_, cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
+                  runtime_, dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
                   outlier_event_logger, added_via_api, validation_visitor_, *api_, options_);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               return std::make_pair(result.first, result.second.release());
@@ -130,6 +130,7 @@ public:
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
   MOCK_METHOD(CdsApi*, createCds_, ());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{

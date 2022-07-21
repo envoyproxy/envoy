@@ -418,6 +418,41 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
   wrapper.reset();
 }
 
+// Verify that binary values could also be extracted from dynamicMetadata().
+TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local metadata = object:dynamicMetadata():get("envoy.pp")
+      local bin_data = metadata["bin_data"]
+      local data_length = string.len(metadata["bin_data"])
+      for idx = 1, data_length do
+        testPrint('Hex Data: ' .. string.format('%x', string.byte(bin_data, idx)))
+      end
+    end
+  )EOF"};
+
+  ProtobufWkt::Value metadata_value;
+  constexpr uint8_t buffer[] = {'h', 'e', 0x00, 'l', 'l', 'o'};
+  metadata_value.set_string_value(reinterpret_cast<char const*>(buffer), sizeof(buffer));
+  ProtobufWkt::Struct metadata;
+  metadata.mutable_fields()->insert({"bin_data", metadata_value});
+
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  (*stream_info.metadata_.mutable_filter_metadata())["envoy.pp"] = metadata;
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+
+  EXPECT_CALL(printer_, testPrint("Hex Data: 68"));          // h (Hex: 68)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 65"));          // e (Hex: 65)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 0"));           // \0 (Hex: 0)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 6c")).Times(2); // l (Hex: 6c)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 6f"));          // 0 (Hex: 6f)
+
+  start("callMe");
+}
+
 // Set, get complex key/values in stream info dynamic metadata.
 TEST_F(LuaStreamInfoWrapperTest, SetGetComplexDynamicMetadata) {
   const std::string SCRIPT{R"EOF(
