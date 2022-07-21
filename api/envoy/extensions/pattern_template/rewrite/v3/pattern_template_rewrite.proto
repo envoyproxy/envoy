@@ -54,8 +54,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   into ``/en-us/hls/en_193913.vtt``.
 // [#not-implemented-hide:]
 message PatternTemplateRewriteConfig {
-  string path_template_rewrite = 1
-      [(validate.rules).string = {min_len: 1 max_len: 256}];
+  string path_template_rewrite = 1 [(validate.rules).string = {min_len: 1 max_len: 256}];
 }
 
 // Holds the segments for rewriting urls based on pattern templates
