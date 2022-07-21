@@ -4,9 +4,8 @@ load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependen
 load("@rules_jvm_external//:defs.bzl", "maven_install")
 load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
 load("@io_bazel_rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
-load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
-load("@rules_proto_grpc//protobuf:repositories.bzl", "protobuf_repos")
-load("@rules_proto_grpc//java:repositories.bzl", rules_proto_grpc_java_repos = "java_repos")
+load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
+load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
 load("@rules_python//python:pip.bzl", "pip_install")
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
 load("@rules_java//java:repositories.bzl", "rules_java_dependencies")
@@ -102,14 +101,10 @@ def kotlin_dependencies(extra_maven_dependencies = []):
     rules_detekt_dependencies()
     robolectric_repositories()
 
-    grpc_java_repositories(
-        omit_bazel_skylib = True,
-        omit_com_google_protobuf = True,
-        omit_com_google_protobuf_javalite = True,
-        omit_net_zlib = True,
-    )
-    protobuf_repos()
-    rules_proto_grpc_java_repos()
+    rules_proto_grpc_toolchains()
+    rules_proto_grpc_repos()
+    rules_proto_dependencies()
+    rules_proto_toolchains()
 
 def python_dependencies():
     # TODO: bifurcate dev deps vs. prod deps
