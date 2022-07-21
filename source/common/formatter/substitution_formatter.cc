@@ -376,7 +376,7 @@ SubstitutionFormatParser::getKnownFormatters() {
         {CommandSyntaxChecker::COMMAND_ONLY,
          [](const std::string&, const absl::optional<size_t>&) {
            return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(),
-                                                        GrpcStatusFormatter::NUMBER);
+                                                        GrpcStatusFormatter::Number);
          }}},
        {"REQUEST_HEADERS_BYTES",
         {CommandSyntaxChecker::COMMAND_ONLY,
@@ -1686,18 +1686,18 @@ HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_head
 
 GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
   if (format.empty()) {
-    return GrpcStatusFormatter::CAMEL_STRING;
+    return GrpcStatusFormatter::CamelString;
   }
 
   if (format == "CAMEL_STRING") {
-    return GrpcStatusFormatter::CAMEL_STRING;
+    return GrpcStatusFormatter::CamelString;
   }
 
   if (format == "SNAKE_STRING") {
-    return GrpcStatusFormatter::SNAKE_STRING;
+    return GrpcStatusFormatter::Snake_String;
   }
   if (format == "NUMBER") {
-    return GrpcStatusFormatter::NUMBER;
+    return GrpcStatusFormatter::Number;
   }
 
   throw EnvoyException("GrpcStatusFormatter only supports CAMEL_STRING, SNAKE_STRING or NUMBER.");
@@ -1719,14 +1719,14 @@ GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
     return absl::nullopt;
   }
   switch (format_) {
-  case CAMEL_STRING: {
+  case CamelString: {
     const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
     if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
       return std::to_string(grpc_status.value());
     }
     return grpc_status_message;
   }
-  case SNAKE_STRING: {
+  case Snake_String: {
     const auto grpc_status_message =
         absl::StatusCodeToString(static_cast<absl::StatusCode>(grpc_status.value()));
     if (grpc_status_message == EMPTY_STRING) {
@@ -1734,7 +1734,7 @@ GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
     }
     return grpc_status_message;
   }
-  case NUMBER: {
+  case Number: {
     return std::to_string(grpc_status.value());
   }
   default:
@@ -1755,14 +1755,14 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
   }
 
   switch (format_) {
-  case CAMEL_STRING: {
+  case CamelString: {
     const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
     if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
       return ValueUtil::stringValue(std::to_string(grpc_status.value()));
     }
     return ValueUtil::stringValue(grpc_status_message);
   }
-  case SNAKE_STRING: {
+  case Snake_String: {
     const auto grpc_status_message =
         absl::StatusCodeToString(static_cast<absl::StatusCode>(grpc_status.value()));
     if (grpc_status_message == EMPTY_STRING) {
@@ -1770,7 +1770,7 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
     }
     return ValueUtil::stringValue(grpc_status_message);
   }
-  case NUMBER: {
+  case Number: {
     return ValueUtil::numberValue(grpc_status.value());
   }
   default:

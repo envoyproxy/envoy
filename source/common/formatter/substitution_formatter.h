@@ -397,9 +397,9 @@ public:
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
 public:
   enum Format {
-    CAMEL_STRING,
-    SNAKE_STRING,
-    NUMBER,
+    CamelString,
+    Snake_String,
+    Number,
   };
 
   GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,

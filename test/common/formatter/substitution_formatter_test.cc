@@ -2342,7 +2342,7 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
 
 TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
-                                GrpcStatusFormatter::Format::CAMEL_STRING);
+                                GrpcStatusFormatter::Format::CamelString);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -2404,7 +2404,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
 
 TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
-                                GrpcStatusFormatter::Format::SNAKE_STRING);
+                                GrpcStatusFormatter::Format::Snake_String);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -2478,7 +2478,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
 
 TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
-                                GrpcStatusFormatter::Format::NUMBER);
+                                GrpcStatusFormatter::Format::Number);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
