@@ -173,7 +173,9 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/memory:utils_lib",
         "//source/common/protobuf",
-        "//source/extensions/key_value/file_based:config_lib",
+        # TODO(abeyad): remove
+        "//source/extensions/config/listeners:config_saver",
+        "//source/extensions/config:store_lib",
         "@com_google_absl//absl/container:btree",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -328,6 +330,7 @@ envoy_cc_library(
         ":type_to_endpoint_lib",
         ":utility_lib",
         ":xds_resource_lib",
+        "//envoy/common:key_value_store_interface",
         "//envoy/config:config_updated_listener_interface",
         "//envoy/config:subscription_factory_interface",
         "//envoy/config:subscription_interface",

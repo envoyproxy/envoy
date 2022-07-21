@@ -10,11 +10,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/hex.h"
-#include "source/common/common/utility.h"
-#include "source/common/config/well_known_names.h"
-#include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
@@ -175,6 +170,21 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     }
   }
   // Otherwise, there is no cluster name to validate.
+}
+
+// TODO(abeyad): add tests for this function
+// TODO(abeyad): make this return optional instead
+std::string
+Utility::getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
+  if (api_config_source.grpc_services_size() > 0) {
+    if (api_config_source.grpc_services(0).has_envoy_grpc()) {
+      return api_config_source.grpc_services(0).envoy_grpc().cluster_name();
+    }
+    if (api_config_source.grpc_services(0).has_google_grpc()) {
+      return api_config_source.grpc_services(0).google_grpc().target_uri();
+    }
+  }
+  return "";
 }
 
 std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(

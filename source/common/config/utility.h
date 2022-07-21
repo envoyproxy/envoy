@@ -190,6 +190,15 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
+   * Gets the gRPC control plane management server from the API config source.  The result is either
+   * a cluster name or a target URI.
+   * @param api_config_source the config source to validate.
+   * @return the gRPC control plane server
+   */
+  static std::string
+  getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api_config_source);
+
+  /**
    * Validate transport_api_version field in ApiConfigSource.
    * @param api_config_source the config source to extract transport API version from.
    * @throws DeprecatedMajorVersionException when the transport version is disabled.

@@ -13,6 +13,8 @@ envoy_cc_extension(
     name = "config_lib",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    # TODO(abeyad): remove
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/common:key_value_store_interface",
         "//envoy/event:dispatcher_interface",

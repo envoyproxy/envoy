@@ -52,6 +52,7 @@
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
+#include "source/extensions/key_value/file_based/config.h"
 #include "source/server/admin/utils.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/connection_handler_impl.h"
@@ -106,7 +107,11 @@ InstanceImpl::InstanceImpl(
             fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
       }
     }
-
+    // TODO(abeyad): don't create this here directly, use config.
+    xds_config_store_ = std::make_unique<Extensions::KeyValue::FileBasedKeyValueStore>(
+        *dispatcher_,
+        /*flush_interval=*/std::chrono::milliseconds(1000), api_->fileSystem(),
+        /*filename=*/"xds_config", /*max_entries=*/1000);
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
     initialize(std::move(local_address), component_factory);

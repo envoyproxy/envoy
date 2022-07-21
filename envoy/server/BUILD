@@ -126,6 +126,7 @@ envoy_cc_library(
         ":options_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/api:api_interface",
+        "//envoy/common:key_value_store_interface",
         "//envoy/common:mutex_tracer",
         "//envoy/event:timer_interface",
         "//envoy/http:context_interface",

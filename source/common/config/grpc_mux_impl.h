@@ -11,18 +11,18 @@
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/api_version.h"
 #include "source/common/config/custom_config_validators.h"
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
+
+// TODO(abeyad): shouldn't depend on extensions here
+#include "source/extensions/config/store.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -40,7 +40,8 @@ public:
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
               CustomConfigValidatorsPtr&& config_validators,
-              ConfigUpdatedListenerList&& config_listeners, KeyValueStore& xds_config_store);
+              ConfigUpdatedListenerList&& config_listeners, KeyValueStore& xds_config_store,
+              const std::string& target_control_plane);
 
   ~GrpcMuxImpl() override;
 
@@ -89,6 +90,7 @@ private:
   void drainRequests();
   void setRetryTimer();
   void sendDiscoveryRequest(absl::string_view type_url);
+  void loadCachedConfig(absl::string_view type_url);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
@@ -193,7 +195,9 @@ private:
 
   Event::Dispatcher& dispatcher_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
-  KeyValueStore& xds_config_store_;
+
+  Envoy::Extensions::Config::Store xds_store_;
+  const std::string target_control_plane_;
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.

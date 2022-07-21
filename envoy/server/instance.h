@@ -7,6 +7,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/common/key_value_store.h"
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
@@ -260,6 +261,11 @@ public:
    * @return Configuration::TransportSocketFactoryContext& factory context for transport sockets.
    */
   virtual Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() PURE;
+
+  /**
+   * @return Envoy::KeyValueStore& for persisted xDS configuration.
+   */
+   virtual KeyValueStore& xdsConfigStore() const PURE;
 
   /**
    * Set the default server-wide tracer provider configuration that will be used as a fallback

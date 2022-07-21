@@ -5,18 +5,20 @@
 #include "envoy/config/subscription.h"
 
 namespace Envoy {
+namespace Extensions {
 namespace Config {
 
-class ConfigSaver : public ConfigUpdatedListener {
+class ConfigSaver : public Envoy::Config::ConfigUpdatedListener {
 public:
   ConfigSaver(KeyValueStore& store);
 
   void onConfigUpdated(const std::string& control_plane_id, const std::string& resource_type_url,
-                       const std::vector<DecodedResourceRef>& resources) override;
+                       const std::vector<Envoy::Config::DecodedResourceRef>& resources) override;
 
 private:
   KeyValueStore& store_;
 };
 
 } // namespace Config
+} // namespace Extensions
 } // namespace Envoy

@@ -629,6 +629,8 @@ envoy_cc_library(
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/common/version:version_lib",
+        # TODO(abeyad): remove this
+        "//source/extensions/key_value/file_based:config_lib",
         "//source/server:overload_manager_lib",
         "//source/server/admin:admin_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

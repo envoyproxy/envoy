@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/key_value_store.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/bootstrap_extension_config.h"
@@ -277,6 +278,7 @@ public:
   ProcessContextOptRef processContext() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
+  KeyValueStore& xdsConfigStore() const override { return *xds_config_store_; } 
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
@@ -396,6 +398,7 @@ private:
   ServerFactoryContextImpl server_contexts_;
   bool enable_reuse_port_default_;
   Regex::EnginePtr regex_engine_;
+  std::unique_ptr<KeyValueStore> xds_config_store_;
 
   bool stats_flush_in_progress_ : 1;
 

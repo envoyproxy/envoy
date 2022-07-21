@@ -27,7 +27,8 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
     Api::Api& api, const Server::Instance& server)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
-      validation_visitor_(validation_visitor), api_(api), server_(server) {}
+      validation_visitor_(validation_visitor), api_(api), server_(server),
+      xds_config_store_(server.xdsConfigStore()) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -79,7 +80,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                                        api_config_source.config_validators());
       // TODO(abeyad): create through factory instead.
       ConfigUpdatedListenerList config_listeners;
-      config_listeners.emplace_back(std::make_unique<ConfigSaver>(dispatcher_, api_.fileSystem()));
+      config_listeners.emplace_back(
+          std::make_unique<Envoy::Extensions::Config::ConfigSaver>(xds_config_store_));
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
@@ -99,7 +101,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source),
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            std::move(config_listeners));
+            std::move(config_listeners), xds_config_store_,
+            Utility::getGrpcControlPlane(api_config_source));
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,

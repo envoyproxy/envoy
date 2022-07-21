@@ -4,18 +4,18 @@
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/extensions/config/listeners/saved_xds_config.pb.h"
+#include "source/extensions/config/saved_xds_config.pb.h"
+#include "source/extensions/config/store.h"
 
 namespace Envoy {
+namespace Extensions {
 namespace Config {
-
-static constexpr char XDS_CONFIG_KEY[] = "xds_config";
 
 ConfigSaver::ConfigSaver(KeyValueStore& store) : store_(store) {}
 
 void ConfigSaver::onConfigUpdated(const std::string& control_plane_id,
                                   const std::string& resource_type_url,
-                                  const std::vector<DecodedResourceRef>& resources) {
+                                  const std::vector<Envoy::Config::DecodedResourceRef>& resources) {
   // TODO(abeyad): this sucks, we keep having to reparse the persisted value in order to update it
   // and persist it again.  Find a better way.
   Envoy::Extensions::Config::SavedXdsConfig xds_config;
@@ -48,4 +48,5 @@ void ConfigSaver::onConfigUpdated(const std::string& control_plane_id,
 }
 
 } // namespace Config
+} // namespace Extensions
 } // namespace Envoy

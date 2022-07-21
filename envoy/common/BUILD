@@ -76,8 +76,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "key_value_store_interface",
     hdrs = ["key_value_store.h"],
-    # TODO(abeyad): get rid of this
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/protobuf:message_validator_interface",
         "//envoy/registry",

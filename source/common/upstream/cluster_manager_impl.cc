@@ -419,7 +419,9 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators), std::move(config_listeners));
+            std::move(custom_config_validators), std::move(config_listeners),
+            server.xdsConfigStore(),
+            Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()));
       }
     }
   } else {

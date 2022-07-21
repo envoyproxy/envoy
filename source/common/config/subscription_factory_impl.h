@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/common/random_generator.h"
+#include "envoy/common/key_value_store.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
@@ -10,6 +10,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
+#include <memory>
 
 namespace Envoy {
 namespace Config {
@@ -41,6 +42,7 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
   const Server::Instance& server_;
+  KeyValueStore& xds_config_store_;
 };
 
 } // namespace Config

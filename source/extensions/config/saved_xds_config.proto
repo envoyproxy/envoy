@@ -10,6 +10,9 @@ message SavedXdsConfig {
   message XdsServerSavedConfig {
     message ResourceList {
       repeated envoy.service.discovery.v3.Resource resources = 1;
+
+      // The version of the resources
+      string version_info = 2;
     };
 
     // Maps the type URL to the resources for that type.
