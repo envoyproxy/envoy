@@ -1013,7 +1013,7 @@ public:
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
-    throw absl::UnimplementedError("Path template matcher not implemented");
+    return url_pattern_;
   }
 
   PathMatchType matchType() const override { return PathMatchType::Pattern; }
@@ -1030,6 +1030,9 @@ public:
   // Router::RouteEntry
   absl::optional<std::string>
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+
+private:
+  std::string url_pattern_{nullptr};
 };
 
 /**
