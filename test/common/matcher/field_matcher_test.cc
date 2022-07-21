@@ -38,33 +38,35 @@ public:
   }
 };
 
+const auto isFoo = [](const InputValue& v) { return v.kind() == InputValue::Kind::String && v.asString() == "foo"; };
+
 TEST_F(FieldMatcherTest, SingleFieldMatcher) {
-  EXPECT_EQ(createSingleMatcher("foo", [](auto v) { return v.toString() == "foo"; })
+  EXPECT_EQ(createSingleMatcher("foo", isFoo)
                 ->match(TestData())
                 .match_state_,
             MatchState::MatchComplete);
   EXPECT_EQ(createSingleMatcher(
-                absl::nullopt, [](auto v) { return v.toString() == "foo"; },
+                absl::nullopt, isFoo,
                 DataInputGetResult::DataAvailability::NotAvailable)
                 ->match(TestData())
                 .match_state_,
             MatchState::UnableToMatch);
   EXPECT_EQ(createSingleMatcher(
-                "fo", [](auto v) { return v.toString() == "foo"; },
+                "fo", isFoo,
                 DataInputGetResult::DataAvailability::MoreDataMightBeAvailable)
                 ->match(TestData())
                 .match_state_,
             MatchState::UnableToMatch);
-  EXPECT_TRUE(createSingleMatcher("foo", [](auto v) { return v.toString() == "foo"; })
+  EXPECT_TRUE(createSingleMatcher("foo", isFoo)
                   ->match(TestData())
                   .result());
-  EXPECT_FALSE(createSingleMatcher("foo", [](auto v) { return v.toString() != "foo"; })
+  EXPECT_FALSE(createSingleMatcher("foo", isFoo)
                    ->match(TestData())
                    .result());
   EXPECT_TRUE(createSingleMatcher(absl::nullopt, [](auto v) { return v.isNull(); })
                   ->match(TestData())
                   .result());
-  EXPECT_FALSE(createSingleMatcher(absl::nullopt, [](auto v) { return v.toString() == "foo"; })
+  EXPECT_FALSE(createSingleMatcher(absl::nullopt, isFoo)
                    ->match(TestData())
                    .result());
 }

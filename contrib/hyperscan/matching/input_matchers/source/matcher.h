@@ -27,7 +27,7 @@ public:
   ~Matcher() override { hs_free_database(database_); }
 
   // Envoy::Matcher::InputMatcher
-  bool match(absl::optional<absl::string_view> input) override;
+  bool match(const Envoy::Matcher::InputValue& input) override;
 
 private:
   std::vector<unsigned int> flags_{};

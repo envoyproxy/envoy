@@ -67,61 +67,61 @@ TEST_F(ConfigTest, IncompatibleArchitecture) {
 TEST_F(ConfigTest, Regex) {
   setup({{"^/asdf/.+", {}}});
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_FALSE(matcher_->match("/ASDF/1"));
-  EXPECT_FALSE(matcher_->match("/asdf/\n"));
-  EXPECT_FALSE(matcher_->match("\n/asdf/1"));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("/asdf/1")));
+  EXPECT_FALSE(matcher_->match(Envoy::Matcher::InputValue("/ASDF/1")));
+  EXPECT_FALSE(matcher_->match(Envoy::Matcher::InputValue("/asdf/\n")));
+  EXPECT_FALSE(matcher_->match(Envoy::Matcher::InputValue("\n/asdf/1")));
 }
 
 // Verify that matching will be performed case-insensitively.
 TEST_F(ConfigTest, RegexWithCaseless) {
   setup({{"^/asdf/.+", {{"caseless", "true"}}}});
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_TRUE(matcher_->match("/ASDF/1"));
-  EXPECT_FALSE(matcher_->match("/asdf/\n"));
-  EXPECT_FALSE(matcher_->match("\n/asdf/1"));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("/asdf/1")));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("/ASDF/1")));
+  EXPECT_FALSE(matcher_->match(Envoy::Matcher::InputValue("/asdf/\n")));
+  EXPECT_FALSE(matcher_->match(Envoy::Matcher::InputValue("\n/asdf/1")));
 }
 
 // Verify that matching a `.` will not exclude newlines.
 TEST_F(ConfigTest, RegexWithDotAll) {
   setup({{"^/asdf/.+", {{"dot_all", "true"}}}});
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_FALSE(matcher_->match("/ASDF/1"));
-  EXPECT_TRUE(matcher_->match("/asdf/\n"));
-  EXPECT_FALSE(matcher_->match("\n/asdf/1"));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("/asdf/1")));
+  EXPECT_FALSE(matcher_->match(Envoy::Matcher::InputValue("/ASDF/1")));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("/asdf/\n")));
+  EXPECT_FALSE(matcher_->match(Envoy::Matcher::InputValue("\n/asdf/1")));
 }
 
 // Verify that `^` and `$` anchors match any newlines in data.
 TEST_F(ConfigTest, RegexWithMultiline) {
   setup({{"^/asdf/.+$", {{"multiline", "true"}}}});
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_FALSE(matcher_->match("/ASDF/1"));
-  EXPECT_FALSE(matcher_->match("/asdf/\n"));
-  EXPECT_TRUE(matcher_->match("\n/asdf/1"));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("/asdf/1")));
+  EXPECT_FALSE(matcher_->match(Envoy::Matcher::InputValue("/ASDF/1")));
+  EXPECT_FALSE(matcher_->match(Envoy::Matcher::InputValue("/asdf/\n")));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("\n/asdf/1")));
 }
 
 // Verify that expressions which can match against an empty string.
 TEST_F(ConfigTest, RegexWithAllowEmpty) {
   setup({{".*", {{"allow_empty", "true"}}}});
 
-  EXPECT_TRUE(matcher_->match(""));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("")));
 }
 
 // Verify that treating the pattern as a sequence of UTF-8 characters.
 TEST_F(ConfigTest, RegexWithUTF8) {
   setup({{"^.$", {{"utf8", "true"}}}});
 
-  EXPECT_TRUE(matcher_->match("😀"));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("😀")));
 }
 
 // Verify that using Unicode properties for character classes.
 TEST_F(ConfigTest, RegexWithUCP) {
   setup({{"^\\w$", {{"utf8", "true"}, {"ucp", "true"}}}});
 
-  EXPECT_TRUE(matcher_->match("Á"));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("Á")));
 }
 
 // Verify that using logical combination.
@@ -130,7 +130,7 @@ TEST_F(ConfigTest, RegexWithCombination) {
          {"b", {{"id", "2"}, {"quiet", "true"}}},
          {"1 | 2", {{"combination", "true"}}}});
 
-  EXPECT_TRUE(matcher_->match("a"));
+  EXPECT_TRUE(matcher_->match(Envoy::Matcher::InputValue("a")));
 }
 
 // Verify that invalid expression will cause a throw.

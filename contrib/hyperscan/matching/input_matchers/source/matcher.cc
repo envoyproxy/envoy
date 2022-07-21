@@ -76,13 +76,13 @@ Matcher::Matcher(
       [this](Event::Dispatcher&) { return std::make_shared<ScratchThreadLocal>(this->database_); });
 }
 
-bool Matcher::match(absl::optional<absl::string_view> input) {
-  if (!input) {
+bool Matcher::match(const Envoy::Matcher::InputValue& input) {
+  if (input.isNull()) {
     return false;
   }
 
   bool matched = false;
-  const absl::string_view input_str = *input;
+  const std::string input_str = input.toString();
   hs_scratch_t* scratch = tls_->get()->scratch_;
   hs_error_t err = hs_scan(
       database_, input_str.data(), input_str.size(), 0, scratch,

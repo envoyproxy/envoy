@@ -14,6 +14,7 @@ envoy_cc_library(
     external_deps = [
         "abseil_base",
         "abseil_hash",
+        "abseil_any",
     ],
     deps = [
         "//envoy/config:typed_config_interface",

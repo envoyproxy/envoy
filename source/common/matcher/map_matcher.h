@@ -32,7 +32,6 @@ public:
     }
 
     const auto result = doMatch(input.data_);
-
     if (result) {
       if (result->matcher_) {
         return result->matcher_->match(data);
@@ -62,7 +61,8 @@ private:
   absl::optional<OnMatch<DataType>> doMatch(const InputValue& data) {
     switch (data.kind()) {
     case InputValue::Kind::Null:
-      return absl::nullopt;
+    case InputValue::Kind::Any:
+      return {};
     case InputValue::Kind::String:
       return doMatch(data.asString());
     case InputValue::Kind::Int:
@@ -74,7 +74,7 @@ private:
           return result;
         }
       }
-      return absl::nullopt;
+      return {};
     }
     }
   }

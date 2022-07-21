@@ -13,6 +13,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/variant.h"
+#include "absl/types/any.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
@@ -159,6 +160,7 @@ public:
   InputValue() {}
   InputValue(absl::string_view data) : data_(absl::in_place_type<std::string>, data) {}
   InputValue(int64_t data) : data_(data) {}
+  InputValue(std::vector<InputValue>&& data): data_(data) {}
 
   enum class Kind {
     // Null value (use when value is not present).
@@ -168,7 +170,9 @@ public:
     // 64-bit signed integer value.
     Int,
     // Dynamic list value (possibly heterogenous).
-    List
+    List,
+    // Opaque type holder for coupled input and matcher combinations
+    Any
   };
 
   Kind kind() const {
@@ -179,6 +183,8 @@ public:
       return Kind::Int;
     case 3:
       return Kind::List;
+    case 4:
+      return Kind::Any;
     default:
       return Kind::Null;
     }
@@ -195,6 +201,20 @@ public:
    * Access the stored integer value or throw an exception if the kind does not match.
    */
   int64_t asInt() const { return absl::get<int64_t>(data_); }
+
+  /**
+   * Access the stored integer or string value as a string.
+   */
+  absl::optional<std::string> stringOrInt() const {
+    switch (kind()) {
+      case Kind::String:
+        return absl::make_optional<std::string>(asString());
+      case Kind::Int:
+        return absl::StrCat(asInt());
+      default:
+        return absl::nullopt;
+    }
+  }
 
   /**
    * Access the stored list value or throw an exception if the kind does not match.
@@ -214,7 +234,7 @@ public:
     case Kind::Int:
       out << result.asInt();
       break;
-    case Kind::List:
+    case Kind::List: {
       bool first = true;
       for (const auto& elt : result.asList()) {
         if (!first) {
@@ -226,22 +246,15 @@ public:
       }
       break;
     }
+    case Kind::Any:
+      out << "(unknown)";
+      break;
+    }
     return out;
   }
 
-  /**
-   * Returns conversion to string.
-   */
-  std::string toString() const {
-    std::stringstream out;
-    out << *this;
-    return out.str();
-  }
-
-  bool operator==(const InputValue& that) const { return data_ == that.data_; }
-
 private:
-  const absl::variant<absl::monostate, std::string, int64_t, std::vector<InputValue>> data_;
+  const absl::variant<absl::monostate, std::string, int64_t, std::vector<InputValue>, absl::any> data_;
 };
 
 // InputMatcher provides the interface for determining whether an input value matches.
@@ -251,7 +264,7 @@ public:
 
   /**
    * Whether the provided input is a match.
-   * @param absl::optional<absl::string_view> the value to match on. Will be absl::nullopt if the
+   * @param absl::optional<absl::string_view> the value to match on. Will be nullopt if the
    * lookup failed.
    */
   virtual bool match(const InputValue& input) PURE;

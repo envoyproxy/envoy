@@ -62,9 +62,9 @@ public:
     data.onRequestHeaders(headers);
     auto result = data_input_->get(data);
     if (!result.data_.isNull()) {
-      std::string value = result.data_.toString();
-      if (!value.empty()) {
-        descriptor_entry = {descriptor_key_, value};
+      const auto value = result.data_.stringOrInt();
+      if (value && !value.value().isEmpty()) {
+        descriptor_entry = {descriptor_key_, value.value()};
       }
       return true;
     }

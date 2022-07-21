@@ -361,6 +361,5 @@ private:
   Server::Configuration::ServerFactoryContext& server_factory_context_;
   MatchInputFactory<DataType> match_input_factory_;
 };
-
 } // namespace Matcher
 } // namespace Envoy
