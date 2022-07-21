@@ -30,6 +30,9 @@ function setup_gcc_toolchain() {
     echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
     exit 1
   fi
+
+  BAZEL_BUILD_OPTIONS=("--config=gcc" "${BAZEL_BUILD_OPTIONS[@]}")
+
   if [[ -z "${ENVOY_RBE}" ]]; then
     export CC=gcc
     export CXX=g++
