@@ -367,7 +367,7 @@ SubstitutionFormatParser::getKnownFormatters() {
            return std::make_unique<LocalReplyBodyFormatter>();
          }}},
        {"GRPC_STATUS",
-        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
+        {CommandSyntaxChecker::PARAMS_OPTIONAL,
          [](const std::string& format, const absl::optional<size_t>&) {
            return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(),
                                                         GrpcStatusFormatter::parseFormat(format));
