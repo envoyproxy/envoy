@@ -332,7 +332,7 @@ message Listener {
   google.protobuf.BoolValue bind_to_port = 26;
 
   // The exclusive listener type and the corresponding config.
-  // TODO(lambdai): https://github.com/envoyproxy/envoy/issues/15372
+  // [#comment: TODO(lambdai): https://github.com/envoyproxy/envoy/issues/15372]
   oneof listener_specifier {
     // Used to represent an internal listener which does not listen on OSI L4 address but can be used by the
     // :ref:`envoy cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` to create a user space connection to.
