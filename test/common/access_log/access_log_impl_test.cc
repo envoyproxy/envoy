@@ -1096,7 +1096,7 @@ typed_config:
   path: /dev/null
   log_format:
     text_format_source:
-      inline_string: "%GRPC_STATUS(NOT_SUPPORT)%\n"
+      inline_string: "%GRPC_STATUS(NOT_SUPPORTED)%\n"
   )EOF";
   EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
                EnvoyException);

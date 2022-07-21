@@ -1738,7 +1738,7 @@ GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
     return std::to_string(grpc_status.value());
   }
   default:
-    throw EnvoyException("Only camel string, snake string and number are "
+    throw EnvoyException("Only CAMEL_STRING, SNAKE_STRING and NUMBER are "
                          "supported in grpc status access log format.");
   }
 }
@@ -1774,7 +1774,7 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
     return ValueUtil::numberValue(grpc_status.value());
   }
   default:
-    throw EnvoyException("Only camel string, snake string and number are "
+    throw EnvoyException("Only CAMEL_STRING, SNAKE_STRING and NUMBER are "
                          "supported in grpc status access log format.");
   }
 }

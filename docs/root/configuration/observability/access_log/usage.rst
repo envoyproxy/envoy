@@ -580,7 +580,7 @@ The following command operators are supported:
 
 %GRPC_STATUS(X)%
   `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>` in the optional parameter X. X can be ``CAMEL_STRING``, ``SNAKE_STRING`` and ``NUMBER``.
-  For example for ``INVALID_ARGUMENT = 3``, it would be ``InvalidArgument`` for ``CAMEL_STRING``, ``INVALID_ARGUMENT`` for ``SNAKE_STRING`` and ``3`` for ``NUMBER``.
+  For example, if the grpc status is INVALID_ARGUMENT (represented by number 3), the formatter will return ``InvalidArgument`` for ``CAMEL_STRING``, ``INVALID_ARGUMENT`` for ``SNAKE_STRING`` and ``3`` for ``NUMBER``.
   If X isn't provided, ``CAMEL_STRING`` will be used.
 
 %GRPC_STATUS_NUMBER%

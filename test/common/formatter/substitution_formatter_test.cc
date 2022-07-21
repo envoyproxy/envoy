@@ -2349,7 +2349,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
   Http::TestResponseTrailerMapImpl response_trailer;
   std::string body;
 
-  std::array<std::string, 17> grpc_statuses{
+  std::vector<std::string> grpc_statuses{
       "OK",       "Canceled",       "Unknown",          "InvalidArgument",   "DeadlineExceeded",
       "NotFound", "AlreadyExists",  "PermissionDenied", "ResourceExhausted", "FailedPrecondition",
       "Aborted",  "OutOfRange",     "Unimplemented",    "Internal",          "Unavailable",
@@ -2411,23 +2411,23 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   Http::TestResponseTrailerMapImpl response_trailer;
   std::string body;
 
-  std::array<std::string, 17> grpc_statuses{"OK",
-                                            "CANCELLED",
-                                            "UNKNOWN",
-                                            "INVALID_ARGUMENT",
-                                            "DEADLINE_EXCEEDED",
-                                            "NOT_FOUND",
-                                            "ALREADY_EXISTS",
-                                            "PERMISSION_DENIED",
-                                            "RESOURCE_EXHAUSTED",
-                                            "FAILED_PRECONDITION",
-                                            "ABORTED",
-                                            "OUT_OF_RANGE",
-                                            "UNIMPLEMENTED",
-                                            "INTERNAL",
-                                            "UNAVAILABLE",
-                                            "DATA_LOSS",
-                                            "UNAUTHENTICATED"};
+  std::vector<std::string> grpc_statuses{"OK",
+                                         "CANCELLED",
+                                         "UNKNOWN",
+                                         "INVALID_ARGUMENT",
+                                         "DEADLINE_EXCEEDED",
+                                         "NOT_FOUND",
+                                         "ALREADY_EXISTS",
+                                         "PERMISSION_DENIED",
+                                         "RESOURCE_EXHAUSTED",
+                                         "FAILED_PRECONDITION",
+                                         "ABORTED",
+                                         "OUT_OF_RANGE",
+                                         "UNIMPLEMENTED",
+                                         "INTERNAL",
+                                         "UNAVAILABLE",
+                                         "DATA_LOSS",
+                                         "UNAUTHENTICATED"};
   for (size_t i = 0; i < grpc_statuses.size(); ++i) {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
     EXPECT_EQ(grpc_statuses[i], formatter.format(request_header, response_header, response_trailer,
