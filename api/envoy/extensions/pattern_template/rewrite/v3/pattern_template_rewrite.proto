@@ -56,22 +56,3 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message PatternTemplateRewriteConfig {
   string path_template_rewrite = 1 [(validate.rules).string = {min_len: 1 max_len: 256}];
 }
-
-// Holds the segments for rewriting urls based on pattern templates
-// [#not-implemented-hide:]
-message PatternTemplateRewrite {
-  message RewriteSegment {
-    oneof segment_type {
-      // Represents a segment of the rewritten URL, including any path segments,
-      // slash and prefix.
-      string literal = 1;
-
-      // Indexes into the RE2 capture for the value to be used
-      // to construct the rewritten URL. Note that the index should be greater
-      // than 0 as 0 index into the whole match RE2 pattern.
-      int32 var_index = 2;
-    }
-  }
-
-  repeated RewriteSegment segments = 3;
-}
