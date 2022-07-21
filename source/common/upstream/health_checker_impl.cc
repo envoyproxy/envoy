@@ -134,7 +134,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
-      method_(envoy::config::core::v3::HealthCheck_HttpHealthCheck_Method_Name(config.http_health_check().method())),
+      method_(envoy::config::core::v3::HealthCheck_HttpHealthCheck_Method_Name(
+          config.http_health_check().method())),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),

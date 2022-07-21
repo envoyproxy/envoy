@@ -3074,10 +3074,11 @@ TEST_F(HttpHealthCheckerImplTest, DefaultMethodGet) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-        .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
-          EXPECT_EQ(Http::Headers::get().MethodValues.Get, std::string(headers.Method()->value().getStringView()));
-          return Http::okStatus();
-        }));
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
+                  std::string(headers.Method()->value().getStringView()));
+        return Http::okStatus();
+      }));
   health_checker_->start();
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
@@ -3087,7 +3088,7 @@ TEST_F(HttpHealthCheckerImplTest, DefaultMethodGet) {
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false, false, true);
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health()); 
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
 TEST_F(HttpHealthCheckerImplTest, MethodHead) {
@@ -3101,10 +3102,11 @@ TEST_F(HttpHealthCheckerImplTest, MethodHead) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-        .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
-          EXPECT_EQ(Http::Headers::get().MethodValues.Head, std::string(headers.Method()->value().getStringView()));
-          return Http::okStatus();
-        }));
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        EXPECT_EQ(Http::Headers::get().MethodValues.Head,
+                  std::string(headers.Method()->value().getStringView()));
+        return Http::okStatus();
+      }));
   health_checker_->start();
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
@@ -3114,7 +3116,7 @@ TEST_F(HttpHealthCheckerImplTest, MethodHead) {
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false, false, true);
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health()); 
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
