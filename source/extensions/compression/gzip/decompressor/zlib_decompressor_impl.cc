@@ -20,10 +20,10 @@ namespace Decompressor {
 ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
                                            uint64_t chunk_size, uint64_t max_inflate_ratio)
     : Common::Base(chunk_size,
-                 [](z_stream* z) {
-                   inflateEnd(z);
-                   delete z;
-                 }),
+                   [](z_stream* z) {
+                     inflateEnd(z);
+                     delete z;
+                   }),
       stats_(generateStats(stats_prefix, scope)), max_inflate_ratio_(max_inflate_ratio) {
   zstream_ptr_->zalloc = Z_NULL;
   zstream_ptr_->zfree = Z_NULL;
