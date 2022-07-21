@@ -6696,62 +6696,59 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), true);
 }
 
-TEST_F(RoutePropertyTest, TestRouteCorsConfig) {
+TEST_F(RoutePropertyTest, TestVHostCorsConfigDisablePNA) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "default"
     domains: ["*"]
+    cors:
+      allow_private_network_access: false
     routes:
       - match:
           prefix: "/api"
         route:
           cluster: "ats"
-          cors:
-            allow_origin_string_match:
-            - exact: "test-origin"
-            allow_methods: "test-methods"
-            allow_headers: "test-headers"
-            expose_headers: "test-expose-headers"
-            max_age: "test-max-age"
-            allow_credentials: true
-            allow_private_network_access: true
-            filter_enabled:
-              runtime_key: "cors.www.enabled"
-              default_value:
-                numerator: 0
-                denominator: "HUNDRED"
-            shadow_enabled:
-              runtime_key: "cors.www.shadow_enabled"
-              default_value:
-                numerator: 100
-                denominator: "HUNDRED"
 )EOF";
 
-  Runtime::MockSnapshot snapshot;
-  EXPECT_CALL(snapshot,
-              featureEnabled("cors.www.enabled",
-                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
-      .WillOnce(Return(false));
-  EXPECT_CALL(snapshot,
-              featureEnabled("cors.www.shadow_enabled",
-                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
-      .WillOnce(Return(true));
-  EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+  const Router::CorsPolicy* cors_policy =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
+          ->routeEntry()
+          ->virtualHost()
+          .corsPolicy();
+
+  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), false);
+}
+
+TEST_F(RoutePropertyTest, TestVHostCorsConfigEmptyPNA) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "default"
+    domains: ["*"]
+    cors:
+      allow_origin_string_match:
+      - safe_regex:
+          regex: .*\.envoyproxy\.io
+      allow_methods: "test-methods"
+      allow_headers: "test-headers"
+      expose_headers: "test-expose-headers"
+      max_age: "test-max-age"
+      allow_credentials: true
+    routes:
+      - match:
+          prefix: "/api"
+        route:
+          cluster: "ats"
+)EOF";
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
-
   const Router::CorsPolicy* cors_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
+          ->routeEntry()
+          ->virtualHost()
+          .corsPolicy();
 
-  EXPECT_EQ(cors_policy->enabled(), false);
-  EXPECT_EQ(cors_policy->shadowEnabled(), true);
-  EXPECT_EQ(1, cors_policy->allowOrigins().size());
-  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
-  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
-  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
-  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
-  EXPECT_EQ(cors_policy->allowCredentials(), true);
-  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), true);
+  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), false);
 }
 
 TEST_F(RouteMatcherTest, Decorator) {
