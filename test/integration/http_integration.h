@@ -38,9 +38,9 @@ public:
 
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
-                                                  uint64_t body_size);
+                                                  uint64_t body_size, bool end_stream = true);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
-                                                  const std::string& body);
+                                                  const std::string& body, bool end_stream = true);
   bool sawGoAway() const { return saw_goaway_; }
   bool connected() const { return connected_; }
   bool streamOpen() const { return !stream_gone_; }

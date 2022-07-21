@@ -46,7 +46,6 @@ public:
 
 template <class FilterCtx, class NeutralNamedHttpFilterFactory>
 class FilterChainHelper : Logger::Loggable<Logger::Id::config> {
-
 public:
   using FilterFactoriesList =
       std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
@@ -64,12 +63,13 @@ public:
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
 
   void processFilters(const FiltersList& filters, const std::string& prefix,
-                      const std::string& filter_chain_type, FilterFactoriesList& filter_factories) {
+                      const std::string& filter_chain_type, FilterFactoriesList& filter_factories,
+                      bool validate_last_filter = true) {
 
     DependencyManager dependency_manager;
     for (int i = 0; i < filters.size(); i++) {
       processFilter(filters[i], i, prefix, filter_chain_type, i == filters.size() - 1,
-                    filter_factories, dependency_manager);
+                    filter_factories, dependency_manager, validate_last_filter);
     }
     // TODO(auni53): Validate encode dependencies too.
     auto status = dependency_manager.validDecodeDependencies();
@@ -84,7 +84,7 @@ private:
                     proto_config,
                 int i, const std::string& prefix, const std::string& filter_chain_type,
                 bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
-                DependencyManager& dependency_manager) {
+                DependencyManager& dependency_manager, bool validate_last_filter) {
     ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
     if (proto_config.config_type_case() ==
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::
@@ -108,11 +108,13 @@ private:
         proto_config, factory_context_.messageValidationVisitor(), *factory);
     Http::FilterFactoryCb callback =
         factory->createFilterFactoryFromProto(*message, stats_prefix_, factory_context_);
-    dependency_manager.registerFilter(factory->name(), *factory->dependencies());
-    bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
-    Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
-                                             filter_chain_type, is_terminal,
-                                             last_filter_in_current_config);
+    if (!last_filter_in_current_config || validate_last_filter) {
+      dependency_manager.registerFilter(factory->name(), *factory->dependencies());
+      bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
+      Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
+                                               filter_chain_type, is_terminal,
+                                               last_filter_in_current_config);
+    }
     auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
         {factory->name(), callback}, proto_config.name());
     ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());

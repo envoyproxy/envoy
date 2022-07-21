@@ -94,7 +94,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   uint64_t streamId() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   Tracing::Span& activeSpan() override;
-  Tracing::Config& tracingConfig() override;
+  const Tracing::Config& tracingConfig() override;
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
@@ -381,9 +381,9 @@ public:
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
 
   /**
-   * Updates response code stats based on the details in the headers.
+   * Optionally updates response code stats based on the details in the headers.
    */
-  virtual void chargeStats(const ResponseHeaderMap& headers) PURE;
+  virtual void chargeStats(const ResponseHeaderMap& /*headers*/) {}
 
   // TODO(snowp): We should consider moving filter access to headers/trailers to happen via the
   // callbacks instead of via the encode/decode callbacks on the filters.
@@ -525,7 +525,7 @@ public:
   /**
    * Returns the tracing configuration to use for this stream.
    */
-  virtual Tracing::Config& tracingConfig() PURE;
+  virtual const Tracing::Config& tracingConfig() PURE;
 
   /**
    * Returns the tracked scope to use for this stream.

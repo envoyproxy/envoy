@@ -29,6 +29,10 @@
 using testing::NiceMock;
 
 namespace Envoy {
+namespace Http {
+class FilterChainManager;
+}
+
 namespace Upstream {
 
 class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
@@ -155,6 +159,7 @@ public:
               alternateProtocolsCacheOptions, (), (const));
   MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
+  MOCK_METHOD(void, createUpstreamFilterChain, (Http::FilterChainManager & manager), (const));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
               (const));
 

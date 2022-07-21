@@ -13,6 +13,7 @@ import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/core/v3/resolver.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -44,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 57]
+// [#next-free-field: 58]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -1126,6 +1127,10 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
+
+  // [#not-implemented-hide:]
+  // Optional HTTP filters for the upstream filter chain.
+  repeated envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter http_filters = 57;
 }
 
 // Extensible load balancing policy configuration.

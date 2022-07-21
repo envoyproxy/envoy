@@ -3490,6 +3490,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
 }
 
 // The router filter is responsible for not propagating 100-continue headers after the initial 100.
+// TODO(alyssawilk) remove coalescing with old code deprecation.
 TEST_F(RouterTest, Coalesce1xxHeaders) {
   // Setup.
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3525,8 +3526,9 @@ TEST_F(RouterTest, Coalesce1xxHeaders) {
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decode1xxHeaders(std::move(continue_headers));
   }
+  // With the filter manager coalescing, the router only sees 1 100.
   EXPECT_EQ(
-      2U,
+      1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
 
   // Reset stream and cleanup.
@@ -5831,7 +5833,9 @@ TEST_F(RouterTest, ConnectPauseAndResume) {
   EXPECT_CALL(encoder, encodeData(_, _));
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  response_decoder->decodeHeaders(std::move(response_headers), true);
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  // Now end the stream.
+  response_decoder->decodeData(data, true);
 }
 
 // Invalid upstream will fail over to generic in opt mode, but crash in debug mode.

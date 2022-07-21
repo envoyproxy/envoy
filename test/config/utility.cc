@@ -1167,20 +1167,32 @@ void ConfigHelper::addVirtualHost(const envoy::config::route::v3::VirtualHost& v
 
 void ConfigHelper::addFilter(const std::string& config) { prependFilter(config); }
 
-void ConfigHelper::prependFilter(const std::string& config) {
+void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
   RELEASE_ASSERT(!finalized_, "");
-  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-      hcm_config;
-  loadHttpConnectionManager(hcm_config);
+  if (downstream) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        hcm_config;
+    loadHttpConnectionManager(hcm_config);
 
-  auto* filter_list_back = hcm_config.add_http_filters();
-  TestUtility::loadFromYaml(config, *filter_list_back);
+    auto* filter_list_back = hcm_config.add_http_filters();
+    TestUtility::loadFromYaml(config, *filter_list_back);
 
-  // Now move it to the front.
-  for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
-    hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+    // Now move it to the front.
+    for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
+      hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+    }
+    storeHttpConnectionManager(hcm_config);
+    return;
   }
-  storeHttpConnectionManager(hcm_config);
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  for (int i = 0; i < static_resources->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+    auto* filter_list_back = cluster->add_http_filters();
+    TestUtility::loadFromYaml(config, *filter_list_back);
+    for (int i = cluster->http_filters_size() - 1; i > 0; --i) {
+      cluster->mutable_http_filters()->SwapElements(i, i - 1);
+    }
+  }
 }
 
 void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::

@@ -30,6 +30,10 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+namespace Http {
+class FilterChainManager;
+}
+
 namespace Upstream {
 
 /**
@@ -1018,6 +1022,8 @@ public:
    * Create network filters on a new upstream connection.
    */
   virtual void createNetworkFilterChain(Network::Connection& connection) const PURE;
+
+  virtual void createUpstreamFilterChain(Http::FilterChainManager& manager) const PURE;
 
   /**
    * Calculate upstream protocol(s) based on features.
