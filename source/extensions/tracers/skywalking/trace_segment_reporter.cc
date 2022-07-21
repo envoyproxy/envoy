@@ -17,7 +17,7 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 TraceSegmentReporter::TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory,
                                            Event::Dispatcher& dispatcher,
                                            Random::RandomGenerator& random_generator,
-                                           SkyWalkingTracerStatsPtr stats,
+                                           SkyWalkingTracerStatsSharedPtr stats,
                                            uint32_t delayed_buffer_size, const std::string& token)
     : tracing_stats_(stats), client_(factory->createUncachedRawAsyncClient()),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(

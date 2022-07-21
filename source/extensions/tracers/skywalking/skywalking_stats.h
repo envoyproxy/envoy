@@ -17,7 +17,7 @@ struct SkyWalkingTracerStats {
   SKYWALKING_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using SkyWalkingTracerStatsPtr = std::shared_ptr<SkyWalkingTracerStats>;
+using SkyWalkingTracerStatsSharedPtr = std::shared_ptr<SkyWalkingTracerStats>;
 
 } // namespace SkyWalking
 } // namespace Tracers

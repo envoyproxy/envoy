@@ -68,7 +68,7 @@ protected:
   NiceMock<Event::MockTimer>* timer_;
   Event::TimerCb timer_cb_;
   std::string test_string = "ABCDEFGHIJKLMN";
-  SkyWalkingTracerStatsPtr tracing_stats_{
+  SkyWalkingTracerStatsSharedPtr tracing_stats_{
       std::make_shared<SkyWalkingTracerStats>(SkyWalkingTracerStats{
           SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))})};
   TraceSegmentReporterPtr reporter_;
