@@ -222,6 +222,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings`` and legacy code paths.
+- area: listener
+  change: |
+    removed ``envoy.reloadable_features.internal_address`` and legacy code paths.
 - area: tcp_proxy
   change: |
     removed ``envoy.reloadable_features.new_tcp_connection_pool`` and legacy code paths.
