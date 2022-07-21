@@ -13,7 +13,7 @@ Lua filter
 In this example, we show how `Lua <https://www.lua.org/>`_ filter can be used with the Envoy
 proxy.
 
-The Envoy proxy configuration includes three Lua filters that contains two different functions:
+The Envoy proxy configuration includes three Lua filters that contain two different functions:
 
 - ``envoy_on_request(request_handle)``
 - ``envoy_on_response(response_handle)``
