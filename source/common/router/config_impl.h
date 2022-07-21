@@ -1012,9 +1012,7 @@ public:
                              ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override {
-    return url_pattern_;
-  }
+  const std::string& matcher() const override { return url_pattern_; }
 
   PathMatchType matchType() const override { return PathMatchType::Pattern; }
 
