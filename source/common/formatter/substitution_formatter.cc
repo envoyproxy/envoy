@@ -1694,7 +1694,7 @@ GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view f
   }
 
   if (format == "SNAKE_STRING") {
-    return GrpcStatusFormatter::Snake_String;
+    return GrpcStatusFormatter::SnakeString;
   }
   if (format == "NUMBER") {
     return GrpcStatusFormatter::Number;
@@ -1726,7 +1726,7 @@ GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
     }
     return grpc_status_message;
   }
-  case Snake_String: {
+  case SnakeString: {
     const auto grpc_status_message =
         absl::StatusCodeToString(static_cast<absl::StatusCode>(grpc_status.value()));
     if (grpc_status_message == EMPTY_STRING) {
@@ -1762,7 +1762,7 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
     }
     return ValueUtil::stringValue(grpc_status_message);
   }
-  case Snake_String: {
+  case SnakeString: {
     const auto grpc_status_message =
         absl::StatusCodeToString(static_cast<absl::StatusCode>(grpc_status.value()));
     if (grpc_status_message == EMPTY_STRING) {

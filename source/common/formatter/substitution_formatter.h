@@ -398,7 +398,7 @@ class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
 public:
   enum Format {
     CamelString,
-    Snake_String,
+    SnakeString,
     Number,
   };
 

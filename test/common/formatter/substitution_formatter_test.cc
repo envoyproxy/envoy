@@ -2404,7 +2404,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
 
 TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
-                                GrpcStatusFormatter::Format::Snake_String);
+                                GrpcStatusFormatter::Format::SnakeString);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
