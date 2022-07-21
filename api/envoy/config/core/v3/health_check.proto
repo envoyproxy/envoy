@@ -85,6 +85,17 @@ message HealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
 
+    enum Method {
+      GET = 0;
+      HEAD = 1;
+      POST = 2;
+      PUT = 3;
+      DELETE = 4;
+      OPTIONS = 5;
+      TRACE = 6;
+      PATCH = 7;
+    }
+
     reserved 5, 7;
 
     reserved "service_name", "use_http2";
@@ -145,17 +156,6 @@ message HealthCheck {
     // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`. See the :ref:`architecture overview
     // <arch_overview_health_checking_identity>` for more information.
     type.matcher.v3.StringMatcher service_name_matcher = 11;
-
-    enum Method {
-      GET = 0;
-      HEAD = 1;
-      POST = 2;
-      PUT = 3;
-      DELETE = 4;
-      OPTIONS = 5;
-      TRACE = 6;
-      PATCH = 7;
-    }
 
     // HTTP Method that will be used for health checking, default is "GET"
     // GET, HEAD, POST, PUT, DELETE, OPTIONS, TRACE, PATCH methods are supported, but making request body is not supported.
