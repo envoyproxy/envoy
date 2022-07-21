@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/extensions/pattern_template/match/v3/pattern_template_match.pb.h"
-#include "envoy/router/pattern_template.h"
+#include "envoy/router/path_match_policy.h"
 
 #include "source/extensions/pattern_template/pattern_template.h"
 
@@ -16,7 +16,7 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Match {
 
-class PatternTemplateMatchPredicate : public Router::PatternTemplateMatchPredicate {
+class PatternTemplateMatchPredicate : public Router::PathMatchPredicate {
 public:
     explicit PatternTemplateMatchPredicate(std::string url_pattern)
       : matching_pattern_regex_(RE2(convertURLPatternSyntaxToRegex(url_pattern).value())) {}

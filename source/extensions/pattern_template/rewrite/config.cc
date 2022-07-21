@@ -1,7 +1,7 @@
 #include "source/extensions/pattern_template/rewrite/config.h"
 
 #include "envoy/registry/registry.h"
-#include "envoy/router/pattern_template.h"
+#include "envoy/router/path_rewrite_policy.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,7 +9,7 @@ namespace PatternTemplate {
 namespace Rewrite {
 
 REGISTER_FACTORY(PatternTemplateRewritePredicateFactory,
-                 Router::PatternTemplateRewritePredicateFactory);
+                 Router::PathRewritePredicateFactory);
 } // namespace Rewrite
 } // namespace PatternTemplate
 } // namespace Extensions

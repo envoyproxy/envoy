@@ -24,7 +24,7 @@ envoy_cc_library(
     ],
     deps = [
         ":pattern_template_internal_cc",
-        "//envoy/router:router_pattern_template_interface",
+        "//envoy/router:router_path_match_policy_interface",
         "//source/common/http:path_utility_lib",
         "//source/extensions/pattern_template/proto:pattern_template_rewrite_segements_cc_proto",
         "@com_google_absl//absl/status",

@@ -46,6 +46,8 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/router:router_interface",
+        "//envoy/router:router_path_match_policy_interface",
+        "//envoy/router:router_path_rewrite_policy_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:filter_config_interface",  # TODO(rodaine): break dependency on server
         "//envoy/upstream:cluster_manager_interface",

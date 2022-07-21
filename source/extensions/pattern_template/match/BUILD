@@ -20,7 +20,7 @@ envoy_cc_library(
         "//source/common/router:__subpackages__",
     ],
     deps = [
-        "//envoy/router:router_pattern_template_interface",
+        "//envoy/router:router_path_match_policy_interface",
         "//source/extensions/pattern_template:pattern_template_lib",
         "@envoy_api//envoy/extensions/pattern_template/match/v3:pkg_cc_proto",
     ],
@@ -34,7 +34,7 @@ envoy_cc_extension(
     deps = [
         ":pattern_template_match_lib",
         "//envoy/registry",
-        "//envoy/router:router_pattern_template_interface",
+        "//envoy/router:router_path_match_policy_interface",
         "//source/extensions/pattern_template:pattern_template_lib",
         "@envoy_api//envoy/extensions/pattern_template/match/v3:pkg_cc_proto",
     ],

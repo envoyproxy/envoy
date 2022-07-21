@@ -5,7 +5,7 @@
 
 #include "source/extensions/pattern_template/proto/pattern_template_rewrite_segments.pb.h"
 
-#include "envoy/router/pattern_template.h"
+#include "envoy/router/path_match_policy.h"
 
 #include "source/extensions/pattern_template/pattern_template_internal.h"
 

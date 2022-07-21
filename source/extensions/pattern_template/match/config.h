@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/pattern_template/match/v3/pattern_template_match.pb.h"
-#include "envoy/router/pattern_template.h"
+#include "envoy/router/path_match_policy.h"
 
 #include "source/extensions/pattern_template/match/pattern_template_match.h"
 
@@ -10,10 +10,10 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Match {
 
-class PatternTemplateMatchPredicateFactory : public Router::PatternTemplateMatchPredicateFactory {
+class PatternTemplateMatchPredicateFactory : public Router::PathMatchPredicateFactory {
 public:
-  Router::PatternTemplateMatchPredicateSharedPtr
-  createUrlTemplateMatchPredicate(std::string url_pattern) override {
+  Router::PathMatchPredicateSharedPtr
+  createPathMatchPredicate(std::string url_pattern) override {
     return std::make_shared<PatternTemplateMatchPredicate>(url_pattern);
   }
 

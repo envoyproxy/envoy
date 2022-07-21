@@ -27,6 +27,8 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/router/config_utility.h"
+#include "source/common/router/path_match_policy.h"
+#include "source/common/router/path_rewrite_policy.h"
 #include "source/common/router/header_formatter.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"

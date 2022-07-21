@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "envoy/router/pattern_template.h"
+#include "envoy/router/path_rewrite_policy.h"
 
 #include "source/extensions/pattern_template/pattern_template.h"
 
@@ -15,7 +15,7 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Rewrite {
 
-class PatternTemplateRewritePredicate : public Router::PatternTemplateRewritePredicate {
+class PatternTemplateRewritePredicate : public Router::PathRewritePredicate {
 public:
   explicit PatternTemplateRewritePredicate(std::string url_pattern, std::string url_rewrite_pattern)
       : matching_pattern_regex_(RE2(convertURLPatternSyntaxToRegex(url_pattern).value())),

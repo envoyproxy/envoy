@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/pattern_template/rewrite/v3/pattern_template_rewrite.pb.h"
-#include "envoy/router/pattern_template.h"
+#include "envoy/router/path_rewrite_policy.h"
 
 #include "source/extensions/pattern_template/rewrite/pattern_template_rewrite.h"
 
@@ -10,10 +10,10 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Rewrite {
 
-class PatternTemplateRewritePredicateFactory : public Router::PatternTemplateRewritePredicateFactory {
+class PatternTemplateRewritePredicateFactory : public Router::PathRewritePredicateFactory {
 public:
-  Router::PatternTemplateRewritePredicateSharedPtr
-  createUrlTemplateRewritePredicate(std::string url_pattern, std::string url_rewrite_pattern) override {
+  Router::PathRewritePredicateSharedPtr
+  createPathRewritePredicate(std::string url_pattern, std::string url_rewrite_pattern) override {
     return std::make_shared<PatternTemplateRewritePredicate>(url_pattern, url_rewrite_pattern);
   }
 

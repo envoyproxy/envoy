@@ -298,9 +298,9 @@ public:
  */
 enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
 
-class PathMatchPolicyImpl {
+class PathMatchPolicy {
 public:
-  virtual ~PathMatchPolicyImpl() = default;
+  virtual ~PathMatchPolicy() = default;
 
   /**
    * @return whether internal redirect is enabled on this route.
