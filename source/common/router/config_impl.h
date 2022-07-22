@@ -617,7 +617,7 @@ public:
     return internal_redirect_policy_;
   }
   const PathMatchPolicyImpl& pathMatchPolicy() const override {
-    return pattern_template_match_policy_;
+    return path_match_policy_;
   }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
@@ -983,7 +983,12 @@ private:
                               absl::string_view current_route_name) const;
 
   PathMatchPolicyImpl
-  buildPathMatchPolicy(std::string path_template, std::string path_template_rewrite) const;
+  buildPathMatchPolicy(envoy::config::route::v3::Route route,
+                                         ProtobufMessage::ValidationVisitor& validator) const;
+
+  PathMatchPolicyImpl
+  buildPathRewritePolicy(envoy::config::route::v3::RouteAction route_action,
+                                         ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
                                                   const Http::HeaderMap& headers) const;
