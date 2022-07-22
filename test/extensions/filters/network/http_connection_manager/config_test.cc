@@ -179,6 +179,7 @@ http_filters:
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
+  EXPECT_FALSE(config.streamErrorOnInvalidHttpMessaging());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, Http3Configured) {
