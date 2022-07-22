@@ -595,8 +595,8 @@ Http::ServerConnectionPtr
 HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          const Buffer::Instance& data,
                                          Http::ServerConnectionCallbacks& callbacks) {
-  switch (codec_type_)
-  case CodecType::HTTP1: {
+  switch (codec_type_) {
+  case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
@@ -623,7 +623,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) {
