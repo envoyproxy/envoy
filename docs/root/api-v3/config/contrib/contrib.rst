@@ -13,3 +13,4 @@ Contrib Extensions
   hyperscan/regex_engine
   dlb/dlb
   qat/qat
+  sgx/sgx

@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.extensions.private_key_providers.sgx.v3alpha;
+
+import "envoy/config/core/v3/config_source.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.private_key_providers.sgx.v3";
+option java_outer_classname = "SgxProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/private_key_providers/sgx/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: SGX private key provider]
+// [#extension: envoy.tls.key_providers.sgx]
+
+message SgxPrivateKeyMethodConfig {
+  // Path to the ctk library file.
+  string sgx_library = 1;
+
+  // Label of the key.
+  string key_label = 2;
+
+  // User PIN.
+  string usr_pin = 3;
+
+  // Security Officer user Pin.
+  string so_pin = 4;
+
+  // Label of the token.
+  string token_label = 5;
+
+  // Type of the key pair in SGX enclave, `rsa` or `ecdsa`.
+  string key_type = 6;
+}
