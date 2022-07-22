@@ -37,15 +37,15 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
   }
 
   auto parse_type = [](absl::string_view str, StatsType& type) {
-    if (str == Labels::Gauges) {
+    if (str == StatLabels::Gauges) {
       type = StatsType::Gauges;
-    } else if (str == Labels::Counters) {
+    } else if (str == StatLabels::Counters) {
       type = StatsType::Counters;
-    } else if (str == Labels::Histograms) {
+    } else if (str == StatLabels::Histograms) {
       type = StatsType::Histograms;
-    } else if (str == Labels::TextReadouts) {
+    } else if (str == StatLabels::TextReadouts) {
       type = StatsType::TextReadouts;
-    } else if (str == Labels::All) {
+    } else if (str == StatLabels::All) {
       type = StatsType::All;
     } else {
       return false;
@@ -87,19 +87,19 @@ absl::string_view StatsParams::typeToString(StatsType type) {
   absl::string_view ret;
   switch (type) {
   case StatsType::TextReadouts:
-    ret = Labels::TextReadouts;
+    ret = StatLabels::TextReadouts;
     break;
   case StatsType::Counters:
-    ret = Labels::Counters;
+    ret = StatLabels::Counters;
     break;
   case StatsType::Gauges:
-    ret = Labels::Gauges;
+    ret = StatLabels::Gauges;
     break;
   case StatsType::Histograms:
-    ret = Labels::Histograms;
+    ret = StatLabels::Histograms;
     break;
   case StatsType::All:
-    ret = Labels::All;
+    ret = StatLabels::All;
     break;
   }
   return ret;

@@ -116,7 +116,7 @@ void StatsHtmlRender::urlHandler(Buffer::Instance& response, const Admin::UrlHan
   path = sanitized_path;
 
   // Alternate gray and white param-blocks. The pure CSS way of coloring based
-  // on row index doesn't work correctly for us we are using a row for each
+  // on row index doesn't work correctly for us as we are using a row for each
   // parameter, and we want each endpoint/option-block to be colored the same.
   const char* row_class = (++index_ & 1) ? " class='gray'" : "";
 
@@ -174,27 +174,29 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
     on_change = absl::StrCat(" onchange='", path, ".submit()'");
   }
 
-  auto value_tag = [](const std::string& value) -> std::string {
-    return value.empty() ? "" : absl::StrCat(" value=", Html::Utility::sanitize(value));
-  };
-
   switch (type) {
   case Admin::ParamDescriptor::Type::Boolean:
     response.addFragments({"<input type='checkbox' name='", name, "' id='", id, "' form='", path,
                            "'", on_change, value.empty() ? ">" : " checked/>"});
     break;
-  case Admin::ParamDescriptor::Type::String:
+  case Admin::ParamDescriptor::Type::String: {
+    std::string sanitized;
+    if (!value.empty()) {
+      sanitized = absl::StrCat(" value=", Html::Utility::sanitize(value));
+    }
     response.addFragments({"<input type='text' name='", name, "' id='", id, "' form='", path, "'",
-                           on_change, value_tag(value), " />"});
+                           on_change, sanitized, " />"});
     break;
+  }
   case Admin::ParamDescriptor::Type::Enum:
     response.addFragments(
         {"\n    <select name='", name, "' id='", id, "' form='", path, "'", on_change, ">\n"});
     for (absl::string_view choice : enum_choices) {
-      std::string sanitized = Html::Utility::sanitize(choice);
-      absl::string_view selected = (value == sanitized) ? " selected" : "";
-      response.addFragments(
-          {"      <option value='", sanitized, "'", selected, ">", sanitized, "</option>\n"});
+      std::string sanitized_choice = Html::Utility::sanitize(choice);
+      std::string sanitized_value = Html::Utility::sanitize(value);
+      absl::string_view selected = (sanitized_value == sanitized_choice) ? " selected" : "";
+      response.addFragments({"      <option value='", sanitized_choice, "'", selected, ">",
+                             sanitized_choice, "</option>\n"});
     }
     response.add("    </select>\n  ");
     break;

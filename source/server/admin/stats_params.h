@@ -14,13 +14,13 @@
 namespace Envoy {
 namespace Server {
 
-namespace Labels {
+namespace StatLabels {
 constexpr absl::string_view All = "All";
 constexpr absl::string_view Counters = "Counters";
 constexpr absl::string_view Gauges = "Gauges";
 constexpr absl::string_view Histograms = "Histograms";
 constexpr absl::string_view TextReadouts = "TextReadouts";
-} // namespace Labels
+} // namespace StatLabels
 
 enum class StatsFormat {
 #ifdef ENVOY_ADMIN_HTML
@@ -55,7 +55,6 @@ struct StatsParams {
   static absl::string_view typeToString(StatsType type);
 
   StatsType type_{StatsType::All};
-  StatsType start_type_{StatsType::TextReadouts};
   bool used_only_{false};
   bool prometheus_text_readouts_{false};
   bool pretty_{false};
