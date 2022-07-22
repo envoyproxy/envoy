@@ -241,7 +241,7 @@ TEST_P(SslIntegrationTest, Http1StreamInfoDownstreamHandshakeTiming) {
 }
 
 TEST_P(SslIntegrationTest, Http2StreamInfoDownstreamHandshakeTiming) {
-  // See MultiplexedIntegrationtest for equivalent test for HTTP/3.
+  // See MultiplexedIntegrationTest for equivalent test for HTTP/3.
   setDownstreamProtocol(Http::CodecType::HTTP2);
   config_helper_.prependFilter(fmt::format(R"EOF(
   name: stream-info-to-headers-filter
