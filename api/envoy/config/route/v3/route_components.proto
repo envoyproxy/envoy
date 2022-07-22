@@ -1021,7 +1021,7 @@ message RouteAction {
   //
   // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
   // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`
-  // or ``prefix_rewrite`` may be specified.
+  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>` may be specified.
   //
   // .. attention::
   //
@@ -1056,7 +1056,7 @@ message RouteAction {
   // before the rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
-  // Only one of ``regex_rewrite``, :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
+  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`, :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
   // or :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`
   // may be specified.
   //
