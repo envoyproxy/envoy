@@ -133,7 +133,7 @@ BIO* BIO_new_io_handle(Envoy::Network::IoHandle* io_handle) {
   RELEASE_ASSERT(b != nullptr, "");
 
   // Initialize the BIO
-  b->num = -1;
+  b->num = io_handle->fdDoNotUse();
   b->ptr = io_handle;
   b->shutdown = 0;
   b->init = 1;
