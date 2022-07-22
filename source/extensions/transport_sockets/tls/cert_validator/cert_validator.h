@@ -1,7 +1,5 @@
 #pragma once
 
-#include <openssl/rsa.h>
-
 #include <array>
 #include <deque>
 #include <functional>

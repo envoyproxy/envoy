@@ -253,7 +253,7 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
   if (!verify_san_list.empty()) {
     if (!verifySubjectAltName(cert, verify_san_list)) {
-      std::string error("verify cert failed: verify SAN list");
+      const char* error = "verify cert failed: verify SAN list";
       if (error_details != nullptr) {
         *error_details = error;
       }
@@ -266,7 +266,7 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
 
   if (!subject_alt_name_matchers.empty()) {
     if (!matchSubjectAltName(cert, subject_alt_name_matchers)) {
-      std::string error("verify cert failed: SAN matcher");
+      const char* error = "verify cert failed: SAN matcher";
       if (error_details != nullptr) {
         *error_details = error;
       }
@@ -289,7 +289,7 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
       if (out_alert != nullptr) {
         *out_alert = SSL_AD_BAD_CERTIFICATE_HASH_VALUE;
       }
-      std::string error("verify cert failed: cert hash and spki");
+      const char* error = "verify cert failed: cert hash and spki";
       if (error_details != nullptr) {
         *error_details = error;
       }
@@ -315,7 +315,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
           Envoy::Ssl::ClientValidationStatus::NotValidated);
     }
     stats_.fail_verify_error_.inc();
-    std::string error = "verify cert failed: empty cert chain";
+    const char* error = "verify cert failed: empty cert chain";
     ENVOY_LOG(debug, error);
     return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
   }
@@ -334,7 +334,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
         !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(ctx.get()),
                                 SSL_CTX_get0_param(&ssl_ctx))) {
       OPENSSL_PUT_ERROR(SSL, ERR_R_X509_LIB);
-      const std::string error = "verify cert failed: init and setup X509_STORE_CTX";
+      const char* error = "verify cert failed: init and setup X509_STORE_CTX";
       onVerifyError(ssl_extended_info, error);
       return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
     }
