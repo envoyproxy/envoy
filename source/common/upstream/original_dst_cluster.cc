@@ -49,7 +49,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
             it->second); // takes a reference in case main deletes the address
         HostSharedPtr host(hosts->hosts_.front());
         ENVOY_LOG(trace, "Using existing host {}.", host->address()->asString());
-        hosts->used_ = true; // Mark as used (TODO: will this leak if main concurrenty deleted it?)
+        hosts->used_ = true; // Mark as used
         return host;
       }
       // Add a new host
@@ -169,6 +169,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
     ENVOY_LOG(debug, "addHost() adding {}", host->address()->asString());
   }
   it->second->hosts_.push_back(host);
+  it->second->used_ = true; // Ensure that it is not immediately drained before stream is established.
   setHostMap(new_host_map);
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
@@ -183,7 +184,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
 void OriginalDstCluster::cleanup() {
   HostVectorSharedPtr keeping_hosts(new HostVector);
   HostVector to_be_removed;
-  // ENVOY_LOG(trace, "Stale original dst hosts cleanup triggered.");
+  ENVOY_LOG(trace, "Stale original dst hosts cleanup triggered.");
   auto host_map = getCurrentHostMap();
   if (!host_map->empty()) {
     ENVOY_LOG(trace, "Cleaning up stale original dst hosts.");
