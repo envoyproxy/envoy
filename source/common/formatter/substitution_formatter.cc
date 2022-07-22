@@ -1685,11 +1685,7 @@ HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_head
 }
 
 GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
-  if (format.empty()) {
-    return GrpcStatusFormatter::CamelString;
-  }
-
-  if (format == "CAMEL_STRING") {
+  if (format.empty() || format == "CAMEL_STRING") {
     return GrpcStatusFormatter::CamelString;
   }
 
