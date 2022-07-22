@@ -84,8 +84,6 @@ void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resou
   validateUpdateSize(resources.size());
   const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
       resources[0].get().resource());
-  // TODO(abeyad): remove
-  ENVOY_LOG_MISC(info, "==> AAB secret={}", secret.DebugString());
 
   if (secret.name() != sds_config_name_) {
     throw EnvoyException(

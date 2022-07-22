@@ -1959,3 +1959,39 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "xds_cached_config_integration_test",
+    srcs = [
+        "xds_cached_config_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    external_deps = ["abseil_time"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
+        "//source/common/network:utility_lib",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/extensions/transport_sockets/tls:test_private_key_method_provider_test_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/test_common:resources_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
+    ],
+)
+

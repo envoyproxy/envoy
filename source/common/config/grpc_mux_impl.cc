@@ -79,12 +79,12 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
     return;
   }
 
-  // if (first_stream_request_) {
+  if (first_stream_request_) {
     // On the initialization of the gRPC mux, load the persisted config, if available.  If the xDS
     // server cannot be reached, the locally persisted config will be used until connectivity is
     // established with the xDS server.
     loadCachedConfig(type_url);
-  // }
+  }
 
   ApiState& api_state = apiStateFor(type_url);
   auto& request = api_state.request_;
@@ -134,7 +134,6 @@ void GrpcMuxImpl::loadCachedConfig(absl::string_view type_url) {
     std::vector<DecodedResourceRef> all_resource_refs;
     OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
     for (const auto& resource : resources) {
-      ENVOY_LOG(info, "==> AAB loaded config resource={}", resource.DebugString());
       auto decoded_resource = std::make_unique<DecodedResourceImpl>(resource_decoder, resource);
 
       if (decoded_resource->ttl()) {
