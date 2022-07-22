@@ -85,17 +85,6 @@ message HealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
 
-    enum Method {
-      GET = 0;
-      HEAD = 1;
-      POST = 2;
-      PUT = 3;
-      DELETE = 4;
-      OPTIONS = 5;
-      TRACE = 6;
-      PATCH = 7;
-    }
-
     reserved 5, 7;
 
     reserved "service_name", "use_http2";
@@ -159,9 +148,9 @@ message HealthCheck {
 
     // HTTP Method that will be used for health checking, default is "GET"
     // GET, HEAD, POST, PUT, DELETE, OPTIONS, TRACE, PATCH methods are supported, but making request body is not supported.
-    // If method which successful response code is not 200 is used, :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
-    // field have to be set to an appropriate range.
-    Method method = 13 [(validate.rules).enum = {defined_only: true}];
+    // CONNECT method is disallowed because it is not appropriate for health check request.
+    // If a non-200 response is expected by the method, it needs to be set in :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
+    RequestMethod method = 13 [(validate.rules).enum = {defined_only: true not_in: 6}];
   }
 
   message TcpHealthCheck {
