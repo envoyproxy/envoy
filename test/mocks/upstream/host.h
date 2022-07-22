@@ -196,8 +196,6 @@ public:
   MOCK_METHOD(LoadMetricStats&, loadMetricStats, (), (const));
   MOCK_METHOD(uint32_t, weight, (), (const));
   MOCK_METHOD(void, weight, (uint32_t new_weight));
-  MOCK_METHOD(bool, used, (), (const));
-  MOCK_METHOD(void, used, (bool new_used));
   MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));

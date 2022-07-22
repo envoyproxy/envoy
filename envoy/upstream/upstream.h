@@ -178,16 +178,6 @@ public:
    * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */
   virtual void weight(uint32_t new_weight) PURE;
-
-  /**
-   * @return the current boolean value of host being in use.
-   */
-  virtual bool used() const PURE;
-
-  /**
-   * @param new_used supplies the new value of host being in use to be stored.
-   */
-  virtual void used(bool new_used) PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;

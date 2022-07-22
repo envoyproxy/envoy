@@ -230,8 +230,7 @@ public:
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
            TimeSource& time_source)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
-                            priority, time_source),
-        used_(true) {
+                            priority, time_source) {
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);
   }
@@ -285,8 +284,6 @@ public:
 
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
-  bool used() const override { return used_; }
-  void used(bool new_used) override { used_ = new_used; }
 
 protected:
   static CreateConnectionData
@@ -303,7 +300,6 @@ private:
 
   std::atomic<uint32_t> health_flags_{};
   std::atomic<uint32_t> weight_;
-  std::atomic<bool> used_;
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {

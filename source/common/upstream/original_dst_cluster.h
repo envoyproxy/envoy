@@ -18,8 +18,18 @@
 namespace Envoy {
 namespace Upstream {
 
-using HostMapSharedPtr = std::shared_ptr<HostMap>;
-using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
+// Container for synthetic hosts produced by workers. Because each worker binds
+// the connection pool to the pointer value of a host, there may be multiple
+// Host structs for the same address.
+struct SyntheticHosts {
+  std::list<Upstream::HostSharedPtr> hosts_;
+  std::atomic<bool> used_{true};
+};
+
+using SyntheticHostsSharedPtr = std::shared_ptr<SyntheticHosts>;
+using HostMultiMap = absl::flat_hash_map<std::string, SyntheticHostsSharedPtr>;
+using HostMultiMapSharedPtr = std::shared_ptr<HostMultiMap>;
+using HostMultiMapConstSharedPtr = std::shared_ptr<const HostMultiMap>;
 
 /**
  * The OriginalDstCluster is a dynamic cluster that automatically adds hosts as needed based on the
@@ -77,7 +87,7 @@ public:
     const std::shared_ptr<OriginalDstCluster> parent_;
     // The optional original host provider that extracts the address from HTTP header map.
     const absl::optional<Http::LowerCaseString>& http_header_name_;
-    HostMapConstSharedPtr host_map_;
+    HostMultiMapConstSharedPtr host_map_;
   };
 
   const absl::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
@@ -105,12 +115,12 @@ private:
     const std::shared_ptr<OriginalDstCluster> cluster_;
   };
 
-  HostMapConstSharedPtr getCurrentHostMap() {
+  HostMultiMapConstSharedPtr getCurrentHostMap() {
     absl::ReaderMutexLock lock(&host_map_lock_);
     return host_map_;
   }
 
-  void setHostMap(const HostMapConstSharedPtr& new_host_map) {
+  void setHostMap(const HostMultiMapConstSharedPtr& new_host_map) {
     absl::WriterMutexLock lock(&host_map_lock_);
     host_map_ = new_host_map;
   }
@@ -126,7 +136,7 @@ private:
   Event::TimerPtr cleanup_timer_;
 
   absl::Mutex host_map_lock_;
-  HostMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
+  HostMultiMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
   absl::optional<Http::LowerCaseString> http_header_name_;
   friend class OriginalDstClusterFactory;
 };

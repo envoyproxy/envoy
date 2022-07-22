@@ -45,9 +45,11 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
       // Check if a host with the destination address is already in the host set.
       auto it = host_map_->find(dst_addr.asString());
       if (it != host_map_->end()) {
-        HostSharedPtr host(it->second); // takes a reference
-        ENVOY_LOG(debug, "Using existing host {}.", host->address()->asString());
-        host->used(true); // Mark as used.
+        SyntheticHostsSharedPtr hosts(
+            it->second); // takes a reference in case main deletes the address
+        HostSharedPtr host(hosts->hosts_.front());
+        ENVOY_LOG(trace, "Using existing host {}.", host->address()->asString());
+        hosts->used_ = true; // Mark as used (TODO: will this leak if main concurrenty deleted it?)
         return host;
       }
       // Add a new host
@@ -138,7 +140,7 @@ OriginalDstCluster::OriginalDstCluster(
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })),
-      host_map_(std::make_shared<HostMap>()) {
+      host_map_(std::make_shared<HostMultiMap>()) {
   if (const auto& config_opt = info_->lbOriginalDstConfig(); config_opt.has_value()) {
     if (config_opt->use_http_header()) {
       http_header_name_ = config_opt->http_header_name().empty()
@@ -160,46 +162,48 @@ OriginalDstCluster::OriginalDstCluster(
 }
 
 void OriginalDstCluster::addHost(HostSharedPtr& host) {
-  HostMapSharedPtr new_host_map = std::make_shared<HostMap>(*getCurrentHostMap());
-  auto pair = new_host_map->emplace(host->address()->asString(), host);
-  bool added = pair.second;
+  HostMultiMapSharedPtr new_host_map = std::make_shared<HostMultiMap>(*getCurrentHostMap());
+  auto [it, added] =
+      new_host_map->emplace(host->address()->asString(), std::make_shared<SyntheticHosts>());
   if (added) {
     ENVOY_LOG(debug, "addHost() adding {}", host->address()->asString());
-    setHostMap(new_host_map);
-    // Given the current config, only EDS clusters support multiple priorities.
-    ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-    const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-    HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
-    all_hosts->emplace_back(host);
-    priority_set_.updateHosts(0,
-                              HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
-                              {}, {std::move(host)}, {}, absl::nullopt);
   }
+  it->second->hosts_.push_back(host);
+  setHostMap(new_host_map);
+  // Given the current config, only EDS clusters support multiple priorities.
+  ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
+  const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
+  HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
+  all_hosts->emplace_back(host);
+  priority_set_.updateHosts(0,
+                            HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
+                            {}, {std::move(host)}, {}, absl::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {
   HostVectorSharedPtr keeping_hosts(new HostVector);
   HostVector to_be_removed;
-  ENVOY_LOG(trace, "Stale original dst hosts cleanup triggered.");
+  // ENVOY_LOG(trace, "Stale original dst hosts cleanup triggered.");
   auto host_map = getCurrentHostMap();
   if (!host_map->empty()) {
     ENVOY_LOG(trace, "Cleaning up stale original dst hosts.");
     for (const auto& pair : *host_map) {
       const std::string& addr = pair.first;
-      const HostSharedPtr& host = pair.second;
-      if (host->used()) {
+      if (pair.second->used_) {
         ENVOY_LOG(trace, "Keeping active host {}.", addr);
-        keeping_hosts->emplace_back(host);
-        host->used(false); // Mark to be removed during the next round.
+        keeping_hosts->insert(keeping_hosts->end(), pair.second->hosts_.begin(),
+                              pair.second->hosts_.end());
+        pair.second->used_ = false; // Mark to be removed during the next round.
       } else {
         ENVOY_LOG(trace, "Removing stale host {}.", addr);
-        to_be_removed.emplace_back(host);
+        to_be_removed.insert(to_be_removed.end(), pair.second->hosts_.begin(),
+                             pair.second->hosts_.end());
       }
     }
   }
 
   if (!to_be_removed.empty()) {
-    HostMapSharedPtr new_host_map = std::make_shared<HostMap>(*host_map);
+    HostMultiMapSharedPtr new_host_map = std::make_shared<HostMultiMap>(*host_map);
     for (const HostSharedPtr& host : to_be_removed) {
       new_host_map->erase(host->address()->asString());
     }
