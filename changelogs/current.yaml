@@ -24,14 +24,14 @@ removed_config_or_runtime:
     removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
 
 new_features:
+- area: dns_resolver
+  change: |
+    added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
 - area: header_formatters
   change: |
     all access log formatters can be used as custom request/response headers. Custom header's syntax is parsed using access logger's parser and
     header values are obtained using access log's substitution formatters. This feature can be reversed by setting runtime guard
     ``envoy.reloadable_features.unified_header_formatter`` to false.
-- area: dns_resolver
-  change: |
-    added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
