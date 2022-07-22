@@ -503,6 +503,11 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   concurrency_ = 1;
   const Http::TestResponseHeaderMapImpl too_early_response_headers{{":status", "425"}};
 
+  // Add filter to check for streamInfo items in response headers.
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -513,6 +518,8 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response1->waitForEndStream());
+  ASSERT_FALSE(
+      response1->headers().get(Http::LowerCaseString("downstream_handshake_complete")).empty());
   // Close the first connection.
   codec_client_->close();
 
@@ -525,6 +532,8 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
+  ASSERT_FALSE(
+      response2->headers().get(Http::LowerCaseString("downstream_handshake_complete")).empty());
   // Ensure 0-RTT was used by second connection.
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());

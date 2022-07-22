@@ -31,6 +31,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:ssl_handshaker_lib",
         "//test/extensions/common/tap:common",
         "//test/integration:http_integration_lib",
+        "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
