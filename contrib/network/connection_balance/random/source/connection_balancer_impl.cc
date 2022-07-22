@@ -2,6 +2,8 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace Network {
+namespace ConnectioBalacnce {
 namespace Random {
 
 void RandomConnectionBalancerImpl::registerHandler(
@@ -21,5 +23,7 @@ RandomConnectionBalancerImpl::pickTargetHandler(Envoy::Network::BalancedConnecti
 }
 
 } // namespace Random
+} // namespace ConnectioBalacnce
+} // namespace Network
 } // namespace Extensions
 } // namespace Envoy

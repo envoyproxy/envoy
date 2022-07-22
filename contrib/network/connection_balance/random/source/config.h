@@ -7,6 +7,8 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace Network {
+namespace ConnectioBalacnce {
 namespace Random {
 
 class RandomConnectionBalanceFactory : public Envoy::Network::ConnectionBalanceFactory {
@@ -21,5 +23,7 @@ public:
 };
 
 } // namespace Random
+} // namespace ConnectioBalacnce
+} // namespace Network
 } // namespace Extensions
 } // namespace Envoy

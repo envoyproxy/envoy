@@ -15,7 +15,7 @@ Example configuration
 
 An example for Dlb connection balancer configuration is:
 
-.. literalinclude:: _include/dlb.yaml
+.. literalinclude:: _include/random.yaml
     :language: yaml
 
 

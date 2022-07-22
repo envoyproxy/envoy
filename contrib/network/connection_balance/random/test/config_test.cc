@@ -8,6 +8,8 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace Network {
+namespace ConnectioBalacnce {
 namespace Random {
 
 class ConfigTest : public testing::Test {
@@ -30,5 +32,7 @@ TEST_F(ConfigTest, CreateConnectionBalancerFromProto) {
 }
 
 } // namespace Random
+} // namespace ConnectioBalacnce
+} // namespace Network
 } // namespace Extensions
 } // namespace Envoy

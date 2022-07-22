@@ -7,6 +7,8 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace Network {
+namespace ConnectioBalacnce {
 namespace Random {
 
 ProtobufTypes::MessagePtr RandomConnectionBalanceFactory::createEmptyConfigProto() {
@@ -23,5 +25,7 @@ RandomConnectionBalanceFactory::createConnectionBalancerFromProto(
 REGISTER_FACTORY(RandomConnectionBalanceFactory, Envoy::Network::ConnectionBalanceFactory);
 
 } // namespace Random
+} // namespace ConnectioBalacnce
+} // namespace Network
 } // namespace Extensions
 } // namespace Envoy

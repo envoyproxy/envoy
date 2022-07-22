@@ -32,5 +32,7 @@ private:
 };
 
 } // namespace Random
+} // namespace ConnectioBalacnce
+} // namespace Network
 } // namespace Extensions
 } // namespace Envoy
