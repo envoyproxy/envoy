@@ -449,7 +449,6 @@ void UpstreamRequest::onPoolReady(
   }
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
-  parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
   if (info.upstreamInfo()) {
     auto& upstream_timing = info.upstreamInfo()->upstreamTiming();
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
