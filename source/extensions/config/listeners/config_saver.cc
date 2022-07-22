@@ -4,8 +4,8 @@
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/extensions/config/saved_xds_config.pb.h"
-#include "source/extensions/config/store.h"
+#include "source/extensions/config/store/saved_xds_config.pb.h"
+#include "source/extensions/config/store/store.h"
 
 namespace Envoy {
 namespace Extensions {

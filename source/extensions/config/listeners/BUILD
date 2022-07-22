@@ -20,7 +20,7 @@ envoy_cc_library(
         "//envoy/config:subscription_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
-        "//source/extensions/config:saved_xds_config_proto_cc_proto",
-        "//source/extensions/config:store_lib",
+        "//source/extensions/config/store:saved_xds_config_proto_cc_proto",
+        "//source/extensions/config/store:store",
     ],
 )

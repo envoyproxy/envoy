@@ -22,7 +22,7 @@
 #include "source/common/config/utility.h"
 
 // TODO(abeyad): shouldn't depend on extensions here
-#include "source/extensions/config/store.h"
+#include "source/extensions/config/store/store.h"
 
 #include "absl/container/node_hash_map.h"
 

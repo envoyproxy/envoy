@@ -175,7 +175,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         # TODO(abeyad): remove
         "//source/extensions/config/listeners:config_saver",
-        "//source/extensions/config:store_lib",
+        "//source/extensions/config/store:store",
         "@com_google_absl//absl/container:btree",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
