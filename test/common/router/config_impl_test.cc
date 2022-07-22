@@ -6648,6 +6648,7 @@ virtual_hosts:
       expose_headers: "test-expose-headers"
       max_age: "test-max-age"
       allow_credentials: true
+      allow_private_network_access: true
       filter_enabled:
         runtime_key: "cors.www.enabled"
         default_value:
@@ -6692,6 +6693,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
   EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
   EXPECT_EQ(cors_policy->allowCredentials(), true);
+  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), true);
 }
 
 TEST_F(RoutePropertyTest, TestRouteCorsConfig) {
@@ -6748,27 +6750,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
   EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
   EXPECT_EQ(cors_policy->allowCredentials(), true);
-}
-
-TEST_F(RoutePropertyTest, TestCorsConfigWithPNA) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: "default"
-    domains: ["*"]
-    routes:
-      - match:
-          prefix: "/api"
-        route:
-          cors:
-            allow_private_network_access: true
-)EOF";
-
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
-
-  const Router::CorsPolicy* cors_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
-
-  EXPECT_EQ(cors_policy->allowCredentials(), true);
+  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), false);
 }
 
 TEST_F(RoutePropertyTest, TestCorsConfigWithInvalidPNA) {
@@ -6784,33 +6766,8 @@ virtual_hosts:
             allow_private_network_access: invalid
 )EOF";
 
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
-
-  const Router::CorsPolicy* cors_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
-
-  EXPECT_EQ(cors_policy->allowCredentials(), false);
-}
-
-TEST_F(RoutePropertyTest, TestCorsConfigWithEmptyPNA) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: "default"
-    domains: ["*"]
-    routes:
-      - match:
-          prefix: "/api"
-        route:
-          cors:
-            allow_credentials: true
-)EOF";
-
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
-
-  const Router::CorsPolicy* cors_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
-
-  EXPECT_EQ(cors_policy->allowCredentials(), false);
+  EXPECT_THROW_WITH_REGEX(parseRouteConfigurationFromYaml(yaml), EnvoyException,
+                          "Unable to parse JSON as proto");
 }
 
 TEST_F(RouteMatcherTest, Decorator) {
