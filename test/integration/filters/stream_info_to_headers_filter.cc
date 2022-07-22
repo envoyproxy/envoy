@@ -38,7 +38,8 @@ public:
       headers.addCopy(Http::LowerCaseString("dns_end"),
                       toUsec(stream_info.downstreamTiming().getValue(dns_end).value()));
     }
-    if (conn_stream_info.downstreamTiming()->downstreamHandshakeComplete().has_value()) {
+    if (conn_stream_info.downstreamTiming().has_value() &&
+        conn_stream_info.downstreamTiming()->downstreamHandshakeComplete().has_value()) {
       headers.addCopy(
           Http::LowerCaseString("downstream_handshake_complete"),
           toUsec(conn_stream_info.downstreamTiming()->downstreamHandshakeComplete().value()));
