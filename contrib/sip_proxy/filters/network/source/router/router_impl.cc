@@ -800,7 +800,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
     // pass the destination and route, so responses to this request have affinity 
     // to upstream host where we recvd this request from
-    downstream_conn->upstreamData(metadata, parent_.route(), parent_.getUpstreamHost()->hostname());
+    downstream_conn->upstreamData(metadata, parent_.route(), parent_.getUpstreamHost()->address()->ip()->addressAsString());
 
     return FilterStatus::Continue;
   }
