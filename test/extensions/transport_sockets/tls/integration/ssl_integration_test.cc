@@ -236,7 +236,8 @@ TEST_P(SslIntegrationTest, Http1StreamInfoDownstreamHandshakeTiming) {
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
 
-  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("downstream_handshake_complete")).empty());
+  ASSERT_FALSE(
+      response->headers().get(Http::LowerCaseString("downstream_handshake_complete")).empty());
 }
 
 TEST_P(SslIntegrationTest, Http2StreamInfoDownstreamHandshakeTiming) {
@@ -251,7 +252,8 @@ TEST_P(SslIntegrationTest, Http2StreamInfoDownstreamHandshakeTiming) {
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
 
-  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("downstream_handshake_complete")).empty());
+  ASSERT_FALSE(
+      response->headers().get(Http::LowerCaseString("downstream_handshake_complete")).empty());
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
