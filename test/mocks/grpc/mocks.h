@@ -88,6 +88,7 @@ public:
               (absl::string_view service_full_name, absl::string_view method_name,
                RawAsyncStreamCallbacks& callbacks,
                const Http::AsyncClient::StreamOptions& options));
+  MOCK_METHOD(absl::string_view, destination, ());
 
   std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
   // Keep track of the number of requests to detect potential race condition.
