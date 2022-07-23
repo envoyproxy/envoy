@@ -517,7 +517,6 @@ message Http2ProtocolOptions {
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 14;
 
-  // [#not-implemented-hide:]
   // Specifies SETTINGS frame parameters to be sent to the peer, with two exceptions:
   //
   // 1. SETTINGS_ENABLE_PUSH (0x2) is not configurable as HTTP/2 server push is not supported by
