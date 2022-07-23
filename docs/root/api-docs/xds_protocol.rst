@@ -669,13 +669,15 @@ Resource warming
 go through warming before they can serve requests. This process
 happens both during :ref:`Envoy initialization <arch_overview_initialization>`
 and when the ``Cluster`` or ``Listener`` is updated. Warming of
-``Cluster`` is completed only when a ``ClusterLoadAssignment`` response
-is supplied by management server. Similarly, warming of ``Listener`` is
-completed only when a ``RouteConfiguration`` is supplied by management
-server if the listener refers to an RDS configuration. Management server
-is expected to provide the EDS/RDS updates during warming. If management
-server does not provide EDS/RDS responses, Envoy will not initialize
-itself during the initialization phase and the updates sent via CDS/LDS
+``Cluster`` is completed only when a new ``ClusterLoadAssignment`` response
+is supplied by management server even though there is no change in endpoints.
+Similarly, warming of ``Listener`` is completed only when a ``RouteConfiguration``
+is supplied by management server if the listener refers to an RDS configuration.
+If Envoy is already aware of ``RouteConfiguration`` referenced by ``Listener``,
+it will use it otherwise Envoy will initiate a new RDS request with the new 
+route name referenced by ``Listener``. Management server is expected to provide
+the EDS/RDS updates during warming. If management server does not provide EDS/RDS responses, 
+Envoy will not initialize itself during the initialization phase and the updates sent via CDS/LDS
 will not take effect until EDS/RDS responses are supplied.
 
 .. _xds_protocol_eventual_consistency_considerations:
