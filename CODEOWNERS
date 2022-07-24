@@ -259,17 +259,17 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
+# IP tagging
+/*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
+# Header to metadata
+/*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
+# zookeeper
+/*/extensions/filters/network/zookeeper_proxy @snowp @JuniorHsu
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
-
-# secondary owner needed or moving to contrib next release.
-/*/extensions/filters/http/ip_tagging @alyssawilk @UNOWNED
-/*/extensions/filters/http/header_to_metadata @zuercher @UNOWNED
-/*/extensions/filters/network/zookeeper_proxy @snowp @UNOWNED
-/*/extensions/tracers/lightstep @UNOWNED @UNOWNED
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
@@ -288,3 +288,4 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/hyperscan/ @zhxie @soulxu
 /contrib/language/ @diceride @diceride
 /contrib/dlb/ @mattklein123 @daixiang0
+/contrib/qat/ @ipuustin @VillePihlava
