@@ -269,14 +269,14 @@ message TagSpecifier {
     // The two regexes of the specifiers will be processed from the elaborated
     // stat name.
     //
-    // The first regex will save ``ios.`` as thae tag value for envoy.http_user_agent``. It will
+    // The first regex will save ``ios.`` as the tag value for envoy.http_user_agent``. It will
     // leave it in the name for potential matching with additional tag specifiers. After all tag
     // specifiers are processed the tags will be removed from the name.
     //
     // The second regex will populate tag ``envoy.http_conn_manager_prefix`` with value
     // ``connection_manager_1.``, based on the original stat name.
     //
-    // As a final step, the matched tags are removed. leaving
+    // As a final step, the matched tags are removed, leaving
     // ``http.user_agent.downstream_cx_total`` as the tag extracted name.
     string regex = 2 [(validate.rules).string = {max_bytes: 1024}];
 
