@@ -551,6 +551,10 @@ static void ios_track_event(envoy_map map, const void *context) {
     [self registerStringAccessor:name accessor:config.stringAccessors[name]];
   }
 
+  for (NSString *name in config.keyValueStores) {
+    [self registerKeyValueStore:name keyValueStore:config.keyValueStores[name]];
+  }
+
   return [self runWithConfigYAML:resolvedYAML logLevel:logLevel];
 }
 
