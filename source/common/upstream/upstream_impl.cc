@@ -352,9 +352,6 @@ Host::CreateConnectionData HostImpl::createConnection(
   Network::ConnectionSocket::OptionsSharedPtr connection_options =
       combineConnectionSocketOptions(cluster, options);
 
-  ASSERT(!address->envoyInternalAddress() ||
-         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
-
   Network::ClientConnectionPtr connection =
       address_list.size() > 1
           ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
@@ -1117,8 +1114,7 @@ ClusterImplBase::ClusterImplBase(
           fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                       cluster.name(), cluster.DebugString()));
     }
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correctly_validate_alpn") &&
-        !matcher_supports_alpn) {
+    if (!matcher_supports_alpn) {
       throw EnvoyException(fmt::format(
           "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
           cluster.name(), cluster.DebugString()));

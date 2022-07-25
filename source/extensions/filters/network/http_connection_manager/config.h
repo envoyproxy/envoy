@@ -23,6 +23,7 @@
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/date_provider_impl.h"
+#include "source/common/http/dependency_manager.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
@@ -33,7 +34,6 @@
 #include "source/common/router/scoped_rds.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/http_connection_manager/dependency_manager.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -236,12 +236,6 @@ public:
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
-  void
-  processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
-                    proto_config,
-                int i, const std::string& prefix, const std::string& filter_chain_type,
-                bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
-                DependencyManager& dependency_manager);
   void
   processDynamicFilterConfig(const std::string& name,
                              const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
