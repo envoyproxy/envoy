@@ -32,7 +32,10 @@ public:
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
           envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_dynamic_resources()
+          ->mutable_cds_config()
+          ->mutable_path_config_source()
+          ->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
 
       const std::string filter =
@@ -85,7 +88,7 @@ typed_config:
   void createUpstreams() override {
     addFakeUpstream(
         Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_, factory_context_),
-        Http::CodecType::HTTP1);
+        Http::CodecType::HTTP1, /*autonomous_upstream=*/false);
   }
 
   Network::ClientConnectionPtr
@@ -97,7 +100,7 @@ typed_config:
         Ssl::createClientSslTransportSocketFactory(options, context_manager_, *api_);
     return dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
-        client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
+        client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
   }
 
   std::string upstream_cert_name_{"server"};

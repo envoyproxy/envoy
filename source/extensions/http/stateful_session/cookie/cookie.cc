@@ -26,6 +26,42 @@ CookieBasedSessionStateFactory::CookieBasedSessionStateFactory(
   if (name_.empty()) {
     throw EnvoyException("Cookie key cannot be empty for cookie based stateful sessions");
   }
+
+  // If no cookie path is specified or root cookie path is specified then this session state will
+  // be enabled for any request.
+  if (path_.empty() || path_ == "/") {
+    path_matcher_ = [](absl::string_view) { return true; };
+    return;
+  }
+
+  // If specified cookie path is ends with '/' then this session state will be enabled for the
+  // requests with a path that starts with the cookie path.
+  // For example the cookie path '/foo/' will matches request paths '/foo/bar' or '/foo/dir', but
+  // will not match request path '/foo'.
+  if (absl::EndsWith(path_, "/")) {
+    path_matcher_ = [path = path_](absl::string_view request_path) {
+      return absl::StartsWith(request_path, path);
+    };
+    return;
+  }
+
+  path_matcher_ = [path = path_](absl::string_view request_path) {
+    if (absl::StartsWith(request_path, path)) {
+      // Request path is same with cookie path.
+      if (request_path.size() == path.size()) {
+        return true;
+      }
+
+      // The next character of the matching part should be the slash ('/'), question mark ('?') or
+      // number sign ('#').
+      ASSERT(request_path.size() > path.size());
+      const char next_char = request_path[path.size()];
+      if (next_char == '/' || next_char == '?' || next_char == '#') {
+        return true;
+      }
+    }
+    return false;
+  };
 }
 
 } // namespace Cookie

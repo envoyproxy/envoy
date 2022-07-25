@@ -47,16 +47,19 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
                                                bool end_stream) {
   // Headers should only happen once, so use this opportunity to add the proxy
   // proto header, if configured.
-  ASSERT(upstream_request_->routeEntry().connectConfig().has_value());
-  Buffer::OwnedImpl data;
-  auto& connect_config = upstream_request_->routeEntry().connectConfig().value();
-  if (connect_config.has_proxy_protocol_config()) {
-    Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
-        connect_config.proxy_protocol_config(), upstream_request_->connection(), data);
-  }
+  const Router::RouteEntry* route_entry = upstream_request_->route().routeEntry();
+  ASSERT(route_entry != nullptr);
+  if (route_entry->connectConfig().has_value()) {
+    Buffer::OwnedImpl data;
+    auto& connect_config = route_entry->connectConfig().value();
+    if (connect_config.has_proxy_protocol_config()) {
+      Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
+          connect_config.proxy_protocol_config(), upstream_request_->connection(), data);
+    }
 
-  if (data.length() != 0 || end_stream) {
-    upstream_conn_data_->connection().write(data, end_stream);
+    if (data.length() != 0 || end_stream) {
+      upstream_conn_data_->connection().write(data, end_stream);
+    }
   }
 
   // TcpUpstream::encodeHeaders is called after the UpstreamRequest is fully initialized. Also use
@@ -90,7 +93,9 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void TcpUpstream::onEvent(Network::ConnectionEvent event) {
-  if (event != Network::ConnectionEvent::Connected && upstream_request_) {
+  if ((event == Network::ConnectionEvent::LocalClose ||
+       event == Network::ConnectionEvent::RemoteClose) &&
+      upstream_request_) {
     upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ConnectionTermination, "");
   }
 }

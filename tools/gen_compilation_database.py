@@ -17,12 +17,16 @@ def generate_compilation_database(args):
         "--remote_download_outputs=all",
     ]
 
-    subprocess.check_call(["bazel", "build"] + bazel_options + [
+    source_dir_targets = args.bazel_targets
+    if args.exclude_contrib:
+        source_dir_targets.remove("//contrib/...")
+
+    subprocess.check_call([args.bazel, "build"] + bazel_options + [
         "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
         "--output_groups=compdb_files,header_files"
-    ] + args.bazel_targets)
+    ] + source_dir_targets)
 
-    execroot = subprocess.check_output(["bazel", "info", "execution_root"]
+    execroot = subprocess.check_output([args.bazel, "info", "execution_root"]
                                        + bazel_options).decode().strip()
 
     db_entries = []
@@ -49,15 +53,22 @@ def is_header(filename):
 
 def is_compile_target(target, args):
     filename = target["file"]
-    if not args.include_headers and is_header(filename):
-        return False
-
-    if not args.include_genfiles:
-        if filename.startswith("bazel-out/"):
+    if is_header(filename):
+        if args.include_all:
+            return True
+        if not args.include_headers:
             return False
 
-    if not args.include_external:
-        if filename.startswith("external/"):
+    if filename.startswith("bazel-out/"):
+        if args.include_all:
+            return True
+        if not args.include_genfiles:
+            return False
+
+    if filename.startswith("external/"):
+        if args.include_all:
+            return True
+        if not args.include_external:
             return False
 
     return True
@@ -103,6 +114,9 @@ if __name__ == "__main__":
     parser.add_argument('--include_genfiles', action='store_true')
     parser.add_argument('--include_headers', action='store_true')
     parser.add_argument('--vscode', action='store_true')
+    parser.add_argument('--include_all', action='store_true')
+    parser.add_argument('--exclude_contrib', action='store_true')
+    parser.add_argument('--bazel', default='bazel')
     parser.add_argument(
         'bazel_targets',
         nargs='*',

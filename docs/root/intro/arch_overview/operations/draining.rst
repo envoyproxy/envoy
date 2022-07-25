@@ -35,6 +35,8 @@ Note that although draining is a per-listener concept, it must be supported at t
 level. Currently the only filters that support graceful draining are
 :ref:`Redis <config_network_filters_redis_proxy>`,
 :ref:`Mongo <config_network_filters_mongo_proxy>`,
+:ref:`Thrift <config_network_filters_thrift_proxy>`
+(if the ``envoy.reloadable_features.thrift_connection_draining`` runtime feature is enabled),
 and :ref:`HTTP connection manager <config_http_conn_man>`.
 
 By default, the :ref:`HTTP connection manager <config_http_conn_man>` filter will

@@ -76,7 +76,7 @@ HeaderString::HeaderString(absl::string_view ref_value) : buffer_(ref_value) { A
 HeaderString::HeaderString(HeaderString&& move_value) noexcept
     : buffer_(std::move(move_value.buffer_)) {
   move_value.clear();
-  ASSERT(valid());
+  // Move constructor does not validate and relies on the source object validating its mutations.
 }
 
 bool HeaderString::valid() const { return validHeaderString(getStringView()); }
@@ -167,6 +167,16 @@ void HeaderString::setInteger(uint64_t value) {
 void HeaderString::setReference(absl::string_view ref_value) {
   buffer_ = ref_value;
   ASSERT(valid());
+}
+
+void HeaderString::setCopyUnvalidatedForTestOnly(absl::string_view view) {
+  if (!absl::holds_alternative<InlineHeaderVector>(buffer_)) {
+    // Switching from Type::Reference to Type::Inline
+    buffer_ = InlineHeaderVector();
+  }
+
+  getInVec(buffer_).reserve(view.size());
+  getInVec(buffer_).assign(view.data(), view.data() + view.size());
 }
 
 uint32_t HeaderString::size() const {

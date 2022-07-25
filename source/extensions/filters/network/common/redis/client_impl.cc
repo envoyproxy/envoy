@@ -30,6 +30,7 @@ ConfigImpl::ConfigImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
       enable_command_stats_(config.enable_command_stats()) {
   switch (config.read_policy()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Primary;
     break;
@@ -46,9 +47,6 @@ ConfigImpl::ConfigImpl(
     break;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::ANY:
     read_policy_ = ReadPolicy::Any;
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
     break;
   }
 }

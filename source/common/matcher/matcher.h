@@ -14,6 +14,7 @@
 #include "source/common/matcher/exact_map_matcher.h"
 #include "source/common/matcher/field_matcher.h"
 #include "source/common/matcher/list_matcher.h"
+#include "source/common/matcher/prefix_map_matcher.h"
 #include "source/common/matcher/validation_visitor.h"
 #include "source/common/matcher/value_input_matcher.h"
 
@@ -62,6 +63,84 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
 
 /**
+ * A matcher that will always resolve to associated on_no_match. This is used when
+ * the matcher is configured without a matcher, allowing for a tree that always resolves
+ * to a specific OnMatch.
+ */
+template <class DataType> class AnyMatcher : public MatchTree<DataType> {
+public:
+  explicit AnyMatcher(absl::optional<OnMatch<DataType>> on_no_match)
+      : on_no_match_(std::move(on_no_match)) {}
+
+  typename MatchTree<DataType>::MatchResult match(const DataType&) override {
+    return {MatchState::MatchComplete, on_no_match_};
+  }
+  const absl::optional<OnMatch<DataType>> on_no_match_;
+};
+
+/**
+ * Constructs a data input function for a data type.
+ **/
+template <class DataType> class MatchInputFactory {
+public:
+  MatchInputFactory(ProtobufMessage::ValidationVisitor& validator,
+                    MatchTreeValidationVisitor<DataType>& validation_visitor)
+      : validator_(validator), validation_visitor_(validation_visitor) {}
+
+  DataInputFactoryCb<DataType> createDataInput(const xds::core::v3::TypedExtensionConfig& config) {
+    return createDataInputBase(config);
+  }
+
+  DataInputFactoryCb<DataType>
+  createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
+    return createDataInputBase(config);
+  }
+
+private:
+  // Wrapper around a CommonProtocolInput that allows it to be used as a DataInput<DataType>.
+  class CommonProtocolInputWrapper : public DataInput<DataType> {
+  public:
+    explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
+        : common_protocol_input_(std::move(common_protocol_input)) {}
+
+    DataInputGetResult get(const DataType&) const override {
+      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
+                                common_protocol_input_->get()};
+    }
+
+  private:
+    const CommonProtocolInputPtr common_protocol_input_;
+  };
+
+  template <class TypedExtensionConfigType>
+  DataInputFactoryCb<DataType> createDataInputBase(const TypedExtensionConfigType& config) {
+    auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
+    if (factory != nullptr) {
+      validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
+
+      ProtobufTypes::MessagePtr message =
+          Config::Utility::translateAnyToFactoryConfig(config.typed_config(), validator_, *factory);
+      auto data_input = factory->createDataInputFactoryCb(*message, validator_);
+      return data_input;
+    }
+
+    // If the provided config doesn't match a typed input, assume that this is one of the common
+    // inputs.
+    auto& common_input_factory =
+        Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        config.typed_config(), validator_, common_input_factory);
+    auto common_input =
+        common_input_factory.createCommonProtocolInputFactoryCb(*message, validator_);
+    return
+        [common_input]() { return std::make_unique<CommonProtocolInputWrapper>(common_input()); };
+  }
+
+  ProtobufMessage::ValidationVisitor& validator_;
+  MatchTreeValidationVisitor<DataType>& validation_visitor_;
+};
+
+/**
  * Recursively constructs a MatchTree from a protobuf configuration.
  * @param DataType the type used as a source for DataInputs
  * @param ActionFactoryContext the context provided to Action factories
@@ -73,7 +152,7 @@ public:
                    Server::Configuration::ServerFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
       : action_factory_context_(context), server_factory_context_(factory_context),
-        validation_visitor_(validation_visitor) {}
+        match_input_factory_(factory_context.messageValidationVisitor(), validation_visitor) {}
 
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
   template <class MatcherType> MatchTreeFactoryCb<DataType> create(const MatcherType& config) {
@@ -83,8 +162,7 @@ public:
     case MatcherType::kMatcherList:
       return createListMatcher(config);
     case MatcherType::MATCHER_TYPE_NOT_SET:
-      IS_ENVOY_BUG("match fail");
-      return nullptr;
+      return createAnyMatcher(config);
     }
     return nullptr;
   }
@@ -100,6 +178,15 @@ public:
   }
 
 private:
+  template <class MatcherType>
+  MatchTreeFactoryCb<DataType> createAnyMatcher(const MatcherType& config) {
+    auto on_no_match = createOnMatch(config.on_no_match());
+
+    return [on_no_match]() {
+      return std::make_unique<AnyMatcher<DataType>>(
+          on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+    };
+  }
   template <class MatcherType>
   MatchTreeFactoryCb<DataType> createListMatcher(const MatcherType& config) {
     std::vector<std::pair<FieldMatcherFactoryCb<DataType>, OnMatchFactoryCb<DataType>>>
@@ -148,7 +235,8 @@ private:
   FieldMatcherFactoryCb<DataType> createFieldMatcher(const FieldMatcherType& field_predicate) {
     switch (field_predicate.match_type_case()) {
     case (PredicateType::kSinglePredicate): {
-      auto data_input = createDataInput(field_predicate.single_predicate().input());
+      auto data_input =
+          match_input_factory_.createDataInput(field_predicate.single_predicate().input());
       auto input_matcher = createInputMatcher(field_predicate.single_predicate());
 
       return [data_input, input_matcher]() {
@@ -176,30 +264,18 @@ private:
 
   template <class MatcherType>
   MatchTreeFactoryCb<DataType> createTreeMatcher(const MatcherType& matcher) {
-    auto data_input = createDataInput(matcher.matcher_tree().input());
+    auto data_input = match_input_factory_.createDataInput(matcher.matcher_tree().input());
+    auto on_no_match = createOnMatch(matcher.on_no_match());
+
     switch (matcher.matcher_tree().tree_type_case()) {
     case MatcherType::MatcherTree::kExactMatchMap: {
-      std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
-      match_children.reserve(matcher.matcher_tree().exact_match_map().map().size());
-
-      for (const auto& children : matcher.matcher_tree().exact_match_map().map()) {
-        match_children.push_back(
-            std::make_pair(children.first, *MatchTreeFactory::createOnMatch(children.second)));
-      }
-
-      auto on_no_match = createOnMatch(matcher.on_no_match());
-
-      return [match_children, data_input, on_no_match]() {
-        auto multimap_matcher = std::make_unique<ExactMapMatcher<DataType>>(
-            data_input(), on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
-        for (const auto& children : match_children) {
-          multimap_matcher->addChild(children.first, children.second());
-        }
-        return multimap_matcher;
-      };
+      return createMapMatcher<ExactMapMatcher>(matcher.matcher_tree().exact_match_map(), data_input,
+                                               on_no_match);
     }
-    case MatcherType::MatcherTree::kPrefixMatchMap:
-      PANIC("unexpected matcher type");
+    case MatcherType::MatcherTree::kPrefixMatchMap: {
+      return createMapMatcher<PrefixMapMatcher>(matcher.matcher_tree().prefix_match_map(),
+                                                data_input, on_no_match);
+    }
     case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
       PANIC("unexpected matcher type");
     case MatcherType::MatcherTree::kCustomMatch: {
@@ -209,10 +285,32 @@ private:
           matcher.matcher_tree().custom_match().typed_config(),
           server_factory_context_.messageValidationVisitor(), factory);
       return factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
-                                                  *this);
+                                                  on_no_match, *this);
     }
     }
     PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  template <template <class> class MapMatcherType, class MapType>
+  MatchTreeFactoryCb<DataType>
+  createMapMatcher(const MapType& map, DataInputFactoryCb<DataType> data_input,
+                   absl::optional<OnMatchFactoryCb<DataType>>& on_no_match) {
+    std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
+    match_children.reserve(map.map().size());
+
+    for (const auto& children : map.map()) {
+      match_children.push_back(
+          std::make_pair(children.first, *MatchTreeFactory::createOnMatch(children.second)));
+    }
+
+    return [match_children, data_input, on_no_match]() {
+      auto multimap_matcher = std::make_unique<MapMatcherType<DataType>>(
+          data_input(), on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+      for (const auto& children : match_children) {
+        multimap_matcher->addChild(children.first, children.second());
+      }
+      return multimap_matcher;
+    };
   }
 
   template <class OnMatchType>
@@ -234,47 +332,6 @@ private:
     }
 
     return absl::nullopt;
-  }
-
-  // Wrapper around a CommonProtocolInput that allows it to be used as a DataInput<DataType>.
-  class CommonProtocolInputWrapper : public DataInput<DataType> {
-  public:
-    explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
-        : common_protocol_input_(std::move(common_protocol_input)) {}
-
-    DataInputGetResult get(const DataType&) const override {
-      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
-                                common_protocol_input_->get()};
-    }
-
-  private:
-    const CommonProtocolInputPtr common_protocol_input_;
-  };
-
-  template <class TypedExtensionConfigType>
-  DataInputFactoryCb<DataType> createDataInput(const TypedExtensionConfigType& config) {
-    auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
-    if (factory != nullptr) {
-      validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
-
-      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          config.typed_config(), server_factory_context_.messageValidationVisitor(), *factory);
-      auto data_input = factory->createDataInputFactoryCb(
-          *message, server_factory_context_.messageValidationVisitor());
-      return data_input;
-    }
-
-    // If the provided config doesn't match a typed input, assume that this is one of the common
-    // inputs.
-    auto& common_input_factory =
-        Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), server_factory_context_.messageValidationVisitor(),
-        common_input_factory);
-    auto common_input = common_input_factory.createCommonProtocolInputFactoryCb(
-        *message, server_factory_context_.messageValidationVisitor());
-    return
-        [common_input]() { return std::make_unique<CommonProtocolInputWrapper>(common_input()); };
   }
 
   template <class SinglePredicateType>
@@ -302,7 +359,7 @@ private:
   const std::string stats_prefix_;
   ActionFactoryContext& action_factory_context_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
-  MatchTreeValidationVisitor<DataType>& validation_visitor_;
+  MatchInputFactory<DataType> match_input_factory_;
 };
 } // namespace Matcher
 } // namespace Envoy

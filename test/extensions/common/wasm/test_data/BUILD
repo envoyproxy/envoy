@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_package",
 )
+load("//bazel:envoy_select.bzl", "envoy_select_wasm_v8_bool")
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary", "wasm_rust_binary")
 
 licenses(["notice"])  # Apache 2
@@ -13,6 +14,7 @@ wasm_rust_binary(
     name = "test_rust.wasm",
     srcs = ["test_rust.rs"],
     rustc_flags = ["-Clink-arg=-zstack-size=32768"],
+    precompile = envoy_select_wasm_v8_bool(),
 )
 
 envoy_cc_library(

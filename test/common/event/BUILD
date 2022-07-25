@@ -16,6 +16,7 @@ envoy_cc_test(
         "//source/common/event:deferred_task",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/mocks/server:watch_dog_mocks",

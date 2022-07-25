@@ -77,6 +77,7 @@ public:
     envoy::type::v3::Int64Range range_;
     Matchers::StringMatcherPtr string_match_;
     const bool invert_match_;
+    const bool treat_missing_as_empty_;
     bool present_;
 
     // HeaderMatcher
@@ -271,6 +272,24 @@ public:
   validateContentLength(absl::string_view header_value,
                         bool override_stream_error_on_invalid_http_message,
                         bool& should_close_connection, size_t& content_length_output);
+
+  /**
+   * Parse a comma-separated header string to the individual tokens. Discard empty tokens
+   * and whitespace. Return a vector of the comma-separated tokens.
+   */
+  static std::vector<absl::string_view> parseCommaDelimitedHeader(absl::string_view header_value);
+
+  /**
+   * Return the part of attribute before first ';'-sign. For example,
+   * "foo;bar=1" would return "foo".
+   */
+  static absl::string_view getSemicolonDelimitedAttribute(absl::string_view value);
+
+  /**
+   * Return a new AcceptEncoding header string vector.
+   */
+  static std::string addEncodingToAcceptEncoding(absl::string_view accept_encoding_header,
+                                                 absl::string_view encoding);
 };
 
 } // namespace Http

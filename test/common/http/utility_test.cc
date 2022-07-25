@@ -155,7 +155,8 @@ TEST(HttpUtility, replaceQueryString) {
 }
 
 TEST(HttpUtility, getResponseStatus) {
-  EXPECT_THROW(Utility::getResponseStatus(TestResponseHeaderMapImpl{}), CodecClientException);
+  EXPECT_ENVOY_BUG(Utility::getResponseStatus(TestResponseHeaderMapImpl{}),
+                   "Details: No status in headers");
   EXPECT_EQ(200U, Utility::getResponseStatus(TestResponseHeaderMapImpl{{":status", "200"}}));
 }
 
@@ -1067,35 +1068,10 @@ public:
 
 // Verify that it resolveMostSpecificPerFilterConfig works with nil routes.
 TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
-  EXPECT_EQ(nullptr,
-            Utility::resolveMostSpecificPerFilterConfig<TestConfig>("envoy.filter", nullptr));
-}
-
-// Verify that resolveMostSpecificPerFilterConfig indeed returns the most specific per
-// filter config.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
-  const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+  filter_callbacks.route_ = nullptr;
 
-  const Router::RouteSpecificFilterConfig config;
-
-  // Test when there's nothing on the route
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         filter_name, filter_callbacks.route()));
-
-  // Testing in reverse order, so that the method always returns the last object.
-  // Testing per-virtualhost typed filter config
-  ON_CALL(*filter_callbacks.route_, mostSpecificPerFilterConfig(filter_name))
-      .WillByDefault(Return(&config));
-  EXPECT_EQ(&config, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         filter_name, filter_callbacks.route()));
-
-  // Cover the case of no route entry
-  ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  ON_CALL(*filter_callbacks.route_, mostSpecificPerFilterConfig(filter_name))
-      .WillByDefault(Return(&config));
-  EXPECT_EQ(&config, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         filter_name, filter_callbacks.route()));
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<TestConfig>(&filter_callbacks));
 }
 
 // Verify that merging works as expected and we get back the merged result.
@@ -1105,10 +1081,9 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   baseTestConfig.state_ = 1;
   routeTestConfig.state_ = 1;
 
-  const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
-  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(filter_name, _))
+  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(_, _))
       .WillOnce(Invoke([&](const std::string&,
                            std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
         cb(baseTestConfig);
@@ -1117,7 +1092,7 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
 
   // merge the configs
   auto merged_cfg = Utility::getMergedPerFilterConfig<TestConfig>(
-      filter_name, filter_callbacks.route(),
+      &filter_callbacks,
       [&](TestConfig& base_cfg, const TestConfig& route_cfg) { base_cfg.merge(route_cfg); });
 
   // make sure that the callback was called (which means that the dynamic_cast worked.)
@@ -1665,6 +1640,36 @@ TEST(CheckRequiredHeaders, Response) {
       absl::InvalidArgumentError("missing required header: :status"),
       HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{{":status", "abcd"}}));
 }
+
+TEST(Utility, isSafeRequest) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("PUT");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("DELETE");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("PATCH");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+
+  request_headers.setMethod("GET");
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("HEAD");
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("OPTIONS");
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
+  request_headers.setMethod("TRACE");
+  EXPECT_TRUE(Utility::isSafeRequest(request_headers));
+
+  request_headers.removePath();
+  request_headers.setMethod("CONNECT");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+
+  request_headers.removeMethod();
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+};
 
 } // namespace Http
 } // namespace Envoy

@@ -37,7 +37,7 @@ public:
 
 private:
   ClusterManager& cm_;
-  std::string name_;
+  const std::string name_;
   std::string system_version_info_;
 };
 

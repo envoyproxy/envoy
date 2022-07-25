@@ -21,9 +21,6 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 namespace {
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    authorization_handle(Http::CustomHeaders::get().Authorization);
-
 constexpr const char* GetAccessTokenBodyFormatString =
     "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}";
 
@@ -40,6 +37,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   const std::string body = fmt::format(GetAccessTokenBodyFormatString, auth_code, encoded_client_id,
                                        encoded_secret, encoded_cb_url);
   request->body().add(body);
+  request->headers().setContentLength(body.length());
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
   dispatchRequest(std::move(request));
 

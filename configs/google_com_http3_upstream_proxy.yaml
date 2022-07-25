@@ -32,6 +32,8 @@ static_resources:
                   cluster: service_google
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: service_google
     connect_timeout: 30s

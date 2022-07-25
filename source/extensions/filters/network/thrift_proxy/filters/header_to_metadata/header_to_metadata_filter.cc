@@ -60,7 +60,7 @@ HeaderToMetadataFilter::HeaderToMetadataFilter(const ConfigSharedPtr config) : c
 
 ThriftProxy::FilterStatus
 HeaderToMetadataFilter::transportBegin(ThriftProxy::MessageMetadataSharedPtr metadata) {
-  auto& headers = metadata->headers();
+  auto& headers = metadata->requestHeaders();
 
   writeHeaderToMetadata(headers, config_->requestRules(), *decoder_callbacks_);
 
@@ -96,6 +96,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 
   // Sane enough, add the key/value.
   switch (type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::network::thrift_proxy::filters::header_to_metadata::v3::
       HeaderToMetadata::STRING:
     val.set_string_value(std::move(value));
@@ -119,8 +120,6 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
     }
     break;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   // Have we seen this namespace before?

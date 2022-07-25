@@ -30,6 +30,9 @@ function setup_gcc_toolchain() {
     echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
     exit 1
   fi
+
+  BAZEL_BUILD_OPTIONS=("--config=gcc" "${BAZEL_BUILD_OPTIONS[@]}")
+
   if [[ -z "${ENVOY_RBE}" ]]; then
     export CC=gcc
     export CXX=g++
@@ -88,21 +91,18 @@ trap cleanup EXIT
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")
 
-# TODO(phlax): deprecate/remove this - i believe it was made redundant here:
-#   https://github.com/envoyproxy/envoy/commit/3ebedeb708a23062332a6fcdf33b462b7070adba#diff-2fa22a1337effee365a51e6844be0ab3
-export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS[*]}"
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
 BAZEL_BUILD_OPTIONS=(
   "${BAZEL_OPTIONS[@]}"
   "--verbose_failures"
-  "--show_task_finish"
   "--experimental_generate_json_trace_profile"
   "--test_output=errors"
   "--noshow_progress"
   "--noshow_loading_progress"
   "--repository_cache=${BUILD_DIR}/repository_cache"
   "--experimental_repository_cache_hardlinks"
+  "--action_env=CLANG_FORMAT"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 

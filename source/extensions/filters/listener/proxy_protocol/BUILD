@@ -18,12 +18,12 @@ envoy_cc_library(
         "proxy_protocol.h",
         "proxy_protocol_header.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:minimal_logger_lib",

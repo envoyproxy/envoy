@@ -91,7 +91,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmNetworkFilterTest,
-                         Envoy::Extensions::Common::Wasm::runtime_and_language_values);
+                         Envoy::Extensions::Common::Wasm::runtime_and_language_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 // Bad code in initial config.
 TEST_P(WasmNetworkFilterTest, BadCode) {

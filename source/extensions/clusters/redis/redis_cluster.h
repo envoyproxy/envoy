@@ -90,13 +90,14 @@ namespace Redis {
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
-  RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
+  RedisCluster(Server::Configuration::ServerFactoryContext& server_context,
+               const envoy::config::cluster::v3::Cluster& cluster,
                const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
                Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
                Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-               Stats::ScopePtr&& stats_scope, bool added_via_api,
+               Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
                ClusterSlotUpdateCallBackSharedPtr factory);
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
@@ -126,7 +127,7 @@ private:
   void updateAllHosts(const Upstream::HostVector& hosts_added,
                       const Upstream::HostVector& hosts_removed, uint32_t priority);
 
-  void onClusterSlotUpdate(ClusterSlotsPtr&&);
+  void onClusterSlotUpdate(ClusterSlotsSharedPtr&&);
 
   void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
@@ -242,7 +243,14 @@ private:
     void onUnexpectedResponse(const NetworkFilters::Common::Redis::RespValuePtr&);
 
     Network::Address::InstanceConstSharedPtr
-    ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value);
+    ipAddressFromClusterEntry(const std::vector<NetworkFilters::Common::Redis::RespValue>& value);
+    bool validateCluster(const NetworkFilters::Common::Redis::RespValue& value);
+    void resolveClusterHostnames(ClusterSlotsSharedPtr&& slots,
+                                 std::shared_ptr<std::uint64_t> hostname_resolution_required_cnt);
+    void resolveReplicas(ClusterSlotsSharedPtr slots, std::size_t index,
+                         std::shared_ptr<std::uint64_t> hostname_resolution_required_cnt);
+    void finishClusterHostnameResolution(ClusterSlotsSharedPtr slots);
+    void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool empty_response);
 
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;
@@ -294,11 +302,12 @@ private:
 
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
+      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) override;
+      Stats::ScopeSharedPtr&& stats_scope) override;
 };
 } // namespace Redis
 } // namespace Clusters

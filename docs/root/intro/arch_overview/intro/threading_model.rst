@@ -26,5 +26,5 @@ Envoy allows for different types of :ref:`connection balancing
 <arch_overview_listeners>`.
 
 On Windows the kernel is not able to balance the connections properly with the async IO model that Envoy is using.
-Until this is fixed by the platfrom, Envoy will enforce listener connection balancing on Windows. This allows us to
+Until this is fixed by the platform, Envoy will enforce listener connection balancing on Windows. This allows us to
 balance connections between different worker threads. This behavior comes with a performance penalty.

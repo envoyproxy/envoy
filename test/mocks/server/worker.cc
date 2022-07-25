@@ -12,15 +12,15 @@ using ::testing::_;
 using ::testing::Invoke;
 
 MockWorker::MockWorker() {
-  ON_CALL(*this, addListener(_, _, _))
-      .WillByDefault(
-          Invoke([this](absl::optional<uint64_t> overridden_listener,
-                        Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
-            UNREFERENCED_PARAMETER(overridden_listener);
-            config.listenSocketFactory().getListenSocket(0);
-            EXPECT_EQ(nullptr, add_listener_completion_);
-            add_listener_completion_ = completion;
-          }));
+  ON_CALL(*this, addListener(_, _, _, _))
+      .WillByDefault(Invoke([this](absl::optional<uint64_t> overridden_listener,
+                                   Network::ListenerConfig& config,
+                                   AddListenerCompletion completion, Runtime::Loader&) -> void {
+        UNREFERENCED_PARAMETER(overridden_listener);
+        config.listenSocketFactory().getListenSocket(0);
+        EXPECT_EQ(nullptr, add_listener_completion_);
+        add_listener_completion_ = completion;
+      }));
 
   ON_CALL(*this, removeListener(_, _))
       .WillByDefault(

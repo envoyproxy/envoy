@@ -14,6 +14,8 @@ static_resources:
         port_value: 10000
     listener_filters:
     - name: envoy.filters.listener.tls_inspector
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
     filter_chains:
     - filters:
       - name: envoy.filters.network.sni_dynamic_forward_proxy

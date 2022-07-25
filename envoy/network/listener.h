@@ -12,6 +12,7 @@
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
+#include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
@@ -95,9 +96,11 @@ public:
   virtual UdpPacketWriterFactory& packetWriterFactory() PURE;
 
   /**
+   * @param address is used to query the address specific router.
    * @return the UdpListenerWorkerRouter for this listener.
    */
-  virtual UdpListenerWorkerRouter& listenerWorkerRouter() PURE;
+  virtual UdpListenerWorkerRouter&
+  listenerWorkerRouter(const Network::Address::Instance& address) PURE;
 
   /**
    * @return the configuration for the listener.
@@ -107,12 +110,21 @@ public:
 
 using UdpListenerConfigOptRef = OptRef<UdpListenerConfig>;
 
+// Forward declare.
+class InternalListenerRegistry;
+
 /**
  * Configuration for an internal listener.
  */
 class InternalListenerConfig {
 public:
   virtual ~InternalListenerConfig() = default;
+
+  /**
+   * @return InternalListenerRegistry& The internal registry of this internal listener config. The
+   *         registry outlives this listener config.
+   */
+  virtual InternalListenerRegistry& internalListenerRegistry() PURE;
 };
 
 using InternalListenerConfigOptRef = OptRef<InternalListenerConfig>;
@@ -137,16 +149,22 @@ public:
   virtual FilterChainFactory& filterChainFactory() PURE;
 
   /**
+   * TODO(soulxu): This will be removed when multiple addresses listener implemented.
    * @return ListenSocketFactory& the factory to create listen socket.
    */
   virtual ListenSocketFactory& listenSocketFactory() PURE;
+
+  /**
+   * @return std::vector<ListenSocketFactoryPtr>& the factories to create listen sockets.
+   */
+  virtual std::vector<ListenSocketFactoryPtr>& listenSocketFactories() PURE;
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.
    *         A listener that doesn't listen on a port can only receive connections
    *         redirected from other listeners.
    */
-  virtual bool bindToPort() PURE;
+  virtual bool bindToPort() const PURE;
 
   /**
    * @return bool if a connection should be handed off to another Listener after the original
@@ -206,10 +224,11 @@ public:
   virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
+   * @param address is used for query the address specific connection balancer.
    * @return the connection balancer for this listener. All listeners have a connection balancer,
    *         though the implementation may be a NOP balancer.
    */
-  virtual ConnectionBalancer& connectionBalancer() PURE;
+  virtual ConnectionBalancer& connectionBalancer(const Network::Address::Instance& address) PURE;
 
   /**
    * Open connection resources for this listener.
@@ -448,40 +467,6 @@ public:
 };
 
 using UdpListenerPtr = std::unique_ptr<UdpListener>;
-
-/**
- * Internal listener callbacks.
- */
-class InternalListener {
-public:
-  virtual ~InternalListener() = default;
-
-  /**
-   * Called when a new connection is accepted.
-   * @param socket supplies the socket that is moved into the callee.
-   */
-  virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
-};
-using InternalListenerOptRef = OptRef<InternalListener>;
-
-/**
- * The query interface of the registered internal listener callbacks.
- */
-class InternalListenerManager {
-public:
-  virtual ~InternalListenerManager() = default;
-
-  /**
-   * Return the internal listener callbacks binding the listener address.
-   *
-   * @param listen_address the internal address of the expected internal listener.
-   */
-  virtual InternalListenerOptRef
-  findByAddress(const Address::InstanceConstSharedPtr& listen_address) PURE;
-};
-
-using InternalListenerManagerOptRef =
-    absl::optional<std::reference_wrapper<InternalListenerManager>>;
 
 /**
  * Handles delivering datagrams to the correct worker.

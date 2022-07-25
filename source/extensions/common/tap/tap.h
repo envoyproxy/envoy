@@ -68,8 +68,11 @@ public:
   /**
    * Create a per tap sink handle for use in submitting either buffered traces or trace segments.
    * @param trace_id supplies a locally unique trace ID. Some sinks use this for output generation.
+   * @param type     Indicates the type of Sink specified in request body
    */
-  virtual PerTapSinkHandlePtr createPerTapSinkHandle(uint64_t trace_id) PURE;
+  virtual PerTapSinkHandlePtr
+  createPerTapSinkHandle(uint64_t trace_id,
+                         envoy::config::tap::v3::OutputSink::OutputSinkTypeCase type) PURE;
 };
 
 using SinkPtr = std::unique_ptr<Sink>;

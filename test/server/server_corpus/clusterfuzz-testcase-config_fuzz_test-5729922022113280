@@ -75,9 +75,14 @@ static_resources {
         }
       }
     }
-    http_protocol_options {
-      allow_absolute_url {
-        value: true
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        http_protocol_options {
+          allow_absolute_url {
+            value: true
+          }
+        }
       }
     }
     alt_stat_name: "["
@@ -131,9 +136,14 @@ static_resources {
       }
       sni: "mane"
     }
-    http_protocol_options {
-      allow_absolute_url {
-        value: true
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        http_protocol_options {
+          allow_absolute_url {
+            value: true
+          }
+        }
       }
     }
     alt_stat_name: "["

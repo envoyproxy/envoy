@@ -166,7 +166,8 @@ void EnvoyQuicServerSession::setHttp3Options(
       return;
     }
     if (initial_interval > 0) {
-      connection()->set_ping_timeout(quic::QuicTime::Delta::FromMilliseconds(max_interval));
+      connection()->set_keep_alive_ping_timeout(
+          quic::QuicTime::Delta::FromMilliseconds(max_interval));
       connection()->set_initial_retransmittable_on_wire_timeout(
           quic::QuicTime::Delta::FromMilliseconds(initial_interval));
     }
@@ -178,6 +179,16 @@ void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionM
                                                         const Network::FilterChain& filter_chain,
                                                         ConnectionMapIter position) {
   position_.emplace(connection_map, filter_chain, position);
+}
+
+quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
+  quic::QuicSSLConfig config = quic::QuicServerSessionBase::GetSSLConfig();
+  config.early_data_enabled = position_.has_value()
+                                  ? dynamic_cast<const QuicServerTransportSocketFactory&>(
+                                        position_->filter_chain_.transportSocketFactory())
+                                        .earlyDataEnabled()
+                                  : true;
+  return config;
 }
 
 } // namespace Quic

@@ -6,6 +6,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -99,10 +100,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "happy_eyeballs_connection_impl_test",
-    srcs = ["happy_eyeballs_connection_impl_test.cc"],
+    name = "happy_eyeballs_connection_provider_test",
+    srcs = ["happy_eyeballs_connection_provider_test.cc"],
     deps = [
         "//source/common/network:happy_eyeballs_connection_impl_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "multi_connection_base_impl_test",
+    srcs = ["multi_connection_base_impl_test.cc"],
+    deps = [
+        "//source/common/network:multi_connection_base_impl_lib",
         "//source/common/network:socket_option_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
@@ -164,6 +174,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "listener_filter_buffer_impl_test",
+    srcs = ["listener_filter_buffer_impl_test.cc"],
+    deps = [
+        "//source/common/network:listener_filter_buffer_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:io_handle_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "listener_impl_test",
     srcs = ["listener_impl_test.cc"],
     deps = [
@@ -188,6 +208,7 @@ envoy_cc_test(
     srcs = ["raw_buffer_socket_test.cc"],
     deps = [
         "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//test/test_common:network_utility_lib",
     ],
 )
@@ -409,6 +430,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "win32_socket_handle_impl_test",
+    srcs = ["win32_socket_handle_impl_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "io_socket_handle_impl_integration_test",
     srcs = ["io_socket_handle_impl_integration_test.cc"],
     tags = ["requires-network"],
@@ -445,5 +479,23 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:filter_matcher_lib",
         "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_proto_library(
+    name = "listener_filter_buffer_fuzz_proto",
+    srcs = ["listener_filter_buffer_fuzz.proto"],
+)
+
+envoy_cc_fuzz_test(
+    name = "listener_filter_buffer_fuzz_test",
+    srcs = ["listener_filter_buffer_fuzz_test.cc"],
+    corpus = "listener_filter_buffer_corpus",
+    deps = [
+        ":listener_filter_buffer_fuzz_proto_cc_proto",
+        "//source/common/network:listener_filter_buffer_lib",
+        "//test/fuzz:utility_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:io_handle_mocks",
     ],
 )

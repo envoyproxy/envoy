@@ -1,7 +1,9 @@
 #pragma once
 
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/runtime/runtime.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -62,6 +64,11 @@ public:
    * proto file marked as work in progress.
    */
   virtual void onWorkInProgress(absl::string_view description) PURE;
+
+  /**
+   * Called to update runtime stats on deprecated fields.
+   */
+  virtual OptRef<Runtime::Loader> runtime() PURE;
 };
 
 class ValidationContext {

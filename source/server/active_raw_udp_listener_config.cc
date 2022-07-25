@@ -13,12 +13,13 @@ ActiveRawUdpListenerFactory::ActiveRawUdpListenerFactory(uint32_t concurrency)
     : concurrency_(concurrency) {}
 
 Network::ConnectionHandler::ActiveUdpListenerPtr
-ActiveRawUdpListenerFactory::createActiveUdpListener(uint32_t worker_index,
+ActiveRawUdpListenerFactory::createActiveUdpListener(Runtime::Loader&, uint32_t worker_index,
                                                      Network::UdpConnectionHandler& parent,
+                                                     Network::SocketSharedPtr&& listen_socket_ptr,
                                                      Event::Dispatcher& dispatcher,
                                                      Network::ListenerConfig& config) {
-  return std::make_unique<ActiveRawUdpListener>(worker_index, concurrency_, parent, dispatcher,
-                                                config);
+  return std::make_unique<ActiveRawUdpListener>(worker_index, concurrency_, parent,
+                                                std::move(listen_socket_ptr), dispatcher, config);
 }
 
 } // namespace Server

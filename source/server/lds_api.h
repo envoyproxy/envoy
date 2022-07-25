@@ -47,7 +47,7 @@ private:
   Config::SubscriptionPtr subscription_;
   std::string system_version_info_;
   ListenerManager& listener_manager_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   Upstream::ClusterManager& cm_;
   Init::TargetImpl init_target_;
 };

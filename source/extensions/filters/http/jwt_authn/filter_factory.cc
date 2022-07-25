@@ -23,14 +23,13 @@ namespace {
  * Validate inline jwks, make sure they are the valid
  */
 void validateJwtConfig(const JwtAuthentication& proto_config, Api::Api& api) {
-  for (const auto& it : proto_config.providers()) {
-    const auto& provider = it.second;
+  for (const auto& [name, provider] : proto_config.providers()) {
     const auto inline_jwks = Config::DataSource::read(provider.local_jwks(), true, api);
     if (!inline_jwks.empty()) {
       auto jwks_obj = Jwks::createFrom(inline_jwks, Jwks::JWKS);
       if (jwks_obj->getStatus() != Status::Ok) {
         throw EnvoyException(
-            fmt::format("Provider '{}' in jwt_authn config has invalid local jwks: {}", it.first,
+            fmt::format("Provider '{}' in jwt_authn config has invalid local jwks: {}", name,
                         ::google::jwt_verify::getStatusString(jwks_obj->getStatus())));
       }
     }

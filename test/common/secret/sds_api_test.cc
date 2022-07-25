@@ -112,9 +112,9 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
                                 Stats::Scope&, Config::SubscriptionCallbacks& cbs,
                                 Config::OpaqueResourceDecoder&,
                                 const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
-        return std::make_unique<Config::FilesystemSubscriptionImpl>(*dispatcher_, sds_config_path,
-                                                                    cbs, resource_decoder, stats,
-                                                                    validation_visitor_, *api_);
+        return std::make_unique<Config::FilesystemSubscriptionImpl>(
+            *dispatcher_, Config::makePathConfigSource(sds_config_path), cbs, resource_decoder,
+            stats, validation_visitor_, *api_);
       }));
 
   auto init_manager = Init::ManagerImpl("testing");

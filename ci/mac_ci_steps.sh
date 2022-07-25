@@ -23,7 +23,6 @@ BUILD_CONFIG="$(dirname "$(realpath "$0")")"/osx-build-config
 # is resolved.
 BAZEL_BUILD_OPTIONS=(
     "--curses=no"
-    --show_task_finish
     --verbose_failures
     "--test_output=all"
     "--flaky_test_attempts=integration@2"

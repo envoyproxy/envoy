@@ -26,7 +26,12 @@ using Headers = std::vector<std::pair<const std::string, const std::string>>;
 class ExtAuthzGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
 public:
-  ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
+  ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat 'http.ext_authz.failure_mode_allowed' and
+    // stat_prefix 'ext_authz'.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();

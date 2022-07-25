@@ -12,7 +12,7 @@
 
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
-#include "quiche/spdy/core/spdy_header_block.h"
+#include "quiche/spdy/core/http2_header_block.h"
 
 namespace Envoy {
 namespace Quic {
@@ -34,30 +34,41 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
+  ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredRequestHeaders(headers));
+  if (write_side_closed()) {
+    return absl::CancelledError("encodeHeaders is called on write-closed stream.");
+  }
 
-  ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  auto spdy_headers = envoyHeadersToSpdyHeaderBlock(headers);
+  auto spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
   if (headers.Method()) {
     if (headers.Method()->value() == "CONNECT") {
-      // It is a bytestream connect and should have :path and :protocol set accordingly
-      // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
-      // if shifting codecs. For now, default to "/" - this can be made
-      // configurable if necessary.
-      // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
-      spdy_headers[":protocol"] = Http::Headers::get().ProtocolValues.Bytestream;
-      if (!headers.Path()) {
-        spdy_headers[":path"] = "/";
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
+        spdy_headers.erase(":scheme");
+        spdy_headers.erase(":path");
+        spdy_headers.erase(":protocol");
+      } else {
+        // Legacy support for abandoned
+        // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
+        spdy_headers[":protocol"] = Http::Headers::get().ProtocolValues.Bytestream;
+        if (!headers.Path()) {
+          spdy_headers[":path"] = "/";
+        }
       }
     } else if (headers.Method()->value() == "HEAD") {
       sent_head_request_ = true;
     }
   }
-  WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
+    size_t bytes_sent = WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
+    ENVOY_BUG(bytes_sent != 0, "Failed to encode headers.");
+  }
+
   if (local_end_stream_) {
     onLocalEndStream();
   }
@@ -67,28 +78,39 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
 void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeData (end_stream={}) of {} bytes.", *this, end_stream,
                    data.length());
-  if (data.length() == 0 && !end_stream) {
+  const bool has_data = data.length() > 0;
+  if (!has_data && !end_stream) {
+    return;
+  }
+  if (write_side_closed()) {
+    IS_ENVOY_BUG("encodeData is called on write-closed stream.");
     return;
   }
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   Buffer::RawSliceVector raw_slices = data.getRawSlices();
-  absl::InlinedVector<quic::QuicMemSlice, 4> quic_slices;
+  absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
   quic_slices.reserve(raw_slices.size());
   for (auto& slice : raw_slices) {
     ASSERT(slice.len_ != 0);
     // Move each slice into a stand-alone buffer.
     // TODO(danzh): investigate the cost of allocating one buffer per slice.
     // If it turns out to be expensive, add a new function to free data in the middle in buffer
-    // interface and re-design QuicMemSliceImpl.
-    quic_slices.emplace_back(quic::QuicMemSliceImpl(data, slice.len_));
+    // interface and re-design QuicheMemSliceImpl.
+    quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
   }
-  absl::Span<quic::QuicMemSlice> span(quic_slices);
+  quic::QuicConsumedData result{0, false};
+  absl::Span<quiche::QuicheMemSlice> span(quic_slices);
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
+    result = WriteBodySlices(span, end_stream);
+  }
   // QUIC stream must take all.
-  WriteBodySlices(span, end_stream);
-  if (data.length() > 0) {
-    // Send buffer didn't take all the data, threshold needs to be adjusted.
+  if (result.bytes_consumed == 0 && has_data) {
+    IS_ENVOY_BUG(fmt::format("Send buffer didn't take all the data. Stream is write {} with {} "
+                             "bytes in send buffer. Current write was rejected.",
+                             write_side_closed() ? "closed" : "open", BufferedDataBytes()));
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
@@ -98,11 +120,21 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
 }
 
 void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& trailers) {
+  ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
+  if (write_side_closed()) {
+    IS_ENVOY_BUG("encodeTrailers is called on write-closed stream.");
+    return;
+  }
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
-  ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   ScopedWatermarkBufferUpdater updater(this, this);
-  WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+
+  {
+    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
+    size_t bytes_sent = WriteTrailers(envoyHeadersToHttp2HeaderBlock(trailers), nullptr);
+    ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers");
+  }
+
   onLocalEndStream();
 }
 
@@ -132,6 +164,7 @@ void EnvoyQuicClientStream::switchStreamBlockState() {
 
 void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
+  mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   if (read_side_closed()) {
     return;
   }
@@ -157,7 +190,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   const absl::optional<uint64_t> optional_status =
-      Http::Utility::getResponseStatusNoThrow(*headers);
+      Http::Utility::getResponseStatusOrNullopt(*headers);
   if (!optional_status.has_value()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
@@ -184,6 +217,15 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 
   ConsumeHeaderList();
+}
+
+void EnvoyQuicClientStream::OnStreamFrame(const quic::QuicStreamFrame& frame) {
+  uint64_t highest_byte_received = frame.data_length + frame.offset;
+  if (highest_byte_received > bytesMeter()->wireBytesReceived()) {
+    mutableBytesMeter()->addWireBytesReceived(highest_byte_received -
+                                              bytesMeter()->wireBytesReceived());
+  }
+  quic::QuicSpdyClientStream::OnStreamFrame(frame);
 }
 
 void EnvoyQuicClientStream::OnBodyAvailable() {
@@ -236,6 +278,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
 
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
+  mutableBytesMeter()->addHeaderBytesReceived(frame_len);
   if (read_side_closed()) {
     return;
   }
@@ -257,7 +300,7 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
       return;
     }
     quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
-    auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
+    auto trailers = http2HeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
         received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
         transform_rst);
     if (trailers == nullptr) {
@@ -289,9 +332,10 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
 void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
                                                quic::ConnectionCloseSource source) {
   if (!end_stream_decoded_) {
-    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
-                          ? quicErrorCodeToEnvoyLocalResetReason(error)
-                          : quicErrorCodeToEnvoyRemoteResetReason(error));
+    runResetCallbacks(
+        source == quic::ConnectionCloseSource::FROM_SELF
+            ? quicErrorCodeToEnvoyLocalResetReason(error, session()->OneRttKeysAvailable())
+            : quicErrorCodeToEnvoyRemoteResetReason(error));
   }
   quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
 }

@@ -219,8 +219,8 @@ TEST_F(CompressorFilterTest, DefaultConfigValues) {
   EXPECT_EQ(30, config_->requestDirectionConfig().minimumLength());
   EXPECT_EQ(false, config_->responseDirectionConfig().disableOnEtagHeader());
   EXPECT_EQ(false, config_->responseDirectionConfig().removeAcceptEncodingHeader());
-  EXPECT_EQ(18, config_->responseDirectionConfig().contentTypeValues().size());
-  EXPECT_EQ(18, config_->requestDirectionConfig().contentTypeValues().size());
+  EXPECT_EQ(20, config_->responseDirectionConfig().contentTypeValues().size());
+  EXPECT_EQ(20, config_->requestDirectionConfig().contentTypeValues().size());
 }
 
 TEST_F(CompressorFilterTest, CompressRequest) {
@@ -298,6 +298,40 @@ TEST_F(CompressorFilterTest, NoAcceptEncodingHeader) {
   doResponseNoCompression(headers);
   EXPECT_EQ(1, stats_.counter("test.compressor.test.test.no_accept_header").value());
   EXPECT_EQ("Accept-Encoding", headers.get_("vary"));
+}
+
+TEST_F(CompressorFilterTest, NoAcceptEncodingAndMinmunContentLength) {
+  doRequestNoCompression({{":method", "get"}, {}});
+  Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "15"}};
+  doResponseNoCompression(headers);
+  EXPECT_EQ(0, stats_.counter("test.compressor.test.test.no_accept_header").value());
+  EXPECT_EQ("", headers.get_("vary"));
+}
+
+TEST_F(CompressorFilterTest, NoAcceptEncodingAndCompressionDisabled) {
+  setUpFilter(R"EOF(
+{
+  "response_direction_config": {
+    "common_config": {
+      "enabled": {
+        "default_value": false,
+      }
+    }
+  },
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+  response_stats_prefix_ = "response.";
+  doRequestNoCompression({{":method", "get"}, {}});
+  Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
+  doResponseNoCompression(headers);
+  EXPECT_EQ(0, stats_.counter("test.compressor.test.test.no_accept_header").value());
+  EXPECT_EQ("", headers.get_("vary"));
 }
 
 TEST_F(CompressorFilterTest, CacheIdentityDecision) {

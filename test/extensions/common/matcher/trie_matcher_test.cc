@@ -5,11 +5,14 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/matcher/matcher.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/matching/data_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/matcher/trie_matcher.h"
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -32,7 +35,8 @@ using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
 using ::Envoy::Matcher::StringAction;
 using ::Envoy::Matcher::StringActionFactory;
 using ::Envoy::Matcher::TestData;
-using ::Envoy::Matcher::TestDataInputFactory;
+using ::Envoy::Matcher::TestDataInputBoolFactory;
+using ::Envoy::Matcher::TestDataInputStringFactory;
 
 class TrieMatcherTest : public ::testing::Test {
 public:
@@ -114,20 +118,72 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
+    auto input = TestDataInputStringFactory("192.0.100.1");
     validateMatch("foo");
   }
   {
-    auto input = TestDataInputFactory("input", "192.101.0.1");
+    auto input = TestDataInputStringFactory("192.101.0.1");
     validateMatch("bar");
   }
   {
-    auto input = TestDataInputFactory("input", "128.0.0.1");
+    auto input = TestDataInputStringFactory("128.0.0.1");
     validateNoMatch();
   }
   {
-    auto input = TestDataInputFactory("input", "xxx");
+    auto input = TestDataInputStringFactory("xxx");
     validateNoMatch();
+  }
+}
+
+TEST_F(TrieMatcherTest, TestMatcherOnNoMatch) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+on_no_match:
+  action:
+    name: bar
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: bar
+  )EOF";
+  loadConfig(yaml);
+
+  {
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    validateMatch("foo");
+  }
+  {
+    // No range matches.
+    auto input = TestDataInputStringFactory("128.0.0.1");
+    validateMatch("bar");
+  }
+  {
+    // Input is not a valid IP.
+    auto input = TestDataInputStringFactory("xxx");
+    validateMatch("bar");
+  }
+  {
+    // Input is nullopt.
+    auto input = TestDataInputStringFactory(
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    validateMatch("bar");
   }
 }
 
@@ -173,15 +229,15 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
+    auto input = TestDataInputStringFactory("192.0.100.1");
     validateMatch("foo");
   }
   {
-    auto input = TestDataInputFactory("input", "192.0.0.1");
+    auto input = TestDataInputStringFactory("192.0.0.1");
     validateMatch("bar");
   }
   {
-    auto input = TestDataInputFactory("input", "255.0.0.1");
+    auto input = TestDataInputStringFactory("255.0.0.1");
     validateMatch("bar");
   }
 }
@@ -215,7 +271,7 @@ matcher_tree:
               input:
                 name: nested
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
               exact_match_map:
                 map:
                   baz:
@@ -228,18 +284,18 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "baz");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("baz");
     validateMatch("bar");
   }
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("");
     validateMatch("foo");
   }
   {
-    auto input = TestDataInputFactory("input", "128.0.0.1");
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory("128.0.0.1");
+    auto nested = TestDataInputBoolFactory("");
     validateMatch("foo");
   }
 }
@@ -275,7 +331,7 @@ matcher_tree:
               input:
                 name: nested
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
               exact_match_map:
                 map:
                   baz:
@@ -288,18 +344,18 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "baz");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("baz");
     validateMatch("bar");
   }
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("");
     validateNoMatch();
   }
   {
-    auto input = TestDataInputFactory("input", "128.0.0.1");
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory("128.0.0.1");
+    auto nested = TestDataInputBoolFactory("");
     validateMatch("foo");
   }
 }
@@ -333,7 +389,7 @@ matcher_tree:
               input:
                 name: nested
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
               exact_match_map:
                 map:
                   bar:
@@ -348,7 +404,7 @@ matcher_tree:
                   input:
                     name: nested
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
                   exact_match_map:
                     map:
                       baz:
@@ -361,18 +417,18 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "baz");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("baz");
     validateMatch("baz");
   }
   {
-    auto input = TestDataInputFactory("input", "192.0.100.1");
-    auto nested = TestDataInputFactory("nested", "bar");
+    auto input = TestDataInputStringFactory("192.0.100.1");
+    auto nested = TestDataInputBoolFactory("bar");
     validateMatch("bar");
   }
   {
-    auto input = TestDataInputFactory("input", "128.0.0.1");
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory("128.0.0.1");
+    auto nested = TestDataInputBoolFactory("");
     validateMatch("foo");
   }
 }
@@ -397,7 +453,7 @@ matcher_tree:
               input:
                 name: nested
                 typed_config:
-                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
               custom_match:
                 name: ip_matcher
                 typed_config:
@@ -416,29 +472,118 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputFactory(
-        "input", {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory(
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    auto nested = TestDataInputBoolFactory("");
     validateNoMatch();
   }
   {
-    auto input = TestDataInputFactory("input", "127.0.0.1");
-    auto nested = TestDataInputFactory(
-        "nested", {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    auto input = TestDataInputStringFactory("127.0.0.1");
+    auto nested = TestDataInputBoolFactory(
+        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
     validateNoMatch();
   }
   {
-    auto input = TestDataInputFactory(
-        "input", {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
-    auto nested = TestDataInputFactory("nested", "");
+    auto input = TestDataInputStringFactory(
+        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+    auto nested = TestDataInputBoolFactory("");
     validateUnableToMatch();
   }
   {
-    auto input = TestDataInputFactory("input", "127.0.0.1");
-    auto nested = TestDataInputFactory(
-        "nested", {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+    auto input = TestDataInputStringFactory("127.0.0.1");
+    auto nested = TestDataInputBoolFactory(
+        {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
     validateUnableToMatch();
   }
+}
+
+TEST(TrieMatcherIntegrationTest, NetworkMatchingData) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+  )EOF";
+  xds::type::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  StringActionFactory action_factory;
+  Registry::InjectFactory<ActionFactory<absl::string_view>> inject_action(action_factory);
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  MockMatchTreeValidationVisitor<Network::MatchingData> validation_visitor;
+  EXPECT_CALL(validation_visitor, performDataInputValidation(_, _)).Times(testing::AnyNumber());
+  absl::string_view context = "";
+  MatchTreeFactory<Network::MatchingData, absl::string_view> matcher_factory(
+      context, factory_context, validation_visitor);
+  auto match_tree = matcher_factory.create(matcher);
+
+  Network::MockConnectionSocket socket;
+  socket.connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080));
+  Network::Matching::MatchingDataImpl data(socket);
+
+  const auto result = match_tree()->match(data);
+  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
+  EXPECT_EQ(result.on_match_->action_cb_()->getTyped<StringAction>().string_, "foo");
+}
+
+TEST(TrieMatcherIntegrationTest, UdpNetworkMatchingData) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+  )EOF";
+  xds::type::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  StringActionFactory action_factory;
+  Registry::InjectFactory<ActionFactory<absl::string_view>> inject_action(action_factory);
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  MockMatchTreeValidationVisitor<Network::UdpMatchingData> validation_visitor;
+  EXPECT_CALL(validation_visitor, performDataInputValidation(_, _)).Times(testing::AnyNumber());
+  absl::string_view context = "";
+  MatchTreeFactory<Network::UdpMatchingData, absl::string_view> matcher_factory(
+      context, factory_context, validation_visitor);
+  auto match_tree = matcher_factory.create(matcher);
+
+  Network::MockConnectionSocket socket;
+  const Network::Address::Ipv4Instance address("192.168.0.1", 8080);
+  Network::Matching::UdpMatchingDataImpl data(address, address);
+
+  const auto result = match_tree()->match(data);
+  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
+  EXPECT_EQ(result.on_match_->action_cb_()->getTyped<StringAction>().string_, "foo");
 }
 
 } // namespace

@@ -3,7 +3,6 @@
 #include "envoy/config/core/v3/extension.pb.h"
 
 #include "source/common/matcher/exact_map_matcher.h"
-#include "source/common/matcher/matcher.h"
 
 #include "test/common/matcher/test_utility.h"
 
@@ -12,32 +11,7 @@
 namespace Envoy {
 namespace Matcher {
 
-class ExactMapMatcherTest : public ::testing::Test {
-public:
-  void verifyNoMatch(const MatchTree<TestData>::MatchResult& result) {
-    EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
-    EXPECT_FALSE(result.on_match_.has_value());
-  }
-
-  void verifyImmediateMatch(const MatchTree<TestData>::MatchResult& result,
-                            absl::string_view expected_value) {
-    EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
-    EXPECT_TRUE(result.on_match_.has_value());
-
-    EXPECT_EQ(nullptr, result.on_match_->matcher_);
-    EXPECT_NE(result.on_match_->action_cb_, nullptr);
-
-    EXPECT_EQ(*static_cast<StringAction*>(result.on_match_->action_cb_().get()),
-              *stringValue(expected_value));
-  }
-
-  void verifyNotEnoughDataForMatch(const MatchTree<TestData>::MatchResult& result) {
-    EXPECT_EQ(MatchState::UnableToMatch, result.match_state_);
-    EXPECT_FALSE(result.on_match_.has_value());
-  }
-};
-
-TEST_F(ExactMapMatcherTest, NoMatch) {
+TEST(ExactMapMatcherTest, NoMatch) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
@@ -48,7 +22,7 @@ TEST_F(ExactMapMatcherTest, NoMatch) {
   verifyNoMatch(result);
 }
 
-TEST_F(ExactMapMatcherTest, NoMatchDueToNoData) {
+TEST(ExactMapMatcherTest, NoMatchDueToNoData) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(DataInputGetResult{
           DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt}),
@@ -59,7 +33,7 @@ TEST_F(ExactMapMatcherTest, NoMatchDueToNoData) {
   verifyNoMatch(result);
 }
 
-TEST_F(ExactMapMatcherTest, NoMatchWithFallback) {
+TEST(ExactMapMatcherTest, NoMatchWithFallback) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
@@ -70,7 +44,7 @@ TEST_F(ExactMapMatcherTest, NoMatchWithFallback) {
   verifyImmediateMatch(result, "no_match");
 }
 
-TEST_F(ExactMapMatcherTest, Match) {
+TEST(ExactMapMatcherTest, Match) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
@@ -83,7 +57,7 @@ TEST_F(ExactMapMatcherTest, Match) {
   verifyImmediateMatch(result, "match");
 }
 
-TEST_F(ExactMapMatcherTest, DataNotAvailable) {
+TEST(ExactMapMatcherTest, DataNotAvailable) {
   ExactMapMatcher<TestData> matcher(std::make_unique<TestInput>(DataInputGetResult{
                                         DataInputGetResult::DataAvailability::NotAvailable, {}}),
                                     stringOnMatch<TestData>("no_match"));
@@ -95,7 +69,7 @@ TEST_F(ExactMapMatcherTest, DataNotAvailable) {
   verifyNotEnoughDataForMatch(result);
 }
 
-TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
+TEST(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(DataInputGetResult{
           DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "no match"}),
@@ -108,7 +82,7 @@ TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
   verifyNotEnoughDataForMatch(result);
 }
 
-TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
+TEST(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(DataInputGetResult{
           DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),

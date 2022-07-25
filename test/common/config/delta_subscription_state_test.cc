@@ -387,6 +387,30 @@ TEST_P(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
 }
 
+// Validate that the resources versions are updated and sent upon reconnection.
+// Regression test of: https://github.com/envoyproxy/envoy/issues/20699
+TEST_P(DeltaSubscriptionStateTestBlank, ReconnectResourcesVersions) {
+  // Subscribe to foo and bar.
+  updateSubscriptionInterest({WildcardStr, "foo", "bar"}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_TRUE(req->initial_resource_versions().empty());
+  // Deliver foo, bar, and a wild with version 1.
+  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"bar", "1"}, {"wild", "1"}}, {}, "d1");
+
+  // Update the versions of foo and wild to 2.
+  deliverSimpleDiscoveryResponse({{"foo", "2"}, {"wild", "2"}}, {}, "d2");
+
+  // Reconnect, and end validate the initial resources versions.
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(),
+              UnorderedElementsAre(Pair("foo", "2"), Pair("bar", "1"), Pair("wild", "2")));
+}
+
 // Check that ambiguous resources may also receive a heartbeat message.
 TEST_P(DeltaSubscriptionStateTestBlank, AmbiguousResourceTTL) {
   Event::SimulatedTimeSystem time_system;
@@ -1240,14 +1264,6 @@ TEST_P(VhdsDeltaSubscriptionStateTest, ResourceTTL) {
   deliverDiscoveryResponse(create_resource_with_ttl(true), {}, "debug1", "nonce1", true, 1);
 
   // Heartbeat update should not be propagated to the subscription callback.
-  EXPECT_CALL(*ttl_timer_, enabled());
-  deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 0);
-
-  // When runtime flag is disabled, maintain old behavior where we do propagate
-  // the update to the subscription callback.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.vhds_heartbeats", "false"}});
-
   EXPECT_CALL(*ttl_timer_, enabled());
   deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 1);
 }

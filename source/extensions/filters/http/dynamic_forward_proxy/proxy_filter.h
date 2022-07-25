@@ -65,6 +65,7 @@ public:
 
 private:
   void addHostAddressToFilterState(const Network::Address::InstanceConstSharedPtr& address);
+  void onDnsResolutionFail();
 
   const ProxyFilterConfigSharedPtr config_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;

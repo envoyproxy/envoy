@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace Quic {
 
-quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
+quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
 EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address,
                                    const quic::QuicSocketAddress& client_address,
                                    const std::string& hostname, bool* cert_matched_sni) {
@@ -32,7 +32,7 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
   std::stringstream pem_stream(chain_str);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
 
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> cert_chain(
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_chain(
       new quic::ProofSource::Chain(chain));
   std::string error_details;
   bssl::UniquePtr<X509> cert = parseDERCertificate(cert_chain->certs[0], &error_details);

@@ -7,6 +7,7 @@
 
 using testing::_;
 using testing::DoAll;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -30,8 +31,12 @@ MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
 MockRetryState::MockRetryState() = default;
 
 void MockRetryState::expectHeadersRetry() {
-  EXPECT_CALL(*this, shouldRetryHeaders(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
+  EXPECT_CALL(*this, shouldRetryHeaders(_, _, _))
+      .WillOnce(Invoke([this](const Http::ResponseHeaderMap&, const Http::RequestHeaderMap&,
+                              DoRetryHeaderCallback callback) {
+        callback_ = [callback]() { callback(false); };
+        return RetryStatus::Yes;
+      }));
 }
 
 void MockRetryState::expectHedgedPerTryTimeoutRetry() {
@@ -40,8 +45,12 @@ void MockRetryState::expectHedgedPerTryTimeoutRetry() {
 }
 
 void MockRetryState::expectResetRetry() {
-  EXPECT_CALL(*this, shouldRetryReset(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
+  EXPECT_CALL(*this, shouldRetryReset(_, _, _))
+      .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used,
+                              DoRetryResetCallback callback) {
+        callback_ = [callback]() { callback(false); };
+        return RetryStatus::Yes;
+      }));
 }
 
 MockRetryState::~MockRetryState() = default;
@@ -103,6 +112,7 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, connectConfig()).WillByDefault(ReturnRef(connect_config_));
+  ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(early_data_policy_));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;
@@ -136,6 +146,7 @@ MockRoute::~MockRoute() = default;
 
 MockRouteConfigProvider::MockRouteConfigProvider() {
   ON_CALL(*this, config()).WillByDefault(Return(route_config_));
+  ON_CALL(*this, configCast()).WillByDefault(Return(route_config_));
 }
 MockRouteConfigProvider::~MockRouteConfigProvider() = default;
 
@@ -157,5 +168,14 @@ MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
 MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
   ON_CALL(*this, upstreamToDownstream()).WillByDefault(ReturnRef(upstream_to_downstream_));
 }
+
+MockClusterSpecifierPlugin::MockClusterSpecifierPlugin() {
+  ON_CALL(*this, route(_, _)).WillByDefault(Return(nullptr));
+}
+
+MockClusterSpecifierPluginFactoryConfig::MockClusterSpecifierPluginFactoryConfig() {
+  ON_CALL(*this, createClusterSpecifierPlugin(_, _)).WillByDefault(Return(nullptr));
+}
+
 } // namespace Router
 } // namespace Envoy

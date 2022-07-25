@@ -7,6 +7,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
@@ -76,10 +77,12 @@ void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& stat
 }
 } // namespace
 
-std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+std::vector<Network::FilterFactoryCb>
+ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
     Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::vector<Network::FilterFactoryCb> ret;
+  ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
@@ -101,38 +104,70 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
         i == filters.size() - 1);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
-    ret.push_back(callback);
+    ret.push_back(std::move(callback));
   }
   return ret;
 }
 
-std::vector<Network::ListenerFilterFactoryCb>
-ProdListenerComponentFactory::createListenerFilterFactoryList_(
+Filter::ListenerFilterFactoriesList
+ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
-    Configuration::ListenerFactoryContext& context) {
-  std::vector<Network::ListenerFilterFactoryCb> ret;
+    Configuration::ListenerFactoryContext& context,
+    Filter::TcpListenerFilterConfigProviderManagerImpl& config_provider_manager) {
+  Filter::ListenerFilterFactoriesList ret;
+
+  ret.reserve(filters.size());
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
-    ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrError(
-                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
-
-    // Now see if there is a factory that will accept the config.
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
-            proto_config);
-    auto message = Config::Utility::translateToFactoryConfig(
-        proto_config, context.messageValidationVisitor(), factory);
-    ret.push_back(factory.createListenerFilterFactoryFromProto(
-        *message, createListenerFilterMatcher(proto_config), context));
+    // dynamic listener filter configuration
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      const auto& config_discovery = proto_config.config_discovery();
+      const auto& name = proto_config.name();
+      if (config_discovery.apply_default_config_without_warming() &&
+          !config_discovery.has_default_config()) {
+        throw EnvoyException(fmt::format(
+            "Error: listener filter config {} applied without warming but has no default config.",
+            name));
+      }
+      for (const auto& type_url : config_discovery.type_urls()) {
+        const auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+        const auto* factory =
+            Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
+                getFactoryByType(factory_type_url);
+        if (factory == nullptr) {
+          throw EnvoyException(fmt::format(
+              "Error: no listener factory found for a required type URL {}.", factory_type_url));
+        }
+      }
+      auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
+          config_discovery, name, context, "tcp_listener.", false, "listener",
+          createListenerFilterMatcher(proto_config));
+      ret.push_back(std::move(filter_config_provider));
+    } else {
+      ENVOY_LOG(debug, "  config: {}",
+                MessageUtil::getJsonStringFromMessageOrError(
+                    static_cast<const Protobuf::Message&>(proto_config.typed_config())));
+      // For static configuration, now see if there is a factory that will accept the config.
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+              proto_config);
+      const auto message = Config::Utility::translateToFactoryConfig(
+          proto_config, context.messageValidationVisitor(), factory);
+      const auto callback = factory.createListenerFilterFactoryFromProto(
+          *message, createListenerFilterMatcher(proto_config), context);
+      auto filter_config_provider =
+          config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name());
+      ret.push_back(std::move(filter_config_provider));
+    }
   }
   return ret;
 }
 
 std::vector<Network::UdpListenerFilterFactoryCb>
-ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
     Configuration::ListenerFactoryContext& context) {
   std::vector<Network::UdpListenerFilterFactoryCb> ret;
@@ -143,7 +178,13 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
-
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
+      throw EnvoyException(fmt::format("UDP listener filter: {} is configured with "
+                                       "unsupported dynamic configuration",
+                                       proto_config.name()));
+      return ret;
+    }
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
@@ -332,12 +373,25 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address")) {
-    RELEASE_ASSERT(
-        !config.address().has_envoy_internal_address(),
-        fmt::format("listener {} has envoy internal address {}. This runtime feature is disabled.",
-                    config.name(), config.address().envoy_internal_address().DebugString()));
+  std::string name;
+  if (!config.name().empty()) {
+    name = config.name();
+  } else {
+    // TODO (soulxu): The random uuid name is bad for logging. We can use listening addresses in
+    // the log to improve that.
+    name = server_.api().randomGenerator().uuid();
   }
+
+  // TODO (soulxu): Support multiple internal addresses in the future.
+  if ((config.address().has_envoy_internal_address() && config.additional_addresses_size() > 0) ||
+      std::any_of(config.additional_addresses().begin(), config.additional_addresses().end(),
+                  [](const envoy::config::listener::v3::AdditionalAddress& proto_address) {
+                    return proto_address.address().has_envoy_internal_address();
+                  })) {
+    throw EnvoyException(
+        fmt::format("listener {}: internal address doesn't support multiple addresses.", name));
+  }
+
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
@@ -352,13 +406,6 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
                       "allowed, and it can only be added via bootstrap configuration");
       return false;
     }
-  }
-
-  std::string name;
-  if (!config.name().empty()) {
-    name = config.name();
-  } else {
-    name = server_.api().randomGenerator().uuid();
   }
 
   auto it = error_state_tracker_.find(name);
@@ -431,9 +478,8 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     stats_.listener_in_place_updated_.inc();
   } else {
     ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
-    new_listener =
-        std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
-                                       workers_started_, hash, server_.options().concurrency());
+    new_listener = std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
+                                                  workers_started_, hash);
   }
 
   ListenerImpl& new_listener_ref = *new_listener;
@@ -444,18 +490,18 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
     if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
+      setNewOrDrainingSocketFactory(name, *new_listener);
     } else {
-      new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
+      new_listener->cloneSocketFactoryFrom(**existing_warming_listener);
     }
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
     if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
+      setNewOrDrainingSocketFactory(name, *new_listener);
     } else {
-      new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory().clone());
+      new_listener->cloneSocketFactoryFrom(**existing_active_listener);
     }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
@@ -467,7 +513,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   } else {
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not.
-    setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
+    setNewOrDrainingSocketFactory(name, *new_listener);
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -490,10 +536,10 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   return true;
 }
 
-bool ListenerManagerImpl::hasListenerWithCompatibleAddress(const ListenerList& list,
+bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& list,
                                                            const ListenerImpl& listener) {
   for (const auto& existing_listener : list) {
-    if (existing_listener->hasCompatibleAddress(listener)) {
+    if (existing_listener->hasDuplicatedAddress(listener)) {
       return true;
     }
   }
@@ -589,7 +635,9 @@ ListenerManagerImpl::listeners(ListenerState state) {
 
 bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
   TRY_ASSERT_MAIN_THREAD {
-    listener.listenSocketFactory().doFinalPreWorkerInit();
+    for (auto& socket_factory : listener.listenSocketFactories()) {
+      socket_factory->doFinalPreWorkerInit();
+    }
     return true;
   }
   END_TRY
@@ -607,16 +655,19 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
   if (overridden_listener.has_value()) {
     ENVOY_LOG(debug, "replacing existing listener {}", overridden_listener.value());
   }
-  worker.addListener(overridden_listener, listener, [this, completion_callback]() -> void {
-    // The add listener completion runs on the worker thread. Post back to the main thread to
-    // avoid locking.
-    server_.dispatcher().post([this, completion_callback]() -> void {
-      stats_.listener_create_success_.inc();
-      if (completion_callback) {
-        completion_callback();
-      }
-    });
-  });
+  worker.addListener(
+      overridden_listener, listener,
+      [this, completion_callback]() -> void {
+        // The add listener completion runs on the worker thread. Post back to the main thread to
+        // avoid locking.
+        server_.dispatcher().post([this, completion_callback]() -> void {
+          stats_.listener_create_success_.inc();
+          if (completion_callback) {
+            completion_callback();
+          }
+        });
+      },
+      server_.runtime());
 }
 
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
@@ -908,6 +959,8 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   // We copy by value first then override if necessary.
   auto transport_socket = filter_chain.transport_socket();
   if (!filter_chain.has_transport_socket()) {
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+    transport_socket.mutable_typed_config()->PackFrom(raw_buffer);
     transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 
@@ -958,19 +1011,13 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   return filter_chain_res;
 }
 
-void ListenerManagerImpl::setNewOrDrainingSocketFactory(
-    const std::string& name, const envoy::config::core::v3::Address& proto_address,
-    ListenerImpl& listener) {
-  // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
-  // sure we are not duplicating the address. This avoids ambiguity about which non-binding
-  // listener is used or even worse for the binding to port != 0 and reuse port case multiple
-  // different listeners receiving connections destined for the same port.
-  if ((!listener.bindToPort() || listener.config().address().socket_address().port_value() != 0) &&
-      (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
-       hasListenerWithCompatibleAddress(active_listeners_, listener))) {
+void ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
+                                                        ListenerImpl& listener) {
+  if (hasListenerWithDuplicatedAddress(warming_listeners_, listener) ||
+      hasListenerWithDuplicatedAddress(active_listeners_, listener)) {
     const std::string message =
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
-                    name, listener.address()->asString());
+                    name, absl::StrJoin(listener.addresses(), ",", Network::AddressStrFormatter()));
     ENVOY_LOG(warn, "{}", message);
     throw EnvoyException(message);
   }
@@ -979,17 +1026,19 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
   // the same address we are configured for. This is an edge case, but
   // may happen if a listener is removed and then added back with a same or different name and
   // intended to listen on the same address. This should work and not fail.
-  const Network::ListenSocketFactory* draining_listen_socket_factory = nullptr;
-  auto existing_draining_listener = std::find_if(
-      draining_listeners_.cbegin(), draining_listeners_.cend(),
-      [&listener](const DrainingListener& draining_listener) {
-        return draining_listener.listener_->listenSocketFactory().getListenSocket(0)->isOpen() &&
-               listener.hasCompatibleAddress(*draining_listener.listener_);
-      });
+  const ListenerImpl* draining_listener_ptr = nullptr;
+  auto existing_draining_listener =
+      std::find_if(draining_listeners_.cbegin(), draining_listeners_.cend(),
+                   [&listener](const DrainingListener& draining_listener) {
+                     return draining_listener.listener_->listenSocketFactories()[0]
+                                ->getListenSocket(0)
+                                ->isOpen() &&
+                            listener.hasCompatibleAddress(*draining_listener.listener_);
+                   });
 
   if (existing_draining_listener != draining_listeners_.cend()) {
-    draining_listen_socket_factory = &existing_draining_listener->listener_->getSocketFactory();
     existing_draining_listener->listener_->debugLog("clones listener sockets");
+    draining_listener_ptr = existing_draining_listener->listener_.get();
   } else {
     auto existing_draining_filter_chain = std::find_if(
         draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
@@ -1002,20 +1051,20 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
         });
 
     if (existing_draining_filter_chain != draining_filter_chains_manager_.cend()) {
-      draining_listen_socket_factory =
-          &existing_draining_filter_chain->getDrainingListener().getSocketFactory();
       existing_draining_filter_chain->getDrainingListener().debugLog("clones listener socket");
+      draining_listener_ptr = &existing_draining_filter_chain->getDrainingListener();
     }
   }
 
-  listener.setSocketFactory(draining_listen_socket_factory != nullptr
-                                ? draining_listen_socket_factory->clone()
-                                : createListenSocketFactory(proto_address, listener));
+  if (draining_listener_ptr != nullptr) {
+    listener.cloneSocketFactoryFrom(*draining_listener_ptr);
+  } else {
+    createListenSocketFactory(listener);
+  }
 }
 
-Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
-    const envoy::config::core::v3::Address& proto_address, ListenerImpl& listener) {
-  Network::Socket::Type socket_type = Network::Utility::protobufAddressSocketType(proto_address);
+void ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listener) {
+  Network::Socket::Type socket_type = listener.socketType();
   ListenerComponentFactory::BindType bind_type = ListenerComponentFactory::BindType::NoBind;
   if (listener.bindToPort()) {
     bind_type = listener.reusePort() ? ListenerComponentFactory::BindType::ReusePort
@@ -1024,9 +1073,11 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
   TRY_ASSERT_MAIN_THREAD {
     Network::SocketCreationOptions creation_options;
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
-    return std::make_unique<ListenSocketFactoryImpl>(
-        factory_, listener.address(), socket_type, listener.listenSocketOptions(), listener.name(),
-        listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency());
+    for (auto& address : listener.addresses()) {
+      listener.addSocketFactory(std::make_unique<ListenSocketFactoryImpl>(
+          factory_, address, socket_type, listener.listenSocketOptions(), listener.name(),
+          listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency()));
+    }
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -1044,7 +1095,17 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
     // already waiting for long timeout. However, connection-oriented UDP listeners shouldn't
     // close the socket because they need to receive packets for existing connections via the
     // listen sockets.
-    listener.listenSocketFactory().closeAllSockets();
+    listener.closeAllSockets();
+
+    // In case of this listener was in-place updated previously and in the filter chains draining
+    // procedure, so close the sockets for the previous draining listener.
+    for (auto& manager : draining_filter_chains_manager_) {
+      // A listener can be in-place updated multiple times, so there may
+      // have multiple draining listeners with same tag.
+      if (manager.getDrainingListenerTag() == listener.listenerTag()) {
+        manager.getDrainingListener().closeAllSockets();
+      }
+    }
   }
 }
 

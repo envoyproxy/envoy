@@ -14,6 +14,16 @@ public:
   virtual ~SubscriptionFactory() = default;
 
   /**
+   * @return true if a config source comes from the local filesystem.
+   */
+  static bool
+  isPathBasedConfigSource(envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase type) {
+    return type == envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath ||
+           type ==
+               envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPathConfigSource;
+  }
+
+  /**
    * Subscription factory interface.
    *
    * @param config envoy::config::core::v3::ConfigSource to construct from.

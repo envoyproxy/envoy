@@ -46,7 +46,8 @@ namespace ProxyProtocol {
 Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
-    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {
+    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
+      allow_requests_without_proxy_protocol_(proto_config.allow_requests_without_proxy_protocol()) {
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
@@ -63,43 +64,56 @@ const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
 
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
+bool Config::allowRequestsWithoutProxyProtocol() const {
+  return allow_requests_without_proxy_protocol_;
+}
+
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(debug, "proxy_protocol: new connection accepted");
-  Network::ConnectionSocket& socket = cb.socket();
-  socket.ioHandle().initializeFileEvent(
-      cb.dispatcher(),
-      [this](uint32_t events) {
-        ASSERT(events == Event::FileReadyType::Read);
-        onRead();
-      },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   cb_ = &cb;
+  // Waiting for data.
   return Network::FilterStatus::StopIteration;
 }
 
-void Filter::onRead() {
-  const ReadOrParseState read_state = onReadWorker();
-  if (read_state == ReadOrParseState::Error) {
+Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
+  const ReadOrParseState read_state = parseBuffer(buffer);
+  switch (read_state) {
+  case ReadOrParseState::Error:
     config_->stats_.downstream_cx_proxy_proto_error_.inc();
-    cb_->continueFilterChain(false);
+    cb_->socket().ioHandle().close();
+    return Network::FilterStatus::StopIteration;
+  case ReadOrParseState::TryAgainLater:
+    return Network::FilterStatus::StopIteration;
+  case ReadOrParseState::SkipFilter:
+    return Network::FilterStatus::Continue;
+  case ReadOrParseState::Done:
+    return Network::FilterStatus::Continue;
   }
+  return Network::FilterStatus::Continue;
 }
 
-ReadOrParseState Filter::onReadWorker() {
+ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
   Network::ConnectionSocket& socket = cb_->socket();
 
   // We return if a) we do not yet have the header, b) we have the header but not yet all
-  // the extension data, or c) a socket error occurred when reading the header or the extension
-  // data. In cases a) and b) we'll be called again when the socket is ready to read and pick up
-  // where we left off.
+  // the extension data.
   if (!proxy_protocol_header_.has_value()) {
-    const ReadOrParseState read_header_state = readProxyHeader(socket.ioHandle());
+    const ReadOrParseState read_header_state = readProxyHeader(buffer);
     if (read_header_state != ReadOrParseState::Done) {
       return read_header_state;
     }
   }
+
+  // After parse the header, the extensions size is discovered. Then extend the buffer
+  // size to receive the extensions.
+  if (proxy_protocol_header_.value().wholeHeaderLength() > max_proxy_protocol_len_) {
+    max_proxy_protocol_len_ = proxy_protocol_header_.value().wholeHeaderLength();
+    // The expected header size is changed, waiting for more data.
+    return ReadOrParseState::TryAgainLater;
+  }
+
   if (proxy_protocol_header_.has_value()) {
-    const ReadOrParseState read_ext_state = readExtensions(socket.ioHandle());
+    const ReadOrParseState read_ext_state = readExtensions(buffer);
     if (read_ext_state != ReadOrParseState::Done) {
       return read_ext_state;
     }
@@ -135,13 +149,13 @@ ReadOrParseState Filter::onReadWorker() {
         proxy_protocol_header_.value().remote_address_);
   }
 
-  // Release the file event so that we do not interfere with the connection read events.
-  socket.ioHandle().resetFileEvents();
-  cb_->continueFilterChain(true);
+  if (!buffer.drain(proxy_protocol_header_.value().wholeHeaderLength())) {
+    return ReadOrParseState::Error;
+  }
   return ReadOrParseState::Done;
 }
 
-absl::optional<size_t> Filter::lenV2Address(char* buf) {
+absl::optional<size_t> Filter::lenV2Address(const char* buf) {
   const uint8_t proto_family = buf[PROXY_PROTO_V2_SIGNATURE_LEN + 1];
   const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   size_t len;
@@ -165,15 +179,16 @@ absl::optional<size_t> Filter::lenV2Address(char* buf) {
   return len;
 }
 
-bool Filter::parseV2Header(char* buf) {
+bool Filter::parseV2Header(const char* buf) {
   const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   uint8_t upper_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 2];
   uint8_t lower_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 1];
   size_t hdr_addr_len = (upper_byte << 8) + lower_byte;
 
   if ((ver_cmd & 0xf) == PROXY_PROTO_V2_LOCAL) {
-    // This is locally-initiated, e.g. health-check, and should not override remote address
-    proxy_protocol_header_.emplace(WireHeader{hdr_addr_len});
+    // This is locally-initiated, e.g. health-check, and should not override remote address.
+    // According to the spec, this address length should be zero for local connection.
+    proxy_protocol_header_.emplace(WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, 0, 0});
     return true;
   }
 
@@ -191,8 +206,8 @@ bool Filter::parseV2Header(char* buf) {
           uint16_t src_port;
           uint16_t dst_port;
         });
-        pp_ipv4_addr* v4;
-        v4 = reinterpret_cast<pp_ipv4_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
+        const pp_ipv4_addr* v4;
+        v4 = reinterpret_cast<const pp_ipv4_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in ra4, la4;
         memset(&ra4, 0, sizeof(ra4));
         memset(&la4, 0, sizeof(la4));
@@ -204,7 +219,8 @@ bool Filter::parseV2Header(char* buf) {
         la4.sin_port = v4->dst_port;
         la4.sin_addr.s_addr = v4->dst_addr;
         proxy_protocol_header_.emplace(
-            WireHeader{hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
+            WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
+                       hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
                        std::make_shared<Network::Address::Ipv4Instance>(&ra4),
                        std::make_shared<Network::Address::Ipv4Instance>(&la4)});
         return true;
@@ -215,8 +231,8 @@ bool Filter::parseV2Header(char* buf) {
           uint16_t src_port;
           uint16_t dst_port;
         });
-        pp_ipv6_addr* v6;
-        v6 = reinterpret_cast<pp_ipv6_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
+        const pp_ipv6_addr* v6;
+        v6 = reinterpret_cast<const pp_ipv6_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in6 ra6, la6;
         memset(&ra6, 0, sizeof(ra6));
         memset(&la6, 0, sizeof(la6));
@@ -229,6 +245,7 @@ bool Filter::parseV2Header(char* buf) {
         safeMemcpy(&(la6.sin6_addr.s6_addr), &(v6->dst_addr));
 
         proxy_protocol_header_.emplace(WireHeader{
+            PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
             hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
             std::make_shared<Network::Address::Ipv6Instance>(ra6),
             std::make_shared<Network::Address::Ipv6Instance>(la6)});
@@ -240,7 +257,7 @@ bool Filter::parseV2Header(char* buf) {
   return false;
 }
 
-bool Filter::parseV1Header(char* buf, size_t len) {
+bool Filter::parseV1Header(const char* buf, size_t len) {
   std::string proxy_line;
   proxy_line.assign(buf, len);
   const auto trimmed_proxy_line = StringUtil::rtrim(proxy_line);
@@ -277,7 +294,8 @@ bool Filter::parseV1Header(char* buf, size_t len) {
         return false;
       }
       proxy_protocol_header_.emplace(
-          WireHeader{0, Network::Address::IpVersion::v4, remote_address, local_address});
+          WireHeader{len, 0, 0, 0, Network::Address::IpVersion::v4, remote_address, local_address});
+      return true;
     } else if (line_parts[1] == "TCP6") {
       const Network::Address::InstanceConstSharedPtr remote_address =
           Network::Utility::parseInternetAddressAndPortNoThrow("[" + std::string{line_parts[2]} +
@@ -290,39 +308,15 @@ bool Filter::parseV1Header(char* buf, size_t len) {
         return false;
       }
       proxy_protocol_header_.emplace(
-          WireHeader{0, Network::Address::IpVersion::v6, remote_address, local_address});
+          WireHeader{len, 0, 0, 0, Network::Address::IpVersion::v6, remote_address, local_address});
+      return true;
     } else {
       ENVOY_LOG(debug, "failed to read proxy protocol");
       return false;
     }
   }
+  proxy_protocol_header_.emplace(WireHeader{len, 0, 0, 0});
   return true;
-}
-
-ReadOrParseState Filter::parseExtensions(Network::IoHandle& io_handle, uint8_t* buf,
-                                         size_t buf_size, size_t* buf_off) {
-  // If we ever implement extensions elsewhere, be sure to
-  // continue to skip and ignore those for LOCAL.
-  while (proxy_protocol_header_.value().extensions_length_) {
-    int to_read = std::min(buf_size, proxy_protocol_header_.value().extensions_length_);
-    buf += (nullptr != buf_off) ? *buf_off : 0;
-    const auto recv_result = io_handle.recv(buf, to_read, 0);
-    if (!recv_result.ok()) {
-      if (recv_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-        return ReadOrParseState::TryAgainLater;
-      }
-      ENVOY_LOG(debug, "failed to read proxy protocol (no bytes avail)");
-      return ReadOrParseState::Error;
-    }
-
-    proxy_protocol_header_.value().extensions_length_ -= recv_result.return_value_;
-
-    if (nullptr != buf_off) {
-      *buf_off += recv_result.return_value_;
-    }
-  }
-
-  return ReadOrParseState::Done;
 }
 
 /**
@@ -335,33 +329,33 @@ ReadOrParseState Filter::parseExtensions(Network::IoHandle& io_handle, uint8_t* 
  *        };
  *        See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details
  */
-bool Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
+bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
   size_t idx{0};
-  while (idx < tlvs.size()) {
-    const uint8_t tlv_type = tlvs[idx];
+  while (idx < len) {
+    const uint8_t tlv_type = buf[idx];
     idx++;
 
-    if ((idx + 1) >= tlvs.size()) {
+    if ((idx + 1) >= len) {
       ENVOY_LOG(debug,
                 fmt::format("failed to read proxy protocol extension. No bytes for TLV length. "
                             "Extension length is {}, current index is {}, current type is {}.",
-                            tlvs.size(), idx, tlv_type));
+                            len, idx, tlv_type));
       return false;
     }
 
-    const uint8_t tlv_length_upper = tlvs[idx];
-    const uint8_t tlv_length_lower = tlvs[idx + 1];
+    const uint8_t tlv_length_upper = buf[idx];
+    const uint8_t tlv_length_lower = buf[idx + 1];
     const size_t tlv_value_length = (tlv_length_upper << 8) + tlv_length_lower;
     idx += 2;
 
     // Get the value.
-    if ((idx + tlv_value_length - 1) >= tlvs.size()) {
+    if ((idx + tlv_value_length - 1) >= len) {
       ENVOY_LOG(
           debug,
           fmt::format("failed to read proxy protocol extension. No bytes for TLV value. "
                       "Extension length is {}, current index is {}, current type is {}, current "
                       "value length is {}.",
-                      tlvs.size(), idx, tlv_type, tlv_length_upper));
+                      len, idx, tlv_type, tlv_length_upper));
       return false;
     }
 
@@ -369,8 +363,7 @@ bool Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
       ProtobufWkt::Value metadata_value;
-      metadata_value.set_string_value(reinterpret_cast<char const*>(tlvs.data() + idx),
-                                      tlv_value_length);
+      metadata_value.set_string_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
                                      ? "envoy.filters.listener.proxy_protocol"
@@ -385,164 +378,121 @@ bool Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
     }
 
     idx += tlv_value_length;
-    ASSERT(idx <= tlvs.size());
+    ASSERT(idx <= len);
   }
   return true;
 }
 
-ReadOrParseState Filter::readExtensions(Network::IoHandle& io_handle) {
-  // Parse and discard the extensions if this is a local command or there's no TLV needs to be saved
-  // to metadata.
+ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
+  auto raw_slice = buffer.rawSlice();
+  // waiting for more data if there is no enough data for extensions.
+  if (raw_slice.len_ < (proxy_protocol_header_.value().wholeHeaderLength())) {
+    return ReadOrParseState::TryAgainLater;
+  }
+
   if (proxy_protocol_header_.value().local_command_ || 0 == config_->numberOfNeededTlvTypes()) {
-    // buf_ is no longer in use so we re-use it to read/discard.
-    return parseExtensions(io_handle, reinterpret_cast<uint8_t*>(buf_), sizeof(buf_), nullptr);
+    // Ignores the extensions if this is a local command or there's no TLV needs to be saved
+    // to metadata. Those will drained from the buffer in the end.
+    return ReadOrParseState::Done;
   }
 
-  // Initialize the buf_tlv_ only when we need to read the TLVs.
-  if (buf_tlv_.empty()) {
-    buf_tlv_.resize(proxy_protocol_header_.value().extensions_length_);
-  }
-
-  // Parse until we have all the TLVs in buf_tlv.
-  const ReadOrParseState parse_extensions_state =
-      parseExtensions(io_handle, buf_tlv_.data(), buf_tlv_.size(), &buf_tlv_off_);
-  if (parse_extensions_state != ReadOrParseState::Done) {
-    return parse_extensions_state;
-  }
-
-  if (!parseTlvs(buf_tlv_)) {
+  const uint8_t* buf = static_cast<const uint8_t*>(raw_slice.mem_) +
+                       proxy_protocol_header_.value().headerLengthWithoutExtension();
+  if (!parseTlvs(buf, proxy_protocol_header_.value().extensions_length_)) {
     return ReadOrParseState::Error;
   }
 
   return ReadOrParseState::Done;
 }
 
-ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
-  while (buf_off_ < MAX_PROXY_PROTO_LEN_V2) {
-    const auto result =
-        io_handle.recv(buf_ + buf_off_, MAX_PROXY_PROTO_LEN_V2 - buf_off_, MSG_PEEK);
+ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) {
+  auto raw_slice = buffer.rawSlice();
+  const char* buf = static_cast<const char*>(raw_slice.mem_);
 
-    if (!result.ok()) {
-      if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-        return ReadOrParseState::TryAgainLater;
-      }
-      ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
+  if (config_.get()->allowRequestsWithoutProxyProtocol()) {
+    auto matchv2 = !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
+                           std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_));
+    auto matchv1 = !memcmp(buf, PROXY_PROTO_V1_SIGNATURE,
+                           std::min<size_t>(PROXY_PROTO_V1_SIGNATURE_LEN, raw_slice.len_));
+    if (!matchv2 && !matchv1) {
+      // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
+      // short-circuit
+      ENVOY_LOG(trace, "request does not use v1 or v2 proxy protocol, forwarding as is");
+      return ReadOrParseState::SkipFilter;
+    }
+  }
+
+  if (raw_slice.len_ >= PROXY_PROTO_V2_HEADER_LEN) {
+    const char* sig = PROXY_PROTO_V2_SIGNATURE;
+    if (!memcmp(buf, sig, PROXY_PROTO_V2_SIGNATURE_LEN)) {
+      header_version_ = V2;
+    } else if (memcmp(buf, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
+      // It is not v2, and can't be v1, so no sense hanging around: it is invalid
+      ENVOY_LOG(debug, "failed to read proxy protocol (exceed max v1 header len)");
       return ReadOrParseState::Error;
     }
-    ssize_t nread = result.return_value_;
+  }
 
-    if (nread < 1) {
-      ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
+  if (header_version_ == V2) {
+    const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
+    if (((ver_cmd & 0xf0) >> 4) != PROXY_PROTO_V2_VERSION) {
+      ENVOY_LOG(debug, "Unsupported V2 proxy protocol version");
       return ReadOrParseState::Error;
     }
-
-    if (buf_off_ + nread >= PROXY_PROTO_V2_HEADER_LEN) {
-      const char* sig = PROXY_PROTO_V2_SIGNATURE;
-      if (!memcmp(buf_, sig, PROXY_PROTO_V2_SIGNATURE_LEN)) {
-        header_version_ = V2;
-      } else if (memcmp(buf_, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
-        // It is not v2, and can't be v1, so no sense hanging around: it is invalid
-        ENVOY_LOG(debug, "failed to read proxy protocol (exceed max v1 header len)");
-        return ReadOrParseState::Error;
-      }
+    absl::optional<ssize_t> addr_len_opt = lenV2Address(buf);
+    if (!addr_len_opt.has_value()) {
+      return ReadOrParseState::Error;
     }
-
-    if (header_version_ == V2) {
-      const int ver_cmd = buf_[PROXY_PROTO_V2_SIGNATURE_LEN];
-      if (((ver_cmd & 0xf0) >> 4) != PROXY_PROTO_V2_VERSION) {
-        ENVOY_LOG(debug, "Unsupported V2 proxy protocol version");
-        return ReadOrParseState::Error;
-      }
-      if (buf_off_ < PROXY_PROTO_V2_HEADER_LEN) {
-        ssize_t exp = PROXY_PROTO_V2_HEADER_LEN - buf_off_;
-        const auto read_result = io_handle.recv(buf_ + buf_off_, exp, 0);
-        if (!read_result.ok() || read_result.return_value_ != uint64_t(exp)) {
-          ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
-          return ReadOrParseState::Error;
-        }
-        buf_off_ += read_result.return_value_;
-        nread -= read_result.return_value_;
-      }
-      absl::optional<ssize_t> addr_len_opt = lenV2Address(buf_);
-      if (!addr_len_opt.has_value()) {
-        return ReadOrParseState::Error;
-      }
-      ssize_t addr_len = addr_len_opt.value();
-      uint8_t upper_byte = buf_[PROXY_PROTO_V2_HEADER_LEN - 2];
-      uint8_t lower_byte = buf_[PROXY_PROTO_V2_HEADER_LEN - 1];
-      ssize_t hdr_addr_len = (upper_byte << 8) + lower_byte;
-      if (hdr_addr_len < addr_len) {
-        ENVOY_LOG(debug, "failed to read proxy protocol (insufficient data)");
-        return ReadOrParseState::Error;
-      }
-      if (ssize_t(buf_off_) + nread >= PROXY_PROTO_V2_HEADER_LEN + addr_len) {
-        ssize_t missing = (PROXY_PROTO_V2_HEADER_LEN + addr_len) - buf_off_;
-        const auto read_result = io_handle.recv(buf_ + buf_off_, missing, 0);
-        if (!read_result.ok() || read_result.return_value_ != uint64_t(missing)) {
-          ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
-          return ReadOrParseState::Error;
-        }
-        buf_off_ += read_result.return_value_;
-        // The TLV remain, they are read/discard in parseExtensions() which is called from the
-        // parent (if needed).
-        if (parseV2Header(buf_)) {
-          return ReadOrParseState::Done;
-        } else {
-          return ReadOrParseState::Error;
-        }
-      } else if (nread != 0) {
-        const auto result = io_handle.recv(buf_ + buf_off_, nread, 0);
-        nread = result.return_value_;
-        if (!result.ok()) {
-          ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
-          return ReadOrParseState::Error;
-        }
-        buf_off_ += nread;
-      }
-    } else {
-      // continue searching buf_ from where we left off
-      for (; search_index_ < buf_off_ + nread; search_index_++) {
-        if (buf_[search_index_] == '\n' && buf_[search_index_ - 1] == '\r') {
-          if (search_index_ == 1) {
-            // This could be the binary protocol. It cannot be the ascii protocol
-            header_version_ = InProgress;
-          } else {
-            header_version_ = V1;
-            search_index_++;
-          }
-          break;
-        }
-      }
-
-      // If we bailed on the first char, we might be v2, but are for sure not v1. Thus we
-      // can read up to min(PROXY_PROTO_V2_HEADER_LEN, bytes_avail). If we bailed after first
-      // char, but before we hit \r\n, read up to search_index_. We're asking only for
-      // bytes we've already seen so there should be no block or fail
-      size_t ntoread;
-      if (header_version_ == InProgress) {
-        ntoread = nread;
+    ssize_t addr_len = addr_len_opt.value();
+    uint8_t upper_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 2];
+    uint8_t lower_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 1];
+    ssize_t hdr_addr_len = (upper_byte << 8) + lower_byte;
+    if (hdr_addr_len < addr_len) {
+      ENVOY_LOG(debug,
+                "incorrect address length, address length = {}, the expected address length = {}",
+                hdr_addr_len, addr_len);
+      return ReadOrParseState::Error;
+    }
+    // waiting for more data if there is no enough data for address.
+    if (raw_slice.len_ >= static_cast<size_t>(PROXY_PROTO_V2_HEADER_LEN + addr_len)) {
+      // The TLV remain, they are parsed in `parseTlvs()` which is called from the
+      // parent (if needed).
+      if (parseV2Header(buf)) {
+        return ReadOrParseState::Done;
       } else {
-        ntoread = search_index_ - buf_off_;
+        return ReadOrParseState::Error;
       }
-
-      const auto result = io_handle.recv(buf_ + buf_off_, ntoread, 0);
-      nread = result.return_value_;
-      ASSERT(result.ok() && size_t(nread) == ntoread);
-
-      buf_off_ += nread;
-
-      if (header_version_ == V1) {
-        if (parseV1Header(buf_, buf_off_)) {
-          return ReadOrParseState::Done;
+    }
+  } else {
+    // continue searching buffer from where we left off
+    for (; search_index_ < raw_slice.len_; search_index_++) {
+      if (buf[search_index_] == '\n' && buf[search_index_ - 1] == '\r') {
+        if (search_index_ == 1) {
+          // There is not enough data to determine if it contains the v2 protocol signature, so wait
+          // for more data.
+          break;
         } else {
-          return ReadOrParseState::Error;
+          header_version_ = V1;
+          search_index_++;
         }
+        break;
+      }
+    }
+
+    if (search_index_ > MAX_PROXY_PROTO_LEN_V1) {
+      return ReadOrParseState::Error;
+    }
+
+    if (header_version_ == V1) {
+      if (parseV1Header(buf, search_index_)) {
+        return ReadOrParseState::Done;
+      } else {
+        return ReadOrParseState::Error;
       }
     }
   }
 
-  ENVOY_LOG(debug, "failed to read proxy protocol (exceed max v2 header len)");
-  return ReadOrParseState::Error;
+  return ReadOrParseState::TryAgainLater;
 }
 
 } // namespace ProxyProtocol

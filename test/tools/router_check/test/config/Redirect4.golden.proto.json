@@ -1,0 +1,30 @@
+{
+  "tests": [
+    {
+      "test_name": "Test_1",
+      "input": {
+        "authority": "redirect.lyft.com",
+        "path": "/foo",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "",
+        "path_redirect": "http://new.lyft.com/foo",
+        "code_redirect": 301
+      }
+    },
+    {
+      "test_name": "Test_2",
+      "input": {
+        "authority": "redirect.lyft.com",
+        "path": "/bar",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "",
+        "path_redirect": "http://new.lyft.com/new_bar",
+        "code_redirect": 302
+      }
+    }
+  ]
+}

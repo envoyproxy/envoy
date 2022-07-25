@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
+#include <cstdint>
+
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
@@ -10,7 +12,7 @@
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/utility.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
@@ -137,9 +139,10 @@ int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
   return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 }
 
-int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
-                                       Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                                       X509& leaf_cert, const Network::TransportSocketOptions*) {
+int SPIFFEValidator::doSynchronousVerifyCertChain(X509_STORE_CTX* store_ctx,
+                                                  Ssl::SslExtendedSocketInfo* ssl_extended_info,
+                                                  X509& leaf_cert,
+                                                  const Network::TransportSocketOptions*) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
@@ -157,12 +160,20 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
     return 0;
   }
 
-  // Set the trust bundle's certificate store on the context, and do the verification.
-  store_ctx->ctx = trust_bundle;
-  if (allow_expired_certificate_) {
-    X509_STORE_CTX_set_verify_cb(store_ctx, CertValidatorUtil::ignoreCertificateExpirationCallback);
+  // Set the trust bundle's certificate store on a copy of the context, and do the verification.
+  bssl::UniquePtr<X509_STORE_CTX> new_store_ctx(X509_STORE_CTX_new());
+  if (!X509_STORE_CTX_init(new_store_ctx.get(), trust_bundle, &leaf_cert,
+                           X509_STORE_CTX_get0_untrusted(store_ctx)) ||
+      !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(new_store_ctx.get()),
+                              X509_STORE_CTX_get0_param(store_ctx))) {
+    stats_.fail_verify_error_.inc();
+    return 0;
   }
-  auto ret = X509_verify_cert(store_ctx);
+  if (allow_expired_certificate_) {
+    X509_STORE_CTX_set_verify_cb(new_store_ctx.get(),
+                                 CertValidatorUtil::ignoreCertificateExpirationCallback);
+  }
+  auto ret = X509_verify_cert(new_store_ctx.get());
   if (!ret) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
@@ -255,14 +266,16 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   return "";
 }
 
-size_t SPIFFEValidator::daysUntilFirstCertExpires() const {
+absl::optional<uint32_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
   if (ca_certs_.empty()) {
-    return 0;
+    return absl::make_optional(std::numeric_limits<uint32_t>::max());
   }
-  size_t ret = SIZE_MAX;
+  absl::optional<uint32_t> ret = absl::make_optional(std::numeric_limits<uint32_t>::max());
   for (auto& cert : ca_certs_) {
-    size_t tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
-    if (tmp < ret) {
+    const absl::optional<uint32_t> tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
+    if (!tmp.has_value()) {
+      return absl::nullopt;
+    } else if (tmp.value() < ret.value()) {
       ret = tmp;
     }
   }
@@ -285,7 +298,7 @@ public:
     return std::make_unique<SPIFFEValidator>(config, stats, time_source);
   }
 
-  absl::string_view name() override { return "envoy.tls.cert_validator.spiffe"; }
+  std::string name() const override { return "envoy.tls.cert_validator.spiffe"; }
 };
 
 REGISTER_FACTORY(SPIFFEValidatorFactory, CertValidatorFactory);

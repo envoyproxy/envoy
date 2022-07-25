@@ -34,7 +34,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/router/upstream_request.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 
@@ -304,7 +304,8 @@ public:
   virtual bool downstreamEndStream() const PURE;
   virtual uint32_t attemptCount() const PURE;
   virtual const VirtualCluster* requestVcluster() const PURE;
-  virtual const RouteEntry* routeEntry() const PURE;
+  virtual const RouteStatsContextOptRef routeStatsContext() const PURE;
+  virtual const Route* route() const PURE;
   virtual const std::list<UpstreamRequestPtr>& upstreamRequests() const PURE;
   virtual const UpstreamRequest* finalUpstreamRequest() const PURE;
   virtual TimeSource& timeSource() PURE;
@@ -431,13 +432,7 @@ public:
       return {};
     }
 
-    auto override_host = callbacks_->upstreamOverrideHost();
-    if (override_host.has_value()) {
-      // TODO(wbpcode): Currently we need to provide additional expected host status to the load
-      // balancer. This should be resolved after the `overrideHostToSelect()` refactoring.
-      return std::make_pair(std::string(override_host.value()), ~static_cast<uint32_t>(0));
-    }
-    return {};
+    return callbacks_->upstreamOverrideHost();
   }
 
   /**
@@ -494,12 +489,19 @@ public:
   bool downstreamEndStream() const override { return downstream_end_stream_; }
   uint32_t attemptCount() const override { return attempt_count_; }
   const VirtualCluster* requestVcluster() const override { return request_vcluster_; }
-  const RouteEntry* routeEntry() const override { return route_entry_; }
+  const RouteStatsContextOptRef routeStatsContext() const override { return route_stats_context_; }
+  const Route* route() const override { return route_.get(); }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const override {
     return upstream_requests_;
   }
   const UpstreamRequest* finalUpstreamRequest() const override { return final_upstream_request_; }
   TimeSource& timeSource() override { return config_.timeSource(); }
+
+protected:
+  void setRetryShadownBufferLimit(uint32_t retry_shadow_buffer_limit) {
+    ASSERT(retry_shadow_buffer_limit_ > retry_shadow_buffer_limit);
+    retry_shadow_buffer_limit_ = retry_shadow_buffer_limit;
+  }
 
 private:
   friend class UpstreamRequest;
@@ -514,17 +516,18 @@ private:
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
-  virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
-                                         Http::RequestHeaderMap& request_headers,
-                                         const Upstream::ClusterInfo& cluster,
-                                         const VirtualCluster* vcluster, Runtime::Loader& runtime,
-                                         Random::RandomGenerator& random,
-                                         Event::Dispatcher& dispatcher, TimeSource& time_source,
-                                         Upstream::ResourcePriority priority) PURE;
+  virtual RetryStatePtr
+  createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
+                   const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                   RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
+                   Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                   TimeSource& time_source, Upstream::ResourcePriority priority) PURE;
 
   std::unique_ptr<GenericConnPool>
   createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster);
   UpstreamRequestPtr createUpstreamRequest();
+  absl::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
+                                                     const Http::HeaderMap& headers) const;
 
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
@@ -555,7 +558,7 @@ private:
                                                 uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
-  void doRetry();
+  void doRetry(bool can_send_early_data, bool can_use_http3);
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
@@ -572,6 +575,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
+  RouteStatsContextOptRef route_stats_context_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
   FilterUtility::HedgingParams hedging_params_;
@@ -600,7 +604,7 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;
-  bool internal_redirects_with_body_enabled_ : 1;
+  bool conn_pool_new_stream_with_early_data_and_http3_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 
@@ -616,9 +620,10 @@ private:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                                  const Upstream::ClusterInfo& cluster,
-                                 const VirtualCluster* vcluster, Runtime::Loader& runtime,
-                                 Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                                 TimeSource& time_source,
+                                 const VirtualCluster* vcluster,
+                                 RouteStatsContextOptRef route_stats_context,
+                                 Runtime::Loader& runtime, Random::RandomGenerator& random,
+                                 Event::Dispatcher& dispatcher, TimeSource& time_source,
                                  Upstream::ResourcePriority priority) override;
 };
 

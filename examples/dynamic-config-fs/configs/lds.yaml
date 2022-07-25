@@ -13,6 +13,8 @@ resources:
         stat_prefix: ingress_http
         http_filters:
         - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         route_config:
           name: local_route
           virtual_hosts:

@@ -355,6 +355,11 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   }
 
   data.drain(sizeof(int32_t));
+  if (message_length < Message::MessageHeaderSize) {
+    ENVOY_LOG(debug, "message size {} less than min. message size {}", message_length,
+              Message::MessageHeaderSize);
+    return false;
+  }
   int32_t request_id = Bson::BufferHelper::removeInt32(data);
   int32_t response_to = Bson::BufferHelper::removeInt32(data);
   Message::OpCode op_code = static_cast<Message::OpCode>(Bson::BufferHelper::removeInt32(data));

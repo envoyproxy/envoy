@@ -42,6 +42,10 @@ MockHostDescription::MockHostDescription()
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
   ON_CALL(*this, healthChecker()).WillByDefault(ReturnRef(health_checker_));
   ON_CALL(*this, transportSocketFactory()).WillByDefault(ReturnRef(*socket_factory_));
+  ON_CALL(*this, canCreateConnection(_))
+      .WillByDefault(Invoke([this](Upstream::ResourcePriority pri) -> bool {
+        return cluster().resourceManager(pri).connections().canCreate();
+      }));
 }
 
 MockHostDescription::~MockHostDescription() = default;

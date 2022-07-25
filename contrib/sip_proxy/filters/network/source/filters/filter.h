@@ -9,10 +9,11 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "contrib/sip_proxy/filters/network/source/decoder_events.h"
-#include "contrib/sip_proxy/filters/network/source/protocol.h"
 #include "contrib/sip_proxy/filters/network/source/router/router.h"
 #include "contrib/sip_proxy/filters/network/source/sip.h"
+#include "contrib/sip_proxy/filters/network/source/stats.h"
 #include "contrib/sip_proxy/filters/network/source/tra/tra.h"
+#include "contrib/sip_proxy/filters/network/source/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,9 +31,9 @@ enum class ResponseStatus {
 /**
  * Decoder filter callbacks add additional callbacks.
  */
-class DecoderFilterCallbacks {
+class DecoderFilterCallbacks : public SipProxy::PendingListHandler {
 public:
-  virtual ~DecoderFilterCallbacks() = default;
+  ~DecoderFilterCallbacks() override = default;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
@@ -53,6 +54,8 @@ public:
    * @return RouteConstSharedPtr the route for the current request.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
+
+  virtual SipFilterStats& stats() PURE;
 
   /**
    * Create a locally generated response using the provided response object.
@@ -87,10 +90,11 @@ public:
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   virtual std::shared_ptr<Router::TransactionInfos> transactionInfos() PURE;
-  virtual std::shared_ptr<SipProxy::SipSettings> settings() PURE;
+  virtual std::shared_ptr<SipProxy::SipSettings> settings() const PURE;
   virtual std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler> traHandler() PURE;
   virtual void onReset() PURE;
-  virtual void continueHanding() PURE;
+  virtual void continueHandling(const std::string& key, bool try_next_affinity) PURE;
+  virtual MessageMetadataSharedPtr metadata() PURE;
 };
 
 /**

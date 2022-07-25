@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/tcp/conn_pool.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/singleton/const_singleton.h"
 
@@ -45,9 +47,8 @@ public:
       return UNFRAMED;
     case TransportType::Auto:
       return AUTO;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 };
 
@@ -96,9 +97,8 @@ public:
       return TWITTER;
     case ProtocolType::Auto:
       return AUTO;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 };
 
@@ -119,12 +119,70 @@ enum class MessageType {
 };
 
 /**
+ * Names of available message types.
+ */
+class MessageTypeNameValues {
+public:
+  // Call (regular request that awaits for a response)
+  const std::string CALL = "call";
+
+  // Reply (or response)
+  const std::string REPLY = "reply";
+
+  // Exception (generated instead of reply)
+  const std::string EXCEPTION = "exception";
+
+  // Oneway (no reply expected)
+  const std::string ONEWAY = "oneway";
+
+  const std::string& fromType(MessageType type) const {
+    switch (type) {
+    case MessageType::Call:
+      return CALL;
+    case MessageType::Reply:
+      return REPLY;
+    case MessageType::Exception:
+      return EXCEPTION;
+    case MessageType::Oneway:
+      return ONEWAY;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+};
+
+using MessageTypeNames = ConstSingleton<MessageTypeNameValues>;
+
+/**
  * A Reply message is either a success or an error (IDL exception)
  */
 enum class ReplyType {
   Success,
   Error,
 };
+
+/**
+ * Names of available reply types.
+ */
+class ReplyTypeNameValues {
+public:
+  // Success
+  const std::string SUCCESS = "success";
+
+  // Error
+  const std::string ERROR = "error";
+
+  const std::string& fromType(ReplyType type) const {
+    switch (type) {
+    case ReplyType::Success:
+      return SUCCESS;
+    case ReplyType::Error:
+      return ERROR;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+};
+
+using ReplyTypeNames = ConstSingleton<ReplyTypeNameValues>;
 
 /**
  * Thrift protocol struct field types.
@@ -173,6 +231,32 @@ enum class AppExceptionType {
   ChecksumMismatch = 14,
   Interruption = 15,
 };
+
+/**
+ * Names of pool failure reason.
+ */
+class PoolFailureReasonNameValues {
+public:
+  const std::string OVERFLOW_NAME = "overflow";
+  const std::string LOCAL_CONNECTION_FAILURE_NAME = "local connection failure";
+  const std::string REMOTE_CONNECTION_FAILURE_NAME = "remote connection failure";
+  const std::string TIMEOUT_NAME = "timeout";
+
+  const std::string& fromReason(ConnectionPool::PoolFailureReason reason) const {
+    switch (reason) {
+    case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+      return LOCAL_CONNECTION_FAILURE_NAME;
+    case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+      return REMOTE_CONNECTION_FAILURE_NAME;
+    case ConnectionPool::PoolFailureReason::Timeout:
+      return TIMEOUT_NAME;
+    case ConnectionPool::PoolFailureReason::Overflow:
+      return OVERFLOW_NAME;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+};
+using PoolFailureReasonNames = ConstSingleton<PoolFailureReasonNameValues>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

@@ -23,6 +23,7 @@ envoy_cc_library(
     name = "upstream_interface",
     hdrs = ["upstream.h"],
     deps = [
+        "//envoy/http:header_evaluator",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/upstream:upstream_interface",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",

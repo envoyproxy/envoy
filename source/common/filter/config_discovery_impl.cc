@@ -8,7 +8,6 @@
 
 #include "source/common/common/containers.h"
 #include "source/common/common/thread.h"
-#include "source/common/config/utility.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 
@@ -57,17 +56,10 @@ void DynamicFilterConfigProviderImplBase::validateTypeUrl(const std::string& typ
 
 const std::string& DynamicFilterConfigProviderImplBase::name() { return subscription_->name(); }
 
-void DynamicFilterConfigProviderImplBase::validateTerminalFilter(const std::string& name,
-                                                                 const std::string& filter_type,
-                                                                 bool is_terminal_filter) {
-  Config::Utility::validateTerminalFilters(name, filter_type, filter_chain_type_,
-                                           is_terminal_filter, last_filter_in_filter_chain_);
-}
-
 FilterConfigSubscription::FilterConfigSubscription(
     const envoy::config::core::v3::ConfigSource& config_source,
-    const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
-    const std::string& stat_prefix,
+    const std::string& filter_config_name,
+    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     FilterConfigProviderManagerImplBase& filter_config_provider_manager,
     const std::string& subscription_id)
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
@@ -75,9 +67,7 @@ FilterConfigSubscription::FilterConfigSubscription(
       filter_config_name_(filter_config_name), factory_context_(factory_context),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
-      scope_(factory_context.scope().createScope(stat_prefix + "extension_config_discovery." +
-                                                 filter_config_name_ + ".")),
-      stat_prefix_(stat_prefix),
+      scope_(factory_context.scope().createScope(stat_prefix)),
       stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
       filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {
@@ -122,10 +112,10 @@ void FilterConfigSubscription::onConfigUpdate(
   for (auto* provider : filter_config_providers_) {
     provider->validateTypeUrl(type_url);
   }
-  auto [message, factory_name, is_terminal_filter] =
+  auto [message, factory_name] =
       filter_config_provider_manager_.getMessage(filter_config, factory_context_);
   for (auto* provider : filter_config_providers_) {
-    provider->validateTerminalFilter(filter_config_name_, factory_name, is_terminal_filter);
+    provider->validateMessage(filter_config_name_, *message, factory_name);
   }
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
 
@@ -140,8 +130,7 @@ void FilterConfigSubscription::onConfigUpdate(
   last_config_ = std::move(message);
   last_type_url_ = type_url;
   last_version_info_ = version_info;
-  last_filter_name_ = factory_name;
-  last_filter_is_terminal_ = is_terminal_filter;
+  last_factory_name_ = factory_name;
 }
 
 void FilterConfigSubscription::onConfigUpdate(
@@ -160,8 +149,8 @@ void FilterConfigSubscription::onConfigUpdate(
     last_config_hash_ = 0;
     last_config_ = nullptr;
     last_type_url_ = "";
-    last_filter_is_terminal_ = false;
-    last_filter_name_ = "";
+    last_version_info_ = "";
+    last_factory_name_ = "";
   } else if (!added_resources.empty()) {
     onConfigUpdate(added_resources, added_resources[0].get().version());
   }
@@ -169,7 +158,8 @@ void FilterConfigSubscription::onConfigUpdate(
 
 void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                                                     const EnvoyException*) {
-  ENVOY_LOG(debug, "Updating filter config {} failed due to {}", filter_config_name_, reason);
+  ENVOY_LOG(debug, "Updating filter config {} failed due to {}", filter_config_name_,
+            static_cast<int>(reason));
   stats_.config_fail_.inc();
   // Make sure to make progress in case the control plane is temporarily failing.
   init_target_.ready();
@@ -195,7 +185,8 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::g
   auto it = subscriptions_.find(subscription_id);
   if (it == subscriptions_.end()) {
     auto subscription = std::make_shared<FilterConfigSubscription>(
-        config_source, name, factory_context, stat_prefix, *this, subscription_id);
+        config_source, name, factory_context.getServerFactoryContext(), stat_prefix, *this,
+        subscription_id);
     subscriptions_.insert({subscription_id, std::weak_ptr<FilterConfigSubscription>(subscription)});
     return subscription;
   } else {
@@ -218,8 +209,8 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   if (subscription->lastConfig()) {
     TRY_ASSERT_MAIN_THREAD {
       provider.validateTypeUrl(subscription->lastTypeUrl());
-      provider.validateTerminalFilter(filter_config_name, subscription->lastFilterName(),
-                                      subscription->isLastFilterTerminal());
+      provider.validateMessage(filter_config_name, *subscription->lastConfig(),
+                               subscription->lastFactoryName());
       last_config_valid = true;
     }
     END_TRY catch (const EnvoyException& e) {
@@ -239,49 +230,19 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   }
 }
 
-std::tuple<ProtobufTypes::MessagePtr, std::string, bool>
-HttpFilterConfigProviderManagerImpl::getMessage(
-    const envoy::config::core::v3::TypedExtensionConfig& filter_config,
-    Server::Configuration::FactoryContext& factory_context) const {
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          filter_config);
-  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-      filter_config.typed_config(),
-      factory_context.messageValidationContext().dynamicValidationVisitor(), factory);
-  bool is_terminal_filter = factory.isTerminalFilterByProto(*message, factory_context);
-  return {std::move(message), factory.name(), is_terminal_filter};
-}
-
-ProtobufTypes::MessagePtr HttpFilterConfigProviderManagerImpl::getDefaultConfig(
-    const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
-    Server::Configuration::FactoryContext& factory_context, bool last_filter_in_filter_chain,
-    const std::string& filter_chain_type,
-    const absl::flat_hash_set<std::string>& require_type_urls) const {
-  auto* default_factory =
-      Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
-          proto_config);
-  if (default_factory == nullptr) {
+void FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
+    const bool null_default_factory, const std::string& filter_config_name,
+    absl::string_view type_url) const {
+  if (null_default_factory) {
     throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
                                      "configuration with type URL {}.",
-                                     filter_config_name, proto_config.type_url()));
+                                     filter_config_name, type_url));
   }
-  validateTypeUrlHelper(Config::Utility::getFactoryType(proto_config), require_type_urls);
-  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-      proto_config, factory_context.messageValidationVisitor(), *default_factory);
-  Config::Utility::validateTerminalFilters(
-      filter_config_name, default_factory->name(), filter_chain_type,
-      default_factory->isTerminalFilterByProto(*message, factory_context),
-      last_filter_in_filter_chain);
-  return message;
 }
 
-Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::instantiateFilterFactory(
-    const Protobuf::Message& message, const std::string& stat_prefix,
-    Server::Configuration::FactoryContext& factory_context) const {
-  auto* factory = Registry::FactoryRegistry<
-      Server::Configuration::NamedHttpFilterConfigFactory>::getFactoryByType(message.GetTypeName());
-  return factory->createFilterFactoryFromProto(message, stat_prefix, factory_context);
+void FilterConfigProviderManagerImplBase::validateProtoConfigTypeUrl(
+    const std::string& type_url, const absl::flat_hash_set<std::string>& require_type_urls) const {
+  validateTypeUrlHelper(type_url, require_type_urls);
 }
 
 } // namespace Filter

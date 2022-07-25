@@ -6,19 +6,6 @@ layered_runtime:
   - name: static-layer
     static_layer:
       "test.runtime.loaded": true
-static_resources:
-  listeners:
-  - name: "test.listener"
-    address:
-      socket_address:
-        protocol: TCP
-        address: 0.0.0.0
-        port_value: 0
-    filter_chains:
-    - filters:
-      - name: envoy.filters.network.test
-        typed_config:
-          "@type": type.googleapis.com/google.protobuf.Struct
 admin:
   address:
     socket_address:

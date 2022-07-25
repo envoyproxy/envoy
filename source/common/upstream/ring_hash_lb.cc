@@ -172,7 +172,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
               ? MurmurHash::murmurHash2(hash_key, MurmurHash::STD_HASH_SEED)
               : HashUtil::xxHash64(hash_key);
 
-      ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key.data(), hash);
+      ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key, hash);
       ring_.push_back({hash, host});
       ++i;
       ++current_hashes;

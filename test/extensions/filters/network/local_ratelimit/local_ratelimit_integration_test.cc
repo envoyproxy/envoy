@@ -8,10 +8,18 @@ class LocalRateLimitIntegrationTest : public Event::TestUsingSimulatedTime,
                                       public BaseIntegrationTest {
 public:
   LocalRateLimitIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat
+    // 'http_local_rate_limiter.http_local_rate_limit.rate_limited' and stat_prefix
+    // 'http_local_rate_limiter'.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
-  void setup(const std::string& filter_yaml) {
-    config_helper_.addNetworkFilter(filter_yaml);
+  void setup(const std::string& filter_yaml = {}) {
+    if (!filter_yaml.empty()) {
+      config_helper_.addNetworkFilter(filter_yaml);
+    }
     BaseIntegrationTest::initialize();
   }
 };
@@ -43,6 +51,83 @@ typed_config:
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   EXPECT_EQ(0,
+            test_server_->counter("local_rate_limit.local_rate_limit_stats.rate_limited")->value());
+}
+
+TEST_P(LocalRateLimitIntegrationTest, RateLimited) {
+  setup(R"EOF(
+name: ratelimit
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit
+  stat_prefix: local_rate_limit_stats
+  token_bucket:
+    max_tokens: 1
+    # Set fill_interval to effectively infinite so we only get max_tokens to start and never re-fill.
+    fill_interval: 100000s
+)EOF");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  tcp_client->waitForData("world");
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(1,
+            test_server_->counter("local_rate_limit.local_rate_limit_stats.rate_limited")->value());
+}
+
+TEST_P(LocalRateLimitIntegrationTest, SharedTokenBucket) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    config_helper_.addNetworkFilter(R"EOF(
+name: ratelimit
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit
+  stat_prefix: local_rate_limit_stats
+  share_key: 'the_key'
+  token_bucket:
+    max_tokens: 2
+    # Set fill_interval to effectively infinite so we only get max_tokens to start and never re-fill.
+    fill_interval: 100000s
+)EOF");
+
+    // Clone the whole listener, which includes the `share_key`.
+    auto static_resources = bootstrap.mutable_static_resources();
+    auto* old_listener = static_resources->mutable_listeners(0);
+    auto* cloned_listener = static_resources->add_listeners();
+    cloned_listener->CopyFrom(*old_listener);
+    cloned_listener->set_name("listener_1");
+  });
+
+  setup();
+
+  // One connection on each listener will exhaust the token bucket, which has 2 tokens.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  tcp_client = makeTcpConnection(lookupPort("listener_1"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Now both listeners will reject connections due to the shared token bucket being empty.
+  tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->waitForDisconnect();
+  EXPECT_EQ(1,
+            test_server_->counter("local_rate_limit.local_rate_limit_stats.rate_limited")->value());
+
+  tcp_client = makeTcpConnection(lookupPort("listener_1"));
+  tcp_client->waitForDisconnect();
+  EXPECT_EQ(2,
             test_server_->counter("local_rate_limit.local_rate_limit_stats.rate_limited")->value());
 }
 

@@ -34,6 +34,10 @@ mappers:
           key: foo
           value: bar
         append: false
+      - header:
+          key: content-type
+          value: "application/json-custom"
+        append: false
 body_format:
   json_format:
     level: TRACE
@@ -41,6 +45,7 @@ body_format:
     response_body: "%LOCAL_REPLY_BODY%"
   )EOF";
   setLocalReplyConfig(yaml);
+  config_helper_.addConfigModifier(configureProxyStatus());
   initialize();
 
   const std::string expected_body = R"({
@@ -77,9 +82,12 @@ body_format:
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ("application/json-custom", response->headers().ContentType()->value().getStringView());
   EXPECT_EQ("150", response->headers().ContentLength()->value().getStringView());
   EXPECT_EQ("550", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=connection_terminated; "
+            "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
   EXPECT_EQ("bar",
             response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
   // Check if returned json is same as expected

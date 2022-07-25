@@ -74,6 +74,9 @@ public:
   Admin& admin() override { return *admin_; }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
+  const Upstream::ClusterManager& clusterManager() const override {
+    return *config_.clusterManager();
+  }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
@@ -91,7 +94,12 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
-  Runtime::Loader& runtime() override { return Runtime::LoaderSingleton::get(); }
+  Runtime::Loader& runtime() override {
+    if (runtime_singleton_) {
+      return runtime_singleton_->instance();
+    }
+    return *runtime_;
+  }
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override {}
@@ -137,18 +145,19 @@ public:
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
-    return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+    return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
         filters, filter_chain_factory_context);
   }
-  std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+  Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
+    return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+        filters, context, tcp_listener_config_provider_manager_);
   }
   std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
+    return ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(filters, context);
   }
   Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
@@ -164,6 +173,10 @@ public:
     return nullptr;
   }
   uint64_t nextListenerTag() override { return 0; }
+  Filter::TcpListenerFilterConfigProviderManagerImpl*
+  getTcpListenerConfigProviderManager() override {
+    return &tcp_listener_config_provider_manager_;
+  }
 
   // Server::WorkerFactory
   WorkerPtr createWorker(uint32_t, OverloadManager&, const std::string&) override {
@@ -206,6 +219,7 @@ private:
   std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerPtr singleton_manager_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
+  std::unique_ptr<Runtime::Loader> runtime_;
   Random::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Configuration::MainImpl config_;
@@ -221,6 +235,7 @@ private:
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
   Quic::QuicStatNames quic_stat_names_;
+  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 
 } // namespace Server

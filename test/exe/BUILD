@@ -53,7 +53,7 @@ envoy_sh_test(
     srcs = ["version_out_test.sh"],
     coverage = False,
     data = [
-        "//:VERSION",
+        "//:VERSION.txt",
         "//bazel:raw_build_id.ldscript",
         "//source/exe:envoy-static",
     ],
@@ -96,6 +96,22 @@ envoy_cc_test(
         "//source/exe:terminate_handler_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "check_extensions_against_registry_test",
+    srcs = ["check_extensions_against_registry_test.cc"],
+    data = [
+        "//source/extensions:extensions_metadata.yaml",
+    ],
+    deps = [
+        "//test/test_common:environment_lib",
+    ] + select({
+        # gcc RBE build has trouble compiling target with all extensions
+        "//bazel:gcc_build": ["//source/exe:envoy_main_common_with_core_extensions_lib"],
+        # This dependency MUST be main_common_lib to meet the purpose of this test
+        "//conditions:default": ["//source/exe:main_common_lib"],
+    }),
 )
 
 envoy_cc_test(

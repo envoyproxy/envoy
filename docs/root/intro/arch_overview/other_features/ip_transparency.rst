@@ -73,6 +73,8 @@ Here is an example config for setting up the socket:
             version: V1
           transport_socket:
             name: envoy.transport_sockets.raw_buffer
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
       ...
 
 There are several things to consider if you plan to use this socket in conjunction with the

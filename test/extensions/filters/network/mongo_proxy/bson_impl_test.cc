@@ -51,6 +51,12 @@ TEST(BsonImplTest, InvalodDocumentTermination) {
   EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
 }
 
+TEST(BsonImplTest, DocumentSizeUnderflow) {
+  Buffer::OwnedImpl buffer;
+  BufferHelper::writeInt32(buffer, 2);
+  EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
+}
+
 TEST(BufferHelperTest, InvalidSize) {
   {
     Buffer::OwnedImpl buffer;

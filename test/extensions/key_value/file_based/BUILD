@@ -13,7 +13,7 @@ envoy_cc_test(
     srcs = ["alternate_protocols_cache_impl_test.cc"],
     deps = [
         "//source/common/common:key_value_store_lib",
-        "//source/common/http:alternate_protocols_cache",
+        "//source/common/http:http_server_properties_cache",
         "//source/common/singleton:manager_impl_lib",
         "//source/extensions/key_value/file_based:config_lib",
         "//test/common/http:common_lib",

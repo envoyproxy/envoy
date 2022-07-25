@@ -88,6 +88,8 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -104,21 +106,6 @@ envoy_cc_test(
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "active_internal_listener_test",
-    srcs = ["active_internal_listener_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//source/common/network:address_lib",
-        "//source/common/network:listen_socket_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
-        "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/server:connection_handler_lib",
-        "//test/mocks/network:network_mocks",
     ],
 )
 
@@ -251,6 +238,7 @@ envoy_cc_test(
         "//test/mocks/server:options_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
@@ -284,6 +272,7 @@ envoy_cc_test_library(
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         "//source/common/init:manager_lib",
+        "//source/extensions/common/matcher:trie_matcher_lib",
         "//source/server:listener_manager_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/matcher:matcher_mocks",
@@ -328,6 +317,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:active_raw_udp_listener_config",
+        "//test/integration/filters:test_listener_filter_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
@@ -453,6 +443,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -489,6 +480,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/server:worker_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:guard_dog_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:overload_manager_mocks",

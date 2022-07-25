@@ -1,6 +1,7 @@
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -85,7 +86,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_ciphers_(stat_name_set_->add("ssl.ciphers")),
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
-      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()) {
+      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()),
+      tls_keylog_local_(config.tlsKeyLogLocal()), tls_keylog_remote_(config.tlsKeyLogRemote()) {
 
   auto cert_validator_name = getCertValidatorName(config.certificateValidationContext());
   auto cert_validator_factory =
@@ -336,6 +338,43 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   //
   // Note that if a negotiated version is outside of this set, we'll issue an ENVOY_BUG.
   stat_name_set_->rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
+
+  if (!config.tlsKeyLogPath().empty()) {
+    ENVOY_LOG(debug, "Enable tls key log");
+    tls_keylog_file_ = config.accessLogManager().createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, config.tlsKeyLogPath()});
+    for (auto& context : tls_contexts_) {
+      SSL_CTX* ctx = context.ssl_ctx_.get();
+      ASSERT(ctx != nullptr);
+      SSL_CTX_set_keylog_callback(ctx, keylogCallback);
+    }
+  }
+}
+
+void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
+  ASSERT(ssl != nullptr);
+  auto callbacks =
+      static_cast<Network::TransportSocketCallbacks*>(SSL_get_ex_data(ssl, sslSocketIndex()));
+  auto ctx = static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+  ASSERT(callbacks != nullptr);
+  ASSERT(ctx != nullptr);
+
+  if ((ctx->tls_keylog_local_.getIpListSize() == 0 ||
+       ctx->tls_keylog_local_.contains(
+           *(callbacks->connection().connectionInfoProvider().localAddress()))) &&
+      (ctx->tls_keylog_remote_.getIpListSize() == 0 ||
+       ctx->tls_keylog_remote_.contains(
+           *(callbacks->connection().connectionInfoProvider().remoteAddress())))) {
+    ctx->tls_keylog_file_->write(absl::StrCat(line, "\n"));
+  }
+}
+
+int ContextImpl::sslSocketIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int ssl_socket_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(ssl_socket_index >= 0, "");
+    return ssl_socket_index;
+  }());
 }
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
@@ -379,11 +418,14 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-bssl::UniquePtr<SSL> ContextImpl::newSsl(const Network::TransportSocketOptions*) {
+bssl::UniquePtr<SSL>
+ContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) {
   // We use the first certificate for a new SSL object, later in the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we replace with the
   // selected certificate via SSL_set_SSL_CTX().
-  return bssl::UniquePtr<SSL>(SSL_new(tls_contexts_[0].ssl_ctx_.get()));
+  auto ssl_con = bssl::UniquePtr<SSL>(SSL_new(tls_contexts_[0].ssl_ctx_.get()));
+  SSL_set_app_data(ssl_con.get(), &options);
+  return ssl_con;
 }
 
 int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
@@ -391,11 +433,16 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
   auto cert = bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl));
-  return impl->cert_validator_->doVerifyCertChain(
+  auto transport_socket_options_shared_ptr_ptr =
+      static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(SSL_get_app_data(ssl));
+  ASSERT(transport_socket_options_shared_ptr_ptr);
+  const Network::TransportSocketOptions* transport_socket_options =
+      (*transport_socket_options_shared_ptr_ptr).get();
+  return impl->cert_validator_->doSynchronousVerifyCertChain(
       store_ctx,
       reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
           SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex())),
-      *cert, static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl)));
+      *cert, transport_socket_options);
 }
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
@@ -446,14 +493,18 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
   return providers;
 }
 
-size_t ContextImpl::daysUntilFirstCertExpires() const {
-  int daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
-  for (auto& ctx : tls_contexts_) {
-    daysUntilExpiration = std::min<int>(
-        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_), daysUntilExpiration);
+absl::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
+  absl::optional<uint32_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
+  if (!daysUntilExpiration.has_value()) {
+    return absl::nullopt;
   }
-  if (daysUntilExpiration < 0) { // Ensure that the return value is unsigned
-    return 0;
+  for (auto& ctx : tls_contexts_) {
+    const absl::optional<uint32_t> tmp =
+        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_);
+    if (!tmp.has_value()) {
+      return absl::nullopt;
+    }
+    daysUntilExpiration = std::min<uint32_t>(tmp.value(), daysUntilExpiration.value());
   }
   return daysUntilExpiration;
 }
@@ -550,7 +601,8 @@ bool ContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl
   return false;
 }
 
-bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOptions* options) {
+bssl::UniquePtr<SSL>
+ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(options));
 
   const std::string server_name_indication = options && options->serverNameOverride().has_value()
@@ -563,7 +615,6 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
   }
 
   if (options && !options->verifySubjectAltNameListOverride().empty()) {
-    SSL_set_app_data(ssl_con.get(), options);
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
 
@@ -1021,10 +1072,8 @@ OcspStapleAction ServerContextImpl::ocspStapleAction(const TlsContext& ctx,
       return OcspStapleAction::Fail;
     }
     return OcspStapleAction::Staple;
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 enum ssl_select_cert_result_t
@@ -1125,7 +1174,7 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
     return false;
   }
 
-  int res = cert_validator_->doVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
+  int res = cert_validator_->doSynchronousVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
   // If |SSL_VERIFY_NONE|, the error is non-fatal, but we keep the error details.
   if (res <= 0 && SSL_CTX_get_verify_mode(ssl_ctx) != SSL_VERIFY_NONE) {
     error_details = Utility::getX509VerificationErrorInfo(ctx.get());

@@ -14,11 +14,13 @@ namespace Envoy {
 namespace Upstream {
 
 EdsClusterImpl::EdsClusterImpl(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                             added_via_api, factory_context.mainThreadDispatcher().timeSource()),
+    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
+    : BaseDynamicClusterImpl(server_context, cluster, runtime, factory_context,
+                             std::move(stats_scope), added_via_api,
+                             factory_context.mainThreadDispatcher().timeSource()),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           factory_context.messageValidationVisitor(), "cluster_name"),
       factory_context_(factory_context), local_info_(factory_context.localInfo()),
@@ -28,8 +30,8 @@ EdsClusterImpl::EdsClusterImpl(
   Event::Dispatcher& dispatcher = factory_context.mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
-  if (eds_config.config_source_specifier_case() ==
-      envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath) {
+  if (Config::SubscriptionFactory::isPathBasedConfigSource(
+          eds_config.config_source_specifier_case())) {
     initialize_phase_ = InitializePhase::Primary;
   } else {
     initialize_phase_ = InitializePhase::Secondary;
@@ -376,17 +378,18 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 EdsClusterFactory::createClusterImpl(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopePtr&& stats_scope) {
+    Stats::ScopeSharedPtr&& stats_scope) {
   if (!cluster.has_eds_cluster_config()) {
     throw EnvoyException("cannot create an EDS cluster without an EDS config");
   }
 
-  return std::make_pair(
-      std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                       std::move(stats_scope), context.addedViaApi()),
-      nullptr);
+  return std::make_pair(std::make_unique<EdsClusterImpl>(
+                            server_context, cluster, context.runtime(), socket_factory_context,
+                            std::move(stats_scope), context.addedViaApi()),
+                        nullptr);
 }
 
 bool EdsClusterImpl::validateAllLedsUpdated() const {

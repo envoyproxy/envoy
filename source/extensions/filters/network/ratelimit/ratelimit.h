@@ -13,6 +13,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 
 namespace Envoy {
@@ -47,19 +50,28 @@ public:
   Config(const envoy::extensions::filters::network::ratelimit::v3::RateLimit& config,
          Stats::Scope& scope, Runtime::Loader& runtime);
   const std::string& domain() { return domain_; }
-  const std::vector<RateLimit::Descriptor>& descriptors() { return descriptors_; }
+  const std::vector<RateLimit::Descriptor>& descriptors() { return original_descriptors_; }
   Runtime::Loader& runtime() { return runtime_; }
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return !failure_mode_deny_; };
+  std::vector<RateLimit::Descriptor>
+  applySubstitutionFormatter(StreamInfo::StreamInfo& stream_info);
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
 
   std::string domain_;
-  std::vector<RateLimit::Descriptor> descriptors_;
+  std::vector<RateLimit::Descriptor> original_descriptors_;
+  std::vector<std::unique_ptr<Formatter::FormatterImpl>> substitution_formatters_;
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
+  // These are needed because Envoy doesn't have substitution formatters independent of HTTP
+  // components yet An issue has been created to resolve this:
+  // https://github.com/envoyproxy/envoy/issues/20818
+  const Http::RequestHeaderMapPtr request_headers_;
+  const Http::ResponseHeaderMapPtr response_headers_;
+  const Http::ResponseTrailerMapPtr response_trailers_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

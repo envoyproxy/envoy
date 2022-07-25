@@ -12,6 +12,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: SimpleHttpCache CacheFilter storage plugin]
 
-// [#extension: envoy.cache.simple_http_cache]
+// [#extension: envoy.extensions.http.cache.simple]
 message SimpleHttpCacheConfig {
 }

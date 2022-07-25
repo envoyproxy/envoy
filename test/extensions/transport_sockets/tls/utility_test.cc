@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -29,12 +30,30 @@ TEST(UtilityTest, TestDnsNameMatching) {
   EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyft.com"));
   EXPECT_TRUE(Utility::dnsNameMatch("a.lyft.com", "*.lyft.com"));
   EXPECT_TRUE(Utility::dnsNameMatch("a.LYFT.com", "*.lyft.COM"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "*yft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("LYFT.com", "*yft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "*lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyf*.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyft*.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "l*ft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("t.lyft.com", "t*.lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("test.lyft.com", "t*.lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("l-lots-of-stuff-ft.com", "l*ft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("t.lyft.com", "t*t.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "l*ft.co"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "ly?t.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "lf*t.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch(".lyft.com", "*lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "**lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "lyft**.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "ly**ft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "lyft.c*m"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*yft.c*m"));
+  EXPECT_FALSE(Utility::dnsNameMatch("test.lyft.com.extra", "*.lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("foo.test.com", "*.lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*.lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("alyft.com", "*.lyft.com"));
-  EXPECT_FALSE(Utility::dnsNameMatch("alyft.com", "*lyft.com"));
-  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("", "*lyft.com"));
   EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", ""));
 }
@@ -104,17 +123,13 @@ TEST(UtilityTest, TestDaysUntilExpiration) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  // Get expiration time from the certificate info.
-  const absl::Time expiration =
-      TestUtility::parseTime(TEST_SAN_DNS_CERT_NOT_AFTER, "%b %e %H:%M:%S %Y GMT");
-
-  int days = std::difftime(absl::ToTimeT(expiration), known_date_time) / (60 * 60 * 24);
-  EXPECT_EQ(days, Utility::getDaysUntilExpiration(cert.get(), time_source));
+  EXPECT_EQ(absl::nullopt, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
   Event::SimulatedTimeSystem time_source;
-  EXPECT_EQ(std::numeric_limits<int>::max(), Utility::getDaysUntilExpiration(nullptr, time_source));
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
+            Utility::getDaysUntilExpiration(nullptr, time_source).value());
 }
 
 TEST(UtilityTest, TestValidFrom) {

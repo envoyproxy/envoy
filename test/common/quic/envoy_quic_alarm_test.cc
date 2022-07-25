@@ -1,6 +1,6 @@
 #include "source/common/quic/envoy_quic_alarm.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
-#include "source/common/quic/platform/envoy_quic_clock.h"
+#include "source/common/quic/envoy_quic_clock.h"
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"

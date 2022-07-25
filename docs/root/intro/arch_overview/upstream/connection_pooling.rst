@@ -71,8 +71,8 @@ stream, but if both TCP and QUIC connections are established, QUIC will eventual
 If an alternate protocol cache is configured via
 :ref:`alternate_protocols_cache_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig.alternate_protocols_cache_options>`
 then HTTP/3 connections will only be attempted to servers which
-advertise HTTP/3 support either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`, (eventually
-the `HTTPS DNS resource record<https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>` or "QUIC hints"
+advertise HTTP/3 support either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_, (eventually
+the `HTTPS DNS resource record <https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>`_ or "QUIC hints"
 which will be manually configured).
 If no such advertisement exists, then HTTP/2 or HTTP/1 will be used instead.
 
@@ -85,6 +85,26 @@ means that upstream HTTP/3 connection attempts might be blocked by the network a
 back to using HTTP/2 or HTTP/1.  This path is alpha and rapidly undergoing improvements with the goal of having
 the default behavior result in optimal latency for internet environments, so please be patient and follow along with Envoy release notes
 to stay aprised of the latest and greatest changes.
+
+.. _arch_overview_happy_eyeballs:
+
+Happy Eyeballs Support
+----------------------
+
+Envoy supports Happy Eyeballs, `RFC6555 <https://tools.ietf.org/html/rfc6555>`_,
+for upstream TCP connections. This behavior is now on by default but can be disabled by the runtime flag
+``envoy.reloadable_features.allow_multiple_dns_addresses``. For clusters which use
+:ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
+this behavior is configured by setting the DNS IP address resolution policy in
+:ref:`config.cluster.v3.Cluster.DnsLookupFamily <envoy_v3_api_enum_config.cluster.v3.Cluster.DnsLookupFamily>`
+to the :ref:`ALL <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.ALL>` option to return
+both IPv4 and IPv6 addresses. The returned addresses will be sorted according the the Happy Eyeballs
+specification and a connection will be attempted to the first in the list. If this connection succeeds,
+it will be used. If it fails, an attempt will be made to the next on the list. If after 300ms the connection
+is still connecting, then a backup connection attempt will be made to the next address on the list.
+
+Eventually an attempt will succeed to one of the addresses in which case that connection will be used, or else
+all attempts will fail in which case a connection error will be reported.
 
 
 .. _arch_overview_conn_pool_how_many:

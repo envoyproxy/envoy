@@ -10,7 +10,8 @@ struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
   Http::CodecType downstream_protocol;
   Http::CodecType upstream_protocol;
-  bool http2_new_codec_wrapper;
+  Http2Impl http2_implementation;
+  bool defer_processing_backedup_streams;
 };
 
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
@@ -27,6 +28,7 @@ struct HttpProtocolTestParams {
 // TEST_P(MyTest, TestInstance) {
 // ....
 // }
+// TODO(#20996) consider switching to SimulatedTimeSystem instead of using real time.
 class HttpProtocolIntegrationTest : public testing::TestWithParam<HttpProtocolTestParams>,
                                     public HttpIntegrationTest {
 public:
@@ -54,8 +56,10 @@ public:
             GetParam().downstream_protocol, GetParam().version,
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      GetParam().http2_new_codec_wrapper ? "true" : "false");
+    setupHttp2Overrides(GetParam().http2_implementation);
+    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
+                                      GetParam().defer_processing_backedup_streams ? "true"
+                                                                                   : "false");
   }
 
   void SetUp() override {
@@ -76,10 +80,12 @@ protected:
   };
 
   void expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
-                                          BytesCountExpectation h2_expectation, const int id = 0);
+                                          BytesCountExpectation h2_expectation,
+                                          BytesCountExpectation h3_expectation, const int id = 0);
 
   void expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
-                                            BytesCountExpectation h2_expectation, const int id = 0);
+                                            BytesCountExpectation h2_expectation,
+                                            BytesCountExpectation h3_expectation, const int id = 0);
 };
 
 } // namespace Envoy

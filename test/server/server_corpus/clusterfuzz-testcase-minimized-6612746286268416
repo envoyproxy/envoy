@@ -86,9 +86,13 @@ static_resources {
         priority: 64
       }
     }
-    use_tcp_for_dns_lookups: true
-    upstream_http_protocol_options {
-      auto_sni: true
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        upstream_http_protocol_options {
+          auto_sni: true
+        }
+      }
     }
     track_timeout_budgets: true
   }
@@ -174,9 +178,14 @@ static_resources {
     connect_timeout {
       nanos: 926363914
     }
-    http_protocol_options {
-      allow_absolute_url {
-        value: true
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        http_protocol_options {
+          allow_absolute_url {
+            value: true
+          }
+        }
       }
       accept_http_10: true
     }
@@ -194,7 +203,6 @@ static_resources {
 }
 cluster_manager {
   load_stats_config {
-    api_type: GRPC
     grpc_services {
       google_grpc {
         target_uri: "2"

@@ -116,8 +116,10 @@ public:
   /**
    * Static method to get the registered cluster factory and create an instance of cluster.
    */
+  // TODO(alyssawilk) clean up redundant members.
   static std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  create(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
+  create(Server::Configuration::ServerFactoryContext& server_context,
+         const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
          Stats::Store& stats, ThreadLocal::Instance& tls,
          Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
          Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
@@ -136,7 +138,8 @@ public:
 
   // Upstream::ClusterFactory
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  create(const envoy::config::cluster::v3::Cluster& cluster,
+  create(Server::Configuration::ServerFactoryContext& server_context,
+         const envoy::config::cluster::v3::Cluster& cluster,
          ClusterFactoryContext& context) override;
   std::string name() const override { return name_; }
 
@@ -148,9 +151,10 @@ private:
    * Create an instance of ClusterImplBase.
    */
   virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) PURE;
+      Stats::ScopeSharedPtr&& stats_scope) PURE;
   const std::string name_;
 };
 
@@ -172,24 +176,26 @@ protected:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) override {
+      Stats::ScopeSharedPtr&& stats_scope) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
     Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(),
                                            socket_factory_context.messageValidationVisitor(),
                                            *config);
-    return createClusterWithConfig(cluster,
+    return createClusterWithConfig(server_context, cluster,
                                    MessageUtil::downcastAndValidate<const ConfigProto&>(
                                        *config, context.messageValidationVisitor()),
                                    context, socket_factory_context, std::move(stats_scope));
   }
 
   virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterWithConfig(
+      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster, const ConfigProto& proto_config,
       ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) PURE;
+      Stats::ScopeSharedPtr&& stats_scope) PURE;
 };
 
 } // namespace Upstream

@@ -145,8 +145,8 @@ void AuthenticatorImpl::startVerify() {
   curr_token_ = std::move(tokens_.back());
   tokens_.pop_back();
 
-  if (provider_ != absl::nullopt) {
-    jwks_data_ = jwks_cache_.findByProvider(provider_.value());
+  if (provider_.has_value()) {
+    jwks_data_ = jwks_cache_.findByProvider(*provider_);
     jwt_ = jwks_data_->getJwtCache().lookup(curr_token_->token());
     if (jwt_ != nullptr) {
       handleGoodJwt(/*cache_hit=*/true);
@@ -165,12 +165,10 @@ void AuthenticatorImpl::startVerify() {
   }
 
   ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
-  if (!jwt_->iss_.empty()) {
-    // Check if `iss` is allowed.
-    if (!curr_token_->isIssuerAllowed(jwt_->iss_)) {
-      doneWithStatus(Status::JwtUnknownIssuer);
-      return;
-    }
+  // Check if `iss` is allowed.
+  if (!curr_token_->isIssuerAllowed(jwt_->iss_)) {
+    doneWithStatus(Status::JwtUnknownIssuer);
+    return;
   }
 
   // Issuer is configured
@@ -201,8 +199,8 @@ void AuthenticatorImpl::startVerify() {
   }
 
   // Check if audience is allowed
-  bool is_allowed = check_audience_ ? check_audience_->areAudiencesAllowed(jwt_->audiences_)
-                                    : jwks_data_->areAudiencesAllowed(jwt_->audiences_);
+  const bool is_allowed = check_audience_ ? check_audience_->areAudiencesAllowed(jwt_->audiences_)
+                                          : jwks_data_->areAudiencesAllowed(jwt_->audiences_);
   if (!is_allowed) {
     doneWithStatus(Status::JwtAudienceNotAllowed);
     return;
@@ -223,7 +221,7 @@ void AuthenticatorImpl::startVerify() {
   }
 
   // TODO(potatop): potential optimization.
-  // Only one remote jwks will be fetched, verify will not continue util it is completed. This is
+  // Only one remote jwks will be fetched, verify will not continue until it is completed. This is
   // fine for provider name requirements, as each provider has only one issuer, but for allow
   // missing or failed there can be more than one issuers. This can be optimized; the same remote
   // jwks fetching can be shared by two requests.

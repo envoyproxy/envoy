@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/config_dump.pb.validate.h"
+#include "envoy/admin/v3/config_dump_shared.pb.h"
+#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -122,7 +122,7 @@ http_filters:
   RouteConstSharedPtr route(Http::TestRequestHeaderMapImpl headers) {
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     headers.addCopy("x-forwarded-proto", "http");
-    return rds_->config()->route(headers, stream_info, 0);
+    return rds_->configCast()->route(headers, stream_info, 0);
   }
 
   NiceMock<Server::MockInstance> server_;
@@ -171,7 +171,9 @@ http_filters:
       RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
                                       server_factory_context_, validation_visitor_,
                                       outer_init_manager_, "foo.", *route_config_provider_manager_),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 TEST_F(RdsImplTest, RdsAndStaticWithOptionalUnknownFilterPerVirtualHostConfig) {
@@ -246,7 +248,7 @@ TEST_F(RdsImplTest, Basic) {
   // Load the config and verified shared count.
   // ConfigConstSharedPtr is shared between: RouteConfigUpdateReceiverImpl, rds_ (via tls_), and
   // config local var below.
-  ConfigConstSharedPtr config = rds_->config();
+  ConfigConstSharedPtr config = rds_->configCast();
   EXPECT_EQ(3, config.use_count());
 
   // Third request.
@@ -346,7 +348,9 @@ TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 // validate the optional unknown factory will be ignored for per virtualhost typed config.
@@ -461,7 +465,9 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 // validate the optional unknown factory will be ignored for per route typed config.
@@ -644,7 +650,7 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
 
   EXPECT_CALL(init_watcher_, ready());
   rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
-  EXPECT_TRUE(rds_->config()->usesVhds());
+  EXPECT_TRUE(rds_->configCast()->usesVhds());
 
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
@@ -698,6 +704,14 @@ rds:
   // valid
   EXPECT_CALL(mock_callback, Call(_)).Times(0);
   EXPECT_NO_THROW(post_cb());
+}
+
+TEST_F(RdsImplTest, RdsRouteConfigProviderImplSubscriptionSetup) {
+  setup();
+  EXPECT_CALL(init_watcher_, ready());
+  RdsRouteConfigSubscription& subscription =
+      dynamic_cast<RdsRouteConfigProviderImpl&>(*rds_).subscription();
+  EXPECT_EQ(rds_.get(), subscription.routeConfigProvider().value());
 }
 
 class RdsRouteConfigSubscriptionTest : public RdsTestBase {

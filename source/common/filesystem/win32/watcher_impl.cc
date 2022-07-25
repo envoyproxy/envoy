@@ -7,8 +7,8 @@
 namespace Envoy {
 namespace Filesystem {
 
-WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
-    : api_(api), os_sys_calls_(Api::OsSysCallsSingleton::get()) {
+WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& file_system)
+    : file_system_(file_system), os_sys_calls_(Api::OsSysCallsSingleton::get()) {
   os_fd_t socks[2];
   Api::SysCallIntResult result = os_sys_calls_.socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
   ASSERT(result.return_value_ == 0);
@@ -55,7 +55,7 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
     return;
   }
 
-  const PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
+  const PathSplitResult result = file_system_.splitPathFromFilename(path);
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here
   const std::wstring directory = wstring_converter_.from_bytes(std::string(result.directory_));

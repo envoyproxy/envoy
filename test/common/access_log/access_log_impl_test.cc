@@ -47,7 +47,9 @@ envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::stri
 
 class AccessLogImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  AccessLogImplTest() : stream_info_(time_source_), file_(new MockAccessLogFile()) {
+  AccessLogImplTest()
+      : stream_info_(time_source_), file_(new MockAccessLogFile()),
+        engine_(std::make_unique<Regex::GoogleReEngine>()) {
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
     ON_CALL(log_manager_, createAccessLog(_)).WillByDefault(Return(file_));
@@ -64,6 +66,7 @@ public:
   TestStreamInfo stream_info_;
   std::shared_ptr<MockAccessLogFile> file_;
   StringViewSaver output_;
+  ScopedInjectableLoader<Regex::Engine> engine_;
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
@@ -820,7 +823,6 @@ filter:
       name: test-header
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "\\d{3}"
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
@@ -1094,7 +1096,7 @@ typed_config:
   path: /dev/null
   log_format:
     text_format_source:
-      inline_string: "%GRPC_STATUS%\n"
+      inline_string: "%GRPC_STATUS% %GRPC_STATUS_NUMBER%\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -1102,7 +1104,7 @@ typed_config:
     EXPECT_CALL(*file_, write(_));
     response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-    EXPECT_EQ("OK\n", output_);
+    EXPECT_EQ("OK 0\n", output_);
     response_trailers_.remove(Http::Headers::get().GrpcStatus);
   }
   {
@@ -1110,7 +1112,7 @@ typed_config:
     EXPECT_CALL(*file_, write(_));
     response_headers_.addCopy(Http::Headers::get().GrpcStatus, "1");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-    EXPECT_EQ("Canceled\n", output_);
+    EXPECT_EQ("Canceled 1\n", output_);
     response_headers_.remove(Http::Headers::get().GrpcStatus);
   }
   {
@@ -1118,7 +1120,7 @@ typed_config:
     EXPECT_CALL(*file_, write(_));
     response_headers_.addCopy(Http::Headers::get().GrpcStatus, "-1");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-    EXPECT_EQ("-1\n", output_);
+    EXPECT_EQ("-1 -1\n", output_);
     response_headers_.remove(Http::Headers::get().GrpcStatus);
   }
 }

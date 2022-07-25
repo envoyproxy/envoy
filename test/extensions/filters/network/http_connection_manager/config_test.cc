@@ -103,6 +103,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 - name: health_check
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
@@ -162,6 +164,8 @@ tracing:
   max_path_tag_length: 128
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -175,6 +179,7 @@ http_filters:
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
+  EXPECT_FALSE(config.streamErrorOnInvalidHttpMessaging());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, Http3Configured) {
@@ -194,6 +199,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -241,6 +248,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_, isQuicListener()).WillOnce(Return(true));
@@ -270,6 +279,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   // When tracing is not enabled on a given "envoy.filters.network.http_connection_manager" filter,
@@ -302,6 +313,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   // Simulate tracer provider configuration in the bootstrap config.
@@ -345,6 +358,8 @@ route_config:
 tracing: {} # notice that tracing is enabled
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
@@ -378,6 +393,8 @@ route_config:
 tracing: {} # notice that tracing is enabled
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   // Simulate tracer provider configuration in the bootstrap config.
@@ -427,6 +444,8 @@ tracing:
       collector_endpoint_version: HTTP_JSON
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   // Simulate tracer provider configuration in the bootstrap config.
@@ -505,6 +524,8 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
   tracing: {}
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -540,6 +561,8 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
       value: 3
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -574,6 +597,8 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
       value: 0.3
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -608,6 +633,8 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
       value: 0.1
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
  )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -653,6 +680,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -667,6 +696,43 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
+TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  internal_address_config:
+    unix_sockets: false
+    cidr_ranges:
+    - address_prefix: 100.64.0.0
+      prefix_len: 10
+    - address_prefix: 50.20.0.0
+      prefix_len: 20
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  Network::Address::Ipv4Instance firstInternalIpAddress{"100.64.0.10", 0, nullptr};
+  Network::Address::Ipv4Instance secondInternalIpAddress{"50.20.0.5", 0, nullptr};
+  // This address is in the list of acceptable addresses (based on RFC1918) when the new config is
+  // unset. However test is verifying that it doesn't match now because of provided cidr_ranges
+  // config.
+  Network::Address::Ipv4Instance defaultIpAddress{"10.48.179.130", 0, nullptr};
+  Network::Address::Ipv4Instance externalIpAddress{"90.60.0.10", 0, nullptr};
+  // This test validates that unixAddress is not treated as internal since unix_sockets is set to
+  // false.
+  Network::Address::PipeInstance unixAddress{"/foo"};
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(firstInternalIpAddress));
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(secondInternalIpAddress));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(defaultIpAddress));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(unixAddress));
+}
+
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -674,6 +740,8 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -691,6 +759,8 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbConfigured) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -708,6 +778,8 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -726,6 +798,8 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -745,6 +819,8 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -762,6 +838,8 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutDefault) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -781,6 +859,8 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutOff) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -798,6 +878,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestHeaderCount) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -817,6 +899,8 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -834,6 +918,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestPerConnection) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -853,6 +939,8 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestPerConnectionConfigurable) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -870,6 +958,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -891,6 +981,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -912,6 +1004,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -934,6 +1028,8 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -955,6 +1051,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -979,6 +1077,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -1003,6 +1103,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
   normalize_path: true
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -1027,6 +1129,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
   normalize_path: false
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -1050,6 +1154,8 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesDefault) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1068,6 +1174,8 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesTrue) {
   merge_slashes: true
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1086,6 +1194,8 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesFalse) {
   merge_slashes: false
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1103,6 +1213,8 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortDefault) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1121,6 +1233,8 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
   strip_matching_host_port: true
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1140,6 +1254,8 @@ TEST_F(HttpConnectionManagerConfigTest, BothStripOptionsAreSet) {
   strip_any_host_port: true
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -1160,6 +1276,8 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
   strip_matching_host_port: false
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1178,6 +1296,8 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortTrue) {
   strip_any_host_port: true
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1196,6 +1316,8 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
   strip_any_host_port: false
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1213,6 +1335,8 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotDefault) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1231,6 +1355,8 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotTrue) {
   strip_trailing_host_dot: true
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1249,6 +1375,8 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotFalse) {
   strip_trailing_host_dot: false
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1266,6 +1394,8 @@ TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) 
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1286,6 +1416,8 @@ TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresDroppedByConfig) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1306,6 +1438,8 @@ TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresRequestRejectedByC
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1324,6 +1458,8 @@ TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1341,6 +1477,8 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledRequestTimeout) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1357,6 +1495,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1367,6 +1507,9 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   const std::string yaml_string = R"EOF(
 codec_type: http1
 stat_prefix: router
@@ -1382,9 +1525,9 @@ route_config:
         cluster: cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   context_.server_factory_context_.cluster_manager_.initializeClusters({"cluster"}, {});
@@ -1531,6 +1674,8 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 http2_protocol_options:
   hpack_table_size: 1024
   custom_settings_parameters: { identifier: 3, value: 2048 }
@@ -1592,6 +1737,8 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 http2_protocol_options:
   custom_settings_parameters:
     - { identifier: 8, value: 0 }
@@ -1615,6 +1762,8 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 http2_protocol_options:
   allow_connect: true
   )EOF";
@@ -1694,6 +1843,8 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 http2_protocol_options:
   custom_settings_parameters:
     - { identifier: 10, value: 0 }
@@ -1714,6 +1865,8 @@ TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseDefault) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1731,6 +1884,8 @@ TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseConfigured) 
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1796,6 +1951,8 @@ TEST_F(HttpConnectionManagerConfigTest, CustomRequestIDExtension) {
       test_field: example
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   TestRequestIDExtensionFactory factory;
@@ -1821,6 +1978,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownRequestIDExtension) {
       "@type": type.googleapis.com/test.http_connection_manager.UnknownRequestIDExtension
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
@@ -1838,7 +1997,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownHttpFilterWithException) {
 
   EXPECT_THROW_WITH_REGEX(
       createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-      "Didn't find a registered implementation for name: 'envoy.filters.http.unknown");
+      "Didn't find a registered implementation for name: 'envoy.filters.http.unknown'");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnknownOptionalHttpFilterWithIgnore) {
@@ -1861,6 +2020,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1886,6 +2047,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
       use_request_id_for_trace_sampling: false
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1910,6 +2073,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
       "@type": type.googleapis.com/google.protobuf.StringValue
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
@@ -1951,6 +2116,8 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionNotCreated) 
       "@type": type.googleapis.com/google.protobuf.UInt32Value
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
@@ -1971,6 +2138,8 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
       header_name: x-ip-header
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -1995,6 +2164,8 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithUse
       header_name: x-ip-header
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
@@ -2015,6 +2186,8 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithNum
       header_name: x-ip-header
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
@@ -2134,6 +2307,8 @@ http_filters:
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
@@ -2165,6 +2340,8 @@ http_filters:
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -2197,6 +2374,8 @@ http_filters:
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -2257,6 +2436,8 @@ http_filters:
     - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     apply_default_config_without_warming: true
 - name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   createHttpConnectionManagerConfig(yaml_string);
@@ -2269,6 +2450,8 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefault) {
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
@@ -2295,6 +2478,8 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
@@ -2335,6 +2520,8 @@ TEST_F(HttpConnectionManagerConfigTest,
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
@@ -2364,6 +2551,8 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -2396,6 +2585,8 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionSetAndDisabl
     name: local_route
   http_filters:
   - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -2465,6 +2656,8 @@ TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
       name: local_route
     http_filters:
     - name: envoy.filters.http.router
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager
