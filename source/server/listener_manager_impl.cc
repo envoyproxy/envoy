@@ -100,7 +100,8 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
         proto_config, filter_chain_factory_context.messageValidationVisitor(), factory);
     Config::Utility::validateTerminalFilters(
         filters[i].name(), factory.name(), "network",
-        factory.isTerminalFilterByProto(*message, filter_chain_factory_context),
+        factory.isTerminalFilterByProto(*message,
+                                        filter_chain_factory_context.getServerFactoryContext()),
         i == filters.size() - 1);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
@@ -143,8 +144,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         }
       }
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
-          config_discovery, name, context, "tcp_listener.", false, "listener",
-          createListenerFilterMatcher(proto_config));
+          config_discovery, name, context.getServerFactoryContext(), context, "tcp_listener.",
+          false, "listener", createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",
