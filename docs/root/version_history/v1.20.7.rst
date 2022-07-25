@@ -1,4 +1,4 @@
-1.21.5 (July 25, 2022)
+1.20.7 (July 21, 2022)
 ======================
 
 Incompatible Behavior Changes
@@ -21,7 +21,6 @@ Removed Config or Runtime
 
 New Features
 ------------
-
 
 Deprecated
 ----------
