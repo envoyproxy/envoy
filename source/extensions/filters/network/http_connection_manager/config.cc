@@ -727,7 +727,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction(), header_validator_factory_.get());
+        headersWithUnderscoresAction());
   }
   case CodecType::HTTP2: {
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
@@ -750,8 +750,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
-        header_validator_factory_);
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

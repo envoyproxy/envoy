@@ -506,6 +506,9 @@ public:
    * If nullptr, don't write the Proxy-Status HTTP response header.
    */
   virtual const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const PURE;
+
+  virtual HeaderValidatorPtr makeHeaderValidator(Protocol protocol,
+                                                 StreamInfo::StreamInfo& stream_info) PURE;
 };
 } // namespace Http
 } // namespace Envoy

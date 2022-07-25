@@ -234,6 +234,11 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
+  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol,
+                                               StreamInfo::StreamInfo& stream_info) override {
+    return header_validator_factory_ ? header_validator_factory_->create(protocol, stream_info)
+                                     : nullptr;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };

@@ -31,7 +31,7 @@ constexpr absl::string_view empty_config = R"EOF(
 class HeaderValidatorTest : public testing::Test {
 protected:
   ::Envoy::Http::HeaderValidatorPtr create(absl::string_view config_yaml,
-                                           HeaderValidatorFactory::Protocol protocol) {
+                                           ::Envoy::Http::Protocol protocol) {
     auto* factory =
         Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
             "envoy.http.header_validators.envoy_default");
@@ -54,7 +54,7 @@ protected:
 };
 
 TEST_F(HeaderValidatorTest, Http1RequestHeaderNameValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http11);
   // Since the default UHV does not yet check anything all header values should be accepted
   std::string key_value("aaa");
   HeaderString key(key_value);
@@ -68,7 +68,7 @@ TEST_F(HeaderValidatorTest, Http1RequestHeaderNameValidation) {
 }
 
 TEST_F(HeaderValidatorTest, Http1ResponseHeaderNameValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http11);
   // Since the default UHV does not yet check anything all header values should be accepted
   std::string key_value("aaa");
   HeaderString key(key_value);
@@ -82,7 +82,7 @@ TEST_F(HeaderValidatorTest, Http1ResponseHeaderNameValidation) {
 }
 
 TEST_F(HeaderValidatorTest, Http1RequestHeaderMapValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http11);
   ::Envoy::Http::TestRequestHeaderMapImpl request_header_map{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   EXPECT_EQ(uhv->validateRequestHeaderMap(request_header_map),
@@ -90,7 +90,7 @@ TEST_F(HeaderValidatorTest, Http1RequestHeaderMapValidation) {
 }
 
 TEST_F(HeaderValidatorTest, Http1ResponseHeaderMapValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http11);
   ::Envoy::Http::TestResponseHeaderMapImpl response_header_map{{":status", "200"}};
   EXPECT_EQ(uhv->validateResponseHeaderMap(response_header_map),
             ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Accept);

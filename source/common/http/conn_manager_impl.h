@@ -347,6 +347,8 @@ private:
       return *tracing_custom_tags_;
     }
 
+    bool validateHeaders();
+
     ConnectionManagerImpl& connection_manager_;
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
     // both locations, then refer to the FM when doing stream logs.
@@ -388,6 +390,7 @@ private:
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
+    Http::HeaderValidatorPtr header_validator_;
 
     friend FilterManager;
   };

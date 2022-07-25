@@ -4,7 +4,6 @@
 #include <cstdint>
 
 #include "envoy/http/header_map.h"
-#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 #include "envoy/tracing/trace_reason.h"
 
@@ -46,8 +45,7 @@ public:
                   const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                   uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                      headers_with_underscores_action,
-                  const HeaderValidatorFactoryPtr& header_validator_factory);
+                      headers_with_underscores_action);
 
   /* The result after calling mutateRequestHeaders(), containing the final remote address. Note that
    * an extension used for detecting the original IP of the request might decide it should be

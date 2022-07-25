@@ -17,8 +17,7 @@ public:
   HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::HeaderValidatorFactory::Protocol protocol,
-      StreamInfo::StreamInfo& stream_info);
+      ::Envoy::Http::Protocol protocol, StreamInfo::StreamInfo& stream_info);
 
   HeaderEntryValidationResult
   validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
@@ -44,7 +43,7 @@ public:
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config);
 
-  ::Envoy::Http::HeaderValidatorPtr create(::Envoy::Http::HeaderValidatorFactory::Protocol protocol,
+  ::Envoy::Http::HeaderValidatorPtr create(::Envoy::Http::Protocol protocol,
                                            StreamInfo::StreamInfo& stream_info) override;
 
 private:

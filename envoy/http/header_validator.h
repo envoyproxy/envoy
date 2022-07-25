@@ -2,6 +2,7 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -63,8 +64,6 @@ using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
 class HeaderValidatorFactory {
 public:
   virtual ~HeaderValidatorFactory() = default;
-
-  enum class Protocol { HTTP09, HTTP1, HTTP2, HTTP3 };
 
   /**
    * Create a new header validator for the specified protocol.

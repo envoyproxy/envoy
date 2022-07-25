@@ -651,8 +651,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                       connection_manager_.read_callbacks_->connection().streamInfo().filterState(),
                       StreamInfo::FilterState::LifeSpan::Connection),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
-          connection_manager_.stats_.named_.downstream_rq_time_,
-          connection_manager_.timeSource())) {
+          connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
+      header_validator_(connection_manager.config_.makeHeaderValidator(
+          connection_manager.codec_->protocol(), filter_manager_.streamInfo())) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
                connection_manager.config_.scopedRouteConfigProvider() != nullptr) ||
@@ -866,6 +867,38 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
   return ip->port();
 }
 
+bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
+  if (header_validator_) {
+    auto validation_result = header_validator_->validateRequestHeaderMap(*request_headers_);
+    if (validation_result == Http::HeaderValidator::RequestHeaderMapValidationResult::Reject ||
+        validation_result == Http::HeaderValidator::RequestHeaderMapValidationResult::Redirect) {
+      std::function<void(ResponseHeaderMap & headers)> modify_headers;
+      Code response_code = Code::BadRequest;
+      absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+      bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
+      if (validation_result == Http::HeaderValidator::RequestHeaderMapValidationResult::Redirect &&
+          !is_grpc) {
+        response_code = Code::TemporaryRedirect;
+        modify_headers = [new_path = request_headers_->Path()->value().getStringView()](
+                             Http::ResponseHeaderMap& response_headers) -> void {
+          response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
+        };
+      } else if (is_grpc) {
+        grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
+      }
+
+      auto response_details_opt = filter_manager_.streamInfo().responseCodeDetails();
+
+      sendLocalReply(response_code, "", modify_headers, grpc_status,
+                     response_details_opt
+                         ? *response_details_opt
+                         : StreamInfo::ResponseCodeDetails::get().InvalidRequestHeaders);
+      return false;
+    }
+  }
+  return true;
+}
+
 // Ordering in this function is complicated, but important.
 //
 // We want to do minimal work before selecting route and creating a filter
@@ -885,6 +918,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   if (request_header_timer_ != nullptr) {
     request_header_timer_->disableTimer();
     request_header_timer_.reset();
+  }
+
+  if (!validateHeaders()) {
+    ENVOY_STREAM_LOG(debug, "request headers validation failed:\n{}", *this, *request_headers_);
+    return;
   }
 
   // Both saw_connection_close_ and is_head_request_ affect local replies: set

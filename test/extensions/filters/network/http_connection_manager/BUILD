@@ -53,6 +53,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/http/original_ip_detection/custom_header:config",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/mocks/http:header_validator_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
