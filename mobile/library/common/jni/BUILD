@@ -53,7 +53,7 @@ cc_library(
 config_setting(
     name = "android_armeabi",
     constraint_values = [
-        "@platforms//cpu:arm",
+        "@platforms//cpu:armv7",
         "@platforms//os:android",
     ],
 )

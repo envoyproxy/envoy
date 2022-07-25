@@ -72,8 +72,9 @@ def upstream_envoy_overrides():
 def swift_repos():
     http_archive(
         name = "build_bazel_rules_apple",
-        sha256 = "36072d4f3614d309d6a703da0dfe48684ec4c65a89611aeb9590b45af7a3e592",
-        url = "https://github.com/bazelbuild/rules_apple/releases/download/1.0.1/rules_apple.1.0.1.tar.gz",
+        sha256 = "d4c2f715b83b5884e1164fb0e9f3de5b053d77d4436a04510b7940274e91699e",
+        strip_prefix = "rules_apple-8533494fa029f0fc44009c4532c191f349acf193",
+        url = "https://github.com/bazelbuild/rules_apple/archive/8533494fa029f0fc44009c4532c191f349acf193.tar.gz",
     )
 
     http_archive(
@@ -105,9 +106,10 @@ def swift_repos():
 def kotlin_repos():
     http_archive(
         name = "rules_java",
-        sha256 = "ddc9e11f4836265fea905d2845ac1d04ebad12a255f791ef7fd648d1d2215a5b",
-        strip_prefix = "rules_java-5.0.0",
-        url = "https://github.com/bazelbuild/rules_java/archive/refs/tags/5.0.0.tar.gz",
+        sha256 = "19462d64b1586c0d4ea0e87f9325be2514f0eb84e56dbf3245450451b3701581",
+        strip_prefix = "rules_java-43243982abc76390ef64be62379a1353f9011771",
+        # TODO(jpsim): Switch back to bazelbuild repo when https://github.com/bazelbuild/rules_java/issues/64 is fixed
+        url = "https://github.com/jpsim/rules_java/archive/43243982abc76390ef64be62379a1353f9011771.tar.gz",
     )
 
     http_archive(
