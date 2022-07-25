@@ -824,9 +824,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
   auto codec1 =
       makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
   // The socket are closed asynchronously, so waiting the connection closed here.
-  while (codec1->connected()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  ASSERT_TRUE(codec1->waitForDisconnect());
 
   // Test the connection again to ensure the socket is closed.
   auto codec2 =
@@ -918,9 +916,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
   auto codec1 =
       makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
   // The socket are closed asynchronously, so waiting the connection closed here.
-  while (codec1->connected()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  ASSERT_TRUE(codec1->waitForDisconnect());
 
   // Test the connection again to ensure the socket is closed.
   auto codec2 =
