@@ -923,6 +923,7 @@ TEST_P(Http1ServerConnectionImplTest, Http11AbsoluteEnabledNoOp) {
 
 TEST_P(Http1ServerConnectionImplTest, Http11InvalidRequest) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -935,6 +936,7 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidRequest) {
 
 TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -1032,6 +1034,7 @@ TEST_P(Http1ServerConnectionImplTest, SimpleGet) {
 // is created as part of sending the protocol error.
 TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -1069,6 +1072,7 @@ TEST_P(Http1ServerConnectionImplTest, RejectInvalidMethod) {
 
 TEST_P(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -1160,6 +1164,7 @@ TEST_P(Http1ServerConnectionImplTest, HostHeaderTranslation) {
 // when the runtime guard is enabled for the feature.
 TEST_P(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -1274,6 +1279,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
 // way (not necessarily with "head value contains NUL" though).
 TEST_P(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -1790,6 +1796,7 @@ TEST_P(Http1ServerConnectionImplTest, RequestWithTrailersDropped) { expectTraile
 
 TEST_P(Http1ServerConnectionImplTest, RequestWithTrailersKept) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -2099,6 +2106,7 @@ TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength100)
 TEST_P(Http1ServerConnectionImplTest,
        ShouldDumpParsedAndPartialHeadersWithoutAllocatingMemoryIfProcessingHeaders) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -2137,6 +2145,7 @@ TEST_P(Http1ServerConnectionImplTest,
 
 TEST_P(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingMemory) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -2918,6 +2927,7 @@ TEST_P(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejected) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -2928,6 +2938,7 @@ TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejected) {
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -2939,6 +2950,7 @@ TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
 // Tests that the default limit for the number of request headers is 100.
 TEST_P(Http1ServerConnectionImplTest, ManyTrailersRejected) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -2968,6 +2980,7 @@ TEST_P(Http1ServerConnectionImplTest, ManyTrailersIgnored) {
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -2994,6 +3007,7 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -3004,6 +3018,7 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejectedBeyondMaxConfigurable) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -3021,6 +3036,7 @@ TEST_P(Http1ServerConnectionImplTest, ManyRequestHeadersRejected) {
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -3054,6 +3070,7 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejectedMaxConfigurable) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -3291,6 +3308,7 @@ TEST_P(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
 
 TEST_P(Http1ServerConnectionImplTest, Utf8Path) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -3324,6 +3342,7 @@ TEST_P(Http1ServerConnectionImplTest, Utf8Path) {
 // Tests that incomplete response headers of 80 kB header value fails.
 TEST_P(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -3347,6 +3366,7 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
 // Tests that incomplete response headers with a 80 kB header field fails.
 TEST_P(Http1ClientConnectionImplTest, ResponseHeadersWithLargeFieldRejected) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -3498,6 +3518,7 @@ TEST_P(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength100) {
 TEST_P(Http1ClientConnectionImplTest,
        ShouldDumpParsedAndPartialHeadersWithoutAllocatingMemoryIfProcessingHeaders) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
@@ -3529,6 +3550,7 @@ TEST_P(Http1ClientConnectionImplTest,
 
 TEST_P(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingMemory) {
   if (parser_impl_ == ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
 
