@@ -728,6 +728,8 @@ public:
     downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
     upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
   }
+
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 };
 
 // An enum representation of the Proxy-Status error space.
