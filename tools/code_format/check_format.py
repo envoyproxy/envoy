@@ -212,7 +212,6 @@ CODE_CONVENTION_REPLACEMENTS = {
 UNSORTED_FLAGS = {
     "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-    "envoy.reloadable_features.sanitize_http_header_referer",
 }
 
 logger = logging.getLogger(__name__)
@@ -641,7 +640,8 @@ class FormatChecker:
                     "use Registry::InjectFactory instead.")
         if not self.allow_listed_for_unpack_to(file_path):
             if "UnpackTo" in line:
-                report_error("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
+                report_error(
+                    "Don't use UnpackTo() directly, use MessageUtil::unpackToNoThrow() instead")
         # Check that we use the absl::Time library
         if self.token_in_line("std::get_time", line):
             if "test/" in file_path:

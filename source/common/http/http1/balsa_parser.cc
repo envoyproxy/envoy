@@ -92,6 +92,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   ASSERT(connection_ != nullptr);
 
   framer_.set_balsa_headers(&headers_);
+  framer_.set_balsa_trailer(&trailers_);
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
 
@@ -101,7 +102,6 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
     break;
   case MessageType::Response:
     framer_.set_is_request(false);
-    framer_.set_balsa_trailer(&trailers_);
     break;
   }
 }

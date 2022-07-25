@@ -866,6 +866,15 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
   return ip->port();
 }
 
+void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
+  // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
+  if (end_stream && !filter_manager_.remoteDecodeComplete()) {
+    filter_manager_.streamInfo().downstreamTiming().onLastDownstreamRxByteReceived(
+        connection_manager_.read_callbacks_->connection().dispatcher().timeSource());
+    ENVOY_STREAM_LOG(debug, "request end stream", *this);
+  }
+}
+
 // Ordering in this function is complicated, but important.
 //
 // We want to do minimal work before selecting route and creating a filter
@@ -908,10 +917,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *request_headers_);
 
-  // We end the decode here only if the request is header only. If we convert the request to a
-  // header only, the stream will be marked as done once a subsequent decodeData/decodeTrailers is
-  // called with end_stream=true.
-  filter_manager_.maybeEndDecode(end_stream);
+  // We end the decode here to mark that the downstream stream is complete.
+  maybeEndDecode(end_stream);
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.random_generator_.bernoulli(
@@ -1159,7 +1166,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
-  filter_manager_.maybeEndDecode(end_stream);
+  maybeEndDecode(end_stream);
   filter_manager_.streamInfo().addBytesReceived(data.length());
 
   filter_manager_.decodeData(data, end_stream);
@@ -1172,7 +1179,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
 
   ASSERT(!request_trailers_);
   request_trailers_ = std::move(trailers);
-  filter_manager_.maybeEndDecode(true);
+  maybeEndDecode(true);
   filter_manager_.decodeTrailers(*request_trailers_);
 }
 

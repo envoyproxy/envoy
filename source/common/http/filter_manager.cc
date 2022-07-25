@@ -783,14 +783,6 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
   }
 }
 
-void FilterManager::maybeEndDecode(bool end_stream) {
-  // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
-  if (end_stream && !remoteDecodeComplete()) {
-    stream_info_.downstreamTiming().onLastDownstreamRxByteReceived(dispatcher_.timeSource());
-    ENVOY_STREAM_LOG(debug, "request end stream", *this);
-  }
-}
-
 void FilterManager::disarmRequestTimeout() { filter_manager_callbacks_.disarmRequestTimeout(); }
 
 std::list<ActiveStreamEncoderFilterPtr>::iterator
