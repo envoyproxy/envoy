@@ -61,8 +61,6 @@ private:
   absl::optional<OnMatch<DataType>> doInputMatch(const InputValue& data) {
     switch (data.kind()) {
     case InputValue::Kind::Null:
-    case InputValue::Kind::Any:
-      return {};
     case InputValue::Kind::String:
       return doMatch(data.asString());
     case InputValue::Kind::Int:

@@ -13,7 +13,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/variant.h"
-#include "absl/types/any.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
@@ -160,7 +159,7 @@ public:
   InputValue() {}
   explicit InputValue(absl::string_view data) : data_(absl::in_place_type<std::string>, data) {}
   explicit InputValue(int64_t data) : data_(data) {}
-  explicit InputValue(std::vector<InputValue>&& data): data_(data) {}
+  explicit InputValue(std::vector<InputValue>&& data) : data_(data) {}
 
   enum class Kind {
     // Null value (use when value is not present).
@@ -203,12 +202,12 @@ public:
    */
   absl::optional<std::string> stringOrInt() const {
     switch (kind()) {
-      case Kind::String:
-        return absl::make_optional<std::string>(asString());
-      case Kind::Int:
-        return absl::StrCat(asInt());
-      default:
-        return absl::nullopt;
+    case Kind::String:
+      return absl::make_optional<std::string>(asString());
+    case Kind::Int:
+      return absl::StrCat(asInt());
+    default:
+      return absl::nullopt;
     }
   }
 
@@ -242,12 +241,12 @@ public:
       }
       break;
     }
+    }
     return out;
   }
 
 private:
-  explicit InputValue(VariantType&& data) : data_(data) {}
-  const VariantType data_;
+  const absl::variant<absl::monostate, std::string, int64_t, std::vector<InputValue>> data_;
 };
 
 // InputMatcher provides the interface for determining whether an input value matches.
@@ -257,7 +256,7 @@ public:
 
   /**
    * Whether the provided input is a match.
-   * @param absl::optional<absl::string_view> the value to match on. Will be nullopt if the
+   * @param InputValue the value to match on. Will be Null if the
    * lookup failed.
    */
   virtual bool match(const InputValue& input) PURE;
@@ -347,8 +346,8 @@ public:
                            ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   /**
-   * The category of this factory depends on the DataType, so we require a name() function to exist
-   * that allows us to get a string representation of the data type for categorization.
+   * The category of this factory depends on the DataType, so we require a name() function to
+   * exist that allows us to get a string representation of the data type for categorization.
    */
   std::string category() const override {
     // Static assert to guide implementors to understand what is required.
