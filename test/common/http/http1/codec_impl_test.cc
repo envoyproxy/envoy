@@ -2850,39 +2850,43 @@ TEST_F(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
 TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
-  testTrailersExceedLimit(long_string, "trailers size exceeds limit", true);
+  testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
+                          true);
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
   // Construct partial headers with a long field name that exceeds the default limit of 60KiB.
   std::string long_string = "bigfield" + std::string(60 * 1024, 'q');
-  testTrailersExceedLimit(long_string, "trailers size exceeds limit", true);
+  testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
+                          true);
 }
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_F(Http1ServerConnectionImplTest, ManyTrailersRejected) {
   // Send a request with 101 headers.
-  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n", "trailers count exceeds limit",
-                          true);
+  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n",
+                          "http/1.1 protocol error: trailers count exceeds limit", true);
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
-  testTrailersExceedLimit(long_string, "trailers size exceeds limit", false);
+  testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
+                          false);
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeTrailerFieldRejectedIgnored) {
   // Default limit of 60 KiB
   std::string long_string = "bigfield" + std::string(60 * 1024, 'q') + ": value\r\n\r\n\r\n";
-  testTrailersExceedLimit(long_string, "trailers size exceeds limit", false);
+  testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
+                          false);
 }
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_F(Http1ServerConnectionImplTest, ManyTrailersIgnored) {
   // Send a request with 101 headers.
-  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n", "trailers count exceeds limit",
-                          false);
+  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n",
+                          "http/1.1 protocol error: trailers count exceeds limit", false);
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
@@ -2903,26 +2907,29 @@ TEST_F(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
 
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "headers size exceeds limit");
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: headers size exceeds limit");
   EXPECT_EQ("http1.headers_too_large", response_encoder->getStream().responseDetails());
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
-  testRequestHeadersExceedLimit(long_string, "headers size exceeds limit", "");
+  testRequestHeadersExceedLimit(long_string, "http/1.1 protocol error: headers size exceeds limit",
+                                "");
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersRejectedBeyondMaxConfigurable) {
   max_request_headers_kb_ = 8192;
   std::string long_string = "big: " + std::string(8193 * 1024, 'q') + "\r\n";
-  testRequestHeadersExceedLimit(long_string, "headers size exceeds limit", "");
+  testRequestHeadersExceedLimit(long_string, "http/1.1 protocol error: headers size exceeds limit",
+                                "");
 }
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_F(Http1ServerConnectionImplTest, ManyRequestHeadersRejected) {
   // Send a request with 101 headers.
-  testRequestHeadersExceedLimit(createHeaderFragment(101), "headers count exceeds limit",
+  testRequestHeadersExceedLimit(createHeaderFragment(101),
+                                "http/1.1 protocol error: headers count exceeds limit",
                                 "http1.too_many_headers");
 }
 
@@ -2951,7 +2958,7 @@ TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "headers size exceeds limit");
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: headers size exceeds limit");
   EXPECT_EQ("http1.headers_too_large", response_encoder->getStream().responseDetails());
 }
 
@@ -2981,7 +2988,7 @@ TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejectedMaxConfigu
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "headers size exceeds limit");
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: headers size exceeds limit");
   EXPECT_EQ("http1.headers_too_large", response_encoder->getStream().responseDetails());
 }
 
@@ -3011,7 +3018,7 @@ TEST_F(Http1ServerConnectionImplTest, ManyRequestHeadersSplitRejected) {
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "headers count exceeds limit");
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: headers count exceeds limit");
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersAccepted) {
@@ -3232,7 +3239,7 @@ TEST_F(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
   buffer = Buffer::OwnedImpl(long_header);
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "headers size exceeds limit");
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: headers size exceeds limit");
 }
 
 // Tests that incomplete response headers with a 80 kB header field fails.
@@ -3252,7 +3259,7 @@ TEST_F(Http1ClientConnectionImplTest, ResponseHeadersWithLargeFieldRejected) {
   buffer = Buffer::OwnedImpl(long_header);
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "headers size exceeds limit");
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: headers size exceeds limit");
 }
 
 // Tests that the size of response headers for HTTP/1 must be under 80 kB.
@@ -3337,7 +3344,7 @@ TEST_F(Http1ClientConnectionImplTest, ManyResponseHeadersRejected) {
 
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "headers count exceeds limit");
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: headers count exceeds limit");
 }
 
 // Tests that the number of response headers is configurable.
