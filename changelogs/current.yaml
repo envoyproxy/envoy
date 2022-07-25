@@ -6,6 +6,54 @@ behavior_changes:
   change: |
     Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
     This behavior change can be reverted by setting the ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` runtime flag to false.
+    the listener filter tls inspector's stats ``connection_closed`` and ``read_error`` are removed. New stats are introduced for listener,
+    ``downstream_peek_remote_close`` and ``read_error``, in :ref:`listener stats <config_listener_stats>`.
+- area: config
+  change: |
+    multiple SDS resources of multiple clusters or listeners are sent in a single SDS requests, instead of multiple SDS requests.
+    This behavioral change can be reverted by setting ``envoy.reloadable_features.combine_sds_requests`` to ``false``.
+- area: stats listener
+  change: |
+    fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`
+    is properly extracted. This changes the Prometheus name from
+    ``envoy_listener_myprefix_downstream_cx_overflow{}`` to ``envoy_listener_downstream_cx_overflow{envoy_listener_address="myprefix"}``.
+    This does not affect the Prometheus name if ``stat_prefix`` is not set.
+- area: stats listener
+  change: |
+    fixed metric tag extraction so that ``worker_id`` is properly extracted from the listener stats. This changes the Prometheus name from
+    ``envoy_listener_worker_1_downstream_cx_active{envoy_listener_address="0.0.0.0_10000"}``
+    to ``envoy_listener_downstream_cx_active{envoy_listener_address="0.0.0.0_10000", envoy_worker_id="1"}``.
+- area: stats server
+  change: |
+    fixed metric tag extraction so that ``worker_id`` is properly extracted fromt the server stats. This changes the Prometheus name from
+    ``envoy_server_worker_1_watchdog_miss{}`` to ``envoy_server_watchdog_miss{envoy_worker_id="1"}``.
+- area: stats thrift_proxy
+  change: |
+    fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.stat_prefix>`
+    is properly extracted. This changes the Prometheus name from
+    ``envoy_thrift_myprefix_request{}`` to ``envoy_thrift_request{envoy_thrift_prefix="myprefix"}``.
+- area: stats redis_proxy
+  change: |
+    fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.stat_prefix>`
+    is properly extracted. This changes the Prometheus name from
+    ``envoy_redis_myprefix_command_pttl_latency_sum{}`` to ``envoy_redis_command_pttl_latency_sum{envoy_redis_prefix="myprefix"}``.
+- area: router
+  change: |
+    updated all HTTP filters to get per-filter config by the :ref:`HTTP filter config name
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+    If there is no entry referred by the filter config name, the canonical filter name
+    (e.g., ``envoy.filters.http.buffer`` for the HTTP buffer filter) will be used for the backwards
+    compatibility.
+- area: router
+  change: |
+    weighted cluster's :ref:`total_weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` is now
+    optional. If not set, Envoy will no longer validate that all weights add up to 100. The sum of
+    :ref:`weights <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.weight>`
+    across all entries in the clusters array must add up to the
+    :ref:`total_weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>`, when it's greater than 0.
+- area: access_logger
+  change: |
+    make the %GRPC_STATUS% operator and the %GRPC_STATUS_NUMBER% operator use the canonical gRPC status set from local reply if it exists. This change can be reverted via the ``envoy.reloadable_features.get_grpc_status_from_stream_info`` runtime flag.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
