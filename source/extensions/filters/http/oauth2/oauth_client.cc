@@ -33,22 +33,20 @@ constexpr const char* UrlBodyTemplateWithoutCredentials =
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                                            const std::string& client_id, const std::string& secret,
                                            const std::string& cb_url, AuthType auth_type) {
-  const auto encoded_client_id = Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
-  const auto encoded_secret = Http::Utility::PercentEncoding::encode(secret, ":/=&?");
   const auto encoded_cb_url = Http::Utility::PercentEncoding::encode(cb_url, ":/=&?");
-
-  const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
-  const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
-  const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
-
   Http::RequestMessagePtr request = createPostRequest();
   std::string body;
+
   switch (auth_type) {
   case AuthType::UrlEncodedBody:
-    body = fmt::format(UrlBodyTemplateWithCredentials, auth_code, encoded_client_id, encoded_secret,
-                       encoded_cb_url);
+    body = fmt::format(UrlBodyTemplateWithCredentials, auth_code,
+                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"),
+                       Http::Utility::PercentEncoding::encode(secret, ":/=&?"), encoded_cb_url);
     break;
   case AuthType::BasicAuth:
+    const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
+    const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
+    const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
     request->headers().appendCopy(Http::CustomHeaders::get().Authorization,
                                   basic_auth_header_value);
     body = fmt::format(UrlBodyTemplateWithoutCredentials, auth_code, encoded_cb_url);
