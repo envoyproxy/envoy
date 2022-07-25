@@ -6753,23 +6753,6 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), false);
 }
 
-TEST_F(RoutePropertyTest, TestCorsConfigWithInvalidPNA) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: "default"
-    domains: ["*"]
-    routes:
-      - match:
-          prefix: "/api"
-        route:
-          cors:
-            allow_private_network_access: invalid
-)EOF";
-
-  EXPECT_THROW_WITH_REGEX(parseRouteConfigurationFromYaml(yaml), EnvoyException,
-                          "Unable to parse JSON as proto");
-}
-
 TEST_F(RouteMatcherTest, Decorator) {
   const std::string yaml = R"EOF(
 virtual_hosts:
