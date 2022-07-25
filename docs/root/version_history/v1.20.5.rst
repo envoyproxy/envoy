@@ -1,4 +1,4 @@
-1.22.3 (July 27, 2022)
+1.20.5 (June 16, 2022)
 ======================
 
 Incompatible Behavior Changes
@@ -13,12 +13,11 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* docker: update Docker images (``distroless`` -> ``49d2923f35d6``) to resolve CVE issues in container packages.
+* docker: update Docker images (``distroless`` -> ``d65ac1a``) to resolve CVE issues in container packages.
 
 Removed Config or Runtime
 -------------------------
-*Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
+*Normally occurs at the end of the* :ref:`deprecation period <v1.20:deprecated>`
 
 New Features
 ------------
