@@ -137,6 +137,8 @@ TEST_P(AdminInstanceTest, Help) {
   /config_dump: dump current Envoy configs (experimental)
       resource: The resource to dump
       mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask
+      name_regex: Dump only the currently loaded configurations whose names match the specified regex. Can be used with both resource and mask query parameters.
+      include_eds: Dump currently loaded configuration including EDS. See the response definition for more information
   /contention: dump current Envoy mutex contention stats (if enabled)
   /cpuprofiler: enable/disable the CPU profiler
   /drain_listeners: drain listeners
@@ -150,7 +152,7 @@ TEST_P(AdminInstanceTest, Help) {
   /init_dump: dump current Envoy init manager information (experimental)
       mask: The desired component to dump unready targets. The mask is parsed as a ProtobufWkt::FieldMask. For example, get the unready targets of all listeners with /init_dump?mask=listener`
   /listeners: print listener info
-      format: File format to use; One of text json
+      format: File format to use; One of (text, json)
   /logging: query/change logging levels
   /memory: print current allocation/heap usage
   /quitquitquit: exit the server
@@ -163,9 +165,9 @@ TEST_P(AdminInstanceTest, Help) {
   /stats: print server stats
       usedonly: Only include stats that have been written by system since restart
       filter: Regular expression (ecmascript) for filtering stats
-      format: Format to use; One of html text json
-      type: Stat types to include.; One of All Counters Histograms Gauges TextReadouts
-      histogram_buckets: Histogram bucket display mode; One of cumulative disjoint none
+      format: Format to use; One of (html, text, json)
+      type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, none)
   /stats/prometheus: print server stats in prometheus format
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)

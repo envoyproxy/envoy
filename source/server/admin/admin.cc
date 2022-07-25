@@ -106,7 +106,13 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                {Admin::ParamDescriptor::Type::String, "mask",
                 "The mask to apply. When both resource and mask are specified, "
                 "the mask is applied to every element in the desired repeated field so that only a "
-                "subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask"}}),
+                "subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask"},
+               {Admin::ParamDescriptor::Type::String, "name_regex",
+                "Dump only the currently loaded configurations whose names match the specified "
+                "regex. Can be used with both resource and mask query parameters."},
+               {Admin::ParamDescriptor::Type::Boolean, "include_eds",
+                "Dump currently loaded configuration including EDS. See the response definition "
+                "for more information"}}),
           makeHandler("/init_dump", "dump current Envoy init manager information (experimental)",
                       MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false,
                       {{Admin::ParamDescriptor::Type::String, "mask",
@@ -193,7 +199,15 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
       local_reply_(LocalReply::Factory::createDefault()),
-      ignore_global_conn_limit_(ignore_global_conn_limit) {}
+      ignore_global_conn_limit_(ignore_global_conn_limit) {
+#ifndef NDEBUG
+  // Verify that no duplicate handlers exist.
+  absl::flat_hash_set<absl::string_view> handlers;
+  for (const UrlHandler& handler : handlers_) {
+    ASSERT(handlers.insert(handler.prefix_).second);
+  }
+#endif
+}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
@@ -360,10 +374,7 @@ void AdminImpl::getHelp(Buffer::Instance& response) {
     for (const ParamDescriptor& param : handler->params_) {
       response.add(fmt::format("      {}: {}", param.id_, param.help_));
       if (param.type_ == ParamDescriptor::Type::Enum) {
-        response.add("; One of");
-        for (absl::string_view choice : param.enum_choices_) {
-          response.addFragments({" ", choice});
-        }
+        response.addFragments({"; One of (", absl::StrJoin(param.enum_choices_, ", "), ")"});
       }
       response.add("\n");
     }
