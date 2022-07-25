@@ -172,6 +172,8 @@ struct NamedHttpFilterFactoryCb {
 };
 
 // Implementation of a HTTP dynamic filter config provider.
+// NeutralHttpFilterConfigFactory can either be a NamedHttpFilterConfigFactory
+// or an UpstreamHttpFilterConfigFactory.
 template <class FactoryCtx, class NeutralHttpFilterConfigFactory>
 class HttpDynamicFilterConfigProviderImpl
     : public DynamicFilterConfigProviderImpl<NamedHttpFilterFactoryCb> {
