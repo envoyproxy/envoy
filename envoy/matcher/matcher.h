@@ -162,11 +162,6 @@ public:
   explicit InputValue(int64_t data) : data_(data) {}
   explicit InputValue(std::vector<InputValue>&& data): data_(data) {}
 
-  using VariantType = absl::variant<absl::monostate, std::string, int64_t, std::vector<InputValue>, absl::any>;
-  static InputValue FromAny(absl::any&& data) {
-    return InputValue(VariantType(data));
-  }
-
   enum class Kind {
     // Null value (use when value is not present).
     Null,
@@ -176,8 +171,6 @@ public:
     Int,
     // Dynamic list value (possibly heterogenous).
     List,
-    // Opaque type holder for coupled input and matcher combinations.
-    Any
   };
 
   Kind kind() const {
@@ -188,8 +181,6 @@ public:
       return Kind::Int;
     case 3:
       return Kind::List;
-    case 4:
-      return Kind::Any;
     default:
       return Kind::Null;
     }
@@ -249,10 +240,6 @@ public:
         }
         out << "'" << elt << "'";
       }
-      break;
-    }
-    case Kind::Any:
-      out << "(unknown)";
       break;
     }
     return out;
