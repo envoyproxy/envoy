@@ -239,9 +239,6 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
-
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -252,9 +249,6 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
-
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -266,9 +260,6 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
-
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));

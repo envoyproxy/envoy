@@ -392,12 +392,6 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
         fmt::format("listener {}: internal address doesn't support multiple addresses.", name));
   }
 
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address")) {
-    RELEASE_ASSERT(
-        !config.address().has_envoy_internal_address(),
-        fmt::format("listener {} has envoy internal address {}. This runtime feature is disabled.",
-                    config.name(), config.address().envoy_internal_address().DebugString()));
-  }
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
