@@ -324,7 +324,6 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
   std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
     return socket_factories_;
   }
