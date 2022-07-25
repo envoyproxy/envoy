@@ -31,6 +31,7 @@ public:
       const Server::Options& options, Quic::QuicStatNames& quic_stat_names,
       Server::Instance& server)
       : ProdClusterManagerFactory(
+            const_cast<Server::Configuration::ServerFactoryContext&>(server.serverFactoryContext()),
             admin, runtime, stats, tls, dns_resolver, ssl_context_manager, main_thread_dispatcher,
             local_info, secret_manager, validation_context, api, http_context, grpc_context,
             router_context, log_manager, singleton_manager, options, quic_stat_names, server),

@@ -281,7 +281,7 @@ stat_prefix: test
     Buffer::OwnedImpl msg;
     ProtocolPtr proto =
         NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
-    MessageMetadata metadata;
+    MessageMetadata metadata(msg_type == MessageType::Call);
     metadata.setMethodName("name");
     metadata.setMessageType(msg_type);
     metadata.setSequenceId(seq_id);

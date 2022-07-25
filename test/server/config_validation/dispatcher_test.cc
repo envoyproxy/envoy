@@ -47,7 +47,7 @@ TEST_P(ConfigValidation, CreateConnection) {
   Network::Address::InstanceConstSharedPtr address(
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
   dispatcher_->createClientConnection(address, address, Network::Test::createRawBufferSocket(),
-                                      nullptr);
+                                      nullptr, nullptr);
   SUCCEED();
 }
 

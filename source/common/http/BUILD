@@ -123,6 +123,35 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dependency_manager",
+    srcs = ["dependency_manager.cc"],
+    hdrs = ["dependency_manager.h"],
+    external_deps = [
+        "abseil_status",
+    ],
+    deps = [
+        "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_chain_helper_lib",
+    srcs = ["filter_chain_helper.cc"],
+    hdrs = ["filter_chain_helper.h"],
+    deps = [
+        ":dependency_manager",
+        "//envoy/config:config_provider_manager_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/router:route_config_provider_manager_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/filter:config_discovery_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_base_lib",
     srcs = ["conn_pool_base.cc"],
     hdrs = ["conn_pool_base.h"],

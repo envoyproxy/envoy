@@ -1,4 +1,6 @@
+# only directories can be ignored, and no globbing
 api
 examples/grpc-bridge/script
 tools/clang_tools
 tools/dev/src
+.project

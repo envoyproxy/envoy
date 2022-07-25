@@ -146,7 +146,7 @@ void LegacyHttpParserImpl::resume() { impl_->resume(); }
 
 CallbackResult LegacyHttpParserImpl::pause() { return impl_->pause(); }
 
-ParserStatus LegacyHttpParserImpl::getStatus() { return intToStatus(impl_->getErrno()); }
+ParserStatus LegacyHttpParserImpl::getStatus() const { return intToStatus(impl_->getErrno()); }
 
 uint16_t LegacyHttpParserImpl::statusCode() const { return impl_->statusCode(); }
 

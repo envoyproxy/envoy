@@ -187,6 +187,9 @@ private:
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeMetadata(MetadataMapPtr&&) override;
 
+    // Mark that the last downstream byte is received, and the downstream stream is complete.
+    void maybeEndDecode(bool end_stream);
+
     // Http::RequestDecoder
     void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
@@ -298,6 +301,7 @@ private:
 
     void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
+    void refreshIdleTimeout();
 
     // All state for the stream. Put here for readability.
     struct State {
