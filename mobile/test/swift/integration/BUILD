@@ -19,6 +19,7 @@ envoy_mobile_swift_test(
         "FilterResetIdleTest.swift",
         "GRPCReceiveErrorTest.swift",
         "IdleTimeoutTest.swift",
+        "KeyValueStoreTest.swift",
         "ReceiveDataTest.swift",
         "ReceiveErrorTest.swift",
         "ResetConnectivityStateTest.swift",
