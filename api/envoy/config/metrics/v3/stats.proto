@@ -269,7 +269,7 @@ message TagSpecifier {
     // The two regexes of the specifiers will be processed from the elaborated
     // stat name.
     //
-    // The first regex will save ``ios.`` as the tag value for envoy.http_user_agent``. It will
+    // The first regex will save ``ios.`` as the tag value for ``envoy.http_user_agent``. It will
     // leave it in the name for potential matching with additional tag specifiers. After all tag
     // specifiers are processed the tags will be removed from the name.
     //
