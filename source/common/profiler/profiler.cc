@@ -83,7 +83,7 @@ namespace Profiler {
 
 absl::StatusOr<std::string> TcmallocProfiler::tcmallocHeapProfile() {
   return absl::Status(absl::StatusCode::kUnimplemented,
-                      "Heap profile is not implemented in current building");
+                      "Heap profile is not implemented in current build");
 }
 
 } // namespace Profiler
