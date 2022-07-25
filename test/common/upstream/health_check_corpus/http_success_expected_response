@@ -22,7 +22,7 @@ health_check_config {
         service_name_matcher {
             prefix: "locations"
         }
-        response: "OK"
+        response:  "\x02"
     }
 }
 actions {
@@ -35,7 +35,7 @@ actions {
                 }
             }
             status: 200
-            body: "Everything OK"
+            body: "\x02"
         }
         tcp_respond {
             

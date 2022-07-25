@@ -147,9 +147,8 @@ message HealthCheck {
     type.matcher.v3.StringMatcher service_name_matcher = 11;
 
     // An optional string to match anywhere in the first 1024 bytes of the response body.
-    // The response data can only be ASCII. If it is set, both the expected response check and status code determine the health check.
-    google.protobuf.StringValue response = 13
-        [(validate.rules).string = {max_bytes: 1024 pattern: "^[\000-\177]+$"}];
+    // If it is set, both the expected response check and status code determine the health check.
+    bytes response = 13 [(validate.rules).bytes = {max_len: 1024}];
   }
 
   message TcpHealthCheck {

@@ -134,6 +134,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
+      expected_response_(config.http_health_check().response()),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
@@ -144,10 +145,6 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       random_generator_(random) {
   if (config.http_health_check().has_service_name_matcher()) {
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
-  }
-
-  if (config.http_health_check().has_response()) {
-    expected_response_ = config.http_health_check().response().value();
   }
 }
 
@@ -233,6 +230,7 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecType codec_client_type) {
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),
+      response_body_(std::make_unique<Buffer::OwnedImpl>()),
       hostname_(getHostname(host, parent_.host_value_, parent_.cluster_.info())),
       protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
       local_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
@@ -262,8 +260,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeData(Buffer::Instance& data,
                                                                      bool end_stream) {
-  if (!parent_.expected_response_.empty()) {
-    absl::StrAppend(&body_, data.toString());
+  if (!parent_.expected_response_.empty() && response_body_->length() < 1024) {
+    response_body_->move(data, 1024 - response_body_->length());
   }
   if (end_stream) {
     onResponseComplete();
@@ -277,6 +275,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
     // a timer setup, or we did the close or got a reset, in which case we already setup a new
     // timer. There is nothing to do here other than blow away the client.
     response_headers_.reset();
+    response_body_->drain(response_body_->length());
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 }
@@ -367,12 +366,13 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   if (!parent_.expected_response_.empty()) {
     // If the expected response is set, check the first 1024 bytes of actual response if contains
     // the expected response.
-    absl::string_view expected_response = parent_.expected_response_;
-    std::string response_data = body_.substr(0, fmin(1024, body_.size()));
+    std::string response_data =
+        std::string(static_cast<const char*>(response_body_->linearize(response_body_->length())),
+                    response_body_->length());
     ENVOY_CONN_LOG(debug, "hc response_body={} expected_response={}", *client_, response_data,
-                   expected_response);
+                   parent_.expected_response_);
 
-    if (!absl::StrContains(response_data, expected_response)) {
+    if (!absl::StrContains(response_data, parent_.expected_response_)) {
       if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
         host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
       }
@@ -440,6 +440,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   }
 
   response_headers_.reset();
+  response_body_->drain(response_body_->length());
 }
 
 // It is possible for this session to have been deferred destroyed inline in handleFailure()

@@ -142,7 +142,7 @@ private:
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     Http::ResponseHeaderMapPtr response_headers_;
-    std::string body_;
+    Buffer::InstancePtr response_body_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
     Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
@@ -167,7 +167,7 @@ private:
 
   const std::string path_;
   const std::string host_value_;
-  std::string expected_response_;
+  const std::string expected_response_;
   absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
       service_name_matcher_;
   Router::HeaderParserPtr request_headers_parser_;
