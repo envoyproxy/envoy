@@ -110,7 +110,7 @@ InstanceImpl::InstanceImpl(
     // TODO(abeyad): don't create this here directly, use config.
     xds_config_store_ = std::make_unique<Extensions::KeyValue::FileBasedKeyValueStore>(
         *dispatcher_,
-        /*flush_interval=*/std::chrono::milliseconds(1000), api_->fileSystem(),
+        /*flush_interval=*/std::chrono::milliseconds(0), api_->fileSystem(),
         /*filename=*/"xds_config", /*max_entries=*/1000);
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);

@@ -173,6 +173,16 @@ public:
       const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
+  // For SotW tests, provides the same funtionality as the function above, except it also takes in
+  // the FakeStream instead of using xds_stream_.  Continue to use the above function for SotW tests
+  // unless the xDS test is not using xds_stream_.
+  AssertionResult compareSotwDiscoveryRequest(
+      FakeStreamPtr& stream, const std::string& expected_type_url,
+      const std::string& expected_version, const std::vector<std::string>& expected_resource_names,
+      bool expect_node = false,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
+      const std::string& expected_error_message = "");
+
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
@@ -210,8 +220,8 @@ public:
       const std::string& expected_error_message = "");
 
   template <class T>
-  void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version) {
+  void sendSotwDiscoveryResponse(FakeStreamPtr& stream, const std::string& type_url,
+                                 const std::vector<T>& messages, const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
@@ -220,7 +230,13 @@ public:
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-    xds_stream_->sendGrpcMessage(discovery_response);
+    stream->sendGrpcMessage(discovery_response);
+  }
+
+  template <class T>
+  void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
+                                 const std::string& version) {
+    sendSotwDiscoveryResponse(xds_stream_, type_url, messages, version);
   }
 
   template <class T>

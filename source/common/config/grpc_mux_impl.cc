@@ -109,6 +109,8 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
     request.clear_node();
   }
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.ShortDebugString());
+  // TODO(abeyad): remove
+  ENVOY_LOG(debug, "Sending DiscoveryRequest for {}: {}", type_url, static_cast<const void*>(this));
   grpc_stream_.sendMessage(request);
   first_stream_request_ = false;
 

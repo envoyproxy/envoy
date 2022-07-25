@@ -1318,7 +1318,6 @@ envoy_cc_test(
         "fails_on_clang_cl",
         "fails_on_windows",
     ],
-    external_deps = ["abseil_time"],
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
@@ -1961,13 +1960,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "xds_cached_config_integration_test",
+    name = "persisted_xds_integration_test",
     srcs = [
-        "xds_cached_config_integration_test.cc",
+        "persisted_xds_integration_test.cc",
     ],
     data = [
         "//test/config/integration/certs",
     ],
+    # TODO(abeyad): remove unneeded dependencies
     external_deps = ["abseil_time"],
     deps = [
         ":http_integration_lib",
@@ -1991,6 +1991,7 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
     ],
 )

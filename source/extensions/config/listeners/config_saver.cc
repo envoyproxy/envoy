@@ -24,6 +24,7 @@ void ConfigSaver::onConfigUpdated(const std::string& control_plane_id,
   }
   auto& type_resources = (*xds_config.mutable_per_server_config())[control_plane_id];
   auto& resource_list = (*type_resources.mutable_per_type_resources())[resource_type_url];
+  resource_list.clear_resources();
   for (const auto& resource_ref : resources) {
     const auto& decoded_resource = resource_ref.get();
     if (decoded_resource.hasResource()) {
@@ -39,6 +40,7 @@ void ConfigSaver::onConfigUpdated(const std::string& control_plane_id,
       *resource_list.add_resources() = std::move(r);
     }
   }
+  // TODO(abeyad): copy other fields
   const std::string value = xds_config.SerializeAsString();
   if (value.empty()) {
     store_.remove(XDS_CONFIG_KEY);
