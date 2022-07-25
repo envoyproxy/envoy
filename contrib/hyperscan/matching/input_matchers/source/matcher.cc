@@ -80,9 +80,13 @@ bool Matcher::match(const Envoy::Matcher::InputValue& input) {
   if (input.isNull()) {
     return false;
   }
+  const input_value = input.stringOrInt();
+  if (!input_value) {
+    return false;
+  }
 
   bool matched = false;
-  const std::string input_str = input.toString();
+  const absl::string_view input_str = input_value.value();
   hs_scratch_t* scratch = tls_->get()->scratch_;
   hs_error_t err = hs_scan(
       database_, input_str.data(), input_str.size(), 0, scratch,
