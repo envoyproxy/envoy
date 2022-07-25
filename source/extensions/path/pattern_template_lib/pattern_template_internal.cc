@@ -1,4 +1,4 @@
-#include "source/extensions/pattern_template/pattern_template_internal.h"
+#include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
 
 #include <optional>
 #include <string>

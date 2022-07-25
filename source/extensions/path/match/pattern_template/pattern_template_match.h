@@ -3,10 +3,10 @@
 
 #include <string>
 
-#include "envoy/extensions/pattern_template/match/v3/pattern_template_match.pb.h"
+#include "envoy/extensions/path/match/v3/pattern_template_match.pb.h"
 #include "envoy/router/pattern_template.h"
 
-#include "source/extensions/pattern_template/pattern_template.h"
+#include "source/extensions/path/pattern_template_lib/pattern_template.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"

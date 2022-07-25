@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/extensions/pattern_template/rewrite/v3/pattern_template_rewrite.pb.h"
+#include "envoy/extensions/path/rewrite/v3/pattern_template_rewrite.pb.h"
 #include "envoy/router/pattern_template.h"
 
-#include "source/extensions/pattern_template/rewrite/pattern_template_rewrite.h"
+#include "source/extensions/path/rewrite/pattern_template/pattern_template_rewrite.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,11 +18,11 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::pattern_template::rewrite::v3::PatternTemplateRewriteConfig>();
+    return std::make_unique<envoy::extensions::path::rewrite::pattern_template::v3::PatternTemplateRewriteConfig>();
   }
 
-  std::string name() const override { return "envoy.pattern_template.pattern_template_rewrite_predicate"; }
-
+  std::string name() const override { return "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate"; }
+  std::string category() const override { return "envoy.path.rewrite"; }
 };
 
 } // namespace Rewrite

@@ -4,8 +4,8 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/pattern_template/pattern_template.h"
-#include "source/extensions/pattern_template/pattern_template_internal.h"
+#include "source/extensions/path/pattern_template_lib/pattern_template.h"
+#include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"

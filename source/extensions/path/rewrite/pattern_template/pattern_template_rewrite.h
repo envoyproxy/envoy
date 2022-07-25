@@ -5,7 +5,7 @@
 
 #include "envoy/router/pattern_template.h"
 
-#include "source/extensions/pattern_template/pattern_template.h"
+#include "source/extensions/path/pattern_template_lib/pattern_template.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"

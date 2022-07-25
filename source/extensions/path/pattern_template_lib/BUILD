@@ -20,13 +20,13 @@ envoy_proto_library(
 )
 
 envoy_cc_library(
-    name = "pattern_template_lib",
+    name = "pattern_template",
     srcs = ["pattern_template.cc"],
     hdrs = ["pattern_template.h"],
     visibility = [
         "//source/common/router:__subpackages__",
-        "//source/extensions/pattern_template:__subpackages__",
-        "//test/extensions/pattern_template:__subpackages__",
+        "//source/extensions/path:__subpackages__",
+        "//test/extensions/path:__subpackages__",
     ],
     deps = [
         ":pattern_template_internal_cc",
@@ -37,8 +37,8 @@ envoy_cc_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
-        "@envoy_api//envoy/extensions/pattern_template/match/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/pattern_template/rewrite/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/path/match/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/path/rewrite/v3:pkg_cc_proto",
     ],
 )
 

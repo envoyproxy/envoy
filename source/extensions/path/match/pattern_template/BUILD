@@ -8,18 +8,18 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# Wildcard & Pattern Rewrites
+# Wildcard & Pattern Matching
 
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "pattern_template_rewrite_lib",
-    srcs = ["pattern_template_rewrite.cc"],
-    hdrs = ["pattern_template_rewrite.h"],
+    name = "pattern_template_match_lib",
+    srcs = ["pattern_template_match.cc"],
+    hdrs = ["pattern_template_match.h"],
     deps = [
         "//envoy/router:router_pattern_template_interface",
-        "//source/extensions/pattern_template:pattern_template_lib",
-        "@envoy_api//envoy/extensions/pattern_template/rewrite/v3:pkg_cc_proto",
+        "//source/extensions/path/pattern_template_lib:pattern_template",
+        "@envoy_api//envoy/extensions/path/match/v3:pkg_cc_proto",
     ],
 )
 
@@ -29,10 +29,10 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     visibility = ["//visibility:public"],
     deps = [
-        ":pattern_template_rewrite_lib",
+        ":pattern_template_match_lib",
         "//envoy/registry",
         "//envoy/router:router_pattern_template_interface",
-        "//source/extensions/pattern_template:pattern_template_lib",
-        "@envoy_api//envoy/extensions/pattern_template/rewrite/v3:pkg_cc_proto",
+        "//source/extensions/path/pattern_template_lib:pattern_template",
+        "@envoy_api//envoy/extensions/path/match/v3:pkg_cc_proto",
     ],
 )

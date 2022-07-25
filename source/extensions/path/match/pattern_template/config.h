@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/extensions/pattern_template/match/v3/pattern_template_match.pb.h"
+#include "envoy/extensions/path/match/v3/pattern_template_match.pb.h"
 #include "envoy/router/pattern_template.h"
 
-#include "source/extensions/pattern_template/match/pattern_template_match.h"
+#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,11 +18,11 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::pattern_template::match::v3::PatternTemplateMatchConfig>();
+    return std::make_unique<envoy::extensions::path::match::pattern_template::v3::PatternTemplateMatchConfig>();
   }
 
-  std::string name() const override { return "envoy.pattern_template.pattern_template_match_predicate"; }
-  std::string category() const override { return "envoy.pattern_template"; }
+  std::string name() const override { return "envoy.path.match.pattern_template.pattern_template_match_predicate"; }
+  std::string category() const override { return "envoy.path.match"; }
 };
 
 } // namespace Match
