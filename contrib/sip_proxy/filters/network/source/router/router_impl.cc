@@ -820,7 +820,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
     //TODO This parent_ can write over the upstream channel
 
     ENVOY_LOG(debug, "Got upstream request from host={},cluster={}. For downstream-connection={}",
-              parent_.getUpstreamHost()->hostname(),  parent_.route()->routeEntry()->clusterName(), downstream_conn_id);
+              parent_.getUpstreamHost()->address()->ip()->addressAsString(),  parent_.route()->routeEntry()->clusterName(), downstream_conn_id);
 
     // remove the X-Envoy-Origin-Ingress header before pushing it
     metadata->removeXEnvoyOriginIngressHeader();
