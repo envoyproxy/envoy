@@ -38,6 +38,7 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
         artifactName: format
+      timeoutInMinutes: 10
       # not all have fixes so improve condition/handling
       condition: failed()
 
@@ -67,6 +68,7 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/fix_proto_format.diff"
         artifactName: format
+      timeoutInMinutes: 10
       condition: failed()
 
   - job: docs
@@ -419,6 +421,7 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/build_images"
         artifactName: docker
+      timeoutInMinutes: 10
       condition: always()
 
 - stage: docs
@@ -561,6 +564,7 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/envoy"
         artifactName: windows.release
+      timeoutInMinutes: 10
       condition: always()
 
   - job: docker
@@ -607,4 +611,5 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/build_images"
         artifactName: docker_windows
+      timeoutInMinutes: 10
       condition: always()

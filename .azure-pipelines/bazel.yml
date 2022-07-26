@@ -79,4 +79,5 @@ steps:
   inputs:
     pathtoPublish: "$(Build.StagingDirectory)/envoy"
     artifactName: ${{ parameters.ciTarget }}${{ parameters.artifactSuffix }}
+  timeoutInMinutes: 10
   condition: always()
