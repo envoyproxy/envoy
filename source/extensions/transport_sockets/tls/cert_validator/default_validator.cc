@@ -82,7 +82,9 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
 
     for (auto& ctx : contexts) {
       X509_STORE* store = SSL_CTX_get_cert_store(ctx);
-      X509_STORE_set_flags(store, X509_V_FLAG_PARTIAL_CHAIN);
+      if (!config_->maxVerifyDepth().has_value()) {
+        X509_STORE_set_flags(store, X509_V_FLAG_PARTIAL_CHAIN);
+      }
       bool has_crl = false;
       for (const X509_INFO* item : list.get()) {
         if (item->x509) {
@@ -135,7 +137,9 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
 
     for (auto& ctx : contexts) {
       X509_STORE* store = SSL_CTX_get_cert_store(ctx);
-      X509_STORE_set_flags(store, X509_V_FLAG_PARTIAL_CHAIN);
+      if (!config_->maxVerifyDepth().has_value()) {
+        X509_STORE_set_flags(store, X509_V_FLAG_PARTIAL_CHAIN);
+      }
       for (const X509_INFO* item : list.get()) {
         if (item->crl) {
           X509_STORE_add_crl(store, item->crl);
