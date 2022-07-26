@@ -152,7 +152,8 @@ function run_testsuite() {
   # To ensure that we don't accidentally change the /hot_restart_version
   # string, compare it against a hard-coded string.
   start_test "Checking for consistency of /hot_restart_version"
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1)
+  # Get last line to avoid the influence of some bootstrap log.
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1 | sed -n '$p')
   EXPECTED_CLI_HOT_RESTART_VERSION="11.${SHARED_MEMORY_SIZE}"
   echo "The Envoy's hot restart version is ${CLI_HOT_RESTART_VERSION}"
   echo "Now checking that the above version is what we expected."
