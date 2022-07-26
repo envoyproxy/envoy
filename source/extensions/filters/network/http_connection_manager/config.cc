@@ -164,8 +164,8 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                 context.getServerFactoryContext(), context.messageValidationVisitor()));
       });
 
-  std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager =
-      Http::FilterChainHelper::createSingletonFilterConfigProviderManager(
+  std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
+      Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
           context.getServerFactoryContext());
 
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
@@ -560,7 +560,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     throw EnvoyException("Non-HTTP/3 codec configured on QUIC listener.");
   }
 
-  Http::FilterChainHelper helper(filter_config_provider_manager_, context_, stats_prefix_);
+  Http::FilterChainHelper<Server::Configuration::FactoryContext,
+                          Server::Configuration::NamedHttpFilterConfigFactory>
+      helper(filter_config_provider_manager_, context_.getServerFactoryContext(), context_,
+             stats_prefix_);
   helper.processFilters(config.http_filters(), "http", "http", filter_factories_);
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -627,7 +630,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) {
-  Http::FilterChainHelper::createFilterChainForFactories(manager, filter_factories_);
+  Http::FilterChainUtility::createFilterChainForFactories(manager, filter_factories_);
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
@@ -658,7 +661,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     filters_to_use = it->second.filter_factories.get();
   }
 
-  Http::FilterChainHelper::createFilterChainForFactories(callbacks, *filters_to_use);
+  Http::FilterChainUtility::createFilterChainForFactories(callbacks, *filters_to_use);
   return true;
 }
 
