@@ -1,3 +1,4 @@
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
@@ -10,8 +11,9 @@
 namespace Envoy {
 namespace {
 
-static constexpr char SDS_CLUSTER[] = "sds_cluster.lyft.com";
-static constexpr char RTDS_CLUSTER[] = "rtds_cluster";
+static constexpr char SDS_CLUSTER_NAME[] = "sds_cluster.lyft.com";
+static constexpr char RTDS_CLUSTER_NAME[] = "rtds_cluster";
+static constexpr char CLIENT_CERT_NAME[] = "client_cert";
 
 std::string bootstrapConfig() {
   return fmt::format(R"EOF(
@@ -63,7 +65,7 @@ admin:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                     RTDS_CLUSTER, Platform::null_device_path);
+                     RTDS_CLUSTER_NAME, Platform::null_device_path);
 }
 
 class PersistedXdsIntegrationTest : public HttpIntegrationTest,
@@ -80,9 +82,9 @@ public:
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add the SDS cluster.
-      addXdsCluster(bootstrap, std::string(SDS_CLUSTER));
+      addXdsCluster(bootstrap, std::string(SDS_CLUSTER_NAME));
       // Add the RTDS cluster.
-      addXdsCluster(bootstrap, std::string(RTDS_CLUSTER));
+      addXdsCluster(bootstrap, std::string(RTDS_CLUSTER_NAME));
 
       // Set up the initial static cluster with SSL using SDS.
       auto* transport_socket =
@@ -91,7 +93,7 @@ public:
       tls_context.set_sni("lyft.com");
       auto* secret_config =
           tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
-      setUpSdsConfig(secret_config, "client_cert");
+      setUpSdsConfig(secret_config, CLIENT_CERT_NAME);
       transport_socket->set_name("envoy.transport_sockets.tls");
       transport_socket->mutable_typed_config()->PackFrom(tls_context);
     });
@@ -158,12 +160,12 @@ protected:
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
     auto* grpc_service = api_config_source->add_grpc_services();
-    setGrpcService(*grpc_service, SDS_CLUSTER, getSdsUpstream().localAddress());
+    setGrpcService(*grpc_service, SDS_CLUSTER_NAME, getSdsUpstream().localAddress());
   }
 
   envoy::extensions::transport_sockets::tls::v3::Secret getClientSecret() {
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    secret.set_name("client_cert");
+    secret.set_name(std::string(CLIENT_CERT_NAME));
     auto* tls_certificate = secret.mutable_tls_certificate();
     tls_certificate->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
@@ -185,15 +187,21 @@ protected:
     return "";
   }
 
-  std::string getCert(const std::string& /*name*/) {
+  void checkSecretExists(const std::string& secret_name, const std::string& version_info) {
     auto response = IntegrationUtil::makeSingleRequest(
-        lookupPort("admin"), "GET", "/certs?format=json", "", downstreamProtocol(), version_);
+        lookupPort("admin"), "GET", "/config_dump?resource=dynamic_active_secrets", "",
+        downstreamProtocol(), version_);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
-    // TODO(abeyad): remove
-    ENVOY_LOG(info, "==> AAB cert={}", loader->asJsonString());
-    return "";
+    envoy::admin::v3::ConfigDump config_dump;
+    TestUtility::loadFromJson(loader->asJsonString(), config_dump);
+    // Expect at least the "client_cert" dynamic secret.
+    ASSERT_GE(config_dump.configs_size(), 1);
+    envoy::admin::v3::SecretsConfigDump::DynamicSecret dynamic_secret;
+    config_dump.configs(0).UnpackTo(&dynamic_secret);
+    EXPECT_EQ(secret_name, dynamic_secret.name());
+    EXPECT_EQ(version_info, dynamic_secret.version_info());
   }
 
   void shutdownAndRestartTestServer() {
@@ -241,7 +249,7 @@ TEST_P(PersistedXdsIntegrationTest, BasicSuccess) {
       initXdsStream(getSdsUpstream(), sds_connection_, sds_stream_);
       EXPECT_TRUE(compareSotwDiscoveryRequest(
           sds_stream_, /*expected_type_url=*/Config::TypeUrl::get().Secret, /*expected_version=*/"",
-          /*expected_resource_names=*/{"client_cert"}, /*expect_node=*/true));
+          /*expected_resource_names=*/{std::string(CLIENT_CERT_NAME)}, /*expect_node=*/true));
       auto sds_resource = getClientSecret();
       sendSotwDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
           sds_stream_, Config::TypeUrl::get().Secret, {sds_resource}, "1");
@@ -272,7 +280,7 @@ TEST_P(PersistedXdsIntegrationTest, BasicSuccess) {
   test_server_->waitForCounterGe("runtime.load_success", 2);
 
   // Verify that the xDS resources are used by Envoy.
-  // TODO(abeyad): add cert check using getCert()
+  checkSecretExists(std::string(CLIENT_CERT_NAME), /*version_info=*/"1");
   EXPECT_EQ("bar", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("meh", getRuntimeKey("baz"));
@@ -303,11 +311,10 @@ TEST_P(PersistedXdsIntegrationTest, BasicSuccess) {
   test_server_->waitForCounterGe("runtime.load_success", 2);
 
   // Verify that the latest resource values are used by Envoy.
+  checkSecretExists(std::string(CLIENT_CERT_NAME), /*version_info=*/"1");
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("saz", getRuntimeKey("baz"));
-  // TODO(abeyad): add cert check
-  getCert("client_cert");
 }
 
 // TODO(abeyad): add test for removed resources updates the persisted xDS.

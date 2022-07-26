@@ -390,6 +390,7 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",

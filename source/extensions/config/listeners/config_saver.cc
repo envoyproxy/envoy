@@ -4,6 +4,7 @@
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/config/store/saved_xds_config.pb.h"
 #include "source/extensions/config/store/store.h"
 
@@ -11,7 +12,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Config {
 
-ConfigSaver::ConfigSaver(KeyValueStore& store) : store_(store) {}
+ConfigSaver::ConfigSaver(KeyValueStore& store, TimeSource& time_source)
+    : store_(store), time_source_(time_source) {}
 
 void ConfigSaver::onConfigUpdated(const std::string& control_plane_id,
                                   const std::string& resource_type_url,
@@ -22,7 +24,7 @@ void ConfigSaver::onConfigUpdated(const std::string& control_plane_id,
   if (auto existing_config = store_.get(XDS_CONFIG_KEY)) {
     xds_config.ParseFromString(std::string(*existing_config));
   }
-  auto& type_resources = (*xds_config.mutable_per_server_config())[control_plane_id];
+  auto& type_resources = (*xds_config.mutable_per_control_plane_config())[control_plane_id];
   auto& resource_list = (*type_resources.mutable_per_type_resources())[resource_type_url];
   resource_list.clear_resources();
   for (const auto& resource_ref : resources) {
@@ -40,7 +42,8 @@ void ConfigSaver::onConfigUpdated(const std::string& control_plane_id,
       *resource_list.add_resources() = std::move(r);
     }
   }
-  // TODO(abeyad): copy other fields
+  TimestampUtil::systemClockToTimestamp(time_source_.systemTime(),
+                                        *xds_config.mutable_last_updated());
   const std::string value = xds_config.SerializeAsString();
   if (value.empty()) {
     store_.remove(XDS_CONFIG_KEY);

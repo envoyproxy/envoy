@@ -172,11 +172,12 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
   // Otherwise, there is no cluster name to validate.
 }
 
-// TODO(abeyad): add tests for this function
-// TODO(abeyad): make this return optional instead
-std::string
+absl::optional<std::string>
 Utility::getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   if (api_config_source.grpc_services_size() > 0) {
+    // Only checking for the first entry in grpc_services, because Envoy's xDS implementation
+    // currently only considers the first gRPC endpoint and ignores any other xDS management servers
+    // specified in an ApiConfigSource.
     if (api_config_source.grpc_services(0).has_envoy_grpc()) {
       return api_config_source.grpc_services(0).envoy_grpc().cluster_name();
     }
@@ -184,7 +185,7 @@ Utility::getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api
       return api_config_source.grpc_services(0).google_grpc().target_uri();
     }
   }
-  return "";
+  return absl::nullopt;
 }
 
 std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(

@@ -5,24 +5,23 @@ package Envoy.Extensions.Config;
 import "google/protobuf/timestamp.proto";
 import "envoy/service/discovery/v3/discovery.proto";
 
-// TODO(abeyad): add comments and "not-implemented-hide" annotations.
+// [#not-implemented-hide:]
+// Serialized xDS configuration fetched and persisted by the Envoy instance from one or more
+// xDS management servers.
+// [#next-free-field: 3]
 message SavedXdsConfig {
   message XdsServerSavedConfig {
     message ResourceList {
       repeated envoy.service.discovery.v3.Resource resources = 1;
-
-      // The version of the resources
-      string version_info = 2;
     };
 
-    // Maps the type URL to the resources for that type.
+    // Maps the type URL to the resources delivered for that type.
     map<string, ResourceList> per_type_resources = 1; 
   };
 
-  // Maps server ID to xDS config from that server.
-  // TODO(abeyad): Don't want the IP address as the key but rather the Cluster ID *or* the host name
-  // (e.g. `trafficdirector.google.com`).
-  map<string, XdsServerSavedConfig> per_server_config = 1;
+  // Maps control plane (i.e. xDS management server) ID to xDS config from that server.
+  map<string, XdsServerSavedConfig> per_control_plane_config = 1;
   
-  google.protobuf.Timestamp saved_date = 2;
+  // The timestamp at which the xDS configuration was last persisted to local storage.
+  google.protobuf.Timestamp last_updated = 2;
 };

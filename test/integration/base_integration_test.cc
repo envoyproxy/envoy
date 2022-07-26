@@ -363,7 +363,6 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   const auto admin_addr =
       test_server->server().admin().socket().connectionInfoProvider().localAddress();
   if (admin_addr->type() == Network::Address::Type::Ip) {
-    // TODO(abeyad): remove
     registerPort("admin", admin_addr->ip()->port());
   }
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "absl/types/optional.h"
+
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -191,11 +193,11 @@ public:
 
   /**
    * Gets the gRPC control plane management server from the API config source.  The result is either
-   * a cluster name or a target URI.
+   * a cluster name or a host name.
    * @param api_config_source the config source to validate.
-   * @return the gRPC control plane server
+   * @return the gRPC control plane server, or absl::nullopt if it couldn't be extracted.
    */
-  static std::string
+  static absl::optional<std::string>
   getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**

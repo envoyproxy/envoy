@@ -109,8 +109,6 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
     request.clear_node();
   }
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.ShortDebugString());
-  // TODO(abeyad): remove
-  ENVOY_LOG(debug, "Sending DiscoveryRequest for {}: {}", type_url, static_cast<const void*>(this));
   grpc_stream_.sendMessage(request);
   first_stream_request_ = false;
 
@@ -129,15 +127,26 @@ void GrpcMuxImpl::loadCachedConfig(absl::string_view type_url) {
     }
 
     // Call getPersistedResources on another thread so we don't have to wait for disk writes here?
-    auto [version_info, resources] =
+    std::vector<envoy::service::discovery::v3::Resource> resources =
         xds_store_.getPersistedResources(target_control_plane_, type_url);
+    if (resources.empty()) {
+      // There are no persisted resources, so nothing to process.
+      return;
+    }
+
     std::vector<DecodedResourcePtr> decoded_resources;
     absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
     std::vector<DecodedResourceRef> all_resource_refs;
     OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
+    std::string version_info;
     for (const auto& resource : resources) {
-      auto decoded_resource = std::make_unique<DecodedResourceImpl>(resource_decoder, resource);
+      if (version_info.empty()) {
+        version_info = resource.version();
+      } else {
+        ASSERT(resource.version() == version_info);
+      }
 
+      auto decoded_resource = std::make_unique<DecodedResourceImpl>(resource_decoder, resource);
       if (decoded_resource->ttl()) {
         api_state.ttl_.add(*decoded_resource->ttl(), decoded_resource->name());
       } else {

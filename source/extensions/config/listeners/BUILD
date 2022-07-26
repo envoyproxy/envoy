@@ -16,10 +16,12 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/common:key_value_store_interface",
+        "//envoy/common:time_interface",
         "//envoy/config:config_updated_listener_interface",
         "//envoy/config:subscription_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/config/store:saved_xds_config_proto_cc_proto",
         "//source/extensions/config/store:store",
     ],
