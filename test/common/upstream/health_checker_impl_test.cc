@@ -675,7 +675,7 @@ public:
   }
 
   void respondBody(size_t index, const std::string& code,
-                    const std::vector<std::string>& response_body, bool immediate_hc_fail = false) {
+                   const std::vector<std::string>& response_body, bool immediate_hc_fail = false) {
     std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
         new Http::TestResponseHeaderMapImpl{{":status", code}});
     if (immediate_hc_fail) {
