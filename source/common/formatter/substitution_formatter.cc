@@ -1733,8 +1733,8 @@ GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
   case Number: {
     return std::to_string(grpc_status.value());
   }
-    PANIC_DUE_TO_CORRUPT_ENUM;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 ProtobufWkt::Value
@@ -1767,8 +1767,8 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
   case Number: {
     return ValueUtil::numberValue(grpc_status.value());
   }
-    PANIC_DUE_TO_CORRUPT_ENUM;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
                                      const std::vector<std::string>& path,
