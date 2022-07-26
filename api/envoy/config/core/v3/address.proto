@@ -41,6 +41,10 @@ message EnvoyInternalAddress {
     // [#not-implemented-hide:] The :ref:`listener name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the destination internal listener.
     string server_listener_name = 1;
   }
+
+  // An optional arbitrary string that can be used to differentiate multiple internal addresses with the same
+  // :ref:`listener name <envoy_v3_api_field_config.core.v3.EnvoyInternalAddress.address_name_specifier>`.
+  string logical_port = 2;
 }
 
 // [#next-free-field: 7]

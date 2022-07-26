@@ -338,7 +338,8 @@ public:
    * Construct from a string name.
    */
   explicit EnvoyInternalInstance(const std::string& address_id,
-                                 const SocketInterface* sock_interface = nullptr);
+                                 const SocketInterface* sock_interface = nullptr,
+                                 const std::string& logical_port = "");
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -352,10 +353,13 @@ public:
 
 private:
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {
-    explicit EnvoyInternalAddressImpl(const std::string& address_id) : address_id_(address_id) {}
+    explicit EnvoyInternalAddressImpl(const std::string& address_id,
+                                      const std::string& logical_port)
+        : address_id_(address_id), logical_port_(logical_port) {}
     ~EnvoyInternalAddressImpl() override = default;
     const std::string& addressId() const override { return address_id_; }
     const std::string address_id_;
+    const std::string logical_port_;
   };
   EnvoyInternalAddressImpl internal_address_;
 };

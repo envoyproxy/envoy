@@ -161,6 +161,7 @@ public:
    * For IPv4 addresses: "1.2.3.4:80"
    * For IPv6 addresses: "[1234:5678::9]:443"
    * For pipe addresses: "/foo"
+   * For internal addresses: "serverListenerName-<hash of metadata>"
    */
   virtual const std::string& asString() const PURE;
 

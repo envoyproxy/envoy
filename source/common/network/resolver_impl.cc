@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
@@ -56,7 +57,8 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
     case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
         kServerListenerName:
       return std::make_shared<EnvoyInternalInstance>(
-          address.envoy_internal_address().server_listener_name());
+          address.envoy_internal_address().server_listener_name(), nullptr,
+          address.envoy_internal_address().logical_port());
     case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
         ADDRESS_NAME_SPECIFIER_NOT_SET:
       break;

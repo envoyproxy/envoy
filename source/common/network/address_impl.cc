@@ -404,10 +404,11 @@ absl::Status PipeInstance::initHelper(const sockaddr_un* address, mode_t mode) {
 }
 
 EnvoyInternalInstance::EnvoyInternalInstance(const std::string& address_id,
-                                             const SocketInterface* sock_interface)
+                                             const SocketInterface* sock_interface,
+                                             const std::string& logical_port)
     : InstanceBase(Type::EnvoyInternal, sockInterfaceOrDefault(sock_interface)),
-      internal_address_(address_id) {
-  friendly_name_ = absl::StrCat("envoy://", address_id);
+      internal_address_(address_id, logical_port) {
+  friendly_name_ = absl::StrCat("envoy://", address_id, ":", logical_port);
 }
 
 bool EnvoyInternalInstance::operator==(const Instance& rhs) const {
