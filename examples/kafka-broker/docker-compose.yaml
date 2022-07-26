@@ -6,6 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     container_name: proxy
+    depends_on:
+    - kafka
     ports:
     - 19092:19092
     - 8001:8001
@@ -15,6 +17,11 @@ services:
     container_name: kafka
     depends_on:
     - zookeeper
+    healthcheck:
+      test: ["CMD", "kafka-topics.sh", "--list", "--zookeeper", "zookeeper:2181"]
+      interval: 5s
+      timeout: 60s
+      retries: 120
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -31,6 +38,11 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     container_name: zookeeper
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -nz 127.0.0.1 2181"]
+      interval: 5s
+      timeout: 60s
+      retries: 120
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
