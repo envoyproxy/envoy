@@ -7,13 +7,13 @@ namespace InputMatchers {
 namespace Hyperscan {
 
 ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database,
-                                       const hs_database_t* som_database) {
+                                       const hs_database_t* start_of_match_database) {
   hs_error_t err = hs_alloc_scratch(database, &scratch_);
   if (err != HS_SUCCESS) {
     throw EnvoyException(fmt::format("unable to allocate scratch space, error code {}.", err));
   }
-  if (som_database) {
-    err = hs_alloc_scratch(som_database, &scratch_);
+  if (start_of_match_database) {
+    err = hs_alloc_scratch(start_of_match_database, &scratch_);
     if (err != HS_SUCCESS) {
       throw EnvoyException(
           fmt::format("unable to allocate start of match scratch space, error code {}.", err));
@@ -42,23 +42,23 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
   // Compile database.
   compile(expressions, flags, ids, &database_);
 
-  // Compile SOM database. The SOM database will report start of matching, works for replaceAll.
+  // Compile start of match database which will report start of matching, works for replaceAll.
   if (report_start_of_matching) {
-    std::vector<unsigned int> som_flags = flags;
-    for (unsigned int& som_flag : som_flags) {
-      som_flag = som_flag | HS_FLAG_SOM_LEFTMOST;
+    std::vector<unsigned int> start_of_match_flags = flags;
+    for (unsigned int& start_of_match_flag : start_of_match_flags) {
+      start_of_match_flag = start_of_match_flag | HS_FLAG_SOM_LEFTMOST;
     }
-    compile(expressions, som_flags, ids, &som_database_);
+    compile(expressions, start_of_match_flags, ids, &start_of_match_database_);
   }
 
   tls_->set([this](Event::Dispatcher&) {
-    return std::make_shared<ScratchThreadLocal>(this->database_, this->som_database_);
+    return std::make_shared<ScratchThreadLocal>(this->database_, this->start_of_match_database_);
   });
 }
 
 Matcher::~Matcher() {
   hs_free_database(database_);
-  hs_free_database(som_database_);
+  hs_free_database(start_of_match_database_);
 }
 
 bool Matcher::match(absl::string_view value) const {
@@ -86,7 +86,7 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
   std::vector<Bound> bounds;
   hs_scratch_t* scratch_ = tls_->get()->scratch_;
   hs_error_t err = hs_scan(
-      som_database_, value.data(), value.size(), 0, scratch_,
+      start_of_match_database_, value.data(), value.size(), 0, scratch_,
       [](unsigned int, unsigned long long from, unsigned long long to, unsigned int,
          void* context) -> int {
         std::vector<Bound>* bounds = static_cast<std::vector<Bound>*>(context);

@@ -13,7 +13,7 @@ namespace InputMatchers {
 namespace Hyperscan {
 
 struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
-  ScratchThreadLocal(const hs_database_t* database, const hs_database_t* som_database);
+  ScratchThreadLocal(const hs_database_t* database, const hs_database_t* start_of_match_database);
   ~ScratchThreadLocal() override;
 
   hs_scratch_t* scratch_{};
@@ -44,7 +44,7 @@ public:
 
 private:
   hs_database_t* database_{};
-  hs_database_t* som_database_{};
+  hs_database_t* start_of_match_database_{};
   ThreadLocal::TypedSlotPtr<ScratchThreadLocal> tls_;
 
   void compile(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
