@@ -24,6 +24,7 @@ namespace {
 class FilterIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
   void initialize() override {
+    TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
     const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
     envoy::config::core::v3::AlternateProtocolsCacheOptions alt_cache;
     alt_cache.set_name("default_alternate_protocols_cache");
@@ -268,7 +269,6 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
 class MixedUpstreamIntegrationTest : public FilterIntegrationTest {
 protected:
   MixedUpstreamIntegrationTest() {
-    TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
     default_request_headers_.setHost("sni.lyft.com");
   }
 
