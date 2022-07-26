@@ -14,9 +14,6 @@ responds_with \
     "http://localhost:${PORT_PROXY}"
 responds_with_header \
     "header_key_1: header_value_1" \
-    "http://localhost:${PORT_PROXY}"
-responds_with_header \
-    "header_key_2: header_value_2" \
-    "http://localhost:${PORT_PROXY}"
+    "http://localhost:${PORT_PROXY}/multiple/lua/scripts"
 
 # TODO(phlax): Add some docs/tests for web service

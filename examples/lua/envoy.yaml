@@ -20,7 +20,7 @@ static_resources:
               - "*"
               routes:
               - match:
-                  prefix: "/"
+                  prefix: "/multiple/lua/scripts"
                 route:
                   cluster: web_service
                 typed_per_filter_config:
@@ -31,13 +31,10 @@ static_resources:
                         function envoy_on_response(response_handle)
                           response_handle:headers():add("header_key_1", "header_value_1")
                         end
-                  lua_filter_with_custom_name_2:
-                    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
-                    source_code:
-                      inline_string: |
-                        function envoy_on_response(response_handle)
-                          response_handle:headers():add("header_key_2", "header_value_2")
-                        end
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: web_service
           http_filters:
           - name: lua_filter_with_custom_name_0
             typed_config:
@@ -49,14 +46,7 @@ static_resources:
                   function envoy_on_request(request_handle)
                     request_handle:headers():add("foo", mylibrary.foobar())
                   end
-                  function envoy_on_response(response_handle)
-                    body_size = response_handle:body():length()
-                    response_handle:headers():add("response-body-size", tostring(body_size))
-                  end
           - name: lua_filter_with_custom_name_1
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-          - name: lua_filter_with_custom_name_2
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
           - name: envoy.filters.http.router
