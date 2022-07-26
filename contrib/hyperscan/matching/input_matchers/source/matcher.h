@@ -20,11 +20,11 @@ struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
 };
 
 struct Bound {
-  Bound(uint64_t start, uint64_t end);
+  Bound(uint64_t begin, uint64_t end);
 
   bool operator<(const Bound& other) const;
 
-  uint64_t start_;
+  uint64_t begin_;
   uint64_t end_;
 };
 

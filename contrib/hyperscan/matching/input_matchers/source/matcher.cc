@@ -23,13 +23,13 @@ ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database,
 
 ScratchThreadLocal::~ScratchThreadLocal() { hs_free_scratch(scratch_); }
 
-Bound::Bound(uint64_t start, uint64_t end) : start_(start), end_(end) {}
+Bound::Bound(uint64_t begin, uint64_t end) : begin_(begin), end_(end) {}
 
 bool Bound::operator<(const Bound& other) const {
-  if (start_ == other.start_) {
+  if (begin_ == other.begin_) {
     return end_ > other.end_;
   }
-  return start_ < other.start_;
+  return begin_ < other.begin_;
 }
 
 Matcher::Matcher(const std::vector<const char*>& expressions,
@@ -109,11 +109,11 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
   parts.reserve(bounds.size() * 2);
   uint64_t pos = 0;
   for (Bound& bound : bounds) {
-    if (bound.start_ < pos) {
+    if (bound.begin_ < pos) {
       continue;
     }
 
-    parts.emplace_back(value.substr(pos, bound.start_ - pos));
+    parts.emplace_back(value.substr(pos, bound.begin_ - pos));
     parts.emplace_back(substitution);
     pos = bound.end_;
   }
