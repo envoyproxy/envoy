@@ -6,8 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     container_name: proxy
-    depends_on:
-    - kafka
     ports:
     - 19092:19092
     - 8001:8001
