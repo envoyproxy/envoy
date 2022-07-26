@@ -183,8 +183,12 @@ StructFormatter::FormatBuilder::toFormatMapValue(const ProtobufWkt::Struct& stru
       output->emplace(pair.first, toFormatListValue(pair.second.list_value()));
       break;
 
+    case ProtobufWkt::Value::kNumberValue:
+      output->emplace(pair.first, toFormatStringValue(std::to_string(uint32_t(pair.second.number_value()))));
+      break;
+
     default:
-      throw EnvoyException("Only string values, nested structs and list values are "
+      throw EnvoyException("Only string values, nested structs, list values and number values are "
                            "supported in structured access log format.");
     }
   }
@@ -207,8 +211,13 @@ StructFormatter::StructFormatListWrapper StructFormatter::FormatBuilder::toForma
     case ProtobufWkt::Value::kListValue:
       output->emplace_back(toFormatListValue(value.list_value()));
       break;
+
+    case ProtobufWkt::Value::kNumberValue:
+      output->emplace_back(toFormatStringValue(std::to_string(uint32_t(value.number_value()))));
+      break;
+
     default:
-      throw EnvoyException("Only string values, nested structs and list values are "
+      throw EnvoyException("Only string values, nested structs, list values and number values are "
                            "supported in structured access log format.");
     }
   }
