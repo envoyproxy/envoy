@@ -32,9 +32,8 @@ using PathMatchPredicateSharedPtr = std::shared_ptr<PathMatchPredicate>;
 class PathMatchPredicateFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~PathMatchPredicateFactory() = default;
-
   virtual PathMatchPredicateSharedPtr
-  createPathMatchPredicate(std::string url_pattern) PURE;
+  createPathMatchPredicate(const Protobuf::Message& config, std::string url_pattern) PURE;
 
   std::string category() const override { return "envoy.path_match_policy"; }
 };

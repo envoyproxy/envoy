@@ -1,4 +1,4 @@
-#include "source/extensions/pattern_template/pattern_template.h"
+#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
 
 #include <map>
 #include <string>
@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "source/common/http/path_utility.h"
-#include "source/extensions/pattern_template/match/pattern_template_match.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"

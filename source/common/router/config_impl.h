@@ -34,7 +34,7 @@
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
 
-#include "source/extensions/pattern_template/match/pattern_template_match.h"
+#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
@@ -461,9 +461,8 @@ private:
  */
 class PathMatchPolicyImpl : public PathMatchPolicy {
 public:
-  // Constructor that enables internal redirect with policy_config controlling the configurable
-  // behaviors.
-  PathMatchPolicyImpl(std::string url_pattern);
+ PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config, std::string url_pattern,
+                                         ProtobufMessage::ValidationVisitor& validator);
 
   // Default constructor that disables internal redirect.
   PathMatchPolicyImpl();
@@ -476,6 +475,7 @@ public:
 
 private:
   const bool enabled_;
+  ProtobufTypes::MessagePtr predicate_config_;
   PathMatchPredicateFactory* predicate_factory_;
 };
 
@@ -486,6 +486,8 @@ private:
  */
 class PathRewritePolicyImpl : public PathRewritePolicy {
 public:
+   PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
+                                         ProtobufMessage::ValidationVisitor& validator, std::string url_pattern,, std::string url_rewrite_pattern);
   // Constructor that enables internal redirect with policy_config controlling the configurable
   // behaviors.
   PathRewritePolicyImpl(std::string url_pattern, std::string url_rewrite_pattern);
@@ -901,6 +903,7 @@ protected:
   Regex::CompiledMatcherPtr regex_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
   const PathMatchPolicyImpl path_match_policy_;
+  const PathRewritePolicyImpl path_rewrite_policy_;
   std::string regex_rewrite_substitution_;
   std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
@@ -986,8 +989,8 @@ private:
   buildPathMatchPolicy(envoy::config::route::v3::Route route,
                                          ProtobufMessage::ValidationVisitor& validator) const;
 
-  PathMatchPolicyImpl
-  buildPathRewritePolicy(envoy::config::route::v3::RouteAction route_action,
+  PathRewritePolicyImpl
+  buildPathRewritePolicy(envoy::config::route::v3::Route route,
                                          ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,

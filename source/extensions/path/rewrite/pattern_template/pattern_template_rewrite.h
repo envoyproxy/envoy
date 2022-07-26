@@ -1,11 +1,11 @@
-#ifndef SOURCE_EXTENSIONS_PATTERN_TEMPLATE_PATTERN_TEMPLATE_REWRITE_H
-#define SOURCE_EXTENSIONS_PATTERN_TEMPLATE_PATTERN_TEMPLATE_REWRITE_H
+#ifndef SOURCE_EXTENSIONS_PATH_REWRITE_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H
+#define SOURCE_EXTENSIONS_PATH_REWRITE_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H
 
 #include <string>
 
 #include "envoy/router/path_rewrite_policy.h"
 
-#include "source/extensions/pattern_template/pattern_template.h"
+#include "source/extensions/path/pattern_template_lib/pattern_template.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -48,4 +48,4 @@ private:
 } // namespace Extensions
 } // namespace Envoy
 
-#endif // SOURCE_EXTENSIONS_PATTERN_TEMPLATE_PATTERN_TEMPLATE_REWRITE_H
+#endif // SOURCE_EXTENSIONS_PATH_REWRITE_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H

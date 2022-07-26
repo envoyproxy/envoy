@@ -1,4 +1,4 @@
-#include "source/extensions/pattern_template/rewrite/config.h"
+#include "source/extensions/path/rewrite/pattern_template/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/router/path_rewrite_policy.h"

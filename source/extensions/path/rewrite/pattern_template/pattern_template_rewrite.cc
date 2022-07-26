@@ -1,14 +1,14 @@
-#include "source/extensions/pattern_template/rewrite/pattern_template_rewrite.h"
+#include "source/extensions/path/rewrite/pattern_template/pattern_template_rewrite.h"
 
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "source/extensions/pattern_template/proto/pattern_template_rewrite_segments.pb.h"
+#include "source/extensions/path/pattern_template_lib/proto/pattern_template_rewrite_segments.pb.h"
 
 #include "source/common/http/path_utility.h"
-#include "source/extensions/pattern_template/pattern_template_internal.h"
+#include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"

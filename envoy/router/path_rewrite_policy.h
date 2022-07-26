@@ -35,7 +35,7 @@ public:
   virtual ~PathRewritePredicateFactory() override = default;
 
   virtual PathRewritePredicateSharedPtr
-  createPathRewritePredicate(std::string url_pattern, std::string url_rewrite_pattern) PURE;
+  createPathRewritePredicate(const Protobuf::Message& config, std::string url_pattern);
 
   std::string category() const override { return "envoy.path_rewrite_policy"; }
 };

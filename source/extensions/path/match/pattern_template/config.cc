@@ -1,4 +1,4 @@
-#include "source/extensions/pattern_template/match/config.h"
+#include "source/extensions/path/match/pattern_template/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/router/path_match_policy.h"

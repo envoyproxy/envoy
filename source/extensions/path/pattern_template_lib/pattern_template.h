@@ -1,13 +1,13 @@
-#ifndef SOURCE_EXTENSIONS_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H
-#define SOURCE_EXTENSIONS_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H
+#ifndef SOURCE_EXTENSIONS_PATH_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H
+#define SOURCE_EXTENSIONS_PATH_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H
 
 #include <string>
 
-#include "source/extensions/pattern_template/proto/pattern_template_rewrite_segments.pb.h"
+#include "source/extensions/path/pattern_template_lib/proto/pattern_template_rewrite_segments.pb.h"
 
 #include "envoy/router/path_match_policy.h"
 
-#include "source/extensions/pattern_template/pattern_template_internal.h"
+#include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -55,4 +55,4 @@ absl::Status isValidMatchPattern(std::string match_pattern);
 } // namespace Extensions
 } // namespace Envoy
 
-#endif // SOURCE_EXTENSIONS_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H
+#endif // SOURCE_EXTENSIONS_PATH_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H
