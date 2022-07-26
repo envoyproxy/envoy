@@ -23,6 +23,8 @@
 namespace Envoy {
 namespace Upstream {
 
+constexpr int kMaxBytesInBuffer = 1024;
+
 /**
  * Factory for creating health checker implementations.
  */

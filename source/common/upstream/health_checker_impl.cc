@@ -260,8 +260,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeData(Buffer::Instance& data,
                                                                      bool end_stream) {
-  if (!parent_.expected_response_.empty() && response_body_->length() < 1024) {
-    response_body_->move(data, 1024 - response_body_->length());
+  if (!parent_.expected_response_.empty() && response_body_->length() < kMaxBytesInBuffer) {
+    response_body_->move(data, kMaxBytesInBuffer - response_body_->length());
   }
   if (end_stream) {
     onResponseComplete();
