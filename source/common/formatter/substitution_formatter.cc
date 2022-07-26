@@ -184,7 +184,8 @@ StructFormatter::FormatBuilder::toFormatMapValue(const ProtobufWkt::Struct& stru
       break;
 
     case ProtobufWkt::Value::kNumberValue:
-      output->emplace(pair.first, toFormatStringValue(std::to_string(uint32_t(pair.second.number_value()))));
+      output->emplace(pair.first,
+                      toFormatStringValue(std::to_string(uint32_t(pair.second.number_value()))));
       break;
 
     default:
