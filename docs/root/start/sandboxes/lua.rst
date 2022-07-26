@@ -78,7 +78,7 @@ Terminal 1
    X-Request-Id: 9e2d0bef-af11-4751-9fef-c6a13d20859a
    * Connection #0 to host localhost left intact
 
-Step 3: Ensure multiple Lua filters can work at same time
+Step 3: Using multiple Lua filters at the same time
 *********************************************************
 
 Two Lua filters are configured in the example Envoy proxy configuration. But the second one only work at
