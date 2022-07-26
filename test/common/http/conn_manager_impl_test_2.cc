@@ -14,7 +14,6 @@ using testing::Property;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StrictMock;
 
 namespace Envoy {
 namespace Http {
