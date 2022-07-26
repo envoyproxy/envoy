@@ -268,9 +268,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
 // an HTTP/2 or an HTTP/3 upstream (but not both).
 class MixedUpstreamIntegrationTest : public FilterIntegrationTest {
 protected:
-  MixedUpstreamIntegrationTest() {
-    default_request_headers_.setHost("sni.lyft.com");
-  }
+  MixedUpstreamIntegrationTest() { default_request_headers_.setHost("sni.lyft.com"); }
 
   void writeFile() {
     uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();
