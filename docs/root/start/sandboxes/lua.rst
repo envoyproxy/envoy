@@ -81,7 +81,7 @@ Terminal 1
 Step 3: Using multiple Lua filters at the same time
 *********************************************************
 
-Two Lua filters are configured in the example Envoy proxy configuration. But the second one only work at
+Two Lua filters are configured in the example Envoy proxy configuration. But the second one can only work at a
 specfic route.
 The output from the ``curl`` command below should include the headers that added by multiple Lua filters.
 
