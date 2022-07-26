@@ -72,13 +72,13 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   ThriftObjectPtr upgrade_response_;
 
   enum class ResponseState : uint8_t {
-    ResponseNonStarted = 0,
-    ResponseStarted = 1,
-    ResponseCompleted = 2,
+    None = 0,
+    Started = 1,
+    Completed = 2,
     ConnectionReleased = 3
   };
 
-  ResponseState response_state_{ResponseState::ResponseNonStarted};
+  ResponseState response_state_{ResponseState::None};
   bool request_complete_ : 1;
   bool response_underflow_ : 1;
   bool charged_response_timing_ : 1;

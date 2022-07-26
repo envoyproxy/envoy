@@ -126,9 +126,9 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
                                        UpstreamResponseCallbacks& callbacks) {
   ENVOY_LOG(trace, "reading response: {} bytes", data.length());
 
-  if (response_state_ == ResponseState::ResponseNonStarted) {
+  if (response_state_ == ResponseState::None) {
     callbacks.startUpstreamResponse(*transport_, *protocol_);
-    response_state_ = ResponseState::ResponseStarted;
+    response_state_ = ResponseState::Started;
   }
 
   const auto& cluster = parent_.cluster();
@@ -162,16 +162,16 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
       break;
     }
 
-    response_state_ = ResponseState::ResponseCompleted;
+    response_state_ = ResponseState::Completed;
     if (callbacks.responseMetadata()->isDraining()) {
       ENVOY_LOG(debug, "got draining signal");
       stats_.incCloseDrain(cluster);
       // ResetStream triggers a local connection failure. However, we want to
       // keep the downstream connection after the upstream connection, i.e.,
       // `conn_data->connection()`, is closed. Therefore, introduce a new state
-      // ResponseCompleted before ConnectionReleased to hint that got all the
-      // response and not to close the downstream connection, especially while
-      // we got a draining signal.
+      // ResponseState::Completed before ResponseState::ConnectionReleased to
+      // hint that got all the response and not to close the downstream
+      // connection, especially while we got a draining signal.
       resetStream();
     }
     onResponseComplete();
@@ -188,7 +188,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
 
 bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream,
                                          UpstreamResponseCallbacks& callbacks) {
-  ASSERT(response_state_ < ResponseState::ResponseCompleted);
+  ASSERT(response_state_ < ResponseState::Completed);
 
   response_size_ += data.length();
 
@@ -319,10 +319,10 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
 
     // Error occurred after a partial or underflow response, propagate the reset to the
     // downstream.
-    if (response_underflow_ || response_state_ == ResponseState::ResponseStarted) {
+    if (response_underflow_ || response_state_ == ResponseState::Started) {
       ENVOY_LOG(debug, "reset downstream connection for a partial or underflow response");
       parent_.resetDownstreamConnection();
-    } else if (response_state_ == ResponseState::ResponseNonStarted) {
+    } else if (response_state_ == ResponseState::None) {
       close_downstream = close_downstream_on_error_;
       stats_.incResponseLocalException(parent_.cluster());
       parent_.sendLocalReply(
