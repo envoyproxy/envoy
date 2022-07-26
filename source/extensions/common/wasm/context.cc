@@ -1844,22 +1844,23 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
 
 void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response) {
   ASSERT(proxy_wasm::current_context_ == nullptr); // Non-reentrant.
+  auto cleanup = [this, token] {
+    if (wasm()->isGrpcCallId(token)) {
+      grpc_call_request_.erase(token);
+    }
+  };
   if (wasm()->on_grpc_receive_) {
     grpc_receive_buffer_ = std::move(response);
     uint32_t response_size = grpc_receive_buffer_->length();
     // Deferred "after VM call" actions are going to be executed upon returning from
     // ContextBase::*, which might include deleting Context object via proxy_done().
-    wasm()->addAfterVmCallAction([this, token] {
+    wasm()->addAfterVmCallAction([this, cleanup] {
       grpc_receive_buffer_.reset();
-      if (wasm()->isGrpcCallId(token)) {
-        grpc_call_request_.erase(token);
-      }
+      cleanup();
     });
     ContextBase::onGrpcReceive(token, response_size);
   } else {
-    if (wasm()->isGrpcCallId(token)) {
-      grpc_call_request_.erase(token);
-    }
+    cleanup();
   }
 }
 
