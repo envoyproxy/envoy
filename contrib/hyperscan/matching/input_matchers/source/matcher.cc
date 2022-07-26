@@ -52,7 +52,7 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
   }
 
   tls_->set([this](Event::Dispatcher&) {
-    return std::make_shared<ScratchThreadLocal>(this->database_, this->start_of_match_database_);
+    return std::make_shared<ScratchThreadLocal>(database_, start_of_match_database_);
   });
 }
 
