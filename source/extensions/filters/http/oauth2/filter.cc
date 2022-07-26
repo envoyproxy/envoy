@@ -121,6 +121,21 @@ std::string findValue(const absl::flat_hash_map<std::string, std::string>& map,
   const auto value_it = map.find(key);
   return value_it != map.end() ? value_it->second : EMPTY_STRING;
 }
+
+AuthType
+getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType auth_type) {
+  switch (auth_type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+      OAuth2Config_AuthType_BASIC_AUTH:
+    return AuthType::BasicAuth;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+      OAuth2Config_AuthType_URL_ENCODED_BODY:
+  default:
+    return AuthType::UrlEncodedBody;
+  }
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -139,7 +154,8 @@ FilterConfig::FilterConfig(
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
-      cookie_names_(proto_config.credentials().cookie_names()) {
+      cookie_names_(proto_config.credentials().cookie_names()),
+      auth_type_(getAuthType(proto_config.auth_type())) {
   if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -341,7 +357,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                                              *Http::ResponseTrailerMapImpl::create(),
                                              decoder_callbacks_->streamInfo(), "");
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
-                                     redirect_uri);
+                                     redirect_uri, config_->authType());
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;

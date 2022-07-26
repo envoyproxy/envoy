@@ -179,6 +179,7 @@ http_filters:
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
+  EXPECT_FALSE(config.streamErrorOnInvalidHttpMessaging());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, Http3Configured) {
@@ -1536,7 +1537,7 @@ http_filters:
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
-  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context_));
+  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context_.getServerFactoryContext()));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {

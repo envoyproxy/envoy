@@ -1004,6 +1004,63 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
+// This test validates two cases.
+// 1. Verify Listener warming is finished only on named RDS response for new routes.
+// 2. Verify Listener does not get in to warming state for existing routes.
+TEST_P(AdsIntegrationTest, ListenerWarmingOnNamedResponse) {
+  initialize();
+
+  // Send initial configuration.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {buildCluster("cluster_0")},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+      {buildListener("listener_0", "route_config_0")}, {}, "1");
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Validate that we can process a request.
+  makeSingleRequest();
+
+  // Update existing listener - update stat prefix, use the same route name.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {buildCluster("cluster_1")}, {buildCluster("cluster_1")},
+      {"cluster_0"}, "2");
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_1")},
+      {buildClusterLoadAssignment("cluster_1")}, {"cluster_0"}, "2");
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0", "rds_test")},
+      {buildListener("listener_0", "route_config_0", "rds_test")}, {}, "2");
+
+  // Validate that listener is updated correctly and does not get in to warming state.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
+
+  // Update listener with a new route.
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_1", "rds_test")},
+      {buildListener("listener_0", "route_config_1", "rds_test")}, {}, "2");
+
+  // Validate that the listener gets in to warming state waiting for RDS.
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 1);
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // Send the new route and validate that listener finishes warming.
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_1", "cluster_1")},
+      {buildRouteConfig("route_config_1", "cluster_1")}, {}, "2");
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 3);
+}
+
 // Regression test for the use-after-free crash when processing RDS update (#3953).
 TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
   initialize();
