@@ -18,6 +18,9 @@ removed_config_or_runtime:
 - area: auto_config
   change: |
     removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
+- area: grpc
+  change: |
+    remove ``envoy.reloadable_features.enable_grpc_async_client_cache`` and legacy code paths.
 - area: hcm
   change: |
     removed ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding`` and legacy code paths.

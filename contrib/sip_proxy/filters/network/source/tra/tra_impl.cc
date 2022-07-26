@@ -191,7 +191,7 @@ ClientPtr traClient(Event::Dispatcher& dispatcher, Server::Configuration::Factor
   // requests.
   return std::make_unique<SipProxy::TrafficRoutingAssistant::GrpcClientImpl>(
       context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-          grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled),
+          grpc_service, context.scope(), true),
       dispatcher, timeout);
 }
 

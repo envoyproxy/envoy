@@ -30,10 +30,6 @@ private:
   friend class AsyncClientFactoryImpl;
 };
 
-// TODO(chaoqin-li1123): Remove this enum class when we verify that sharing async client is safe and
-// the "envoy.reloadable_features.enable_grpc_async_client_cache" runtime has been removed.
-enum class CacheOption { AlwaysCache, CacheWhenRuntimeEnabled };
-
 using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
 // Singleton gRPC client manager. Grpc::AsyncClientManager can be used to create per-service
@@ -56,8 +52,7 @@ public:
    */
   virtual RawAsyncClientSharedPtr
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& grpc_service,
-                            Stats::Scope& scope, bool skip_cluster_check,
-                            CacheOption cache_option) PURE;
+                            Stats::Scope& scope, bool skip_cluster_check) PURE;
 
   /**
    * Create a Grpc::AsyncClients factory for a service. Validation of the service is performed and
