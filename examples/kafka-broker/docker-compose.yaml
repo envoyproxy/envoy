@@ -16,7 +16,8 @@ services:
     image: confluentinc/cp-kafka:latest
     container_name: kafka
     depends_on:
-    - zookeeper
+      zookeeper:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "kafka-topics.sh", "--list", "--zookeeper", "zookeeper:2181"]
       interval: 5s
