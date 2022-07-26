@@ -142,8 +142,6 @@ TEST_P(AdminInstanceTest, Help) {
   /contention: dump current Envoy mutex contention stats (if enabled)
   /cpuprofiler: enable/disable the CPU profiler
   /drain_listeners: drain listeners
-      graceful: When draining listeners, enter a graceful drain period prior to closing listeners. This behaviour and duration is configurable via server options or CLI
-      inboundonly: Drains all inbound listeners. traffic_direction field in envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a listener is inbound or outbound.
   /healthcheck/fail: cause the server to fail health checks
   /healthcheck/ok: cause the server to pass health checks
   /heapprofiler: enable/disable the heap profiler
@@ -154,8 +152,6 @@ TEST_P(AdminInstanceTest, Help) {
   /listeners: print listener info
       format: File format to use; One of (text, json)
   /logging: query/change logging levels
-      paths: To change multiple logging levels at once, set to <logger_name1>=<desired_level1>,<logger_name2>=<desired_level2>.
-      level: desired logging level; One of (, trace, debug, info, warning, error, critical, off)
   /memory: print current allocation/heap usage
   /quitquitquit: exit the server
   /ready: print server state, return 200 if LIVE, otherwise return 503

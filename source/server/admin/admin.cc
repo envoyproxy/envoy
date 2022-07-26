@@ -137,7 +137,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
 
           // TODO(jmarantz): add support for param-passing through a POST. Browsers send
           // those params as the post-body rather than query-params and that requires some
-          // re-plumbing through the admin callback API.
+          // re-plumbing through the admin callback API. See also drain_listeners.
           makeHandler("/logging", "query/change logging levels",
                       MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true),
 
@@ -149,15 +149,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true),
           makeHandler(
               "/drain_listeners", "drain listeners",
-              MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true,
-              {{ParamDescriptor::Type::Boolean, "graceful",
-                "When draining listeners, enter a graceful drain period prior to closing "
-                "listeners. This behaviour and duration is configurable via server options "
-                "or CLI"},
-               {ParamDescriptor::Type::Boolean, "inboundonly",
-                "Drains all inbound listeners. traffic_direction field in "
-                "envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a "
-                "listener is inbound or outbound."}}),
+              MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true),
           makeHandler("/server_info", "print server version/status information",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
           makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
