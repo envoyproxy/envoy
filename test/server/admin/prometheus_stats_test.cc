@@ -286,7 +286,6 @@ envoy_histogram1_bucket{le="20"} 0
 envoy_histogram1_bucket{le="+Inf"} 0
 envoy_histogram1_sum{} 0
 envoy_histogram1_count{} 0
-
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());
