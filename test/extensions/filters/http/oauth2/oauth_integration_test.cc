@@ -1,3 +1,4 @@
+#include "source/common/common/base64.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -74,6 +75,22 @@ resources:
         inline_string: "hmac_secret_1")EOF",
                                               false);
 
+    setOauthConfig();
+
+    // Add the OAuth cluster.
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_static_resources()->add_clusters() =
+          config_helper_.buildStaticCluster("oauth", 0, "127.0.0.1");
+    });
+
+    setUpstreamCount(2);
+
+    HttpIntegrationTest::initialize();
+  }
+
+  virtual void setOauthConfig() {
+    // This config is same as when the 'auth_type: "URL_ENCODED_BODY"' is set as it's the default
+    // value
     config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
 name: oauth
 typed_config:
@@ -114,16 +131,6 @@ typed_config:
     - http://example.com
     - https://example.com
 )EOF"));
-
-    // Add the OAuth cluster.
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      *bootstrap.mutable_static_resources()->add_clusters() =
-          config_helper_.buildStaticCluster("oauth", 0, "127.0.0.1");
-    });
-
-    setUpstreamCount(2);
-
-    HttpIntegrationTest::initialize();
   }
 
   bool validateHmac(const Http::ResponseHeaderMap& headers, absl::string_view host,
@@ -150,6 +157,15 @@ typed_config:
     return validator.isValid();
   }
 
+  virtual void checkClientSecretInRequest(absl::string_view token_secret) {
+    std::string request_body = upstream_request_->body().toString();
+    const auto query_parameters = Http::Utility::parseFromBody(request_body);
+    auto it = query_parameters.find("client_secret");
+
+    ASSERT_TRUE(it != query_parameters.end());
+    EXPECT_EQ(it->second, token_secret);
+  }
+
   void doAuthenticationFlow(absl::string_view token_secret, absl::string_view hmac_secret) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -169,12 +185,7 @@ typed_config:
 
     ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
-    std::string request_body = upstream_request_->body().toString();
-    const auto query_parameters = Http::Utility::parseFromBody(request_body);
-    auto it = query_parameters.find("client_secret");
-
-    ASSERT_TRUE(it != query_parameters.end());
-    EXPECT_EQ(it->second, token_secret);
+    checkClientSecretInRequest(token_secret);
 
     upstream_request_->encodeHeaders(
         Http::TestRequestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
@@ -200,6 +211,65 @@ typed_config:
   }
 
   const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC", "OauthExpires"};
+};
+
+class OauthIntegrationTestWithBasicAuth : public OauthIntegrationTest {
+  void setOauthConfig() override {
+    config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
+name: oauth
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+  config:
+    token_endpoint:
+      cluster: oauth
+      uri: oauth.com/token
+      timeout: 3s
+    authorization_endpoint: https://oauth.com/oauth/authorize/
+    redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+    redirect_path_matcher:
+      path:
+        exact: /callback
+    signout_path:
+      path:
+        exact: /signout
+    credentials:
+      client_id: foo
+      token_secret:
+        name: token
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/token_secret.yaml"
+          resource_api_version: V3
+      hmac_secret:
+        name: hmac
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/hmac_secret.yaml"
+          resource_api_version: V3
+    auth_scopes:
+    - user
+    - openid
+    - email
+    resources:
+    - oauth2-resource
+    - http://example.com
+    - https://example.com
+    auth_type: "BASIC_AUTH"
+)EOF"));
+  }
+
+  void checkClientSecretInRequest(absl::string_view token_secret) override {
+    EXPECT_FALSE(
+        upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
+    const std::string basic_auth_token = absl::StrCat("foo:", token_secret);
+    const std::string encoded_token =
+        Base64::encode(basic_auth_token.data(), basic_auth_token.size());
+    const auto token_secret_expected = absl::StrCat("Basic ", encoded_token);
+    EXPECT_EQ(token_secret_expected, upstream_request_->headers()
+                                         .get(Http::CustomHeaders::get().Authorization)[0]
+                                         ->value()
+                                         .getStringView());
+  }
 };
 
 // Regular request gets redirected to the login page.
@@ -238,6 +308,12 @@ TEST_F(OauthIntegrationTest, AuthenticationFlow) {
   test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
   // 3. Do another one authentication flow.
   doAuthenticationFlow("token_secret_1", "hmac_secret_1");
+}
+
+// Do OAuth flow with Basic auth header in access token request.
+TEST_F(OauthIntegrationTestWithBasicAuth, AuthenticationFlow) {
+  initialize();
+  doAuthenticationFlow("token_secret", "hmac_secret");
 }
 
 } // namespace
