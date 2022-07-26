@@ -627,14 +627,14 @@ void ConnectionManager::UpstreamActiveTrans::sendLocalReply(const DirectResponse
   UNREFERENCED_PARAMETER(end_stream);
   ASSERT(false, "Need to implemented. sendLocalReply");    
   // local reply should be sent upstream..                                                
-  // parent_.sendLocalReply(*metadata_, response, end_stream);
+  parent_.sendLocalReply(*metadata_, response, end_stream);
 
-  // if (end_stream) {
-  //   return;
-  // }
+  if (end_stream) {
+    return;
+  }
 
-  // // Consume any remaining request data from the downstream.
-  // local_response_sent_ = true;
+  // Consume any remaining request data from the downstream.
+  local_response_sent_ = true;
 }
 
 void ConnectionManager::UpstreamActiveTrans::startUpstreamResponse() {

@@ -1,5 +1,6 @@
 #pragma once
 #include <map>
+#include <vector>
 
 #include "source/common/singleton/const_singleton.h"
 
@@ -66,6 +67,11 @@ enum class AppExceptionType {
   InjectedFailure = 13,
   ChecksumMismatch = 14,
   Interruption = 15,
+};
+
+enum ErrorCode {
+  bad_request,
+  service_unavailable,
 };
 
 class HeaderTypeMap {

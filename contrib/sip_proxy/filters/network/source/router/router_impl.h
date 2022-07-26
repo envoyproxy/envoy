@@ -387,6 +387,8 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
+  void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
+
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
   void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
   SipFilters::DecoderFilterCallbacks& decoderFilterCallbacks() { return *callbacks_; }

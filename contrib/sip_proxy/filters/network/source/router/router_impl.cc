@@ -767,6 +767,28 @@ void UpstreamRequest::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbac
   }
 }
 
+
+void UpstreamRequest::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, 
+                                     bool end_stream) {
+  if (conn_data_->connection().state() == Network::Connection::State::Closed) {
+    ENVOY_LOG(debug, "Connection state is closed for upstream local reply");
+    return;
+  }
+
+  Buffer::OwnedImpl buffer;
+
+  metadata.setEP(conn_data_->connection().connectionInfoProvider().localAddress()->ip()->addressAsString());
+  response.encode(metadata, buffer);
+
+  ENVOY_CONN_LOG(
+      debug, "send upstreamlocal reply {} --> {} bytes {}\n{}", conn_data_->connection(),
+      conn_data_->connection().connectionInfoProvider().localAddress()->asStringView(),
+      conn_data_->connection().connectionInfoProvider().remoteAddress()->asStringView(),
+      buffer.length(), buffer.toString());
+
+  write(buffer, end_stream);
+}
+
 bool ResponseDecoder::onData(Buffer::Instance& data) {
   decoder_->onData(data);
   return true;
@@ -779,7 +801,10 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
   if (metadata->msgType() == MsgType::Request) {  
     auto ingress_id = metadata->ingressId();
     if (ingress_id == nullptr) {
-      ENVOY_LOG(debug, "dropping upstream request with no X-Envoy-Origin-Ingress header: \n{}", metadata->rawMsg());
+      ENVOY_LOG(error, "Dropping upstream request with no X-Envoy-Origin-Ingress header: \n{}", metadata->rawMsg());
+      // TEST 
+      auto response = AppException(AppExceptionType::ProtocolError, ErrorCode::bad_request, "Missing X-Envoy-Origin-Ingress header");
+      parent_.sendLocalReply(*metadata, response, false);
       return FilterStatus::StopIteration;
     }
 
@@ -791,6 +816,8 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       ENVOY_LOG(debug, "raw message failing to get a valid downstream connection: \n{}\n", metadata->rawMsg());
       return FilterStatus::StopIteration;
     }
+
+    //TODO This parent_ can write over the upstream channel
 
     ENVOY_LOG(debug, "Got upstream request from host={},cluster={}. For downstream-connection={}",
               parent_.getUpstreamHost()->hostname(),  parent_.route()->routeEntry()->clusterName(), downstream_conn_id);
