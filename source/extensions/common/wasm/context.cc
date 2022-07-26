@@ -1836,14 +1836,17 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
 
 void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response) {
   ASSERT(proxy_wasm::current_context_ == nullptr); // Non-reentrant.
+  if (wasm()->isGrpcCallId(token)) {
+    grpc_call_request_.erase(token);
+  }
   if (wasm()->on_grpc_receive_) {
     grpc_receive_buffer_ = std::move(response);
     uint32_t response_size = grpc_receive_buffer_->length();
+    wasm()->addAfterVmCallAction([this] {
+      grpc_receive_buffer_.reset();
+    });
+    // on_grpc_receive_ may indirectly delete Context via proxy_done().
     ContextBase::onGrpcReceive(token, response_size);
-    grpc_receive_buffer_.reset();
-  }
-  if (wasm()->isGrpcCallId(token)) {
-    grpc_call_request_.erase(token);
   }
 }
 
