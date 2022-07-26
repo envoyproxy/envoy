@@ -42,7 +42,7 @@ Change to the ``examples/lua`` directory.
 Step 2: Send a request to the service
 *************************************
 
-The output from the ``curl`` command below should include the header added by Lua filter.
+The output from the ``curl`` command below should include the header added by the Lua filter.
 
 Terminal 1
 
