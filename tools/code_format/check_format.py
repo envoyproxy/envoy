@@ -3,6 +3,7 @@
 import argparse
 import common
 import functools
+import logging
 import multiprocessing
 import os
 import os.path
@@ -14,9 +15,10 @@ import sys
 import traceback
 import shutil
 import paths
+from functools import cached_property
 
 EXCLUDED_PREFIXES = (
-    "./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
+    "./.", "./generated/", "./thirdparty/", "./build", "./bazel-", "./tools/dev/src",
     "./source/extensions/extensions_build_config.bzl", "./contrib/contrib_build_config.bzl",
     "./bazel/toolchains/configs/", "./tools/testdata/check_format/", "./tools/pyformat/",
     "./third_party/", "./test/extensions/filters/http/wasm/test_data",
@@ -155,7 +157,6 @@ HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 
 SUBDIR_SET = set(common.include_dir_order())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
-PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
 X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
 DESIGNATED_INITIALIZER_REGEX = re.compile(r"\{\s*\.\w+\s*\=")
 MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}")
@@ -211,8 +212,14 @@ CODE_CONVENTION_REPLACEMENTS = {
 UNSORTED_FLAGS = {
     "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-    "envoy.reloadable_features.sanitize_http_header_referer",
 }
+
+logger = logging.getLogger(__name__)
+
+LINE_NUMBER_RE = re.compile(r"^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$")
+VIRTUAL_INCLUDE_HEADERS_RE = re.compile(r"#include.*/_virtual_includes/")
+OWNER_RE = re.compile('@\S+')
+PROJECT_OWNERS_RE = re.compile(r'.*github.com.(.*)\)\)')
 
 
 class FormatChecker:
@@ -234,6 +241,10 @@ class FormatChecker:
             "./tools/clang_tools",
         ]
         self.include_dir_order = args.include_dir_order
+
+    @cached_property
+    def namespace_re(self):
+        return re.compile("^\s*namespace\s+%s\s*{" % self.namespace_check, re.MULTILINE)
 
     # Map a line transformation function across each line of a file,
     # writing the result lines as requested.
@@ -265,7 +276,10 @@ class FormatChecker:
 
     # Obtain all the lines in a given file.
     def read_lines(self, path):
-        return self.read_file(path).split('\n')
+        with open(path) as f:
+            for l in f:
+                yield l[:-1]
+        yield ""
 
     # Read a UTF-8 encoded file as a str.
     def read_file(self, path):
@@ -348,24 +362,12 @@ class FormatChecker:
 
         nolint = "NOLINT(namespace-%s)" % self.namespace_check.lower()
         text = self.read_file(file_path)
-        if not re.search("^\s*namespace\s+%s\s*{" % self.namespace_check, text, re.MULTILINE) and \
-                not nolint in text:
+        if not self.namespace_re.search(text) and not nolint in text:
             return [
                 "Unable to find %s namespace or %s for file: %s" %
                 (self.namespace_check, nolint, file_path)
             ]
         return []
-
-    def package_name_for_proto(self, file_path):
-        package_name = None
-        error_message = []
-        result = PROTO_PACKAGE_REGEX.search(self.read_file(file_path))
-        if result is not None and len(result.groups()) == 1:
-            package_name = result.group(1)
-        if package_name is None:
-            error_message = ["Unable to find package name for proto file: %s" % file_path]
-
-        return [package_name, error_message]
 
     # To avoid breaking the Lyft import, we just check for path inclusion here.
     def allow_listed_for_protobuf_deps(self, file_path):
@@ -590,7 +592,7 @@ class FormatChecker:
                     "term %s should be replaced with preferred term %s" %
                     (invalid_construct, valid_construct))
         # Do not include the virtual_includes headers.
-        if re.search("#include.*/_virtual_includes/", line):
+        if VIRTUAL_INCLUDE_HEADERS_RE.search(line):
             report_error("Don't include the virtual includes headers.")
 
         # Some errors cannot be fixed automatically, and actionable, consistent,
@@ -638,7 +640,8 @@ class FormatChecker:
                     "use Registry::InjectFactory instead.")
         if not self.allow_listed_for_unpack_to(file_path):
             if "UnpackTo" in line:
-                report_error("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
+                report_error(
+                    "Don't use UnpackTo() directly, use MessageUtil::unpackToNoThrow() instead")
         # Check that we use the absl::Time library
         if self.token_in_line("std::get_time", line):
             if "test/" in file_path:
@@ -888,10 +891,6 @@ class FormatChecker:
         if not file_path.endswith(PROTO_SUFFIX):
             error_messages += self.fix_header_order(file_path)
         error_messages += self.clang_format(file_path)
-        if file_path.endswith(PROTO_SUFFIX) and self.is_api_file(file_path):
-            package_name, error_message = self.package_name_for_proto(file_path)
-            if package_name is None:
-                error_messages += error_message
         return error_messages
 
     def check_source_path(self, file_path):
@@ -906,23 +905,13 @@ class FormatChecker:
                 command, "header_order.py check failed", file_path)
         command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
         error_messages += self.execute_command(command, "clang-format check failed", file_path)
-
-        if file_path.endswith(PROTO_SUFFIX) and self.is_api_file(file_path):
-            package_name, error_message = self.package_name_for_proto(file_path)
-            if package_name is None:
-                error_messages += error_message
         return error_messages
 
     # Example target outputs are:
     #   - "26,27c26"
     #   - "12,13d13"
     #   - "7a8,9"
-    def execute_command(
-        self,
-        command,
-        error_message,
-        file_path,
-        regex=re.compile(r"^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$")):
+    def execute_command(self, command, error_message, file_path, regex=LINE_NUMBER_RE):
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
@@ -951,29 +940,40 @@ class FormatChecker:
             return ["clang-format rewrite error: %s" % (file_path)]
         return []
 
-    def check_format(self, file_path):
+    def check_format(self, file_path, fail_on_diff=False):
         error_messages = []
+        orig_error_messages = []
         # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
         # an issue, but there's still an error, that's a problem.
         try_to_fix = self.operation_type == "fix"
         if self.is_build_file(file_path) or self.is_starlark_file(
                 file_path) or self.is_workspace_file(file_path):
             if try_to_fix:
-                error_messages += self.fix_build_path(file_path)
-            error_messages += self.check_build_path(file_path)
+                orig_error_messages = self.check_build_path(file_path)
+                if orig_error_messages:
+                    error_messages += self.fix_build_path(file_path)
+                    error_messages += self.check_build_path(file_path)
+            else:
+                error_messages += self.check_build_path(file_path)
         else:
             if try_to_fix:
-                error_messages += self.fix_source_path(file_path)
-            error_messages += self.check_source_path(file_path)
+                orig_error_messages = self.check_source_path(file_path)
+                if orig_error_messages:
+                    error_messages += self.fix_source_path(file_path)
+                    error_messages += self.check_source_path(file_path)
+            else:
+                error_messages += self.check_source_path(file_path)
 
         if error_messages:
             return ["From %s" % file_path] + error_messages
+        if not error_messages and fail_on_diff:
+            return orig_error_messages
         return error_messages
 
-    def check_format_return_trace_on_error(self, file_path):
+    def check_format_return_trace_on_error(self, file_path, fail_on_diff=False):
         """Run check_format and return the traceback of any exception."""
         try:
-            return self.check_format(file_path)
+            return self.check_format(file_path, fail_on_diff=fail_on_diff)
         except:
             return traceback.format_exc().split("\n")
 
@@ -988,20 +988,21 @@ class FormatChecker:
         for owned in owned_directories:
             if owned.startswith(dir_name) or dir_name.startswith(owned):
                 found = True
+                break
         if not found:
             error_messages.append(
                 "New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
-    def check_format_visitor(self, arg, dir_name, names):
+    def check_format_visitor(self, arg, dir_name, names, fail_on_diff=False):
         """Run check_format in parallel for the given files.
-    Args:
-      arg: a tuple (pool, result_list, owned_directories, error_messages)
-        pool and result_list are for starting tasks asynchronously.
-        owned_directories tracks directories listed in the CODEOWNERS file.
-        error_messages is a list of string format errors.
-      dir_name: the parent directory of the given files.
-      names: a list of file names.
-    """
+        Args:
+          arg: a tuple (pool, result_list, owned_directories, error_messages)
+            pool and result_list are for starting tasks asynchronously.
+            owned_directories tracks directories listed in the CODEOWNERS file.
+            error_messages is a list of string format errors.
+          dir_name: the parent directory of the given files.
+            names: a list of file names.
+        """
 
         # Unpack the multiprocessing.Pool process pool and list of results. Since
         # python lists are passed as references, this is used to collect the list of
@@ -1028,9 +1029,14 @@ class FormatChecker:
 
         dir_name = normalize_path(dir_name)
 
+        # TODO(phlax): improve class/process handling - this is required because if it
+        #   is not cached before the class is sent into the pool, it only caches on the
+        #   forked proc
+        self.namespace_re
+
         for file_name in names:
             result = pool.apply_async(
-                self.check_format_return_trace_on_error, args=(dir_name + file_name,))
+                self.check_format_return_trace_on_error, args=(dir_name + file_name, fail_on_diff))
             result_list.append(result)
 
     # check_error_messages iterates over the list with error messages and prints
@@ -1071,6 +1077,10 @@ if __name__ == "__main__":
         nargs="?",
         default=".",
         help="specify the root directory for the script to recurse over. Default '.'.")
+    parser.add_argument(
+        "--fail_on_diff",
+        action="store_true",
+        help="exit with failure if running fix produces changes.")
     parser.add_argument(
         "--add-excluded-prefixes", type=str, nargs="+", help="exclude additional prefixes.")
     parser.add_argument(
@@ -1123,6 +1133,12 @@ if __name__ == "__main__":
     if format_checker.check_error_messages(ct_error_messages):
         sys.exit(1)
 
+    # TODO(phlax): Remove this after a month or so
+    logger.warning(
+        "Please note: `tools/code_format/check_format.py` no longer checks API `.proto` files, "
+        "please use `tools/proto_format/proto_format.sh` if you are making changes to the API files"
+    )
+
     def check_visibility(error_messages):
         # https://github.com/envoyproxy/envoy/issues/20589
         # https://github.com/envoyproxy/envoy/issues/9953
@@ -1157,12 +1173,11 @@ if __name__ == "__main__":
 
     def get_owners():
         with open('./OWNERS.md') as f:
-            EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*github.com.(.*)\)\)')
             maintainers = ["@UNOWNED"]
             for line in f:
                 if "Senior extension maintainers" in line:
                     return maintainers
-                m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
+                m = PROJECT_OWNERS_RE.search(line)
                 if m is not None:
                     maintainers.append("@" + m.group(1).lower())
 
@@ -1180,7 +1195,7 @@ if __name__ == "__main__":
                     m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
                     if m is not None and not line.startswith('#'):
                         owned.append(m.group(1).strip())
-                        owners = re.findall('@\S+', m.group(2).strip())
+                        owners = OWNER_RE.findall(m.group(2).strip())
                         if len(owners) < 2:
                             error_messages.append(
                                 "Extensions require at least 2 owners in CODEOWNERS:\n"
@@ -1209,7 +1224,7 @@ if __name__ == "__main__":
                             continue
 
                         owned.append(stripped_path)
-                        owners = re.findall('@\S+', m.group(2).strip())
+                        owners = OWNER_RE.findall(m.group(2).strip())
                         if len(owners) < 2:
                             error_messages.append(
                                 "Contrib extensions require at least 2 owners in CODEOWNERS:\n"
@@ -1246,13 +1261,15 @@ if __name__ == "__main__":
                     file_path = os.path.join(root, filename)
                     check_file = (
                         path_predicate(filename) and not file_path.startswith(EXCLUDED_PREFIXES)
-                        and file_path.endswith(SUFFIXES))
+                        and file_path.endswith(SUFFIXES) and
+                        not (file_path.endswith(PROTO_SUFFIX) and root.startswith(args.api_prefix)))
                     if check_file:
                         _files.append(filename)
                 if not _files:
                     continue
                 format_checker.check_format_visitor(
-                    (pool, results, owned_directories, error_messages), root, _files)
+                    (pool, results, owned_directories, error_messages), root, _files,
+                    args.fail_on_diff)
 
             # Close the pool to new tasks, wait for all of the running tasks to finish,
             # then collect the error messages.
@@ -1268,7 +1285,10 @@ if __name__ == "__main__":
         error_messages += sum((r.get() for r in results), [])
 
     if format_checker.check_error_messages(error_messages):
-        print("ERROR: check format failed. run 'tools/code_format/check_format.py fix'")
+        if args.operation_type == "check":
+            print("ERROR: check format failed. run 'tools/code_format/check_format.py fix'")
+        else:
+            print("ERROR: check format failed. diff has been applied'")
         sys.exit(1)
 
     if args.operation_type == "check":

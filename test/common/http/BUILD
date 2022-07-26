@@ -533,3 +533,11 @@ envoy_cc_test_library(
         "//source/extensions/http/original_ip_detection/xff:xff_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "dependency_manager_test",
+    srcs = ["dependency_manager_test.cc"],
+    deps = [
+        "//source/common/http:dependency_manager",
+    ],
+)

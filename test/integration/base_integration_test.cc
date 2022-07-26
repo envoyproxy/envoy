@@ -84,7 +84,8 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options,
+      nullptr));
 
   connection->enableHalfClose(enableHalfClose());
   return connection;
@@ -347,11 +348,16 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
   auto listener_it = listeners.cbegin();
   auto port_it = port_names.cbegin();
-  for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
-    const auto listen_addr = listener_it->get().listenSocketFactory().localAddress();
-    if (listen_addr->type() == Network::Address::Type::Ip) {
-      ENVOY_LOG(debug, "registered '{}' as port {}.", *port_it, listen_addr->ip()->port());
-      registerPort(*port_it, listen_addr->ip()->port());
+  for (; port_it != port_names.end() && listener_it != listeners.end(); ++listener_it) {
+    auto socket_factory_it = listener_it->get().listenSocketFactories().begin();
+    for (; socket_factory_it != listener_it->get().listenSocketFactories().end() &&
+           port_it != port_names.end();
+         ++socket_factory_it, ++port_it) {
+      const auto listen_addr = (*socket_factory_it)->localAddress();
+      if (listen_addr->type() == Network::Address::Type::Ip) {
+        ENVOY_LOG(debug, "registered '{}' as port {}.", *port_it, listen_addr->ip()->port());
+        registerPort(*port_it, listen_addr->ip()->port());
+      }
     }
   }
   const auto admin_addr =
@@ -477,13 +483,18 @@ size_t entryIndex(const std::string& file, uint32_t entry) {
   return index;
 }
 
-std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
+                                                  bool allow_excess_entries) {
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
   for (int i = 0; i < 1000; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
     size_t index = entryIndex(contents, entry);
     if (contents.length() > index) {
+      if (!allow_excess_entries) {
+        EXPECT_EQ(contents.length(), entryIndex(contents, entry + 1))
+            << "Waiting for entry " << entry << " but it was not the last entry";
+      }
       return contents.substr(index);
     }
     absl::SleepFor(absl::Milliseconds(1));

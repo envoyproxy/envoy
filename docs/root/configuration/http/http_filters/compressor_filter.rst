@@ -9,8 +9,8 @@ at the expense of higher CPU load or offloading it to a compression accelerator.
 
 Configuration
 -------------
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`
-* This filter should be configured with the name *envoy.filters.http.compressor*.
 
 How it works
 ------------
