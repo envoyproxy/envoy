@@ -366,9 +366,9 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   if (!parent_.expected_response_.empty()) {
     // If the expected response is set, check the first 1024 bytes of actual response if contains
     // the expected response.
-    std::string response_data =
-        std::string(static_cast<const char*>(response_body_->linearize(response_body_->length())),
-                    response_body_->length());
+    absl::string_view response_data = absl::string_view(
+        static_cast<const char*>(response_body_->linearize(response_body_->length())),
+        response_body_->length());
     ENVOY_CONN_LOG(debug, "hc response_body={} expected_response={}", *client_, response_data,
                    parent_.expected_response_);
 

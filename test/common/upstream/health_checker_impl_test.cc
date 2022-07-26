@@ -1151,7 +1151,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckMaxBuffer) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckHttp2) {
-  setupServiceValidationWithExpectedResponseHC("Everything OK");
+  setupServiceHTTP2ValidationWithExpectedResponseHC();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
