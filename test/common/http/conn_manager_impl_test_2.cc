@@ -3153,7 +3153,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorReject) {
   setup(false, "");
   EXPECT_CALL(header_validator_factory_, create(_, _))
       .WillOnce(Invoke([](Protocol, StreamInfo::StreamInfo& stream_info) {
-        auto header_validator = std::make_unique<StrictMock<MockHeaderValidator>>();
+        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
             .WillOnce(InvokeWithoutArgs([stream_info = &stream_info]() {
               stream_info->setResponseCodeDetails("header_map_is_bad");
@@ -3201,7 +3201,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
   setup(false, "");
   EXPECT_CALL(header_validator_factory_, create(_, _))
       .WillOnce(Invoke([](Protocol, StreamInfo::StreamInfo& stream_info) {
-        auto header_validator = std::make_unique<StrictMock<MockHeaderValidator>>();
+        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
             .WillOnce(InvokeWithoutArgs([stream_info = &stream_info]() {
               stream_info->setResponseCodeDetails("header_map_is_bad");
@@ -3238,7 +3238,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
   setup(false, "");
   EXPECT_CALL(header_validator_factory_, create(_, _))
       .WillOnce(Invoke([](Protocol, StreamInfo::StreamInfo& stream_info) {
-        auto header_validator = std::make_unique<StrictMock<MockHeaderValidator>>();
+        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
             .WillOnce(Invoke([stream_info = &stream_info](RequestHeaderMap& header_map) {
               stream_info->setResponseCodeDetails("header_map_is_bad");
@@ -3273,7 +3273,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
   setup(false, "");
   EXPECT_CALL(header_validator_factory_, create(_, _))
       .WillOnce(Invoke([](Protocol, StreamInfo::StreamInfo& stream_info) {
-        auto header_validator = std::make_unique<StrictMock<MockHeaderValidator>>();
+        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
             .WillOnce(Invoke([stream_info = &stream_info](RequestHeaderMap& header_map) {
               stream_info->setResponseCodeDetails("header_map_is_bad");
@@ -3310,7 +3310,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   setup(false, "");
   EXPECT_CALL(header_validator_factory_, create(_, _)).WillOnce(InvokeWithoutArgs([]() {
-    auto header_validator = std::make_unique<StrictMock<MockHeaderValidator>>();
+    auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
     EXPECT_CALL(*header_validator, validateRequestHeaderMap(_)).WillOnce(InvokeWithoutArgs([]() {
       return HeaderValidator::RequestHeaderMapValidationResult::Accept;
     }));
