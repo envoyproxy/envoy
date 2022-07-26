@@ -674,7 +674,7 @@ public:
     }
   }
 
-  void respond_body(size_t index, const std::string& code,
+  void respondBody(size_t index, const std::string& code,
                     const std::vector<std::string>& response_body, bool immediate_hc_fail = false) {
     std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
         new Http::TestResponseHeaderMapImpl{{":status", code}});
@@ -1099,7 +1099,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheck) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond_body(0, "200", {"Test Everything OK"});
+  respondBody(0, "200", {"Test Everything OK"});
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
@@ -1121,7 +1121,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckBuffer) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond_body(0, "200", {"Test OK", "Everything", " OK", "OK", "This is a Test"});
+  respondBody(0, "200", {"Test OK", "Everything", " OK", "OK", "This is a Test"});
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
@@ -1146,7 +1146,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckMaxBuffer) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
 
   std::string data_piece(512, 'A');
-  respond_body(0, "200", {data_piece, data_piece, data_piece});
+  respondBody(0, "200", {data_piece, data_piece, data_piece});
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
@@ -1168,7 +1168,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckHttp2) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond_body(0, "200", {"Test Everything OK"});
+  respondBody(0, "200", {"Test Everything OK"});
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
@@ -1193,7 +1193,7 @@ TEST_F(HttpHealthCheckerImplTest, FailExpectedResponseCheck) {
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
 
-  respond_body(0, "200", {"Test Everything Not OK"});
+  respondBody(0, "200", {"Test Everything Not OK"});
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
@@ -1218,7 +1218,7 @@ TEST_F(HttpHealthCheckerImplTest, FailStatusCheckWithExpectedResponseCheck) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond_body(0, "203", {"Test Everything OK"});
+  respondBody(0, "203", {"Test Everything OK"});
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
@@ -1244,7 +1244,7 @@ TEST_F(HttpHealthCheckerImplTest, ImmediateFailExpectedResponseCheck) {
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
 
-  respond_body(0, "200", {"Something Not OK"}, true);
+  respondBody(0, "200", {"Something Not OK"}, true);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
   EXPECT_EQ(Host::Health::Unhealthy,
