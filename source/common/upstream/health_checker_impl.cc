@@ -55,6 +55,15 @@ const std::string& getHostname(const HostSharedPtr& host,
   return getHostname(host, EMPTY_STRING, cluster);
 }
 
+envoy::config::core::v3::RequestMethod
+getMethod(const envoy::config::core::v3::RequestMethod config_method) {
+  if (config_method == envoy::config::core::v3::METHOD_UNSPECIFIED) {
+    return envoy::config::core::v3::GET;
+  }
+
+  return config_method;
+}
+
 } // namespace
 
 class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
@@ -134,7 +143,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
-      method_(config.http_health_check().method()),
+      method_(getMethod(config.http_health_check().method())),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
@@ -145,10 +154,6 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       random_generator_(random) {
   if (config.http_health_check().has_service_name_matcher()) {
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
-  }
-
-  if (method_ == envoy::config::core::v3::RequestMethod::METHOD_UNSPECIFIED) {
-    method_ = envoy::config::core::v3::RequestMethod::GET;
   }
 }
 
