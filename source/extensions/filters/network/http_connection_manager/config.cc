@@ -133,8 +133,8 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
                              [[maybe_unused]] Server::Configuration::FactoryContext& context) {
 
   Http::HeaderValidatorFactoryPtr header_validator_factory;
-#ifdef ENVOY_ENABLE_UHV
   if (config.has_typed_header_validation_config()) {
+#ifdef ENVOY_ENABLE_UHV
     auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(
         config.typed_header_validation_config());
     if (!factory) {
@@ -148,8 +148,12 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
       throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
                                        config.typed_header_validation_config().name()));
     }
-  }
+#else
+    throw EnvoyException(
+        fmt::format("This Envoy binary does not support header validator extensions.: '{}'",
+                    config.typed_header_validation_config().name()));
 #endif
+  }
   return header_validator_factory;
 }
 

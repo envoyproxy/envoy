@@ -2623,16 +2623,23 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
       .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
                              &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+#ifdef ENVOY_ENABLE_UHV
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
   StrictMock<StreamInfo::MockStreamInfo> stream_info;
-#ifdef ENVOY_ENABLE_UHV
   EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
 #else
-  // If UHV is disabled, providing config should not create header validator
-  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  // If UHV is disabled, providing config should result in rejection
+  EXPECT_THROW(
+      {
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_,
+                                           http_tracer_manager_, filter_config_provider_manager_);
+      },
+      EnvoyException);
 #endif
 }
 

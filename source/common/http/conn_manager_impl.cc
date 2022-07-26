@@ -888,6 +888,8 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       }
 
       auto response_details_opt = filter_manager_.streamInfo().responseCodeDetails();
+      ENVOY_BUG(response_details_opt.has_value(),
+                "Header validator must set response code details on failure.");
 
       sendLocalReply(response_code, "", modify_headers, grpc_status,
                      response_details_opt
@@ -920,6 +922,8 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
 // modifications which may themselves affect route selection.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& headers,
                                                         bool end_stream) {
+  ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
+                   *headers);
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
@@ -929,15 +933,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     request_header_timer_.reset();
   }
 
-  if (!validateHeaders()) {
-    ENVOY_STREAM_LOG(debug, "request headers validation failed:\n{}", *this, *request_headers_);
-    return;
-  }
-
   // Both saw_connection_close_ and is_head_request_ affect local replies: set
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
   state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
+
+  if (!validateHeaders()) {
+    ENVOY_STREAM_LOG(debug, "request headers validation failed:\n{}", *this, *request_headers_);
+    return;
+  }
 
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_.isRoutable()) {
@@ -951,9 +955,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   } else {
     snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->configCast();
   }
-
-  ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
-                   *request_headers_);
 
   // We end the decode here to mark that the downstream stream is complete.
   maybeEndDecode(end_stream);

@@ -351,6 +351,9 @@ private:
       return *tracing_custom_tags_;
     }
 
+    // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
+    // Call header validator extension to validate request header map after it was deserialized.
+    // If header map failed validation, it sends an error response and returns false.
     bool validateHeaders();
 
     ConnectionManagerImpl& connection_manager_;
