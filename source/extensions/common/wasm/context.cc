@@ -1839,13 +1839,14 @@ void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr 
   if (wasm()->on_grpc_receive_) {
     grpc_receive_buffer_ = std::move(response);
     uint32_t response_size = grpc_receive_buffer_->length();
+    // Deferred "after VM call" actions are going to be executed upon returning from
+    // ContextBase::*, which might include deleting Context object via proxy_done().
     wasm()->addAfterVmCallAction([this, token] {
       grpc_receive_buffer_.reset();
       if (wasm()->isGrpcCallId(token)) {
        grpc_call_request_.erase(token);
       }
     });
-    // on_grpc_receive_ may indirectly delete Context via proxy_done().
     ContextBase::onGrpcReceive(token, response_size);
   } else {
     if (wasm()->isGrpcCallId(token)) {
