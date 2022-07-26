@@ -64,8 +64,8 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidated) {
   codec->close();
 }
 
-// With verify-depth set, certificate validation fails
-TEST_P(SslCertValidatorIntegrationTest, CertValidationFailed) {
+// With verify-depth set, certificate validation succeeds since we allow partial chain
+TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithVerifyDepth) {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
                                   .setTlsV13(true)
@@ -74,8 +74,10 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationFailed) {
   initialize();
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
-  ASSERT_TRUE(codec->waitForDisconnect());
+  ASSERT_TRUE(codec->connected());
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
+  codec->close();
 }
 
 } // namespace Ssl

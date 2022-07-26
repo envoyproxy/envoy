@@ -77,8 +77,12 @@ generate_ca ca
 generate_ca intermediate_ca ca
 # Generate 2nd intermediate ca.
 generate_ca intermediate_ca_2 intermediate_ca
+# Generate 3rd intermediate ca.
+generate_ca intermediate_ca_3 intermediate_ca_2
 # Concatenate intermediate and ca certs create valid certificate chain.
 cat cacert.pem intermediate_cacert.pem  intermediate_ca_2cert.pem > intermediate_ca_cert_chain.pem
+# Concatenate intermediate certs create partial certificate chain
+cat intermediate_ca_2cert.pem intermediate_ca_3cert.pem > intermediate_partial_ca_cert_chain.pem
 # Generate RSA cert for the server.
 generate_rsa_key server ca
 generate_x509_cert server ca

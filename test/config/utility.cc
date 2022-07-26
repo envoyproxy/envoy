@@ -1375,12 +1375,12 @@ void ConfigHelper::initializeTls(
       validation_context->add_verify_certificate_hash(TEST_CLIENT2_CERT_HASH);
       std::string cert_yaml = R"EOF(
         trusted_ca:
-          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_ca_2cert.pem"
+          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_partial_ca_cert_chain.pem"
       )EOF";
-      if (options.max_verify_depth_) {
+      if (options.max_verify_depth_.has_value()) {
         cert_yaml += R"EOF(
-        max_verify_depth: 1
-      )EOF";
+        max_verify_depth:
+      )EOF" + std::to_string(options.max_verify_depth_.value());
       }
       TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
     } else {
