@@ -41,6 +41,9 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
 - area: dns_resolver
   change: |
     added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
