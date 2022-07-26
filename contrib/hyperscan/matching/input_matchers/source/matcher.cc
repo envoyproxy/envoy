@@ -106,6 +106,7 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
 
   // Concatenate string and replace matched pair with substitution.
   std::vector<absl::string_view> parts;
+  parts.reserve(bounds.size() * 2);
   uint64_t pos = 0;
   for (Bound& bound : bounds) {
     if (bound.start_ < pos) {
