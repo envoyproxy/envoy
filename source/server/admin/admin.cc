@@ -76,6 +76,16 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
   }
 }
 
+namespace {
+std::vector<absl::string_view> prependBlank(const std::vector<absl::string_view>& strings) {
+  std::vector<absl::string_view> v;
+  v.reserve(strings.size() + 1);
+  v.push_back("");
+  v.insert(v.end(), strings.begin(), strings.end());
+  return v;
+}
+} // namespace
+
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                      bool ignore_global_conn_limit)
     : server_(server),
@@ -135,7 +145,12 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion), false,
                       false),
           makeHandler("/logging", "query/change logging levels",
-                      MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true),
+                      MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true,
+                      {{Admin::ParamDescriptor::Type::String, "paths",
+                        "To change multiple logging levels at once, set to "
+                        "<logger_name1>=<desired_level1>,<logger_name2>=<desired_level2>."},
+                       {Admin::ParamDescriptor::Type::Enum, "level", "desired logging level",
+                        prependBlank(LogsHandler::levelStrings())}}),
           makeHandler("/memory", "print current allocation/heap usage",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false),
           makeHandler("/quitquitquit", "exit the server",
