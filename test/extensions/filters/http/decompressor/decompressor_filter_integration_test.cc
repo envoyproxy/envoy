@@ -380,8 +380,9 @@ TEST_P(DecompressorIntegrationTest, LimitMaxDecompressOutputSize) {
                                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0xb7,
                                 0x01, 0x60, 0x83, 0xbc, 0xe6, 0x00, 0x50, 0x00, 0x00};
 
-  // Note that the threshold is max_inflate_ratio*48 = 480 which is less than 20K.
-  Buffer::OwnedImpl data(buffer, 48);
+  // Note that the threshold is max_inflate_ratio*sizeof(buffer) which is less than 20K.
+  int compressed_data_length = sizeof(buffer);
+  Buffer::OwnedImpl data(buffer, compressed_data_length);
   codec_client_->sendData(*request_encoder, data, true);
 
   waitForNextUpstreamRequest();
@@ -399,7 +400,7 @@ TEST_P(DecompressorIntegrationTest, LimitMaxDecompressOutputSize) {
 
   // Only 4096 bytes(one chunk) decompressed.
   EXPECT_EQ(4096, upstream_request_->bodyLength());
-  EXPECT_EQ("48",
+  EXPECT_EQ(std::to_string(compressed_data_length),
             upstream_request_->trailers()
                 ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
                 ->value()
@@ -416,7 +417,8 @@ TEST_P(DecompressorIntegrationTest, LimitMaxDecompressOutputSize) {
   test_server_->waitForCounterEq(
       "http.config_test.decompressor.testlib.gzip.request.not_decompressed", 0);
   test_server_->waitForCounterEq(
-      "http.config_test.decompressor.testlib.gzip.request.total_compressed_bytes", 48);
+      "http.config_test.decompressor.testlib.gzip.request.total_compressed_bytes",
+      compressed_data_length);
   test_server_->waitForCounterEq(
       "http.config_test.decompressor.testlib.gzip.request.total_uncompressed_bytes", 4096);
   test_server_->waitForCounterGe(
