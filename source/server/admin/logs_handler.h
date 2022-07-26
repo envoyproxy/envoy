@@ -30,6 +30,11 @@ public:
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
+  /**
+   * Returns the valid logging levels as an array of string views.
+   */
+  static std::vector<absl::string_view> levelStrings();
+
 private:
   /**
    * Attempt to change the log level of a logger or all loggers.

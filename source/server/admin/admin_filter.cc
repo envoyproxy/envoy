@@ -24,6 +24,7 @@ Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_
   // addDecodedData() here since we might need to perform onComplete() processing if end_stream is
   // true.
   decoder_callbacks_->addDecodedData(data, false);
+  post_data_.move(data);
 
   if (end_stream) {
     onComplete();
@@ -62,11 +63,29 @@ const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
 }
 
 void AdminFilter::onComplete() {
-  const absl::string_view path = request_headers_->getPathValue();
+  ENVOY_LOG_MISC(error, "post data = {}", post_data_.toString());
+  absl::string_view path = request_headers_->getPathValue();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
   auto header_map = Http::ResponseHeaderMapImpl::create();
+  std::string path_buffer;
   RELEASE_ASSERT(request_headers_, "");
+  if (post_data_.length() != 0 &&
+      request_headers_->getMethodValue() == Http::Headers::get().MethodValues.Post &&
+      request_headers_->getContentTypeValue() == "application/x-www-form-urlencoded" &&
+      path.find('?') == absl::string_view::npos) {
+    std::vector<std::string> sanitized;
+    for (absl::string_view param : absl::StrSplit(post_data_.toString(), "&")) {
+      if (param.find('=') == param.size() - 1) {
+        continue;
+      }
+      sanitized.push_back(std::string(param));
+    }
+    if (!sanitized.empty()) {
+      path_buffer = absl::StrCat(path, "?", absl::StrJoin(sanitized, "&"));
+    }
+    path = path_buffer;
+  }
   Admin::RequestPtr handler = admin_handler_fn_(path, *this);
   Http::Code code = handler->start(*header_map);
   Utility::populateFallbackResponseHeaders(code, *header_map);
