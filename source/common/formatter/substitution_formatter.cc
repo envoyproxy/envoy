@@ -1733,9 +1733,7 @@ GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
   case Number: {
     return std::to_string(grpc_status.value());
   }
-  default:
-    throw EnvoyException("Only CAMEL_STRING, SNAKE_STRING and NUMBER are "
-                         "supported in grpc status access log format.");
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 
@@ -1769,9 +1767,7 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
   case Number: {
     return ValueUtil::numberValue(grpc_status.value());
   }
-  default:
-    throw EnvoyException("Only CAMEL_STRING, SNAKE_STRING and NUMBER are "
-                         "supported in grpc status access log format.");
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
