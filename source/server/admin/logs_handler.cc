@@ -16,9 +16,10 @@ namespace {
 absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> buildLevelMap() {
   absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> levels;
 
-  uint32_t i = 0;
-  for (absl::string_view level_string : LogsHandler::levelStrings()) {
-    levels[level_string] = static_cast<spdlog::level::level_enum>(i++);
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    spdlog::string_view_t spd_level_string{spdlog::level::level_string_views[i]};
+    absl::string_view level_string{spd_level_string.data(), spd_level_string.size()};
+    levels[level_string] = static_cast<spdlog::level::level_enum>(i);
   }
 
   return levels;
@@ -27,16 +28,6 @@ absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> buildLevelMap(
 
 LogsHandler::LogsHandler(Server::Instance& server)
     : HandlerContextBase(server), log_levels_(buildLevelMap()) {}
-
-std::vector<absl::string_view> LogsHandler::levelStrings() {
-  std::vector<absl::string_view> strings;
-  strings.reserve(ARRAY_SIZE(spdlog::level::level_string_views));
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    spdlog::string_view_t level{spdlog::level::level_string_views[i]};
-    strings.push_back(absl::string_view{level.data(), level.size()});
-  }
-  return strings;
-}
 
 Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHeaderMap&,
                                        Buffer::Instance& response, AdminStream&) {
