@@ -329,7 +329,7 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
   if (active_listener.has_value()) {
     // If the tag matches this must be a TCP listener.
     ASSERT(active_listener->get().tcpListener().has_value());
-    return active_listener->get().tcpListener();
+    return active_listener->get().tcpListener().value().get();
   }
   return absl::nullopt;
 }
