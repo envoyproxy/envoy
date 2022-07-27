@@ -984,6 +984,10 @@ TEST_F(ThriftRouterTest, TruncatedResponse) {
 
   upstream_callbacks_->onUpstreamData(buffer, true);
   destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("thrift.downstream_cx_underflow_request_close")
+                     .value());
 }
 
 TEST_F(ThriftRouterTest, UpstreamLocalCloseMidResponse) {
