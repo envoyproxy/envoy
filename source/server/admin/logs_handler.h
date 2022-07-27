@@ -39,11 +39,12 @@ private:
   /**
    * Attempt to change the log level of a logger or all loggers.
    *
-   * Returns StatusCode::kInvalidArgument if validation failed.
+   * @return OkStatus if there are no non-empty params, StatusCode::kInvalidArgument if
+   * validation failed.
    *
-   * @param params supplies the incoming endpoint query params.
+   * @param params supplies the incoming endpoint query or post params.
    */
-  absl::Status changeLogLevel(const Http::Utility::QueryParams& params);
+  absl::Status changeLogLevel(Http::Utility::QueryParams& params);
   void changeAllLogLevels(spdlog::level::level_enum level);
   absl::Status
   changeLogLevels(const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes);

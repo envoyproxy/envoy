@@ -62,7 +62,6 @@ private:
   Http::RequestHeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
   bool end_stream_on_complete_ = true;
-  Buffer::OwnedImpl post_data_;
 };
 
 } // namespace Server
