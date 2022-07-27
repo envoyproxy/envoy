@@ -48,11 +48,6 @@
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
-#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
-#include "source/extensions/path/match/pattern_template/config.h"
-#include "source/extensions/path/rewrite/pattern_template/pattern_template_rewrite.h"
-#include "source/extensions/path/rewrite/pattern_template/config.h"
-
 
 #include "absl/strings/match.h"
 
@@ -358,11 +353,31 @@ std::vector<InternalRedirectPredicateSharedPtr> InternalRedirectPolicyImpl::pred
   }
   return predicates;
 }
+PathRewritePolicyImpl::PathRewritePolicyImpl() : enabled_(false){};
+
+PathRewritePolicyImpl::PathRewritePolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
+                                         ProtobufMessage::ValidationVisitor& validator, std::string curr_url)
+    : curr_url_(curr_url), enabled_(true) {
+
+  absl::string_view name = "envoy.path_match_policy.pattern_template_rewrite_predicate";
+  auto* factory = Registry::FactoryRegistry<Router::PathRewritePredicateFactory>::getFactory(name);
+    ASSERT(factory); // factory not found
+    ProtobufTypes::MessagePtr proto_config = factory->createEmptyConfigProto();
+    Envoy::Config::Utility::translateOpaqueConfig(typed_config.typed_config(), validator, *proto_config);
+
+    predicate_factory_ = factory;
+    predicate_config_ = std::move(proto_config);
+}
+
+PathRewritePredicateSharedPtr PathRewritePolicyImpl::predicate() const {
+  return predicate_factory_->createPathRewritePredicate(*predicate_config_, curr_url_);
+}
 
 PathMatchPolicyImpl::PathMatchPolicyImpl() : enabled_(false){};
 
-PathMatchPolicyImpl::PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config, std::string url_pattern,
-                                         ProtobufMessage::ValidationVisitor& validator)
+PathMatchPolicyImpl::PathMatchPolicyImpl(
+    const envoy::config::core::v3::TypedExtensionConfig typed_config,
+    ProtobufMessage::ValidationVisitor& validator, std::string url_pattern)
     : url_pattern_(url_pattern), enabled_(true) {
 
   absl::string_view name = "envoy.path_match_policy.pattern_template_match_predicate";
@@ -681,16 +696,16 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
 
     // TODO: validate path_match_policy
-    if (!matching::PatternTemplateMatchPredicate::is_valid_match_pattern(path_template).ok()) {
-      throw EnvoyException(fmt::format("path_match_policy {} is invalid", path_template));
-    }
+//    if (!matching::PatternTemplateMatchPredicate::is_valid_match_pattern(path_template).ok()) {
+//      throw EnvoyException(fmt::format("path_match_policy {} is invalid", path_template));
+//    }
   }
 
   if (path_rewrite_policy_.enabled()) {
     // TODO: validate path_rewrite_policy
-    if (!matching::PatternTemplateMatchPredicate::is_valid_match_rewrite(path_template).ok()) {
-      throw EnvoyException(fmt::format("path_rewrite_policy {} is invalid", path_template));
-    }
+//    if (!matching::PatternTemplateMatchPredicate::is_valid_match_rewrite(path_template).ok()) {
+//      throw EnvoyException(fmt::format("path_rewrite_policy {} is invalid", path_template));
+//    }
   }
 
   if (!prefix_rewrite_.empty()) {
@@ -1001,9 +1016,9 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   }
 
   // complete pattern rewrite
-  if (path_match_policy_.enabled()) {
+  if (path_rewrite_policy_.enabled()) {
     auto just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
-    return *std::move(path_match_policy_.predicate()->rewritePattern(just_path, matched_path));
+    return *std::move(path_rewrite_policy_.predicate()->rewritePattern(just_path, matched_path));
   }
 
   // There are no rewrites configured.
@@ -1199,19 +1214,18 @@ InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
 PathRewritePolicyImpl
 RouteEntryImplBase::buildPathRewritePolicy(envoy::config::route::v3::Route route,
                                          ProtobufMessage::ValidationVisitor& validator) const {
-  if (route.has_path_rewrite_policy()) {
-        return PathRewritePolicyImpl(route.path_rewrite_policy(), validator, route.name());
+  if (route.route().has_path_rewrite_policy()) {
+        return PathRewritePolicyImpl(route.route().path_rewrite_policy(), validator, route.name());
   }
     return PathRewritePolicyImpl();
   }
 }
 
 // TODO
-PathMatchPolicyImpl
-RouteEntryImplBase::buildPathMatchPolicy(envoy::config::route::v3::Route route,
+PathMatchPolicyImpl RouteEntryImplBase::buildPathMatchPolicy(envoy::config::route::v3::Route route,
                                          ProtobufMessage::ValidationVisitor& validator) const {
-  if (route.has_path_match_policy()) {
-    return PathMatchPolicyImpl(route.path_match_policy(), validator, route.name());
+  if (route.match().has_path_match_policy()) {
+    return PathMatchPolicyImpl(route.match().path_match_policy(), validator, route.name());
   }
 
   return PathMatchPolicyImpl();

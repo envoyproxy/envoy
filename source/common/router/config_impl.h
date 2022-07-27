@@ -34,8 +34,6 @@
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
 
-#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
-
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
@@ -456,13 +454,12 @@ private:
 };
 
 /**
- * Implementation of InternalRedirectPolicy that reads from the proto
- * InternalRedirectPolicy of the RouteAction.
+ * Implementation of PathMatchPolicy that reads from the proto
+ * PathMatchPolicy of the RouteAction.
  */
 class PathMatchPolicyImpl : public PathMatchPolicy {
 public:
- PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config, std::string url_pattern,
-                                         ProtobufMessage::ValidationVisitor& validator);
+ PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config, ProtobufMessage::ValidationVisitor& validator, std::string url_pattern);
 
   // Default constructor that disables internal redirect.
   PathMatchPolicyImpl();
@@ -479,18 +476,14 @@ private:
   PathMatchPredicateFactory* predicate_factory_;
 };
 
-
 /**
  * Implementation of InternalRedirectPolicy that reads from the proto
  * InternalRedirectPolicy of the RouteAction.
  */
 class PathRewritePolicyImpl : public PathRewritePolicy {
 public:
-   PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
-                                         ProtobufMessage::ValidationVisitor& validator, std::string url_pattern,, std::string url_rewrite_pattern);
-  // Constructor that enables internal redirect with policy_config controlling the configurable
-  // behaviors.
-  PathRewritePolicyImpl(std::string url_pattern, std::string url_rewrite_pattern);
+   PathRewritePolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
+                                         ProtobufMessage::ValidationVisitor& validator, std::string curr_url);
 
   // Default constructor that disables internal redirect.
   PathRewritePolicyImpl();
@@ -499,11 +492,11 @@ public:
 
   PathRewritePredicateSharedPtr predicate() const override;
 
-  const std::string url_pattern_;
-  const std::string url_rewrite_pattern_;
+  const std::string curr_url_;
 
 private:
   const bool enabled_;
+  ProtobufTypes::MessagePtr predicate_config_;
   PathRewritePredicateFactory* predicate_factory_;
 };
 

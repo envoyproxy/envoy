@@ -22,7 +22,7 @@ envoy_cc_library(
     deps = [
         "//envoy/router:router_path_rewrite_policy_interface",
         "//source/extensions/path/pattern_template_lib:pattern_template_lib",
-        "@envoy_api//envoy/extensions/path/rewrite/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/path/rewrite/pattern_template/v3:pkg_cc_proto",
     ],
 )
 
@@ -36,6 +36,6 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/router:router_path_rewrite_policy_interface",
         "//source/extensions/path/pattern_template_lib:pattern_template_lib",
-        "@envoy_api//envoy/extensions/path/rewrite/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/path/rewrite/pattern_template/v3:pkg_cc_proto",
     ],
 )
