@@ -62,8 +62,7 @@ TEST_F(HeaderValidatorTest, Http1RequestHeaderNameValidation) {
   for (int c = 0; c <= 0xff; ++c) {
     key_value[1] = c;
     setHeaderStringUnvalidated(key, key_value);
-    EXPECT_EQ(uhv->validateRequestHeaderEntry(key, value),
-              ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept);
+    EXPECT_TRUE(uhv->validateRequestHeaderEntry(key, value));
   }
 }
 
@@ -76,8 +75,7 @@ TEST_F(HeaderValidatorTest, Http1ResponseHeaderNameValidation) {
   for (int c = 0; c <= 0xff; ++c) {
     key_value[1] = c;
     setHeaderStringUnvalidated(key, key_value);
-    EXPECT_EQ(uhv->validateResponseHeaderEntry(key, value),
-              ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept);
+    EXPECT_TRUE(uhv->validateResponseHeaderEntry(key, value).ok());
   }
 }
 
@@ -85,15 +83,13 @@ TEST_F(HeaderValidatorTest, Http1RequestHeaderMapValidation) {
   auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http11);
   ::Envoy::Http::TestRequestHeaderMapImpl request_header_map{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-  EXPECT_EQ(uhv->validateRequestHeaderMap(request_header_map),
-            ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Accept);
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(request_header_map));
 }
 
 TEST_F(HeaderValidatorTest, Http1ResponseHeaderMapValidation) {
   auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http11);
   ::Envoy::Http::TestResponseHeaderMapImpl response_header_map{{":status", "200"}};
-  EXPECT_EQ(uhv->validateResponseHeaderMap(response_header_map),
-            ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Accept);
+  EXPECT_TRUE(uhv->validateResponseHeaderMap(response_header_map).ok());
 }
 
 } // namespace EnvoyDefault

@@ -212,10 +212,7 @@ public:
     return proxy_status_config_.get();
   }
   Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol, StreamInfo::StreamInfo&) override {
-#ifdef ENVOY_ENABLE_UHV
     // TODO(yanavlasov): admin interface should use the default validator
-    ENVOY_BUG(false, "Admin interface should use the default validator");
-#endif
     return nullptr;
   }
 

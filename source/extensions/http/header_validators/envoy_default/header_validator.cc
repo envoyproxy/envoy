@@ -24,22 +24,22 @@ HeaderValidator::HeaderValidator(const HeaderValidatorConfig&, ::Envoy::Http::Pr
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateRequestHeaderEntry(const HeaderString&, const HeaderString&) {
-  return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+  return HeaderEntryValidationResult::success();
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateResponseHeaderEntry(const HeaderString&, const HeaderString&) {
-  return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+  return HeaderEntryValidationResult::success();
 }
 
 ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
 HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap&) {
-  return ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Accept;
+  return RequestHeaderMapValidationResult::success();
 }
 
 ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
 HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap&) {
-  return ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Accept;
+  return ResponseHeaderMapValidationResult::success();
 }
 
 } // namespace EnvoyDefault

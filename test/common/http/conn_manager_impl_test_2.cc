@@ -3152,12 +3152,13 @@ TEST_F(HttpConnectionManagerImplTest, DirectLocalReplyCausesDisconnect) {
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
   setup(false, "");
   EXPECT_CALL(header_validator_factory_, create(Protocol::Http11, _))
-      .WillOnce(Invoke([](Protocol, StreamInfo::StreamInfo& stream_info) {
+      .WillOnce(InvokeWithoutArgs([]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
-            .WillOnce(InvokeWithoutArgs([stream_info = &stream_info]() {
-              stream_info->setResponseCodeDetails("header_map_is_bad");
-              return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+            .WillOnce(InvokeWithoutArgs([]() {
+              return HeaderValidator::RequestHeaderMapValidationResult(
+                  HeaderValidator::RequestHeaderMapValidationResult::Action::Reject,
+                  "bad_header_map");
             }));
         return header_validator;
       }));
@@ -3189,7 +3190,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
         // By default mock codec indicates HTTP/1.1 protocol which should result in closed
         // connection on error
         EXPECT_EQ("close", headers.getConnectionValue());
-        EXPECT_EQ("header_map_is_bad",
+        EXPECT_EQ("bad_header_map",
                   filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
       }));
   EXPECT_CALL(*filter, onStreamComplete());
@@ -3204,12 +3205,13 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
   codec_->protocol_ = Protocol::Http2;
   setup(false, "");
   EXPECT_CALL(header_validator_factory_, create(Protocol::Http2, _))
-      .WillOnce(Invoke([](Protocol, StreamInfo::StreamInfo& stream_info) {
+      .WillOnce(InvokeWithoutArgs([]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
-            .WillOnce(InvokeWithoutArgs([stream_info = &stream_info]() {
-              stream_info->setResponseCodeDetails("header_map_is_bad");
-              return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+            .WillOnce(InvokeWithoutArgs([]() {
+              return HeaderValidator::RequestHeaderMapValidationResult(
+                  HeaderValidator::RequestHeaderMapValidationResult::Action::Reject,
+                  "bad_header_map");
             }));
         return header_validator;
       }));
@@ -3228,7 +3230,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
         EXPECT_EQ("400", headers.getStatusValue());
         // For HTTP/2 protocols connection should not be closed
         EXPECT_TRUE(headers.Connection() == nullptr);
-        EXPECT_EQ("header_map_is_bad", decoder_->streamInfo().responseCodeDetails().value());
+        EXPECT_EQ("bad_header_map", decoder_->streamInfo().responseCodeDetails().value());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -3239,16 +3241,14 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
   codec_->protocol_ = Protocol::Http2;
   setup(false, "");
-  EXPECT_CALL(header_validator_factory_, create(_, _))
-      .WillOnce(Invoke([](Protocol, StreamInfo::StreamInfo& stream_info) {
-        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
-        EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
-            .WillOnce(InvokeWithoutArgs([stream_info = &stream_info]() {
-              stream_info->setResponseCodeDetails("header_map_is_bad");
-              return HeaderValidator::RequestHeaderMapValidationResult::Reject;
-            }));
-        return header_validator;
-      }));
+  EXPECT_CALL(header_validator_factory_, create(_, _)).WillOnce(InvokeWithoutArgs([]() {
+    auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+    EXPECT_CALL(*header_validator, validateRequestHeaderMap(_)).WillOnce(InvokeWithoutArgs([]() {
+      return HeaderValidator::RequestHeaderMapValidationResult(
+          HeaderValidator::RequestHeaderMapValidationResult::Action::Reject, "bad_header_map");
+    }));
+    return header_validator;
+  }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3266,7 +3266,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("200", headers.getStatusValue());
         EXPECT_EQ("13", headers.getGrpcStatusValue());
-        EXPECT_EQ("header_map_is_bad", decoder_->streamInfo().responseCodeDetails().value());
+        EXPECT_EQ("bad_header_map", decoder_->streamInfo().responseCodeDetails().value());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -3276,17 +3276,17 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
 // Header validator redirects
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
   setup(false, "");
-  EXPECT_CALL(header_validator_factory_, create(_, _))
-      .WillOnce(Invoke([](Protocol, StreamInfo::StreamInfo& stream_info) {
-        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
-        EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
-            .WillOnce(Invoke([stream_info = &stream_info](RequestHeaderMap& header_map) {
-              stream_info->setResponseCodeDetails("header_map_is_bad");
-              header_map.setPath("/some/new/path");
-              return HeaderValidator::RequestHeaderMapValidationResult::Redirect;
-            }));
-        return header_validator;
-      }));
+  EXPECT_CALL(header_validator_factory_, create(_, _)).WillOnce(InvokeWithoutArgs([]() {
+    auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+    EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
+        .WillOnce(Invoke([](RequestHeaderMap& header_map) {
+          header_map.setPath("/some/new/path");
+          return HeaderValidator::RequestHeaderMapValidationResult(
+              HeaderValidator::RequestHeaderMapValidationResult::Action::Redirect,
+              "bad_header_map");
+        }));
+    return header_validator;
+  }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3301,7 +3301,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("307", headers.getStatusValue());
         EXPECT_EQ("/some/new/path", headers.getLocationValue());
-        EXPECT_EQ("header_map_is_bad", decoder_->streamInfo().responseCodeDetails().value());
+        EXPECT_EQ("bad_header_map", decoder_->streamInfo().responseCodeDetails().value());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -3312,17 +3312,17 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
   codec_->protocol_ = Protocol::Http2;
   setup(false, "");
-  EXPECT_CALL(header_validator_factory_, create(_, _))
-      .WillOnce(Invoke([](Protocol, StreamInfo::StreamInfo& stream_info) {
-        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
-        EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
-            .WillOnce(Invoke([stream_info = &stream_info](RequestHeaderMap& header_map) {
-              stream_info->setResponseCodeDetails("header_map_is_bad");
-              header_map.setPath("/some/new/path");
-              return HeaderValidator::RequestHeaderMapValidationResult::Redirect;
-            }));
-        return header_validator;
-      }));
+  EXPECT_CALL(header_validator_factory_, create(_, _)).WillOnce(InvokeWithoutArgs([]() {
+    auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+    EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
+        .WillOnce(Invoke([](RequestHeaderMap& header_map) {
+          header_map.setPath("/some/new/path");
+          return HeaderValidator::RequestHeaderMapValidationResult(
+              HeaderValidator::RequestHeaderMapValidationResult::Action::Redirect,
+              "bad_header_map");
+        }));
+    return header_validator;
+  }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3340,7 +3340,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("200", headers.getStatusValue());
         EXPECT_EQ("13", headers.getGrpcStatusValue());
-        EXPECT_EQ("header_map_is_bad", decoder_->streamInfo().responseCodeDetails().value());
+        EXPECT_EQ("bad_header_map", decoder_->streamInfo().responseCodeDetails().value());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -3353,7 +3353,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   EXPECT_CALL(header_validator_factory_, create(_, _)).WillOnce(InvokeWithoutArgs([]() {
     auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
     EXPECT_CALL(*header_validator, validateRequestHeaderMap(_)).WillOnce(InvokeWithoutArgs([]() {
-      return HeaderValidator::RequestHeaderMapValidationResult::Accept;
+      return HeaderValidator::RequestHeaderMapValidationResult::success();
     }));
     return header_validator;
   }));

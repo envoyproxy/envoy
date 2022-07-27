@@ -142,8 +142,6 @@ struct ResponseCodeDetailValues {
   const std::string PathNormalizationFailed = "path_normalization_failed";
   // The request was rejected because it attempted an unsupported upgrade.
   const std::string UpgradeFailed = "upgrade_failed";
-  // The request was rejected due to header validator rejecting header map.
-  const std::string InvalidRequestHeaders = "invalid_request_headers";
 
   // The request was rejected by the HCM because there was no route configuration found.
   const std::string RouteConfigurationNotFound = "route_configuration_not_found";

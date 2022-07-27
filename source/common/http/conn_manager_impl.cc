@@ -870,13 +870,13 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
 bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   if (header_validator_) {
     auto validation_result = header_validator_->validateRequestHeaderMap(*request_headers_);
-    if (validation_result == Http::HeaderValidator::RequestHeaderMapValidationResult::Reject ||
-        validation_result == Http::HeaderValidator::RequestHeaderMapValidationResult::Redirect) {
+    if (!validation_result.ok()) {
       std::function<void(ResponseHeaderMap & headers)> modify_headers;
       Code response_code = Code::BadRequest;
       absl::optional<Grpc::Status::GrpcStatus> grpc_status;
       bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
-      if (validation_result == Http::HeaderValidator::RequestHeaderMapValidationResult::Redirect &&
+      if (validation_result.action() ==
+              Http::HeaderValidator::RequestHeaderMapValidationResult::Action::Redirect &&
           !is_grpc) {
         response_code = Code::TemporaryRedirect;
         modify_headers = [new_path = request_headers_->Path()->value().getStringView()](
@@ -887,14 +887,7 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
       }
 
-      auto response_details_opt = filter_manager_.streamInfo().responseCodeDetails();
-      ENVOY_BUG(response_details_opt.has_value(),
-                "Header validator must set response code details on failure.");
-
-      sendLocalReply(response_code, "", modify_headers, grpc_status,
-                     response_details_opt
-                         ? *response_details_opt
-                         : StreamInfo::ResponseCodeDetails::get().InvalidRequestHeaders);
+      sendLocalReply(response_code, "", modify_headers, grpc_status, validation_result.details());
       return false;
     }
   }
