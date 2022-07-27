@@ -95,7 +95,7 @@ New Features
 * oauth filter: added :ref:`cookie_names <v1.21:envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>` to allow overriding (default) cookie names (``BearerToken``, ``OauthHMAC``, and ``OauthExpires``) set by the filter.
 * oauth filter: setting ``IdToken`` and ``RefreshToken`` cookies if they are provided by Identity provider along with ``AccessToken``.
 * perf: added support for `Perfetto <https://perfetto.dev>`_ performance tracing.
-* router: added support for the :ref:`<v1.21:config_http_conn_man_headers_x-forwarded-host>` header.
+* router: added support for the :ref:`v1.21:config_http_conn_man_headers_x-forwarded-host` header.
 * stateful session http filter: added :ref:`stateful session http filter <v1.21:config_http_filters_stateful_session>`.
 * stats: added text_readouts query parameter to prometheus stats to return gauges made from text readouts.
 * tcp: added a :ref:`FilterState <v1.21:envoy_v3_api_msg_type.v3.HashPolicy.FilterState>` :ref:`hash policy <v1.21:envoy_v3_api_msg_type.v3.HashPolicy>`, used by :ref:`TCP proxy <v1.21:envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.hash_policy>` to allow hashing load balancer algorithms to hash on objects in filter state.
