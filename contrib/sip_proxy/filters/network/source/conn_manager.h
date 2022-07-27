@@ -215,8 +215,8 @@ private:
       parent_.sendLocalReply(response, end_stream);
     }
     void startUpstreamResponse() override { parent_.startUpstreamResponse(); }
-    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination) override {
-      return parent_.upstreamData(metadata, return_route, return_destination);
+    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination, Network::Connection* return_connection) override {
+      return parent_.upstreamData(metadata, return_route, return_destination, return_connection);
     }
     void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
@@ -320,7 +320,7 @@ private:
     SipFilterStats& stats() override { return parent_.stats_; }
     void sendLocalReply(const DirectResponse& response, bool end_stream) override;
     void startUpstreamResponse() override;
-    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination) override;
+    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination, Network::Connection* return_connection) override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
 
@@ -419,10 +419,10 @@ private:
     // IngressID ingressID() override { return parent_.local_ingress_id_.value(); } // fixme - careful need to ensure theres a value
     const Network::Connection* connection() const override;
     Router::RouteConstSharedPtr route() override { return route_; };
-    // SipFilterStats& stats() override { return parent_.stats_; }
+    SipFilterStats& stats() override { return parent_.stats_; }
     void sendLocalReply(const DirectResponse& response, bool end_stream) override;
     void startUpstreamResponse() override;
-    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination) override;
+    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination, Network::Connection* return_connection) override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
 
@@ -434,9 +434,14 @@ private:
     }
 
     void onError(const std::string& what);
+    void setReturnConnection(Network::Connection* return_connection) {
+      return_connection_ = return_connection;
+    }
 
     Router::RouteConstSharedPtr route_;
     std::string destination_;
+    Network::Connection* return_connection_;
+    MessageMetadataSharedPtr metadata_;
   };
 
   // Wrapper around a connection to enable routing of requests from upstream to downstream
@@ -465,7 +470,7 @@ private:
 
     void startUpstreamResponse() override;
 
-    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination) override;
+    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination, Network::Connection* connection) override;
 
     void resetDownstreamConnection() override { };
 
@@ -521,6 +526,7 @@ private:
   void dispatch();
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void setLocalResponseSent(absl::string_view transaction_id);
+  void sendUpstreamLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredTransDestroy(ActiveTrans& trans);
   void resetAllTrans(bool local_reset);
 

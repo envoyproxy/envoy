@@ -767,7 +767,6 @@ void UpstreamRequest::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbac
   }
 }
 
-
 void UpstreamRequest::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, 
                                      bool end_stream) {
   if (conn_data_->connection().state() == Network::Connection::State::Closed) {
@@ -789,6 +788,11 @@ void UpstreamRequest::sendLocalReply(MessageMetadata& metadata, const DirectResp
   write(buffer, end_stream);
 }
 
+void UpstreamRequest::onError(MessageMetadataSharedPtr metadata, const ErrorCode error_code, const std::string& what) {
+  auto response = AppException(AppExceptionType::ProtocolError, error_code, what);
+  sendLocalReply(*metadata, response, false);
+}
+
 bool ResponseDecoder::onData(Buffer::Instance& data) {
   decoder_->onData(data);
   return true;
@@ -802,9 +806,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
     auto ingress_id = metadata->ingressId();
     if (ingress_id == nullptr) {
       ENVOY_LOG(error, "Dropping upstream request with no X-Envoy-Origin-Ingress header: \n{}", metadata->rawMsg());
-      // TEST 
-      auto response = AppException(AppExceptionType::ProtocolError, ErrorCode::bad_request, "Missing X-Envoy-Origin-Ingress header");
-      parent_.sendLocalReply(*metadata, response, false);
+      parent_.onError(metadata, ErrorCode::bad_request, "Missing X-Envoy-Origin-Ingress header");
       return FilterStatus::StopIteration;
     }
 
@@ -813,7 +815,8 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
     if (downstream_conn == nullptr) {
       ENVOY_LOG(debug, "No downstream connection found for: '{}'\n", downstream_conn_id);
       ENVOY_LOG(debug, "Downstream connection map dumped: \n{}\n", parent_.dumpDownstreamConnection());
-      ENVOY_LOG(debug, "raw message failing to get a valid downstream connection: \n{}\n", metadata->rawMsg());
+      ENVOY_LOG(debug, "Raw message failing to get a valid downstream connection: \n{}\n", metadata->rawMsg());
+      parent_.onError(metadata, ErrorCode::transaction_not_exist, "No downstream connection found for provided ID");
       return FilterStatus::StopIteration;
     }
 
@@ -827,7 +830,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
     // pass the destination and route, so responses to this request have affinity 
     // to upstream host where we recvd this request from
-    downstream_conn->upstreamData(metadata, parent_.route(), parent_.getUpstreamHost()->address()->ip()->addressAsString());
+    downstream_conn->upstreamData(metadata, parent_.route(), parent_.getUpstreamHost()->address()->ip()->addressAsString(), parent_.getUpstreamConnection());
 
     return FilterStatus::Continue;
   }
@@ -846,7 +849,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       }
 
       active_trans->startUpstreamResponse();
-      active_trans->upstreamData(metadata, nullptr, "");
+      active_trans->upstreamData(metadata, nullptr, "", nullptr);
     } else {
       ENVOY_LOG(debug, "no active trans selected {}\n{}", transaction_id, metadata->rawMsg());
       return FilterStatus::StopIteration;

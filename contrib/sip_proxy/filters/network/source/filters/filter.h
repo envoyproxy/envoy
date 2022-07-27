@@ -87,7 +87,7 @@ public:
    * @return ResponseStatus indicating if the upstream response requires more data, is complete,
    *         or if an error occurred requiring the upstream connection to be reset.
    */
-  virtual ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination) PURE;
+  virtual ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination, Network::Connection* return_connection) PURE;
 
   /**
    * Reset the downstream connection.

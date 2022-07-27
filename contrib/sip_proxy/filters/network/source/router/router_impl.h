@@ -388,6 +388,7 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
+  void onError(MessageMetadataSharedPtr metadata, const ErrorCode error_code, const std::string& what);
 
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
   void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
@@ -397,6 +398,9 @@ public:
   void setConnectionState(ConnectionState state) { conn_state_ = state; }
   void write(Buffer::Instance& data, bool end_stream) {
     return conn_data_->connection().write(data, end_stream);
+  }
+  Envoy::Network::Connection* getUpstreamConnection() {
+    return &conn_data_->connection();
   }
 
   std::shared_ptr<TransactionInfo> transactionInfo() { return transaction_info_; }
