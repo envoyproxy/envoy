@@ -54,8 +54,14 @@ void GrpcClientImpl::createTrafficRoutingAssistant(
     (*request.mutable_create_request()->mutable_data())[item.first] = item.second;
   }
 
+  if (context.has_value()) {
+    for (auto& item : context.value()) {
+      (*request.mutable_create_request()->mutable_context())[item.first] = item.second;
+    }
+  }
+
   return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Create",
-                     request, context, parent_span, stream_info);
+                     request, parent_span, stream_info);
 }
 
 void GrpcClientImpl::updateTrafficRoutingAssistant(
@@ -69,8 +75,14 @@ void GrpcClientImpl::updateTrafficRoutingAssistant(
     (*request.mutable_update_request()->mutable_data())[item.first] = item.second;
   }
 
+  if (context.has_value()) {
+    for (auto& item : context.value()) {
+      (*request.mutable_update_request()->mutable_context())[item.first] = item.second;
+    }
+  }
+
   return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Update",
-                     request, context, parent_span, stream_info);
+                     request, parent_span, stream_info);
 }
 
 void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
@@ -83,8 +95,14 @@ void GrpcClientImpl::retrieveTrafficRoutingAssistant(const std::string& type,
   request.set_type(type);
   request.mutable_retrieve_request()->set_key(key);
 
+  if (context.has_value()) {
+    for (auto& item : context.value()) {
+      (*request.mutable_retrieve_request()->mutable_context())[item.first] = item.second;
+    }
+  }
+
   return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Retrieve",
-                     request, context, parent_span, stream_info);
+                     request, parent_span, stream_info);
 }
 
 void GrpcClientImpl::deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
@@ -96,8 +114,14 @@ void GrpcClientImpl::deleteTrafficRoutingAssistant(const std::string& type, cons
   request.set_type(type);
   request.mutable_delete_request()->set_key(key);
 
+  if (context.has_value()) {
+    for (auto& item : context.value()) {
+      (*request.mutable_delete_request()->mutable_context())[item.first] = item.second;
+    }
+  }
+
   return sendRequest("envoy.extensions.filters.network.sip_proxy.tra.v3alpha.TraService.Delete",
-                     request, context, parent_span, stream_info);
+                     request, parent_span, stream_info);
 }
 
 void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
@@ -125,14 +149,7 @@ void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
 void GrpcClientImpl::sendRequest(
     const std::string& method,
     envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest& request,
-    absl::optional<TraContextMap> context, Tracing::Span& parent_span,
-    const StreamInfo::StreamInfo& stream_info) {
-
-  if (context.has_value()) {
-    for (auto& item : context.value()) {
-      (*request.mutable_retrieve_request()->mutable_context())[item.first] = item.second;
-    }
-  }
+    Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
 
   const auto& service_method =
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method);
@@ -191,7 +208,7 @@ ClientPtr traClient(Event::Dispatcher& dispatcher, Server::Configuration::Factor
   // requests.
   return std::make_unique<SipProxy::TrafficRoutingAssistant::GrpcClientImpl>(
       context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-          grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled),
+          grpc_service, context.scope(), true),
       dispatcher, timeout);
 }
 

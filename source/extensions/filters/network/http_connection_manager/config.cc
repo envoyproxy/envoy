@@ -164,8 +164,8 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                 context.getServerFactoryContext(), context.messageValidationVisitor()));
       });
 
-  std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager =
-      Http::FilterChainHelper::createSingletonFilterConfigProviderManager(
+  std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
+      Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
           context.getServerFactoryContext());
 
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
@@ -560,7 +560,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     throw EnvoyException("Non-HTTP/3 codec configured on QUIC listener.");
   }
 
-  Http::FilterChainHelper helper(filter_config_provider_manager_, context_, stats_prefix_);
+  Http::FilterChainHelper<Server::Configuration::FactoryContext,
+                          Server::Configuration::NamedHttpFilterConfigFactory>
+      helper(filter_config_provider_manager_, context_.getServerFactoryContext(), context_,
+             stats_prefix_);
   helper.processFilters(config.http_filters(), "http", "http", filter_factories_);
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -595,8 +598,8 @@ Http::ServerConnectionPtr
 HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          const Buffer::Instance& data,
                                          Http::ServerConnectionCallbacks& callbacks) {
-  switch (codec_type_)
-  case CodecType::HTTP1: {
+  switch (codec_type_) {
+  case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
@@ -623,11 +626,11 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) {
-  Http::FilterChainHelper::createFilterChainForFactories(manager, filter_factories_);
+  Http::FilterChainUtility::createFilterChainForFactories(manager, filter_factories_);
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
@@ -658,7 +661,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     filters_to_use = it->second.filter_factories.get();
   }
 
-  Http::FilterChainHelper::createFilterChainForFactories(callbacks, *filters_to_use);
+  Http::FilterChainUtility::createFilterChainForFactories(callbacks, *filters_to_use);
   return true;
 }
 
