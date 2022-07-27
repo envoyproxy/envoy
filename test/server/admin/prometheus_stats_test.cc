@@ -473,16 +473,12 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithTextReadoutsInGaugeFormat) {
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_upstream_cx_total_count counter
 envoy_cluster_upstream_cx_total_count{cluster="c1"} 0
-
 # TYPE envoy_cluster_upstream_cx_total gauge
 envoy_cluster_upstream_cx_total{cluster="c1"} 0
-
 # TYPE envoy_control_plane_identifier gauge
 envoy_control_plane_identifier{cluster="c1",text_value="CP-1"} 0
-
 # TYPE envoy_invalid_tag_values gauge
 envoy_invalid_tag_values{tag1="\\",tag2="\n",tag3="\"",text_value="test"} 0
-
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());
