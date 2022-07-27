@@ -148,6 +148,8 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   const uint64_t response_size = 0;
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
 
+  config_helper_.setConnectTimeout(std::chrono::seconds(2));
+
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
