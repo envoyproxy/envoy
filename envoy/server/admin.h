@@ -55,6 +55,8 @@ public:
    * absl::nullopt.
    */
   virtual Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+  virtual Http::Utility::QueryParams queryParams() const PURE;
 };
 
 /**

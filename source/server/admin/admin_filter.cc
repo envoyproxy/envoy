@@ -62,14 +62,34 @@ const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
   return *request_headers_;
 }
 
+Http::Utility::QueryParams AdminFilter::queryParams() const {
+  absl::string_view path = request_headers_->getPathValue();
+  Http::Utility::QueryParams query = Http::Utility::parseAndDecodeQueryString(path);
+  if (!query.empty()) {
+    return query;
+  }
+
+  // Check if the params are in the request's body.
+  const Buffer::Instance* body = getRequestBody();
+  if (body != nullptr &&
+      request_headers_->getMethodValue() == Http::Headers::get().MethodValues.Post &&
+      request_headers_->getContentTypeValue() ==
+      Http::Headers::get().ContentTypeValues.FormUrlEncoded) {
+    query = Http::Utility::parseFromBody(body->toString());
+  }
+
+  return query;
+}
+
 void AdminFilter::onComplete() {
   ENVOY_LOG_MISC(error, "post data = {}", post_data_.toString());
   absl::string_view path = request_headers_->getPathValue();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
   auto header_map = Http::ResponseHeaderMapImpl::create();
-  std::string path_buffer;
+  //std::string path_buffer;
   RELEASE_ASSERT(request_headers_, "");
+  /*
   if (post_data_.length() != 0 &&
       request_headers_->getMethodValue() == Http::Headers::get().MethodValues.Post &&
       request_headers_->getContentTypeValue() == "application/x-www-form-urlencoded" &&
@@ -86,6 +106,7 @@ void AdminFilter::onComplete() {
     }
     path = path_buffer;
   }
+  */
   Admin::RequestPtr handler = admin_handler_fn_(path, *this);
   Http::Code code = handler->start(*header_map);
   Utility::populateFallbackResponseHeaders(code, *header_map);

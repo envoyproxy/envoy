@@ -157,10 +157,11 @@ buildNameMatcher(const Http::Utility::QueryParams& params) {
 ConfigDumpHandler::ConfigDumpHandler(ConfigTracker& config_tracker, Server::Instance& server)
     : HandlerContextBase(server), config_tracker_(config_tracker) {}
 
-Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
+Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view,
                                                 Http::ResponseHeaderMap& response_headers,
-                                                Buffer::Instance& response, AdminStream&) const {
-  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
+                                                Buffer::Instance& response,
+                                                AdminStream& admin_stream) const {
+  Http::Utility::QueryParams query_params = admin_stream.queryParams();
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
   const bool include_eds = shouldIncludeEdsInDump(query_params);
