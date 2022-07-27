@@ -305,8 +305,8 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_timeout_budget_stat_names_(stats.symbolTable()),
       subscription_factory_(local_info, main_thread_dispatcher, *this,
                             validation_context.dynamicValidationVisitor(), api, server),
-      eds_subscription_factory_(local_info, main_thread_dispatcher, *this,
-                             api, validation_context.dynamicValidationVisitor(), server) {
+      eds_subscription_factory_(local_info, main_thread_dispatcher, *this, api,
+                                validation_context.dynamicValidationVisitor(), server) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();

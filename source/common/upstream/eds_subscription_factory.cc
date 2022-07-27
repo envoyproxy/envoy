@@ -1,6 +1,6 @@
 #include "source/common/upstream/eds_subscription_factory.h"
 
- #include <assert.h>
+#include <assert.h>
 
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
@@ -8,13 +8,12 @@
 namespace Envoy {
 namespace Upstream {
 
-EdsSubscriptionFactory::EdsSubscriptionFactory(const LocalInfo::LocalInfo& local_info,
-                                               Event::Dispatcher& dispatcher,
-                                               Upstream::ClusterManager& cm, Api::Api& api,
-                                               ProtobufMessage::ValidationVisitor& validation_visitor, 
-                                               const Server::Instance& server)
+EdsSubscriptionFactory::EdsSubscriptionFactory(
+    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+    Upstream::ClusterManager& cm, Api::Api& api,
+    ProtobufMessage::ValidationVisitor& validation_visitor, const Server::Instance& server)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm), api_(api),
-    validation_visitor_(validation_visitor), server_(server) {}
+      validation_visitor_(validation_visitor), server_(server) {}
 
 Config::SubscriptionPtr EdsSubscriptionFactory::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -24,9 +23,9 @@ Config::SubscriptionPtr EdsSubscriptionFactory::subscriptionFromConfigSource(
           envoy::config::core::v3::ConfigSource::kApiConfigSource &&
       config.api_config_source().api_type() == envoy::config::core::v3::ApiConfigSource::GRPC) {
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
-      Config::CustomConfigValidatorsPtr custom_config_validators =
-          std::make_unique<Config::CustomConfigValidatorsImpl>(validation_visitor_, server_,
-                                                       api_config_source.config_validators());
+    Config::CustomConfigValidatorsPtr custom_config_validators =
+        std::make_unique<Config::CustomConfigValidatorsImpl>(validation_visitor_, server_,
+                                                             api_config_source.config_validators());
     Config::GrpcMuxSharedPtr mux_to_use = getOrCreateMux(
         Config::Utility::factoryForGrpcApiConfigSource(
             cm_.grpcAsyncClientManager(), api_config_source, scope, /*skip_cluster_check*/ true)
@@ -44,9 +43,8 @@ Config::SubscriptionPtr EdsSubscriptionFactory::subscriptionFromConfigSource(
 }
 
 Config::SubscriptionPtr EdsSubscriptionFactory::collectionSubscriptionFromUrl(
-    const xds::core::v3::ResourceLocator&,
-    const envoy::config::core::v3::ConfigSource&, absl::string_view,
-    Stats::Scope&, Config::SubscriptionCallbacks&,
+    const xds::core::v3::ResourceLocator&, const envoy::config::core::v3::ConfigSource&,
+    absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks&,
     Config::OpaqueResourceDecoder&) {
   PANIC("not implemented");
 }

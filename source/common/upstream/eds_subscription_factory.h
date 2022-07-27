@@ -4,9 +4,8 @@
 #include "envoy/config/subscription.h"
 #include "envoy/stats/scope.h"
 
- #include "source/common/config/custom_config_validators_impl.h"
-
 #include "source/common/common/assert.h"
+#include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/grpc_subscription_impl.h"
 #include "source/common/config/subscription_factory_impl.h"
@@ -16,11 +15,11 @@
 
 /**
  * EdsSubscriptionFactory is used for instantiation of EDS subscriptions so as to minimize the
- * number of open grpc connections used by thses subscriptions. This is done by sharing a grpc
+ * number of open grpc connections used by these subscriptions. This is done by sharing a grpc
  * multiplexer between subscriptions handled by the same config server. Please see
  * https://github.com/envoyproxy/envoy/issues/2943 for additional information and related issues.
  *
- * TODO (dmitri-d, nezdolik): This implementation should be generalized to cover RDS.
+ * TODO(nezdolik): This implementation should be generalized to cover RDS.
  */
 
 namespace Envoy {
@@ -36,7 +35,8 @@ public:
   virtual ~EdsSubscriptionFactory() = default;
 
   EdsSubscriptionFactory(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                         Upstream::ClusterManager& cm, Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor, 
+                         Upstream::ClusterManager& cm, Api::Api& api,
+                         ProtobufMessage::ValidationVisitor& validation_visitor,
                          const Server::Instance& server);
 
   // Config::SubscriptionFactory
@@ -59,7 +59,8 @@ protected:
   getOrCreateMux(Grpc::RawAsyncClientPtr async_client,
                  const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
                  const envoy::config::core::v3::ApiConfigSource& config_source, Stats::Scope& scope,
-                 const Config::RateLimitSettings& rate_limit_settings, Config::CustomConfigValidatorsPtr& custom_config_validators);
+                 const Config::RateLimitSettings& rate_limit_settings,
+                 Config::CustomConfigValidatorsPtr& custom_config_validators);
 
 private:
   const LocalInfo::LocalInfo& local_info_;
