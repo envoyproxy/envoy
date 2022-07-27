@@ -1097,7 +1097,6 @@ public:
   // Router::RouteEntry
   absl::optional<std::string>
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
-
   private:
     const std::string match_pattern_;
 };
