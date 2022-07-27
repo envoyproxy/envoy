@@ -1,4 +1,4 @@
-1.22.3 (July 27, 2022)
+1.20.7 (July 21, 2022)
 ======================
 
 Incompatible Behavior Changes
@@ -17,8 +17,7 @@ Bug Fixes
 
 Removed Config or Runtime
 -------------------------
-*Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
+*Normally occurs at the end of the* :ref:`deprecation period <v1.20:deprecated>`
 
 New Features
 ------------
