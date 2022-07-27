@@ -48,8 +48,8 @@ Terminal 1
 
 .. code-block:: console
 
-   $ curl -v localhost:8000 2>&1 | grep -E "Foo|header_key_1"
-   Foo: bar                       <-- This is added by the common Lua filter. --<
+   $ curl -v localhost:8000 2>&1 | grep Foo
+   Foo: bar                              <-- This is added by the common Lua filter. --<
 
 Step 3: Using multiple Lua filters at the same time
 *********************************************************
@@ -63,9 +63,8 @@ Terminal 1
 
 .. code-block:: console
 
-   curl -v localhost:8000/multiple/lua/scripts 2>&1 | grep -E "Foo|header_key_1"
-   < header_key_1: header_value_1              <-- This is added by the second route-specific Lua filter. --<
-   Foo: bar                                    <-- This is added by the common Lua filter. --<
+   curl -v localhost:8000/multiple/lua/scripts 2>&1 | grep header_key_1
+   < header_key_1: header_value_1        <-- This is added by the second route-specific Lua filter. --<
 
 .. seealso::
 
