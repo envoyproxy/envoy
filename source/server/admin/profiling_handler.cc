@@ -34,7 +34,8 @@ Http::Code ProfilingHandler::handlerCpuProfiler(absl::string_view, Http::Respons
 }
 
 Http::Code ProfilingHandler::handlerHeapProfiler(absl::string_view, Http::ResponseHeaderMap&,
-                                                 Buffer::Instance& response, AdminStream& admin_stream) {
+                                                 Buffer::Instance& response,
+                                                 AdminStream& admin_stream) {
   if (!Profiler::Heap::profilerEnabled()) {
     response.add("The current build does not support heap profiler");
     return Http::Code::NotImplemented;
