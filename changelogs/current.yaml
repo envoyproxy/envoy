@@ -9,6 +9,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: http
+  change: |
+    changed the lifetime of router clean up. This is intended as a no-op but in case of unexpected issues can be reverted by setting runtime guard ``envoy.reloadable_features.clean_up_router`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

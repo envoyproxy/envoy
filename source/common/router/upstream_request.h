@@ -20,6 +20,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
@@ -40,6 +41,11 @@ public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
                   bool can_send_early_data, bool can_use_http3);
   ~UpstreamRequest() override;
+  void deleteIsPending() override {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.clean_up_router")) {
+      cleanUp();
+    }
+  }
 
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();

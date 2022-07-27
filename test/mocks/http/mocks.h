@@ -208,7 +208,7 @@ public:
 
 class MockStreamFilterCallbacksBase {
 public:
-  Event::MockDispatcher dispatcher_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::shared_ptr<Router::MockRoute> route_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_info_;
