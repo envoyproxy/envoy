@@ -44,7 +44,6 @@ public:
     const std::tuple<ActionType, std::string> result_;
   };
 
-  // Header entry validation can either accept or reject the request
   enum class RejectAction { Accept, Reject };
   enum class RejectOrRedirectAction { Accept, Reject, Redirect };
   using RejectResult = Result<RejectAction>;
