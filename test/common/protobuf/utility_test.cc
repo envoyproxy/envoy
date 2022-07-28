@@ -35,6 +35,7 @@
 #include "test/proto/sensitive.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -1451,6 +1452,32 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     MessageUtil::unpackTo(source_any, dst);
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
+}
+
+// MessageUtility::unpackToNoThrow() with the right type.
+TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
+  ProtobufWkt::Duration src_duration;
+  src_duration.set_seconds(42);
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(src_duration);
+  ProtobufWkt::Duration dst_duration;
+  EXPECT_OK(MessageUtil::unpackToNoThrow(source_any, dst_duration));
+  // Source and destination are expected to be equal.
+  EXPECT_EQ(src_duration, dst_duration);
+}
+
+// MessageUtility::unpackToNoThrow() with the wrong type.
+TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(source_duration);
+  ProtobufWkt::Timestamp dst;
+  auto status = MessageUtil::unpackToNoThrow(source_any, dst);
+  EXPECT_TRUE(absl::IsInternal(status));
+  EXPECT_THAT(std::string(status.message()),
+              testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
+                                     "\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.

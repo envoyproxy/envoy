@@ -1805,24 +1805,19 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.update_expected_rq_timeout_on_retry")) {
-    // If not enabled, then it will re-use the previous headers (if any.)
+  // The request timeouts only account for time elapsed since the downstream request completed
+  // which might not have happened yet (in which case zero time has elapsed.)
+  std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
 
-    // The request timeouts only account for time elapsed since the downstream request completed
-    // which might not have happened yet (in which case zero time has elapsed.)
-    std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
-
-    if (DateUtil::timePointValid(downstream_request_complete_time_)) {
-      Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-      elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-    }
-
-    FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
-                                     *downstream_headers_, !config_.suppress_envoy_headers_,
-                                     grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
+  if (DateUtil::timePointValid(downstream_request_complete_time_)) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
   }
+
+  FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
+                                   *downstream_headers_, !config_.suppress_envoy_headers_,
+                                   grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);

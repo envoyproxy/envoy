@@ -572,34 +572,9 @@ message RouteMatch {
     // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
     string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
 
-    // If specified, the route is a template match rule meaning that the
-    // ``:path`` header (without the query string) must match the given
-    // ``path_template`` pattern.
-    //
-    // Path template matching types:
-    //
-    // * ``*`` : Matches a single path component, up to the next path separator: /
-    //
-    // * ``**`` : Matches zero or more path segments. If present, must be the last operator.
-    //
-    // * ``{name} or {name=*}`` :  A named variable matching one path segment up to the next path separator: /.
-    //
-    // * ``{name=videos/*}`` : A named variable matching more than one path segment.
-    //      The path component matching videos/* is captured as the named variable.
-    //
-    // * ``{name=**}`` : A named variable matching zero or more path segments.
-    //
-    //
-    // For example:
-    //
-    // * ``/videos/*/*/*.m4s`` would match ``videos/123414/hls/1080p5000_00001.m4s``
-    //
-    // * ``/videos/{file}`` would match ``/videos/1080p5000_00001.m4s``
-    //
-    // * ``/**.mpd`` would match ``/content/123/india/dash/55/manifest.mpd``
     // [#not-implemented-hide:]
-    string path_template = 15
-        [(validate.rules).string = {min_len: 1 max_len: 256 ignore_empty: true}];
+    // [#comment: TODO(silverstar195): Hook into extension once added]
+    core.v3.TypedExtensionConfig path_match_policy = 15;
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
@@ -1045,9 +1020,9 @@ message RouteAction {
   // place the original path before rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
-  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`
-  // [#comment:TODO(silverstar194) add the following once path_template_rewrite is implemented: :ref:`path_template_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.path_template_rewrite>`]
-  // or ``prefix_rewrite`` may be specified.
+  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>` or
+  // [#comment:TODO(silverstar194) add the following once implemented: :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`]
+  // :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>` may be specified.
   //
   // .. attention::
   //
@@ -1082,9 +1057,10 @@ message RouteAction {
   // before the rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
-  // Only one of :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
-  // [#comment:TODO(silverstar194) add the following once path_template_rewrite is implemented: :ref:`path_template_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.path_template_rewrite>`,]
-  // or ``regex_rewrite`` may be specified.
+  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`
+  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
+  // [#comment:TODO(silverstar194) add the following once implemented: :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`]
+  // may be specified.
   //
   // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
   //
@@ -1104,48 +1080,9 @@ message RouteAction {
   //   ``/aaa/yyy/bbb``.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
 
-  // Indicates that during forwarding, portions of the path that match the
-  // pattern should be rewritten, even allowing the substitution of variables
-  // from the match pattern into the new path as specified by the rewrite template.
-  // This is useful to allow application paths to be
-  // rewritten in a way that is aware of segments with variable content like
-  // identifiers. The router filter will place the original path as it was
-  // before the rewrite into the :ref:`x-envoy-original-path
-  // <config_http_filters_router_x-envoy-original-path>` header.
-  //
-  // Only one of :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
-  // :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
-  // or ``path_template_rewrite`` may be specified.
-  //
-  // Template pattern matching types:
-  //
-  // * ``*`` : Matches a single path component, up to the next path separator: /
-  //
-  // * ``**`` : Matches zero or more path segments. If present, must be the last operator.
-  //
-  // * ``{name} or {name=*}`` :  A named variable matching one path segment up to the next path separator: /.
-  //
-  // * ``{name=videos/*}`` : A named variable matching more than one path segment.
-  //      The path component matching videos/* is captured as the named variable.
-  //
-  // * ``{name=**}`` : A named variable matching zero or more path segments.
-  //
-  // Only named matches can be used to perform rewrites.
-  //
-  // Examples using path_template_rewrite:
-  //
-  // * The pattern ``/{one}/{two}`` paired with a substitution string of ``/{two}/{one}`` would
-  //   transform ``/cat/dog`` into ``/dog/cat``.
-  //
-  // * The pattern ``/videos/{language=lang/*}/*`` paired with a substitution string of
-  //   ``/{language}`` would transform ``/videos/lang/en/video.m4s`` into ``lang/en``.
-  //
-  // * The path pattern ``/content/{format}/{lang}/{id}/{file}.vtt`` paired with a substitution
-  //   string of ``/{lang}/{format}/{file}.vtt`` would transform ``/content/hls/en-us/12345/en_193913.vtt``
-  //   into ``/en-us/hls/en_193913.vtt``.
   // [#not-implemented-hide:]
-  string path_template_rewrite = 41
-      [(validate.rules).string = {min_len: 1 max_len: 256 ignore_empty: true}];
+  // [#comment: TODO(silverstar195): Hook into extension once added]
+  core.v3.TypedExtensionConfig path_rewrite_policy = 41;
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with

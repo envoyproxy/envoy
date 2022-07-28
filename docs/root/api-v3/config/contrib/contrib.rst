@@ -11,4 +11,5 @@ Contrib Extensions
   cryptomb/cryptomb
   hyperscan/matcher
   hyperscan/regex_engine
+  dlb/dlb
   qat/qat

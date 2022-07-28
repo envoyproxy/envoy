@@ -64,8 +64,9 @@ protected:
   NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.scope_;
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
   std::string test_string = "ABCDEFGHIJKLMN";
-  SkyWalkingTracerStats tracing_stats_{
-      SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))};
+  SkyWalkingTracerStatsSharedPtr tracing_stats_{
+      std::make_shared<SkyWalkingTracerStats>(SkyWalkingTracerStats{
+          SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))})};
   TracerPtr tracer_;
 };
 
