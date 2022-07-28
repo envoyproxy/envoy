@@ -7,6 +7,12 @@
 // `DO_NOT_INCLUDE_NETINET_TCP_H` to prevent inclusion of the wrong version.
 #define DO_NOT_INCLUDE_NETINET_TCP_H 1
 
+// Contains the last field in the `struct tcp_info` that is we actually use.
+// This is necessary so that at runtime we require a kernel that offers a struct
+// of this size at minimal.
+// This define must be updated whenever we use a field with a higher offset in that struct.
+#define LAST_TCP_INFO_FIELD_WE_USE tcpi_data_segs_out
+
 #include "source/extensions/transport_sockets/tcp_stats/tcp_stats.h"
 
 #include <linux/tcp.h>
@@ -25,7 +31,11 @@ namespace TcpStats {
 Config::Config(const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config_proto,
                Stats::Scope& scope)
     : stats_(generateStats(scope)),
-      update_period_(PROTOBUF_GET_OPTIONAL_MS(config_proto, update_period)) {}
+      update_period_(PROTOBUF_GET_OPTIONAL_MS(config_proto, update_period)) {
+  struct tcp_info info;
+  tcp_info_min_size_ = offsetof(struct tcp_info, LAST_TCP_INFO_FIELD_WE_USE) +
+                       sizeof(info.LAST_TCP_INFO_FIELD_WE_USE);
+}
 
 TcpStats Config::generateStats(Stats::Scope& scope) {
   const std::string prefix("tcp_stats");
@@ -77,15 +87,11 @@ void TcpStatsSocket::closeSocket(Network::ConnectionEvent event) {
 absl::optional<struct tcp_info> TcpStatsSocket::querySocketInfo() {
   struct tcp_info info;
   memset(&info, 0, sizeof(info));
-  socklen_t optlen = sizeof(info);
 
-  // Minimal supported size of the `struct tcp_info`. We rely on that field at build time, so it
-  // must be present in the kernel at runtime.
-  size_t size = offsetof(struct tcp_info, LAST_TCP_INFO_FIELD_WE_USE) +
-                sizeof(info.LAST_TCP_INFO_FIELD_WE_USE);
+  socklen_t optlen = config_->tcp_info_min_size_;
 
   const auto result = callbacks_->ioHandle().getOption(IPPROTO_TCP, TCP_INFO, &info, &optlen);
-  if ((result.return_value_ != 0) || (optlen < size)) {
+  if ((result.return_value_ != 0) || (optlen < config_->tcp_info_min_size_)) {
     ENVOY_LOG(debug, "Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc {} errno {} optlen {}",
               result.return_value_, result.errno_, optlen);
     return absl::nullopt;

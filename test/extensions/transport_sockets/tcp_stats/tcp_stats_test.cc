@@ -39,8 +39,8 @@ public:
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     ON_CALL(io_handle_, getOption(IPPROTO_TCP, TCP_INFO, _, _))
         .WillByDefault(Invoke([this](int, int, void* optval, socklen_t* optlen) {
-          ASSERT(*optlen == sizeof(tcp_info_));
-          memcpy(optval, &tcp_info_, sizeof(tcp_info_));
+          ASSERT(*optlen == config_->tcp_info_min_size_);
+          memcpy(optval, &tcp_info_, config_->tcp_info_min_size_);
           return Api::SysCallIntResult{0, 0};
         }));
     createTcpStatsSocket(enable_periodic, timer_, inner_socket_, tcp_stats_socket_);
@@ -127,14 +127,14 @@ TEST_F(TcpStatsTest, SyscallFailureShortRead) {
   tcp_info_.tcpi_notsent_bytes = 42;
   EXPECT_CALL(io_handle_, getOption(IPPROTO_TCP, TCP_INFO, _, _))
       .WillOnce(Invoke([this](int, int, void* optval, socklen_t* optlen) {
-        *optlen = offsetof(struct tcp_info, LAST_TCP_INFO_FIELD_WE_USE);
-        memcpy(optval, &tcp_info_, *optlen);
+        *optlen = config_->tcp_info_min_size_ - 1;
+        memcpy(optval, &tcp_info_, *optlen - 1);
         return Api::SysCallIntResult{0, 0};
       }));
   EXPECT_LOG_CONTAINS(
       "debug",
       fmt::format("Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc 0 errno 0 optlen {}",
-                  offsetof(struct tcp_info, LAST_TCP_INFO_FIELD_WE_USE)),
+                  config_->tcp_info_min_size_ - 1),
       timer_->callback_());
 
   // Not updated on failed syscall.
@@ -149,7 +149,7 @@ TEST_F(TcpStatsTest, SyscallFailureReturnCode) {
   EXPECT_LOG_CONTAINS(
       "debug",
       fmt::format("Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc -1 errno 42 optlen {}",
-                  sizeof(tcp_info_)),
+                  config_->tcp_info_min_size_),
       timer_->callback_());
 
   // Not updated on failed syscall.
