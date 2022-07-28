@@ -13,33 +13,33 @@ HeaderValidatorFactory::HeaderValidatorFactory(const HeaderValidatorConfig& conf
     : config_(config) {}
 
 ::Envoy::Http::HeaderValidatorPtr
-HeaderValidatorFactory::create(::Envoy::Http::HeaderValidatorFactory::Protocol protocol,
+HeaderValidatorFactory::create(::Envoy::Http::Protocol protocol,
                                StreamInfo::StreamInfo& stream_info) {
   return std::make_unique<HeaderValidator>(config_, protocol, stream_info);
 }
 
-HeaderValidator::HeaderValidator(const HeaderValidatorConfig&,
-                                 ::Envoy::Http::HeaderValidatorFactory::Protocol,
-                                 StreamInfo::StreamInfo&) {}
+HeaderValidator::HeaderValidator(const HeaderValidatorConfig&, ::Envoy::Http::Protocol,
+                                 StreamInfo::StreamInfo& stream_info)
+    : stream_info_(stream_info) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateRequestHeaderEntry(const HeaderString&, const HeaderString&) {
-  return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+  return HeaderEntryValidationResult::success();
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateResponseHeaderEntry(const HeaderString&, const HeaderString&) {
-  return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+  return HeaderEntryValidationResult::success();
 }
 
 ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
 HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap&) {
-  return ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Accept;
+  return RequestHeaderMapValidationResult::success();
 }
 
 ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
 HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap&) {
-  return ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Accept;
+  return ResponseHeaderMapValidationResult::success();
 }
 
 } // namespace EnvoyDefault
