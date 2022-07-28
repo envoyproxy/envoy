@@ -20,6 +20,8 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
+#include "envoy/router/path_match_policy.h"
+#include "envoy/router/path_rewrite_policy.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -296,6 +298,48 @@ public:
  * RetryStatus whether request should be retried or not.
  */
 enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
+
+/**
+ * PathMatchPolicy from the route configuration.
+ */
+class PathMatchPolicy {
+public:
+  virtual ~PathMatchPolicy() = default;
+
+  /**
+   * @return whether path match based on custom policy is enabled on this route.
+   */
+  virtual bool enabled() const PURE;
+
+  /**
+   * Creates the target route predicates. This should really be called only once for each upstream
+   * match. Creating the predicate lazily to avoid wasting CPU cycles on non-matching
+   * responses, which should be the most common case.
+   * @return a newly constructed PathMatchPredicate instance.
+   */
+  virtual PathMatchPredicateSharedPtr predicate() const PURE;
+};
+
+/**
+ * PathRewritePolicy from the route configuration.
+ */
+class PathRewritePolicy {
+public:
+  virtual ~PathRewritePolicy() = default;
+
+  /**
+   * @return whether path rewrite based on custom policy is enabled on this route.
+   */
+  virtual bool enabled() const PURE;
+
+  /**
+   * Creates the target route predicates. This should really be called only once for each upstream
+   * rewrite. Creating the predicate lazily to avoid wasting CPU cycles on non-rewrite
+   * responses, which should be the most common case.
+   * @return a newly constructed PathRewritePredicate instances.
+   */
+  virtual PathRewritePredicateSharedPtr predicate() const PURE;
+};
 
 /**
  * InternalRedirectPolicy from the route configuration.
@@ -763,7 +807,7 @@ enum class PathMatchType {
   Exact,
   Regex,
   PathSeparatedPrefix,
-  Pattern,
+  Policy,
 };
 
 /**
@@ -914,6 +958,18 @@ public:
    *         simply proxied as normal responses.
    */
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
+
+  /**
+   * @return const PathMatchPolicy& the path match policy for the route. All routes
+   *         have a path match policy even if it is not enabled.
+   */
+  virtual const PathMatchPolicy& pathMatchPolicy() const PURE;
+
+  /**
+   * @return const PathRewritePolicy& the path rewrite policy for the route. All routes
+   *         have a path rewrite policy even if it is not enabled.
+   */
+  virtual const PathRewritePolicy& pathRewritePolicy() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
