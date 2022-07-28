@@ -466,7 +466,7 @@ public:
     healthy_threshold: 2
     http_health_check:
       path: /healthcheck
-      response: {0}
+      expected_response_in_prefix: {0}
     )EOF",
                                    response);
 
@@ -484,7 +484,7 @@ public:
     healthy_threshold: 2
     http_health_check:
       path: /healthcheck
-      response: RXZlcnl0aGluZyBPSw==
+      expected_response_in_prefix: RXZlcnl0aGluZyBPSw==
       codec_client_type: Http2
     )EOF";
 
