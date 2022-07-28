@@ -299,7 +299,7 @@ public:
     last_downstream_tx_byte_sent_ = time_source.monotonicTime();
   }
   void onDownstreamHandshakeComplete(TimeSource& time_source) {
-    ASSERT(!downstream_handshake_complete_);
+    // An existing value can be overwritten, e.g. in resumption case.
     downstream_handshake_complete_ = time_source.monotonicTime();
   }
 
