@@ -581,13 +581,12 @@ uses ``%RESPONSE_CODE%`` operator to modify request headers using code from the 
 The output is an empty string, because request headers are modified
 before the request is sent upstream and the response is not received yet.
 
-.. code-block:: yaml
-
-  request_headers_to_add:
-    - header:
-        key: "response-code"
-        value: "%RESPONSE_CODE%"
-      append: true
+.. literalinclude:: _include/header_formatters.yaml
+    :language: yaml
+    :linenos:
+    :lines: 15-20
+    :emphasize-lines: 3-6
+    :caption: :download:`header_formatters.yaml <_include/header_formatters.yaml>`
 
 .. attention::
 
