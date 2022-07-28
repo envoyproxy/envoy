@@ -1,11 +1,10 @@
 date: Pending
 
 behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: build
   change: |
     official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
-- area: tls-inspector
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: http
   change: |
     Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
@@ -56,12 +55,10 @@ new_features:
     added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
 - area: gzip
   change: |
-    official released binary is now built with Clang 14.0.0.
+    added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
 - area: build
   change: |
     official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
-- area: conn pool
-    added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
