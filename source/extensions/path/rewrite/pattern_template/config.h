@@ -4,8 +4,6 @@
 #include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.validate.h"
 #include "envoy/router/path_rewrite_policy.h"
 
-#include "source/extensions/path/rewrite/pattern_template/pattern_template_rewrite.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace PatternTemplate {

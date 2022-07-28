@@ -4,8 +4,6 @@
 #include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.validate.h"
 #include "envoy/router/path_match_policy.h"
 
-#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
-
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 
