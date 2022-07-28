@@ -33,6 +33,7 @@ stages:
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        AZP_BRANCH: $(Build.SourceBranch)
       displayName: "Run format checks"
     - task: PublishBuildArtifacts@1
       inputs:
