@@ -721,7 +721,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
              path_rewrite_policy_.predicate()->pattern(), path_match_policy_.predicate()->pattern())
              .ok()) {
       throw EnvoyException(fmt::format(
-          "mismatch between path_match_policy {} and path_rewrite_policy {} is invalid",
+          "mismatch between path_match_policy {} and path_rewrite_policy {}",
           path_match_policy_.predicate()->pattern(), path_rewrite_policy_.predicate()->pattern()));
     }
   }
