@@ -78,8 +78,14 @@ absl::optional<struct tcp_info> TcpStatsSocket::querySocketInfo() {
   struct tcp_info info;
   memset(&info, 0, sizeof(info));
   socklen_t optlen = sizeof(info);
+
+  // Minimal supported size of the `struct tcp_info`. We rely on that field at build time, so it
+  // must be present in the kernel at runtime.
+  size_t size = offsetof(struct tcp_info, LAST_TCP_INFO_FIELD_WE_USE) +
+                sizeof(info.LAST_TCP_INFO_FIELD_WE_USE);
+
   const auto result = callbacks_->ioHandle().getOption(IPPROTO_TCP, TCP_INFO, &info, &optlen);
-  if ((result.return_value_ != 0) || (optlen < sizeof(info))) {
+  if ((result.return_value_ != 0) || (optlen < size)) {
     ENVOY_LOG(debug, "Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc {} errno {} optlen {}",
               result.return_value_, result.errno_, optlen);
     return absl::nullopt;

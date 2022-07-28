@@ -127,14 +127,14 @@ TEST_F(TcpStatsTest, SyscallFailureShortRead) {
   tcp_info_.tcpi_notsent_bytes = 42;
   EXPECT_CALL(io_handle_, getOption(IPPROTO_TCP, TCP_INFO, _, _))
       .WillOnce(Invoke([this](int, int, void* optval, socklen_t* optlen) {
-        *optlen = *optlen - 1;
-        memcpy(optval, &tcp_info_, sizeof(*optlen));
+        *optlen = offsetof(struct tcp_info, LAST_TCP_INFO_FIELD_WE_USE);
+        memcpy(optval, &tcp_info_, *optlen);
         return Api::SysCallIntResult{0, 0};
       }));
   EXPECT_LOG_CONTAINS(
       "debug",
       fmt::format("Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc 0 errno 0 optlen {}",
-                  sizeof(tcp_info_) - 1),
+                  offsetof(struct tcp_info, LAST_TCP_INFO_FIELD_WE_USE)),
       timer_->callback_());
 
   // Not updated on failed syscall.

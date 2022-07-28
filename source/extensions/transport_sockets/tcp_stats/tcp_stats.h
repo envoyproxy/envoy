@@ -15,6 +15,12 @@
 // Defined in /usr/include/linux/tcp.h.
 struct tcp_info;
 
+// Contains the last field in the `struct tcp_info` that is we actually use.
+// This is necessary so that at runtime we require a kernel that offers a struct
+// of this size at minimal.
+// This define must be updated whenever we use a field with a higher offset in that struct.
+#define LAST_TCP_INFO_FIELD_WE_USE tcpi_data_segs_out
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
