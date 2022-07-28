@@ -41,11 +41,7 @@ public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
                   bool can_send_early_data, bool can_use_http3);
   ~UpstreamRequest() override;
-  void deleteIsPending() override {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.clean_up_router")) {
-      cleanUp();
-    }
-  }
+  void deleteIsPending() override { cleanUp(); }
 
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();
