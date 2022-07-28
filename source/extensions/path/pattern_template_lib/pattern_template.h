@@ -47,9 +47,9 @@ absl::Status isValidPathTemplateRewritePattern(const std::string& path_template_
 
 // Returns if path_template and rewrite_template have valid variables
 absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
-                                      std::string& capture_regex);
+                                      const std::string& capture_regex);
 
-absl::Status isValidMatchPattern(std::string match_pattern);
+absl::Status isValidMatchPattern(const std::string match_pattern);
 
 } // namespace PatternTemplate
 } // namespace Extensions

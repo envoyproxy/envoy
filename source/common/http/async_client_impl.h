@@ -234,6 +234,9 @@ private:
     const Router::PathMatchPolicy& pathMatchPolicy() const override {
       return path_match_policy_;
     }
+    const Router::PathRewritePolicy& pathRewritePolicy() const override {
+      return path_rewrite_policy_;
+    }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -298,6 +301,7 @@ private:
     static const NullRateLimitPolicy rate_limit_policy_;
     static const Router::InternalRedirectPolicyImpl internal_redirect_policy_;
     static const Router::PathMatchPolicyImpl path_match_policy_;
+    static const Router::PathRewritePolicyImpl path_rewrite_policy_;
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;

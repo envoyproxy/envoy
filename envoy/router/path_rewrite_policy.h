@@ -23,6 +23,9 @@ public:
 
   virtual absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
                                            absl::string_view matched_path) const PURE;
+
+  virtual std::string pattern() const PURE;
+
 };
 
 using PathRewritePredicateSharedPtr = std::shared_ptr<PathRewritePredicate>;
@@ -35,9 +38,12 @@ public:
   virtual ~PathRewritePredicateFactory() override = default;
 
   virtual PathRewritePredicateSharedPtr
-  createPathRewritePredicate(const Protobuf::Message& config, std::string url_pattern);
+  createPathRewritePredicate(const Protobuf::Message& rewrite_config) PURE;
 
-  std::string category() const override { return "envoy.path_rewrite_policy"; }
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
+
+  virtual std::string name() const override PURE;
+  virtual std::string category() const override PURE;
 };
 
 } // namespace Router

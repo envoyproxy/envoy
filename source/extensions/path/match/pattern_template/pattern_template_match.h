@@ -18,17 +18,20 @@ namespace Match {
 
 class PatternTemplateMatchPredicate : public Router::PathMatchPredicate {
 public:
-    explicit PatternTemplateMatchPredicate(const Protobuf::Message&, std::string url_pattern)
-      : matching_pattern_regex_(RE2(convertURLPatternSyntaxToRegex(url_pattern).value())) {}
+  explicit PatternTemplateMatchPredicate(
+      const envoy::extensions::path::match::pattern_template::v3::PatternTemplateMatchConfig&
+          config)
+      : path_template_(config.path_template()){}
 
-    absl::string_view name() const override {
-      return "envoy.pattern_template.pattern_template_match_predicate";
-    }
+  absl::string_view name() const override {
+    return "envoy.path.match.pattern_template.v3.pattern_template_match_predicate";
+  }
 
-    bool match(absl::string_view pattern) const override;
+  bool match(absl::string_view pattern) const override;
+  std::string pattern() const override;
 
-  private:
-    RE2 matching_pattern_regex_{nullptr};
+private:
+  const std::string path_template_;
 };
 
 } // namespace Match

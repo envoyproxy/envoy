@@ -22,6 +22,8 @@ public:
   virtual absl::string_view name() const PURE;
 
   virtual bool match(absl::string_view pattern) const PURE;
+
+  virtual std::string pattern() const PURE;
 };
 
 using PathMatchPredicateSharedPtr = std::shared_ptr<PathMatchPredicate>;
@@ -32,10 +34,11 @@ using PathMatchPredicateSharedPtr = std::shared_ptr<PathMatchPredicate>;
 class PathMatchPredicateFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~PathMatchPredicateFactory() = default;
-  virtual PathMatchPredicateSharedPtr
-  createPathMatchPredicate(const Protobuf::Message& config, std::string url_pattern) PURE;
 
-  std::string category() const override { return "envoy.path_match_policy"; }
+  virtual PathMatchPredicateSharedPtr
+  createPathMatchPredicate(const Protobuf::Message& config) PURE;
+
+  std::string category() const override { return "envoy.path.match"; }
 };
 
 } // namespace Router

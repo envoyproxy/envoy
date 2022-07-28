@@ -164,14 +164,26 @@ public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };
 
-class MockPatternTemplateMatchPolicy : public PatternTemplateMatchPolicy {
+class MockPathRewritePolicy : public PathRewritePolicy {
 public:
-  MockPatternTemplateMatchPolicy();
+  MockPathRewritePolicy();
   MOCK_METHOD(bool, enabled, (), (const));
-  MOCK_METHOD(PatternTemplatePredicateMatchSharedPtr, predicate, (), (const));
+  MOCK_METHOD(PathRewritePredicateSharedPtr, predicate, (), (const));
 };
 
-class MockPatternTemplateMatchPredicate : public PatternTemplateMatchPredicate {
+class MockPathRewritePredicate : public PathRewritePredicate {
+public:
+  MOCK_METHOD(absl::string_view, name, (), (const));
+};
+
+class MockPathMatchPolicy : public PathMatchPolicy {
+public:
+  MockPathMatchPolicy();
+  MOCK_METHOD(bool, enabled, (), (const));
+  MOCK_METHOD(PathMatchPredicateSharedPtr, predicate, (), (const));
+};
+
+class MockPathMatchPredicate : public PathMatchPredicate {
 public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };
@@ -388,7 +400,8 @@ public:
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
-  MOCK_METHOD(const PatternTemplatePolicy&, patternTemplatePolicy, (), (const));
+  MOCK_METHOD(const PathMatchPolicy&, pathMatchPolicy, (), (const));
+  MOCK_METHOD(const PathRewritePolicy&, pathRewritePolicy, (), (const));
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
@@ -426,7 +439,8 @@ public:
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
-  testing::NiceMock<MockPatternTemplatePolicy> pattern_template_policy_;
+  testing::NiceMock<MockPathMatchPolicy> path_match_policy_;
+  testing::NiceMock<MockPathRewritePolicy> path_rewrite_policy_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;

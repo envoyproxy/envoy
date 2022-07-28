@@ -5099,7 +5099,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Specify only one of prefix_rewrite, regex_rewrite or path_template_rewrite");
+      "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
 }
 
 TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
@@ -8832,7 +8832,7 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const auto& pattern_template_policy =
-      config.route(headers, 0)->routeEntry()->patternTemplatePolicy();
+      config.route(headers, 0)->routeEntry()->pathMatchPolicy();
   EXPECT_FALSE(pattern_template_policy.enabled());
 }
 
@@ -8843,22 +8843,32 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/bar/{country}/{lang}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/bar/{country}/{lang}"
         route:
-          path_template_rewrite: "/bar/{lang}/{country}"
           cluster: some-cluster
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/bar/{lang}/{country}"
+
   )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
   Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/bar/one/two", "GET");
 
-  const auto& pattern_template_policy =
-      config.route(headers, 0)->routeEntry()->patternTemplatePolicy();
+  const auto& pattern_match_policy = config.route(headers, 0)->routeEntry()->pathMatchPolicy();
+  EXPECT_TRUE(pattern_match_policy.enabled());
+  EXPECT_EQ(pattern_match_policy.predicate()->pattern(), "/bar/{country}/{lang}");
 
-  EXPECT_TRUE(pattern_template_policy.enabled());
-  EXPECT_EQ(pattern_template_policy.predicate()->url_pattern_, "/bar/{country}/{lang}");
-  EXPECT_EQ(pattern_template_policy.predicate()->url_rewrite_pattern_, "/bar/{lang}/{country}");
+  const auto& pattern_rewrite_policy = config.route(headers, 0)->routeEntry()->pathRewritePolicy();
+  EXPECT_TRUE(pattern_rewrite_policy.enabled());
+  EXPECT_EQ(pattern_rewrite_policy.predicate()->pattern(), "/bar/{lang}/{country}");
 }
 
 TEST_F(RouteMatcherTest, SimplePathPatternMatchOnly) {
@@ -8869,7 +8879,11 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{lang}/{state}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{lang}/{state}"
           case_sensitive: false
         route: { cluster: path-pattern-cluster}
   )EOF";
@@ -8897,15 +8911,27 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{lang}/{state}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{lang}/{state}"
           case_sensitive: false
         route: { cluster: path-pattern-cluster-one}
       - match:
-          path_template: "/boo/{go}/{fly}/{bat}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/boo/{go}/{fly}/{bat}"
           case_sensitive: false
         route: { cluster: path-pattern-cluster-two}
       - match:
-          path_template: "/foo/boo/{go}/{fly}/{bat}/{sno}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/foo/boo/{go}/{fly}/{bat}/{sno}"
           case_sensitive: false
         route: { cluster: path-pattern-cluster-three}
   )EOF";
@@ -8952,11 +8978,19 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{one}/{two}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{one}/{two}"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/rest/{two}/{one}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/rest/{two}/{one}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
@@ -8978,11 +9012,19 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{one=*}/{two}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{one=*}/{two}"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/{two}/{one}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/{two}/{one}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
@@ -9004,17 +9046,33 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{one}/{two}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{one}/{two}"
           case_sensitive: true
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/{two}/{one}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/{two}/{one}"
       - match:
-          path_template: "/REST/{one}/{two}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/REST/{one}/{two}"
           case_sensitive: true
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/TEST/{one}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/TEST/{one}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
@@ -9043,17 +9101,25 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{one/{two}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{one/{two}"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/{two}/{one}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/{two}/{one}"
   )EOF";
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "path_template /rest/{one/{two} is invalid");
+      EnvoyException, "path_match_policy /rest/{one/{two} is invalid");
 }
 
 TEST_F(RouteMatcherTest, PatternMatchConfigMissingVariable) {
@@ -9063,11 +9129,19 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{one}/{two}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{one}/{two}"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/rest/{one}/{two}/{missing}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/rest/{one}/{two}/{missing}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
@@ -9075,7 +9149,7 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException,
-      "mismatch between path_template /rest/{one}/{two} and path_template_rewrite "
+      "mismatch between path_match_policy /rest/{one}/{two} and path_rewrite_policy"
       "/rest/{one}/{two}/{missing}");
 }
 
@@ -9086,18 +9160,26 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{on==e}/{two}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{on==e}/{two}"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/rest/{one}/{two}/{missing}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/rest/{one}/{two}/{missing}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException, "path_template /rest/{on==e}/{two} is invalid");
+      EnvoyException, "path_match_policy /rest/{on==e}/{two} is invalid");
 }
 
 TEST_F(RouteMatcherTest, PatternMatchWildcardUnnamedVariable) {
@@ -9107,11 +9189,19 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/*/{two}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/*/{two}"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/{two}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/{two}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
@@ -9133,11 +9223,19 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{one}/**"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{one}/**"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/{one}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/{one}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
@@ -9160,11 +9258,19 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{one=*}/{last=**}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{one=*}/{last=**}"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/{last}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/{last}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
@@ -9187,11 +9293,19 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{one}/{middle=videos/*}/end"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{one}/{middle=videos/*}/end"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/{middle}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/{middle}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
@@ -9214,11 +9328,19 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{one}/{One}/end"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{one}/{One}/end"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
-          path_template_rewrite: "/{One}/{one}"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+              path_template_rewrite: "/{One}/{one}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
@@ -9241,7 +9363,11 @@ virtual_hosts:
     domains: ["*"]
     routes:
       - match:
-          path_template: "/rest/{one}/{two}/{three}/{four}/{five}/{six}"
+          path_match_policy:
+            name: envoy.path.match.pattern_template.v3.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+              path_template: "/rest/{one}/{two}/{three}/{four}/{five}/{six}"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
@@ -9252,7 +9378,7 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException,
-      "path_template /rest/{one}/{two}/{three}/{four}/{five}/{six} is invalid");
+      "path_match_policy /rest/{one}/{two}/{three}/{four}/{five}/{six} is invalid");
 }
 
 TEST_F(RouteConfigurationV2, DefaultInternalRedirectPolicyIsSensible) {

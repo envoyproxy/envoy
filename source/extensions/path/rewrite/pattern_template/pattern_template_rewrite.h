@@ -6,7 +6,14 @@
 #include "envoy/router/path_rewrite_policy.h"
 
 #include "source/extensions/path/pattern_template_lib/pattern_template.h"
+#include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.h"
+#include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.validate.h"
 
+#include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.h"
+#include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.validate.h"
+
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
@@ -17,29 +24,30 @@ namespace Rewrite {
 
 class PatternTemplateRewritePredicate : public Router::PathRewritePredicate {
 public:
-  explicit PatternTemplateRewritePredicate(std::string url_pattern, std::string url_rewrite_pattern)
-      : matching_pattern_regex_(RE2(convertURLPatternSyntaxToRegex(url_pattern).value())),
-        url_rewrite_pattern_(url_rewrite_pattern) {}
+  explicit PatternTemplateRewritePredicate(
+      const envoy::extensions::path::rewrite::pattern_template::v3::PatternTemplateRewriteConfig&
+          rewrite_config)
+      : url_rewrite_pattern_(rewrite_config.path_template_rewrite()) {}
 
   absl::string_view name() const override {
-    return "envoy.pattern_template.pattern_template_rewrite_predicate";
+    return "envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate";
   }
+
+  std::string pattern() const override { return url_rewrite_pattern_; }
 
   absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
                                              absl::string_view matched_path) const override;
 
-  static absl::Status isValidRewritePattern(std::string match_pattern,
-                                               std::string rewrite_pattern);
+  static absl::Status isValidRewritePattern(std::string match_pattern, std::string rewrite_pattern);
 
 private:
   // Returns the rewritten URL path based on the given parsed rewrite pattern.
   // Used for template-based URL rewrite.
   absl::StatusOr<std::string> rewriteURLTemplatePattern(
       absl::string_view url, absl::string_view capture_regex,
-      const envoy::extensions::pattern_template::PatternTemplateRewriteSegments&
-          rewrite_pattern) const;
+      const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern)
+      const;
 
-  RE2 matching_pattern_regex_{nullptr};
   std::string url_rewrite_pattern_{nullptr};
 };
 

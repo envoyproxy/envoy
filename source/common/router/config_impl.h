@@ -459,7 +459,8 @@ private:
  */
 class PathMatchPolicyImpl : public PathMatchPolicy {
 public:
- PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config, ProtobufMessage::ValidationVisitor& validator, std::string url_pattern);
+ PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
+    ProtobufMessage::ValidationVisitor& validator, std::string route_url);
 
   // Default constructor that disables internal redirect.
   PathMatchPolicyImpl();
@@ -468,11 +469,13 @@ public:
 
   PathMatchPredicateSharedPtr predicate() const override;
 
-  const std::string url_pattern_;
+  std::string route_url() const { return route_url_; }
+
+  ProtobufTypes::MessagePtr predicate_config_;
 
 private:
+  const std::string route_url_;
   const bool enabled_;
-  ProtobufTypes::MessagePtr predicate_config_;
   PathMatchPredicateFactory* predicate_factory_;
 };
 
@@ -483,7 +486,7 @@ private:
 class PathRewritePolicyImpl : public PathRewritePolicy {
 public:
    PathRewritePolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
-                                         ProtobufMessage::ValidationVisitor& validator, std::string curr_url);
+                                         ProtobufMessage::ValidationVisitor& validator, std::string route_url);
 
   // Default constructor that disables internal redirect.
   PathRewritePolicyImpl();
@@ -492,11 +495,10 @@ public:
 
   PathRewritePredicateSharedPtr predicate() const override;
 
-  const std::string curr_url_;
-
 private:
+  const std::string route_url_;
   const bool enabled_;
-  ProtobufTypes::MessagePtr predicate_config_;
+  ProtobufTypes::MessagePtr rewrite_predicate_config_;
   PathRewritePredicateFactory* predicate_factory_;
 };
 
@@ -611,9 +613,10 @@ public:
   const InternalRedirectPolicy& internalRedirectPolicy() const override {
     return internal_redirect_policy_;
   }
-  const PathMatchPolicyImpl& pathMatchPolicy() const override {
-    return path_match_policy_;
-  }
+
+  const PathMatchPolicyImpl& pathMatchPolicy() const override { return path_match_policy_; }
+  const PathRewritePolicyImpl& pathRewritePolicy() const override { return path_rewrite_policy_; }
+
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
@@ -729,6 +732,9 @@ public:
     }
     const PathMatchPolicyImpl& pathMatchPolicy() const override {
       return parent_->pathMatchPolicy();
+    }
+    const PathRewritePolicyImpl& pathRewritePolicy() const override {
+      return parent_->pathRewritePolicy();
     }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
     const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {

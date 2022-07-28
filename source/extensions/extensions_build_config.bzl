@@ -240,6 +240,13 @@ EXTENSIONS = {
     "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
 
     #
+    # Path match and rewrite
+    #
+
+    "envoy.path.match.pattern_template.v3.pattern_template_match_predicate": "//source/extensions/path/match/pattern_template:config",
+    "envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate": "//source/extensions/path/rewrite/pattern_template:config",
+
+    #
     # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
     #
 
