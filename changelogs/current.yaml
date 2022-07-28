@@ -9,6 +9,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: prometheus stats
+  change: |
+    removed blank line for comptiable with openmetrics
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
