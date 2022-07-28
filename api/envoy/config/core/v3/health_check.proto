@@ -125,6 +125,10 @@ message HealthCheck {
     // range are required. Only statuses in the range [100, 600) are allowed.
     repeated type.v3.Int64Range expected_statuses = 9;
 
+    // An optional string to match anywhere in the first 1024 bytes of the response body.
+    // If it is set, both the expected response check and status code determine the health check.
+    bytes expected_response_in_prefix = 13 [(validate.rules).bytes = {max_len: 1024}];
+
     // Specifies a list of HTTP response statuses considered retriable. If provided, responses in this range
     // will count towards the configured :ref:`unhealthy_threshold <envoy_v3_api_field_config.core.v3.HealthCheck.unhealthy_threshold>`,
     // but will not result in the host being considered immediately unhealthy. Ranges follow half-open semantics of
@@ -145,10 +149,6 @@ message HealthCheck {
     // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`. See the :ref:`architecture overview
     // <arch_overview_health_checking_identity>` for more information.
     type.matcher.v3.StringMatcher service_name_matcher = 11;
-
-    // An optional string to match anywhere in the first 1024 bytes of the response body.
-    // If it is set, both the expected response check and status code determine the health check.
-    bytes response = 13 [(validate.rules).bytes = {max_len: 1024}];
   }
 
   message TcpHealthCheck {
