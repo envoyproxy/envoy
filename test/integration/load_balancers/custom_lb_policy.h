@@ -4,6 +4,7 @@
 
 #include "source/common/upstream/load_balancer_factory_base.h"
 
+#include "test/integration/load_balancers/config.pb.h"
 #include "test/test_common/registry.h"
 
 namespace Envoy {
@@ -56,6 +57,10 @@ private:
 class CustomLbFactory : public Upstream::TypedLoadBalancerFactoryBase {
 public:
   CustomLbFactory() : TypedLoadBalancerFactoryBase("envoy.load_balancers.custom_lb") {}
+
+  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return Envoy::ProtobufTypes::MessagePtr{new ::test::integration::custom_lb::CustomLbConfig()};
+  }
 
   Upstream::ThreadAwareLoadBalancerPtr
   create(const Upstream::PrioritySet&, Upstream::ClusterStats&, Stats::Scope&, Runtime::Loader&,

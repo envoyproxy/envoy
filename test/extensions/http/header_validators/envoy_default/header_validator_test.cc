@@ -31,7 +31,7 @@ constexpr absl::string_view empty_config = R"EOF(
 class HeaderValidatorTest : public testing::Test {
 protected:
   ::Envoy::Http::HeaderValidatorPtr create(absl::string_view config_yaml,
-                                           HeaderValidatorFactory::Protocol protocol) {
+                                           ::Envoy::Http::Protocol protocol) {
     auto* factory =
         Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
             "envoy.http.header_validators.envoy_default");
@@ -49,12 +49,12 @@ protected:
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  ::Envoy::Http::HeaderValidatorFactorySharedPtr uhv_factory_;
+  ::Envoy::Http::HeaderValidatorFactoryPtr uhv_factory_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 
 TEST_F(HeaderValidatorTest, Http1RequestHeaderNameValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http11);
   // Since the default UHV does not yet check anything all header values should be accepted
   std::string key_value("aaa");
   HeaderString key(key_value);
@@ -62,13 +62,12 @@ TEST_F(HeaderValidatorTest, Http1RequestHeaderNameValidation) {
   for (int c = 0; c <= 0xff; ++c) {
     key_value[1] = c;
     setHeaderStringUnvalidated(key, key_value);
-    EXPECT_EQ(uhv->validateRequestHeaderEntry(key, value),
-              ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept);
+    EXPECT_TRUE(uhv->validateRequestHeaderEntry(key, value));
   }
 }
 
 TEST_F(HeaderValidatorTest, Http1ResponseHeaderNameValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http11);
   // Since the default UHV does not yet check anything all header values should be accepted
   std::string key_value("aaa");
   HeaderString key(key_value);
@@ -76,24 +75,21 @@ TEST_F(HeaderValidatorTest, Http1ResponseHeaderNameValidation) {
   for (int c = 0; c <= 0xff; ++c) {
     key_value[1] = c;
     setHeaderStringUnvalidated(key, key_value);
-    EXPECT_EQ(uhv->validateResponseHeaderEntry(key, value),
-              ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept);
+    EXPECT_TRUE(uhv->validateResponseHeaderEntry(key, value).ok());
   }
 }
 
 TEST_F(HeaderValidatorTest, Http1RequestHeaderMapValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http11);
   ::Envoy::Http::TestRequestHeaderMapImpl request_header_map{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-  EXPECT_EQ(uhv->validateRequestHeaderMap(request_header_map),
-            ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Accept);
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(request_header_map));
 }
 
 TEST_F(HeaderValidatorTest, Http1ResponseHeaderMapValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http11);
   ::Envoy::Http::TestResponseHeaderMapImpl response_header_map{{":status", "200"}};
-  EXPECT_EQ(uhv->validateResponseHeaderMap(response_header_map),
-            ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Accept);
+  EXPECT_TRUE(uhv->validateResponseHeaderMap(response_header_map).ok());
 }
 
 } // namespace EnvoyDefault

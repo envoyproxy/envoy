@@ -271,7 +271,7 @@ TEST_F(SipDecoderTest, DecodeOK200) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   EXPECT_EQ(2U, store_.counter("test.request").value());
-  EXPECT_EQ(2U, stats_.request_active_.value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
@@ -397,7 +397,7 @@ TEST_F(SipDecoderTest, DecodeSUBSCRIBE) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   EXPECT_EQ(2U, store_.counter("test.request").value());
-  EXPECT_EQ(2U, stats_.request_active_.value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 

@@ -69,8 +69,8 @@ These input functions are available for matching TCP connections and HTTP reques
 * :ref:`DNS SAN <extension_envoy.matching.inputs.dns_san>`.
 * :ref:`Subject <extension_envoy.matching.inputs.subject>`.
 
-Common Input Functons
-*********************
+Common Input Functions
+**********************
 
 These input functions are available in any context:
 
