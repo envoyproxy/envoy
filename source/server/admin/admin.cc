@@ -149,7 +149,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true,
                       {{Admin::ParamDescriptor::Type::String, "paths",
                         "Change multiple logging levels by setting to "
-                        "<logger_name1>=<desired_level1>,<logger_name2>=<desired_level2>."},
+                        "<logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>."},
                        {Admin::ParamDescriptor::Type::Enum, "level", "desired logging level",
                         prepend("", LogsHandler::levelStrings())}}),
           makeHandler("/memory", "print current allocation/heap usage",
