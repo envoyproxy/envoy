@@ -9149,7 +9149,7 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException,
-      "mismatch between path_match_policy /rest/{one}/{two} and path_rewrite_policy"
+      "mismatch between path_match_policy /rest/{one}/{two} and path_rewrite_policy "
       "/rest/{one}/{two}/{missing}");
 }
 
