@@ -11,27 +11,12 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_library(
-    name = "pattern_template_rewrite_lib",
-    srcs = ["pattern_template_rewrite.cc"],
-    hdrs = ["pattern_template_rewrite.h"],
-    visibility = [
-        "//source/common/router:__subpackages__",
-    ],
-    deps = [
-        "//envoy/router:router_path_rewrite_policy_interface",
-        "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
-    ],
-)
-
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     visibility = ["//visibility:public"],
     deps = [
-        ":pattern_template_rewrite_lib",
         "//envoy/registry",
         "//envoy/router:router_path_rewrite_policy_interface",
         "@envoy_api//envoy/extensions/path/rewrite/pattern_template/v3:pkg_cc_proto",
