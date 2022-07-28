@@ -1014,7 +1014,7 @@ public:
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return url_pattern_; }
 
-  PathMatchType matchType() const override { return PathMatchType::Pattern; }
+  PathMatchType matchType() const override { return PathMatchType::Policy; }
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
