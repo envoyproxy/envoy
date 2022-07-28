@@ -38,8 +38,6 @@ This extension emits the following statistics:
    :widths: 1, 1, 2
 
    no_metadata, Counter, Metadata key is absent from the import location.
-   no_filter_state, Counter, Filter state object key is absent from the downstream filter state.
-   filter_state_error, Counter, Unable to copy the filter state object (e.g. it is read only).
 
 Example config
 --------------
@@ -104,11 +102,6 @@ Below is a smallest static config that redirect TCP proxy on port 19000 to the T
   - name: envoy.bootstrap.internal_listener
     typed_config:
       "@type": "type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener"
-  layered_runtime:
-    layers:
-    - name: enable_internal_address
-      static_layer:
-        envoy.reloadable_features.internal_address: true
 
 Real world use cases
 --------------------

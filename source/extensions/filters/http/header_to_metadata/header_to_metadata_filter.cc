@@ -265,8 +265,7 @@ const Config* HeaderToMetadataFilter::getConfig() const {
     return effective_config_;
   }
 
-  effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<Config>(
-      "envoy.filters.http.header_to_metadata", decoder_callbacks_->route());
+  effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<Config>(decoder_callbacks_);
   if (effective_config_) {
     return effective_config_;
   }

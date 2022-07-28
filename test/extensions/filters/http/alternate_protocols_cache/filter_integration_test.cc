@@ -24,6 +24,7 @@ namespace {
 class FilterIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
   void initialize() override {
+    TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
     const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
     envoy::config::core::v3::AlternateProtocolsCacheOptions alt_cache;
     alt_cache.set_name("default_alternate_protocols_cache");
@@ -82,7 +83,8 @@ typed_config:
         auto http2_config = configWithType(Http::CodecType::HTTP2);
         Network::DownstreamTransportSocketFactoryPtr http2_factory =
             createUpstreamTlsContext(http2_config);
-        addFakeUpstream(std::move(http2_factory), Http::CodecType::HTTP2);
+        addFakeUpstream(std::move(http2_factory), Http::CodecType::HTTP2,
+                        /*autonomous_upstream=*/false);
 
         // Make the next upstream is HTTP/3
         auto http3_config = configWithType(Http::CodecType::HTTP3);
@@ -145,6 +147,8 @@ TEST_P(FilterIntegrationTest, AltSvc) {
 TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   const uint64_t response_size = 0;
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  config_helper_.setConnectTimeout(std::chrono::seconds(2));
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -266,10 +270,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
 // an HTTP/2 or an HTTP/3 upstream (but not both).
 class MixedUpstreamIntegrationTest : public FilterIntegrationTest {
 protected:
-  MixedUpstreamIntegrationTest() {
-    TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
-    default_request_headers_.setHost("sni.lyft.com");
-  }
+  MixedUpstreamIntegrationTest() { default_request_headers_.setHost("sni.lyft.com"); }
 
   void writeFile() {
     uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();
@@ -291,11 +292,11 @@ protected:
     if (use_http2_) {
       auto config = configWithType(Http::CodecType::HTTP2);
       Network::DownstreamTransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      addFakeUpstream(std::move(factory), Http::CodecType::HTTP2);
+      addFakeUpstream(std::move(factory), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
     } else {
       auto config = configWithType(Http::CodecType::HTTP3);
       Network::DownstreamTransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      addFakeUpstream(std::move(factory), Http::CodecType::HTTP3);
+      addFakeUpstream(std::move(factory), Http::CodecType::HTTP3, /*autonomous_upstream=*/false);
       writeFile();
     }
   }

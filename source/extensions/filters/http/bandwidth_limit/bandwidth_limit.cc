@@ -233,8 +233,8 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
 }
 
 const FilterConfig& BandwidthLimiter::getConfig() const {
-  const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
-      "envoy.filters.http.bandwidth_limit", decoder_callbacks_->route());
+  const auto* config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
   if (config) {
     return *config;
   }

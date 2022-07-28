@@ -390,5 +390,14 @@ private:
   static absl::uint128 flipOrder(const absl::uint128& input);
 };
 
+/**
+ * Log formatter for an address.
+ */
+struct AddressStrFormatter {
+  void operator()(std::string* out, const Network::Address::InstanceConstSharedPtr& instance) {
+    out->append(instance->asString());
+  }
+};
+
 } // namespace Network
 } // namespace Envoy

@@ -871,7 +871,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
       .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         callbacks->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
         callbacks->sendLocalReply(direct_response, false);
-        return FilterStatus::StopIteration;
+        return FilterStatus::AbortIteration;
       }));
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
@@ -918,7 +918,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_CALL(*first_filter, onMessageDecoded(_, _))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         callbacks->sendLocalReply(direct_response, false);
-        return FilterStatus::StopIteration;
+        return FilterStatus::AbortIteration;
       }));
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
@@ -1274,7 +1274,7 @@ TEST_F(ConnectionManagerTest, SendLocalReplyInMessageDecoded) {
         EXPECT_EQ(1, conn_manager_->getActiveMessagesForTest().size());
         EXPECT_NE(nullptr, conn_manager_->getActiveMessagesForTest().front()->metadata());
         callbacks->sendLocalReply(direct_response, false);
-        return FilterStatus::StopIteration;
+        return FilterStatus::AbortIteration;
       }));
 
   // The sendLocalReply is called, the ActiveMessage object should be destroyed.

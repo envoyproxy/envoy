@@ -46,9 +46,9 @@ ListenerFilterWithDataFuzzer::ListenerFilterWithDataFuzzer()
               getListenSocket(_))
       .WillOnce(Return(socket_));
   connection_handler_->addListener(absl::nullopt, *this, runtime_);
-  conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
-                                              Network::Address::InstanceConstSharedPtr(),
-                                              Network::Test::createRawBufferSocket(), nullptr);
+  conn_ = dispatcher_->createClientConnection(
+      socket_->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
   conn_->addConnectionCallbacks(connection_callbacks_);
 }
 

@@ -211,6 +211,10 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
+  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol, StreamInfo::StreamInfo&) override {
+    // TODO(yanavlasov): admin interface should use the default validator
+    return nullptr;
+  }
 
 private:
   friend class AdminTestingPeer;
@@ -396,7 +400,7 @@ private:
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return parent_.socket_factories_;
     }
-    bool bindToPort() override { return true; }
+    bool bindToPort() const override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }

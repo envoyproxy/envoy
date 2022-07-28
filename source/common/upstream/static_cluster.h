@@ -14,7 +14,8 @@ namespace Upstream {
  */
 class StaticClusterImpl : public ClusterImplBase {
 public:
-  StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
+  StaticClusterImpl(Server::Configuration::ServerFactoryContext& server_context,
+                    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
 
@@ -38,6 +39,7 @@ public:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopeSharedPtr&& stats_scope) override;

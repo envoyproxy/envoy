@@ -52,8 +52,7 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
 
   // Route-level configuration overrides filter-level configuration.
   const auto* per_route_kill_settings =
-      Http::Utility::resolveMostSpecificPerFilterConfig<KillSettings>(
-          "envoy.filters.http.kill_request", decoder_callbacks_->route());
+      Http::Utility::resolveMostSpecificPerFilterConfig<KillSettings>(decoder_callbacks_);
 
   if (per_route_kill_settings) {
     is_correct_direction = per_route_kill_settings->getDirection() == KillRequest::REQUEST;

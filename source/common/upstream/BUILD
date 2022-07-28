@@ -368,6 +368,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_factory_interface",
         "//source/common/common:empty_string",
         "//source/common/network:address_lib",
+        "//source/common/network:filter_state_dst_address_lib",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

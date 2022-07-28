@@ -974,7 +974,7 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
 
   UpgradeMap upgrade_map_;
-  const uint64_t total_cluster_weight_;
+  uint64_t total_cluster_weight_;
   std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   TlsContextMatchCriteriaConstPtr tls_context_match_criteria_;
@@ -1012,7 +1012,8 @@ public:
                              ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override { return path_template_; }
+  const std::string& matcher() const override { return url_pattern_; }
+
   PathMatchType matchType() const override { return PathMatchType::Pattern; }
 
   // Router::Matchable
@@ -1029,8 +1030,7 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
-  const std::string path_template_;
-  const Matchers::PathMatcherConstSharedPtr path_matcher_;
+  std::string url_pattern_{nullptr};
 };
 
 /**

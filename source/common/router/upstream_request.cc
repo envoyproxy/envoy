@@ -148,6 +148,7 @@ void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
 }
 
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+  ENVOY_STREAM_LOG(trace, "upstream response headers:\n{}", *parent_.callbacks(), *headers);
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   resetPerTryIdleTimer();
@@ -199,6 +200,7 @@ void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
+  ENVOY_STREAM_LOG(trace, "upstream response trailers:\n{}", *parent_.callbacks(), *trailers);
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   maybeEndDecode(true);
@@ -447,7 +449,6 @@ void UpstreamRequest::onPoolReady(
   }
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
-  parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
   if (info.upstreamInfo()) {
     auto& upstream_timing = info.upstreamInfo()->upstreamTiming();
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;

@@ -85,7 +85,7 @@ IntegrationCodecClient::IntegrationCodecClient(
     Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
     Http::CodecType type, bool wait_till_connected)
-    : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
+    : CodecClientProd(type, std::move(conn), host_description, dispatcher, random, nullptr),
       dispatcher_(dispatcher), callbacks_(*this, wait_till_connected), codec_callbacks_(*this),
       codec_client_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);

@@ -83,10 +83,6 @@ FilterStatus ActiveResponseDecoder::applyMessageEncodedFilters(MessageMetadataSh
   switch (status) {
   case FilterStatus::StopIteration:
     break;
-  case FilterStatus::Retry:
-    response_status_ = DubboFilters::UpstreamResponseStatus::Retry;
-    decoder_->reset();
-    break;
   default:
     ASSERT(FilterStatus::Continue == status);
     break;
@@ -249,16 +245,24 @@ void ActiveMessage::onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSh
   };
 
   auto status = applyDecoderFilters(nullptr, FilterIterationStartState::CanStartFromCurrent);
-  if (status == FilterStatus::StopIteration) {
-    ENVOY_LOG(debug, "dubbo request: stop calling decoder filter, id is {}", metadata->requestId());
+  switch (status) {
+  case FilterStatus::StopIteration:
+    ENVOY_LOG(debug, "dubbo request: pause calling decoder filter, id is {}",
+              metadata->requestId());
     pending_stream_decoded_ = true;
     return;
+  case FilterStatus::AbortIteration:
+    ENVOY_LOG(debug, "dubbo request: abort calling decoder filter, id is {}",
+              metadata->requestId());
+    parent_.deferredMessage(*this);
+    return;
+  case FilterStatus::Continue:
+    ENVOY_LOG(debug, "dubbo request: complete processing of downstream request messages, id is {}",
+              metadata->requestId());
+    finalizeRequest();
+    return;
   }
-
-  finalizeRequest();
-
-  ENVOY_LOG(debug, "dubbo request: complete processing of downstream request messages, id is {}",
-            metadata->requestId());
+  PANIC_DUE_TO_CORRUPT_ENUM
 }
 
 void ActiveMessage::finalizeRequest() {

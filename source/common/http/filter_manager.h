@@ -749,12 +749,6 @@ public:
   void disarmRequestTimeout();
 
   /**
-   * If end_stream is true, marks decoding as complete. This is a noop if end_stream is false.
-   * @param end_stream whether decoding is complete.
-   */
-  void maybeEndDecode(bool end_stream);
-
-  /**
    * If end_stream is true, marks encoding as complete. This is a noop if end_stream is false.
    * @param end_stream whether encoding is complete.
    */

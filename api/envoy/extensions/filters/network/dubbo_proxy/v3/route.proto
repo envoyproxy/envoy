@@ -94,7 +94,7 @@ message RouteAction {
 
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
   // the upstream cluster with metadata matching what is set in this field will be considered for
-  // load balancing. The filter name should be specified as *envoy.lb*.
+  // load balancing. The filter name should be specified as ``envoy.lb``.
   config.core.v3.Metadata metadata_match = 3;
 }
 
