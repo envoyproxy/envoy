@@ -548,7 +548,7 @@ public:
   }
 
   void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true,
-                      bool is_drain = false) {
+                      bool is_drain = false, bool is_partial_response = false) {
     Buffer::OwnedImpl buffer;
 
     EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
@@ -564,6 +564,10 @@ public:
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
     upstream_callbacks_->onUpstreamData(buffer, false);
+
+    if (is_partial_response) {
+      return;
+    }
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(ThriftFilters::ResponseStatus::Complete));
@@ -986,7 +990,7 @@ TEST_F(ThriftRouterTest, TruncatedResponse) {
   destroyRouter();
 
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.downstream_cx_underflow_request_close")
+                     .counterFromString("thrift.downstream_cx_underflow_response_close")
                      .value());
 }
 
@@ -1742,6 +1746,23 @@ TEST_F(ThriftRouterTest, UpstreamDraining) {
   completeRequest();
   returnResponse(MessageType::Reply, true, true /* is_drain */);
   destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, UpstreamPartialResponse) {
+  initializeRouter();
+
+  EXPECT_CALL(callbacks_, resetDownstreamConnection());
+
+  startRequestWithExistingConnection(MessageType::Call);
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Reply, true, false, true /* is_partial_response */);
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+  destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("thrift.downstream_cx_partial_response_close")
+                     .value());
 }
 
 TEST_F(ThriftRouterTest, ShadowRequests) {
