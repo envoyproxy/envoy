@@ -15,8 +15,10 @@
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -433,6 +435,31 @@ TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
   EXPECT_FALSE(transcoder);
 }
 
+class TranscoderTestProtoJsonMarshaller
+    : public ProtoJson::ProtoJsonMarshaller<google::rpc::Status> {
+  Protobuf::util::Status marshal(const google::rpc::Status& status,
+                                 std::string& output) const override {
+    output = absl::StrFormat(R"({"new_code_name":%d, "new_message_name":"%s"})", status.code(),
+                             status.message());
+    return Protobuf::util::Status(StatusCode::kOk, "");
+  }
+};
+
+class TranscoderTestProtoJsonMarshallerFactory
+    : public ProtoJson::ProtoJsonMarshallerFactory<google::rpc::Status> {
+public:
+  std::unique_ptr<ProtoJson::ProtoJsonMarshaller<google::rpc::Status>>
+  createProtoJsonMarshaller(const Protobuf::Message&) override {
+    return std::make_unique<TranscoderTestProtoJsonMarshaller>();
+  }
+
+  std::string name() const override {
+    return "envoy.proto_json_marshaller.transcoder_test_proto_json_marshaller";
+  }
+
+  std::string category() const override { return "envoy.proto_json_marshaller"; };
+};
+
 class GrpcJsonTranscoderFilterTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
 protected:
   GrpcJsonTranscoderFilterTest(
@@ -463,6 +490,10 @@ protected:
   static const std::string bookstoreDescriptorPath() {
     return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
+
+  TranscoderTestProtoJsonMarshallerFactory factory_;
+  Registry::InjectFactory<ProtoJson::ProtoJsonMarshallerFactory<google::rpc::Status>>
+      register_factory_{factory_};
 
   // TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
   JsonTranscoderConfig config_;
@@ -1606,6 +1637,46 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipTranscodingStatusIfBod
 
   Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+}
+
+class GrpcJsonTranscoderFilterConvertGrpcStatusByExtensionTest
+    : public GrpcJsonTranscoderFilterGrpcStatusTest {
+public:
+  GrpcJsonTranscoderFilterConvertGrpcStatusByExtensionTest()
+      : GrpcJsonTranscoderFilterGrpcStatusTest(makeProtoConfig()) {}
+
+private:
+  const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
+  makeProtoConfig() {
+    auto proto_config = bookstoreProtoConfig();
+    proto_config.set_convert_grpc_status(true);
+    proto_config.mutable_grpc_status_json_marshaller()->set_name(
+        "envoy.proto_json_marshaller.transcoder_test_proto_json_marshaller");
+    return proto_config;
+  }
+};
+
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusByExtensionTest,
+       TranscodingBinaryHeaderInTrailerOnlyResponse) {
+  const std::string expected_response(
+      R"({"new_code_name":5, "new_message_name":"Resource not found"})");
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+        EXPECT_EQ(expected_response, data.toString());
+      }));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"content-type", "application/grpc"},
+      {"grpc-status", "5"},
+      {"grpc-message", "unused"},
+      {"grpc-status-details-bin", "CAUSElJlc291cmNlIG5vdCBmb3VuZA"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_EQ("404", response_headers.get_(":status"));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+  EXPECT_FALSE(response_headers.has("grpc-status"));
+  EXPECT_FALSE(response_headers.has("grpc-message"));
+  EXPECT_FALSE(response_headers.has("grpc-status-details-bin"));
 }
 
 struct GrpcJsonTranscoderFilterPrintTestParam {

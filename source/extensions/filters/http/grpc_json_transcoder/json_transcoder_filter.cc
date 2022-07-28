@@ -10,6 +10,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
@@ -225,6 +226,13 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
   request_validation_options_ = proto_config.request_validation_options();
+  if (proto_config.has_grpc_status_json_marshaller()) {
+    grpc_status_json_marshaller_ =
+        Envoy::Config::Utility::getFactoryByName<
+            ProtoJson::ProtoJsonMarshallerFactory<google::rpc::Status>>(
+            proto_config.grpc_status_json_marshaller().name())
+            ->createProtoJsonMarshaller(proto_config.grpc_status_json_marshaller().typed_config());
+  }
 }
 
 void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
@@ -890,7 +898,9 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
 
   std::string json_status;
   auto translate_status =
-      per_route_config_->translateProtoMessageToJson(*status_details, &json_status);
+      config_.grpc_status_json_marshaller()
+          ? config_.grpc_status_json_marshaller()->marshal(*status_details, json_status)
+          : per_route_config_->translateProtoMessageToJson(*status_details, &json_status);
   if (!translate_status.ok()) {
     ENVOY_LOG(debug, "Transcoding status error {}", translate_status.ToString());
     return false;

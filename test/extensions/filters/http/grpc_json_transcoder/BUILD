@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
