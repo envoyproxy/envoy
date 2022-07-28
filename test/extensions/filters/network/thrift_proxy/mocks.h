@@ -137,6 +137,7 @@ public:
   MOCK_METHOD(DecoderEventHandler&, newDecoderEventHandler, ());
   MOCK_METHOD(bool, passthroughEnabled, (), (const));
   MOCK_METHOD(bool, isRequest, (), (const));
+  MOCK_METHOD(bool, headerKeysPreserveCase, (), (const));
 };
 
 class MockDecoderEventHandler : public DecoderEventHandler {
@@ -213,6 +214,8 @@ public:
 
   // ThriftProxy::ThriftFilters::DecoderFilter
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(ThriftFilters::LocalErrorStatus, onLocalReply,
+              (const MessageMetadata& metadata, bool reset_imminent));
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks));
   MOCK_METHOD(bool, passthroughSupported, (), (const));
 
@@ -279,6 +282,8 @@ public:
 
   // ThriftProxy::ThriftFilters::EncoderFilter
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(ThriftFilters::LocalErrorStatus, onLocalReply,
+              (const MessageMetadata& metadata, bool reset_imminent));
   MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallbacks & callbacks));
   MOCK_METHOD(bool, passthroughSupported, (), (const));
 
@@ -342,6 +347,8 @@ public:
 
   // ThriftProxy::ThriftFilters::BidirectionalFilter
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(ThriftFilters::LocalErrorStatus, onLocalReply,
+              (const MessageMetadata& metadata, bool reset_imminent));
   MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallbacks & callbacks));
   MOCK_METHOD(bool, encodePassthroughSupported, (), (const));
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks));
@@ -398,10 +405,10 @@ public:
   MOCK_METHOD(FilterStatus, decodeSetEnd, ());
 };
 
-class MockFilterConfigFactory : public NamedThriftFilterConfigFactory {
+class MockDecoderFilterConfigFactory : public NamedThriftFilterConfigFactory {
 public:
-  MockFilterConfigFactory();
-  ~MockFilterConfigFactory() override;
+  MockDecoderFilterConfigFactory();
+  ~MockDecoderFilterConfigFactory() override;
 
   FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
@@ -419,6 +426,54 @@ public:
 
 private:
   std::shared_ptr<MockDecoderFilter> mock_filter_;
+  const std::string name_;
+};
+
+class MockEncoderFilterConfigFactory : public NamedThriftFilterConfigFactory {
+public:
+  MockEncoderFilterConfigFactory();
+  ~MockEncoderFilterConfigFactory() override;
+
+  FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
+
+  std::string name() const override { return name_; }
+
+  ProtobufWkt::Struct config_struct_;
+  std::string config_stat_prefix_;
+
+private:
+  std::shared_ptr<MockEncoderFilter> mock_filter_;
+  const std::string name_;
+};
+
+class MockBidirectionalFilterConfigFactory : public NamedThriftFilterConfigFactory {
+public:
+  MockBidirectionalFilterConfigFactory();
+  ~MockBidirectionalFilterConfigFactory() override;
+
+  FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
+
+  std::string name() const override { return name_; }
+
+  ProtobufWkt::Struct config_struct_;
+  std::string config_stat_prefix_;
+
+private:
+  std::shared_ptr<MockBidirectionalFilter> mock_filter_;
   const std::string name_;
 };
 

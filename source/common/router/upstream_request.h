@@ -20,6 +20,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
@@ -40,6 +41,7 @@ public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
                   bool can_send_early_data, bool can_use_http3);
   ~UpstreamRequest() override;
+  void deleteIsPending() override { cleanUp(); }
 
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();
@@ -70,10 +72,8 @@ public:
   void onAboveWriteBufferHighWatermark() override { disableDataFromDownstreamForFlowControl(); }
   void onBelowWriteBufferLowWatermark() override { enableDataFromDownstreamForFlowControl(); }
   // UpstreamToDownstream
-  const RouteEntry& routeEntry() const override;
+  const Route& route() const override;
   const Network::Connection& connection() const override;
-
-  // UpstreamToDownstream
   const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
     return stream_options_;
   }
@@ -88,8 +88,7 @@ public:
   void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                    Upstream::HostDescriptionConstSharedPtr host,
                    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                   const StreamInfo::StreamInfo& info,
-                   absl::optional<Http::Protocol> protocol) override;
+                   StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) override;
   UpstreamToDownstream& upstreamToDownstream() override { return *this; }
 
   void clearRequestEncoder();

@@ -28,21 +28,21 @@ TrafficRoutingAssistantHandler::TrafficRoutingAssistantHandler(
   }
 }
 
-void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(const std::string& type,
-                                                                   const std::string& key,
-                                                                   const std::string& val) {
+void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
+    const std::string& type, const std::string& key, const std::string& val,
+    const absl::optional<TraContextMap> context) {
   if (cache_manager_[type][key] != val) {
     cache_manager_.insertCache(type, key, val);
     if (traClient()) {
       traClient()->updateTrafficRoutingAssistant(
-          type, absl::flat_hash_map<std::string, std::string>{std::make_pair(key, val)},
+          type, absl::flat_hash_map<std::string, std::string>{std::make_pair(key, val)}, context,
           Tracing::NullSpan::instance(), stream_info_);
     }
   }
 }
 
 QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
-    const std::string& type, const std::string& key,
+    const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
   if (cache_manager_.contains(type, key)) {
     host = cache_manager_[type][key];
@@ -52,8 +52,8 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
   if (activetrans.metadata()->affinityIteration()->query()) {
     parent_.pushIntoPendingList(type, key, activetrans, [&]() {
       if (traClient()) {
-        traClient()->retrieveTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
-                                                     stream_info_);
+        traClient()->retrieveTrafficRoutingAssistant(type, key, context,
+                                                     Tracing::NullSpan::instance(), stream_info_);
       }
     });
     host = "";
@@ -63,11 +63,11 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
   return QueryStatus::Stop;
 }
 
-void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(const std::string& type,
-                                                                   const std::string& key) {
+void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(
+    const std::string& type, const std::string& key, const absl::optional<TraContextMap> context) {
   cache_manager_[type].erase(key);
   if (traClient()) {
-    traClient()->deleteTrafficRoutingAssistant(type, key, Tracing::NullSpan::instance(),
+    traClient()->deleteTrafficRoutingAssistant(type, key, context, Tracing::NullSpan::instance(),
                                                stream_info_);
   }
 }
@@ -199,6 +199,9 @@ void ConnectionManager::continueHandling(const std::string& key, bool try_next_a
             auto ex = AppException(AppExceptionType::InternalError,
                                    fmt::format("envoy can't establish connection to {}", key));
             sendLocalReply(*(metadata), ex, false);
+            setLocalResponseSent(metadata->transactionId().value());
+
+            decoder_->complete();
           }
         } else {
           continueHandling(metadata, decoder_event_handler);
@@ -214,11 +217,13 @@ void ConnectionManager::continueHandling(MessageMetadataSharedPtr metadata,
   } catch (const AppException& ex) {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
     sendLocalReply(*(decoder_->metadata()), ex, false);
+    setLocalResponseSent(decoder_->metadata()->transactionId().value());
+
+    decoder_->complete();
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
 
-    // Transport/protocol mismatch (including errors in automatic detection). Just hang up
-    // since we don't know how to encode a response.
+    // Still unaware how to handle this, just close the connection
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -229,18 +234,13 @@ void ConnectionManager::dispatch() {
   } catch (const AppException& ex) {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
     sendLocalReply(*(decoder_->metadata()), ex, false);
-
-    std::string&& k = std::string(decoder_->metadata()->transactionId().value());
-    if (transactions_.find(k) != transactions_.end()) {
-      transactions_[k]->setLocalResponseSent(true);
-    }
+    setLocalResponseSent(decoder_->metadata()->transactionId().value());
 
     decoder_->complete();
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
 
-    // Transport/protocol mismatch (including errors in automatic detection). Just hang up
-    // since we don't know how to encode a response.
+    // Still unaware how to handle this, just close the connection
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -258,7 +258,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   const DirectResponse::ResponseType result = response.encode(metadata, buffer);
 
   ENVOY_CONN_LOG(
-      debug, "send local reply {} --> {} bytes {}\n", read_callbacks_->connection(),
+      debug, "send local reply {} --> {} bytes {}\n{}", read_callbacks_->connection(),
       read_callbacks_->connection().connectionInfoProvider().localAddress()->asStringView(),
       read_callbacks_->connection().connectionInfoProvider().remoteAddress()->asStringView(),
       buffer.length(), buffer.toString());
@@ -282,6 +282,12 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
     PANIC("not reached");
   }
   stats_.counterFromElements("", "local-generated-response").inc();
+}
+
+void ConnectionManager::setLocalResponseSent(absl::string_view transaction_id) {
+  if (transactions_.find(transaction_id) != transactions_.end()) {
+    transactions_[transaction_id]->setLocalResponseSent(true);
+  }
 }
 
 void ConnectionManager::doDeferredTransDestroy(ConnectionManager::ActiveTrans& trans) {
@@ -324,7 +330,6 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  stats_.request_active_.inc();
   stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
 
   std::string&& k = std::string(metadata->transactionId().value());
@@ -386,7 +391,7 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
 
   encoder->encode(metadata_, buffer);
 
-  ENVOY_STREAM_LOG(info, "send response {}\n{}", parent_, buffer.length(), buffer.toString());
+  ENVOY_STREAM_LOG(debug, "send response {}\n{}", parent_, buffer.length(), buffer.toString());
   cm.read_callbacks_->connection().write(buffer, false);
 
   cm.stats_.response_.inc();

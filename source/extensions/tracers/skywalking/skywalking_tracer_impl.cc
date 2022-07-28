@@ -28,8 +28,9 @@ using cpp2sky::TracerException;
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
                Server::Configuration::TracerFactoryContext& context)
-    : tracing_stats_{SKYWALKING_TRACER_STATS(
-          POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.skywalking."))},
+    : tracing_stats_(std::make_shared<SkyWalkingTracerStats>(
+          SkyWalkingTracerStats{SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(
+              context.serverFactoryContext().scope(), "tracing.skywalking."))})),
       tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
   loadConfig(proto_config.client_config(), context.serverFactoryContext());
   tracing_context_factory_ = std::make_unique<TracingContextFactory>(config_);
@@ -52,12 +53,14 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
   // TODO(shikugawa): support extension span header.
   auto propagation_header = trace_context.getByKey(skywalkingPropagationHeaderKey());
   if (!propagation_header.has_value()) {
-    tracing_context = tracing_context_factory_->create();
-    // Sampling status is always true on SkyWalking. But with disabling skip_analysis,
-    // this span can't be analyzed.
+    // Although a sampling flag can be added to the propagation header, it will be ignored by most
+    // of SkyWalking agent. The agent will enable tracing anyway if it see the propagation header.
+    // So, if no propagation header is provided and sampling decision of Envoy is false, we need not
+    // propagate this sampling decision to the upstream. A null span will be used directly.
     if (!decision.traced) {
-      tracing_context->setSkipAnalysis();
+      return std::make_unique<Tracing::NullSpan>();
     }
+    tracing_context = tracing_context_factory_->create();
   } else {
     auto header_value_string = propagation_header.value();
     try {

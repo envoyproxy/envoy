@@ -137,8 +137,9 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
   }
 
   // The probing socket will have the same host but a different port.
-  auto probing_socket = createConnectionSocket(
-      connectionSocket()->connectionInfoProvider().remoteAddress(), new_local_address, nullptr);
+  auto probing_socket =
+      createConnectionSocket(connectionSocket()->connectionInfoProvider().remoteAddress(),
+                             new_local_address, connectionSocket()->options());
   setUpConnectionSocket(*probing_socket, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(probing_socket->ioHandle()));

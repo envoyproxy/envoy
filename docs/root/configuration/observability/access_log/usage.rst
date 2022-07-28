@@ -737,6 +737,40 @@ The following command operators are supported:
 
    CLUSTER_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
+.. _config_access_log_format_upstream_host_metadata:
+
+%UPSTREAM_METADATA(NAMESPACE:KEY*):Z%
+  HTTP/TCP
+    :ref:`Upstream host Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
+    lookup key in the namespace with the option of specifying nested keys separated by ':',
+    and Z is an optional parameter denoting string truncation up to Z characters long. The data
+    will be logged as a JSON string. For example, for the following upstream host metadata:
+
+    ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+
+    * %UPSTREAM_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_key)% will log: ``foo``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``bar``
+    * %UPSTREAM_METADATA(com.unknown_filter)% will log: ``-``
+    * %UPSTREAM_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
+    * %UPSTREAM_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
+
+  UDP/THRIFT
+    Not implemented ("-").
+
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored.
+
+  .. note::
+
+   UPSTREAM_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
+
 .. _config_access_log_format_filter_state:
 
 %FILTER_STATE(KEY:F):Z%
@@ -758,6 +792,25 @@ The following command operators are supported:
     when the referenced key is a simple value. If the referenced key is a struct or list value, a
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
+
+%UPSTREAM_FILTER_STATE(KEY:F):Z%
+  HTTP
+    Extracts filter state from upstream components like cluster or transport socket extensions.
+
+    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
+    look up the filter state object. The serialized proto will be logged as JSON string if possible.
+    If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
+    Z is an optional parameter denoting string truncation up to Z characters long.
+    F is an optional parameter used to indicate which method FilterState uses for serialization.
+    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
+    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+
+  TCP/UDP
+    Not implemented.
+
+  .. note::
+
+    This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`
 
 %REQUESTED_SERVER_NAME%
   HTTP/TCP/THRIFT
@@ -924,7 +977,7 @@ The following command operators are supported:
   The body text for the requests rejected by the Envoy.
 
 %FILTER_CHAIN_NAME%
-  The network filter chain name of the downstream connection.
+  The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

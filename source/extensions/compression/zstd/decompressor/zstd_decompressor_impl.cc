@@ -1,10 +1,22 @@
 #include "source/extensions/compression/zstd/decompressor/zstd_decompressor_impl.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Compression {
 namespace Zstd {
 namespace Decompressor {
+
+namespace {
+
+// How many times the output buffer is allowed to be bigger than the size of
+// accumulated input. This value is used to detect compression bombs.
+// TODO(rojkov): Re-design the Decompressor interface to handle compression
+// bombs gracefully instead of this quick solution.
+constexpr uint64_t MaxInflateRatio = 100;
+
+} // namespace
 
 ZstdDecompressorImpl::ZstdDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
                                            const ZstdDDictManagerPtr& ddict_manager,
@@ -14,6 +26,8 @@ ZstdDecompressorImpl::ZstdDecompressorImpl(Stats::Scope& scope, const std::strin
 
 void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
+  uint64_t limit = MaxInflateRatio * input_buffer.length();
+
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     if (input_slice.len_ > 0) {
       if (ddict_manager_ && !is_dictionary_set_) {
@@ -36,6 +50,16 @@ void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
 
       setInput(input_slice);
       if (!process(output_buffer)) {
+        return;
+      }
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_compression_bomb_protection") &&
+          (output_buffer.length() > limit)) {
+        stats_.zstd_generic_error_.inc();
+        ENVOY_LOG(trace,
+                  "excessive decompression ratio detected: output "
+                  "size {} for input size {}",
+                  output_buffer.length(), input_buffer.length());
         return;
       }
     }

@@ -167,7 +167,8 @@ parseRouteConfigurationFromYaml(const std::string& yaml) {
 
 class ConfigImplTestBase {
 protected:
-  ConfigImplTestBase() : api_(Api::createApiForTest()) {
+  ConfigImplTestBase()
+      : api_(Api::createApiForTest()), engine_(std::make_unique<Regex::GoogleReEngine>()) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
@@ -332,6 +333,7 @@ most_specific_header_mutations_wins: {0}
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Event::SimulatedTimeSystem test_time_;
+  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
@@ -345,7 +347,6 @@ virtual_hosts:
   routes:
   - match:
       safe_regex:
-        google_re2: {}
         regex: "foobar"
     route:
       cluster: connect_break
@@ -357,7 +358,6 @@ virtual_hosts:
       prefix_rewrite: "/rewrote"
   - match:
       safe_regex:
-        google_re2: {}
         regex: ".*"
     route:
       cluster: connect_fallthrough
@@ -396,7 +396,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/users/\\d+/location$"
     - name: ":method"
       string_match:
@@ -489,7 +488,6 @@ virtual_hosts:
     route:
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "^/new(.*?)_endpoint(.*)$"
         substitution: /\1_rewritten_endpoint\2
       cluster: www2
@@ -498,7 +496,6 @@ virtual_hosts:
     route:
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "e"
         substitution: "X"
       cluster: www2
@@ -509,7 +506,6 @@ virtual_hosts:
       cluster: www2
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "[aeioe]"
         substitution: "V"
   - match:
@@ -552,37 +548,31 @@ virtual_hosts:
   routes:
   - match:
       safe_regex:
-        google_re2: {}
         regex: "/t[io]c"
     route:
       cluster: clock
   - match:
       safe_regex:
-        google_re2: {}
         regex: "/baa+"
     route:
       cluster: sheep
   - match:
       safe_regex:
-        google_re2: {}
         regex: ".*/\\d{3}$"
     route:
       cluster: three_numbers
       prefix_rewrite: "/rewrote"
   - match:
       safe_regex:
-        google_re2: {}
         regex: ".*/\\d{4}$"
     route:
       cluster: four_numbers
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "(^.*)/(\\d{4})$"
         substitution: /four/\2/endpoint\1
   - match:
       safe_regex:
-        google_re2: {}
         regex: ".*"
     route:
       cluster: regex_default
@@ -592,7 +582,6 @@ virtual_hosts:
   routes:
   - match:
       safe_regex:
-        google_re2: {}
         regex: ".*"
     route:
       cluster: regex_default
@@ -676,7 +665,6 @@ virtual_hosts:
       cluster: ats
       host_rewrite_path_regex:
         pattern:
-          google_re2: {}
           regex: "^/.+/(.+)$"
         substitution: \1
       append_x_forwarded_host: true
@@ -690,7 +678,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/rides$"
     - name: ":method"
       string_match:
@@ -700,7 +687,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/rides/\\d+$"
     - name: ":method"
       string_match:
@@ -710,7 +696,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/users/\\d+/chargeaccounts$"
     - name: ":method"
       string_match:
@@ -720,7 +705,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/users$"
     - name: ":method"
       string_match:
@@ -730,7 +714,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/users/\\d+$"
     - name: ":method"
       string_match:
@@ -740,7 +723,6 @@ virtual_hosts:
     - name: ":path"
       string_match:
         safe_regex:
-          google_re2: {}
           regex: "^/users/\\d+/location$"
     - name: ":method"
       string_match:
@@ -1187,7 +1169,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/(+invalid)"
         route: { cluster: "regex" }
   )EOF";
@@ -1205,7 +1186,6 @@ virtual_hosts:
         name: "invalid"
         string_match:
           safe_regex:
-            google_re2: {}
             regex: "^/(+invalid)"
   )EOF";
 
@@ -2038,6 +2018,122 @@ virtual_hosts:
   }
 }
 
+// Tests that when 'ignore_path_parameters_in_path_matching' is true, port from host header
+// is ignored in host matching.
+TEST_F(RouteMatcherTest, IgnorePathParametersInPathMatching) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match:
+      path: "/path-bluh"
+    name: "business-specific-route"
+    route:
+      cluster: local_service_grpc
+  - match:
+      prefix: ""
+    name: "catchall-route"
+    route:
+      cluster: default-boring-service
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"local_service_grpc", "default-boring-service"}, {});
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true);
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET"), 0)
+                  ->routeEntry()
+                  ->routeName(),
+              "catchall-route");
+  }
+  // Set ignore_port_in_host_matching to true, and path-parameters will be ignored.
+  route_configuration.set_ignore_path_parameters_in_path_matching(true);
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true);
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET"), 0)
+                  ->routeEntry()
+                  ->routeName(),
+              "business-specific-route");
+    EXPECT_EQ(
+        config
+            .route(genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d#foo=bar", "GET"),
+                   0)
+            ->routeEntry()
+            ->routeName(),
+        "business-specific-route");
+    EXPECT_EQ(
+        config
+            .route(genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d;&foo=bar", "GET"),
+                   0)
+            ->routeEntry()
+            ->routeName(),
+        "business-specific-route");
+  }
+}
+
+// Tests that when 'ignore_port_in_host_matching' is true, port from host header
+// is ignored in host matching.
+TEST_F(RouteMatcherTest, IgnorePortInHostMatching) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["www.foo.com", "12.34.56.78", "[12:34:56:7890::]"]
+  routes:
+  - match:
+      prefix: ""
+    name: "business-specific-route"
+    route:
+      cluster: local_service_grpc
+- name: catchall_host
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: ""
+    name: "default-route"
+    route:
+      cluster: default_catch_all_service
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"local_service_grpc", "default_catch_all_service"}, {});
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true);
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->routeName(),
+              "default-route");
+    EXPECT_EQ(
+        config.route(genHeaders("12.34.56.78:1234", "/foo", "GET"), 0)->routeEntry()->routeName(),
+        "default-route");
+    EXPECT_EQ(
+        config.route(genHeaders("www.foo.com:8090", "/foo", "GET"), 0)->routeEntry()->routeName(),
+        "default-route");
+    EXPECT_EQ(config.route(genHeaders("[12:34:56:7890::]:8090", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->routeName(),
+              "default-route");
+  }
+  // Set ignore_port_in_host_matching to true, and port will be ignored.
+  route_configuration.set_ignore_port_in_host_matching(true);
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true);
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->routeName(),
+              "default-route");
+    EXPECT_EQ(
+        config.route(genHeaders("12.34.56.78:1234", "/foo", "GET"), 0)->routeEntry()->routeName(),
+        "business-specific-route");
+    EXPECT_EQ(
+        config.route(genHeaders("www.foo.com:8090", "/foo", "GET"), 0)->routeEntry()->routeName(),
+        "business-specific-route");
+    EXPECT_EQ(config.route(genHeaders("[12:34:56:7890::]:8090", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->routeName(),
+              "business-specific-route");
+  }
+}
+
 TEST_F(RouteMatcherTest, Priority) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -2161,7 +2257,6 @@ virtual_hosts:
       - name: test_header_pattern
         string_match:
           safe_regex:
-            google_re2: {}
             regex: "^user=test-\\d+$"
     route:
       cluster: local_service_with_header_pattern_set_regex
@@ -2285,7 +2380,6 @@ virtual_hosts:
             - name: test_header
               string_match:
                 safe_regex:
-                  google_re2: {}
                   regex: "(+invalid regex)"
         route: { cluster: "local_service" }
   )EOF";
@@ -2312,7 +2406,6 @@ virtual_hosts:
       - name: id
         string_match:
           safe_regex:
-            google_re2: {}
             regex: "\\d+[02468]"
       - name: debug
     route:
@@ -3763,6 +3856,27 @@ virtual_hosts:
             config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
 }
 
+TEST_F(RouteMatcherTest, ClusterNotFoundResponseCodeConfig500) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: "not_found"
+          cluster_not_found_response_code: INTERNAL_SERVER_ERROR
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+
+  EXPECT_EQ("not_found", config.route(headers, 0)->routeEntry()->clusterName());
+  EXPECT_EQ(Http::Code::InternalServerError,
+            config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
+}
+
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCodeConfig404) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -4978,7 +5092,6 @@ virtual_hosts:
       prefix_rewrite: /
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: foo
         substitution: bar
       cluster: www2
@@ -5989,28 +6102,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, WeightedClustersSumOFWeightsNotEqualToMax) {
-  std::string yaml = R"EOF(
-virtual_hosts:
-  - name: www2
-    domains: ["www.lyft.com"]
-    routes:
-      - match: { prefix: "/" }
-        route:
-          weighted_clusters:
-            clusters:
-              - name: cluster1
-                weight: 3
-              - name: cluster2
-                weight: 3
-              - name: cluster3
-                weight: 3
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Sum of weights in the weighted_cluster should add up to 100");
-
-  yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
@@ -6339,7 +6431,6 @@ virtual_hosts:
   - match:
       prefix: "/"
       safe_regex:
-        google_re2: {}
         regex: "/[bc]at"
     route:
       cluster: www2
@@ -6389,7 +6480,6 @@ virtual_hosts:
   - match:
       path: "/foo"
       safe_regex:
-        google_re2: {}
         regex: "/[bc]at"
     route:
       cluster: www2
@@ -6424,7 +6514,6 @@ virtual_hosts:
       prefix: "/"
       path: "/foo"
       safe_regex:
-        google_re2: {}
         regex: "/[bc]at"
     route:
       cluster: www2
@@ -6535,7 +6624,6 @@ virtual_hosts:
     cors:
       allow_origin_string_match:
       - safe_regex:
-          google_re2: {}
           regex: .*\.envoyproxy\.io
       allow_methods: "test-methods"
       allow_headers: "test-headers"
@@ -6680,6 +6768,89 @@ virtual_hosts:
     Router::RouteConstSharedPtr route = config.route(headers, 0);
     EXPECT_EQ(nullptr, route->decorator());
   }
+}
+
+TEST_F(RouteMatcherTest, ConfigEarlyData) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+      early_data_policy:
+        name: envoy.route.early_data_policy.default
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.early_data.v3.DefaultEarlyDataPolicy
+ )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // Default allows safe requests using early data.
+  Http::TestRequestHeaderMapImpl foo_request1 = genHeaders("www.lyft.com", "/foo", "GET");
+  EXPECT_TRUE(config.route(foo_request1, 0)
+                  ->routeEntry()
+                  ->earlyDataPolicy()
+                  .allowsEarlyDataForRequest(foo_request1));
+  Http::TestRequestHeaderMapImpl foo_request2 = genHeaders("www.lyft.com", "/foo", "POST");
+  EXPECT_FALSE(config.route(foo_request2, 0)
+                   ->routeEntry()
+                   ->earlyDataPolicy()
+                   .allowsEarlyDataForRequest(foo_request2));
+
+  // Disable early data.
+  Http::TestRequestHeaderMapImpl bar_request1 = genHeaders("www.lyft.com", "/bar", "GET");
+  EXPECT_FALSE(config.route(bar_request1, 0)
+                   ->routeEntry()
+                   ->earlyDataPolicy()
+                   .allowsEarlyDataForRequest(bar_request1));
+  Http::TestRequestHeaderMapImpl bar_request2 = genHeaders("www.lyft.com", "/bar", "POST");
+  EXPECT_FALSE(config.route(bar_request2, 0)
+                   ->routeEntry()
+                   ->earlyDataPolicy()
+                   .allowsEarlyDataForRequest(bar_request2));
+}
+
+TEST_F(RouteMatcherTest, ConfigRouteStats) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+    stat_prefix: "foo_prefix"
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+      early_data_policy:
+        name: envoy.route.early_data_policy.default
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.early_data.v3.DefaultEarlyDataPolicy
+ )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // Validate that route has stats config if stat_prefix is configured.
+  Http::TestRequestHeaderMapImpl foo_request1 = genHeaders("www.lyft.com", "/foo", "GET");
+  EXPECT_EQ(true, config.route(foo_request1, 0)->routeEntry()->routeStatsContext().has_value());
+
+  // Validate that route does not have stats config if stat_prefix is configured.
+  Http::TestRequestHeaderMapImpl bar_request1 = genHeaders("www.lyft.com", "/bar", "GET");
+  EXPECT_EQ(false, config.route(bar_request1, 0)->routeEntry()->routeStatsContext().has_value());
 }
 
 class CustomRequestHeadersTest : public testing::Test, public ConfigImplTestBase {};
@@ -7191,7 +7362,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/rege[xy]"
         route: { cluster: ww2 }
       - match: { path: "/exact-path" }
@@ -7238,7 +7408,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/first"
         tracing:
           client_sampling:
@@ -7246,7 +7415,6 @@ virtual_hosts:
         route: { cluster: ww2 }
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/second"
         tracing:
           overall_sampling:
@@ -7327,7 +7495,6 @@ virtual_hosts:
         redirect: { host_redirect: new.lyft.com, prefix_rewrite: "/new/prefix"}
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/[r][e][g][e][x].*"
         redirect: { prefix_rewrite: "/new/regex-prefix/" }
       - match: { prefix: "/http/prefix"}
@@ -7450,23 +7617,19 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: /foo/([0-9]{4})/(.*)
         redirect:
           regex_rewrite:
             pattern:
-              google_re2: {}
               regex: /foo/([0-9]{4})/(.*)
             substitution: /\2/\1/baz
       - match:
           safe_regex:
-            google_re2: {}
             regex: /strip-query/([0-9]{4})/(.*)
         redirect:
           strip_query: true
           regex_rewrite:
             pattern:
-              google_re2: {}
               regex: /strip-query/([0-9]{4})/(.*)
             substitution: /\2/\1/baz
   )EOF";
@@ -7642,7 +7805,6 @@ virtual_hosts:
             - name: test_header_pattern
               string_match:
                 safe_regex:
-                  google_re2: {}
                   regex: "^user=test-\\d+$"
         route:
           cluster: local_service_with_header_pattern_set_regex
@@ -8344,7 +8506,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route: { cluster: some-cluster }
   )EOF";
@@ -8376,7 +8537,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8398,7 +8558,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8421,7 +8580,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8444,7 +8602,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8469,7 +8626,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8507,7 +8663,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8535,7 +8690,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8558,7 +8712,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8581,7 +8734,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8609,7 +8761,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8649,7 +8800,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8672,7 +8822,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8702,7 +8851,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster
@@ -8738,7 +8886,6 @@ virtual_hosts:
     routes:
       - match:
           safe_regex:
-            google_re2: {}
             regex: "/regex"
         route:
           cluster: some-cluster

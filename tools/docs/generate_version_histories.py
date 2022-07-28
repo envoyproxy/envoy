@@ -43,7 +43,7 @@ Stable versions
   :maxdepth: 2
   :caption: Changelog
 {% for version in stable_versions %}
-  v{{ version.base_version }}: {{ changelogs[minor_versions[version][0]].version }} ({{ changelogs[minor_versions[version][0]].release_date }}) <v{{ version.base_version }}/v{{ version.base_version }}>
+  v{{ version.base_version }}: {{ version.release_version }} ({{ version.release_date }}) <v{{ version.base_version }}/v{{ version.base_version }}>
 {%- endfor %}
 
 Archived versions
@@ -55,7 +55,7 @@ Archived versions
   :titlesonly:
   :maxdepth: 1
 {% for version in archived_versions %}
-  v{{ version.base_version }}: {{ changelogs[minor_versions[version][0]].version }} ({{ changelogs[minor_versions[version][0]].release_date }}) <v{{ version.base_version }}/v{{ version.base_version }}>
+  v{{ version.base_version }}: {{ version.release_version }} ({{ version.release_date }}) <v{{ version.base_version }}/v{{ version.base_version }}>
 {%- endfor %}
 
 .. _deprecated:
@@ -81,7 +81,7 @@ Latest release:
   `{{ current_release }} <https://github.com/envoyproxy/envoy/releases/tag/v{{ current_release }}>`_ ({{ release_date }})
 {% if current_release != original_release.version %}
 Initial release date:
-  {{ original_release.release_date }}
+  {{ original_release_date }}
 {% endif %}
 
 .. toctree::
@@ -97,18 +97,18 @@ Initial release date:
 VERSION_HISTORY_TPL = """
 .. _version_history_{{ changelog.base_version }}:
 
-{{ changelog.base_version }} ({{ changelog.release_date }})
-{{ "=" * (changelog.base_version|length + changelog.release_date|length + 4) }}
+{{ changelog.base_version }} ({{ release_date }})
+{{ "=" * (changelog.base_version|length + release_date|length + 4) }}
 
 {% for name, section in sections.items() %}
-{% if changelog.data[name] %}
+{% if data[name] %}
 {{ section.title }}
 {{ "-" * section.title|length }}
 {% if section.description %}
 {{ section.description | versionize(mapped_version) }}
 {% endif %}
 
-{% for item in changelog.entries(name) -%}
+{% for item in entries[name] -%}
 * **{{ item.area }}**: {{ item.change | versionize(mapped_version) | indent(width=2, first=false) }}
 {%- endfor %}
 {% endif %}
@@ -179,57 +179,85 @@ class VersionHistories(runner.Runner):
 
     @runner.cleansup
     async def run(self) -> None:
-        self.write_version_history_index()
-        self.write_version_histories()
-        self.write_version_history_minor_indeces()
+        await self.write_version_history_index()
+        await self.write_version_histories()
+        await self.write_version_history_minor_indeces()
         self.write_tarball()
 
     def write_tarball(self) -> None:
-        with tarfile.open(self.args.output_file, "w") as tarball:
+        with tarfile.open(self.args.output_file, "w:gz") as tarball:
             tarball.add(self.tpath, arcname="./")
 
-    def write_version_histories(self) -> None:
+    async def write_version_histories(self) -> None:
         for changelog_version in self.project.changelogs:
-            self.write_version_history(changelog_version)
+            await self.write_version_history(changelog_version)
 
-    def write_version_history(self, changelog_version: version.Version) -> None:
+    async def write_version_history(self, changelog_version: version.Version) -> None:
         minor_version = utils.minor_version_for(changelog_version)
         root_path = self.tpath.joinpath(f"v{minor_version.base_version}")
         root_path.mkdir(parents=True, exist_ok=True)
         map_version = (
             minor_version < self.project.minor_version
             and (minor_version in self.project.inventories.versions))
+        changelog = self.project.changelogs[changelog_version]
+        data = await changelog.data
         version_history = self.version_history_tpl.render(
             mapped_version=(minor_version if map_version else None),
             sections=self.sections,
-            changelog=self.project.changelogs[changelog_version])
+            data=data,
+            entries={
+                s: sorted(await changelog.entries(s), key=self._sort_entries)
+                for s in self.sections
+                if s in data
+            },
+            release_date=await changelog.release_date,
+            changelog=changelog)
         version_path = root_path.joinpath(f"v{changelog_version}.rst")
         version_path.write_text(f"{version_history.strip()}\n\n")
 
-    def write_version_history_index(self) -> None:
+    async def write_version_history_index(self) -> None:
         stable_message = (
             "Versions that are currently supported." if self.project.is_main_dev else
             "Versions that were supported when this branch was initially released.")
         archived_message = (
             "Versions that are no longer supported." if self.project.is_main_dev else
             "Versions that were no longer supported when this branch was initially released.")
+
+        class _Version:
+
+            def __init__(self, version):
+                self.version = version
+                self.base_version = version.base_version
+
+        stable_versions = [_Version(v) for v in self.project.stable_versions]
+        for v in stable_versions:
+            release_version = self.project.changelogs[self.project.minor_versions[v.version][0]]
+            v.release_version = release_version.version
+            v.release_date = await release_version.release_date
+
+        archived_versions = [_Version(v) for v in self.project.archived_versions]
+        for v in archived_versions:
+            release_version = self.project.changelogs[self.project.minor_versions[v.version][0]]
+            v.release_version = release_version.version
+            v.release_date = await release_version.release_date
+
         version_history_rst = self.version_history_index_tpl.render(
             archived_message=archived_message,
             stable_message=stable_message,
             dev_version=self.project.dev_version,
             changelogs=self.project.changelogs,
             minor_versions=self.project.minor_versions,
-            stable_versions=self.project.stable_versions,
-            archived_versions=self.project.archived_versions)
+            stable_versions=stable_versions,
+            archived_versions=archived_versions)
         self.tpath.joinpath("version_history.rst").write_text(f"{version_history_rst.strip()}\n\n")
 
-    def write_version_history_minor_indeces(self) -> None:
+    async def write_version_history_minor_indeces(self) -> None:
         for i, (minor_version, patches) in enumerate(self.project.minor_versions.items()):
             if self.project.is_main_dev and i == 0:
                 continue
-            self.write_version_history_minor_index(minor_version, patches)
+            await self.write_version_history_minor_index(minor_version, patches)
 
-    def write_version_history_minor_index(
+    async def write_version_history_minor_index(
             self, minor_version: version.Version, patch_versions) -> None:
         skip_first = (self.project.is_dev and self.project.is_current(patch_versions[0]))
         if skip_first:
@@ -240,10 +268,15 @@ class VersionHistories(runner.Runner):
             minor_version=f"v{minor_version.base_version}",
             current_release=current_release.base_version,
             original_release=original_release,
-            release_date=self.project.changelogs[current_release].release_date,
+            original_release_date=await original_release.release_date,
+            release_date=await self.project.changelogs[current_release].release_date,
             patch_versions=patch_versions)
         self.minor_index_path(minor_version).write_text(
             f"{version_history_minor_index.strip()}\n\n")
+
+    def _sort_entries(self, entry):
+        # TODO(phlax): fix sorting in `envoy.base.utils` and remove
+        return entry.area, entry.change
 
 
 def main(*args):

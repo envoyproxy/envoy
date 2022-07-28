@@ -6,6 +6,7 @@
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
@@ -21,24 +22,37 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 namespace {
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    authorization_handle(Http::CustomHeaders::get().Authorization);
-
-constexpr const char* GetAccessTokenBodyFormatString =
+constexpr const char* UrlBodyTemplateWithCredentials =
     "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}";
+
+constexpr const char* UrlBodyTemplateWithoutCredentials =
+    "grant_type=authorization_code&code={0}&redirect_uri={1}";
 
 } // namespace
 
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                                            const std::string& client_id, const std::string& secret,
-                                           const std::string& cb_url) {
-  const auto encoded_client_id = Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
-  const auto encoded_secret = Http::Utility::PercentEncoding::encode(secret, ":/=&?");
+                                           const std::string& cb_url, AuthType auth_type) {
   const auto encoded_cb_url = Http::Utility::PercentEncoding::encode(cb_url, ":/=&?");
-
   Http::RequestMessagePtr request = createPostRequest();
-  const std::string body = fmt::format(GetAccessTokenBodyFormatString, auth_code, encoded_client_id,
-                                       encoded_secret, encoded_cb_url);
+  std::string body;
+
+  switch (auth_type) {
+  case AuthType::UrlEncodedBody:
+    body = fmt::format(UrlBodyTemplateWithCredentials, auth_code,
+                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"),
+                       Http::Utility::PercentEncoding::encode(secret, ":/=&?"), encoded_cb_url);
+    break;
+  case AuthType::BasicAuth:
+    const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
+    const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
+    const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
+    request->headers().appendCopy(Http::CustomHeaders::get().Authorization,
+                                  basic_auth_header_value);
+    body = fmt::format(UrlBodyTemplateWithoutCredentials, auth_code, encoded_cb_url);
+    break;
+  }
+
   request->body().add(body);
   request->headers().setContentLength(body.length());
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");

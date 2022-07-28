@@ -6,4 +6,5 @@ message HeaderToFilterStateFilterConfig {
   string header_name = 1;
   string state_name = 2;
   bool read_only = 3;
+  bool shared = 4;
 }

@@ -40,14 +40,17 @@ public:
   }
 
   // FilterState
-  void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-               FilterState::StateType state_type,
-               FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain) override;
+  void
+  setData(absl::string_view data_name, std::shared_ptr<Object> data,
+          FilterState::StateType state_type,
+          FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
+          FilterState::StreamSharing stream_sharing = FilterState::StreamSharing::None) override;
   bool hasDataWithName(absl::string_view) const override;
   const Object* getDataReadOnlyGeneric(absl::string_view data_name) const override;
   Object* getDataMutableGeneric(absl::string_view data_name) override;
   std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) override;
   bool hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const override;
+  FilterState::ObjectsPtr objectsSharedWithUpstreamConnection() const override;
 
   FilterState::LifeSpan lifeSpan() const override { return life_span_; }
   FilterStateSharedPtr parent() const override { return parent_; }
@@ -57,11 +60,6 @@ private:
   bool hasDataWithNameInternally(absl::string_view data_name) const;
   enum class ParentAccessMode { ReadOnly, ReadWrite };
   void maybeCreateParent(ParentAccessMode parent_access_mode);
-
-  struct FilterObject {
-    std::shared_ptr<Object> data_;
-    FilterState::StateType state_type_;
-  };
 
   absl::variant<FilterStateSharedPtr, LazyCreateAncestor> ancestor_;
   FilterStateSharedPtr parent_;

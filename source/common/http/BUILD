@@ -123,6 +123,35 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dependency_manager",
+    srcs = ["dependency_manager.cc"],
+    hdrs = ["dependency_manager.h"],
+    external_deps = [
+        "abseil_status",
+    ],
+    deps = [
+        "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_chain_helper_lib",
+    srcs = ["filter_chain_helper.cc"],
+    hdrs = ["filter_chain_helper.h"],
+    deps = [
+        ":dependency_manager",
+        "//envoy/config:config_provider_manager_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/router:route_config_provider_manager_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/filter:config_discovery_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_base_lib",
     srcs = ["conn_pool_base.cc"],
     hdrs = ["conn_pool_base.h"],
@@ -210,6 +239,7 @@ envoy_cc_library(
         ":date_provider_lib",
         "//envoy/config:config_provider_interface",
         "//envoy/http:filter_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/http:original_ip_detection_interface",
         "//envoy/http:request_id_extension_interface",
         "//envoy/router:rds_interface",
@@ -242,9 +272,7 @@ envoy_cc_library(
         "//source/common/http/matching:inputs_lib",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
-        "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -281,6 +309,7 @@ envoy_cc_library(
         "//envoy/http:context_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:drain_decision_interface",
@@ -307,7 +336,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/match_wrapper:config",
+        "//source/common/http/match_delegate:config",
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
@@ -353,6 +382,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/common:hashable_interface",
         "//envoy/http:hash_policy_interface",
+        "//source/common/common:matchers_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )

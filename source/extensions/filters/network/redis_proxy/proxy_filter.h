@@ -57,7 +57,7 @@ public:
   const std::string redis_drain_close_runtime_key_{"redis.drain_close_enabled"};
   ProxyStats stats_;
   const std::string downstream_auth_username_;
-  const std::string downstream_auth_password_;
+  std::vector<std::string> downstream_auth_passwords_;
 
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -117,6 +117,7 @@ private:
   void onAuth(PendingRequest& request, const std::string& password);
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
+  bool checkPassword(const std::string& password);
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;

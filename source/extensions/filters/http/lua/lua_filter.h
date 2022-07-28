@@ -15,8 +15,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-constexpr char GLOBAL_SCRIPT_NAME[] = "GLOBAL";
-
 class PerLuaCodeSetup : Logger::Loggable<Logger::Id::lua> {
 public:
   PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls);
@@ -166,7 +164,8 @@ public:
             {"importPublicKey", static_luaImportPublicKey},
             {"verifySignature", static_luaVerifySignature},
             {"base64Escape", static_luaBase64Escape},
-            {"timestamp", static_luaTimestamp}};
+            {"timestamp", static_luaTimestamp},
+            {"timestampString", static_luaTimestampString}};
   }
 
 private:
@@ -284,10 +283,18 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestamp);
 
+  /**
+   * TimestampString.
+   * @param1 (string) optional format (e.g. milliseconds_from_epoch, microseconds_from_epoch).
+   * Defaults to milliseconds_from_epoch.
+   * @return (string) timestamp.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestampString);
+
+  enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
+
   int doSynchronousHttpCall(lua_State* state, Tracing::Span& span);
   int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span);
-
-  int timestamp(int timestamp, absl::uint128 resolution);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
@@ -352,8 +359,12 @@ public:
                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
                Api::Api& api);
 
-  PerLuaCodeSetup* perLuaCodeSetup(const std::string& name) const {
-    const auto iter = per_lua_code_setups_map_.find(name);
+  PerLuaCodeSetup* perLuaCodeSetup(absl::optional<absl::string_view> name = absl::nullopt) const {
+    if (!name.has_value()) {
+      return default_lua_code_setup_.get();
+    }
+
+    const auto iter = per_lua_code_setups_map_.find(name.value());
     if (iter != per_lua_code_setups_map_.end()) {
       return iter->second.get();
     }
@@ -363,6 +374,7 @@ public:
   Upstream::ClusterManager& cluster_manager_;
 
 private:
+  PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
 };
 
@@ -408,8 +420,8 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
                                     Http::StreamFilterCallbacks* callbacks) {
   const FilterConfigPerRoute* config_per_route = nullptr;
   if (callbacks && callbacks->route()) {
-    config_per_route = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-        "envoy.filters.http.lua", callbacks->route());
+    config_per_route =
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks);
   }
 
   if (config_per_route != nullptr) {
@@ -423,7 +435,7 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
     return config_per_route->perLuaCodeSetup();
   }
   ASSERT(filter_config);
-  return filter_config->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
+  return filter_config->perLuaCodeSetup();
 }
 
 } // namespace

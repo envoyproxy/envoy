@@ -19,10 +19,20 @@ EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP = {
 
 # This maps from the Bazel proto_library target to the Go language binding target for external dependencies.
 EXTERNAL_PROTO_GO_BAZEL_DEP_MAP = {
-    "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto": "@com_google_googleapis//google/api/expr/v1alpha1:expr_go_proto",
-    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:expr_go_proto",
+    # Note @com_google_googleapis are point to @go_googleapis.
+    #
+    # It is aligned to xDS dependency to suppress the conflicting package heights error between
+    # @com_github_cncf_udpa//xds/type/matcher/v3:pkg_go_proto
+    # @envoy_api//envoy/config/rbac/v3:pkg_go_proto
+    #
+    # TODO(https://github.com/bazelbuild/rules_go/issues/1986): update to
+    #    @com_google_googleapis when the bug is resolved. Also see the note to
+    #    go_googleapis in https://github.com/bazelbuild/rules_go/blob/master/go/dependencies.rst#overriding-dependencies
+    "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto": "@go_googleapis//google/api/expr/v1alpha1:expr_go_proto",
+    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@go_googleapis//google/api/expr/v1alpha1:expr_go_proto",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_go",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_and_config_proto_go",
+    "@opentelemetry_proto//:trace": "@opentelemetry_proto//:trace_go_proto",
     "@opentelemetry_proto//:logs": "@opentelemetry_proto//:logs_go_proto",
     "@opentelemetry_proto//:common": "@opentelemetry_proto//:common_go_proto",
 }
@@ -33,6 +43,7 @@ EXTERNAL_PROTO_CC_BAZEL_DEP_MAP = {
     "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_cc_proto",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_cc",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto_cc",
+    "@opentelemetry_proto//:trace": "@opentelemetry_proto//:trace_cc_proto",
     "@opentelemetry_proto//:logs": "@opentelemetry_proto//:logs_cc_proto",
     "@opentelemetry_proto//:common": "@opentelemetry_proto//:common_cc_proto",
 }
@@ -43,6 +54,7 @@ EXTERNAL_PROTO_PY_BAZEL_DEP_MAP = {
     "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_py_proto",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_py",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto_py",
+    "@opentelemetry_proto//:trace": "@opentelemetry_proto//:trace_py_proto",
     "@opentelemetry_proto//:logs": "@opentelemetry_proto//:logs_py_proto",
     "@opentelemetry_proto//:common": "@opentelemetry_proto//:common_py_proto",
 }

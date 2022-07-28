@@ -117,7 +117,9 @@ public:
 
 class ConnectionManagerTest : public testing::Test {
 public:
-  ConnectionManagerTest() : stats_(DubboFilterStats::generateStats("test.", store_)) {
+  ConnectionManagerTest()
+      : stats_(DubboFilterStats::generateStats("test.", store_)),
+        engine_(std::make_unique<Regex::GoogleReEngine>()) {
 
     route_config_provider_manager_ =
         std::make_unique<Router::RouteConfigProviderManagerImpl>(factory_context_.admin_);
@@ -329,6 +331,7 @@ public:
   std::unique_ptr<ConnectionManager> conn_manager_;
   MockSerializer* custom_serializer_{};
   MockProtocol* custom_protocol_{};
+  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 TEST_F(ConnectionManagerTest, OnDataHandlesRequestTwoWay) {
@@ -868,7 +871,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
       .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         callbacks->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
         callbacks->sendLocalReply(direct_response, false);
-        return FilterStatus::StopIteration;
+        return FilterStatus::AbortIteration;
       }));
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
@@ -915,7 +918,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_CALL(*first_filter, onMessageDecoded(_, _))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         callbacks->sendLocalReply(direct_response, false);
-        return FilterStatus::StopIteration;
+        return FilterStatus::AbortIteration;
       }));
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
@@ -1156,7 +1159,6 @@ multiple_route_config:
             method:
               name:
                 safe_regex:
-                  google_re2: {}
                   regex: "(.*?)"
           route:
               cluster: user_service_dubbo_server
@@ -1272,7 +1274,7 @@ TEST_F(ConnectionManagerTest, SendLocalReplyInMessageDecoded) {
         EXPECT_EQ(1, conn_manager_->getActiveMessagesForTest().size());
         EXPECT_NE(nullptr, conn_manager_->getActiveMessagesForTest().front()->metadata());
         callbacks->sendLocalReply(direct_response, false);
-        return FilterStatus::StopIteration;
+        return FilterStatus::AbortIteration;
       }));
 
   // The sendLocalReply is called, the ActiveMessage object should be destroyed.

@@ -38,32 +38,32 @@ message CacheConfig {
     // ever depend on host.
     bool exclude_host = 2;
 
-    // If *query_parameters_included* is nonempty, only query parameters matched
+    // If ``query_parameters_included`` is nonempty, only query parameters matched
     // by one or more of its matchers are included in the cache key. Any other
     // query params will not affect cache lookup.
     repeated config.route.v3.QueryParameterMatcher query_parameters_included = 3;
 
-    // If *query_parameters_excluded* is nonempty, query parameters matched by one
+    // If ``query_parameters_excluded`` is nonempty, query parameters matched by one
     // or more of its matchers are excluded from the cache key (even if also
-    // matched by *query_parameters_included*), and will not affect cache lookup.
+    // matched by ``query_parameters_included``), and will not affect cache lookup.
     repeated config.route.v3.QueryParameterMatcher query_parameters_excluded = 4;
   }
 
   // Config specific to the cache storage implementation.
-  // [#extension-category: envoy.filters.http.cache]
+  // [#extension-category: envoy.http.cache]
   google.protobuf.Any typed_config = 1 [(validate.rules).any = {required: true}];
 
-  // List of matching rules that defines allowed *Vary* headers.
+  // List of matching rules that defines allowed ``Vary`` headers.
   //
-  // The *vary* response header holds a list of header names that affect the
+  // The ``vary`` response header holds a list of header names that affect the
   // contents of a response, as described by
   // https://httpwg.org/specs/rfc7234.html#caching.negotiated.responses.
   //
-  // During insertion, *allowed_vary_headers* acts as a allowlist: if a
-  // response's *vary* header mentions any header names that aren't matched by any rules in
-  // *allowed_vary_headers*, that response will not be cached.
+  // During insertion, ``allowed_vary_headers`` acts as a allowlist: if a
+  // response's ``vary`` header mentions any header names that aren't matched by any rules in
+  // ``allowed_vary_headers``, that response will not be cached.
   //
-  // During lookup, *allowed_vary_headers* controls what request headers will be
+  // During lookup, ``allowed_vary_headers`` controls what request headers will be
   // sent to the cache storage implementation.
   repeated type.matcher.v3.StringMatcher allowed_vary_headers = 2;
 

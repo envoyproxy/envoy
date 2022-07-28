@@ -14,6 +14,7 @@ envoy_cc_library(
         "wasm_runtime_factory.h",
     ],
     deps = [
+        "//envoy/config:typed_config_interface",
         "@proxy_wasm_cpp_host//:wasm_vm_headers",
     ],
 )

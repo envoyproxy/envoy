@@ -41,21 +41,24 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     for (const auto& entry : descriptor.entries()) {
       new_descriptor.entries_.push_back({entry.key(), entry.value()});
     }
-    RateLimit::TokenBucket token_bucket;
-    token_bucket.fill_interval_ =
+    RateLimit::TokenBucket per_descriptor_token_bucket;
+    per_descriptor_token_bucket.fill_interval_ =
         absl::Milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(descriptor.token_bucket(), fill_interval, 0));
-    if (token_bucket.fill_interval_ % token_bucket_.fill_interval_ != absl::ZeroDuration()) {
+    if (per_descriptor_token_bucket.fill_interval_ % token_bucket_.fill_interval_ !=
+        absl::ZeroDuration()) {
       throw EnvoyException(
           "local rate descriptor limit is not a multiple of token bucket fill timer");
     }
-    new_descriptor.multiplier_ = token_bucket.fill_interval_ / token_bucket_.fill_interval_;
-    token_bucket.max_tokens_ = descriptor.token_bucket().max_tokens();
-    token_bucket.tokens_per_fill_ =
+    // Save the multiplicative factor to control the descriptor refill frequency.
+    new_descriptor.multiplier_ =
+        per_descriptor_token_bucket.fill_interval_ / token_bucket_.fill_interval_;
+    per_descriptor_token_bucket.max_tokens_ = descriptor.token_bucket().max_tokens();
+    per_descriptor_token_bucket.tokens_per_fill_ =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(descriptor.token_bucket(), tokens_per_fill, 1);
-    new_descriptor.token_bucket_ = token_bucket;
+    new_descriptor.token_bucket_ = per_descriptor_token_bucket;
 
     auto token_state = std::make_shared<TokenState>();
-    token_state->tokens_ = token_bucket.max_tokens_;
+    token_state->tokens_ = per_descriptor_token_bucket.max_tokens_;
     token_state->fill_time_ = time_source_.monotonicTime();
     new_descriptor.token_state_ = token_state;
 
@@ -89,7 +92,7 @@ LocalRateLimiterImpl::~LocalRateLimiterImpl() {
 void LocalRateLimiterImpl::onFillTimer() {
   onFillTimerHelper(tokens_, token_bucket_);
   onFillTimerDescriptorHelper();
-  counter_++;
+  refill_counter_++;
   fill_timer_->enableTimer(absl::ToChronoMilliseconds(token_bucket_.fill_interval_));
 }
 
@@ -116,7 +119,11 @@ void LocalRateLimiterImpl::onFillTimerHelper(TokenState& tokens,
 
 void LocalRateLimiterImpl::onFillTimerDescriptorHelper() {
   for (const auto& descriptor : descriptors_) {
-    if (counter_ % descriptor.multiplier_ == 0) {
+    // Descriptors are refilled every Nth timer hit where N is the ratio of the
+    // descriptor refill interval over the global refill interval. For example,
+    // if the descriptor refill interval is 150ms and the global refill
+    // interval is 50ms, this descriptor is refilled every 3rd call.
+    if (refill_counter_ % descriptor.multiplier_ == 0) {
       onFillTimerHelper(*descriptor.token_state_, descriptor.token_bucket_);
     }
   }

@@ -538,6 +538,8 @@ protected:
   // edge cases (such as for METADATA frames) where nghttp2 will issue a callback for a stream_id
   // that is not associated with an existing stream.
   const StreamImpl* getStream(int32_t stream_id) const;
+  // Same as getStream, but without the ASSERT.
+  StreamImpl* getStreamUnchecked(int32_t stream_id);
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
 
@@ -648,8 +650,6 @@ protected:
   // this changes in the future. Also it is important that onSend does not do partial writes, as the
   // nghttp2 library will keep calling this callback to write the rest of the frame.
   ssize_t onSend(const uint8_t* data, size_t length);
-
-  const bool skip_dispatching_frames_for_closed_connection_;
 
   // Called when a stream encodes to the http2 connection which enables us to
   // keep the active_streams list in LRU if deferred processing.

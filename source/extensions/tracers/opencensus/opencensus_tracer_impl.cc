@@ -244,7 +244,6 @@ std::string Span::getTraceIdAsHex() const {
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& /*config*/, const std::string& name,
                                   SystemTime /*start_time*/) {
-  span_.AddAnnotation("spawnChild");
   return std::make_unique<Span>(oc_config_,
                                 ::opencensus::trace::Span::StartSpan(name, /*parent=*/&span_));
 }

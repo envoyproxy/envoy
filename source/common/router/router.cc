@@ -322,17 +322,19 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
     Stats::StatName upstream_zone = upstreamZone(upstream_host);
-    Http::CodeStats::ResponseStatInfo info{config_.scope_,
-                                           cluster_->statsScope(),
-                                           config_.empty_stat_name_,
-                                           response_status_code,
-                                           internal_request,
-                                           route_entry_->virtualHost().statName(),
-                                           request_vcluster_ ? request_vcluster_->statName()
-                                                             : config_.empty_stat_name_,
-                                           config_.zone_name_,
-                                           upstream_zone,
-                                           is_canary};
+    Http::CodeStats::ResponseStatInfo info{
+        config_.scope_,
+        cluster_->statsScope(),
+        config_.empty_stat_name_,
+        response_status_code,
+        internal_request,
+        route_entry_->virtualHost().statName(),
+        request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
+        route_stats_context_.has_value() ? route_stats_context_->statName()
+                                         : config_.empty_stat_name_,
+        config_.zone_name_,
+        upstream_zone,
+        is_canary};
 
     Http::CodeStats& code_stats = httpContext().codeStats();
     code_stats.chargeResponseStat(info, exclude_http_code_stats_);
@@ -343,6 +345,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                                  alt_stat_prefix_->statName(),
                                                  response_status_code,
                                                  internal_request,
+                                                 config_.empty_stat_name_,
                                                  config_.empty_stat_name_,
                                                  config_.empty_stat_name_,
                                                  config_.zone_name_,
@@ -463,6 +466,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
+  route_stats_context_ = route_entry_->routeStatsContext();
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.getPathValue());
 
@@ -553,7 +557,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      callbacks_->streamInfo().filterState());
+      *callbacks_->streamInfo().filterState());
 
   if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
     if (auto typed_state = downstream_connection->streamInfo()
@@ -654,9 +658,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ = createRetryState(
-      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, config_.runtime_,
-      config_.random_, callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
+  retry_state_ =
+      createRetryState(route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_,
+                       route_stats_context_, config_.runtime_, config_.random_,
+                       callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys.
@@ -674,9 +679,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   conn_pool_new_stream_with_early_data_and_http3_ =
       Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3);
-  const bool can_send_early_data = conn_pool_new_stream_with_early_data_and_http3_ &&
-                                   Http::Utility::isSafeRequest(*downstream_headers_);
-
+  const bool can_send_early_data =
+      conn_pool_new_stream_with_early_data_and_http3_ &&
+      route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
                                         /*can_use_http3=*/true);
@@ -940,6 +945,9 @@ void Filter::onResponseTimeout() {
       if (request_vcluster_) {
         request_vcluster_->stats().upstream_rq_timeout_.inc();
       }
+      if (route_stats_context_.has_value()) {
+        route_stats_context_->stats().upstream_rq_timeout_.inc();
+      }
 
       if (upstream_request->upstreamHost()) {
         upstream_request->upstreamHost()->stats().rq_timeout_.inc();
@@ -966,7 +974,7 @@ void Filter::onResponseTimeout() {
   }
 
   onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,
-                         StreamInfo::ResponseCodeDetails::get().UpstreamTimeout);
+                         StreamInfo::ResponseCodeDetails::get().ResponseTimeout);
 }
 
 // Called when the per try timeout is hit but we didn't reset the request
@@ -1169,7 +1177,6 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
 
     auto request_ptr = upstream_request.removeFromList(upstream_requests_);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-      request_ptr->cleanUp();
       callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
     }
     return true;
@@ -1207,7 +1214,6 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   chargeUpstreamAbort(error_code, dropped, upstream_request);
   auto request_ptr = upstream_request.removeFromList(upstream_requests_);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-    request_ptr->cleanUp();
     callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
   }
 
@@ -1319,7 +1325,6 @@ void Filter::resetAll() {
     auto request_ptr = upstream_requests_.back()->removeFromList(upstream_requests_);
     request_ptr->resetStream();
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-      request_ptr->cleanUp();
       callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
     }
   }
@@ -1410,7 +1415,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         auto request_ptr = upstream_request.removeFromList(upstream_requests_);
         if (Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.allow_upstream_inline_write")) {
-          request_ptr->cleanUp();
           callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
         }
         return;
@@ -1445,7 +1449,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     auto request_ptr = upstream_request.removeFromList(upstream_requests_);
     request_ptr->resetStream();
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-      request_ptr->cleanUp();
       callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
     }
     return;
@@ -1566,17 +1569,19 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
     Http::CodeStats& code_stats = httpContext().codeStats();
-    Http::CodeStats::ResponseTimingInfo info{config_.scope_,
-                                             cluster_->statsScope(),
-                                             config_.empty_stat_name_,
-                                             response_time,
-                                             upstream_request.upstreamCanary(),
-                                             internal_request,
-                                             route_entry_->virtualHost().statName(),
-                                             request_vcluster_ ? request_vcluster_->statName()
-                                                               : config_.empty_stat_name_,
-                                             config_.zone_name_,
-                                             upstreamZone(upstream_request.upstreamHost())};
+    Http::CodeStats::ResponseTimingInfo info{
+        config_.scope_,
+        cluster_->statsScope(),
+        config_.empty_stat_name_,
+        response_time,
+        upstream_request.upstreamCanary(),
+        internal_request,
+        route_entry_->virtualHost().statName(),
+        request_vcluster_ ? request_vcluster_->statName() : config_.empty_stat_name_,
+        route_stats_context_.has_value() ? route_stats_context_->statName()
+                                         : config_.empty_stat_name_,
+        config_.zone_name_,
+        upstreamZone(upstream_request.upstreamHost())};
 
     code_stats.chargeResponseTiming(info);
 
@@ -1587,6 +1592,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
                                                response_time,
                                                upstream_request.upstreamCanary(),
                                                internal_request,
+                                               config_.empty_stat_name_,
                                                config_.empty_stat_name_,
                                                config_.empty_stat_name_,
                                                config_.zone_name_,
@@ -1794,24 +1800,19 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.update_expected_rq_timeout_on_retry")) {
-    // If not enabled, then it will re-use the previous headers (if any.)
+  // The request timeouts only account for time elapsed since the downstream request completed
+  // which might not have happened yet (in which case zero time has elapsed.)
+  std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
 
-    // The request timeouts only account for time elapsed since the downstream request completed
-    // which might not have happened yet (in which case zero time has elapsed.)
-    std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
-
-    if (DateUtil::timePointValid(downstream_request_complete_time_)) {
-      Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-      elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-    }
-
-    FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
-                                     *downstream_headers_, !config_.suppress_envoy_headers_,
-                                     grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
+  if (DateUtil::timePointValid(downstream_request_complete_time_)) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
   }
+
+  FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
+                                   *downstream_headers_, !config_.suppress_envoy_headers_,
+                                   grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
@@ -1838,16 +1839,15 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
                        [](const auto& req) -> bool { return req->awaitingHeaders(); });
 }
 
-RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
-                                           Http::RequestHeaderMap& request_headers,
-                                           const Upstream::ClusterInfo& cluster,
-                                           const VirtualCluster* vcluster, Runtime::Loader& runtime,
-                                           Random::RandomGenerator& random,
-                                           Event::Dispatcher& dispatcher, TimeSource& time_source,
-                                           Upstream::ResourcePriority priority) {
+RetryStatePtr
+ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
+                             const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+                             RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
+                             Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                             TimeSource& time_source, Upstream::ResourcePriority priority) {
   std::unique_ptr<RetryStateImpl> retry_state =
-      RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
-                             dispatcher, time_source, priority);
+      RetryStateImpl::create(policy, request_headers, cluster, vcluster, route_stats_context,
+                             runtime, random, dispatcher, time_source, priority);
   if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or

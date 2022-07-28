@@ -46,6 +46,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quic_core_flags_list_lib",
         "@com_github_google_quiche//:quic_core_protocol_flags_list_lib",
     ],
@@ -85,11 +86,8 @@ envoy_quiche_platform_impl_cc_library(
     tags = ["nofips"],
     deps = [
         ":quiche_flags_impl_lib",
-        "//envoy/api:io_error_interface",
         "//source/common/common:assert_lib",
-        "//source/server:backtrace_lib",
         "@com_github_google_quiche//:quic_platform_export",
-        "@com_github_google_quiche//:quic_platform_ip_address_family",
         "@com_google_absl//absl/container:btree",
     ],
 )
@@ -117,6 +115,7 @@ envoy_quiche_platform_impl_cc_library(
     ],
     tags = ["nofips"],
     deps = [
+        "//source/server:backtrace_lib",
         "@com_github_google_quiche//:quiche_common_platform_export",
     ],
 )

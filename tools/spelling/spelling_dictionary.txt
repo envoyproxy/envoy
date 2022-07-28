@@ -26,6 +26,9 @@ BBR
 BIDIRECTIONAL
 BSON
 BPF
+Bdecoded
+Bencoded
+GiB
 Repick
 TRA
 btree
@@ -51,6 +54,7 @@ ETX
 FS
 HEXDIG
 HEXDIGIT
+HPE
 LRU
 NAK
 OWS
@@ -269,6 +273,7 @@ OSI
 OSS
 OSX
 OT
+OTLP
 OU
 OVFL
 PAYLOADLEN
@@ -311,6 +316,7 @@ RFC
 RHS
 RLE
 RLS
+RLQS
 RNG
 RPC
 RSA
@@ -801,6 +807,7 @@ iteratively
 javascript
 jitter
 jittered
+js
 kafka
 keepalive
 keepalives
@@ -1259,6 +1266,7 @@ tokenizing
 toolchain
 traceid
 traceparent
+tracestate
 transcode
 transcoded
 transcoder
@@ -1370,4 +1378,5 @@ ElastiCache
 pinterest
 NSS
 SSLKEYLOGFILE
-
+DLB
+PCIE

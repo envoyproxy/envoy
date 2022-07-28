@@ -304,9 +304,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   EXPECT_EQ(upstream_pauses, upstream_resumes);
 
   uint32_t downstream_pauses =
-      test_server_->counter("tcp.tcp_stats.downstream_flow_control_paused_reading_total")->value();
+      test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_paused_reading_total")
+          ->value();
   uint32_t downstream_resumes =
-      test_server_->counter("tcp.tcp_stats.downstream_flow_control_resumed_reading_total")->value();
+      test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_resumed_reading_total")
+          ->value();
   EXPECT_EQ(downstream_pauses, downstream_resumes);
 }
 
@@ -369,15 +371,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
 
   ASSERT_TRUE(tcp_client->write(data, true, true, std::chrono::milliseconds(30000)));
 
-  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
+  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 1);
   ASSERT_TRUE(fake_upstream_connection->readDisable(false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
 
-  EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 1);
-  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 0);
+  EXPECT_EQ(test_server_->counter("tcp.tcpproxy_stats.upstream_flush_total")->value(), 1);
+  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 0);
 }
 
 // Test that Envoy doesn't crash or assert when shutting down with an upstream flush active
@@ -400,7 +402,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 
   ASSERT_TRUE(tcp_client->write(data, true));
 
-  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
+  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 1);
   test_server_.reset();
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -1312,9 +1314,9 @@ void TcpProxySslIntegrationTest::setupConnections() {
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
   context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
-  ssl_client_ =
-      dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          context_->createTransportSocket(nullptr), nullptr);
+  ssl_client_ = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      context_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
 
   // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
@@ -1434,9 +1436,9 @@ class MysqlIntegrationTest : public TcpProxyIntegrationTest {
 public:
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
-      Network::TransportSocketFactoryPtr factory =
+      Network::DownstreamTransportSocketFactoryPtr factory =
           upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
-                        : Network::Test::createRawBufferSocketFactory();
+                        : Network::Test::createRawBufferDownstreamSocketFactory();
       auto endpoint = upstream_address_fn_(i);
       fake_upstreams_.emplace_back(
           new FakeMysqlUpstream(std::move(factory), endpoint, upstreamConfig()));

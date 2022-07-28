@@ -27,6 +27,7 @@ filegroup(
             # TODO(phlax/windows-dev): figure out how to get this working on windows
             #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
+            "root/configuration/other_features/_include/dlb.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
         ],
     ) + select({
@@ -49,29 +50,31 @@ genrule(
         "//source/extensions:extensions_metadata.yaml",
         "//contrib:extensions_metadata.yaml",
     ],
-    outs = ["extensions_security_rst.tar"],
+    outs = ["extensions_security_rst.tar.gz"],
     cmd = """
     $(location //tools/docs:generate_extensions_security_rst) \\
         $(location //source/extensions:extensions_metadata.yaml) \\
         $(location //contrib:extensions_metadata.yaml) $@
     """,
-    tools = ["//tools/docs:generate_extensions_security_rst"],
+    exec_tools = ["//tools/docs:generate_extensions_security_rst"],
 )
 
 genrule(
     name = "external_deps_rst",
-    outs = ["external_deps_rst.tar"],
+    outs = ["external_deps_rst.tar.gz"],
     cmd = """
     $(location //tools/docs:generate_external_deps_rst) \
         $(location //bazel:all_repository_locations) \
         $@
     """,
-    tools = [
+    exec_tools = [
         "//bazel:all_repository_locations",
         "//tools/docs:generate_external_deps_rst",
     ],
 )
 
+# These `proto_srcs` need to match the srcs in //tools/protodoc:api_v3_protodoc
+# TODO: figure a way to automate these queries from the `protodoc_rule`
 genquery(
     name = "v3_proto_srcs",
     expression = "labels(srcs, labels(deps, @envoy_api//:v3_protos))",
@@ -85,51 +88,45 @@ genquery(
 )
 
 genrule(
+    name = "proto_srcs",
+    outs = ["proto_srcs.txt"],
+    cmd = """
+    cat $(location :v3_proto_srcs) $(location :xds_proto_srcs)  > $@
+    """,
+    exec_tools = [
+        ":v3_proto_srcs",
+        ":xds_proto_srcs",
+    ],
+)
+
+genrule(
     name = "empty_protos_rst",
     srcs = [":empty_extensions.json"],
-    outs = ["empty_protos_rst.tar"],
+    outs = ["empty_protos_rst.tar.gz"],
     cmd = """
     $(location //tools/protodoc:generate_empty) \\
         $(location empty_extensions.json) $@
     """,
-    tools = ["//tools/protodoc:generate_empty"],
+    exec_tools = ["//tools/protodoc:generate_empty"],
 )
 
 genrule(
     name = "api_rst",
     srcs = [
         "//tools/protodoc:api_v3_protodoc",
-        ":v3_proto_srcs",
+        ":proto_srcs",
     ],
-    outs = ["api_rst.tar"],
+    outs = ["api_rst.tar.gz"],
     cmd = """
     $(location //tools/docs:generate_api_rst) \\
-        $(location v3_proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
+        $(location proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
     """,
-    tools = ["//tools/docs:generate_api_rst"],
-)
-
-genrule(
-    name = "xds_rst",
-    srcs = [
-        "//tools/protodoc:xds_protodoc",
-        ":xds_proto_srcs",
-    ],
-    outs = ["xds_rst.tar"],
-    cmd = """
-    $(location //tools/docs:generate_api_rst) \\
-        $(location xds_proto_srcs) $(locations //tools/protodoc:xds_protodoc) $@
-    """,
-    tools = ["//tools/docs:generate_api_rst"],
+    exec_tools = ["//tools/docs:generate_api_rst"],
 )
 
 pkg_files(
     name = "sphinx_base",
-    srcs = glob(
-        [
-            "_ext/*",
-        ],
-    ) + [
+    srcs = [
         ":conf.py",
         ":redirects.txt",
         ":versions.yaml",
@@ -139,23 +136,34 @@ pkg_files(
 
 pkg_files(
     name = "sphinx_root",
-    srcs = glob(["root/**/*"]),
+    srcs = glob([
+        "root/**/*.css",
+        "root/**/*.ico",
+        "root/**/*.js",
+        "root/**/*.json",
+        "root/**/*.pb",
+        "root/**/*.png",
+        "root/**/*.proto",
+        "root/**/*.rst",
+        "root/**/*.svg",
+        "root/**/*.yaml",
+    ]) + ["root/_pygments/style.py"],
     strip_prefix = "/docs/root",
 )
 
 pkg_files(
     name = "sphinx_inventories",
-    srcs = glob(["inventories/**/*"]),
+    srcs = glob(["inventories/**/*.inv"]),
     strip_prefix = "",
 )
 
 genrule(
     name = "version_histories",
-    outs = ["version_histories.tar"],
+    outs = ["version_histories.tar.gz"],
     cmd = """
     $(location //tools/docs:generate_version_histories) $@
     """,
-    tools = [
+    exec_tools = [
         ":versions.yaml",
         "//:VERSION.txt",
         "//changelogs",
@@ -191,7 +199,7 @@ pkg_filegroup(
 
 pkg_tar(
     name = "version_history_rst",
-    extension = "tar",
+    extension = "tar.gz",
     package_dir = "version_history",
     deps = [":version_histories"],
 )
@@ -199,35 +207,57 @@ pkg_tar(
 pkg_tar(
     name = "rst",
     srcs = [":rst_files"],
-    extension = "tar",
+    extension = "tar.gz",
     deps = [
         ":api_rst",
         ":empty_protos_rst",
         ":extensions_security_rst",
         ":external_deps_rst",
         ":version_history_rst",
-        ":xds_rst",
     ],
 )
 
+# TODO(phlax): Add `envoy_sphinx` rule to encapsulate these and above targets
+genrule(
+    name = "html_release",
+    outs = ["html_release.tar.gz"],
+    cmd = """
+    . $(location //bazel:volatile_env) \
+    && $(location //tools/docs:sphinx_runner) \
+         $${SPHINX_RUNNER_ARGS:-} \
+         --build_sha="$${BUILD_SCM_REVISION:-}" \
+         --docs_tag="$${BUILD_DOCS_TAG:-}" \
+         --version_file=$(location //:VERSION.txt) \
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \\
+         $(location rst) \
+         $@
+    """,
+    exec_tools = [
+        "//bazel:volatile_env",
+        "//tools/docs:sphinx_runner",
+        ":rst",
+        "//:VERSION.txt",
+        "@envoy_api//:v3_proto_set",
+    ],
+    stamp = 1,
+)
+
+# No git stamping, speeds up local dev switching branches
 genrule(
     name = "html",
-    outs = ["html.tar"],
+    outs = ["html.tar.gz"],
     cmd = """
-    $(location //tools/docs:sphinx_runner) \\
-         --build_sha="$${BUILD_SHA:-}" \\
-         --docs_tag="$${DOCS_TAG:-}" \\
-         --version_file=$(location //:VERSION.txt) \\
-         --validator_path=$(location //tools/config_validation:validate_fragment) \\
-         --descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text) \\
-         $(location rst) \\
+    $(location //tools/docs:sphinx_runner) \
+         $${SPHINX_RUNNER_ARGS:-} \
+         --version_file=$(location //:VERSION.txt) \
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \
+         $(location :rst) \
          $@
     """,
     exec_tools = [
         "//tools/docs:sphinx_runner",
         ":rst",
-        "//tools/config_validation:validate_fragment",
-        "//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text",
         "//:VERSION.txt",
+        "@envoy_api//:v3_proto_set",
     ],
 )

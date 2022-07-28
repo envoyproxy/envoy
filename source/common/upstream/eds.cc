@@ -14,11 +14,13 @@ namespace Envoy {
 namespace Upstream {
 
 EdsClusterImpl::EdsClusterImpl(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                             added_via_api, factory_context.mainThreadDispatcher().timeSource()),
+    : BaseDynamicClusterImpl(server_context, cluster, runtime, factory_context,
+                             std::move(stats_scope), added_via_api,
+                             factory_context.mainThreadDispatcher().timeSource()),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           factory_context.messageValidationVisitor(), "cluster_name"),
       factory_context_(factory_context), local_info_(factory_context.localInfo()),
@@ -376,6 +378,7 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 EdsClusterFactory::createClusterImpl(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopeSharedPtr&& stats_scope) {
@@ -383,10 +386,10 @@ EdsClusterFactory::createClusterImpl(
     throw EnvoyException("cannot create an EDS cluster without an EDS config");
   }
 
-  return std::make_pair(
-      std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                       std::move(stats_scope), context.addedViaApi()),
-      nullptr);
+  return std::make_pair(std::make_unique<EdsClusterImpl>(
+                            server_context, cluster, context.runtime(), socket_factory_context,
+                            std::move(stats_scope), context.addedViaApi()),
+                        nullptr);
 }
 
 bool EdsClusterImpl::validateAllLedsUpdated() const {
