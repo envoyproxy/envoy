@@ -958,19 +958,7 @@ public:
    *         simply proxied as normal responses.
    */
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
-
-  /**
-   * @return const PathMatchPolicy& the path match policy for the route. All routes
-   *         have a path match policy even if it is not enabled.
-   */
-  virtual const PathMatchPolicy& pathMatchPolicy() const PURE;
-
-  /**
-   * @return const PathRewritePolicy& the path rewrite policy for the route. All routes
-   *         have a path rewrite policy even if it is not enabled.
-   */
-  virtual const PathRewritePolicy& pathRewritePolicy() const PURE;
-
+  
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
    *         This is an upper bound so does not necessarily reflect the bytes which will be buffered

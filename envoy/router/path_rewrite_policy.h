@@ -22,7 +22,7 @@ public:
   /**
    * @return the name of the current predicate.
    */
-  virtual absl::string_view name() const PURE;
+  virtual std::string_view name() const PURE;
 
   /**
    * Used to rewrite the current url to the specified output. Can return a failure in case rewrite
