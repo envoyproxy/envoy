@@ -47,8 +47,7 @@ As the request does not have the required header it is denied, and Envoy refuses
 In the example, requests should only be allowed if its ``Origin`` header
 matches the regex pattern ``https?://(www.)?envoyproxy.io/docs/envoy.*``.
 
-Now, use ``curl`` to make a request for the upstream service which will be
-denied since its ``Origin`` header is missing.
+Now, use ``curl`` to make a request for the upstream service.
 
 .. code-block:: console
 
