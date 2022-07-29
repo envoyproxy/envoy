@@ -1,7 +1,7 @@
 .. _install_sandboxes_rbac:
 
 Role Based Access Control (RBAC) - HTTP
-====================================
+=======================================
 
 .. sidebar:: Requirements
 
@@ -41,7 +41,7 @@ Change to the ``examples/rbac`` directory and bring up the docker composition.
   rbac_envoy_1     /docker-entrypoint.sh /usr ...   Up      0.0.0.0:10000->10000/tcp, 0.0.0.0:10001->10001/tcp
 
 Step 2: Denial of upstream service using RBAC
-*************************************
+*********************************************
 
 The sandbox is configured to proxy port ``10000`` to the upstream service.
 
