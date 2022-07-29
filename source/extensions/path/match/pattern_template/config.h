@@ -25,11 +25,11 @@ public:
         envoy::extensions::path::match::pattern_template::v3::PatternTemplateMatchConfig>();
   }
 
-  std::string name() const override {
+  absl::string_view name() const override {
     return "envoy.path.match.pattern_template.v3.pattern_template_match_predicate";
   }
 
-  std::string category() const override { return "envoy.path.match"; }
+  absl::string_view category() const override { return "envoy.path.match"; }
 };
 
 } // namespace Match

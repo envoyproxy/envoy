@@ -22,11 +22,11 @@ public:
         envoy::extensions::path::rewrite::pattern_template::v3::PatternTemplateRewriteConfig>();
   }
 
-  std::string name() const override {
+  absl::string_view name() const override {
     return "envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate";
   }
 
-  std::string category() const override { return "envoy.path.rewrite"; }
+  absl::string_view category() const override { return "envoy.path.rewrite"; }
 };
 
 } // namespace Rewrite
