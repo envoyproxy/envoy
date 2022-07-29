@@ -72,7 +72,7 @@ Step 3: Check stats via admin
 
 The sandbox is configured with the ``10001`` port for Envoy admin.
 
-Check RBAC stats were updated.
+Checking the admin interface we should now see that the RBAC stats are updated, with one request denied and the other allowed
 
 .. code-block:: console
 
