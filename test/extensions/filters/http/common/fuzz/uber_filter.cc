@@ -1,6 +1,8 @@
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 
+#include "source/common/common/thread_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/event/dispatcher_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -13,7 +15,11 @@ namespace Extensions {
 namespace HttpFilters {
 
 UberFilterFuzzer::UberFilterFuzzer()
-    : async_request_{&cluster_manager_.thread_local_cluster_.async_client_} {
+    : async_request_{&cluster_manager_.thread_local_cluster_.async_client_},
+      thread_factory_(Thread::threadFactoryForTest()) {
+  ON_CALL(api_, threadFactory()).WillByDefault(testing::ReturnRef(thread_factory_));
+  worker_thread_dispatcher_ =
+      std::make_unique<Event::DispatcherImpl>("filter_fuzz_test", api_, api_.time_system_);
   // This is a decoder filter.
   ON_CALL(filter_callback_, addStreamDecoderFilter(_))
       .WillByDefault(Invoke([&](Http::StreamDecoderFilterSharedPtr filter) -> void {
@@ -77,12 +83,26 @@ void UberFilterFuzzer::fuzz(
   // Data path should not throw exceptions.
   if (decoder_filter_ != nullptr) {
     HttpFilterFuzzer::runData(decoder_filter_.get(), downstream_data);
+  } else {
+    decoding_finished_ = true;
   }
   if (encoder_filter_ != nullptr) {
     HttpFilterFuzzer::runData(encoder_filter_.get(), upstream_data);
+  } else {
+    encoding_finished_ = true;
   }
   if (access_logger_ != nullptr) {
     HttpFilterFuzzer::accessLog(access_logger_.get(), stream_info_);
+  }
+
+  // Most filters should have finished processing during runData, but filters that
+  // rely on an additional thread (e.g. for file system interaction) may need to wait
+  // for the worker thread to complete the filter's task.
+  while (!isFilterFinished()) {
+    auto end_timer = worker_thread_dispatcher_->createTimer(
+        []() { throw EnvoyException("filter did not finish processing within timeout"); });
+    end_timer->enableTimer(std::chrono::milliseconds(5000));
+    worker_thread_dispatcher_->run(Event::DispatcherImpl::RunType::Block);
   }
 
   reset();

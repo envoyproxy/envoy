@@ -51,6 +51,12 @@ public:
     encoded_trailers_.clear();
   }
 
+  // Returns true if decoder and encoder are both finished or nonexistent.
+  bool isFilterFinished() { return decoding_finished_ && encoding_finished_; }
+
+  // Records that the filter type has finished processing.
+  template <class FilterType> void finishFilter(FilterType* filter) = delete;
+
 protected:
   // Templated functions to validate and send headers/data/trailers for decoders/encoders.
   // General functions are deleted, but templated specializations for encoders/decoders are defined
@@ -70,6 +76,9 @@ protected:
   // If your filter needs to stop decoding because of a direct response, make sure you override
   // sendLocalReply to set enabled_ to false.
   bool enabled_ = true;
+
+  bool decoding_finished_ = false;
+  bool encoding_finished_ = false;
 
   // Headers/trailers need to be saved for the lifetime of the filter,
   // so save them as member variables.
@@ -92,6 +101,7 @@ void HttpFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
   if ((headersStatus != Http::FilterHeadersStatus::Continue &&
        headersStatus != Http::FilterHeadersStatus::StopIteration) ||
       !enabled_) {
+    finishFilter(filter);
     return;
   }
 
@@ -104,12 +114,14 @@ void HttpFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
     const auto& dataStatus = sendData(filter, buffer, end_stream);
     ENVOY_LOG_MISC(debug, "Finished with FilterDataStatus: {}", static_cast<int>(dataStatus));
     if (dataStatus != Http::FilterDataStatus::Continue || !enabled_) {
+      finishFilter(filter);
       return;
     }
   }
 
   if (data.has_trailers() && enabled_) {
     sendTrailers(filter, data);
+    finishFilter(filter);
   }
 }
 
@@ -155,6 +167,14 @@ inline Http::FilterHeadersStatus HttpFilterFuzzer::sendHeaders(Http::StreamEncod
     filter->encodeComplete();
   }
   return status;
+}
+
+template <> inline void HttpFilterFuzzer::finishFilter(Http::StreamDecoderFilter*) {
+  decoding_finished_ = true;
+}
+
+template <> inline void HttpFilterFuzzer::finishFilter(Http::StreamEncoderFilter*) {
+  encoding_finished_ = true;
 }
 
 template <>
