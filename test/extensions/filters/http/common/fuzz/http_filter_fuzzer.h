@@ -44,6 +44,8 @@ public:
   // Fuzzed headers and trailers are needed for access logging, reset the data and destroy filters.
   void reset() {
     enabled_ = true;
+    encoding_finished_ = false;
+    decoding_finished_ = false;
     request_headers_.clear();
     response_headers_.clear();
     request_trailers_.clear();
@@ -98,10 +100,12 @@ void HttpFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
   }
   const auto& headersStatus = sendHeaders(filter, data, end_stream);
   ENVOY_LOG_MISC(debug, "Finished with FilterHeadersStatus: {}", static_cast<int>(headersStatus));
+  if ((end_stream && headersStatus == Http::FilterHeadersStatus::Continue) || !enabled_) {
+    finishFilter(filter);
+  }
   if ((headersStatus != Http::FilterHeadersStatus::Continue &&
        headersStatus != Http::FilterHeadersStatus::StopIteration) ||
       !enabled_) {
-    finishFilter(filter);
     return;
   }
 
@@ -113,8 +117,13 @@ void HttpFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
     Buffer::OwnedImpl buffer(data_chunks[i]);
     const auto& dataStatus = sendData(filter, buffer, end_stream);
     ENVOY_LOG_MISC(debug, "Finished with FilterDataStatus: {}", static_cast<int>(dataStatus));
-    if (dataStatus != Http::FilterDataStatus::Continue || !enabled_) {
+    if ((end_stream && dataStatus == Http::FilterDataStatus::Continue) || !enabled_) {
       finishFilter(filter);
+    }
+    if ((dataStatus != Http::FilterDataStatus::Continue &&
+         dataStatus != Http::FilterDataStatus::StopIterationAndBuffer &&
+         dataStatus != Http::FilterDataStatus::StopIterationNoBuffer) ||
+        !enabled_) {
       return;
     }
   }

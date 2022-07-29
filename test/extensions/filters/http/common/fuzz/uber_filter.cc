@@ -101,8 +101,14 @@ void UberFilterFuzzer::fuzz(
   while (!isFilterFinished()) {
     auto end_timer = worker_thread_dispatcher_->createTimer(
         []() { throw EnvoyException("filter did not finish processing within timeout"); });
+    // This timer doesn't work because, from the log,
+    // "Simulated timer enabled. Use advanceTimeWait or advanceTimeAsync functions to ensure it is
+    // called."
     end_timer->enableTimer(std::chrono::milliseconds(5000));
     worker_thread_dispatcher_->run(Event::DispatcherImpl::RunType::Block);
+    // Apparently RunType::Block doesn't actually block if there's no events ready to
+    // fire, so this loop spins. Yield to keep it from spinning too wildly.
+    std::this_thread::yield();
   }
 
   reset();
