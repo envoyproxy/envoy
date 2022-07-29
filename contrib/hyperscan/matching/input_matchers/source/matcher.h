@@ -47,7 +47,7 @@ private:
   hs_database_t* start_of_match_database_{};
   ThreadLocal::TypedSlotPtr<ScratchThreadLocal> tls_;
 
-  // Compiles the Hyperscan database. It will throw on failure of lacking memories or malformed
+  // Compiles the Hyperscan database. It will throw on failure of insufficient memory or malformed
   // regex patterns and flags. Vector parameters should have the same size.
   void compile(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
                const std::vector<unsigned int>& ids, hs_database_t** database);
