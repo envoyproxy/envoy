@@ -587,13 +587,10 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     encode_functions.modify_headers_(*response_headers);
   }
   bool has_custom_content_type = false;
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.use_cannoical_grpc_status_in_local_reply_body_rewrite")) {
-    if (encode_functions.rewrite_) {
-      std::string content_type_value = std::string(response_headers->getContentTypeValue());
-      encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
-      has_custom_content_type = (content_type_value != response_headers->getContentTypeValue());
-    }
+  if (encode_functions.rewrite_) {
+    std::string content_type_value = std::string(response_headers->getContentTypeValue());
+    encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
+    has_custom_content_type = (content_type_value != response_headers->getContentTypeValue());
   }
 
   // Respond with a gRPC trailers-only response if the request is gRPC
@@ -608,12 +605,6 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
                         : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
     }
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.use_cannoical_grpc_status_in_local_reply_body_rewrite")) {
-      if (encode_functions.rewrite_) {
-        encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
-      }
-    }
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
@@ -629,14 +620,6 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     response_headers->removeContentLength();
     encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response
     return;
-  }
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.use_cannoical_grpc_status_in_local_reply_body_rewrite")) {
-    if (encode_functions.rewrite_) {
-      std::string content_type_value = std::string(response_headers->getContentTypeValue());
-      encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
-      has_custom_content_type = (content_type_value != response_headers->getContentTypeValue());
-    }
   }
 
   if (!body_text.empty()) {

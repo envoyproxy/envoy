@@ -16,7 +16,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -915,50 +914,6 @@ TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusPreserved) {
       is_reset, encode_functions,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
                               Grpc::Status::WellKnownGrpcStatus::InvalidArgument, false});
-}
-
-TEST(HttpUtility, SendLocalGrpcReplySetGrpcStatusBeforeCallBodyRewrite) {
-  MockStreamDecoderFilterCallbacks callbacks;
-  bool is_reset = false;
-  auto encode_functions = Utility::EncodeFunctions{
-      nullptr,
-      [&](ResponseHeaderMap& headers, Code&, std::string&, absl::string_view&) -> void {
-        EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.getGrpcStatusValue(),
-                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unimplemented)));
-      },
-      [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-        callbacks.encodeHeaders(std::move(headers), end_stream, "");
-      },
-      nullptr};
-  EXPECT_CALL(callbacks, encodeHeaders_(_, _));
-  Utility::sendLocalReply(is_reset, encode_functions,
-                          Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
-                                                  Grpc::Status::WellKnownGrpcStatus::Unimplemented,
-                                                  false});
-}
-
-TEST(HttpUtility, SendLocalGrpcReplySetGrpcStatusAfterCallBodyRewrite) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.use_cannoical_grpc_status_in_local_reply_body_rewrite",
-        "false"}});
-  MockStreamDecoderFilterCallbacks callbacks;
-  bool is_reset = false;
-  auto encode_functions = Utility::EncodeFunctions{
-      nullptr,
-      [&](ResponseHeaderMap& headers, Code&, std::string&, absl::string_view&) -> void {
-        EXPECT_EQ(headers.GrpcStatus(), nullptr);
-      },
-      [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-        callbacks.encodeHeaders(std::move(headers), end_stream, "");
-      },
-      nullptr};
-  EXPECT_CALL(callbacks, encodeHeaders_(_, _));
-  Utility::sendLocalReply(is_reset, encode_functions,
-                          Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
-                                                  Grpc::Status::WellKnownGrpcStatus::Unimplemented,
-                                                  false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {

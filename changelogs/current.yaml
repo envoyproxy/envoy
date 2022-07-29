@@ -6,9 +6,6 @@ behavior_changes:
   change: |
     Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
     This behavior change can be reverted by setting the ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` runtime flag to false.
-- area: hcm
-  change: |
-    set gRPC status header before boday rewrite during local reply gRPC so cannoical gRPC status can be accessed through for body rewrite. This change can be reverted via the ``envoy.reloadable_features.use_cannoical_grpc_status_in_local_reply_body_rewrite`` runtime flag.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
