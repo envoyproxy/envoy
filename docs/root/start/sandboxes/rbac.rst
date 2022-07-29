@@ -60,14 +60,17 @@ Now, use ``curl`` to make a request for the upstream service.
 
   RBAC: access denied
 
-And make another request with proper headers set.
+Step 3: Authorization of upstream service using RBAC
+****************************************************
+
+Now, we can make another request with proper headers set.
 
 .. code-block:: console
 
   $ curl -si -H "Referer: https://www.envoyproxy.io/docs/envoy" localhost:10000 | grep HTTP/1.1
   HTTP/1.1 200 OK
 
-Step 3: Check stats via admin
+Step 4: Check stats via admin
 *****************************
 
 The sandbox is configured with the ``10001`` port for Envoy admin.
