@@ -14,7 +14,7 @@ public:
   Router::PathRewritePredicateSharedPtr
   createPathRewritePredicate(const Protobuf::Message& config) override {
     // TODO(silverstar194): Implement createPathRewritePredicate
-   throw absl::UnimplementedError("createPathRewritePredicate not implemented");
+    throw absl::UnimplementedError("createPathRewritePredicate not implemented");
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
