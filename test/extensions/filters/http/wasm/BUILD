@@ -40,7 +40,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/wasm:wasm_filter_lib",
-        "//source/extensions/tracers/datadog:datadog_tracer_lib",
+        "//source/extensions/tracers/zipkin:zipkin_lib",
         "//test/extensions/common/wasm:wasm_runtime",
         "//test/extensions/filters/http/wasm/test_data:test_cpp_plugin",
         "//test/mocks/network:connection_mocks",

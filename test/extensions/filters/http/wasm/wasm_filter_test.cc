@@ -3,7 +3,7 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/extensions/filters/http/wasm/wasm_filter.h"
-#include "source/extensions/tracers/datadog/datadog_tracer_impl.h"
+#include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/connection.h"
@@ -97,40 +97,50 @@ public:
   TestFilter& filter() { return *static_cast<TestFilter*>(context_.get()); }
 
   void setupSpan() {
-    const std::string yaml_string = R"EOF(
-    collector_cluster: fake_cluster
-    )EOF";
-    envoy::config::trace::v3::DatadogConfig datadog_config;
-    TestUtility::loadFromYaml(yaml_string, datadog_config);
-
     cm_.initializeClusters({"fake_cluster"}, {});
+
+    std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
+    )EOF";
+
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
     cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
     cm_.initializeThreadLocalClusters({"fake_cluster"});
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillByDefault(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
     timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
-    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900), _));
+    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
 
-    driver_ =
-        std::make_unique<Tracers::Datadog::Driver>(datadog_config, cm_, stats_, tls_, runtime_);
-
-    datadog_span_ = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
-                                       {Tracing::Reason::Sampling, true});
+    driver_ = std::make_unique<Tracers::Zipkin::Driver>(zipkin_config, cm_, stats_, tls_, runtime_,
+                                                        local_info_, random_, time_source_);
+    zipkin_span_ = driver_->startSpan(mock_tracing_config_, request_headers_, operation_name_,
+                                      start_time_, {Tracing::Reason::Sampling, true});
   }
 
 protected:
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   Grpc::MockAsyncClientManager async_client_manager_;
-  std::unique_ptr<Tracers::Datadog::Driver> driver_;
-  Tracing::SpanPtr datadog_span_;
+  std::unique_ptr<Tracers::Zipkin::Driver> driver_;
+  Tracing::SpanPtr zipkin_span_;
   NiceMock<Event::MockTimer>* timer_;
   Stats::TestUtil::TestStore stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Tracing::MockConfig> config_;
+  NiceMock<Envoy::Tracing::MockConfig> mock_tracing_config_;
   const std::string operation_name_{"test"};
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   SystemTime start_time_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Event::SimulatedTimeSystem test_time_;
+  TimeSource& time_source_{test_time_.timeSystem()};
 };
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmHttpFilterTest,
@@ -755,7 +765,7 @@ TEST_P(WasmHttpFilterTest, AsyncCall) {
   Tracing::SpanPtr current_span;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   rootContext().setDecoderFilterCallbacks(decoder_callbacks);
-  EXPECT_CALL(decoder_callbacks, activeSpan()).WillOnce(ReturnRef(*datadog_span_));
+  EXPECT_CALL(decoder_callbacks, activeSpan()).WillOnce(ReturnRef(*zipkin_span_));
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
@@ -772,9 +782,9 @@ TEST_P(WasmHttpFilterTest, AsyncCall) {
             current_span =
                 options.parent_span_->spawnChild(Tracing::EgressConfig::get(), "fake", start_time_);
             current_span->injectContext(message->headers(), nullptr);
-            EXPECT_TRUE(message->headers().getByKey("x-datadog-parent-id") != "");
-            EXPECT_TRUE(message->headers().getByKey("x-datadog-parent-id") != "");
-            EXPECT_TRUE(message->headers().getByKey("x-datadog-sampling-priority") != "");
+            EXPECT_TRUE(message->headers().getByKey("x-b3-traceid") != "");
+            EXPECT_TRUE(message->headers().getByKey("x-b3-spanid") != "");
+            EXPECT_TRUE(message->headers().getByKey("x-b3-sampled") != "");
             return &request;
           }));
 
@@ -1011,7 +1021,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     Tracing::SpanPtr current_span;
     Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
     rootContext().setDecoderFilterCallbacks(decoder_callbacks);
-    EXPECT_CALL(decoder_callbacks, activeSpan()).WillOnce(ReturnRef(*datadog_span_));
+    EXPECT_CALL(decoder_callbacks, activeSpan()).WillOnce(ReturnRef(*zipkin_span_));
 
     EXPECT_CALL(*async_client, sendRaw(_, _, _, _, _, _))
         .WillOnce(Invoke([&](absl::string_view service_full_name, absl::string_view method_name,
@@ -1057,9 +1067,9 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     if (callbacks) {
       current_span->injectContext(request_headers, nullptr);
       callbacks->onCreateInitialMetadata(request_headers);
-      EXPECT_TRUE(request_headers.has("x-datadog-trace-id"));
-      EXPECT_TRUE(request_headers.has("x-datadog-parent-id"));
-      EXPECT_TRUE(request_headers.has("x-datadog-sampling-priority"));
+      EXPECT_TRUE(request_headers.has("x-b3-traceid"));
+      EXPECT_TRUE(request_headers.has("x-b3-spanid"));
+      EXPECT_TRUE(request_headers.has("x-b3-sampled"));
       const auto source = request_headers.get(Http::LowerCaseString{"source"});
       EXPECT_EQ(source.size(), 1);
       EXPECT_EQ(source[0]->value().getStringView(), id);
