@@ -353,11 +353,6 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
-
-  TestUtility::loadFromYaml(invalid_yaml, proto_config);
-  EXPECT_THROW_WITH_MESSAGE(std::make_unique<FilterConfig>(proto_config, context_),
-                            Envoy::Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm network filter ");
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
