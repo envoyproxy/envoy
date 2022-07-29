@@ -319,7 +319,7 @@ private:
    * Called for each header in order to complete an in progress header decode.
    * @return A status representing success.
    */
-  Status completeHeader();
+  Status completeCurrentHeader();
 
   /**
    * Check if header name contains underscore character.
