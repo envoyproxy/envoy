@@ -588,7 +588,7 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   }
   bool has_custom_content_type = false;
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.body_rewrite_on_canonical_grpc_status_in_reply")) {
+          "envoy.reloadable_features.use_cannoical_grpc_status_in_local_reply_body_rewrite")) {
     if (encode_functions.rewrite_) {
       std::string content_type_value = std::string(response_headers->getContentTypeValue());
       encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
@@ -609,7 +609,7 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     }
 
     if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.body_rewrite_on_canonical_grpc_status_in_reply")) {
+            "envoy.reloadable_features.use_cannoical_grpc_status_in_local_reply_body_rewrite")) {
       if (encode_functions.rewrite_) {
         encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
       }
@@ -631,7 +631,7 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     return;
   }
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.body_rewrite_on_canonical_grpc_status_in_reply")) {
+          "envoy.reloadable_features.use_cannoical_grpc_status_in_local_reply_body_rewrite")) {
     if (encode_functions.rewrite_) {
       std::string content_type_value = std::string(response_headers->getContentTypeValue());
       encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
