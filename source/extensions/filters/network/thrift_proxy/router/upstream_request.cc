@@ -323,10 +323,8 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     if (response_underflow_ || response_state_ == ResponseState::Started) {
       ENVOY_LOG(debug, "reset downstream connection for a partial or underflow response");
       if (response_underflow_) {
-        std::cout << "XXX response underflow" << std::endl;
         stats_.incCloseUnderflowResponse(parent_.cluster());
       } else {
-        std::cout << "XXX partial response" << std::endl;
         stats_.incClosePartialResponse(parent_.cluster());
       }
       parent_.resetDownstreamConnection();

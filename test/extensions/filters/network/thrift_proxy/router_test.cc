@@ -548,7 +548,7 @@ public:
   }
 
   void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true,
-                      bool is_drain = false, bool is_partial_response = false) {
+                      bool is_drain = false, bool is_partial = false) {
     Buffer::OwnedImpl buffer;
 
     EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
@@ -565,7 +565,7 @@ public:
         .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
     upstream_callbacks_->onUpstreamData(buffer, false);
 
-    if (is_partial_response) {
+    if (is_partial) {
       return;
     }
 
@@ -1756,7 +1756,7 @@ TEST_F(ThriftRouterTest, UpstreamPartialResponse) {
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
   completeRequest();
-  returnResponse(MessageType::Reply, true, false, true /* is_partial_response */);
+  returnResponse(MessageType::Reply, true, false, true /* is_partial*/);
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
   destroyRouter();
 
