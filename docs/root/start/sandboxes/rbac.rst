@@ -40,7 +40,7 @@ Change to the ``examples/rbac`` directory and bring up the docker composition.
 Step 2: Denial of upstream service using RBAC
 *************************************
 
-The sandbox is configured with ``10000`` port for upstream service.
+The sandbox is configured to proxy port ``10000`` to the upstream service.
 
 If a request is denied, Envoy will refuse the connection with a 403 HTTP
 response code and with the content ``RBAC: access denied``.
