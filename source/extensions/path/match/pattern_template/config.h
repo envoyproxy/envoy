@@ -17,9 +17,9 @@ public:
   Router::PathMatchPredicateSharedPtr
   createPathMatchPredicate(const Protobuf::Message& config) override {
     // TODO(silverstar194): Implement createPathMatchPredicate
-   const Protobuf::Message& temp = config;
-   config = temp;
-   throw absl::UnimplementedError("createPathMatchPredicate not implemented");
+    const Protobuf::Message& temp = config;
+    config = temp;
+    throw absl::UnimplementedError("createPathMatchPredicate not implemented");
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
