@@ -6750,7 +6750,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
   EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
   EXPECT_EQ(cors_policy->allowCredentials(), true);
-  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), false);
+  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), absl::nullopt);
 }
 
 TEST_F(RouteMatcherTest, Decorator) {
