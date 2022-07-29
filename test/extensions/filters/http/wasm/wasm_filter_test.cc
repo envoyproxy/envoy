@@ -1,4 +1,3 @@
-#include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/grpc/async_client.h"
 
 #include "source/common/http/message_impl.h"
