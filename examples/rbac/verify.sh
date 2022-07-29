@@ -10,7 +10,7 @@ export PORT_ADMIN="${RBAC_PORT_ADMIN:-10001}"
 run_log "Test upstream with access denied response"
 responds_with "RBAC: access denied" "http://localhost${PORT_PROXY}"
 
-run_log "Test upstream without access denied response"
+run_log "Test authorized upstream response"
 responds_without "RBAC: access denied" "http://localhost${PORT_PROXY}" -H "Referer: https://www.envoyproxy.io/docs/envoy"
 
 run_log "Check admin stats"
