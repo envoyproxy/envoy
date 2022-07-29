@@ -47,7 +47,6 @@ envoy_extension_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:wasm_lib",
-        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
