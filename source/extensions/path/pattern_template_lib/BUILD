@@ -1,7 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_cc_test",
     "envoy_extension_package",
 )
 
@@ -22,7 +21,6 @@ envoy_cc_library(
     ],
     deps = [
         ":pattern_template_internal_cc",
-        "//envoy/router:router_path_match_policy_interface",
         "//source/common/http:path_utility_lib",
         "//source/extensions/path/pattern_template_lib/proto:pattern_template_rewrite_segements_cc_proto",
         "@com_google_absl//absl/status",
@@ -46,33 +44,6 @@ envoy_cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:variant",
-        "@com_googlesource_code_re2//:re2",
-    ],
-)
-
-envoy_cc_test(
-    name = "pattern_template_test",
-    srcs = ["pattern_template_test.cc"],
-    deps = [
-        ":pattern_template",
-        "//source/extensions/path/pattern_template_lib/proto:pattern_template_rewrite_segements_cc_proto",
-        "//test/test_common:status_utility_lib",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-envoy_cc_test(
-    name = "pattern_template_internal_test",
-    srcs = ["pattern_template_internal_test.cc"],
-    deps = [
-        ":pattern_template_internal_cc",
-        "//source/extensions/path/pattern_template_lib/proto:pattern_template_rewrite_segements_cc_proto",
-        "//test/test_common:status_utility_lib",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
     ],
 )

@@ -3,8 +3,6 @@
 
 #include <string>
 
-#include "envoy/router/path_match_policy.h"
-
 #include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
 #include "source/extensions/path/pattern_template_lib/proto/pattern_template_rewrite_segments.pb.h"
 
@@ -49,6 +47,9 @@ absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
                                       const std::string& capture_regex);
 
 absl::Status isValidMatchPattern(const std::string match_pattern);
+
+absl::StatusOr<std::string> rewriteURLTemplatePattern( absl::string_view url, absl::string_view capture_regex,
+    const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern);
 
 } // namespace PatternTemplate
 } // namespace Extensions

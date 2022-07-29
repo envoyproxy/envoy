@@ -126,13 +126,44 @@ absl::Status isValidPathTemplateRewritePattern(const std::string& path_template_
 
 absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
                                       const std::string& capture_regex) {
-
   absl::StatusOr<std::string> status = convertURLPatternSyntaxToRegex(capture_regex).value();
   if (!status.ok()) {
     return status.status();
   }
-
   return parseRewritePattern(path_template_rewrite, *std::move(status)).status();
+}
+
+absl::StatusOr<std::string> rewriteURLTemplatePattern(
+    absl::string_view url, absl::string_view capture_regex,
+    const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern) {
+  RE2 regex = RE2(PatternTemplateInternal::toStringPiece(capture_regex));
+  if (!regex.ok()) {
+    return absl::InternalError(regex.error());
+  }
+
+  // First capture is the whole matched regex pattern.
+  int capture_num = regex.NumberOfCapturingGroups() + 1;
+  std::vector<re2::StringPiece> captures(capture_num);
+  if (!regex.Match(PatternTemplateInternal::toStringPiece(url), /*startpos=*/0,
+                   /*endpos=*/url.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
+    return absl::InvalidArgumentError("Pattern not match");
+  }
+
+  std::string rewritten_url;
+
+  for (const envoy::extensions::pattern_template::PatternTemplateRewriteSegments::RewriteSegment&
+           segment : rewrite_pattern.segments()) {
+    if (segment.has_literal()) {
+      absl::StrAppend(&rewritten_url, segment.literal());
+    } else if (segment.has_var_index()) {
+      if (segment.var_index() < 1 || segment.var_index() >= capture_num) {
+        return absl::InvalidArgumentError("Invalid variable index");
+      }
+      absl::StrAppend(&rewritten_url, absl::string_view(captures[segment.var_index()].as_string()));
+    }
+  }
+
+  return rewritten_url;
 }
 
 } // namespace PatternTemplate

@@ -154,10 +154,10 @@ TEST_P(ConsumeVariableFailure, ConsumeVariableFailureTest) {
   EXPECT_THAT(consumeVariable(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-class parseURLPatternSyntaxSuccess : public testing::TestWithParam<std::string> {};
+class ParseURLPatternSyntaxSuccess : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(
-    parseURLPatternSyntaxSuccessTestSuite, parseURLPatternSyntaxSuccess,
+    ParseURLPatternSyntaxSuccessTestSuite, ParseURLPatternSyntaxSuccess,
     testing::Values("/**.m3u8", "/**.mpd", "/*_suf", "/{path=**}.m3u8", "/{foo}/**.ts",
                     "/media/*.m4s", "/media/{contentId=*}/**", "/media/*", "/api/*/*/**",
                     "/api/*/v1/**", "/api/*/v1/*", "/{version=api/*}/*", "/api/*/*/",
@@ -179,7 +179,7 @@ TEST_P(ParseURLPatternSyntaxSuccess, ParseURLPatternSyntaxSuccessTest) {
   EXPECT_EQ(parsed_patt->DebugString(), pattern);
 }
 
-class parseURLPatternSyntaxFailure : public testing::TestWithParam<std::string> {};
+class ParseURLPatternSyntaxFailure : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(
     ParseURLPatternSyntaxFailureTestSuite, ParseURLPatternSyntaxFailure,
