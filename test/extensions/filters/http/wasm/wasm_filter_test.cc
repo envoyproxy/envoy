@@ -135,7 +135,6 @@ protected:
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   SystemTime start_time_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Event::SimulatedTimeSystem test_time_;
