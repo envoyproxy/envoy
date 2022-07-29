@@ -10,5 +10,4 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile-backend
+      context: ../shared/echo

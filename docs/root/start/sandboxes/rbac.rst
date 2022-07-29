@@ -67,7 +67,7 @@ Now, we can make another request with proper headers set.
 
 .. code-block:: console
 
-  $ curl -si -H "Referer: https://www.envoyproxy.io/docs/envoy" localhost:10000 | grep HTTP/1.1
+  $ curl -si -H "Referer: https://www.envoyproxy.io/docs/envoy" localhost:10000 | grep 200
   HTTP/1.1 200 OK
 
 Step 4: Check stats via admin

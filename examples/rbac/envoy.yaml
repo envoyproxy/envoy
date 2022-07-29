@@ -70,7 +70,7 @@ static_resources:
             address:
               socket_address:
                 address: backend
-                port_value: 80
+                port_value: 8080
 
 admin:
   address:
