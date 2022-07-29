@@ -1,6 +1,6 @@
 .. _install_sandboxes_rbac:
 
-Role Based Access Control (``RBAC``)
+Role Based Access Control (RBAC) - HTTP
 ====================================
 
 .. sidebar:: Requirements
