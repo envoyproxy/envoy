@@ -19,6 +19,9 @@ Envoy supports 2 types for RBAC:
 
 This sandbox provides an example of RBAC of HTTP requests.
 
+In the example, requests should only be allowed if its ``Referer`` header
+matches the regex pattern ``https?://(www.)?envoyproxy.io/docs/envoy.*``.
+
 Step 1: Start all of our containers
 ***********************************
 
@@ -43,9 +46,6 @@ Step 2: Denial of upstream service using RBAC
 The sandbox is configured to proxy port ``10000`` to the upstream service.
 
 As the request does not have the required header it is denied, and Envoy refuses the connection with an HTTP 403 return code and with the content ``RBAC: access denied``.
-
-In the example, requests should only be allowed if its ``Origin`` header
-matches the regex pattern ``https?://(www.)?envoyproxy.io/docs/envoy.*``.
 
 Now, use ``curl`` to make a request for the upstream service.
 
