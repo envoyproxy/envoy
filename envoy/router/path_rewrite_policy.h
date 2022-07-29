@@ -22,7 +22,7 @@ public:
   /**
    * @return the name of the current predicate.
    */
-  virtual std::string_view name() const PURE;
+  virtual absl::string_view name() const PURE;
 
   /**
    * Used to rewrite the current url to the specified output. Can return a failure in case rewrite
@@ -38,7 +38,7 @@ public:
   /**
    * @return the rewrite pattern of the predicate.
    */
-  virtual std::string pattern() const PURE;
+  virtual absl::string_view pattern() const PURE;
 };
 
 using PathRewritePredicateSharedPtr = std::shared_ptr<PathRewritePredicate>;
@@ -58,12 +58,12 @@ public:
   /**
    * @return the name of the rewrite pattern predicate to be created.
    */
-  virtual std::string name() const override PURE;
+  virtual absl::string_view name() const override PURE;
 
   /**
    * @return the category of the rewrite pattern predicate to be created.
    */
-  virtual std::string category() const override PURE;
+  virtual absl::string_view category() const override PURE;
 };
 
 } // namespace Router

@@ -22,7 +22,7 @@ public:
   /**
    * @return the name of the current predicate.
    */
-  virtual std::string name() const PURE;
+  virtual absl::string_view name() const PURE;
 
   /**
    * Used to determine if the current url matches the predicate pattern.
@@ -35,7 +35,7 @@ public:
   /**
    * @return the match pattern of the predicate.
    */
-  virtual std::string pattern() const PURE;
+  virtual absl::string_view pattern() const PURE;
 };
 
 using PathMatchPredicateSharedPtr = std::shared_ptr<PathMatchPredicate>;
@@ -57,7 +57,7 @@ public:
   /**
    * @return the category of the rewrite pattern predicate to be created.
    */
-  std::string category() const override { return "envoy.path.match"; }
+  absl::string_view category() const override { return "envoy.path.match"; }
 };
 
 } // namespace Router
