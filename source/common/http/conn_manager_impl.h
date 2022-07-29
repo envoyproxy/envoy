@@ -355,6 +355,7 @@ private:
     // Call header validator extension to validate request header map after it was deserialized.
     // If header map failed validation, it sends an error response and returns false.
     bool validateHeaders();
+    bool validateTrailers();
 
     ConnectionManagerImpl& connection_manager_;
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in

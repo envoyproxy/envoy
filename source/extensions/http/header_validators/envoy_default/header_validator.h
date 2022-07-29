@@ -19,19 +19,22 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, StreamInfo::StreamInfo& stream_info);
 
-  HeaderEntryValidationResult
-  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                             const ::Envoy::Http::HeaderString& value) override;
+  ValidationResult validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                              const ::Envoy::Http::HeaderString& value) override;
 
-  HeaderEntryValidationResult
-  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                              const ::Envoy::Http::HeaderString& value) override;
+  ValidationResult validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                               const ::Envoy::Http::HeaderString& value) override;
 
   RequestHeaderMapValidationResult
   validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) override;
 
-  ResponseHeaderMapValidationResult
-  validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
+  ValidationResult validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
+
+  ValidationResult
+  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) override;
+
+  ValidationResult
+  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) override;
 
 protected:
   StreamInfo::StreamInfo& stream_info_;

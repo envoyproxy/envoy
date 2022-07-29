@@ -894,6 +894,23 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   return true;
 }
 
+bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
+  if (header_validator_) {
+    auto validation_result = header_validator_->validateRequestTrailerMap(*request_trailers_);
+    if (!validation_result.ok()) {
+      Code response_code = Code::BadRequest;
+      absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+      if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
+        grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
+      }
+
+      sendLocalReply(response_code, "", nullptr, grpc_status, validation_result.details());
+      return false;
+    }
+  }
+  return true;
+}
+
 void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
   if (end_stream && !filter_manager_.remoteDecodeComplete()) {
@@ -1205,12 +1222,17 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& trailers) {
+  ENVOY_STREAM_LOG(debug, "request trailers complete:\n{}", *this, *trailers);
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   resetIdleTimer();
 
   ASSERT(!request_trailers_);
   request_trailers_ = std::move(trailers);
+  if (!validateTrailers()) {
+    ENVOY_STREAM_LOG(debug, "request trailers validation failed:\n{}", *this, *request_trailers_);
+    return;
+  }
   maybeEndDecode(true);
   filter_manager_.decodeTrailers(*request_trailers_);
 }

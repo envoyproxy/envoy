@@ -3347,6 +3347,102 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
   conn_manager_->onData(fake_input, false);
 }
 
+// Header validator rejects trailer map before response has started
+TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeResponse) {
+  codec_->protocol_ = Protocol::Http2;
+  setup(false, "");
+  EXPECT_CALL(header_validator_factory_, create(Protocol::Http2, _))
+      .WillOnce(InvokeWithoutArgs([]() {
+        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+        EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
+            .WillOnce(InvokeWithoutArgs(
+                []() { return HeaderValidator::RequestHeaderMapValidationResult::success(); }));
+
+        EXPECT_CALL(*header_validator, validateRequestTrailerMap(_))
+            .WillOnce(InvokeWithoutArgs([]() {
+              return HeaderValidator::ValidationResult(
+                  HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map");
+            }));
+        return header_validator;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    RequestTrailerMapPtr trailers{
+        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
+    decoder_->decodeTrailers(std::move(trailers));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+        // For HTTP/2 protocols connection should not be closed
+        EXPECT_TRUE(headers.Connection() == nullptr);
+        EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Header validator rejects trailer map after response has started
+TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse) {
+  codec_->protocol_ = Protocol::Http2;
+  setup(false, "");
+  EXPECT_CALL(header_validator_factory_, create(Protocol::Http2, _))
+      .WillOnce(InvokeWithoutArgs([]() {
+        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+        EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
+            .WillOnce(InvokeWithoutArgs(
+                []() { return HeaderValidator::RequestHeaderMapValidationResult::success(); }));
+
+        EXPECT_CALL(*header_validator, validateRequestTrailerMap(_))
+            .WillOnce(InvokeWithoutArgs([]() {
+              return HeaderValidator::ValidationResult(
+                  HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map");
+            }));
+        return header_validator;
+      }));
+
+  setupFilterChain(1, 0, 1);
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+
+    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+    decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "");
+
+    RequestTrailerMapPtr trailers{
+        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
+    decoder_->decodeTrailers(std::move(trailers));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("200", headers.getStatusValue());
+      }));
+
+  EXPECT_CALL(response_encoder_.stream_, resetStream(_));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
+}
+
 // Request completes normally if header validator accepts it
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   setup(false, "");

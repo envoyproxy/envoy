@@ -92,6 +92,19 @@ TEST_F(HeaderValidatorTest, Http1ResponseHeaderMapValidation) {
   EXPECT_TRUE(uhv->validateResponseHeaderMap(response_header_map).ok());
 }
 
+TEST_F(HeaderValidatorTest, Http2RequestTrailerMapValidation) {
+  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http2);
+  ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{"trailer1", "value1"},
+                                                               {"trailer2", "values"}};
+  EXPECT_TRUE(uhv->validateRequestTrailerMap(request_trailer_map));
+}
+
+TEST_F(HeaderValidatorTest, Http2ResponseTrailerMapValidation) {
+  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http2);
+  ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer1", "value1"}};
+  EXPECT_TRUE(uhv->validateResponseTrailerMap(response_trailer_map).ok());
+}
+
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http

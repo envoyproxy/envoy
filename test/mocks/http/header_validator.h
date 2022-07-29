@@ -10,14 +10,15 @@ namespace Http {
 class MockHeaderValidator : public HeaderValidator {
 public:
   ~MockHeaderValidator() override = default;
-  MOCK_METHOD(HeaderEntryValidationResult, validateRequestHeaderEntry,
+  MOCK_METHOD(ValidationResult, validateRequestHeaderEntry,
               (const HeaderString& key, const HeaderString& value));
-  MOCK_METHOD(HeaderEntryValidationResult, validateResponseHeaderEntry,
+  MOCK_METHOD(ValidationResult, validateResponseHeaderEntry,
               (const HeaderString& key, const HeaderString& value));
   MOCK_METHOD(RequestHeaderMapValidationResult, validateRequestHeaderMap,
               (RequestHeaderMap & header_map));
-  MOCK_METHOD(ResponseHeaderMapValidationResult, validateResponseHeaderMap,
-              (ResponseHeaderMap & header_map));
+  MOCK_METHOD(ValidationResult, validateResponseHeaderMap, (ResponseHeaderMap & header_map));
+  MOCK_METHOD(ValidationResult, validateRequestTrailerMap, (RequestTrailerMap & trailer_map));
+  MOCK_METHOD(ValidationResult, validateResponseTrailerMap, (ResponseTrailerMap & trailer_map));
 };
 
 class MockHeaderValidatorFactory : public HeaderValidatorFactory {

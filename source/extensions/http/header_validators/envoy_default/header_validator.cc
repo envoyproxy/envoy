@@ -22,14 +22,14 @@ HeaderValidator::HeaderValidator(const HeaderValidatorConfig&, ::Envoy::Http::Pr
                                  StreamInfo::StreamInfo& stream_info)
     : stream_info_(stream_info) {}
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+::Envoy::Http::HeaderValidator::ValidationResult
 HeaderValidator::validateRequestHeaderEntry(const HeaderString&, const HeaderString&) {
-  return HeaderEntryValidationResult::success();
+  return ValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+::Envoy::Http::HeaderValidator::ValidationResult
 HeaderValidator::validateResponseHeaderEntry(const HeaderString&, const HeaderString&) {
-  return HeaderEntryValidationResult::success();
+  return ValidationResult::success();
 }
 
 ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
@@ -37,9 +37,19 @@ HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap&) {
   return RequestHeaderMapValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
+::Envoy::Http::HeaderValidator::ValidationResult
 HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap&) {
-  return ResponseHeaderMapValidationResult::success();
+  return ValidationResult::success();
+}
+
+::Envoy::Http::HeaderValidator::ValidationResult
+HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap&) {
+  return ValidationResult::success();
+}
+
+::Envoy::Http::HeaderValidator::ValidationResult
+HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap&) {
+  return ValidationResult::success();
 }
 
 } // namespace EnvoyDefault
