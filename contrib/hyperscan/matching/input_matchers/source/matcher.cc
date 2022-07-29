@@ -142,7 +142,7 @@ void Matcher::compile(const std::vector<const char*>& expressions,
     hs_free_compile_error(compile_err);
 
     if (compile_err_expression < 0) {
-      throw EnvoyException(fmt::format("unable to compile database: {}", compile_err_message));
+      IS_ENVOY_BUG(fmt::format("unable to compile database: {}", compile_err_message));
     } else {
       throw EnvoyException(fmt::format("unable to compile pattern '{}': {}",
                                        expressions.at(compile_err_expression),
