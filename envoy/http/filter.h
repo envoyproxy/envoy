@@ -685,6 +685,7 @@ public:
   struct LocalReplyData {
     // The error code which (barring reset) will be sent to the client.
     Http::Code code_;
+    // The gRPC status set in local reply.
     absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
     // The details of why a local reply is being sent.
     absl::string_view details_;
