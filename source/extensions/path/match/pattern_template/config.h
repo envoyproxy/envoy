@@ -16,8 +16,10 @@ class PatternTemplateMatchPredicateFactory : public Router::PathMatchPredicateFa
 public:
   Router::PathMatchPredicateSharedPtr
   createPathMatchPredicate(const Protobuf::Message& config) override {
-    // TODO(silverstar195): Implement createPathMatchPredicate
-    return nullptr;
+    // TODO(silverstar194): Implement createPathMatchPredicate
+   const Protobuf::Message& temp = config;
+   config = temp;
+   throw absl::UnimplementedError("createPathMatchPredicate not implemented");
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -25,11 +27,11 @@ public:
         envoy::extensions::path::match::pattern_template::v3::PatternTemplateMatchConfig>();
   }
 
-  absl::string_view name() const override {
+  std::string name() const override {
     return "envoy.path.match.pattern_template.v3.pattern_template_match_predicate";
   }
 
-  absl::string_view category() const override { return "envoy.path.match"; }
+  std::string category() const override { return "envoy.path.match"; }
 };
 
 } // namespace Match

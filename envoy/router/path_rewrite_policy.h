@@ -58,12 +58,12 @@ public:
   /**
    * @return the name of the rewrite pattern predicate to be created.
    */
-  virtual absl::string_view name() const override PURE;
+  virtual std::string name() const override PURE;
 
   /**
    * @return the category of the rewrite pattern predicate to be created.
    */
-  virtual absl::string_view category() const override PURE;
+  virtual std::string category() const override PURE;
 };
 
 } // namespace Router

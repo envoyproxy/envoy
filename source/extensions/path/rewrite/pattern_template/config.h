@@ -12,9 +12,9 @@ namespace Rewrite {
 class PatternTemplateRewritePredicateFactory : public Router::PathRewritePredicateFactory {
 public:
   Router::PathRewritePredicateSharedPtr
-  createPathRewritePredicate(const Protobuf::Message& rewrite_config) override {
-    // TODO(silverstar195): Implement createPathRewritePredicate
-    return nullptr;
+  createPathRewritePredicate(const Protobuf::Message& config) override {
+    // TODO(silverstar194): Implement createPathRewritePredicate
+   throw absl::UnimplementedError("createPathRewritePredicate not implemented");
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -22,11 +22,11 @@ public:
         envoy::extensions::path::rewrite::pattern_template::v3::PatternTemplateRewriteConfig>();
   }
 
-  absl::string_view name() const override {
+  std::string name() const override {
     return "envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate";
   }
 
-  absl::string_view category() const override { return "envoy.path.rewrite"; }
+  std::string category() const override { return "envoy.path.rewrite"; }
 };
 
 } // namespace Rewrite
