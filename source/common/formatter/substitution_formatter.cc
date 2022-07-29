@@ -185,7 +185,7 @@ StructFormatter::FormatBuilder::toFormatMapValue(const ProtobufWkt::Struct& stru
 
     case ProtobufWkt::Value::kNumberValue:
       output->emplace(pair.first,
-                      toFormatStringValue(std::to_string(uint32_t(pair.second.number_value()))));
+                      PlainNumberFormatter::toFormatNumberValue(pair.second.number_value()));
       break;
 
     default:
@@ -214,7 +214,7 @@ StructFormatter::StructFormatListWrapper StructFormatter::FormatBuilder::toForma
       break;
 
     case ProtobufWkt::Value::kNumberValue:
-      output->emplace_back(toFormatStringValue(std::to_string(uint32_t(value.number_value()))));
+      output->emplace_back(PlainNumberFormatter::toFormatNumberValue(value.number_value()));
       break;
 
     default:
@@ -1549,6 +1549,36 @@ ProtobufWkt::Value PlainStringFormatter::formatValue(const Http::RequestHeaderMa
                                                      const StreamInfo::StreamInfo&,
                                                      absl::string_view) const {
   return str_;
+}
+
+PlainNumberFormatter::PlainNumberFormatter(const double& num) { num_.set_number_value(num); }
+
+absl::optional<std::string> PlainNumberFormatter::format(const Http::RequestHeaderMap&,
+                                                         const Http::ResponseHeaderMap&,
+                                                         const Http::ResponseTrailerMap&,
+                                                         const StreamInfo::StreamInfo&,
+                                                         absl::string_view) const {
+  std::string str = std::to_string(num_.number_value());
+  str = str.substr(0, str.find_last_not_of('0') + 1);
+  str = str.substr(0, str.find_last_not_of('.') + 1);
+  return str;
+}
+
+ProtobufWkt::Value PlainNumberFormatter::formatValue(const Http::RequestHeaderMap&,
+                                                     const Http::ResponseHeaderMap&,
+                                                     const Http::ResponseTrailerMap&,
+                                                     const StreamInfo::StreamInfo&,
+                                                     absl::string_view) const {
+  return num_;
+}
+
+std::vector<FormatterProviderPtr>
+PlainNumberFormatter::toFormatNumberValue(const double& number_format) {
+  double current_number;
+  current_number = number_format;
+  std::vector<FormatterProviderPtr> formatters;
+  formatters.emplace_back(FormatterProviderPtr{new PlainNumberFormatter(current_number)});
+  return formatters;
 }
 
 absl::optional<std::string>

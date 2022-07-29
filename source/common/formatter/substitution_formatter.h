@@ -281,6 +281,26 @@ private:
 };
 
 /**
+ * FormatterProvider for numbers.
+ */
+class PlainNumberFormatter : public FormatterProvider {
+public:
+  PlainNumberFormatter(const double& num);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+  static std::vector<FormatterProviderPtr> toFormatNumberValue(const double& number_format);
+
+private:
+  ProtobufWkt::Value num_;
+};
+
+/**
  * FormatterProvider for local_reply_body. It returns the string from `local_reply_body` argument.
  */
 class LocalReplyBodyFormatter : public FormatterProvider {
