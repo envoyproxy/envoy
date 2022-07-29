@@ -70,7 +70,7 @@ And make another request with proper headers set.
 Step 3: Check stats via admin
 *****************************
 
-The sandbox is configured with ``10001`` port for admin.
+The sandbox is configured with the ``10001`` port for Envoy admin.
 
 Check RBAC stats were updated.
 
