@@ -941,7 +941,8 @@ TEST(HttpUtility, SendLocalGrpcReplySetGrpcStatusBeforeCallBodyRewrite) {
 TEST(HttpUtility, SendLocalGrpcReplySetGrpcStatusAfterCallBodyRewrite) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.use_cannoical_grpc_status_in_local_reply_body_rewrite", "false"}});
+      {{"envoy.reloadable_features.use_cannoical_grpc_status_in_local_reply_body_rewrite",
+        "false"}});
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
   auto encode_functions = Utility::EncodeFunctions{
