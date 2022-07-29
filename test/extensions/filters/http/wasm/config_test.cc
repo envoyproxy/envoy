@@ -224,8 +224,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   cb(filter_callback);
 
   TestUtility::loadFromYaml(invalid_yaml, proto_config);
-  auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
-  EXPECT_EQ(filter_config->createFilter(), nullptr);
+  EXPECT_THROW_WITH_MESSAGE(std::make_unique<FilterConfig>(proto_config, context_), WasmException,
+                            "Unable to create Wasm HTTP filter ");
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {

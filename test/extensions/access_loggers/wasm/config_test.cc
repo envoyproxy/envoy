@@ -180,8 +180,11 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
 
   TestUtility::loadFromYaml(invalid_yaml, proto_config);
-  filter_instance = factory->createAccessLogInstance(proto_config, nullptr, context_);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
+  // When trying again with invalid config, it should raise the exception again because the canary
+  // will fail.
+  EXPECT_THROW_WITH_MESSAGE(factory->createAccessLogInstance(proto_config, nullptr, context_),
+                            Envoy::Extensions::Common::Wasm::WasmException,
+                            "Unable to create Wasm access log ");
 }
 
 TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
