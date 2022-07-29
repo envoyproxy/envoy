@@ -42,8 +42,7 @@ Step 2: Denial of upstream service using RBAC
 
 The sandbox is configured to proxy port ``10000`` to the upstream service.
 
-If a request is denied, Envoy will refuse the connection with a 403 HTTP
-response code and with the content ``RBAC: access denied``.
+As the request does not have the required header it is denied, and Envoy refuses the connection with an HTTP 403 return code and with the content ``RBAC: access denied``.
 
 In the example, requests should only be allowed if its ``Origin`` header
 matches the regex pattern ``https?://(www.)?envoyproxy.io/docs/envoy.*``.
