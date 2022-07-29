@@ -69,12 +69,12 @@ Http::Utility::QueryParams AdminFilter::queryParams() const {
   }
 
   // Check if the params are in the request's body.
-  const Buffer::Instance* body = getRequestBody();
-  if (body != nullptr &&
-      request_headers_->getMethodValue() == Http::Headers::get().MethodValues.Post &&
-      request_headers_->getContentTypeValue() ==
-          Http::Headers::get().ContentTypeValues.FormUrlEncoded) {
-    query = Http::Utility::parseFromBody(body->toString());
+  if (request_headers_->getContentTypeValue() ==
+      Http::Headers::get().ContentTypeValues.FormUrlEncoded) {
+    const Buffer::Instance* body = getRequestBody();
+    if (body != nullptr) {
+      query = Http::Utility::parseFromBody(body->toString());
+    }
   }
 
   return query;
