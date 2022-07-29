@@ -154,7 +154,7 @@ TEST_P(AdminInstanceTest, Help) {
   /listeners: print listener info
       format: File format to use; One of (text, json)
   /logging: query/change logging levels
-      paths: Change multiple logging levels by setting to <logger_name1>=<desired_level1>,<logger_name2>=<desired_level2>.
+      paths: Change multiple logging levels by setting to <logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>.
       level: desired logging level; One of (, trace, debug, info, warning, error, critical, off)
   /memory: print current allocation/heap usage
   /quitquitquit: exit the server

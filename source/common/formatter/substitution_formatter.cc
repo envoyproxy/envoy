@@ -367,16 +367,16 @@ SubstitutionFormatParser::getKnownFormatters() {
            return std::make_unique<LocalReplyBodyFormatter>();
          }}},
        {"GRPC_STATUS",
-        {CommandSyntaxChecker::COMMAND_ONLY,
-         [](const std::string&, const absl::optional<size_t>&) {
-           return std::make_unique<GrpcStatusFormatter>("grpc-status", "",
-                                                        absl::optional<size_t>());
+        {CommandSyntaxChecker::PARAMS_OPTIONAL,
+         [](const std::string& format, const absl::optional<size_t>&) {
+           return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(),
+                                                        GrpcStatusFormatter::parseFormat(format));
          }}},
        {"GRPC_STATUS_NUMBER",
         {CommandSyntaxChecker::COMMAND_ONLY,
          [](const std::string&, const absl::optional<size_t>&) {
            return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(),
-                                                        true);
+                                                        GrpcStatusFormatter::Number);
          }}},
        {"REQUEST_HEADERS_BYTES",
         {CommandSyntaxChecker::COMMAND_ONLY,
@@ -1684,11 +1684,25 @@ HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_head
       extractHeadersByteSize(request_headers, response_headers, response_trailers));
 }
 
+GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
+  if (format.empty() || format == "CAMEL_STRING") {
+    return GrpcStatusFormatter::CamelString;
+  }
+
+  if (format == "SNAKE_STRING") {
+    return GrpcStatusFormatter::SnakeString;
+  }
+  if (format == "NUMBER") {
+    return GrpcStatusFormatter::Number;
+  }
+
+  throw EnvoyException("GrpcStatusFormatter only supports CAMEL_STRING, SNAKE_STRING or NUMBER.");
+}
+
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
                                          const std::string& alternative_header,
-                                         absl::optional<size_t> max_length, bool format_as_number)
-    : HeaderFormatter(main_header, alternative_header, max_length),
-      format_as_number_(format_as_number) {}
+                                         absl::optional<size_t> max_length, Format format)
+    : HeaderFormatter(main_header, alternative_header, max_length), format_(format) {}
 
 absl::optional<std::string>
 GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
@@ -1700,14 +1714,27 @@ GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
   if (!grpc_status.has_value()) {
     return absl::nullopt;
   }
-  if (format_as_number_) {
+  switch (format_) {
+  case CamelString: {
+    const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
+    if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
+      return std::to_string(grpc_status.value());
+    }
+    return grpc_status_message;
+  }
+  case SnakeString: {
+    const auto grpc_status_message =
+        absl::StatusCodeToString(static_cast<absl::StatusCode>(grpc_status.value()));
+    if (grpc_status_message == EMPTY_STRING) {
+      return std::to_string(grpc_status.value());
+    }
+    return grpc_status_message;
+  }
+  case Number: {
     return std::to_string(grpc_status.value());
   }
-  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
-  if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
-    return std::to_string(grpc_status.value());
   }
-  return grpc_status_message;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 ProtobufWkt::Value
@@ -1720,16 +1747,29 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
   if (!grpc_status.has_value()) {
     return unspecifiedValue();
   }
-  if (format_as_number_) {
+
+  switch (format_) {
+  case CamelString: {
+    const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
+    if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
+      return ValueUtil::stringValue(std::to_string(grpc_status.value()));
+    }
+    return ValueUtil::stringValue(grpc_status_message);
+  }
+  case SnakeString: {
+    const auto grpc_status_message =
+        absl::StatusCodeToString(static_cast<absl::StatusCode>(grpc_status.value()));
+    if (grpc_status_message == EMPTY_STRING) {
+      return ValueUtil::stringValue(std::to_string(grpc_status.value()));
+    }
+    return ValueUtil::stringValue(grpc_status_message);
+  }
+  case Number: {
     return ValueUtil::numberValue(grpc_status.value());
   }
-  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
-  if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
-    return ValueUtil::stringValue(std::to_string(grpc_status.value()));
   }
-  return ValueUtil::stringValue(grpc_status_message);
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
-
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
                                      const std::vector<std::string>& path,
                                      absl::optional<size_t> max_length,

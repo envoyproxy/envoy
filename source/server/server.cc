@@ -765,10 +765,7 @@ void InstanceImpl::onRuntimeReady() {
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                          stats_store_, false)
               ->createUncachedRawAsyncClient(),
-          *dispatcher_, runtime(), stats_store_, *ssl_context_manager_, info_factory_,
-          access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
-          *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
-          *api_, options_);
+          stats_store_, *ssl_context_manager_, info_factory_);
     }
     END_TRY
     catch (const EnvoyException& e) {

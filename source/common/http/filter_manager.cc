@@ -236,7 +236,7 @@ const Network::Connection* ActiveStreamFilterBase::connection() { return parent_
 
 Event::Dispatcher& ActiveStreamFilterBase::dispatcher() { return parent_.dispatcher_; }
 
-StreamInfo::StreamInfo& ActiveStreamFilterBase::streamInfo() { return parent_.stream_info_; }
+StreamInfo::StreamInfo& ActiveStreamFilterBase::streamInfo() { return parent_.streamInfo(); }
 
 Tracing::Span& ActiveStreamFilterBase::activeSpan() {
   return parent_.filter_manager_callbacks_.activeSpan();
@@ -437,7 +437,7 @@ ResponseHeaderMapOptRef ActiveStreamDecoderFilter::informationalHeaders() const 
 
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
-  parent_.stream_info_.setResponseCodeDetails(details);
+  parent_.streamInfo().setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
 }
@@ -820,7 +820,7 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
   return std::next(filter->entry());
 }
 
-void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
+void DownstreamFilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
   state_.under_on_local_reply_ = true;
   filter_manager_callbacks_.onLocalReply(data.code_);
 
@@ -832,7 +832,7 @@ void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
   state_.under_on_local_reply_ = false;
 }
 
-void FilterManager::sendLocalReply(
+void DownstreamFilterManager::sendLocalReply(
     Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
@@ -851,9 +851,9 @@ void FilterManager::sendLocalReply(
     state_.encoder_filter_chain_aborted_ = true;
   }
 
-  stream_info_.setResponseCodeDetails(details);
+  streamInfo().setResponseCodeDetails(details);
   StreamFilterBase::LocalReplyData data{code, details, false};
-  FilterManager::onLocalReply(data);
+  onLocalReply(data);
   if (data.reset_imminent_) {
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
                      details);
@@ -886,7 +886,7 @@ void FilterManager::sendLocalReply(
   }
 }
 
-void FilterManager::sendLocalReplyViaFilterChain(
+void DownstreamFilterManager::sendLocalReplyViaFilterChain(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
@@ -913,7 +913,7 @@ void FilterManager::sendLocalReplyViaFilterChain(
             // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
             // opt refs.
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
-                                 stream_info_, code, body, content_type);
+                                 streamInfo(), code, body, content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
@@ -930,7 +930,7 @@ void FilterManager::sendLocalReplyViaFilterChain(
       Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
 }
 
-void FilterManager::sendDirectLocalReply(
+void DownstreamFilterManager::sendDirectLocalReply(
     Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap&)>& modify_headers, bool is_head_request,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
@@ -950,7 +950,7 @@ void FilterManager::sendDirectLocalReply(
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
-                                 stream_info_, code, body, content_type);
+                                 streamInfo(), code, body, content_type);
           },
           [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
             // Move the response headers into the FilterManager to make sure they're visible to
@@ -1128,9 +1128,7 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
 
   // Now encode metadata via the codec.
   if (!metadata_map_ptr->empty()) {
-    MetadataMapVector metadata_map_vector;
-    metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
-    filter_manager_callbacks_.encodeMetadata(metadata_map_vector);
+    filter_manager_callbacks_.encodeMetadata(std::move(metadata_map_ptr));
   }
 }
 
@@ -1412,7 +1410,7 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
     return false;
   }
 
-  parent_.stream_info_.setResponseCodeDetails(
+  parent_.streamInfo().setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().InternalRedirect);
 
   if (headers != nullptr) {
@@ -1427,7 +1425,7 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
     parent_.filter_manager_callbacks_.chargeStats(*headers);
   }
 
-  parent_.filter_manager_callbacks_.recreateStream(parent_.stream_info_.filter_state_);
+  parent_.filter_manager_callbacks_.recreateStream(parent_.streamInfo().filterState());
 
   return true;
 }
