@@ -65,7 +65,6 @@ public:
   // StreamInfo::StreamInfo
   MOCK_METHOD(void, setResponseFlag, (ResponseFlag response_flag));
   MOCK_METHOD(void, setResponseCode, (uint32_t));
-  MOCK_METHOD(void, setLocalReplyGrpcStatus, (Grpc::Status::GrpcStatus));
   MOCK_METHOD(void, setResponseCodeDetails, (absl::string_view));
   MOCK_METHOD(void, setConnectionTerminationDetails, (absl::string_view));
   MOCK_METHOD(bool, intersectResponseFlags, (uint64_t), (const));
@@ -91,7 +90,6 @@ public:
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(void, protocol, (Http::Protocol protocol));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));
-  MOCK_METHOD(absl::optional<Grpc::Status::GrpcStatus>, localReplyGrpcStatus, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, responseCodeDetails, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, connectionTerminationDetails, (), (const));
   MOCK_METHOD(void, addBytesSent, (uint64_t));

@@ -73,7 +73,6 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/proto:helloworld_proto_cc_proto",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

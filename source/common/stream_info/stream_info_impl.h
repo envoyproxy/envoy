@@ -174,19 +174,11 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
 
-  absl::optional<Grpc::Status::GrpcStatus> localReplyGrpcStatus() const override {
-    return local_reply_grpc_status_;
-  }
-
   const absl::optional<std::string>& responseCodeDetails() const override {
     return response_code_details_;
   }
 
   void setResponseCode(uint32_t code) override { response_code_ = code; }
-
-  void setLocalReplyGrpcStatus(Grpc::Status::GrpcStatus status) override {
-    local_reply_grpc_status_ = status;
-  }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
     ASSERT(!StringUtil::hasEmptySpace(rc_details));
@@ -341,7 +333,6 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
-  absl::optional<Grpc::Status::GrpcStatus> local_reply_grpc_status_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};

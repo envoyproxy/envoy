@@ -15,7 +15,6 @@ envoy_cc_library(
     deps = [
         ":filter_state_interface",
         "//envoy/common:time_interface",
-        "//envoy/grpc:status",
         "//envoy/http:header_map_interface",
         "//envoy/http:protocol_interface",
         "//envoy/http:request_id_extension_interface",

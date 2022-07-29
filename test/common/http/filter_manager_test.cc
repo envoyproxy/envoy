@@ -200,10 +200,24 @@ TEST_F(FilterManagerTest, OnLocalReply) {
 
   // Make sure all 3 filters get onLocalReply, and that the reset is preserved
   // even if not the last return.
-  EXPECT_CALL(*decoder_filter, onLocalReply(_));
+  EXPECT_CALL(*decoder_filter, onLocalReply(_))
+      .WillOnce(Invoke(
+          [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return Http::LocalErrorStatus::Continue;
+          }));
   EXPECT_CALL(*stream_filter, onLocalReply(_))
-      .WillOnce(Return(LocalErrorStatus::ContinueAndResetStream));
-  EXPECT_CALL(*encoder_filter, onLocalReply(_));
+      .WillOnce(Invoke(
+          [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return LocalErrorStatus::ContinueAndResetStream;
+          }));
+  EXPECT_CALL(*encoder_filter, onLocalReply(_))
+      .WillOnce(Invoke(
+          [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return Http::LocalErrorStatus::Continue;
+          }));
   EXPECT_CALL(filter_manager_callbacks_, resetStream());
   decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
                                              Grpc::Status::Internal, "details");
@@ -213,9 +227,6 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
-
-  ASSERT_TRUE(filter_manager_->streamInfo().localReplyGrpcStatus().has_value());
-  EXPECT_EQ(filter_manager_->streamInfo().localReplyGrpcStatus().value(), Grpc::Status::Internal);
 
   filter_manager_->destroyFilters();
 }
