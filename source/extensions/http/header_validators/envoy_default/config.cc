@@ -4,7 +4,7 @@
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.validate.h"
 
 #include "source/common/config/utility.h"
-#include "source/extensions/http/header_validators/envoy_default/header_validator.h"
+#include "source/extensions/http/header_validators/envoy_default/header_validator_factory.h"
 
 namespace Envoy {
 namespace Extensions {
