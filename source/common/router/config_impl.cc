@@ -384,8 +384,10 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
-  allow_private_network_access_ =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_private_network_access, false);
+  if (config.has_allow_private_network_access()) {
+    allow_private_network_access_ =
+        PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
+  }
 }
 
 void validateMirrorClusterSpecifier(
