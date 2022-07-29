@@ -142,7 +142,7 @@ double the keys will move). Maglev aims for minimal disruption when set of upstr
 Best practice is to set
 :ref:`table_size<envoy_v3_api_field_config.cluster.v3.Cluster.MaglevLbConfig.table_size>` and monitor
 the :ref:`min_entries_per_host and max_entries_per_host gauges <config_cluster_manager_cluster_stats_maglev_lb>`
-to ensure no hosts are underrepresented or missing. With that said, for many applications
+to ensure no hosts are under-represented or missing. With that said, for many applications
 including Redis, Maglev is very likely a superior drop in replacement for ring hash. The advanced reader can use
 :repo:`this benchmark </test/common/upstream/load_balancer_benchmark.cc>` to compare ring hash
 versus Maglev with different parameters.
