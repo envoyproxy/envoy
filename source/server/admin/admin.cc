@@ -461,6 +461,7 @@ Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_vie
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
   request_headers->setMethod(method);
+  request_headers->setPath(path_and_query);
   filter.decodeHeaders(*request_headers, false);
   Buffer::OwnedImpl response;
 
