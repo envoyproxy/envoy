@@ -80,7 +80,7 @@ message TcpProxy {
     //
     // Example: dynamically set hostname using dynamic metadata
     //
-    // .. code-block: yaml
+    // .. code-block:: yaml
     //
     //    tunneling_config:
     //      hostname: "%DYNAMIC_METADATA(tunnel:address)%"
