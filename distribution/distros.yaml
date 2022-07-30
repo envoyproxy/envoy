@@ -1,8 +1,4 @@
 
-debian_buster:
-  image: debian:buster-slim
-  ext: buster.changes
-
 debian_bullseye:
   image: debian:bullseye-slim
   ext: bullseye.changes
