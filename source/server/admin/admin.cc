@@ -356,6 +356,7 @@ Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
         }
       }
 
+      ASSERT(admin_stream.getRequestHeaders().getPathValue() == path_and_query);
       return handler.handler_(path_and_query, admin_stream);
     }
   }

@@ -69,9 +69,8 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   AdminImpl admin_bad_profile_path(TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
                                    server_, false);
   Http::TestResponseHeaderMapImpl header_map;
-  const absl::string_view post = Http::Headers::get().MethodValues.Post;
-  request_headers_.setMethod(post);
   constexpr absl::string_view url = "/cpuprofiler?enable=y";
+  request_headers_.setMethod(Http::Headers::get().MethodValues.Post);
   request_headers_.setPath(url);
   admin_filter_.decodeHeaders(request_headers_, false);
   EXPECT_NO_LOGS(
