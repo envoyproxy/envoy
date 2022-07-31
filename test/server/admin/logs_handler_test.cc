@@ -64,9 +64,9 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   // You can't set the overall level and multiple levels at once at the same time.
   EXPECT_EQ(Http::Code::BadRequest, postCallback(query + "&level=info", header_map, response));
 
-  // Likewise it's OK to set a path with a blank level.
+  // It's OK to set a path with a blank level -- that happens with HTML forms.
   EXPECT_EQ(Http::Code::OK, postCallback(query + "&level=", header_map, response));
-  // It's OK to set the level even if there's a blank path -- that happens with HTML forms.
+  // Likewise it's OK to set the level even if there's a blank path.
   EXPECT_EQ(Http::Code::OK, postCallback("/logging?level=warning&paths=", header_map, response));
 }
 

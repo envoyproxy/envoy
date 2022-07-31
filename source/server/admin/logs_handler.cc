@@ -107,7 +107,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
 
   if (level != params.end()) {
     // Change all log levels.
-    auto level_to_use = parseLogLevel(level->second);
+    absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level->second);
     if (!level_to_use.ok()) {
       return level_to_use.status();
     }
@@ -132,7 +132,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
         return absl::InvalidArgumentError("empty logger name or empty logger level");
       }
 
-      auto level_to_use = parseLogLevel(level);
+      absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level);
       if (!level_to_use.ok()) {
         return level_to_use.status();
       }
@@ -150,10 +150,10 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
 
     // Change particular log level by name.
     const auto it = params.begin();
-    auto key = it->first;
-    auto value = it->second;
+    const std::string& key = it->first;
+    const std::string& value = it->second;
 
-    auto level_to_use = parseLogLevel(value);
+    absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(value);
     if (!level_to_use.ok()) {
       return level_to_use.status();
     }
