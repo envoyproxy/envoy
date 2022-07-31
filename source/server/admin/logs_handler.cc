@@ -31,9 +31,8 @@ LogsHandler::LogsHandler(Server::Instance& server)
 std::vector<absl::string_view> LogsHandler::levelStrings() {
   std::vector<absl::string_view> strings;
   strings.reserve(ARRAY_SIZE(spdlog::level::level_string_views));
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    spdlog::string_view_t level{spdlog::level::level_string_views[i]};
-    strings.push_back(absl::string_view{level.data(), level.size()});
+  for (spdlog::string_view_t level : spdlog::level::level_string_views) {
+    strings.emplace_back(absl::string_view{level.data(), level.size()});
   }
   return strings;
 }
