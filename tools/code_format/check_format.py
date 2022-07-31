@@ -62,7 +62,7 @@ class FormatConfig:
     @cached_property
     def paths(self) -> Dict[str, Tuple[str, ...] | Dict[str, Tuple[str, ...]]]:
         """Mapping of named paths."""
-        paths = self._normalize("paths", cb=lambda paths: tuple(f"./{p}" for p in paths))
+        paths = self._normalize("paths", cb=lambda paths: tuple(p for p in paths))
         paths["build_fixer_py"] = self._build_fixer_path
         paths["header_order_py"] = self._header_order_path
         return paths
@@ -125,6 +125,11 @@ class FormatChecker:
         args.api_prefix
         self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
         self._include_dir_order = args.include_dir_order
+
+    @cached_property
+    def api_proto_packages(self):
+        response = subprocess.run(["git", "grep", "-ilE", "^api_proto_package\(", "api/**/BUILD"], capture_output=True, encoding="utf-8")
+        return set(x for x in response.stdout.split("\n") if x)
 
     @cached_property
     def build_fixer_check_excluded_paths(self):
@@ -323,7 +328,7 @@ class FormatChecker:
 
     def allow_listed_for_std_regex(self, file_path):
         return file_path.startswith(
-            "./test") or file_path in self.config.paths["std_regex"]["include"]
+            "test") or file_path in self.config.paths["std_regex"]["include"]
 
     def allow_listed_for_grpc_init(self, file_path):
         return file_path in self.config.paths["grpc_init"]["include"]
@@ -336,13 +341,13 @@ class FormatChecker:
     def allow_listed_for_raw_try(self, file_path):
         # TODO(chaoqin-li1123): Exclude some important extensions from ALLOWLIST.
         return file_path in self.config.paths["raw_try"]["include"] or file_path.startswith(
-            "./source/extensions")
+            "source/extensions")
 
     def deny_listed_for_exceptions(self, file_path):
         # Returns true when it is a non test header file or the file_path is in DENYLIST or
         # it is under tools/testdata subdirectory.
 
-        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in self.config.paths["exception"]["include"]) or file_path in self.config.paths["exception"]["exclude"] \
+        return (file_path.endswith('.h') and not file_path.startswith("test/") and not file_path in self.config.paths["exception"]["include"]) or file_path in self.config.paths["exception"]["exclude"] \
             or self.is_in_subdir(file_path, 'tools/testdata')
 
     def allow_listed_for_build_urls(self, file_path):
@@ -908,11 +913,11 @@ class FormatChecker:
 
     def check_owners(self, dir_name, owned_directories, error_messages):
         """Checks to make sure a given directory is present either in CODEOWNERS or OWNED_EXTENSIONS
-    Args:
-      dir_name: the directory being checked.
-      owned_directories: directories currently listed in CODEOWNERS.
-      error_messages: where to put an error message for new unowned directories.
-    """
+        Args:
+          dir_name: the directory being checked.
+          owned_directories: directories currently listed in CODEOWNERS.
+          error_messages: where to put an error message for new unowned directories.
+        """
         found = False
         for owned in owned_directories:
             if owned.startswith(dir_name) or dir_name.startswith(owned):
@@ -922,7 +927,7 @@ class FormatChecker:
             error_messages.append(
                 "New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
-    def check_format_visitor(self, arg, dir_name, names, fail_on_diff=False):
+    def check_format_visitor(self, arg, filepath, fail_on_diff=False):
         """Run check_format in parallel for the given files.
         Args:
           arg: a tuple (pool, result_list, owned_directories, error_messages)
@@ -949,14 +954,14 @@ class FormatChecker:
         # Check to see if this directory is a subdir under /source/extensions
         # Also ignore top level directories under /source/extensions since we don't
         # need owners for source/extensions/access_loggers etc, just the subdirectories.
-        if dir_name and dir_name.startswith(
-                core_extensions_full_prefix) and '/' in dir_name[len(core_extensions_full_prefix):]:
-            self.check_owners(dir_name[len(source_prefix):], owned_directories, error_messages)
+        # if dir_name and dir_name.startswith(
+        #        core_extensions_full_prefix) and '/' in dir_name[len(core_extensions_full_prefix):]:
+        #     self.check_owners(dir_name[len(source_prefix):], owned_directories, error_messages)
 
         # For contrib extensions we track ownership at the top level only.
-        contrib_prefix = 'contrib/'
-        if dir_name.startswith(contrib_prefix):
-            self.check_owners(str(pathlib.Path(*pathlib.PurePath(dir_name).parts[:2])), owned_directories, error_messages)
+        # contrib_prefix = 'contrib/'
+        # if dir_name.startswith(contrib_prefix):
+        #     self.check_owners(str(pathlib.Path(*pathlib.PurePath(dir_name).parts[:2])), owned_directories, error_messages)
 
         # These need to be pre-warmed before this class is sent to the pool or the mem forks and it repeats
         self.api_proto_packages
@@ -971,10 +976,9 @@ class FormatChecker:
         self.config.replacements
         self.config.dir_order
 
-        for file_name in names:
-            result = pool.apply_async(
-                self.check_format_return_trace_on_error, args=(dir_name + file_name, fail_on_diff))
-            result_list.append(result)
+        result = pool.apply_async(
+            self.check_format_return_trace_on_error, args=(str(filepath), fail_on_diff))
+        result_list.append(result)
 
     # check_error_messages iterates over the list with error messages and prints
     # errors and returns a bool based on whether there were any errors.
@@ -990,7 +994,7 @@ class FormatChecker:
 
 
 def normalize_path(path):
-    """Convert path to form ./path/to/dir/ for directories and ./path/to/file otherwise"""
+    """Convert path to form path/to/dir/ for directories and path/to/file otherwise"""
 
     isdir = os.path.isdir(path)
     if isdir and not path.endswith("/"):
@@ -1014,8 +1018,8 @@ if __name__ == "__main__":
         help="specify the root directory for the script to recurse over. Default '.'.")
     parser.add_argument(
         "--config_path",
-        default="./tools/code_format/config.yaml",
-        help="specify the config path. Default './tools/code_format/config.yaml'.")
+        default="tools/code_format/config.yaml",
+        help="specify the config path. Default 'tools/code_format/config.yaml'.")
     parser.add_argument(
         "--fail_on_diff",
         action="store_true",
@@ -1028,7 +1032,7 @@ if __name__ == "__main__":
         type=int,
         default=multiprocessing.cpu_count(),
         help="number of worker processes to use; defaults to one per core.")
-    parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
+    parser.add_argument("--api-prefix", type=str, default="api/", help="path of the API tree.")
     parser.add_argument(
         "--skip_envoy_build_rule_check",
         action="store_true",
@@ -1105,7 +1109,7 @@ if __name__ == "__main__":
                 error_messages.append("Failed to check visibility with command %s" % command)
 
     def get_owners():
-        with open('./OWNERS.md') as f:
+        with open('OWNERS.md') as f:
             maintainers = ["@UNOWNED"]
             for line in f:
                 if "Senior extension maintainers" in line:
@@ -1121,13 +1125,13 @@ if __name__ == "__main__":
         try:
             maintainers = get_owners()
 
-            with open('./CODEOWNERS') as f:
+            with open('CODEOWNERS') as f:
                 for line in f:
                     # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
                     # name and store it in the list of directories with documented owners.
                     m = format_checker.config.re["codeowners_extensions"].search(line)
                     if m is not None and not line.startswith('#'):
-                        owned.append(m.group(1).strip())
+                        owned.append(m.group(1).strip().strip("/"))
                         owners = format_checker.config.re["owner"].findall(m.group(2).strip())
                         if len(owners) < 2:
                             error_messages.append(
@@ -1138,7 +1142,6 @@ if __name__ == "__main__":
                             error_messages.append(
                                 "Extensions require at least one maintainer OWNER:\n"
                                 "    {}".format(line))
-
                     m = format_checker.config.re["codeowners_contrib"].search(line)
                     if m is not None and not line.startswith('#'):
                         stripped_path = m.group(1).strip()
@@ -1150,7 +1153,7 @@ if __name__ == "__main__":
 
                         if not (stripped_path.count('/') == 2 or
                                 (stripped_path.count('/') == 3
-                                 and stripped_path.startswith('contrib/common/'))):
+                                 and stripped_path.startswith('/contrib/common/'))):
                             error_messages.append(
                                 "Contrib CODEOWNERS entry '{}' must be 2 directories deep unless in /contrib/common/ and then it can be 3 directories deep"
                                 .format(stripped_path))
@@ -1202,7 +1205,7 @@ if __name__ == "__main__":
                         and root.startswith(args.api_prefix)))
                 if check_file:
                     format_checker.check_format_visitor(
-                        (pool, results, owned_directories, error_messages), fpath)
+                        (pool, results, owned_directories, error_messages), fpath, args.fail_on_diff)
 
             # Close the pool to new tasks, wait for all of the running tasks to finish,
             # then collect the error messages.
