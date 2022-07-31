@@ -243,7 +243,7 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
                            ? validated != Envoy::Ssl::ClientValidationStatus::Failed
                            : validated == Envoy::Ssl::ClientValidationStatus::Validated;
 
-  return (allow_untrusted_certificate_ || success) ? 1 : 0;
+  return (allow_untrusted_certificate_ || success);
 }
 
 Envoy::Ssl::ClientValidationStatus
