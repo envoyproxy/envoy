@@ -65,5 +65,8 @@ new_features:
 - area: access_log
   change: |
     updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
+- area: redis
+  change: |
+    added support for redis transactions.
 
 deprecated:

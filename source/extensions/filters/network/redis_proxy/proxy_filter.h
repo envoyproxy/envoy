@@ -92,6 +92,8 @@ public:
 
   bool connectionAllowed() { return connection_allowed_; }
 
+  Common::Redis::Client::Transaction& transaction() { return transaction_; }
+
 private:
   friend class RedisProxyFilterTest;
 
@@ -107,6 +109,10 @@ private:
     }
     void onResponse(Common::Redis::RespValuePtr&& value) override {
       parent_.onResponse(*this, std::move(value));
+    }
+
+    Common::Redis::Client::Transaction& transaction() override {
+      return parent_.transaction();
     }
 
     ProxyFilter& parent_;
@@ -127,6 +133,7 @@ private:
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
+  Common::Redis::Client::Transaction transaction_;
 };
 
 } // namespace RedisProxy
