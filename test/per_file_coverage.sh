@@ -35,7 +35,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/exe:92.6"
 "source/extensions/common:95.8"
 "source/extensions/common/tap:92.9"
-"source/extensions/common/wasm:95.0" # flaky: be careful adjusting
+"source/extensions/common/wasm:94.9" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common:96.1"
 "source/extensions/filters/common/expr:96.2"
@@ -76,6 +76,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/stat_sinks/common/statsd:96.4"
 "source/extensions/stat_sinks/graphite_statsd:75.0"
 "source/extensions/stat_sinks/statsd:76.9"
+"source/extensions/tracers:95.0"
+"source/extensions/tracers/common:73.7"
+"source/extensions/tracers/common/ot:71.7"
 "source/extensions/tracers/opencensus:93.2"
 "source/extensions/tracers/xray:96.2"
 "source/extensions/tracers/zipkin:95.8"
@@ -90,7 +93,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:93.3" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/admin:97.4" # TODO(soulxu) try to raise this back to `97.6` when multiple addresses listener implemented and the old interface of Network::ListenerConfig is removed.
+"source/server/admin:97.6"
 "source/server/config_validation:74.8"
 )
 

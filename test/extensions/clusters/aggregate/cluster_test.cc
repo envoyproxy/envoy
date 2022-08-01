@@ -101,9 +101,9 @@ public:
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
 
-    cluster_ =
-        std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, api_->randomGenerator(),
-                                  factory_context, std::move(scope), false);
+    cluster_ = std::make_shared<Cluster>(server_context_, cluster_config, config, cm_, runtime_,
+                                         api_->randomGenerator(), factory_context, std::move(scope),
+                                         false);
 
     cm_.initializeThreadLocalClusters({"primary", "secondary"});
     primary_.cluster_.info_->name_ = "primary";
@@ -123,6 +123,7 @@ public:
     lb_ = lb_factory_->create();
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;

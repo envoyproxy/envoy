@@ -14,7 +14,3 @@ ubuntu_bionic:
 ubuntu_focal:
   image: ubuntu:20.04
   ext: focal.changes
-
-ubuntu_impish:
-  image: ubuntu:21.10
-  ext: impish.changes

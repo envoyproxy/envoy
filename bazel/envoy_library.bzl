@@ -197,7 +197,7 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
     )
 
 # Envoy proto targets should be specified with this function.
-def envoy_proto_library(name, external_deps = [], **kwargs):
+def envoy_proto_library(name, **kwargs):
     api_cc_py_proto_library(
         name,
         # Avoid generating .so, we don't need it, can interfere with builds

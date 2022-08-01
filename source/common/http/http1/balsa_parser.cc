@@ -18,6 +18,8 @@ namespace {
 using ::quiche::BalsaFrameEnums;
 using ::quiche::BalsaHeaders;
 
+constexpr absl::string_view kColonSlashSlash = "://";
+
 bool isMethodValid(absl::string_view method) {
   static constexpr absl::string_view kValidMethods[] = {
       "ACL",       "BIND",    "CHECKOUT", "CONNECT", "COPY",       "DELETE",     "GET",
@@ -31,6 +33,58 @@ bool isMethodValid(absl::string_view method) {
   return std::binary_search(begin, end, method);
 }
 
+// This method is crafted to match the URL validation behavior of the http-parser library.
+bool isUrlValid(absl::string_view url, bool is_connect) {
+  if (url.empty()) {
+    return false;
+  }
+
+  // Same set of characters are allowed for path and query.
+  const auto is_valid_path_query_char = [](char c) {
+    return c == 9 || c == 12 || ('!' <= c && c <= 126);
+  };
+
+  // The URL may start with a path.
+  if (auto it = url.begin(); *it == '/' || *it == '*') {
+    ++it;
+    return std::all_of(it, url.end(), is_valid_path_query_char);
+  }
+
+  // If method is not CONNECT, parse scheme.
+  if (!is_connect) {
+    // Scheme must be alpha and non-empty.
+    auto it = std::find_if_not(url.begin(), url.end(), [](char c) { return std::isalpha(c); });
+    if (it == url.begin()) {
+      return false;
+    }
+    url.remove_prefix(it - url.begin());
+    if (!absl::StartsWith(url, kColonSlashSlash)) {
+      return false;
+    }
+    url.remove_prefix(kColonSlashSlash.length());
+  }
+
+  // Path and query start with the first '/' or '?' character.
+  const auto is_path_query_start = [](char c) { return c == '/' || c == '?'; };
+
+  // Divide the rest of the URL into two sections: host, and path/query/fragments.
+  auto path_query_begin = std::find_if(url.begin(), url.end(), is_path_query_start);
+  const absl::string_view host = url.substr(0, path_query_begin - url.begin());
+  const absl::string_view path_query = url.substr(path_query_begin - url.begin());
+
+  const auto valid_host_char = [](char c) {
+    return std::isalnum(c) || c == '!' || c == '$' || c == '%' || c == '&' || c == '\'' ||
+           c == '(' || c == ')' || c == '*' || c == '+' || c == ',' || c == '-' || c == '.' ||
+           c == ':' || c == ';' || c == '=' || c == '@' || c == '[' || c == ']' || c == '_' ||
+           c == '~';
+  };
+
+  // Match http-parser's quirk of allowing any number of '@' characters in host
+  // as long as they are not consecutive.
+  return std::all_of(host.begin(), host.end(), valid_host_char) && !absl::StrContains(host, "@@") &&
+         std::all_of(path_query.begin(), path_query.end(), is_valid_path_query_char);
+}
+
 } // anonymous namespace
 
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length)
@@ -38,6 +92,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   ASSERT(connection_ != nullptr);
 
   framer_.set_balsa_headers(&headers_);
+  framer_.set_balsa_trailer(&trailers_);
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
 
@@ -47,7 +102,6 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
     break;
   case MessageType::Response:
     framer_.set_is_request(false);
-    framer_.set_balsa_trailer(&trailers_);
     break;
   }
 }
@@ -112,39 +166,22 @@ void BalsaParser::OnBodyChunkInput(absl::string_view input) {
 void BalsaParser::OnHeaderInput(absl::string_view /*input*/) {}
 void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
 
-void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
+void BalsaParser::OnHeader(absl::string_view key, absl::string_view value) {
   if (status_ == ParserStatus::Error) {
     return;
   }
-  headers.ForEachHeader([this](const absl::string_view key, const absl::string_view value) {
-    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
-    if (status_ == ParserStatus::Error) {
-      return false;
-    }
-    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
-    if (status_ == ParserStatus::Error) {
-      return false;
-    }
-    return true;
-  });
+
+  status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
+
+  if (status_ == ParserStatus::Error) {
+    return;
+  }
+
+  status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
 }
 
-void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
-  if (status_ == ParserStatus::Error) {
-    return;
-  }
-  trailer.ForEachHeader([this](const absl::string_view key, const absl::string_view value) {
-    status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
-    if (status_ == ParserStatus::Error) {
-      return false;
-    }
-    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
-    if (status_ == ParserStatus::Error) {
-      return false;
-    }
-    return true;
-  });
-}
+void BalsaParser::ProcessHeaders(const BalsaHeaders& /*headers*/) {}
+void BalsaParser::ProcessTrailers(const BalsaHeaders& /*trailer*/) {}
 
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
                                           absl::string_view method_input,
@@ -160,6 +197,13 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
   }
   status_ = convertResult(connection_->onMessageBegin());
   if (status_ == ParserStatus::Error) {
+    return;
+  }
+  const bool is_connect = method_input == Headers::get().MethodValues.Connect;
+  if (!isUrlValid(request_uri, is_connect)) {
+    status_ = ParserStatus::Error;
+    // Error message matching that of http-parser.
+    error_message_ = "HPE_INVALID_URL";
     return;
   }
   status_ = convertResult(connection_->onUrl(request_uri.data(), request_uri.size()));

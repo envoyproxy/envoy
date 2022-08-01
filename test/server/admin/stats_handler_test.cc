@@ -142,11 +142,12 @@ TEST_F(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
   const CodeResponse code_response(handlerStats(url));
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
-  EXPECT_EQ("usage: /stats?format=(json|prometheus|text)\n\n", code_response.second);
+  EXPECT_EQ("usage: /stats?format=(html|json|prometheus|text)\n\n", code_response.second);
 }
 
 TEST_F(AdminStatsTest, HandlerStatsPlainText) {
   const std::string url = "/stats";
+  Buffer::OwnedImpl data, used_data;
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -181,6 +182,43 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
                               "P99.9(109.99,109.99) P100(110,110)\n";
   EXPECT_EQ(expected, code_response.second);
 }
+
+#ifdef ENVOY_ADMIN_HTML
+TEST_F(AdminStatsTest, HandlerStatsHtml) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  store_->counterFromStatName(makeStat("foo.c0")).add(0);
+  Stats::ScopeSharedPtr scope0 = store_->createScope("");
+  store_->counterFromStatName(makeStat("foo.c1")).add(1);
+  Stats::ScopeSharedPtr scope = store_->createScope("scope");
+  scope->gaugeFromStatName(makeStat("g2"), Stats::Gauge::ImportMode::Accumulate).set(2);
+  Stats::ScopeSharedPtr scope2 = store_->createScope("scope1.scope2");
+  scope2->textReadoutFromStatName(makeStat("t3")).set("text readout value");
+  scope2->counterFromStatName(makeStat("unset"));
+
+  auto test = [this](absl::string_view params, const std::vector<std::string>& expected,
+                     const std::vector<std::string>& not_expected) {
+    std::string url = absl::StrCat("/stats?format=html", params);
+    CodeResponse code_response = handlerStats(url);
+    EXPECT_EQ(Http::Code::OK, code_response.first);
+    for (const std::string& expect : expected) {
+      EXPECT_THAT(code_response.second, HasSubstr(expect)) << "params=" << params;
+    }
+    for (const std::string& not_expect : not_expected) {
+      EXPECT_THAT(code_response.second, Not(HasSubstr(not_expect))) << "params=" << params;
+    }
+  };
+  test("",
+       {"foo.c0: 0", "foo.c1: 1", "scope.g2: 2", "scope1.scope2.unset: 0", // expected
+        "scope1.scope2.t3: \"text readout value\"", "No Histograms found"},
+       {"No TextReadouts found"});                   // not expected
+  test("&type=Counters", {"foo.c0: 0", "foo.c1: 1"}, // expected
+       {"No Histograms found", "scope.g2: 2"});      // not expected
+  test("&usedonly", {"foo.c0: 0", "foo.c1: 1"},      // expected
+       {"scope1.scope2.unset"});                     // not expected
+}
+#endif
 
 TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
   const std::string url = "/stats?histogram_buckets=cumulative";
@@ -258,8 +296,7 @@ TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsInvalid) {
   const std::string url = "/stats?histogram_buckets=invalid_input";
   CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
-  EXPECT_EQ("usage: /stats?histogram_buckets=cumulative  or /stats?histogram_buckets=disjoint \n",
-            code_response.second);
+  EXPECT_EQ("usage: /stats?histogram_buckets=(cumulative|disjoint|none)\n", code_response.second);
 }
 
 TEST_F(AdminStatsTest, HandlerStatsJsonNoHistograms) {
@@ -1292,11 +1329,9 @@ TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
   const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
 envoy_cluster_upstream_cx_total{cluster="c2"} 20
-
 # TYPE envoy_cluster_upstream_cx_active gauge
 envoy_cluster_upstream_cx_active{cluster="c1"} 11
 envoy_cluster_upstream_cx_active{cluster="c2"} 12
-
 )EOF";
 
   const CodeResponse code_response = handlerStats(url);
@@ -1337,14 +1372,11 @@ TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTex
   const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
 envoy_cluster_upstream_cx_total{cluster="c2"} 20
-
 # TYPE envoy_cluster_upstream_cx_active gauge
 envoy_cluster_upstream_cx_active{cluster="c1"} 11
 envoy_cluster_upstream_cx_active{cluster="c2"} 12
-
 # TYPE envoy_control_plane_identifier gauge
 envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
-
 )EOF";
 
   const CodeResponse code_response = handlerStats(url);

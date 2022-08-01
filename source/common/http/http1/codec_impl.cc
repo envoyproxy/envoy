@@ -19,6 +19,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/http1/balsa_parser.h"
 #include "source/common/http/http1/header_formatter.h"
 #include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/http/utility.h"
@@ -439,6 +440,14 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   }
   if (Utility::isUpgrade(headers)) {
     upgrade_request_ = true;
+    // If the flag is flipped from true to false all outstanding upgrade requests that are waiting
+    // for upstream connections will become invalid, as Envoy will add chunk encoding to the
+    // protocol stream. This will likely cause the server to disconnect, since it will be unable to
+    // parse the protocol.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade")) {
+      disableChunkEncoding();
+    }
   }
 
   if (connection_.sendFullyQualifiedUrl() && !is_connect) {
@@ -500,10 +509,14 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count) {
-  parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
+    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024);
+  } else {
+    parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
+  }
 }
 
-Status ConnectionImpl::completeLastHeader() {
+Status ConnectionImpl::completeCurrentHeader() {
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
@@ -538,7 +551,8 @@ Status ConnectionImpl::completeLastHeader() {
     RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().TooManyHeaders));
     const absl::string_view header_type =
         processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
-    return codecProtocolError(absl::StrCat(header_type, " count exceeds limit"));
+    return codecProtocolError(
+        absl::StrCat("http/1.1 protocol error: ", header_type, " count exceeds limit"));
   }
 
   header_parsing_state_ = HeaderParsingState::Field;
@@ -571,7 +585,8 @@ Status ConnectionImpl::checkMaxHeadersSize() {
         processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HeadersTooLarge));
-    return codecProtocolError(absl::StrCat(header_type, " size exceeds limit"));
+    return codecProtocolError(
+        absl::StrCat("http/1.1 protocol error: ", header_type, " size exceeds limit"));
   }
   return okStatus();
 }
@@ -746,7 +761,7 @@ Status ConnectionImpl::onHeaderFieldImpl(const char* data, size_t length) {
     allocTrailers();
   }
   if (header_parsing_state_ == HeaderParsingState::Value) {
-    RETURN_IF_ERROR(completeLastHeader());
+    RETURN_IF_ERROR(completeCurrentHeader());
   }
 
   current_header_field_.append(data, length);
@@ -776,8 +791,8 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
   if (current_header_value_.empty()) {
     // Strip leading whitespace if the current header value input contains the first bytes of the
     // encoded header value. Trailing whitespace is stripped once the full header value is known in
-    // ConnectionImpl::completeLastHeader. http_parser does not strip leading or trailing whitespace
-    // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4 .
+    // ConnectionImpl::completeCurrentHeader. http_parser does not strip leading or trailing
+    // whitespace as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4 .
     header_value = StringUtil::ltrim(header_value);
   }
   current_header_value_.append(header_value.data(), header_value.length());
@@ -789,7 +804,7 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   ASSERT(!processing_trailers_);
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "onHeadersCompleteBase", connection_);
-  RETURN_IF_ERROR(completeLastHeader());
+  RETURN_IF_ERROR(completeCurrentHeader());
 
   if (!parser_->isHttp11()) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
@@ -902,7 +917,7 @@ StatusOr<CallbackResult> ConnectionImpl::onMessageCompleteImpl() {
   // If true, this indicates we were processing trailers and must
   // move the last header into current_header_map_
   if (header_parsing_state_ == HeaderParsingState::Value) {
-    RETURN_IF_ERROR(completeLastHeader());
+    RETURN_IF_ERROR(completeCurrentHeader());
   }
 
   return onMessageCompleteBase();
