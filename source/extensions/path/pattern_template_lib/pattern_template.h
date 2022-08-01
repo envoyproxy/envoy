@@ -48,7 +48,8 @@ absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
 
 absl::Status isValidMatchPattern(const std::string match_pattern);
 
-absl::StatusOr<std::string> rewriteURLTemplatePattern( absl::string_view url, absl::string_view capture_regex,
+absl::StatusOr<std::string> rewriteURLTemplatePattern(
+    absl::string_view url, absl::string_view capture_regex,
     const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern);
 
 } // namespace PatternTemplate

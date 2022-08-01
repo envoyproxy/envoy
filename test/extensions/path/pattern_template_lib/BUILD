@@ -14,7 +14,7 @@ envoy_cc_test(
     name = "pattern_template_test",
     srcs = ["pattern_template_test.cc"],
     deps = [
-        "//source/extensions/path/pattern_template_lib:pattern_template_lib",
+        "//source/extensions/path/pattern_template_lib",
         "//source/extensions/path/pattern_template_lib/proto:pattern_template_rewrite_segements_cc_proto",
         "//test/test_common:status_utility_lib",
         "@com_google_absl//absl/status",
