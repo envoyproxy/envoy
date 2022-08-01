@@ -13,7 +13,7 @@ minor_behavior_changes:
   change: |
     added support for intermediate CA as trusted ca. The peer certificate issued by an intermediate CA will be trusted with
     setting valid partial chain in trusted ca, which can not be verified without trusting its ancestor root CA(full chain in trsuted ca)
-    previously. :ref:`trust_ca<envoy_v3_api_msg_extensions.extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca`.
+    previously. :ref:`trust_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
 - area: prometheus_stats
   change: |
     removed blank line for being compatible with OpenMetrics.
