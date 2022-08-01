@@ -965,16 +965,29 @@ TEST_P(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListe
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                            "error adding listener '127.0.0.1:1234': address is not an internal "
-                            "address but an internal listener config is provided");
+                            "error adding listener 'foo': address should not be used "
+                            "when an internal listener config is provided");
+}
+
+TEST_P(ListenerManagerImplTest, RejectListenerWithInternalListenerAddress) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      envoy_internal_address:
+        server_listener_name: test
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+      "error adding listener 'foo': use internal listener field instead of internal address");
 }
 
 TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
   const std::string yaml = R"EOF(
     name: "foo"
-    address:
-      envoy_internal_address:
-        server_listener_name: test_internal_listener_name
+    internal_listener: {}
     filter_chains:
     - filters: []
   )EOF";
@@ -997,14 +1010,14 @@ TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
     EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(new_listener, "version", *manager_, "foo", true,
                                                false, /*hash=*/static_cast<uint64_t>(0)),
                               EnvoyException,
-                              "error adding listener 'envoy://test_internal_listener_name': has "
+                              "error adding listener 'foo': has "
                               "unsupported tcp listener feature");
   }
   {
     auto new_listener = listener;
     new_listener.mutable_socket_options()->Add();
     EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(new_listener), EnvoyException,
-                              "error adding listener 'envoy://test_internal_listener_name': does "
+                              "error adding listener 'foo': does "
                               "not support socket option")
   }
   {
@@ -6169,12 +6182,10 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
 static_listeners:
 )EOF");
 
-  // Add foo listener. The internal listener does not need explicit internal listener field.
+  // Add foo listener.
   const std::string listener_foo_yaml = R"EOF(
 name: test_internal_listener
-address:
-  envoy_internal_address:
-    server_listener_name: test_internal_listener_name
+internal_listener: {}
 filter_chains:
 - filters: []
   name: foo
@@ -6194,9 +6205,7 @@ dynamic_listeners:
       listener:
         "@type": type.googleapis.com/envoy.config.listener.v3.Listener
         name: test_internal_listener
-        address:
-          envoy_internal_address:
-            server_listener_name: test_internal_listener_name
+        internal_listener: {}
         filter_chains:
         - filters: []
           name: foo
@@ -6212,9 +6221,7 @@ dynamic_listeners:
   // Update foo listener. Should share socket.
   const std::string listener_foo_update1_yaml = R"EOF(
 name: test_internal_listener
-address:
-  envoy_internal_address:
-    server_listener_name: test_internal_listener_name
+internal_listener: {}
 filter_chains:
 - filters: []
   name: foo
@@ -6239,9 +6246,7 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_name
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
@@ -6299,9 +6304,7 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_name
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
@@ -6313,9 +6316,7 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_name
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
@@ -6337,13 +6338,10 @@ per_connection_buffer_limit_bytes: 10
   // Add bar listener.
   const std::string listener_bar_yaml = R"EOF(
   name: test_internal_listener_bar
-  address:
-    envoy_internal_address:
-      server_listener_name: test_internal_listener_bar
+  internal_listener: {}
   filter_chains:
   - filters: []
     name: foo
-  internal_listener: {}
     )EOF";
 
   ListenerHandle* listener_bar = expectListenerCreate(false, true);
@@ -6358,13 +6356,10 @@ per_connection_buffer_limit_bytes: 10
   // Add baz listener, this time requiring initializing.
   const std::string listener_baz_yaml = R"EOF(
   name: test_internal_listener_baz
-  address:
-    envoy_internal_address:
-      server_listener_name: test_internal_listener_baz
+  internal_listener: {}
   filter_chains:
   - filters: []
     name: foo
-  internal_listener: {}
     )EOF";
 
   ListenerHandle* listener_baz = expectListenerCreate(true, true);
@@ -6382,9 +6377,7 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_name
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
@@ -6397,13 +6390,10 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener_bar
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_bar
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
-          internal_listener: {}
         last_updated:
           seconds: 4004004004
           nanos: 4000000
@@ -6413,13 +6403,10 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener_baz
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_baz
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
-          internal_listener: {}
         last_updated:
           seconds: 5005005005
           nanos: 5000000
@@ -6432,9 +6419,6 @@ per_connection_buffer_limit_bytes: 10
   // Update baz while it is warming.
   const std::string listener_baz_update1_yaml = R"EOF(
   name: test_internal_listener_baz
-  address:
-    envoy_internal_address:
-      server_listener_name: test_internal_listener_baz
   internal_listener: {}
   filter_chains:
   - filters:

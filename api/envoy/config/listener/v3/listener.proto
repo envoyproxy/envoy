@@ -104,8 +104,6 @@ message Listener {
 
   // Configuration for envoy internal listener. All the future internal listener features should be added here.
   message InternalListenerConfig {
-    // Name of the internal listener. Must be unique across the listeners.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
   }
 
   reserved 14, 23;
@@ -338,8 +336,6 @@ message Listener {
     // Used to represent an internal listener which does not listen on OSI L4 address but can be used by the
     // :ref:`envoy cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` to create a user space connection to.
     // The internal listener acts as a TCP listener. It supports listener filters and network filter chains.
-    // The internal listener requires :ref:`address <envoy_v3_api_field_config.listener.v3.Listener.address>` has
-    // field `envoy_internal_address`.
     //
     // There are some limitations that are derived from the implementation. The known limitations include:
     //
