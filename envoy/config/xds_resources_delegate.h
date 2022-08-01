@@ -19,7 +19,7 @@ public:
   virtual ~XdsResourcesDelegate() = default;
 
   /**
-   * Returns a list of xDS resources for the given authority and type.  It is up to the
+   * Returns a list of xDS resources for the given authority and type. It is up to the
    * implementation to determine what resources to supply, if any.
    *
    * This function is intended to only be called on xDS fetch startup, and allows the
