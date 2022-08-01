@@ -41,7 +41,6 @@ public:
     if (!wasm || wasm->isFailed()) {
       if (handle->plugin()->fail_open_) {
         return nullptr; // Fail open skips adding this filter to callbacks.
-
       } else {
         return std::make_shared<Context>(nullptr, 0,
                                          handle); // Fail closed is handled by an empty Context.
