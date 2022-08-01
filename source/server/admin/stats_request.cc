@@ -204,6 +204,12 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
     return true;
   };
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
+    if (params_.scope_.has_value()) {
+      std::string scope_name = scope->symbolTable().toString(scope->prefix());
+      if (!absl::StartsWith(params_.scope_, scope_name)) {
+        continue;
+      }
+    }
     scope->iterate(check_stat);
   }
 }
