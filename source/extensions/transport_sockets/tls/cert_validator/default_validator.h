@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <string>
@@ -17,7 +18,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/san_matcher.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
@@ -41,16 +42,16 @@ public:
   // Tls::CertValidator
   void addClientValidationContext(SSL_CTX* context, bool require_client_cert) override;
 
-  int doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                        X509& leaf_cert,
-                        const Network::TransportSocketOptions* transport_socket_options) override;
+  int doSynchronousVerifyCertChain(
+      X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
+      const Network::TransportSocketOptions* transport_socket_options) override;
 
   int initializeSslContexts(std::vector<SSL_CTX*> contexts, bool provides_certificates) override;
 
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
 
-  size_t daysUntilFirstCertExpires() const override;
+  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override { return ca_file_path_; };
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 

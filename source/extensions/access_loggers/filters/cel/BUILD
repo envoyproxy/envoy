@@ -12,9 +12,6 @@ envoy_cc_extension(
     name = "cel_lib",
     srcs = ["cel.cc"],
     hdrs = ["cel.h"],
-    extra_visibility = [
-        "//test:__subpackages__",
-    ],
     deps = [
         "//envoy/access_log:access_log_interface",
         "//envoy/http:header_map_interface",
@@ -37,8 +34,9 @@ envoy_cc_extension(
             "-DUSE_CEL_PARSER",
         ],
     }),
+    # legacy test use
     extra_visibility = [
-        "//test:__subpackages__",
+        "//test/common/access_log:__subpackages__",
     ],
     deps = [
         ":cel_lib",

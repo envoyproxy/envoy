@@ -1,15 +1,14 @@
 #pragma once
 
-#include <chrono>
-#include <iostream>
-#include <list>
-#include <memory>
+#include <vector>
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/variant.h"
+#include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/sip_proxy/filters/network/source/operation.h"
 #include "contrib/sip_proxy/filters/network/source/sip.h"
 
@@ -18,209 +17,216 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
 
+#define ALL_PROTOCOL_STATES(FUNCTION)                                                              \
+  FUNCTION(StopIteration)                                                                          \
+  FUNCTION(TransportBegin)                                                                         \
+  FUNCTION(MessageBegin)                                                                           \
+  FUNCTION(MessageEnd)                                                                             \
+  FUNCTION(TransportEnd)                                                                           \
+  FUNCTION(HandleAffinity)                                                                         \
+  FUNCTION(Done)
+
+using TraContextMap = absl::flat_hash_map<std::string, std::string>;
+
+/**
+ * ProtocolState represents a set of states used in a state machine to decode
+ * Sip requests and responses.
+ */
+enum class State { ALL_PROTOCOL_STATES(GENERATE_ENUM) };
+
+class SipHeader : public Logger::Loggable<Logger::Id::filter> {
+public:
+  SipHeader(HeaderType type, absl::string_view value) : type_(type), raw_text_(value) {}
+  void parseHeader();
+
+  bool empty() const { return raw_text_.empty(); }
+
+  // "text" as the special param for raw_text_
+  bool hasParam(absl::string_view param) const {
+    if (param == "text") {
+      return true;
+    }
+
+    for (auto& p : params_) {
+      if (p.first == param) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // "text" as the special param for raw_text_
+  absl::string_view param(absl::string_view param) const {
+    for (const auto& p : params_) {
+      if (p.first == param) {
+        return p.second;
+      }
+    }
+    return "";
+  }
+
+  absl::string_view text() const { return raw_text_; }
+
+  HeaderType type_;
+  absl::string_view raw_text_;
+  std::vector<std::pair<absl::string_view, absl::string_view>> params_;
+};
+
+class AffinityEntry {
+public:
+  AffinityEntry(const std::string& header, const std::string& type, const std::string& key,
+                bool query, bool subscribe)
+      : header_(header), type_(type), key_(key), query_(query), subscribe_(subscribe) {}
+
+  std::string& header() { return header_; }
+  std::string& type() { return type_; }
+  std::string& key() { return key_; }
+  bool query() { return query_; }
+  bool subscribe() { return subscribe_; }
+
+private:
+  std::string header_;
+  std::string type_;
+  std::string key_;
+  bool query_;
+  bool subscribe_;
+};
+
 /**
  * MessageMetadata encapsulates metadata about Sip messages. The various fields are considered
- * optional since they may come from either the transport or protocol in some cases. Unless
- * otherwise noted, accessor methods throw absl::bad_optional_access if the corresponding value has
- * not been set.
+ * optional. Unless otherwise noted, accessor methods throw absl::bad_optional_access if the
+ * corresponding value has not been set.
  */
 class MessageMetadata : public Logger::Loggable<Logger::Id::filter> {
 public:
   MessageMetadata() = default;
   MessageMetadata(std::string&& raw_msg) : raw_msg_(std::move(raw_msg)) {}
 
-  MsgType msgType() { return msg_type_; }
-  MethodType methodType() { return method_type_; }
-  MethodType respMethodType() { return resp_method_type_; }
-  absl::optional<absl::string_view> ep() { return ep_; }
-  std::vector<Operation>& operationList() { return operation_list_; }
-  absl::optional<std::pair<std::string, std::string>> pCookieIpMap() { return p_cookie_ip_map_; }
-
-  absl::optional<absl::string_view> requestURI() { return request_uri_; }
-  absl::optional<absl::string_view> topRoute() { return top_route_; }
-  absl::optional<absl::string_view> domain() { return domain_; }
-  absl::optional<absl::string_view> transactionId() { return transaction_id_; }
-  std::string destination() { return destination_; }
-  std::map<std::string, std::string>& paramMap() { return param_map_; };
-  std::vector<std::pair<std::string, std::string>>& destinationList() { return destination_list_; }
-  std::map<std::string, bool>& queryMap() { return query_map_; }
-  std::map<std::string, bool>& subscribeMap() { return subscribe_map_; }
-  void addDestination(std::string param, std::string value) {
-    destination_list_.emplace_back(std::make_pair(param, value));
-  }
-  void addParam(std::string param, std::string value) { param_map_[param] = value; }
-  void resetParam() { param_map_.clear(); }
-  void addQuery(std::string param, bool value) { query_map_[param] = value; }
-  void addSubscribe(std::string param, bool value) { subscribe_map_[param] = value; }
-
+  /**
+   * The whole SIP message is stored in metadata raw_msg, it is initialized when construct metadata.
+   */
   std::string& rawMsg() { return raw_msg_; }
 
+  MsgType msgType() { return msg_type_; }
   void setMsgType(MsgType data) { msg_type_ = data; }
+
+  MethodType methodType() { return method_type_; }
   void setMethodType(MethodType data) { method_type_ = data; }
-  void setRespMethodType(MethodType data) { resp_method_type_ = data; }
-  void setOperation(Operation op) { operation_list_.emplace_back(op); }
+
+  absl::optional<absl::string_view> ep() { return ep_; }
   void setEP(absl::string_view data) { ep_ = data; }
+
+  absl::optional<absl::string_view> opaque() { return opaque_; }
+  void setOpaque(absl::string_view data) { opaque_ = data; }
+
+  std::vector<Operation>& operationList() { return operation_list_; }
+  void setOperation(Operation op) { operation_list_.emplace_back(op); }
+
+#if 1
+  // TODO Only used for NOKIA customized affinity. should be deleted later.
+  absl::optional<std::pair<std::string, std::string>> pCookieIpMap() { return p_cookie_ip_map_; }
   void setPCookieIpMap(std::pair<std::string, std::string>&& data) { p_cookie_ip_map_ = data; }
+#endif
 
-  void setRequestURI(absl::string_view data) { request_uri_ = data; }
-  void setTopRoute(absl::string_view data) { top_route_ = data; }
-  void setDomain(absl::string_view header, std::string domain_matched_param_name) {
-    domain_ = getDomain(header, domain_matched_param_name);
-  }
+  absl::optional<absl::string_view> transactionId() { return transaction_id_; }
+  /**
+   * @param data full SIP header
+   */
+  void setTransactionId(absl::string_view data);
 
-  void addEPOperation(size_t raw_offset, absl::string_view& header, std::string own_domain,
-                      std::string domain_matched_param_name) {
-    if (header.find(";ep=") != absl::string_view::npos) {
-      // already Contact have ep
-      return;
-    }
-    auto pos = header.find(">");
-    if (pos == absl::string_view::npos) {
-      // no url
-      return;
-    }
-
-    // Get domain
-    absl::string_view domain = getDomain(header, domain_matched_param_name);
-
-    // Compare the domain
-    if (domain != own_domain) {
-      ENVOY_LOG(trace, "header {} domain:{} is not equal to own_domain:{}, don't add EP.", header,
-                domain, own_domain);
-      return;
-    }
-
-    setOperation(Operation(OperationType::Insert, raw_offset + pos, InsertOperationValue(";ep=")));
-  }
-
-  void addOpaqueOperation(size_t raw_offset, absl::string_view& header) {
-    if (header.find(",opaque=") != absl::string_view::npos) {
-      // already has opaque
-      return;
-    }
-    auto pos = header.length();
-    setOperation(
-        Operation(OperationType::Insert, raw_offset + pos, InsertOperationValue(",opaque=")));
-  }
-
-  void deleteInstipOperation(size_t raw_offset, absl::string_view& header) {
-    // Delete inst-ip and remove "sip:" in x-suri
-    if (auto pos = header.find(";inst-ip="); pos != absl::string_view::npos) {
-      setOperation(
-          Operation(OperationType::Delete, raw_offset + pos,
-                    DeleteOperationValue(
-                        header.substr(pos, header.find_first_of(";>", pos + 1) - pos).size())));
-      pos = header.find("x-suri=sip:");
-      if (pos != absl::string_view::npos) {
-        setOperation(Operation(OperationType::Delete, raw_offset + pos + strlen("x-suri="),
-                               DeleteOperationValue(4)));
-      }
-    }
-  }
-
-  // input is the full SIP header
-  void setTransactionId(absl::string_view data) {
-    auto start_index = data.find("branch=");
-    if (start_index == absl::string_view::npos) {
-      return;
-    }
-    start_index += strlen("branch=");
-
-    auto end_index = data.find_first_of(";>", start_index);
-    if (end_index == absl::string_view::npos) {
-      end_index = data.size();
-    }
-    transaction_id_ = data.substr(start_index, end_index - start_index);
-  }
-
+  std::string destination() { return destination_; }
   void setDestination(std::string destination) { destination_ = destination; }
   void resetDestination() { destination_.clear(); }
-  /*only used in UT*/
-  void resetTransactionId() { transaction_id_.reset(); }
 
-  std::vector<std::pair<std::string, std::string>>::iterator destIter;
+  bool stopLoadBalance() { return stop_load_balance_; };
+  void setStopLoadBalance(bool stop_load_balance) { stop_load_balance_ = stop_load_balance; };
+
+  State state() { return state_; };
+  void setState(State state) { state_ = state; };
+
+  std::vector<AffinityEntry>& affinity() { return affinity_; }
+  void resetAffinityIteration() { affinity_iteration_ = affinity_.begin(); }
+  std::vector<AffinityEntry>::iterator& affinityIteration() { return affinity_iteration_; };
+  std::vector<AffinityEntry>::iterator& nextAffinityIteration() {
+    if (affinity_iteration_ != affinity_.end()) {
+      return ++affinity_iteration_;
+    } else {
+      return affinity_iteration_;
+    }
+  };
+
+  void addEPOperation(
+      size_t raw_offset, absl::string_view& header,
+      const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
+          local_services);
+  void addOpaqueOperation(size_t raw_offset, absl::string_view& header);
+  void deleteInstipOperation(size_t raw_offset, absl::string_view& header);
+
+  void addMsgHeader(HeaderType type, absl::string_view value);
+
+  std::string getDomainFromHeaderParameter(absl::string_view& header, const std::string& parameter);
+
+  void parseHeader(HeaderType type, unsigned short index = 0) {
+    return headers_[type][index].parseHeader();
+  }
+
+  // TODO how to combine the interface of header and listHeader?
+  SipHeader header(HeaderType type, unsigned int index = 0) {
+    if (index >= headers_[type].size()) {
+      return SipHeader{type, ""};
+    }
+    return headers_[type].at(index);
+  }
+
+  std::vector<SipHeader>& listHeader(HeaderType type) { return headers_[type]; }
+
+  TraContextMap traContext() {
+    if (tra_context_map_.empty()) {
+      auto fromHeader = listHeader(HeaderType::From).front().text();
+      tra_context_map_.emplace(std::make_pair("method_type", methodStr[methodType()]));
+      tra_context_map_.emplace(std::make_pair("from_header", fromHeader));
+    }
+    return tra_context_map_;
+  }
 
 private:
   MsgType msg_type_;
   MethodType method_type_;
-  MethodType resp_method_type_;
+  std::vector<std::vector<SipHeader>> headers_{HeaderType::HeaderMaxNum};
+
   std::vector<Operation> operation_list_;
   absl::optional<absl::string_view> ep_{};
-  absl::optional<absl::string_view> pep_{};
-  absl::optional<absl::string_view> route_ep_{};
-  absl::optional<absl::string_view> route_opaque_{};
+  absl::optional<absl::string_view> opaque_{};
 
   absl::optional<std::pair<std::string, std::string>> p_cookie_ip_map_{};
 
-  absl::optional<absl::string_view> request_uri_{};
-  absl::optional<absl::string_view> top_route_{};
-  absl::optional<absl::string_view> domain_{};
   absl::optional<absl::string_view> transaction_id_{};
-  std::string destination_ = "";
-  // Params get from Top Route header
-  std::map<std::string, std::string> param_map_{};
-  // Destination get from param_map_ ordered by CustomizedAffinity, not queried
-  std::vector<std::pair<std::string, std::string>> destination_list_{};
-  // Could do remote query for this param
-  std::map<std::string, bool> query_map_{};
-  // Could do remote subscribe for this param
-  std::map<std::string, bool> subscribe_map_{};
+
+  std::string destination_{};
+
+  std::vector<AffinityEntry> affinity_{};
+  std::vector<AffinityEntry>::iterator affinity_iteration_{affinity_.begin()};
 
   std::string raw_msg_{};
+  State state_{State::TransportBegin};
+  bool stop_load_balance_{};
 
-  absl::string_view getDomain(absl::string_view header, std::string domain_matched_param_name) {
-    // ENVOY_LOG(error, "header: {}\ndomain_matched_param_name: {}", header,
-    // domain_matched_param_name);
+  TraContextMap tra_context_map_{};
 
-    // Get domain
-    absl::string_view domain = "";
-
-    if (domain_matched_param_name != "host") {
-      auto start = header.find(domain_matched_param_name);
-      if (start == absl::string_view::npos) {
-        domain = "";
-      } else {
-        // domain_matched_param_name + "="
-        // start = start + strlen(domain_matched_param_name.c_str()) + strlen("=") ;
-        start = start + domain_matched_param_name.length() + strlen("=");
-        if ("sip:" == header.substr(start, strlen("sip:"))) {
-          start += strlen("sip:");
-        }
-        // end
-        auto end = header.find_first_of(":;>", start);
-        if (end == absl::string_view::npos) {
-          domain = "";
-        } else {
-          domain = header.substr(start, end - start);
-        }
+  bool isDomainMatched(
+      absl::string_view& header,
+      const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
+          local_services) {
+    for (auto& service : local_services) {
+      if (service.parameter().empty() || service.domain().empty()) {
+        // no default value
+        continue;
+      }
+      if (service.domain() == getDomainFromHeaderParameter(header, service.parameter())) {
+        return true;
       }
     }
-
-    // Still get host if mapped domain is empty
-    if (domain_matched_param_name == "host" || domain == "") {
-      auto start = header.find("sip:");
-      if (start == absl::string_view::npos) {
-        return "";
-      }
-      start += strlen("sip:");
-      auto end = header.find_first_of(":;>", start);
-      if (end == absl::string_view::npos) {
-        return "";
-      }
-
-      auto addr = header.substr(start, end - start);
-
-      // Remove name in format of sip:name@addr:pos
-      auto pos = addr.find("@");
-      if (pos == absl::string_view::npos) {
-        domain = header.substr(start, end - start);
-      } else {
-        pos += strlen("@");
-        domain = addr.substr(pos, addr.length() - pos);
-      }
-    }
-
-    return domain;
+    return false;
   }
 };
 

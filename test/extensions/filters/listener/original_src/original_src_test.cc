@@ -62,6 +62,7 @@ protected:
 
 TEST_F(OriginalSrcTest, OnNewConnectionUnixSocketSkips) {
   auto filter = makeDefaultFilter();
+  EXPECT_EQ(filter->maxReadBytes(), 0);
   setAddressToReturn("unix://domain.socket");
   EXPECT_CALL(callbacks_.socket_, addOption_(_)).Times(0);
   EXPECT_EQ(filter->onAccept(callbacks_), Network::FilterStatus::Continue);

@@ -78,10 +78,14 @@ public:
         name: secure-mode
         transport_socket:
           name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
       - match: {}
         name: default-mode
         transport_socket:
           name: envoy.transport_sockets.raw_buffer
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
  )EOF",
                  Cluster::InitializePhase::Secondary);
   }
@@ -121,14 +125,14 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_);
-    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
-                                                std::move(scope), false);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+    cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_.loader(),
+                                                factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
@@ -145,6 +149,7 @@ public:
     VERBOSE_EXPECT_NO_THROW(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   bool initialized_{};
   Stats::TestUtil::TestStore stats_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
@@ -154,7 +159,7 @@ public:
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
   NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  TestScopedRuntime runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
@@ -162,6 +167,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Server::MockOptions options_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
@@ -1456,6 +1462,130 @@ TEST_F(EdsTest, EndpointLocality) {
   EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
+// Validate that onConfigUpdate() updates the endpoint locality of an existing endpoint.
+TEST_F(EdsTest, EndpointLocalityUpdated) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* locality = endpoints->mutable_locality();
+  locality->set_region("oceania");
+  locality->set_zone("hello");
+  locality->set_sub_zone("world");
+
+  {
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("1.2.3.4");
+    endpoint_address->set_port_value(80);
+  }
+  {
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("2.3.4.5");
+    endpoint_address->set_port_value(80);
+  }
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(0, hosts[i]->priority());
+    const auto& locality = hosts[i]->locality();
+    EXPECT_EQ("oceania", locality.region());
+    EXPECT_EQ("hello", locality.zone());
+    EXPECT_EQ("world", locality.sub_zone());
+  }
+  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
+
+  // Update locality now
+  locality->set_region("space");
+  locality->set_zone("station");
+  locality->set_sub_zone("mars");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  auto& updatedHosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(updatedHosts.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(0, updatedHosts[i]->priority());
+    const auto& locality = updatedHosts[i]->locality();
+    EXPECT_EQ("space", locality.region());
+    EXPECT_EQ("station", locality.zone());
+    EXPECT_EQ("mars", locality.sub_zone());
+  }
+}
+
+// Validate that onConfigUpdate() does not update the endpoint locality if fix for the issue,
+// https://github.com/envoyproxy/envoy/issues/12392, is disabled.
+// Unlike EndpointLocalityUpdated, runtime feature flag is disabled this time and then it is
+// verified that locality update does not happen on eds cluster endpoints.
+TEST_F(EdsTest, EndpointLocalityNotUpdatedIfFixDisabled) {
+  runtime_.mergeValues(
+      {{"envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints", "false"}});
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* locality = endpoints->mutable_locality();
+  locality->set_region("oceania");
+  locality->set_zone("hello");
+  locality->set_sub_zone("world");
+
+  {
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("1.2.3.4");
+    endpoint_address->set_port_value(80);
+  }
+  {
+    auto* endpoint_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+    endpoint_address->set_address("2.3.4.5");
+    endpoint_address->set_port_value(80);
+  }
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(0, hosts[i]->priority());
+    const auto& locality = hosts[i]->locality();
+    EXPECT_EQ("oceania", locality.region());
+    EXPECT_EQ("hello", locality.zone());
+    EXPECT_EQ("world", locality.sub_zone());
+  }
+  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
+
+  // Update locality now
+  locality->set_region("space");
+  locality->set_zone("station");
+  locality->set_sub_zone("mars");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  // runtime flag is disabled, verify that locality does not get updated
+  auto& updatedHosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(updatedHosts.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(0, updatedHosts[i]->priority());
+    const auto& locality = updatedHosts[i]->locality();
+    EXPECT_EQ("oceania", locality.region());
+    EXPECT_EQ("hello", locality.zone());
+    EXPECT_EQ("world", locality.sub_zone());
+  }
+}
+
 // Validate that onConfigUpdate() does not propagate locality weights to the host set when
 // locality weighted balancing isn't configured and the cluster does not use LB policy extensions.
 TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
@@ -1576,6 +1706,9 @@ TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLocalityWeightedConfig) {
 // Validate that onConfigUpdate() propagates locality weights to the host set when the cluster uses
 // load balancing policy extensions.
 TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLoadBalancingPolicyConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.
   expectLocalityWeightsPresentForClusterConfig(R"EOF(

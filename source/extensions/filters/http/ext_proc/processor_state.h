@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 #include "envoy/http/filter.h"
@@ -12,6 +13,8 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+
+#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,7 +54,7 @@ private:
   uint32_t bytes_enqueued_{};
 };
 
-class ProcessorState : public Logger::Loggable<Logger::Id::filter> {
+class ProcessorState : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   // This describes whether the filter is waiting for a response to a gRPC message.
   // We use it to determine how to respond to stream messages send back from
@@ -76,16 +79,17 @@ public:
     TrailersCallback,
   };
 
-  explicit ProcessorState(Filter& filter)
+  explicit ProcessorState(Filter& filter,
+                          envoy::config::core::v3::TrafficDirection traffic_direction)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
         complete_body_available_(false), trailers_available_(false), body_replaced_(false),
-        partial_body_processed_(false) {}
+        partial_body_processed_(false), traffic_direction_(traffic_direction) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
 
+  envoy::config::core::v3::TrafficDirection trafficDirection() const { return traffic_direction_; }
   CallbackState callbackState() const { return callback_state_; }
-  void setCallbackState(CallbackState state) { callback_state_ = state; }
   void setPaused(bool paused) { paused_ = paused; }
 
   bool completeBodyAvailable() const { return complete_body_available_; }
@@ -106,16 +110,19 @@ public:
   void setHeaders(Http::RequestOrResponseHeaderMap* headers) { headers_ = headers; }
   void setTrailers(Http::HeaderMap* trailers) { trailers_ = trailers; }
 
-  void startMessageTimer(Event::TimerCb cb, std::chrono::milliseconds timeout);
-  void cleanUpTimer() const;
+  void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
+                            CallbackState callback_state);
+  void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
+                             CallbackState next_state = CallbackState::Idle);
 
   // Idempotent methods for watermarking the body
   virtual void requestWatermark() PURE;
   virtual void clearWatermark() PURE;
 
-  bool handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
-  bool handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
-  bool handleTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response);
+  absl::Status handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
+  absl::Status
+  handleTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response);
 
   virtual const Buffer::Instance* bufferedData() const PURE;
   bool hasBufferedData() const { return bufferedData() != nullptr && bufferedData()->length() > 0; }
@@ -188,13 +195,15 @@ protected:
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
   ChunkQueue chunk_queue_;
+  absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
+  const envoy::config::core::v3::TrafficDirection traffic_direction_;
 };
 
 class DecodingProcessorState : public ProcessorState {
 public:
   explicit DecodingProcessorState(
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
-      : ProcessorState(filter) {
+      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND) {
     setProcessingModeInternal(mode);
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
@@ -264,7 +273,7 @@ class EncodingProcessorState : public ProcessorState {
 public:
   explicit EncodingProcessorState(
       Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
-      : ProcessorState(filter) {
+      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND) {
     setProcessingModeInternal(mode);
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;

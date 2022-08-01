@@ -63,6 +63,10 @@ absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
     if (!ssl_info.dnsSansPeerCertificate().empty()) {
       return CelValue::CreateString(&ssl_info.dnsSansPeerCertificate()[0]);
     }
+  } else if (value == SHA256PeerCertificateDigest) {
+    if (!ssl_info.sha256PeerCertificateDigest().empty()) {
+      return CelValue::CreateString(&ssl_info.sha256PeerCertificateDigest());
+    }
   }
   return {};
 }
@@ -128,6 +132,15 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
       return convertHeaderEntry(headers_.value_->RequestId());
     } else if (value == UserAgent) {
       return convertHeaderEntry(headers_.value_->UserAgent());
+    } else if (value == Query) {
+      absl::string_view path = headers_.value_->getPathValue();
+      auto query_offset = path.find('?');
+      if (query_offset == absl::string_view::npos) {
+        return CelValue::CreateStringView(absl::string_view());
+      }
+      path = path.substr(query_offset + 1);
+      auto fragment_offset = path.find('#');
+      return CelValue::CreateStringView(path.substr(0, fragment_offset));
     }
   }
   return {};
@@ -276,8 +289,8 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
     return {};
   }
   auto value = key.StringOrDie().value();
-  if (filter_state_.hasDataWithName(value)) {
-    const StreamInfo::FilterState::Object* object = filter_state_.getDataReadOnlyGeneric(value);
+  if (const StreamInfo::FilterState::Object* object = filter_state_.getDataReadOnlyGeneric(value);
+      object != nullptr) {
     const CelState* cel_state = dynamic_cast<const CelState*>(object);
     if (cel_state) {
       return cel_state->exprValue(arena_, false);

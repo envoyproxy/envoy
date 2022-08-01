@@ -61,12 +61,12 @@ protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),
         cluster_manager_factory_(
-            server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-            server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
-            server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
-            server_.httpContext(), server_.grpcContext(), server_.routerContext(),
-            server_.accessLogManager(), server_.singletonManager(), server_.options(),
-            server_.quic_stat_names_) {}
+            server_context_, server_.admin(), server_.runtime(), server_.stats(),
+            server_.threadLocal(), server_.dnsResolver(), server_.sslContextManager(),
+            server_.dispatcher(), server_.localInfo(), server_.secretManager(),
+            server_.messageValidationContext(), *api_, server_.httpContext(), server_.grpcContext(),
+            server_.routerContext(), server_.accessLogManager(), server_.singletonManager(),
+            server_.options(), server_.quic_stat_names_, server_) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -75,6 +75,7 @@ protected:
   }
 
   Api::ApiPtr api_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Server::MockInstance> server_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
 };
@@ -435,7 +436,8 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
-                            "Didn't find a registered implementation for name: 'invalid'");
+                            "Didn't find a registered implementation for 'invalid' with type URL: "
+                            "'envoy.config.trace.v2.BlackHoleConfig'");
 }
 
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
@@ -511,9 +513,9 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
   sink.set_name("envoy.invalid");
 
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
-                            EnvoyException,
-                            "Didn't find a registered implementation for name: 'envoy.invalid'");
+  EXPECT_THROW_WITH_MESSAGE(
+      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      "Didn't find a registered implementation for 'envoy.invalid' with type URL: ''");
 }
 
 TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
@@ -550,7 +552,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
-                            "Provided name for static registration lookup was empty.");
+                            "Didn't find a registered implementation for '' with type URL: ''");
 }
 
 TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
@@ -591,7 +593,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
-                            "Provided name for static registration lookup was empty.");
+                            "Didn't find a registered implementation for '' with type URL: ''");
 }
 
 // An explicit non-empty LayeredRuntime is available to the server with no

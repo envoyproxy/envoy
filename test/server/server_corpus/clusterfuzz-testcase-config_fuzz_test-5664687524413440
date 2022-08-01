@@ -54,7 +54,6 @@ static_resources {
           tls_certificate_sds_secret_configs {
             sds_config {
               api_config_source {
-                api_type: REST
                 grpc_services {
                   google_grpc {
                     target_uri: "name"
@@ -111,7 +110,6 @@ static_resources {
             name: "\177"
             sds_config {
               api_config_source {
-                api_type: REST
                 grpc_services {
                   google_grpc {
                     target_uri: "name"
@@ -158,7 +156,6 @@ static_resources {
             name: "\177"
             sds_config {
               api_config_source {
-                api_type: REST
                 grpc_services {
                   google_grpc {
                     target_uri: "name"

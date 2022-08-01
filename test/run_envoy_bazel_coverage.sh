@@ -2,7 +2,7 @@
 
 set -e
 
-LLVM_VERSION="12.0.1"
+LLVM_VERSION="14.0.0"
 CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ */\1/')
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
@@ -94,7 +94,7 @@ fi
 
 if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
-    COVERAGE_THRESHOLD=24.0
+    COVERAGE_THRESHOLD=23.75
   fi
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then

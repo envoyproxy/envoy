@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -19,16 +19,16 @@ public:
   FilterConfig(
       const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
           proto_config,
-      Http::AlternateProtocolsCacheManagerFactory& alternate_protocol_cache_manager_factory,
+      Http::HttpServerPropertiesCacheManagerFactory& alternate_protocol_cache_manager_factory,
       TimeSource& time_source);
 
   // Returns the alternate protocols cache for the current thread.
-  Http::AlternateProtocolsCacheSharedPtr getAlternateProtocolCache(Event::Dispatcher& dispatcher);
+  Http::HttpServerPropertiesCacheSharedPtr getAlternateProtocolCache(Event::Dispatcher& dispatcher);
 
   TimeSource& timeSource() { return time_source_; }
 
 private:
-  const Http::AlternateProtocolsCacheManagerSharedPtr alternate_protocol_cache_manager_;
+  const Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocol_cache_manager_;
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config_;
   TimeSource& time_source_;
 };
@@ -50,7 +50,7 @@ public:
   void onDestroy() override;
 
 private:
-  const Http::AlternateProtocolsCacheSharedPtr cache_;
+  const Http::HttpServerPropertiesCacheSharedPtr cache_;
   TimeSource& time_source_;
 };
 

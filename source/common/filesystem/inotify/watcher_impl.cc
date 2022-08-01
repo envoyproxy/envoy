@@ -16,8 +16,8 @@
 namespace Envoy {
 namespace Filesystem {
 
-WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
-    : api_(api), inotify_fd_(inotify_init1(IN_NONBLOCK)),
+WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& file_system)
+    : file_system_(file_system), inotify_fd_(inotify_init1(IN_NONBLOCK)),
       inotify_event_(dispatcher.createFileEvent(
           inotify_fd_,
           [this](uint32_t events) -> void {
@@ -34,7 +34,7 @@ WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
 void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb callback) {
   // Because of general inotify pain, we always watch the directory that the file lives in,
   // and then synthetically raise per file events.
-  const PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
+  const PathSplitResult result = file_system_.splitPathFromFilename(path);
 
   const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
   int watch_fd = inotify_add_watch(inotify_fd_, std::string(result.directory_).c_str(), watch_mask);

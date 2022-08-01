@@ -61,7 +61,7 @@ TEST_P(SocketInterfaceIntegrationTest, Basic) {
         response.append(data.toString());
         conn.close(Network::ConnectionCloseType::FlushWrite);
       });
-  connection->run();
+  ASSERT_TRUE(connection->run());
   EXPECT_EQ("hello", response);
 }
 
@@ -77,8 +77,9 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
           Network::Test::getLoopbackAddressUrlString(Network::Address::IpVersion::v4),
           lookupPort("listener_0"), sock_interface);
 
-  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                                Network::Test::createRawBufferSocket(), nullptr);
+  client_ =
+      dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                          Network::Test::createRawBufferSocket(), nullptr, nullptr);
 
   client_->addConnectionCallbacks(connect_callbacks_);
   client_->connect();
@@ -89,7 +90,8 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
   client_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
-// Test that connecting to internal address will crash.
+// Test that connecting to internal address will crash if the user space socket extension is not
+// linked.
 TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
@@ -102,8 +104,8 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
 
   ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
                    address, Network::Address::InstanceConstSharedPtr(),
-                   Network::Test::createRawBufferSocket(), nullptr),
-               "panic: not implemented");
+                   Network::Test::createRawBufferSocket(), nullptr, nullptr),
+               "" /* Nullptr dereference */);
 }
 
 // Test that recv from internal address will crash.

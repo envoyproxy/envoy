@@ -43,9 +43,10 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
         Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.matcher());
     return factory.create(permission.matcher(), validation_visitor);
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::rbac::v3::Permission::RuleCase::RULE_NOT_SET:
+    break; // Fall through to PANIC.
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& principal) {
@@ -75,9 +76,10 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const NotMatcher>(principal.not_id());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kUrlPath:
     return std::make_shared<const PathMatcher>(principal.url_path());
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::rbac::v3::Principal::IdentifierCase::IDENTIFIER_NOT_SET:
+    break; // Fall through to PANIC.
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set,
@@ -158,8 +160,6 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   case DownstreamRemote:
     ip = info.downstreamAddressProvider().remoteAddress();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return range_.isInRange(*ip.get());
 }

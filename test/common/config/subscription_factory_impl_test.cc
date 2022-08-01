@@ -17,6 +17,7 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
@@ -43,7 +44,7 @@ public:
   SubscriptionFactoryTest()
       : http_request_(&cm_.thread_local_cluster_.async_client_),
         api_(Api::createApiForTest(stats_store_, random_)),
-        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_) {}
+        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, server_) {}
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
@@ -69,6 +70,7 @@ public:
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockInstance> server_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   SubscriptionFactoryImpl subscription_factory_;
@@ -80,8 +82,7 @@ class SubscriptionFactoryTestUnifiedOrLegacyMux
 public:
   SubscriptionFactoryTestUnifiedOrLegacyMux() {
     if (GetParam() == LegacyOrUnified::Unified) {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.unified_mux", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.unified_mux", "true"}});
     }
   }
 

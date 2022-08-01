@@ -6,7 +6,7 @@
 #include "source/common/http/context_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -51,6 +51,7 @@ public:
   MOCK_METHOD(Admin&, admin, ());
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
+  MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const));
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Network::DnsResolverSharedPtr, dnsResolver, ());
@@ -195,6 +196,7 @@ public:
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
+  testing::NiceMock<MockOptions> options_;
 };
 
 } // namespace Configuration

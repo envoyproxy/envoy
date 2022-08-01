@@ -24,6 +24,12 @@ MockClusterManager::MockClusterManager()
   ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));
   ON_CALL(*this, localClusterName()).WillByDefault((ReturnRef(local_cluster_name_)));
   ON_CALL(*this, subscriptionFactory()).WillByDefault(ReturnRef(subscription_factory_));
+  ON_CALL(*this, allocateOdCdsApi(_, _, _))
+      .WillByDefault(Invoke([](const envoy::config::core::v3::ConfigSource&,
+                               OptRef<xds::core::v3::ResourceLocator>,
+                               ProtobufMessage::ValidationVisitor&) -> OdCdsApiHandlePtr {
+        return MockOdCdsApiHandle::create();
+      }));
 }
 
 MockClusterManager::~MockClusterManager() = default;

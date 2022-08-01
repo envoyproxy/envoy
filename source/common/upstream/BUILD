@@ -45,13 +45,45 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "od_cds_api_lib",
+    srcs = ["od_cds_api_impl.cc"],
+    hdrs = ["od_cds_api_impl.h"],
+    deps = [
+        ":cds_api_helper_lib",
+        "//envoy/config:subscription_interface",
+        "//envoy/protobuf:message_validator_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "cluster_discovery_manager_lib",
+    srcs = ["cluster_discovery_manager.cc"],
+    hdrs = ["cluster_discovery_manager.h"],
+    deps = [
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:enum_to_int",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
     deps = [
         ":cds_api_lib",
+        ":cluster_discovery_manager_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
+        ":od_cds_api_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
         "//envoy/api:api_interface",
@@ -67,6 +99,7 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/config:custom_config_validators_lib",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/config:subscription_factory_lib",
@@ -74,7 +107,7 @@ envoy_cc_library(
         "//source/common/config:xds_resource_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:async_client_lib",
-        "//source/common/http:alternate_protocols_cache",
+        "//source/common/http:http_server_properties_cache",
         "//source/common/http:mixed_conn_pool",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
@@ -335,6 +368,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_factory_interface",
         "//source/common/common:empty_string",
         "//source/common/network:address_lib",
+        "//source/common/network:filter_state_dst_address_lib",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -505,6 +539,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/network:dns_interface",

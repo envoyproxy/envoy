@@ -17,6 +17,13 @@ namespace Network {
  */
 class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
+  /**
+   * Check whether we are a) on Android or an Apple platform and b) configured via runtime to always
+   * use v6 sockets.
+   * This appears to be what Android OS does for all platform sockets.
+   */
+  static bool forceV6();
+
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                               absl::optional<int> domain = absl::nullopt)
       : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
@@ -80,6 +87,7 @@ public:
 
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
   absl::optional<std::string> interfaceName() override;
 
 protected:

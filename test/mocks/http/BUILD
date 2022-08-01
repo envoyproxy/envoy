@@ -10,11 +10,11 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_mock(
-    name = "alternate_protocols_cache_mocks",
-    srcs = ["alternate_protocols_cache.cc"],
-    hdrs = ["alternate_protocols_cache.h"],
+    name = "http_server_properties_cache_mocks",
+    srcs = ["http_server_properties_cache.cc"],
+    hdrs = ["http_server_properties_cache.h"],
     deps = [
-        "//envoy/http:alternate_protocols_cache_interface",
+        "//envoy/http:http_server_properties_cache_interface",
     ],
 )
 
@@ -35,6 +35,15 @@ envoy_cc_mock(
         "//envoy/http:conn_pool_interface",
         "//test/mocks:common_lib",
         "//test/mocks/upstream:host_mocks",
+    ],
+)
+
+envoy_cc_mock(
+    name = "header_validator_mocks",
+    hdrs = ["header_validator.h"],
+    deps = [
+        "//envoy/http:header_validator_interface",
+        "//test/mocks:common_lib",
     ],
 )
 

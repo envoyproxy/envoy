@@ -22,9 +22,9 @@ struct XRayConfiguration {
 };
 
 enum class SamplingDecision {
+  Unknown, // default
   Sampled,
   NotSampled,
-  Unknown,
 };
 
 /**

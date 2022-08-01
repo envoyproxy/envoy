@@ -1,8 +1,8 @@
 #pragma once
 
-#include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/common/http/conn_pool_base.h"
-#include "source/common/http/http3_status_tracker.h"
+#include "source/common/http/http3/conn_pool.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -14,6 +14,7 @@ namespace Http {
 // [WiFi / cellular] [ipv4 / ipv6] [QUIC / TCP].
 // Currently only [QUIC / TCP are handled]
 class ConnectivityGrid : public ConnectionPool::Instance,
+                         public Http3::PoolConnectResultCallback,
                          protected Logger::Loggable<Logger::Id::pool> {
 public:
   struct ConnectivityOptions {
@@ -38,7 +39,7 @@ public:
                            public LinkedObject<WrapperCallbacks> {
   public:
     WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder, PoolIterator pool_it,
-                     ConnectionPool::Callbacks& callbacks);
+                     ConnectionPool::Callbacks& callbacks, const Instance::StreamOptions& options);
 
     // This holds state for a single connection attempt to a specific pool.
     class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
@@ -54,7 +55,7 @@ public:
                          absl::string_view transport_failure_reason,
                          Upstream::HostDescriptionConstSharedPtr host) override;
       void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                       const StreamInfo::StreamInfo& info,
+                       StreamInfo::StreamInfo& info,
                        absl::optional<Http::Protocol> protocol) override;
 
       ConnectionPool::Instance& pool() { return **pool_it_; }
@@ -92,7 +93,7 @@ public:
     // Called by a ConnectionAttempt when the underlying pool is ready.
     void onConnectionAttemptReady(ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
                                   Upstream::HostDescriptionConstSharedPtr host,
-                                  const StreamInfo::StreamInfo& info,
+                                  StreamInfo::StreamInfo& info,
                                   absl::optional<Http::Protocol> protocol);
 
   private:
@@ -125,6 +126,8 @@ public:
     bool http3_attempt_failed_{};
     // True if the TCP attempt succeeded.
     bool tcp_attempt_succeeded_{};
+    // Latch the passed-in stream options.
+    const Instance::StreamOptions stream_options_{};
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
@@ -133,10 +136,9 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                   AlternateProtocolsCacheSharedPtr alternate_protocols,
-                   std::chrono::milliseconds next_attempt_duration,
+                   HttpServerPropertiesCacheSharedPtr alternate_protocols,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-                   Stats::Scope& scope);
+                   Stats::Scope& scope, Http::PersistentQuicInfo& quic_info);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
@@ -145,7 +147,8 @@ public:
   // Http::ConnPool::Instance
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
-                                         ConnectionPool::Callbacks& callbacks) override;
+                                         ConnectionPool::Callbacks& callbacks,
+                                         const Instance::StreamOptions& options) override;
   void addIdleCallback(IdleCb cb) override;
   bool isIdle() const override;
   void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override;
@@ -171,12 +174,20 @@ public:
   // event that HTTP/3 is marked broken again.
   void markHttp3Confirmed();
 
+  // Http3::PoolConnectResultCallback
+  void onHandshakeComplete() override;
+  void onZeroRttHandshakeFailed() override;
+
 protected:
   // Set the required idle callback on the pool.
   void setupPool(ConnectionPool::Instance& pool);
 
 private:
   friend class ConnectivityGridForTest;
+
+  // Return origin of the remote host. If the host doesn't have an IP address,
+  // the port of the origin will be 0.
+  HttpServerPropertiesCache::Http3StatusTracker& getHttp3StatusTracker() const;
 
   // Called by each pool as it idles. The grid is responsible for calling
   // idle_callbacks_ once all pools have idled.
@@ -200,9 +211,7 @@ private:
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
-  Http3StatusTracker http3_status_tracker_;
-  // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
-  AlternateProtocolsCacheSharedPtr alternate_protocols_;
+  HttpServerPropertiesCacheSharedPtr alternate_protocols_;
 
   // True iff this pool is draining. No new streams or connections should be created
   // in this state.
@@ -227,6 +236,11 @@ private:
 
   Quic::QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  // The origin for this pool.
+  // Note the host name here is based off of the host name used for SNI, which
+  // may be from the cluster config, or the request headers for auto-sni.
+  HttpServerPropertiesCache::Origin origin_;
+  Http::PersistentQuicInfo& quic_info_;
 };
 
 } // namespace Http

@@ -4,15 +4,18 @@
 #include <vector>
 
 #include "envoy/admin/v3/mutex_stats.pb.h"
+#include "envoy/server/admin.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
-#include "source/common/html/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/memory/stats.h"
 #include "source/server/admin/admin_html_generator.h"
 #include "source/server/admin/prometheus_stats.h"
-#include "source/server/admin/utils.h"
+#include "source/server/admin/stats_request.h"
+
+#include "absl/strings/numbers.h"
 
 #include "absl/strings/numbers.h"
 
@@ -84,73 +87,7 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
   return Http::Code::OK;
 }
 
-bool StatsHandler::Params::shouldShowMetric(const Stats::Metric& metric) const {
-  if (used_only_ && !metric.used()) {
-    return false;
-  }
-  if (filter_.has_value()) {
-    std::string name = metric.name();
-    if (!std::regex_search(name, filter_.value())) {
-      return false;
-    }
-  }
-  return true;
-}
-
-Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& response) {
-  query_ = Http::Utility::parseAndDecodeQueryString(url);
-  used_only_ = query_.find("usedonly") != query_.end();
-  pretty_ = query_.find("pretty") != query_.end();
-  prometheus_text_readouts_ = query_.find("text_readouts") != query_.end();
-  if (!Utility::filterParam(query_, response, filter_)) {
-    return Http::Code::BadRequest;
-  }
-  if (filter_.has_value()) {
-    filter_string_ = query_.find("filter")->second;
-  }
-
-  auto parse_type = [](absl::string_view str, Type& type) {
-    if (str == GaugesLabel) {
-      type = Type::Gauges;
-    } else if (str == CountersLabel) {
-      type = Type::Counters;
-    } else if (str == HistogramsLabel) {
-      type = Type::Histograms;
-    } else if (str == TextReadoutsLabel) {
-      type = Type::TextReadouts;
-    } else if (str == AllLabel) {
-      type = Type::All;
-    } else {
-      return false;
-    }
-    return true;
-  };
-
-  auto type_iter = query_.find("type");
-  if (type_iter != query_.end() && !parse_type(type_iter->second, type_)) {
-    response.add("invalid &type= param");
-    return Http::Code::BadRequest;
-  }
-
-  const absl::optional<std::string> format_value = Utility::formatParam(query_);
-  if (format_value.has_value()) {
-    if (format_value.value() == "prometheus") {
-      format_ = Format::Prometheus;
-    } else if (format_value.value() == "json") {
-      format_ = Format::Json;
-    } else if (format_value.value() == "text") {
-      format_ = Format::Text;
-    } else if (format_value.value() == "html") {
-      format_ = Format::Html;
-    } else {
-      response.add("usage: /stats?format=json  or /stats?format=prometheus \n\n");
-      return Http::Code::BadRequest;
-    }
-  }
-
-  return Http::Code::OK;
-}
-
+#if 0
 Http::Code StatsHandler::handlerStats(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response,
@@ -498,29 +435,82 @@ void StatsHandler::Context::collectHelper(const Stats::Store& stats, std::functi
     fn(*histogram);
   }
 }
+#endif
+
+Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream& /*admin_stream*/) {
+  StatsParams params;
+  Buffer::OwnedImpl response;
+  Http::Code code = params.parse(path, response);
+  if (code != Http::Code::OK) {
+    return Admin::makeStaticTextRequest(response, code);
+  }
+
+  if (params.format_ == StatsFormat::Prometheus) {
+    // TODO(#16139): modify streaming algorithm to cover Prometheus.
+    //
+    // This may be easiest to accomplish by populating the set
+    // with tagExtractedName(), and allowing for vectors of
+    // stats as multiples will have the same tag-extracted names.
+    // Ideally we'd find a way to do this without slowing down
+    // the non-Prometheus implementations.
+    Buffer::OwnedImpl response;
+    prometheusFlushAndRender(params, response);
+    return Admin::makeStaticTextRequest(response, code);
+  }
+
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+
+  return makeRequest(server_.stats(), params,
+                     [this]() -> Admin::UrlHandler { return statsHandler(); });
+}
+
+Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
+                                            StatsRequest::UrlHandlerFn url_handler_fn) {
+  return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
+}
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response, AdminStream&) {
-  Params params;
+  return prometheusStats(path_and_query, response);
+}
+
+Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
+                                         Buffer::Instance& response) {
+  StatsParams params;
   Http::Code code = params.parse(path_and_query, response);
   if (code != Http::Code::OK) {
     return code;
   }
+
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
-  Stats::Store& stats = server_.stats();
+
+  prometheusFlushAndRender(params, response);
+  return Http::Code::OK;
+}
+
+void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response) {
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
+}
+
+void StatsHandler::prometheusRender(Stats::Store& stats,
+                                    const Stats::CustomStatNamespaces& custom_namespaces,
+                                    const StatsParams& params, Buffer::Instance& response) {
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       params.prometheus_text_readouts_ ? stats.textReadouts()
                                        : std::vector<Stats::TextReadoutSharedPtr>();
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
-                                              text_readouts_vec, response, params.used_only_,
-                                              params.filter_, server_.api().customStatNamespaces());
-  return Http::Code::OK;
+                                              text_readouts_vec, response, params,
+                                              custom_namespaces);
 }
 
-// TODO(ambuc) Export this as a server (?) stat for monitoring.
 Http::Code StatsHandler::handlerContention(absl::string_view,
                                            Http::ResponseHeaderMap& response_headers,
                                            Buffer::Instance& response, AdminStream&) {
@@ -541,51 +531,28 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 }
 
 Admin::UrlHandler StatsHandler::statsHandler() {
-  return {"/stats",
-          "Print server stats.",
-          MAKE_ADMIN_HANDLER(handlerStats),
-          false,
-          false,
-          {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
-            "Only include stats that have been written by system since restart"},
-           {Admin::ParamDescriptor::Type::String, "filter",
-            "Regular expression (ecmascript) for filtering stats"},
-           {Admin::ParamDescriptor::Type::Enum,
-            "format",
-            "File format to use.",
-            {"html", "text", "json"}},
-           {Admin::ParamDescriptor::Type::Enum,
-            "type",
-            "Stat types to include.",
-            {AllLabel, CountersLabel, HistogramsLabel, GaugesLabel, TextReadoutsLabel}}}};
-}
-
-absl::string_view StatsHandler::typeToString(StatsHandler::Type type) {
-  static constexpr absl::string_view TextReadouts = "TextReadouts";
-  static constexpr absl::string_view Counters = "Counters";
-  static constexpr absl::string_view Gauges = "Gauges";
-  static constexpr absl::string_view Histograms = "Histograms";
-  static constexpr absl::string_view All = "All";
-
-  absl::string_view ret;
-  switch (type) {
-  case Type::TextReadouts:
-    ret = TextReadouts;
-    break;
-  case Type::Counters:
-    ret = Counters;
-    break;
-  case Type::Gauges:
-    ret = Gauges;
-    break;
-  case Type::Histograms:
-    ret = Histograms;
-    break;
-  case Type::All:
-    ret = All;
-    break;
-  }
-  return ret;
+  return {
+      "/stats",
+      "print server stats",
+      [this](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
+        return makeRequest(path, admin_stream);
+      },
+      false,
+      false,
+      {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+        "Only include stats that have been written by system since restart"},
+       {Admin::ParamDescriptor::Type::String, "filter",
+        "Regular expression (ecmascript) for filtering stats"},
+       {Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {"html", "text", "json"}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "type",
+        "Stat types to include.",
+        {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
+         StatLabels::TextReadouts}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "histogram_buckets",
+        "Histogram bucket display mode",
+        {"cumulative", "disjoint", "none"}}}};
 }
 
 } // namespace Server

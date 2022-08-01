@@ -3,6 +3,7 @@
 #include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
+#include "source/common/http/message_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/filters/network/wasm/config.h"
 #include "source/extensions/filters/network/wasm/wasm_filter.h"
@@ -22,7 +23,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Wasm {
 
-class WasmNetworkFilterConfigTest : public testing::TestWithParam<std::string> {
+class WasmNetworkFilterConfigTest
+    : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmNetworkFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
     ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
@@ -57,23 +59,18 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNetworkFilterConfigTest,
-                         Envoy::Extensions::Common::Wasm::runtime_values);
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
@@ -106,14 +103,8 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code =
-      GetParam() != "null"
+      std::get<0>(GetParam()) != "null"
           ? TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
                 "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"))
           : "NetworkTestCpp";
@@ -122,7 +113,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                        GetParam(), R"EOF("
+                                        std::get<0>(GetParam()), R"EOF("
       code:
         local: { inline_bytes: ")EOF",
                                         Base64::encode(code.data(), code.size()), R"EOF(" }
@@ -146,7 +137,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCode) {
     name: "test"
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                        GetParam(), R"EOF("
+                                        std::get<0>(GetParam()), R"EOF("
       code:
         local: { inline_string: "bad code" }
   )EOF");
@@ -166,7 +157,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
     fail_open: true
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                        GetParam(), R"EOF("
+                                        std::get<0>(GetParam()), R"EOF("
       code:
         local: { inline_string: "bad code" }
   )EOF");
@@ -180,20 +171,14 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
@@ -209,13 +194,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
@@ -223,7 +202,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
     fail_open: true
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
@@ -237,20 +216,14 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefault) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
@@ -270,20 +243,14 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefaul
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
@@ -305,20 +272,14 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
@@ -339,6 +300,119 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
+}
+
+TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  const std::string invalid_yaml =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                               std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
+    configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "invalid"
+  )EOF"));
+
+  envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(invalid_yaml, proto_config);
+  WasmFilterConfig factory;
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, context_),
+                            Envoy::Extensions::Common::Wasm::WasmException,
+                            "Unable to create Wasm network filter ");
+  const std::string valid_yaml =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                               std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
+    configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "valid"
+  )EOF"));
+  TestUtility::loadFromYaml(valid_yaml, proto_config);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
+  EXPECT_CALL(init_watcher_, ready());
+  context_.initManager().initialize(init_watcher_);
+  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+
+  TestUtility::loadFromYaml(invalid_yaml, proto_config);
+  auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
+  EXPECT_EQ(filter_config->createFilter(), nullptr);
+}
+
+TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"));
+  const std::string sha256 = Hex::encode(
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      code:
+        remote:
+          http_uri:
+            uri: https://example.com/data
+            cluster: cluster_1
+            timeout: 5s
+          sha256: )EOF",
+                                                                    sha256));
+  envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  WasmFilterConfig factory;
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  cluster_manager_.initializeThreadLocalClusters({"cluster_1"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
+  Http::AsyncClient::Callbacks* async_callbacks = nullptr;
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            if (!async_callbacks) {
+              async_callbacks = &callbacks;
+            }
+            return &request;
+          }));
+  NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
+  EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(threadlocal));
+  threadlocal.registered_ = false;
+  auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
+  EXPECT_EQ(filter_config->createFilter(), nullptr);
+  EXPECT_CALL(init_watcher_, ready());
+  context_.initManager().initialize(init_watcher_);
+  auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})};
+  response->body().add(code);
+  async_callbacks->onSuccess(request, std::move(response));
+  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  threadlocal.registered_ = true;
+  EXPECT_NE(filter_config->createFilter(), nullptr);
 }
 
 } // namespace Wasm

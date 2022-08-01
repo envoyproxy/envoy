@@ -44,8 +44,6 @@ std::string PayloadOptions::protocolName() const {
     return "binary";
   case ProtocolType::Compact:
     return "compact";
-  case ProtocolType::Twitter:
-    return "finagle";
   default:
     PANIC("reached unexpected code");
   }

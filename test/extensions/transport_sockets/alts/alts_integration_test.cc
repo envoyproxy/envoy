@@ -117,8 +117,6 @@ public:
 
     config_helper_.prependFilter(R"EOF(
     name: decode-dynamic-metadata-filter
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.Empty
     )EOF");
 
     HttpIntegrationTest::initialize();
@@ -187,7 +185,7 @@ public:
   }
 
   Network::TransportSocketPtr makeAltsTransportSocket() {
-    auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
+    auto client_transport_socket = client_alts_->createTransportSocket(nullptr, nullptr);
     client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
     client_tsi_socket_->setActualFrameSizeToUse(16384);
     client_tsi_socket_->setFrameOverheadSize(4);
@@ -198,7 +196,8 @@ public:
     auto client_transport_socket = makeAltsTransportSocket();
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               std::move(client_transport_socket), nullptr);
+                                               std::move(client_transport_socket), nullptr,
+                                               nullptr);
   }
 
   std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {
@@ -242,7 +241,7 @@ public:
   std::unique_ptr<grpc::Server> fake_handshaker_server_;
   ConditionalInitializer fake_handshaker_server_ci_;
   int fake_handshaker_server_port_{};
-  Network::TransportSocketFactoryPtr client_alts_;
+  Network::UpstreamTransportSocketFactoryPtr client_alts_;
   TsiSocket* client_tsi_socket_{nullptr};
   bool capturing_handshaker_;
   CapturingHandshakerService* capturing_handshaker_service_;

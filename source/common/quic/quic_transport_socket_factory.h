@@ -6,7 +6,10 @@
 #include "envoy/ssl/context_config.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
+
+#include "quiche/quic/core/crypto/quic_crypto_client_config.h"
 
 namespace Envoy {
 namespace Quic {
@@ -34,23 +37,15 @@ QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::st
 // socket for QUIC in current implementation. This factory doesn't provides a
 // transport socket, instead, its derived class provides TLS context config for
 // server and client.
-class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory,
-                                       protected Logger::Loggable<Logger::Id::quic> {
+class QuicTransportSocketFactoryBase : protected Logger::Loggable<Logger::Id::quic> {
 public:
   QuicTransportSocketFactoryBase(Stats::Scope& store, const std::string& perspective)
       : stats_(generateStats(store, perspective)) {}
 
+  virtual ~QuicTransportSocketFactoryBase() = default;
+
   // To be called right after construction.
   virtual void initialize() PURE;
-
-  // Network::TransportSocketFactory
-  Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr /*options*/) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  bool implementsSecureTransport() const override { return true; }
-  bool usesProxyProtocolOptions() const override { return false; }
-  bool supportsAlpn() const override { return true; }
 
 protected:
   virtual void onSecretUpdated() PURE;
@@ -59,10 +54,19 @@ protected:
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
 // differentiate server and client side context config.
-class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
+class QuicServerTransportSocketFactory : public Network::DownstreamTransportSocketFactory,
+                                         public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(Stats::Scope& store, Ssl::ServerContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)) {}
+  QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
+                                   Ssl::ServerContextConfigPtr config)
+      : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)),
+        enable_early_data_(enable_early_data) {}
+
+  // Network::DownstreamTransportSocketFactory
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override {
+    PANIC("not implemented");
+  }
+  bool implementsSecureTransport() const override { return true; }
 
   void initialize() override {
     config_->setSecretUpdateCallback([this]() {
@@ -82,20 +86,29 @@ public:
     return config_->tlsCertificates();
   }
 
+  bool earlyDataEnabled() const { return enable_early_data_; }
+
 protected:
   void onSecretUpdated() override { stats_.context_config_update_by_sds_.inc(); }
 
 private:
   Ssl::ServerContextConfigPtr config_;
+  bool enable_early_data_;
 };
 
-class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
+class QuicClientTransportSocketFactory : public Network::CommonUpstreamTransportSocketFactory,
+                                         public QuicTransportSocketFactoryBase {
 public:
   QuicClientTransportSocketFactory(
       Ssl::ClientContextConfigPtr config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
 
   void initialize() override {}
+  bool implementsSecureTransport() const override { return true; }
+  bool supportsAlpn() const override { return true; }
+  absl::string_view defaultServerNameIndication() const override {
+    return clientContextConfig().serverNameIndication();
+  }
 
   // As documented above for QuicTransportSocketFactoryBase, the actual HTTP/3
   // code does not create transport sockets.
@@ -104,8 +117,9 @@ public:
   // is needed. In this case the QuicClientTransportSocketFactory falls over to
   // using the fallback factory.
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override {
-    return fallback_factory_->createTransportSocket(options);
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr host) const override {
+    return fallback_factory_->createTransportSocket(options, host);
   }
 
   virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
@@ -114,6 +128,10 @@ public:
     return fallback_factory_->config();
   }
 
+  // Returns a crypto config generated from the up-to-date client context config. Once the passed in
+  // context config gets updated, a new crypto config object will be returned by this method.
+  std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig();
+
 protected:
   // fallback_factory_ will update the context.
   void onSecretUpdated() override {}
@@ -121,6 +139,11 @@ protected:
 private:
   // The QUIC client transport socket can create TLS sockets for fallback to TCP.
   std::unique_ptr<Extensions::TransportSockets::Tls::ClientSslSocketFactory> fallback_factory_;
+  // Latch the latest client context, to determine if it has updated since last
+  // checked.
+  Envoy::Ssl::ClientContextSharedPtr client_context_;
+  // If client_context_ changes, client config will be updated as well.
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
 };
 
 // Base class to create above QuicTransportSocketFactory for server and client
@@ -137,7 +160,7 @@ class QuicServerTransportSocketConfigFactory
       public Server::Configuration::DownstreamTransportSocketConfigFactory {
 public:
   // Server::Configuration::DownstreamTransportSocketConfigFactory
-  Network::TransportSocketFactoryPtr
+  Network::DownstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) override;
@@ -153,7 +176,7 @@ class QuicClientTransportSocketConfigFactory
       public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
   // Server::Configuration::UpstreamTransportSocketConfigFactory
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
 

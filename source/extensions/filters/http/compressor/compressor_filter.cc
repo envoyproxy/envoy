@@ -30,12 +30,26 @@ const uint64_t DefaultMinimumContentLength = 30;
 
 // Default content types will be used if any is provided by the user.
 const std::vector<std::string>& defaultContentEncoding() {
-  CONSTRUCT_ON_FIRST_USE(
-      std::vector<std::string>,
-      {"text/html", "text/plain", "text/css", "application/javascript", "application/x-javascript",
-       "text/javascript", "text/x-javascript", "text/ecmascript", "text/js", "text/jscript",
-       "text/x-js", "application/ecmascript", "application/x-json", "application/xml",
-       "application/json", "image/svg+xml", "text/xml", "application/xhtml+xml"});
+  CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {"text/html",
+                                                    "text/plain",
+                                                    "text/css",
+                                                    "application/javascript",
+                                                    "application/x-javascript",
+                                                    "text/javascript",
+                                                    "text/x-javascript",
+                                                    "text/ecmascript",
+                                                    "text/js",
+                                                    "text/jscript",
+                                                    "text/x-js",
+                                                    "application/ecmascript",
+                                                    "application/x-json",
+                                                    "application/xml",
+                                                    "application/json",
+                                                    "image/svg+xml",
+                                                    "text/xml",
+                                                    "application/xhtml+xml",
+                                                    "application/grpc-web",
+                                                    "application/grpc-web+proto"});
 }
 
 // List of CompressorFilterConfig objects registered for a stream.
@@ -214,9 +228,8 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   // to be used for a request, with e.g. "Accept-Encoding: deflate;q=0.75, gzip;q=0.5", and caches
   // it in the state. All other compression filters in the sequence use the cached decision.
   const StreamInfo::FilterStateSharedPtr& filter_state = callbacks.streamInfo().filterState();
-  if (filter_state->hasData<CompressorRegistry>(key)) {
-    CompressorRegistry& registry = filter_state->getDataMutable<CompressorRegistry>(key);
-    registry.filter_configs_.push_back(config_);
+  if (auto registry = filter_state->getDataMutable<CompressorRegistry>(key); registry != nullptr) {
+    registry->filter_configs_.push_back(config_);
   } else {
     auto registry_ptr = std::make_unique<CompressorRegistry>();
     registry_ptr->filter_configs_.push_back(config_);
@@ -228,6 +241,8 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
   const auto& config = config_->responseDirectionConfig();
+
+  // This is used to decide whether stats for accept-encoding header should be touched.
   const bool isEnabledAndContentLengthBigEnough =
       config.compressionEnabled() && config.isMinimumContentLength(headers);
 
@@ -235,7 +250,7 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
       isEnabledAndContentLengthBigEnough && !Http::Utility::isUpgrade(headers) &&
       config.isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
       isEtagAllowed(headers) && !headers.getInline(response_content_encoding_handle.handle());
-  if (!end_stream && isEnabledAndContentLengthBigEnough && isAcceptEncodingAllowed(headers) &&
+  if (!end_stream && isAcceptEncodingAllowed(isEnabledAndContentLengthBigEnough, headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
     sanitizeEtagHeader(headers);
     headers.removeContentLength();
@@ -309,11 +324,13 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   // Find all compressors enabled for the filter chain.
   std::map<std::string, uint32_t> allowed_compressors;
   uint32_t registration_count{0};
-  for (const auto& filter_config :
-       decoder_callbacks_->streamInfo()
-           .filterState()
-           ->getDataReadOnly<CompressorRegistry>(compressorRegistryKey())
-           .filter_configs_) {
+
+  auto typed_state =
+      decoder_callbacks_->streamInfo().filterState()->getDataReadOnly<CompressorRegistry>(
+          compressorRegistryKey());
+  ASSERT(typed_state != nullptr);
+
+  for (const auto& filter_config : (*typed_state).filter_configs_) {
     // A compressor filter may be limited to compress certain Content-Types. If the response's
     // content type doesn't match the list of content types this filter is enabled for then
     // it must be excluded from the decision process.
@@ -453,7 +470,14 @@ bool CompressorFilter::shouldCompress(const CompressorFilter::EncodingDecision& 
   return should_compress;
 }
 
-bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const {
+bool CompressorFilter::isAcceptEncodingAllowed(bool maybe_compress,
+                                               const Http::ResponseHeaderMap& headers) const {
+  // Return false immediately if we are not going to compress irrespective of the content of
+  // accept-encoding. This way we neither need to update stats nor choose the right encoding.
+  if (!maybe_compress) {
+    return false;
+  }
+
   if (accept_encoding_ == nullptr) {
     config_->responseDirectionConfig().responseStats().no_accept_header_.inc();
     return false;
@@ -464,10 +488,10 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
   // Check if we have already cached our decision on encoding.
   const StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
-  if (filter_state->hasData<CompressorFilter::EncodingDecision>(encoding_decision_key)) {
-    const CompressorFilter::EncodingDecision& decision =
-        filter_state->getDataReadOnly<CompressorFilter::EncodingDecision>(encoding_decision_key);
-    return shouldCompress(decision);
+  if (auto typed_state =
+          filter_state->getDataReadOnly<CompressorFilter::EncodingDecision>(encoding_decision_key);
+      typed_state != nullptr) {
+    return shouldCompress(*typed_state);
   }
 
   // No cached decision found, so decide now.
@@ -530,6 +554,7 @@ bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMa
                                  Http::Headers::get().TransferEncodingValues.Deflate) ||
           absl::EqualsIgnoreCase(trimmed_value,
                                  Http::Headers::get().TransferEncodingValues.Compress) ||
+          absl::EqualsIgnoreCase(trimmed_value, Http::Headers::get().TransferEncodingValues.Zstd) ||
           // or with a custom non-standard compression provided by an external
           // compression library.
           absl::EqualsIgnoreCase(trimmed_value, config_->contentEncoding())) {

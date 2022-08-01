@@ -5,6 +5,8 @@ licenses(["notice"])  # Apache 2
 api_cc_test(
     name = "pgv_test",
     srcs = ["pgv_test.cc"],
+    # Workaround for https://github.com/bazelbuild/bazel/issues/13819
+    linkstatic = True,
     deps = [
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

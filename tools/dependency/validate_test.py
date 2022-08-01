@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Tests for validate.py"""
 
+import asyncio
 import unittest
 
 import validate
@@ -26,10 +27,10 @@ class FakeBuildGraph(object):
         self._reachable_deps = reachable_deps
         self._extensions = extensions
 
-    def query_external_deps(self, *targets, exclude=None):
+    async def query_external_deps(self, *targets, exclude=None):
         result = set(sum((self._reachable_deps.get(t, []) for t in targets), []))
         if exclude:
-            result = result - self.query_external_deps(*exclude)
+            result = result - await self.query_external_deps(*exclude)
         return result
 
     def list_extensions(self):
@@ -52,7 +53,7 @@ class ValidateTest(unittest.TestCase):
             '//source/extensions/...': ['b'],
             '//source/...': ['a', 'b']
         })
-        validator.validate_build_graph_structure()
+        asyncio.run(validator.validate_build_graph_structure())
 
     def test_invalid_build_graph_structure(self):
         validator = self.build_validator({}, {
@@ -61,41 +62,46 @@ class ValidateTest(unittest.TestCase):
             '//source/...': ['a', 'b', 'c']
         })
         self.assertRaises(
-            validate.DependencyError, lambda: validator.validate_build_graph_structure())
+            validate.DependencyError,
+            lambda: asyncio.run(validator.validate_build_graph_structure()))
 
     def test_valid_test_only_deps(self):
         validator = self.build_validator({'a': fake_dep('dataplane_core')}, {'//source/...': ['a']})
-        validator.validate_test_only_deps()
+        asyncio.run(validator.validate_test_only_deps())
         validator = self.build_validator({'a': fake_dep('test_only')},
                                          {'//test/...': ['a', 'b__pip3']})
-        validator.validate_test_only_deps()
+        asyncio.run(validator.validate_test_only_deps())
 
     def test_invalid_test_only_deps(self):
         validator = self.build_validator({'a': fake_dep('test_only')}, {'//source/...': ['a']})
-        self.assertRaises(validate.DependencyError, lambda: validator.validate_test_only_deps())
+        self.assertRaises(
+            validate.DependencyError, lambda: asyncio.run(validator.validate_test_only_deps()))
         validator = self.build_validator({'a': fake_dep('test_only')}, {'//test/...': ['b']})
-        self.assertRaises(validate.DependencyError, lambda: validator.validate_test_only_deps())
+        self.assertRaises(
+            validate.DependencyError, lambda: asyncio.run(validator.validate_test_only_deps()))
 
     def test_valid_dataplane_core_deps(self):
         validator = self.build_validator({'a': fake_dep('dataplane_core')},
                                          {'//source/common/http/...': ['a']})
-        validator.validate_data_plane_core_deps()
+        asyncio.run(validator.validate_data_plane_core_deps())
 
     def test_invalid_dataplane_core_deps(self):
         validator = self.build_validator({'a': fake_dep('controlplane')},
                                          {'//source/common/http/...': ['a']})
         self.assertRaises(
-            validate.DependencyError, lambda: validator.validate_data_plane_core_deps())
+            validate.DependencyError,
+            lambda: asyncio.run(validator.validate_data_plane_core_deps()))
 
     def test_valid_controlplane_deps(self):
         validator = self.build_validator({'a': fake_dep('controlplane')},
                                          {'//source/common/config/...': ['a']})
-        validator.validate_control_plane_deps()
+        asyncio.run(validator.validate_control_plane_deps())
 
     def test_invalid_controlplane_deps(self):
         validator = self.build_validator({'a': fake_dep('other')},
                                          {'//source/common/config/...': ['a']})
-        self.assertRaises(validate.DependencyError, lambda: validator.validate_control_plane_deps())
+        self.assertRaises(
+            validate.DependencyError, lambda: asyncio.run(validator.validate_control_plane_deps()))
 
     def test_valid_extension_deps(self):
         validator = self.build_validator({
@@ -105,7 +111,7 @@ class ValidateTest(unittest.TestCase):
             '//source/extensions/foo/...': ['a', 'b'],
             '//source/exe:envoy_main_common_with_core_extensions_lib': ['a']
         })
-        validator.validate_extension_deps('foo', '//source/extensions/foo/...')
+        asyncio.run(validator.validate_extension_deps('foo', '//source/extensions/foo/...'))
 
     def test_invalid_extension_deps_wrong_category(self):
         validator = self.build_validator({
@@ -116,8 +122,8 @@ class ValidateTest(unittest.TestCase):
             '//source/exe:envoy_main_common_with_core_extensions_lib': ['a']
         })
         self.assertRaises(
-            validate.DependencyError,
-            lambda: validator.validate_extension_deps('foo', '//source/extensions/foo/...'))
+            validate.DependencyError, lambda: asyncio.run(
+                validator.validate_extension_deps('foo', '//source/extensions/foo/...')))
 
     def test_invalid_extension_deps_allowlist(self):
         validator = self.build_validator({
@@ -128,8 +134,8 @@ class ValidateTest(unittest.TestCase):
             '//source/exe:envoy_main_common_with_core_extensions_lib': ['a']
         })
         self.assertRaises(
-            validate.DependencyError,
-            lambda: validator.validate_extension_deps('foo', '//source/extensions/foo/...'))
+            validate.DependencyError, lambda: asyncio.run(
+                validator.validate_extension_deps('foo', '//source/extensions/foo/...')))
 
 
 if __name__ == '__main__':

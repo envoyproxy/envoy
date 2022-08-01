@@ -107,7 +107,8 @@ std::string OpenTracingSpan::getBaggage(absl::string_view key) {
   return span_->BaggageItem({key.data(), key.length()});
 }
 
-void OpenTracingSpan::injectContext(Tracing::TraceContext& trace_context) {
+void OpenTracingSpan::injectContext(Tracing::TraceContext& trace_context,
+                                    const Upstream::HostDescriptionConstSharedPtr&) {
   if (driver_.propagationMode() == OpenTracingDriver::PropagationMode::SingleHeader) {
     // Inject the span context using Envoy's single-header format.
     std::ostringstream oss;

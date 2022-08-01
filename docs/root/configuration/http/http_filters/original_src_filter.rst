@@ -3,8 +3,8 @@
 Original Source
 ===============
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.original_src.v3.OriginalSrc``.
 * :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.original_src.v3.OriginalSrc>`
-* This filter should be configured with the name *envoy.filters.http.original_src*.
 
 The original source http filter replicates the downstream remote address of the connection on
 the upstream side of Envoy. For example, if a downstream connection connects to Envoy with IP
@@ -73,3 +73,5 @@ The following example configures Envoy to use the original source for all connec
         "@type": type.googleapis.com/envoy.extensions.filters.listener.original_src.v3.OriginalSrc
         mark: 123
     - name: envoy.filters.http.router
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

@@ -48,10 +48,22 @@ std::string sanitizeValue(const absl::string_view value) {
  * not show it if we only wanted used metrics.
  */
 template <class StatType>
-static bool shouldShowMetric(const StatType& metric, const bool used_only,
-                             const absl::optional<std::regex>& regex) {
-  return ((!used_only || metric.used()) &&
-          (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
+static bool shouldShowMetric(const StatType& metric, const StatsParams& params) {
+  // This duplicates logic in StatsRequest::populateStatsFromScopes, but differs
+  // in one subtle way: in Prometheus we only use metric.name() for filtering,
+  // not rendering, so we only construct the name if there's a filter.
+  if (params.used_only_ && !metric.used()) {
+    return false;
+  }
+  if (params.filter_ != nullptr) {
+    if (!std::regex_search(metric.name(), *params.filter_)) {
+      return false;
+    }
+  } else if (params.re2_filter_ != nullptr &&
+             !re2::RE2::PartialMatch(metric.name(), *params.re2_filter_)) {
+    return false;
+  }
+  return true;
 }
 
 /*
@@ -80,7 +92,7 @@ struct MetricLessThan {
  */
 template <class StatType>
 uint64_t outputStatType(
-    Buffer::Instance& response, const bool used_only, const absl::optional<std::regex>& regex,
+    Buffer::Instance& response, const StatsParams& params,
     const std::vector<Stats::RefcountPtr<StatType>>& metrics,
     const std::function<std::string(
         const StatType& metric, const std::string& prefixed_tag_extracted_name)>& generate_output,
@@ -121,11 +133,9 @@ uint64_t outputStatType(
 
   for (const auto& metric : metrics) {
     ASSERT(&global_symbol_table == &metric->constSymbolTable());
-
-    if (!shouldShowMetric(*metric, used_only, regex)) {
+    if (!shouldShowMetric(*metric, params)) {
       continue;
     }
-
     groups[metric->tagExtractedStatName()].push_back(metric.get());
   }
 
@@ -148,7 +158,6 @@ uint64_t outputStatType(
     for (const auto& metric : group.second) {
       response.add(generate_output(*metric, prefixed_tag_extracted_name.value()));
     }
-    response.add("\n");
   }
   return result;
 }
@@ -256,26 +265,22 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::GaugeSharedPtr>& gauges,
     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts, Buffer::Instance& response,
-    const bool used_only, const absl::optional<std::regex>& regex,
-    const Stats::CustomStatNamespaces& custom_namespaces) {
+    const StatsParams& params, const Stats::CustomStatNamespaces& custom_namespaces) {
 
   uint64_t metric_name_count = 0;
-  metric_name_count += outputStatType<Stats::Counter>(response, used_only, regex, counters,
+  metric_name_count += outputStatType<Stats::Counter>(response, params, counters,
                                                       generateNumericOutput<Stats::Counter>,
                                                       "counter", custom_namespaces);
 
-  metric_name_count +=
-      outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
-                                   generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
+  metric_name_count += outputStatType<Stats::Gauge>(
+      response, params, gauges, generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
 
   // TextReadout stats are returned in gauge format, so "gauge" type is set intentionally.
-  metric_name_count +=
-      outputStatType<Stats::TextReadout>(response, used_only, regex, text_readouts,
-                                         generateTextReadoutOutput, "gauge", custom_namespaces);
+  metric_name_count += outputStatType<Stats::TextReadout>(
+      response, params, text_readouts, generateTextReadoutOutput, "gauge", custom_namespaces);
 
-  metric_name_count += outputStatType<Stats::ParentHistogram>(response, used_only, regex,
-                                                              histograms, generateHistogramOutput,
-                                                              "histogram", custom_namespaces);
+  metric_name_count += outputStatType<Stats::ParentHistogram>(
+      response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
 
   return metric_name_count;
 }

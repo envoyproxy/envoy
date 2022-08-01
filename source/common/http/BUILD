@@ -123,11 +123,41 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dependency_manager",
+    srcs = ["dependency_manager.cc"],
+    hdrs = ["dependency_manager.h"],
+    external_deps = [
+        "abseil_status",
+    ],
+    deps = [
+        "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_chain_helper_lib",
+    srcs = ["filter_chain_helper.cc"],
+    hdrs = ["filter_chain_helper.h"],
+    deps = [
+        ":dependency_manager",
+        "//envoy/config:config_provider_manager_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/router:route_config_provider_manager_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/filter:config_discovery_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_base_lib",
     srcs = ["conn_pool_base.cc"],
     hdrs = ["conn_pool_base.h"],
     deps = [
         ":codec_client_lib",
+        ":http_server_properties_cache",
         "//envoy/http:conn_pool_interface",
         "//envoy/stats:timespan_interface",
         "//source/common/common:linked_object",
@@ -143,6 +173,7 @@ envoy_cc_library(
     hdrs = ["mixed_conn_pool.h"],
     deps = [
         ":conn_pool_base_lib",
+        ":http_server_properties_cache",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//source/common/tcp:conn_pool_lib",
@@ -150,30 +181,32 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "http3_status_tracker",
-    srcs = ["http3_status_tracker.cc"],
-    hdrs = ["http3_status_tracker.h"],
+    name = "http3_status_tracker_impl_lib",
+    srcs = ["http3_status_tracker_impl.cc"],
+    hdrs = ["http3_status_tracker_impl.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
+        "//envoy/http:http_server_properties_cache_interface",
     ],
 )
 
 envoy_cc_library(
-    name = "alternate_protocols_cache",
+    name = "http_server_properties_cache",
     srcs = [
-        "alternate_protocols_cache_impl.cc",
-        "alternate_protocols_cache_manager_impl.cc",
+        "http_server_properties_cache_impl.cc",
+        "http_server_properties_cache_manager_impl.cc",
     ],
     hdrs = [
-        "alternate_protocols_cache_impl.h",
-        "alternate_protocols_cache_manager_impl.h",
+        "http_server_properties_cache_impl.h",
+        "http_server_properties_cache_manager_impl.h",
     ],
     external_deps = ["quiche_quic_platform"],
     deps = [
+        ":http3_status_tracker_impl_lib",
         "//envoy/common:time_interface",
         "//envoy/event:dispatcher_interface",
-        "//envoy/http:alternate_protocols_cache_interface",
+        "//envoy/http:http_server_properties_cache_interface",
         "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:resource_manager_interface",
@@ -191,8 +224,8 @@ envoy_cc_library(
     srcs = ["conn_pool_grid.cc"],
     hdrs = ["conn_pool_grid.h"],
     deps = [
-        ":alternate_protocols_cache",
-        ":http3_status_tracker",
+        ":http3_status_tracker_impl_lib",
+        ":http_server_properties_cache",
         ":mixed_conn_pool",
         "//source/common/http/http3:conn_pool_lib",
         "//source/common/quic:quic_stat_names_lib",
@@ -206,6 +239,7 @@ envoy_cc_library(
         ":date_provider_lib",
         "//envoy/config:config_provider_interface",
         "//envoy/http:filter_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/http:original_ip_detection_interface",
         "//envoy/http:request_id_extension_interface",
         "//envoy/router:rds_interface",
@@ -238,9 +272,7 @@ envoy_cc_library(
         "//source/common/http/matching:inputs_lib",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
-        "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -277,6 +309,7 @@ envoy_cc_library(
         "//envoy/http:context_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:drain_decision_interface",
@@ -303,7 +336,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/match_wrapper:config",
+        "//source/common/http/match_delegate:config",
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
@@ -349,6 +382,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/common:hashable_interface",
         "//envoy/http:hash_policy_interface",
+        "//source/common/common:matchers_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -501,7 +535,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_googlesource_googleurl//url:envoy_url",
+        "@com_googlesource_googleurl//url",
     ],
 )
 

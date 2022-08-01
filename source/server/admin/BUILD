@@ -2,6 +2,8 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_admin_html",
+    "envoy_select_admin_no_html",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +12,11 @@ envoy_package()
 
 envoy_cc_library(
     name = "admin_lib",
-    srcs = ["admin.cc"],
+    srcs = ["admin.cc"] + envoy_select_admin_html([
+        "admin_html.cc",
+    ]) + envoy_select_admin_no_html([
+        "admin_no_html.cc",
+    ]),
     hdrs = ["admin.h"],
     deps = [
         ":admin_filter_lib",
@@ -120,6 +126,58 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "stats_params_lib",
+    srcs = ["stats_params.cc"],
+    hdrs = ["stats_params.h"],
+    deps = [
+        ":utils_lib",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/server:admin_interface",
+        "//source/common/stats:histogram_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "stats_request_lib",
+    srcs = ["stats_request.cc"],
+    hdrs = ["stats_request.h"],
+    deps = [
+        ":handler_ctx_lib",
+        ":prometheus_stats_lib",
+        ":stats_params_lib",
+        ":stats_render_lib",
+        ":utils_lib",
+        "//envoy/http:codes_interface",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/stats:histogram_lib",
+        "@com_google_absl//absl/container:btree",
+    ],
+)
+
+envoy_cc_library(
+    name = "stats_render_lib",
+    srcs = ["stats_render.cc"] + envoy_select_admin_html([
+        ":generate_admin_html",
+        "stats_html_render.cc",
+    ]),
+    hdrs = ["stats_render.h"] + envoy_select_admin_html([
+        "stats_html_render.h",
+    ]),
+    deps = [
+        ":stats_params_lib",
+        ":utils_lib",
+        "//envoy/server:admin_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/json:json_sanitizer_lib",
+        "//source/common/stats:histogram_lib",
+    ] + envoy_select_admin_html([
+        "//source/common/html:utility_lib",
+    ]),
+)
+
+envoy_cc_library(
     name = "stats_handler_lib",
     srcs = ["stats_handler.cc"],
     hdrs = ["stats_handler.h"],
@@ -127,16 +185,16 @@ envoy_cc_library(
         ":admin_html_generator_lib",
         ":handler_ctx_lib",
         ":prometheus_stats_lib",
+        ":stats_render_lib",
+        ":stats_request_lib",
         ":utils_lib",
         "//envoy/http:codes_interface",
         "//envoy/server:admin_interface",
         "//envoy/server:instance_interface",
         "//source/common/buffer:buffer_lib",
-        "//source/common/html:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/memory:stats_lib",
-        "//source/common/stats:histogram_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )
@@ -146,6 +204,7 @@ envoy_cc_library(
     srcs = ["prometheus_stats.cc"],
     hdrs = ["prometheus_stats.h"],
     deps = [
+        ":stats_params_lib",
         ":utils_lib",
         "//envoy/stats:custom_stat_namespaces_interface",
         "//source/common/buffer:buffer_lib",

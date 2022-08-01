@@ -2,8 +2,8 @@
 
 External Processing
 ===================
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor``.
 * :ref:`Http filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`
-* This filter should be configured with the name *envoy.filters.http.ext_proc*
 
 The external processing filter connects an external service, called an "external processor,"
 to the filter chain. The processing service itself implements a gRPC interface that allows
@@ -48,3 +48,5 @@ The following statistics are supported:
   streams_closed, Counter, The number of streams successfully closed on either end
   streams_failed, Counter, The number of times a stream produced a gRPC error
   failure_mode_allowed, Counter, The number of times an error was ignored due to configuration
+  message_timeouts, Counter, The number of times a message failed to receive a response within the configured timeout
+  rejected_header_mutations, Counter, The number of rejected header mutations

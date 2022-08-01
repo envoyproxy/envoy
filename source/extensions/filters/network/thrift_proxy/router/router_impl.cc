@@ -48,6 +48,29 @@ RouteEntryImplBase::RouteEntryImplBase(
   }
 }
 
+// Similar validation procedure with Envoy::Router::RouteEntryImplBase::validateCluster
+void RouteEntryImplBase::validateClusters(
+    const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const {
+  // Currently, we verify that the cluster exists in the CM if we have an explicit cluster or
+  // weighted cluster rule. We obviously do not verify a cluster_header rule. This means that
+  // trying to use all CDS clusters with a static route table will not work. In the upcoming RDS
+  // change we will make it so that dynamically loaded route tables do *not* perform CM checks.
+  // In the future we might decide to also have a config option that turns off checks for static
+  // route tables. This would enable the all CDS with static route table case.
+  if (!cluster_name_.empty()) {
+    if (!cluster_info_maps.hasCluster(cluster_name_)) {
+      throw EnvoyException(fmt::format("route: unknown thrift cluster '{}'", cluster_name_));
+    }
+  } else if (!weighted_clusters_.empty()) {
+    for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
+      if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
+        throw EnvoyException(
+            fmt::format("route: unknown thrift weighted cluster '{}'", cluster->clusterName()));
+      }
+    }
+  }
+}
+
 std::vector<std::shared_ptr<RequestMirrorPolicy>> RouteEntryImplBase::buildMirrorPolicies(
     const envoy::extensions::filters::network::thrift_proxy::v3::RouteAction& route) {
   std::vector<std::shared_ptr<RequestMirrorPolicy>> policies{};
@@ -76,7 +99,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value,
 
   const auto& cluster_header = clusterHeader();
   if (!cluster_header.get().empty()) {
-    const auto& headers = metadata.headers();
+    const auto& headers = metadata.requestHeaders();
     const auto entry = headers.get(cluster_header);
     if (!entry.empty()) {
       // This is an implicitly untrusted header, so per the API documentation only the first
@@ -126,7 +149,7 @@ MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
 
 RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                       uint64_t random_value) const {
-  if (RouteEntryImplBase::headersMatch(metadata.headers())) {
+  if (RouteEntryImplBase::headersMatch(metadata.requestHeaders())) {
     bool matches =
         method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
@@ -155,7 +178,7 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
 
 RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                        uint64_t random_value) const {
-  if (RouteEntryImplBase::headersMatch(metadata.headers())) {
+  if (RouteEntryImplBase::headersMatch(metadata.requestHeaders())) {
     bool matches =
         service_name_.empty() ||
         (metadata.hasMethodName() && absl::StartsWith(metadata.methodName(), service_name_));
@@ -169,20 +192,37 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
 }
 
 RouteMatcher::RouteMatcher(
-    const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config) {
+    const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
+    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
   using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
+    RouteEntryImplBaseConstSharedPtr route_entry;
     switch (route.match().match_specifier_case()) {
     case RouteMatch::MatchSpecifierCase::kMethodName:
-      routes_.emplace_back(new MethodNameRouteEntryImpl(route));
+      route_entry = std::make_shared<MethodNameRouteEntryImpl>(route);
       break;
     case RouteMatch::MatchSpecifierCase::kServiceName:
-      routes_.emplace_back(new ServiceNameRouteEntryImpl(route));
+      route_entry = std::make_shared<ServiceNameRouteEntryImpl>(route);
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case RouteMatch::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
+
+    if (validation_clusters) {
+      // Throw exception for unknown clusters.
+      route_entry->validateClusters(*validation_clusters);
+
+      for (const auto& mirror_policy : route_entry->requestMirrorPolicies()) {
+        if (!validation_clusters->hasCluster(mirror_policy->clusterName())) {
+          throw EnvoyException(fmt::format("route: unknown thrift shadow cluster '{}'",
+                                           mirror_policy->clusterName()));
+        }
+      }
+    }
+
+    // Now we pass the validation. Add the route to the table.
+    routes_.emplace_back(route_entry);
   }
 }
 
@@ -224,6 +264,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
 }
 
 FilterStatus Router::transportEnd() {
+  upstream_request_->onRequestComplete();
   if (upstream_request_->metadata_->messageType() == MessageType::Oneway) {
     // No response expected
     upstream_request_->onResponseComplete();
@@ -240,7 +281,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
                      fmt::format("no route for method '{}'", metadata->methodName())),
-        true);
+        close_downstream_on_error_);
     return FilterStatus::StopIteration;
   }
 
@@ -251,7 +292,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       prepareUpstreamRequest(cluster_name, metadata, callbacks_->downstreamTransportType(),
                              callbacks_->downstreamProtocolType(), this);
   if (prepare_result.exception.has_value()) {
-    callbacks_->sendLocalReply(prepare_result.exception.value(), true);
+    callbacks_->sendLocalReply(prepare_result.exception.value(), close_downstream_on_error_);
     return FilterStatus::StopIteration;
   }
 
@@ -284,9 +325,9 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     }
   }
 
-  upstream_request_ =
-      std::make_unique<UpstreamRequest>(*this, *upstream_req_info.conn_pool_data, metadata,
-                                        upstream_req_info.transport, upstream_req_info.protocol);
+  upstream_request_ = std::make_unique<UpstreamRequest>(
+      *this, *upstream_req_info.conn_pool_data, metadata, upstream_req_info.transport,
+      upstream_req_info.protocol, close_downstream_on_error_);
   return upstream_request_->start();
 }
 
@@ -295,6 +336,7 @@ FilterStatus Router::messageEnd() {
   const auto encode_size = upstream_request_->encodeAndWrite(upstream_request_buffer_);
   addSize(encode_size);
   stats().recordUpstreamRequestSize(*cluster_, request_size_);
+  callbacks_->streamInfo().addBytesReceived(request_size_);
 
   // Dispatch shadow requests, if any.
   // Note: if connections aren't ready, the write will happen when appropriate.

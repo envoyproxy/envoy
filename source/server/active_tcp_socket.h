@@ -13,6 +13,7 @@
 #include "envoy/network/listener.h"
 
 #include "source/common/common/linked_object.h"
+#include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/server/active_listener_base.h"
 
 namespace Envoy {
@@ -48,6 +49,13 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
       }
       return listener_filter_->onAccept(cb);
     }
+
+    Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override {
+      return listener_filter_->onData(buffer);
+    }
+
+    size_t maxReadBytes() const override { return listener_filter_->maxReadBytes(); }
+
     /**
      * Check if this filter filter should be disabled on the incoming socket.
      * @param cb the callbacks the filter instance can use to communicate with the filter chain.
@@ -87,6 +95,8 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
 
   StreamInfo::FilterState& filterState() override { return *stream_info_->filterState().get(); }
 
+  void createListenerFilterBuffer();
+
   // The owner of this ActiveTcpSocket.
   ActiveStreamListenerBase& listener_;
   Network::ConnectionSocketPtr socket_;
@@ -96,6 +106,8 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   Event::TimerPtr timer_;
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool connected_{false};
+
+  Network::ListenerFilterBufferImplPtr listener_filter_buffer_;
 };
 
 } // namespace Server

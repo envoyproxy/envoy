@@ -543,6 +543,7 @@ public:
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
   COUNTER(upstream_cx_connect_fail)                                                                \
   COUNTER(upstream_cx_connect_timeout)                                                             \
+  COUNTER(upstream_cx_connect_with_0_rtt)                                                          \
   COUNTER(upstream_cx_destroy)                                                                     \
   COUNTER(upstream_cx_destroy_local)                                                               \
   COUNTER(upstream_cx_destroy_local_with_active_rq)                                                \
@@ -575,6 +576,7 @@ public:
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
+  COUNTER(upstream_rq_0rtt)                                                                        \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_per_try_idle_timeout)                                                        \
   COUNTER(upstream_rq_retry)                                                                       \
@@ -587,6 +589,7 @@ public:
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
+  COUNTER(upstream_http3_broken)                                                                   \
   GAUGE(lb_subsets_active, Accumulate)                                                             \
   GAUGE(max_host_weight, NeverImport)                                                              \
   GAUGE(membership_degraded, NeverImport)                                                          \
@@ -1000,6 +1003,11 @@ public:
    * computations until they have been health checked for the first time.
    */
   virtual bool warmHosts() const PURE;
+
+  /**
+   * @return true if this cluster is configured to set local interface name on upstream connections.
+   */
+  virtual bool setLocalInterfaceNameOnUpstreamConnections() const PURE;
 
   /**
    * @return eds cluster service_name of the cluster.

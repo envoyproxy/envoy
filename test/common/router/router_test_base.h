@@ -30,13 +30,18 @@ public:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
                                  const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 Runtime::Loader&, Random::RandomGenerator&, Event::Dispatcher&,
-                                 TimeSource&, Upstream::ResourcePriority) override {
+                                 RouteStatsContextOptRef, Runtime::Loader&,
+                                 Random::RandomGenerator&, Event::Dispatcher&, TimeSource&,
+                                 Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<MockRetryState>();
     if (reject_all_hosts_) {
       // Set up RetryState to always reject the host
       ON_CALL(*retry_state_, shouldSelectAnotherHost(_)).WillByDefault(Return(true));
+    }
+    if (retry_425_response_) {
+      ON_CALL(*retry_state_, wouldRetryFromRetriableStatusCode(Http::Code::TooEarly))
+          .WillByDefault(Return(true));
     }
     return RetryStatePtr{retry_state_};
   }
@@ -48,6 +53,7 @@ public:
   NiceMock<Network::MockConnection> downstream_connection_;
   MockRetryState* retry_state_{};
   bool reject_all_hosts_ = false;
+  bool retry_425_response_ = false;
 };
 
 class RouterTestBase : public testing::Test {
@@ -78,6 +84,9 @@ public:
   void testAppendUpstreamHost(absl::optional<Http::LowerCaseString> hostname_header_name,
                               absl::optional<Http::LowerCaseString> host_address_header_name);
   void testDoNotForward(absl::optional<Http::LowerCaseString> not_forwarded_header_name);
+  void expectNewStreamWithImmediateEncoder(Http::RequestEncoder& encoder,
+                                           Http::ResponseDecoder** decoder,
+                                           Http::Protocol protocol);
 
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};

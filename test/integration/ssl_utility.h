@@ -52,6 +52,11 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
+  ClientSslTransportOptions& setClientWithIntermediateCert(bool intermediate_cert) {
+    client_with_intermediate_cert_ = intermediate_cert;
+    return *this;
+  }
+
   bool alpn_{};
   bool client_ecdsa_cert_{false};
   std::vector<std::string> cipher_suites_{};
@@ -60,21 +65,22 @@ struct ClientSslTransportOptions {
   std::string sni_;
   envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol tls_version_{
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
-  bool use_expired_spiffe_cert_{};
+  bool use_expired_spiffe_cert_{false};
+  bool client_with_intermediate_cert_{false};
 };
 
 void initializeUpstreamTlsContextConfig(
     const ClientSslTransportOptions& options,
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context);
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
                                       ContextManager& context_manager, Api::Api& api);
 
-Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
-                                                            Api::Api& api, bool use_http3 = false);
+Network::DownstreamTransportSocketFactoryPtr
+createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool use_http3 = false);
 
-Network::TransportSocketFactoryPtr
+Network::DownstreamTransportSocketFactoryPtr
 createFakeUpstreamSslContext(const std::string& upstream_cert_name, ContextManager& context_manager,
                              Server::Configuration::TransportSocketFactoryContext& factory_context);
 

@@ -9,3 +9,6 @@ Contrib Extensions
 
   sip/sip
   cryptomb/cryptomb
+  hyperscan/hyperscan
+  dlb/dlb
+  qat/qat

@@ -15,7 +15,6 @@
 #include "source/server/options_impl.h"
 #include "source/server/process_context_impl.h"
 
-#include "test/common/runtime/utility.h"
 #include "test/integration/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
@@ -133,7 +132,7 @@ void IntegrationTestServer::start(
   if (tap_path) {
     std::vector<uint32_t> ports;
     for (auto listener : server().listenerManager().listeners()) {
-      const auto listen_addr = listener.get().listenSocketFactory().localAddress();
+      const auto listen_addr = listener.get().listenSocketFactories()[0]->localAddress();
       if (listen_addr->type() == Network::Address::Type::Ip) {
         ports.push_back(listen_addr->ip()->port());
       }

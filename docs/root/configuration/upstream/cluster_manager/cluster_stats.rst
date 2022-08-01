@@ -41,6 +41,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_http3_total, Counter, Total HTTP/3 connections
   upstream_cx_connect_fail, Counter, Total connection failures
   upstream_cx_connect_timeout, Counter, Total connection connect timeouts
+  upstream_cx_connect_with_0_rtt, Counter, Total connections able to send 0-rtt requests (early data).
   upstream_cx_idle_timeout, Counter, Total connection idle timeouts
   upstream_cx_max_duration_reached, Counter, Total connections closed due to max duration reached
   upstream_cx_connect_attempts_exceeded, Counter, Total consecutive connection failures exceeding configured connection attempts

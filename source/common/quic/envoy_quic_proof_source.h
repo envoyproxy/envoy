@@ -20,7 +20,7 @@ public:
   ~EnvoyQuicProofSource() override = default;
 
   // quic::ProofSource
-  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
   GetCertChain(const quic::QuicSocketAddress& server_address,
                const quic::QuicSocketAddress& client_address, const std::string& hostname,
                bool* cert_matched_sni) override;

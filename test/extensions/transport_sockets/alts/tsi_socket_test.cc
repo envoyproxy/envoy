@@ -906,19 +906,21 @@ protected:
 
     socket_factory_ = std::make_unique<TsiSocketFactory>(handshaker_factory, nullptr);
   }
-  Network::TransportSocketFactoryPtr socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr socket_factory_;
 };
 
 TEST_F(TsiSocketFactoryTest, CreateTransportSocket) {
-  EXPECT_NE(nullptr, socket_factory_->createTransportSocket(nullptr));
+  EXPECT_NE(nullptr, socket_factory_->createTransportSocket(nullptr, nullptr));
 }
 
 TEST_F(TsiSocketFactoryTest, ImplementsSecureTransport) {
   EXPECT_TRUE(socket_factory_->implementsSecureTransport());
 }
 
-TEST_F(TsiSocketFactoryTest, UsesProxyProtocolOptions) {
-  EXPECT_FALSE(socket_factory_->usesProxyProtocolOptions());
+TEST_F(TsiSocketFactoryTest, HashKey) {
+  std::vector<uint8_t> key;
+  socket_factory_->hashKey(key, nullptr);
+  EXPECT_EQ(0, key.size());
 }
 
 } // namespace

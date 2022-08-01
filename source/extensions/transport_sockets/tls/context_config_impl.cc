@@ -8,6 +8,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
+#include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
@@ -170,6 +171,7 @@ ContextConfigImpl::ContextConfigImpl(
     const std::string& default_cipher_suites, const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : api_(factory_context.api()), options_(factory_context.options()),
+      singleton_manager_(factory_context.singletonManager()),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
@@ -182,7 +184,9 @@ ContextConfigImpl::ContextConfigImpl(
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
-      factory_context_(factory_context) {
+      factory_context_(factory_context), tls_keylog_path_(config.key_log().path()),
+      tls_keylog_local_(config.key_log().local_address_range()),
+      tls_keylog_remote_(config.key_log().remote_address_range()) {
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -218,7 +222,8 @@ ContextConfigImpl::ContextConfigImpl(
     }
   }
 
-  HandshakerFactoryContextImpl handshaker_factory_context(api_, options_, alpn_protocols_);
+  HandshakerFactoryContextImpl handshaker_factory_context(api_, options_, alpn_protocols_,
+                                                          singleton_manager_);
   Ssl::HandshakerFactory* handshaker_factory;
   if (config.has_custom_handshaker()) {
     // If a custom handshaker is configured, derive the factory from the config.
@@ -298,6 +303,7 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
     const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol& version,
     unsigned default_version) {
   switch (version) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO:
     return default_version;
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0:
@@ -308,9 +314,9 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
     return TLS1_2_VERSION;
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3:
     return TLS1_3_VERSION;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  IS_ENVOY_BUG("unexpected tls version provided");
+  return default_version;
 }
 
 const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
@@ -365,16 +371,8 @@ const std::string ServerContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "ECDHE-ECDSA-AES128-GCM-SHA256:"
     "ECDHE-RSA-AES128-GCM-SHA256:"
 #endif
-    "ECDHE-ECDSA-AES128-SHA:"
-    "ECDHE-RSA-AES128-SHA:"
-    "AES128-GCM-SHA256:"
-    "AES128-SHA:"
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
-    "ECDHE-RSA-AES256-GCM-SHA384:"
-    "ECDHE-ECDSA-AES256-SHA:"
-    "ECDHE-RSA-AES256-SHA:"
-    "AES256-GCM-SHA384:"
-    "AES256-SHA";
+    "ECDHE-RSA-AES256-GCM-SHA384:";
 
 const std::string ServerContextConfigImpl::DEFAULT_CURVES =
 #ifndef BORINGSSL_FIPS
@@ -476,15 +474,15 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
         policy) {
   switch (policy) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::LENIENT_STAPLING:
     return Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::STRICT_STAPLING:
     return Ssl::ServerContextConfig::OcspStaplePolicy::StrictStapling;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE:
     return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Tls

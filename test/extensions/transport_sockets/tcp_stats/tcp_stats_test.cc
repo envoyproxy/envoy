@@ -1,7 +1,7 @@
 #if defined(__linux__)
 #define DO_NOT_INCLUDE_NETINET_TCP_H 1
 
-#include </usr/include/linux/tcp.h>
+#include <linux/tcp.h>
 
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
@@ -260,20 +260,20 @@ public:
     envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
     auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
     inner_factory_ = inner_factory.get();
-    factory_ =
-        std::make_unique<TcpStatsSocketFactory>(context_, proto_config, std::move(inner_factory));
+    factory_ = std::make_unique<UpstreamTcpStatsSocketFactory>(context_, proto_config,
+                                                               std::move(inner_factory));
   }
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
-  std::unique_ptr<TcpStatsSocketFactory> factory_;
+  std::unique_ptr<UpstreamTcpStatsSocketFactory> factory_;
 };
 
 // Test createTransportSocket returns nullptr if inner call returns nullptr
 TEST_F(TcpStatsSocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
   initialize();
-  EXPECT_CALL(*inner_factory_, createTransportSocket(_)).WillOnce(ReturnNull());
-  EXPECT_EQ(nullptr, factory_->createTransportSocket(nullptr));
+  EXPECT_CALL(*inner_factory_, createTransportSocket(_, _)).WillOnce(ReturnNull());
+  EXPECT_EQ(nullptr, factory_->createTransportSocket(nullptr, nullptr));
 }
 
 // Test implementsSecureTransport calls inner factory
@@ -294,6 +294,7 @@ TEST_F(TcpStatsSocketFactoryTest, ImplementsSecureTransportCallInnerFactory) {
 
 #else // #if defined(__linux__)
 
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
 #include "test/mocks/server/transport_socket_factory_context.h"
@@ -309,6 +310,8 @@ namespace TcpStats {
 TEST(TcpStatsTest, ConfigErrorOnUnsupportedPlatform) {
   envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
   proto_config.mutable_transport_socket()->set_name("envoy.transport_sockets.raw_buffer");
+  envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+  proto_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(raw_buffer);
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
 
   envoy::config::core::v3::TransportSocket transport_socket_config;

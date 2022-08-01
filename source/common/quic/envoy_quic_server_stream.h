@@ -36,6 +36,8 @@ public:
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
 
+  // quic::QuicStream
+  void OnStreamFrame(const quic::QuicStreamFrame& frame) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   bool OnStopSending(quic::QuicResetStreamError error) override;

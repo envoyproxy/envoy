@@ -20,12 +20,13 @@ def envoy_all_extensions(denylist = []):
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
     # These extensions can be removed on a site specific basis.
-    return [_selected_extension_target(v) for k, v in all_extensions.items() if not k in denylist]
+    return {_selected_extension_target(v): True for k, v in all_extensions.items() if k not in denylist}.keys()
 
 # Core extensions needed to run Envoy's integration tests.
 _core_extensions = [
     "envoy.access_loggers.file",
-    "envoy.access_loggers.stream",
+    "envoy.access_loggers.stderr",
+    "envoy.access_loggers.stdout",
     "envoy.filters.http.router",
     "envoy.filters.http.health_check",
     "envoy.filters.network.http_connection_manager",
@@ -40,14 +41,14 @@ def envoy_all_core_extensions():
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
     # These extensions can be removed on a site specific basis.
-    return [v for k, v in all_extensions.items() if k in _core_extensions]
+    return {_selected_extension_target(v): True for k, v in all_extensions.items() if k in _core_extensions}.keys()
 
 _http_filter_prefix = "envoy.filters.http"
 
 def envoy_all_http_filters():
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
-    return [_selected_extension_target(v) for k, v in all_extensions.items() if k.startswith(_http_filter_prefix)]
+    return {_selected_extension_target(v): True for k, v in all_extensions.items() if k.startswith(_http_filter_prefix)}.keys()
 
 # All network-layer filters are extensions with names that have the following prefix.
 _network_filter_prefix = "envoy.filters.network"

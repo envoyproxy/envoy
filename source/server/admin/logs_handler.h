@@ -8,7 +8,11 @@
 
 #include "source/server/admin/handler_ctx.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Server {
@@ -28,11 +32,27 @@ public:
 
 private:
   /**
-   * Attempt to change the log level of a logger or all loggers
+   * Attempt to change the log level of a logger or all loggers.
+   *
+   * Returns StatusCode::kInvalidArgument if validation failed.
+   *
    * @param params supplies the incoming endpoint query params.
-   * @return TRUE if level change succeeded, FALSE otherwise.
    */
-  bool changeLogLevel(const Http::Utility::QueryParams& params);
+  absl::Status changeLogLevel(const Http::Utility::QueryParams& params);
+  void changeAllLogLevels(spdlog::level::level_enum level);
+  absl::Status
+  changeLogLevels(const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum>& changes);
+
+  inline absl::StatusOr<spdlog::level::level_enum> parseLogLevel(absl::string_view level_string) {
+    auto level_it = log_levels_.find(level_string);
+    if (level_it == log_levels_.end()) {
+      return absl::InvalidArgumentError("unknown logger level");
+    }
+    return level_it->second;
+  }
+
+  // Maps level string to level enum.
+  const absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> log_levels_;
 };
 
 } // namespace Server

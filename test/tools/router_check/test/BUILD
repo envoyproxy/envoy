@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_package",
     "envoy_sh_test",
 )
@@ -14,6 +15,17 @@ envoy_sh_test(
     cc_binary = ["//test/tools/router_check:router_check_tool"],
     data = [
         ":configs",
+    ],
+)
+
+envoy_cc_test(
+    name = "router_test",
+    srcs = ["router_test.cc"],
+    data = [
+        ":configs",
+    ],
+    deps = [
+        "//test/tools/router_check:router_check_main_lib",
     ],
 )
 

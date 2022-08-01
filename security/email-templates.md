@@ -74,13 +74,20 @@ Cc: envoy-security@googlegroups.com
 
 Hello Envoy Distributors,
 
-Please find attached candidate patches for CVE-YEAR-ABCDEF. You may use the
-attached patches for testing and preparing your distributions. The patches can
-be applied with "git am".
+Please find attached candidate patches for the CVEs listed below. The patches will
+be publicly released on the $ORDINALDAY of $MONTH $YEAR.
 
-Patches starting with "$VERSION" should be applied against the $OLDVERSION release.
+* CVE-YEAR-ABCDEF (CVSS score $CVSS, $SEVERITY): Envoy $AFFECTED_VERSIONS - $CVESUMMARY
 
-Patches starting with "master-" should be applied against commit $COMMIT.
+Be aware that these patches have been tested and validated against the tests checking
+for susceptibility of the CVEs, but please report any potential problems if encountered
+in your CI infrastructures to envoy-security@googlegroups.com.
+
+You may use the attached patches for testing and preparing your distributions. The
+patches can be applied with "git am". The attached archive contains the following:
+
+* main-$MAINCOMMIT directory with patches applied to main branch commit $MAINCOMMIT
+* $VERSION directory with patches applied to branch release/$VERSION
 
 As a reminder, these patches are under embargo until $ORDINALDAY of $MONTH $YEAR
 at $PDTHOUR PDT ($GMTHOUR GMT). The information below should be treated as

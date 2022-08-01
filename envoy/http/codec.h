@@ -329,7 +329,7 @@ public:
    * configured.
    * @return uint32_t the stream's configured buffer limits.
    */
-  virtual uint32_t bufferLimit() PURE;
+  virtual uint32_t bufferLimit() const PURE;
 
   /**
    * @return string_view optionally return the reason behind codec level errors.
@@ -453,6 +453,9 @@ struct Http1Settings {
   // True if this is an edge Envoy (using downstream address, no trusted hops)
   // and https:// URLs should be rejected over unencrypted connections.
   bool validate_scheme_{false};
+
+  // If true, Envoy will send a fully qualified URL in the firstline of the request.
+  bool send_fully_qualified_url_{false};
 };
 
 /**

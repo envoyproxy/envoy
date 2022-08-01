@@ -19,6 +19,7 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
+#include "test/test_listener.h"
 
 #include "absl/debugging/symbolize.h"
 
@@ -86,6 +87,9 @@ int main(int argc, char** argv) {
     argv[i] = argv[i + input_args];
   }
 
+  // Make sure flags are restored. Fuzz tests do not pass the singleton checks.
+  ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
+  listeners.Append(new Envoy::TestListener(false));
   testing::InitGoogleTest(&argc, argv);
   testing::InitGoogleMock(&argc, argv);
   Envoy::Fuzz::Runner::setupEnvironment(argc, argv, spdlog::level::info);

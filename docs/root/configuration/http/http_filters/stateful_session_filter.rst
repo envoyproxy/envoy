@@ -37,8 +37,8 @@ host set changes. This filter implements 'strong' stickiness. It is intended to 
 Configuration
 -------------
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>`
-* This filter should be configured with the name *envoy.filters.http.stateful_session*.
 
 How it works
 ------------
@@ -61,19 +61,13 @@ Currently, only :ref:`cookie-based session state
 <envoy_v3_api_msg_extensions.http.stateful_session.cookie.v3.CookieBasedSessionState>` is supported.
 So let's take this as an example.
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.stateful_session
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession
-    session_state:
-      name: envoy.http.stateful_session.cookie
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
-        name: global-session-cookie
-        path: /path
-        ttl: 120s
-
+.. literalinclude:: _include/stateful-cookie-session.yaml
+    :language: yaml
+    :lines: 28-44
+    :emphasize-lines: 4-14
+    :linenos:
+    :lineno-start: 28
+    :caption: :download:`stateful-cookie-session.yaml <_include/stateful-cookie-session.yaml>`
 
 In the above configuration, the cookie-based session state obtains the overridden host of the current session
 from the cookie named `global-session-cookie` and if the corresponding host exists in the upstream cluster, the

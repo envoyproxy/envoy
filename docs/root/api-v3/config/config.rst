@@ -31,8 +31,10 @@ Extensions
   http/header_formatters
   http/original_ip_detection
   http/stateful_session
+  http/header_validators
   stat_sinks/stat_sinks
   quic/quic_extensions
   formatter/formatter
   contrib/contrib
   rbac/matchers
+  config_validators/config_validators

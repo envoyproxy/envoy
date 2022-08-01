@@ -224,6 +224,9 @@ public:
   }
   bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
 
+  // Test only method that does not have validation and allows setting arbitrary values.
+  void setCopyUnvalidatedForTestOnly(absl::string_view view);
+
 private:
   enum class Type { Reference, Inline };
 
@@ -356,6 +359,7 @@ private:
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(ProxyConnection)                                                                     \
+  HEADER_FUNC(ProxyStatus)                                                                         \
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \

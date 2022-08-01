@@ -7,7 +7,8 @@ resources:
   eds_cluster_config:
     eds_config:
       resource_api_version: V3
-      path: "{{ eds_json_path }}"
+      path_config_source:
+        path: "{{ eds_json_path }}"
   lb_policy: ROUND_ROBIN
   typed_extension_protocol_options:
     envoy.extensions.upstreams.http.v3.HttpProtocolOptions:

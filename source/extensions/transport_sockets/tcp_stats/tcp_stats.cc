@@ -9,7 +9,7 @@
 
 #include "source/extensions/transport_sockets/tcp_stats/tcp_stats.h"
 
-#include </usr/include/linux/tcp.h>
+#include <linux/tcp.h>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"

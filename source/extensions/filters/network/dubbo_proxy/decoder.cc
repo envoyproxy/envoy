@@ -64,7 +64,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Inst
   case ProtocolState::OnDecodeStreamData:
     return onDecodeStreamData(buffer);
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
   }
 }
 

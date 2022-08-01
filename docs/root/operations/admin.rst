@@ -63,7 +63,9 @@ modify different aspects of the server:
 
 .. http:get:: /
 
-  Render an HTML home page with a table of links to all available options.
+  Render an HTML home page with a table of links to all available options. This can be
+  disabled by compiling Envoy with `--define=admin_html=disabled` in which case an error
+  message is printed. Disabling the HTML mode reduces the Envoy binary size.
 
 .. http:get:: /help
 
@@ -97,7 +99,7 @@ modify different aspects of the server:
       :ref:`average success rate <envoy_v3_api_field_data.cluster.v3.OutlierEjectSuccessRate.cluster_average_success_rate>`,
       and :ref:`ejection threshold<envoy_v3_api_field_data.cluster.v3.OutlierEjectSuccessRate.cluster_success_rate_ejection_threshold>`
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
-      :ref/`interval<envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`.
+      :ref:`interval<envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`.
 
     - ``added_via_api`` flag -- ``false`` if the cluster was added via static configuration, ``true``
       if it was added via the :ref:`CDS<config_cluster_manager_cds>` api.
@@ -292,10 +294,11 @@ modify different aspects of the server:
 
 .. http:post:: /logging
 
-  Enable/disable different logging levels on a particular logger or all loggers.
+  Enable/disable logging levels for different loggers.
 
   - To change the logging level across all loggers, set the query parameter as level=<desired_level>.
   - To change a particular logger's level, set the query parameter like so, <logger_name>=<desired_level>.
+  - To change multiple logging levels at once, set the query parameter as paths=<logger_name1>=<desired_level1>,<logger_name2>=<desired_level2>.
   - To list the loggers, send a POST request to the /logging endpoint without a query parameter.
 
   .. note::
@@ -438,11 +441,30 @@ modify different aspects of the server:
 
   .. http:get:: /stats?filter=regex
 
-  Filters the returned stats to those with names matching the regular expression
-  ``regex``. Compatible with ``usedonly``. Performs partial matching by default, so
-  ``/stats?filter=server`` will return all stats containing the word ``server``.
-  Full-string matching can be specified with begin- and end-line anchors. (i.e.
-  ``/stats?filter=^server.concurrency$``)
+  Filters the returned stats to those with names matching the regular
+  expression ``regex``. Compatible with ``usedonly``. Performs partial
+  matching by default, so ``/stats?filter=server`` will return all stats
+  containing the word ``server``.  Full-string matching can be specified
+  with begin- and end-line anchors. (i.e.  ``/stats?filter=^server.concurrency$``)
+
+  By default, the regular expression is evaluated using the
+  `Google RE2 <https://github.com/google/re2>` engine. To switch
+  to std::regex using Ecmascript syntax, POST an admin :ref:`runtime <arch_overview_runtime>` request:
+  ``/runtime_modify?envoy.reloadable_features.admin_stats_filter_use_re2=false``
+
+  .. http:get:: /stats?histogram_buckets=cumulative
+
+  Changes histogram output to display cumulative buckets with upper bounds (e.g. B0.5, B1, B5, ...).
+  The output for each bucket will be in the form of (interval,cumulative) (e.g. B0.5(0,0)).
+  All values below the upper bound are included even if they are placed into other buckets.
+  Compatible with ``usedonly`` and ``filter``.
+
+  .. http:get:: /stats?histogram_buckets=disjoint
+
+  Changes histogram output to display disjoint buckets with upper bounds (e.g. B0.5, B1, B5, ...).
+  The output for each bucket will be in the form of (interval,cumulative) (e.g. B0.5(0,0)).
+  Buckets do not include values from other buckets with smaller upper bounds;
+  the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
 
 .. http:get:: /stats?format=json
 
@@ -499,6 +521,102 @@ modify different aspects of the server:
 
   Outputs statistics that Envoy has updated (counters incremented at least once,
   gauges changed at least once, and histograms added to at least once) in JSON format.
+
+  .. http:get:: /stats?format=json&histogram_buckets=cumulative
+
+  Changes histogram output to display cumulative buckets with upper bounds.
+  All values below the upper bound are included even if they are placed into other buckets.
+  Compatible with ``usedonly`` and ``filter``.
+
+  Example histogram output:
+
+  .. code-block:: json
+
+    {
+      "histograms": [
+        {
+          "name": "example_histogram",
+          "buckets": [
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2, "interval": 0, "cumulative": 1},
+            {"upper_bound": 3, "interval": 1, "cumulative": 3},
+            {"upper_bound": 4, "interval": 1, "cumulative": 3}
+          ]
+        },
+        {
+          "name": "other_example_histogram",
+          "buckets": [
+            {"upper_bound": 0.5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 10, "interval": 0, "cumulative": 0},
+            {"upper_bound": 25, "interval": 0, "cumulative": 0},
+            {"upper_bound": 50, "interval": 0, "cumulative": 0},
+            {"upper_bound": 100, "interval": 0, "cumulative": 0},
+            {"upper_bound": 250, "interval": 0, "cumulative": 0},
+            {"upper_bound": 500, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2500, "interval": 0, "cumulative": 100},
+            {"upper_bound": 5000, "interval": 0, "cumulative": 300},
+            {"upper_bound": 10000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 30000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 60000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 300000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 600000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 1800000, "interval": 0, "cumulative": 600},
+            {"upper_bound": 3600000, "interval": 0, "cumulative": 600}
+          ]
+        }
+      ]
+    }
+
+  .. http:get:: /stats?format=json&histogram_buckets=disjoint
+
+  Changes histogram output to display disjoint buckets with upper bounds.
+  Buckets do not include values from other buckets with smaller upper bounds;
+  the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
+
+  Example histogram output:
+
+  .. code-block:: json
+
+    {
+      "histograms": [
+        {
+          "name": "example_histogram",
+          "buckets": [
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2, "interval": 0, "cumulative": 1},
+            {"upper_bound": 3, "interval": 1, "cumulative": 2},
+            {"upper_bound": 4, "interval": 0, "cumulative": 0}
+          ]
+        },
+        {
+          "name": "other_example_histogram",
+          "buckets": [
+            {"upper_bound": 0.5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1, "interval": 0, "cumulative": 0},
+            {"upper_bound": 5, "interval": 0, "cumulative": 0},
+            {"upper_bound": 10, "interval": 0, "cumulative": 0},
+            {"upper_bound": 25, "interval": 0, "cumulative": 0},
+            {"upper_bound": 50, "interval": 0, "cumulative": 0},
+            {"upper_bound": 100, "interval": 0, "cumulative": 0},
+            {"upper_bound": 250, "interval": 0, "cumulative": 0},
+            {"upper_bound": 500, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 2500, "interval": 0, "cumulative": 100},
+            {"upper_bound": 5000, "interval": 0, "cumulative": 200},
+            {"upper_bound": 10000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 30000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 60000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 300000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 600000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 1800000, "interval": 0, "cumulative": 0},
+            {"upper_bound": 3600000, "interval": 0, "cumulative": 0}
+          ]
+        }
+      ]
+    }
 
 .. http:get:: /stats?format=prometheus
 

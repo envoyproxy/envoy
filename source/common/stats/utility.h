@@ -6,7 +6,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/thread.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
@@ -92,7 +92,7 @@ absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
  * @param elements The vector of mixed DynamicName and StatName
  * @return A scope named using the joined elements.
  */
-ScopePtr scopeFromStatNames(Scope& scope, const StatNameVec& names);
+ScopeSharedPtr scopeFromStatNames(Scope& scope, const StatNameVec& names);
 
 /**
  * Creates a counter from a vector of tokens which are used to create the

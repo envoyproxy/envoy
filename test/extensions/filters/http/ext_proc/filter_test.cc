@@ -1,3 +1,6 @@
+#include <algorithm>
+
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
@@ -58,7 +61,7 @@ protected:
   void initialize(std::string&& yaml) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
-    EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
+    EXPECT_CALL(*client_, start(_, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -82,7 +85,7 @@ protected:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
-    filter_ = std::make_unique<Filter>(config_, std::move(client_));
+    filter_ = std::make_unique<Filter>(config_, std::move(client_), grpc_service_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -100,7 +103,8 @@ protected:
     }
   }
 
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks, testing::Unused) {
+  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks, testing::Unused,
+                                     testing::Unused) {
     stream_callbacks_ = &callbacks;
 
     auto stream = std::make_unique<MockStream>();
@@ -115,24 +119,28 @@ protected:
 
   bool doSendClose() { return !server_closed_stream_; }
 
-  void setUpDecodingBuffering(Buffer::Instance& buf) {
+  void setUpDecodingBuffering(Buffer::Instance& buf, bool expect_modification = false) {
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buf));
     EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
         .WillRepeatedly(
             Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
-    EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
-        .WillOnce(
-            Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+    if (expect_modification) {
+      EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+          .WillOnce(
+              Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+    }
   }
 
-  void setUpEncodingBuffering(Buffer::Instance& buf) {
+  void setUpEncodingBuffering(Buffer::Instance& buf, bool expect_modification = false) {
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&buf));
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
         .WillRepeatedly(
             Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
-    EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
-        .WillOnce(
-            Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+    if (expect_modification) {
+      EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
+          .WillOnce(
+              Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+    }
   }
 
   void setUpDecodingWatermarking(bool& watermarked) {
@@ -235,6 +243,22 @@ protected:
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
+  // The number of processor grpc calls made in the encoding and decoding path.
+  void expectGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction,
+                       const Grpc::Status::GrpcStatus status, const int expected_calls_count) {
+    const ExtProcLoggingInfo::GrpcCalls& grpc_calls =
+        stream_info_.filterState()
+            ->getDataReadOnly<
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfoName)
+            ->grpcCalls(traffic_direction);
+    int calls_count = std::count_if(
+        grpc_calls.begin(), grpc_calls.end(),
+        [&](ExtProcLoggingInfo::GrpcCall grpc_call) { return grpc_call.status_ == status; });
+    EXPECT_EQ(calls_count, expected_calls_count);
+  }
+
+  envoy::config::core::v3::GrpcService grpc_service_;
   std::unique_ptr<MockClient> client_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   ProcessingRequest last_request_;
@@ -243,8 +267,8 @@ protected:
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Router::RouteConstSharedPtr route_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Http::TestRequestHeaderMapImpl request_headers_;
@@ -315,6 +339,8 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -458,6 +484,8 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 0);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -539,7 +567,7 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
   Buffer::OwnedImpl req_data;
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
   Buffer::OwnedImpl buffered_data;
-  setUpDecodingBuffering(buffered_data);
+  setUpDecodingBuffering(buffered_data, true);
 
   // Testing the case where we just have one chunk of data and it is buffered.
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
@@ -736,7 +764,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
   Buffer::OwnedImpl req_data;
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
   Buffer::OwnedImpl buffered_request_data;
-  setUpDecodingBuffering(buffered_request_data);
+  setUpDecodingBuffering(buffered_request_data, true);
 
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
 
@@ -761,7 +789,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
   Buffer::OwnedImpl resp_data;
   TestUtility::feedBufferWithRandomCharacters(resp_data, 100);
   Buffer::OwnedImpl buffered_response_data;
-  setUpEncodingBuffering(buffered_response_data);
+  setUpEncodingBuffering(buffered_response_data, true);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
 
   processResponseBody([&buffered_response_data](const HttpBody& req_body, ProcessingResponse&,
@@ -810,7 +838,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
   Buffer::OwnedImpl buffered_req_data;
   Buffer::OwnedImpl empty_data;
-  setUpDecodingBuffering(buffered_req_data);
+  setUpDecodingBuffering(buffered_req_data, true);
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data, false));
   // At this point, Envoy adds data to the buffer
   buffered_req_data.add(req_data);
@@ -841,7 +869,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
   Buffer::OwnedImpl resp_data_3;
   TestUtility::feedBufferWithRandomCharacters(resp_data_3, 100);
   Buffer::OwnedImpl buffered_resp_data;
-  setUpEncodingBuffering(buffered_resp_data);
+  setUpEncodingBuffering(buffered_resp_data, true);
 
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_data_1, false));
   // Emulate what Envoy does with this data
@@ -1050,7 +1078,7 @@ TEST_F(HttpFilterTest, PostFastAndBigRequestPartialBuffering) {
   Buffer::OwnedImpl req_data_3;
   TestUtility::feedBufferWithRandomCharacters(req_data_3, 2000);
   Buffer::OwnedImpl buffered_data;
-  setUpDecodingBuffering(buffered_data);
+  setUpDecodingBuffering(buffered_data, true);
   Buffer::OwnedImpl expected_request_data;
   expected_request_data.add(req_data_1);
   expected_request_data.add(req_data_2);
@@ -1108,7 +1136,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -1175,6 +1204,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_EQ(9, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(9, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 2);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 7);
 }
 
 // Using a configuration with streaming set for the request and
@@ -1196,7 +1227,8 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -1236,7 +1268,7 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
   Buffer::OwnedImpl response_buffer;
-  setUpEncodingBuffering(response_buffer);
+  setUpEncodingBuffering(response_buffer, true);
 
   for (int i = 0; i < 3; i++) {
     Buffer::OwnedImpl resp_chunk;
@@ -1565,6 +1597,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Internal, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1619,6 +1652,8 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Internal, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1891,7 +1926,7 @@ TEST_F(HttpFilterTest, ReplaceRequest) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
   Buffer::OwnedImpl req_buffer;
-  setUpDecodingBuffering(req_buffer);
+  setUpDecodingBuffering(req_buffer, true);
   processRequestHeaders(
       false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& hdrs_resp) {
         hdrs_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
@@ -1950,7 +1985,7 @@ TEST_F(HttpFilterTest, ReplaceCompleteResponseBuffered) {
   Buffer::OwnedImpl resp_data_2;
   TestUtility::feedBufferWithRandomCharacters(resp_data_2, 100);
   Buffer::OwnedImpl buffered_resp_data;
-  setUpEncodingBuffering(buffered_resp_data);
+  setUpEncodingBuffering(buffered_resp_data, true);
 
   processResponseHeaders(
       false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& hdrs_resp) {
@@ -1991,7 +2026,8 @@ TEST_F(HttpFilterTest, OutOfOrder) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_FALSE(last_request_.async_mode());
@@ -2084,6 +2120,110 @@ TEST(OverrideTest, DisabledThingsAreDisabled) {
   route1.merge(route2);
   EXPECT_TRUE(route1.disabled());
   EXPECT_FALSE(route1.processingMode());
+}
+
+// When merging two configurations, second grpc_service overrides the first.
+TEST(OverrideTest, GrpcServiceOverride) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_1");
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_2");
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  ASSERT_TRUE(route1.grpcService().has_value());
+  EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg2.overrides().grpc_service()));
+}
+
+// When merging two configurations, unset grpc_service is equivalent to no override.
+TEST(OverrideTest, GrpcServiceNonOverride) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_1");
+  ExtProcPerRoute cfg2;
+  // Leave cfg2.grpc_service unset.
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  ASSERT_TRUE(route1.grpcService().has_value());
+  EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
+}
+
+// Verify that attempts to change headers that are not allowed to be changed
+// are ignored and a counter is incremented.
+TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& header_resp) {
+        auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+        auto add1 = headers_mut->add_set_headers();
+        // Not allowed to change the "host" header by default
+        add1->mutable_header()->set_key("Host");
+        add1->mutable_header()->set_value("wrong:1234");
+        // Not allowed to remove x-envoy headers by default.
+        headers_mut->add_remove_headers("x-envoy-special-thing");
+      });
+
+  // The original headers should not have been modified now.
+  Http::TestRequestHeaderMapImpl expected{
+      {":path", "/"},
+      {":method", "POST"},
+      {":scheme", "http"},
+      {"host", "host"},
+  };
+  EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
+
+  stream_callbacks_->onGrpcClose();
+  filter_->onDestroy();
+
+  EXPECT_EQ(2, config_->stats().rejected_header_mutations_.value());
+}
+
+// Verify that attempts to change headers that are not allowed to be changed
+// can be configured to cause a request failure.
+TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  mutation_rules:
+    disallow_is_error:
+      value: true
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  Http::TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError, _, _, Eq(absl::nullopt), _))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  auto headers_mut =
+      resp1->mutable_request_headers()->mutable_response()->mutable_header_mutation();
+  auto add1 = headers_mut->add_set_headers();
+  // Not allowed to change the "host" header by default
+  add1->mutable_header()->set_key("Host");
+  add1->mutable_header()->set_value("wrong:1234");
+  // Not allowed to remove x-envoy headers by default.
+  headers_mut->add_remove_headers("x-envoy-special-thing");
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  EXPECT_TRUE(immediate_response_headers.empty());
+  stream_callbacks_->onGrpcClose();
+
+  filter_->onDestroy();
 }
 
 } // namespace

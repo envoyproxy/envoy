@@ -39,6 +39,7 @@ public:
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
   const std::string& alpn() const override;
+  const std::string& sni() const override;
 
   virtual SSL* ssl() const PURE;
 
@@ -58,6 +59,7 @@ protected:
   mutable std::string cached_session_id_;
   mutable std::string cached_tls_version_;
   mutable std::string alpn_;
+  mutable std::string sni_;
 };
 
 } // namespace Tls

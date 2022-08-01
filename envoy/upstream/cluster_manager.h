@@ -17,6 +17,7 @@
 #include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/http/persistent_quic_info.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
@@ -25,7 +26,6 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/store.h"
-#include "envoy/stats/symbol_table.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/health_checker.h"
@@ -40,7 +40,7 @@ namespace Envoy {
 namespace Upstream {
 
 /**
- * ClusterUpdateCallbacks provide a way to exposes Cluster lifecycle events in the
+ * ClusterUpdateCallbacks provide a way to expose Cluster lifecycle events in the
  * ClusterManager.
  */
 class ClusterUpdateCallbacks {
@@ -72,6 +72,76 @@ public:
 };
 
 using ClusterUpdateCallbacksHandlePtr = std::unique_ptr<ClusterUpdateCallbacksHandle>;
+
+/**
+ * Status enum for the result of an attempted cluster discovery.
+ */
+enum class ClusterDiscoveryStatus {
+  /**
+   * The discovery process timed out. This means that we haven't yet received any reply from
+   * on-demand CDS about it.
+   */
+  Timeout,
+  /**
+   * The discovery process has concluded and on-demand CDS has no such cluster.
+   */
+  Missing,
+  /**
+   * Cluster found and currently available through ClusterManager.
+   */
+  Available,
+};
+
+/**
+ * ClusterDiscoveryCallback is a callback called at the end of the on-demand cluster discovery
+ * process. The status of the discovery is sent as a parameter.
+ */
+using ClusterDiscoveryCallback = std::function<void(ClusterDiscoveryStatus)>;
+using ClusterDiscoveryCallbackPtr = std::unique_ptr<ClusterDiscoveryCallback>;
+
+/**
+ * ClusterDiscoveryCallbackHandle is a RAII wrapper for a ClusterDiscoveryCallback. Deleting the
+ * ClusterDiscoveryCallbackHandle will remove the callbacks from ClusterManager.
+ */
+class ClusterDiscoveryCallbackHandle {
+public:
+  virtual ~ClusterDiscoveryCallbackHandle() = default;
+};
+
+using ClusterDiscoveryCallbackHandlePtr = std::unique_ptr<ClusterDiscoveryCallbackHandle>;
+
+/**
+ * A handle to an on-demand CDS.
+ */
+class OdCdsApiHandle {
+public:
+  virtual ~OdCdsApiHandle() = default;
+
+  /**
+   * Request an on-demand discovery of a cluster with a passed name. This ODCDS may be used to
+   * perform the discovery process in the main thread if there is no discovery going on for this
+   * cluster. When the requested cluster is added and warmed up, the passed callback will be invoked
+   * in the same thread that invoked this function.
+   *
+   * The returned handle can be destroyed to prevent the callback from being invoked. Note that the
+   * handle can only be destroyed in the same thread that invoked the function. Destroying the
+   * handle might not stop the discovery process, though. As soon as the callback is invoked,
+   * destroying the handle does nothing. It is a responsibility of the caller to make sure that the
+   * objects captured in the callback outlive the callback.
+   *
+   * This function is thread-safe.
+   *
+   * @param name is the name of the cluster to be discovered.
+   * @param callback will be called when the discovery is finished.
+   * @param timeout describes how long the operation may take before failing.
+   * @return the discovery process handle.
+   */
+  virtual ClusterDiscoveryCallbackHandlePtr
+  requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,
+                                  std::chrono::milliseconds timeout) PURE;
+};
+
+using OdCdsApiHandlePtr = std::unique_ptr<OdCdsApiHandle>;
 
 class ClusterManagerFactory;
 
@@ -179,13 +249,13 @@ public:
              warming_clusters_.find(cluster) != warming_clusters_.end();
     }
 
-    ClusterConstOptRef getCluster(absl::string_view cluster) {
+    ClusterConstOptRef getCluster(absl::string_view cluster) const {
       auto active_cluster = active_clusters_.find(cluster);
-      if (active_cluster != active_clusters_.end()) {
+      if (active_cluster != active_clusters_.cend()) {
         return active_cluster->second;
       }
       auto warming_cluster = warming_clusters_.find(cluster);
-      if (warming_cluster != warming_clusters_.end()) {
+      if (warming_cluster != warming_clusters_.cend()) {
         return warming_cluster->second;
       }
       return absl::nullopt;
@@ -193,6 +263,10 @@ public:
 
     ClusterInfoMap active_clusters_;
     ClusterInfoMap warming_clusters_;
+
+    // Number of clusters that were dynamically added via API (xDS). This will be
+    // less than or equal to the number of `active_clusters_` and `warming_clusters_`.
+    uint32_t added_via_api_clusters_num_{0};
   };
 
   /**
@@ -200,7 +274,7 @@ public:
    *
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
-  virtual ClusterInfoMaps clusters() PURE;
+  virtual ClusterInfoMaps clusters() const PURE;
 
   using ClusterSet = absl::flat_hash_set<std::string>;
 
@@ -312,21 +386,49 @@ public:
   virtual const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const PURE;
 
   /**
+   * Predicate function used in drainConnections().
+   * @param host supplies the host that is about to be drained.
+   * @return true if the host should be drained, and false otherwise.
+   *
+   * IMPORTANT: This predicate must be completely self contained and thread safe. It will be posted
+   * to all worker threads and run concurrently.
+   */
+  using DrainConnectionsHostPredicate = std::function<bool(const Host&)>;
+
+  /**
    * Drain all connection pool connections owned by this cluster.
    * @param cluster, the cluster to drain.
+   * @param predicate supplies the optional drain connections host predicate. If not supplied, all
+   *                  hosts are drained.
    */
-  virtual void drainConnections(const std::string& cluster) PURE;
+  virtual void drainConnections(const std::string& cluster,
+                                DrainConnectionsHostPredicate predicate) PURE;
 
   /**
    * Drain all connection pool connections owned by all clusters in the cluster manager.
+   * @param predicate supplies the optional drain connections host predicate. If not supplied, all
+   *                  hosts are drained.
    */
-  virtual void drainConnections() PURE;
+  virtual void drainConnections(DrainConnectionsHostPredicate predicate) PURE;
 
   /**
    * Check if the cluster is active and statically configured, and if not, throw exception.
    * @param cluster, the cluster to check.
    */
   virtual void checkActiveStaticCluster(const std::string& cluster) PURE;
+
+  /**
+   * Allocates an on-demand CDS API provider from configuration proto or locator.
+   *
+   * @param odcds_config is a configuration proto. Used when odcds_resources_locator is a nullopt.
+   * @param odcds_resources_locator is a locator for ODCDS. Used over odcds_config if not a nullopt.
+   * @param validation_visitor
+   * @return OdCdsApiHandlePtr the ODCDS handle.
+   */
+  virtual OdCdsApiHandlePtr
+  allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
+                   OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+                   ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -381,7 +483,8 @@ public:
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   TimeSource& time_source, ClusterConnectivityState& state) PURE;
+                   TimeSource& time_source, ClusterConnectivityState& state,
+                   Http::PersistentQuicInfoPtr& quic_info) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and
@@ -430,21 +533,13 @@ public:
    * Parameters for createClusterInfo().
    */
   struct CreateClusterInfoParams {
-    Server::Admin& admin_;
-    Runtime::Loader& runtime_;
+    Server::Configuration::ServerFactoryContext& server_context_;
     const envoy::config::cluster::v3::Cluster& cluster_;
     const envoy::config::core::v3::BindConfig& bind_config_;
     Stats::Store& stats_;
     Ssl::ContextManager& ssl_context_manager_;
     const bool added_via_api_;
-    ClusterManager& cm_;
-    const LocalInfo::LocalInfo& local_info_;
-    Event::Dispatcher& dispatcher_;
-    Singleton::Manager& singleton_manager_;
     ThreadLocal::SlotAllocator& tls_;
-    ProtobufMessage::ValidationVisitor& validation_visitor_;
-    Api::Api& api_;
-    const Server::Options& options_;
   };
 
   /**

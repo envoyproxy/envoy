@@ -10,7 +10,9 @@ public:
   ActiveRawUdpListenerFactory(uint32_t concurrency);
 
   Network::ConnectionHandler::ActiveUdpListenerPtr
-  createActiveUdpListener(uint32_t worker_index, Network::UdpConnectionHandler& parent,
+  createActiveUdpListener(Runtime::Loader&, uint32_t worker_index,
+                          Network::UdpConnectionHandler& parent,
+                          Network::SocketSharedPtr&& listen_socket_ptr,
                           Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return true; }
   const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }

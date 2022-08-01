@@ -96,14 +96,14 @@ public:
     envoy::extensions::clusters::aggregate::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
-    Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");
+    Stats::ScopeSharedPtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
 
-    cluster_ =
-        std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, api_->randomGenerator(),
-                                  factory_context, std::move(scope), false);
+    cluster_ = std::make_shared<Cluster>(server_context_, cluster_config, config, cm_, runtime_,
+                                         api_->randomGenerator(), factory_context, std::move(scope),
+                                         false);
 
     cm_.initializeThreadLocalClusters({"primary", "secondary"});
     primary_.cluster_.info_->name_ = "primary";
@@ -123,6 +123,7 @@ public:
     lb_ = lb_factory_->create();
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -149,6 +150,7 @@ public:
   NiceMock<Upstream::MockThreadLocalCluster> primary_, secondary_;
   Upstream::PrioritySetImpl primary_ps_, secondary_ps_;
   NiceMock<Upstream::MockLoadBalancer> primary_load_balancer_, secondary_load_balancer_;
+  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 
   const std::string default_yaml_config_ = R"EOF(
     name: aggregate_cluster

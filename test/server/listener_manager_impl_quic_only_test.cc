@@ -26,8 +26,8 @@ public:
 };
 
 #if defined(ENVOY_ENABLE_QUIC)
-TEST_F(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryAndSslContext) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+std::string getBasicConfig() {
+  std::string yaml = TestEnvironment::substitute(R"EOF(
 address:
   socket_address:
     address: 127.0.0.1
@@ -36,6 +36,7 @@ address:
 filter_chains:
 - filter_chain_match:
     transport_protocol: "quic"
+  name: foo
   filters:
   - name: envoy.filters.network.http_connection_manager
     typed_config:
@@ -46,6 +47,8 @@ filter_chains:
         name: local_route
       http_filters:
         - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   transport_socket:
     name: envoy.transport_sockets.quic
     typed_config:
@@ -70,7 +73,29 @@ filter_chains:
 udp_listener_config:
   quic_options: {}
   )EOF",
-                                                       Network::Address::IpVersion::v4);
+                                                 Network::Address::IpVersion::v4);
+  return yaml;
+}
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryAndSslContext) {
+  std::string yaml = getBasicConfig();
+  if (use_matcher_) {
+    yaml = yaml + R"EOF(
+filter_chain_matcher:
+  matcher_tree:
+    input:
+      name: transport
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.TransportProtocolInput
+    exact_match_map:
+      map:
+        "quic":
+          action:
+            name: foo
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+    )EOF";
+  }
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
   ON_CALL(udp_gso_syscall_, supportsUdpGso())
@@ -109,7 +134,7 @@ udp_listener_config:
   }
 #endif
 
-  manager_->addOrUpdateListener(listener_proto, "", true);
+  addOrUpdateListener(listener_proto);
   EXPECT_EQ(1u, manager_->listeners().size());
   EXPECT_FALSE(manager_->listeners()[0]
                    .get()
@@ -117,7 +142,7 @@ udp_listener_config:
                    ->listenerFactory()
                    .isTransportConnectionless());
   Network::SocketSharedPtr listen_socket =
-      manager_->listeners().front().get().listenSocketFactory().getListenSocket(0);
+      manager_->listeners().front().get().listenSocketFactories()[0]->getListenSocket(0);
 
   Network::UdpPacketWriterPtr udp_packet_writer =
       manager_->listeners()
@@ -151,9 +176,73 @@ udp_listener_config:
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
   EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 }
+
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
+  std::string yaml = getBasicConfig();
+  yaml = yaml + R"EOF(
+  udp_packet_packet_writer_config:
+    name: envoy.udp_packet_writer.default
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.udp_packet_writer.v3.UdpDefaultWriterFactory
+  )EOF";
+
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+  // Configure GSO support but later verify that the default writer is used instead.
+  ON_CALL(udp_gso_syscall_, supportsUdpGso()).WillByDefault(Return(true));
+  EXPECT_CALL(server_.api_.random_, uuid());
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
+#else
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
+#endif
+                           ListenerComponentFactory::BindType::ReusePort);
+
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#ifdef SO_RXQ_OVFL
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
+                   /* expected_sockopt_name */ SO_RXQ_OVFL,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#endif
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
+                   /* expected_sockopt_name */ SO_REUSEPORT,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#ifdef UDP_GRO
+  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
+                     /* expected_sockopt_name */ UDP_GRO,
+                     /* expected_value */ 1,
+                     /* expected_num_calls */ 1);
+  }
 #endif
 
-TEST_F(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithWrongTransportSocket) {
+  addOrUpdateListener(listener_proto);
+  EXPECT_EQ(1u, manager_->listeners().size());
+  EXPECT_FALSE(manager_->listeners()[0]
+                   .get()
+                   .udpListenerConfig()
+                   ->listenerFactory()
+                   .isTransportConnectionless());
+  Network::SocketSharedPtr listen_socket =
+      manager_->listeners().front().get().listenSocketFactories()[0]->getListenSocket(0);
+
+  Network::UdpPacketWriterFactory& udp_packet_writer_factory =
+      manager_->listeners().front().get().udpListenerConfig()->packetWriterFactory();
+  Network::UdpPacketWriterPtr udp_packet_writer = udp_packet_writer_factory.createUdpPacketWriter(
+      listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
+  // Even though GSO is enabled, the default writer should be used.
+  EXPECT_EQ(false, udp_packet_writer->isBatchMode());
+}
+#endif
+
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithWrongTransportSocket) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 address:
   socket_address:
@@ -163,6 +252,7 @@ address:
 filter_chains:
 - filter_chain_match:
     transport_protocol: "quic"
+  name: foo
   filters: []
   transport_socket:
     name: envoy.transport_sockets.quic
@@ -192,15 +282,15 @@ udp_listener_config:
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
 
 #if defined(ENVOY_ENABLE_QUIC)
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "wrong transport socket config specified for quic transport socket");
 #else
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "QUIC is configured but not enabled in the build.");
 #endif
 }
 
-TEST_F(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithWrongCodec) {
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithWrongCodec) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 address:
   socket_address:
@@ -210,6 +300,7 @@ address:
 filter_chains:
 - filter_chain_match:
     transport_protocol: "quic"
+  name: foo
   filters: []
   transport_socket:
     name: envoy.transport_sockets.quic
@@ -240,16 +331,16 @@ udp_listener_config:
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
 
 #if defined(ENVOY_ENABLE_QUIC)
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "error building network filter chain for quic listener: requires exactly "
                           "one http_connection_manager filter.");
 #else
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "QUIC is configured but not enabled in the build.");
 #endif
 }
 
-TEST_F(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithConnectionBalencer) {
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithConnectionBalencer) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 address:
   socket_address:
@@ -259,6 +350,7 @@ address:
 filter_chains:
 - filter_chain_match:
     transport_protocol: "quic"
+  name: foo
   filters:
   - name: envoy.filters.network.http_connection_manager
     typed_config:
@@ -300,14 +392,16 @@ connection_balance_config:
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
 
 #if defined(ENVOY_ENABLE_QUIC)
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "connection_balance_config is configured for QUIC listener which doesn't "
                           "work with connection balancer.");
 #else
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "QUIC is configured but not enabled in the build.");
 #endif
 }
+
+INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplQuicOnlyTest, ::testing::Values(false, true));
 
 } // namespace
 } // namespace Server

@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "source/common/quic/platform/quiche_flags_impl.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 
 // Not wired into command-line parsing.
 #define DEFINE_QUIC_COMMAND_LINE_FLAG_IMPL(type, flag, value, help)                                \

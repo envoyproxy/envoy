@@ -99,7 +99,8 @@ public:
     EXPECT_CALL(mock_router_filter_, cluster()).Times(AnyNumber());
     EXPECT_CALL(mock_router_filter_, callbacks()).Times(AnyNumber());
     mock_router_filter_.requests_.push_back(std::make_unique<UpstreamRequest>(
-        mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>()));
+        mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>(), false,
+        false));
     auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
     EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection_));
     tcp_upstream_ =
@@ -147,7 +148,7 @@ TEST_F(TcpUpstreamTest, Basic) {
 
 TEST_F(TcpUpstreamTest, V1Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
-      mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
+      mock_router_filter_.route_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
   mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
@@ -170,7 +171,7 @@ TEST_F(TcpUpstreamTest, V1Header) {
 
 TEST_F(TcpUpstreamTest, V2Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
-      mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
+      mock_router_filter_.route_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
   mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));

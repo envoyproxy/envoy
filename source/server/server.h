@@ -216,7 +216,7 @@ public:
 
 private:
   Instance& server_;
-  Stats::ScopePtr server_scope_;
+  Stats::ScopeSharedPtr server_scope_;
 };
 
 /**
@@ -246,6 +246,7 @@ public:
   Admin& admin() override { return *admin_; }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override;
+  const Upstream::ClusterManager& clusterManager() const override;
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
@@ -304,8 +305,6 @@ public:
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
-  enum class ReusePortDefault { True, False, Runtime };
-
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
@@ -355,10 +354,12 @@ private:
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
+  std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
@@ -369,7 +370,6 @@ private:
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
   DrainManagerPtr drain_manager_;
-  AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<Server::GuardDog> main_thread_guard_dog_;
   std::unique_ptr<Server::GuardDog> worker_guard_dog_;
@@ -394,7 +394,8 @@ private:
   ListenerHooks& hooks_;
   Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
-  absl::optional<ReusePortDefault> enable_reuse_port_default_;
+  bool enable_reuse_port_default_;
+  Regex::EnginePtr regex_engine_;
 
   bool stats_flush_in_progress_ : 1;
 

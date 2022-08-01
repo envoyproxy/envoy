@@ -190,7 +190,7 @@ TEST_F(OpenTracingDriverTest, InjectFailure) {
     const auto span_context_injection_error_count =
         stats_.counter("tracing.opentracing.span_context_injection_error").value();
     EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
-    span->injectContext(request_headers_);
+    span->injectContext(request_headers_, nullptr);
 
     EXPECT_EQ(span_context_injection_error_count + 1,
               stats_.counter("tracing.opentracing.span_context_injection_error").value());
@@ -204,7 +204,7 @@ TEST_F(OpenTracingDriverTest, ExtractWithUnindexedHeader) {
 
   Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                    start_time_, {Tracing::Reason::Sampling, true});
-  first_span->injectContext(request_headers_);
+  first_span->injectContext(request_headers_, nullptr);
 
   Tracing::SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                     start_time_, {Tracing::Reason::Sampling, true});

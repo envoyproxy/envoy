@@ -34,10 +34,10 @@ public:
   }
 };
 
-class EncoderDecoderBuffferFilterConfig
+class EncoderDecoderBufferFilterConfig
     : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  EncoderDecoderBuffferFilterConfig() : EmptyHttpFilterConfig("encoder-decoder-buffer-filter") {}
+  EncoderDecoderBufferFilterConfig() : EmptyHttpFilterConfig("encoder-decoder-buffer-filter") {}
 
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext&) override {
@@ -48,7 +48,7 @@ public:
 };
 
 // perform static registration
-static Registry::RegisterFactory<EncoderDecoderBuffferFilterConfig,
+static Registry::RegisterFactory<EncoderDecoderBufferFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

@@ -105,7 +105,7 @@ struct ScopedRdsStats {
 // A scoped RDS subscription to be used with the dynamic scoped RDS ConfigProvider.
 class ScopedRdsConfigSubscription
     : public Envoy::Config::DeltaConfigSubscriptionInstance,
-      Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration> {
+      public Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration> {
 public:
   using ScopedRouteConfigurationMap =
       std::map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>;
@@ -153,7 +153,7 @@ private:
         parent_.stats_.on_demand_scopes_.dec();
       }
     }
-    ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
+    ConfigConstSharedPtr routeConfig() { return route_provider_->configCast(); }
 
     void addOnDemandUpdateCallback(std::function<void()> callback);
 
@@ -227,7 +227,7 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
   // Stats must outlive subscription.
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   ScopedRdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
@@ -286,10 +286,8 @@ public:
   Envoy::Config::ConfigProviderPtr
   createStaticConfigProvider(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
                              const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
-    ASSERT(false,
-           "SRDS supports delta updates and requires the use of the createStaticConfigProvider() "
-           "overload that accepts a config proto set as an argument.");
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("SRDS supports delta updates and requires the use of the createStaticConfigProvider() "
+          "overload that accepts a config proto set as an argument.");
   }
   Envoy::Config::ConfigProviderPtr createStaticConfigProvider(
       std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,

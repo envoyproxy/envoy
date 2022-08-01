@@ -7,7 +7,9 @@ Configuration
 -------------------------
 
 Access logs are configured as part of the :ref:`HTTP connection manager config
-<config_http_conn_man>` or :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
+<config_http_conn_man>`, :ref:`TCP Proxy <config_network_filters_tcp_proxy>`,
+:ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>` or
+:ref:`Thrift Proxy <config_network_filters_thrift_proxy>`.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
 
@@ -127,11 +129,14 @@ The following command operators are supported:
 .. _config_access_log_format_start_time:
 
 %START_TIME%
-  HTTP
+  HTTP/THRIFT
     Request start time including milliseconds.
 
   TCP
     Downstream connection start time including milliseconds.
+
+  UDP
+    UDP proxy session start time including milliseconds.
 
   START_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   In addition to that, START_TIME also accepts following specifiers:
@@ -167,15 +172,18 @@ The following command operators are supported:
   HTTP
     Uncompressed bytes of request headers.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
 
 %BYTES_RECEIVED%
-  HTTP
+  HTTP/THRIFT
     Body bytes received.
 
   TCP
     Downstream bytes received on connection.
+
+  UDP
+    Not implemented (0).
 
   Renders a numeric value in typed JSON logs.
 
@@ -183,10 +191,20 @@ The following command operators are supported:
   HTTP
     Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
+  available (e.g. in TCP logs).
+
+%UPSTREAM_PROTOCOL%
+  HTTP
+    Upstream protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
+
+  TCP/UDP
+    Not implemented ("-").
+
+  In typed JSON logs, UPSTREAM_PROTOCOL will render the string ``"-"`` if the protocol is not
   available (e.g. in TCP logs).
 
 %RESPONSE_CODE%
@@ -198,7 +216,7 @@ The following command operators are supported:
     will be logged. If a 100-continue is followed by a 200, the logged response will be 200.
     If a 100-continue results in a disconnect, the 100 will be logged.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -210,7 +228,7 @@ The following command operators are supported:
     HTTP response code details provides additional information about the response code, such as
     who set it (the upstream or envoy) and why.
 
-  TCP
+  TCP/UDP
     Not implemented ("-")
 
 .. _config_access_log_format_connection_termination_details:
@@ -224,22 +242,25 @@ The following command operators are supported:
   HTTP
     Uncompressed bytes of response headers.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
 
 %RESPONSE_TRAILERS_BYTES%
   HTTP
     Uncompressed bytes of response trailers.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
 
 %BYTES_SENT%
-  HTTP
+  HTTP/THRIFT
     Body bytes sent. For WebSocket connection it will also include response header bytes.
 
   TCP
     Downstream bytes sent on connection.
+
+  UDP
+    Not implemented (0).
 
 %UPSTREAM_REQUEST_ATTEMPT_COUNT%
   HTTP
@@ -250,6 +271,9 @@ The following command operators are supported:
     Number of times the connection request is attempted upstream. Note that an attempt count of '0'
     means that the connection request was never attempted upstream.
 
+  UDP
+    Not implemented (0).
+
   Renders a numeric value in typed JSON logs.
 
 %UPSTREAM_WIRE_BYTES_SENT%
@@ -257,6 +281,9 @@ The following command operators are supported:
     Total number of bytes sent to the upstream by the http stream.
 
   TCP
+    Total number of bytes sent to the upstream by the tcp proxy.
+
+  UDP
     Not implemented (0).
 
 %UPSTREAM_WIRE_BYTES_RECEIVED%
@@ -264,20 +291,23 @@ The following command operators are supported:
     Total number of bytes received from the upstream by the http stream.
 
   TCP
+    Total number of bytes received from the upstream by the tcp proxy.
+
+  UDP
     Not implemented (0).
 
 %UPSTREAM_HEADER_BYTES_SENT%
   HTTP
     Number of header bytes sent to the upstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
 
 %UPSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the upstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
 
 %DOWNSTREAM_WIRE_BYTES_SENT%
@@ -285,6 +315,9 @@ The following command operators are supported:
     Total number of bytes sent to the downstream by the http stream.
 
   TCP
+    Total number of bytes sent to the downstream by the tcp proxy.
+
+  UDP
     Not implemented (0).
 
 %DOWNSTREAM_WIRE_BYTES_RECEIVED%
@@ -292,30 +325,36 @@ The following command operators are supported:
     Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
 
   TCP
+    Total number of bytes received from the downstream by the tcp proxy.
+
+  UDP
     Not implemented (0).
 
 %DOWNSTREAM_HEADER_BYTES_SENT%
   HTTP
     Number of header bytes sent to the downstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
 
 %DOWNSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the downstream by the http stream.
 
-  TCP
+  TCP/UDP
     Not implemented (0).
 
   Renders a numeric value in typed JSON logs.
 
 %DURATION%
-  HTTP
+  HTTP/THRIFT
     Total duration in milliseconds of the request from the start time to the last byte out.
 
   TCP
     Total duration in milliseconds of the downstream connection.
+
+  UDP
+    Not implemented (0).
 
   Renders a numeric value in typed JSON logs.
 
@@ -324,7 +363,7 @@ The following command operators are supported:
     Total duration in milliseconds of the request from the start time to the last byte of
     the request received from the downstream.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -333,7 +372,7 @@ The following command operators are supported:
   HTTP
     Total duration in milliseconds of the request from the start time to the last byte sent upstream.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -343,7 +382,7 @@ The following command operators are supported:
     Total duration in milliseconds of the request from the start time to the first byte read from the
     upstream host.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -353,7 +392,7 @@ The following command operators are supported:
     Total duration in milliseconds of the request from the first byte read from the upstream host to the last
     byte sent downstream.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
@@ -391,9 +430,17 @@ The following command operators are supported:
     * **UPE**: The upstream response had an HTTP protocol error.
     * **UMSDR**: The upstream request reached max stream duration.
     * **OM**: Overload Manager terminated the request.
+    * **DF**: The request was terminated due to DNS resolution failure.
+
+  UDP
+    Not implemented ("-").
 
 %ROUTE_NAME%
-  Name of the route.
+  HTTP/TCP
+    Name of the route.
+
+  UDP
+    Not implemented ("-").
 
 %VIRTUAL_CLUSTER_NAME%
   HTTP*/gRPC
@@ -413,6 +460,26 @@ The following command operators are supported:
   Local address of the upstream connection. If the address is an IP address it includes both
   address and port.
 
+%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
+  Local address of the upstream connection, without any port component.
+  IP addresses are the only address type with a port component.
+
+%UPSTREAM_LOCAL_PORT%
+  Local port of the upstream connection.
+  IP addresses are the only address type with a port component.
+
+%UPSTREAM_REMOTE_ADDRESS%
+  Remote address of the upstream connection. If the address is an IP address it includes both
+  address and port.
+
+%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
+  Remote address of the upstream connection, without any port component.
+  IP addresses are the only address type with a port component.
+
+%UPSTREAM_REMOTE_PORT%
+  Remote port of the upstream connection.
+  IP addresses are the only address type with a port component.
+
 .. _config_access_log_format_upstream_transport_failure_reason:
 
 %UPSTREAM_TRANSPORT_FAILURE_REASON%
@@ -421,7 +488,7 @@ The following command operators are supported:
     reason from the transport socket. The format of this field depends on the configured upstream
     transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
 
-  TCP
+  TCP/UDP
     Not implemented ("-")
 
 %DOWNSTREAM_REMOTE_ADDRESS%
@@ -435,8 +502,18 @@ The following command operators are supported:
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-  Remote address of the downstream connection. If the address is an IP address the output does
-  *not* include port.
+  Remote address of the downstream connection, without any port component.
+  IP addresses are the only address type with a port component.
+
+  .. note::
+
+    This may not be the physical remote address of the peer if the address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+    <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_REMOTE_PORT%
+  Remote port of the downstream connection.
+  IP addresses are the only address type with a port component.
 
   .. note::
 
@@ -455,8 +532,18 @@ The following command operators are supported:
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
-  The direct remote address of the downstream connection. If the address is an IP address the output does
-  *not* include port.
+  Direct remote address of the downstream connection, without any port component.
+  IP addresses are the only address type with a port component.
+
+  .. note::
+
+    This is always the physical remote address of the peer even if the downstream remote address has
+    been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
+    or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_PORT%
+  Direct remote port of the downstream connection.
+  IP addresses are the only address type with a port component.
 
   .. note::
 
@@ -467,6 +554,7 @@ The following command operators are supported:
 %DOWNSTREAM_LOCAL_ADDRESS%
   Local address of the downstream connection. If the address is an IP address it includes both
   address and port.
+
   If the original connection was redirected by iptables REDIRECT, this represents
   the original destination address restored by the
   :ref:`Original Destination Filter <config_listener_filters_original_dst>` using SO_ORIGINAL_DST socket option.
@@ -474,7 +562,12 @@ The following command operators are supported:
   option was set to true, this represents the original destination address and port.
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
-    Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+  Local address of the downstream connection, without any port component.
+  IP addresses are the only address type with a port component.
+
+%DOWNSTREAM_LOCAL_PORT%
+  Local port of the downstream connection.
+  IP addresses are the only address type with a port component.
 
 .. _config_access_log_format_connection_id:
 
@@ -485,11 +578,13 @@ The following command operators are supported:
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
 
-%GRPC_STATUS%
-  gRPC status code which is easy to interpret with text message corresponding with number.
+%GRPC_STATUS(X)%
+  `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>`_ formatted according to the optional parameter ``X``, which can be ``CAMEL_STRING``, ``SNAKE_STRING`` and ``NUMBER``.
+  For example, if the grpc status is ``INVALID_ARGUMENT`` (represented by number 3), the formatter will return ``InvalidArgument`` for ``CAMEL_STRING``, ``INVALID_ARGUMENT`` for ``SNAKE_STRING`` and ``3`` for ``NUMBER``.
+  If ``X`` isn't provided, ``CAMEL_STRING`` will be used.
 
-%DOWNSTREAM_LOCAL_PORT%
-    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
+%GRPC_STATUS_NUMBER%
+  gRPC status code.
 
 .. _config_access_log_format_req:
 
@@ -500,21 +595,21 @@ The following command operators are supported:
     the HTTP request header named X first and if it's not set, then request header Y is used. If
     none of the headers are present '-' symbol will be in the log.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
 %RESP(X?Y):Z%
   HTTP
     Same as **%REQ(X?Y):Z%** but taken from HTTP response headers.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
 %TRAILER(X?Y):Z%
   HTTP
     Same as **%REQ(X?Y):Z%** but taken from HTTP response trailers.
 
-  TCP
+  TCP/UDP
     Not implemented ("-").
 
 .. _config_access_log_format_dynamic_metadata:
@@ -540,6 +635,64 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-").
+
+  UDP
+    For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`,
+    NAMESPACE should be always set to "udp.proxy", optional KEYs are as follows:
+
+    * ``cluster_name``: Name of the cluster.
+    * ``bytes_sent``: Total number of downstream bytes sent to the upstream in the session.
+    * ``bytes_received``: Total number of downstream bytes received from the upstream in the session.
+    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the upstream in the session.
+    * ``errors_received``: Number of errors that have occurred when receiving datagrams from the upstream in UDP proxy.
+      Since the receiving errors are counted in at the listener level (vs. the session), this counter is global to all sessions and may not be directly attributable to the session being logged.
+    * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in the session.
+    * ``datagrams_received``: Number of datagrams received from the upstream successfully in the session.
+
+    Recommended access log format for UDP proxy:
+
+    .. code-block:: none
+
+      [%START_TIME%] %DYNAMIC_METADATA(udp.proxy:cluster_name)%
+      %DYNAMIC_METADATA(udp.proxy:bytes_sent)%
+      %DYNAMIC_METADATA(udp.proxy:bytes_received)%
+      %DYNAMIC_METADATA(udp.proxy:errors_sent)%
+      %DYNAMIC_METADATA(udp.proxy:errors_received)%
+      %DYNAMIC_METADATA(udp.proxy:datagrams_sent)%
+      %DYNAMIC_METADATA(udp.proxy:datagrams_received)%\n
+
+  THRIFT
+    For :ref:`Thrift Proxy <config_network_filters_thrift_proxy>`,
+    NAMESPACE should be always set to "thrift.proxy", optional KEYs are as follows:
+
+    * ``method``: Name of the method.
+    * ``cluster_name``: Name of the cluster.
+    * ``passthrough``: Passthrough support for the request and response.
+    * ``request:transport_type``: The transport type of the request.
+    * ``request:protocol_type``: The protocol type of the request.
+    * ``request:message_type``: The message type of the request.
+    * ``response:transport_type``: The transport type of the response.
+    * ``response:protocol_type``: The protocol type of the response.
+    * ``response:message_type``: The message type of the response.
+    * ``response:reply_type``: The reply type of the response.
+
+    Recommended access log format for Thrift proxy:
+
+    .. code-block:: none
+
+      [%START_TIME%] %DYNAMIC_METADATA(thrift.proxy:method)%
+      %DYNAMIC_METADATA(thrift.proxy:cluster)%
+      %DYNAMIC_METADATA(thrift.proxy:request:transport_type)%
+      %DYNAMIC_METADATA(thrift.proxy:request:protocol_type)%
+      %DYNAMIC_METADATA(thrift.proxy:request:message_type)%
+      %DYNAMIC_METADATA(thrift.proxy:response:transport_type)%
+      %DYNAMIC_METADATA(thrift.proxy:response:protocol_type)%
+      %DYNAMIC_METADATA(thrift.proxy:response:message_type)%
+      %DYNAMIC_METADATA(thrift.proxy:response:reply_type)%
+      %BYTES_RECEIVED%
+      %BYTES_SENT%
+      %DURATION%
+      %UPSTREAM_HOST%\n
 
   .. note::
 
@@ -572,7 +725,7 @@ The following command operators are supported:
     * %CLUSTER_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
     * %CLUSTER_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
 
-  TCP
+  TCP/UDP/THRIFT
     Not implemented ("-").
 
   .. note::
@@ -586,6 +739,40 @@ The following command operators are supported:
 
    CLUSTER_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
+.. _config_access_log_format_upstream_host_metadata:
+
+%UPSTREAM_METADATA(NAMESPACE:KEY*):Z%
+  HTTP/TCP
+    :ref:`Upstream host Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
+    lookup key in the namespace with the option of specifying nested keys separated by ':',
+    and Z is an optional parameter denoting string truncation up to Z characters long. The data
+    will be logged as a JSON string. For example, for the following upstream host metadata:
+
+    ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+
+    * %UPSTREAM_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_key)% will log: ``foo``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
+    * %UPSTREAM_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``bar``
+    * %UPSTREAM_METADATA(com.unknown_filter)% will log: ``-``
+    * %UPSTREAM_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
+    * %UPSTREAM_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
+
+  UDP/THRIFT
+    Not implemented ("-").
+
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored.
+
+  .. note::
+
+   UPSTREAM_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
+
 .. _config_access_log_format_filter_state:
 
 %FILTER_STATE(KEY:F):Z%
@@ -598,7 +785,7 @@ The following command operators are supported:
     If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
 
-  TCP
+  TCP/UDP
     Same as HTTP, the filter state is from connection instead of a L7 request.
 
   .. note::
@@ -608,91 +795,110 @@ The following command operators are supported:
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
-%REQUESTED_SERVER_NAME%
+%UPSTREAM_FILTER_STATE(KEY:F):Z%
   HTTP
+    Extracts filter state from upstream components like cluster or transport socket extensions.
+
+    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
+    look up the filter state object. The serialized proto will be logged as JSON string if possible.
+    If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
+    Z is an optional parameter denoting string truncation up to Z characters long.
+    F is an optional parameter used to indicate which method FilterState uses for serialization.
+    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
+    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+
+  TCP/UDP
+    Not implemented.
+
+  .. note::
+
+    This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`
+
+%REQUESTED_SERVER_NAME%
+  HTTP/TCP/THRIFT
     String value set on ssl connection socket for Server Name Indication (SNI)
-  TCP
-    String value set on ssl connection socket for Server Name Indication (SNI)
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_LOCAL_URI_SAN%
-  HTTP
+  HTTP/TCP/THRIFT
     The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
-  TCP
-    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_URI_SAN%
-  HTTP
+  HTTP/TCP/THRIFT
     The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
-  TCP
-    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_LOCAL_SUBJECT%
-  HTTP
+  HTTP/TCP/THRIFT
     The subject present in the local certificate used to establish the downstream TLS connection.
-  TCP
-    The subject present in the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_SUBJECT%
-  HTTP
+  HTTP/TCP/THRIFT
     The subject present in the peer certificate used to establish the downstream TLS connection.
-  TCP
-    The subject present in the peer certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_ISSUER%
-  HTTP
+  HTTP/TCP/THRIFT
     The issuer present in the peer certificate used to establish the downstream TLS connection.
-  TCP
-    The issuer present in the peer certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_TLS_SESSION_ID%
-  HTTP
+  HTTP/TCP/THRIFT
     The session ID for the established downstream TLS connection.
-  TCP
-    The session ID for the established downstream TLS connection.
+  UDP
+    Not implemented (0).
 
 %DOWNSTREAM_TLS_CIPHER%
-  HTTP
+  HTTP/TCP/THRIFT
     The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
-  TCP
-    The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_TLS_VERSION%
-  HTTP
+  HTTP/TCP/THRIFT
     The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
-  TCP
-    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_FINGERPRINT_256%
-  HTTP
+  HTTP/TCP/THRIFT
     The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
-  TCP
-    The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_FINGERPRINT_1%
-  HTTP
+  HTTP/TCP/THRIFT
     The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
-  TCP
-    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_SERIAL%
-  HTTP
+  HTTP/TCP/THRIFT
     The serial number of the client certificate used to establish the downstream TLS connection.
-  TCP
-    The serial number of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 %DOWNSTREAM_PEER_CERT%
-  HTTP
+  HTTP/TCP/THRIFT
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
-  TCP
-    The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
 .. _config_access_log_format_downstream_peer_cert_v_start:
 
 %DOWNSTREAM_PEER_CERT_V_START%
-  HTTP
+  HTTP/TCP/THRIFT
     The validity start date of the client certificate used to establish the downstream TLS connection.
-  TCP
-    The validity start date of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
   DOWNSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
@@ -700,12 +906,70 @@ The following command operators are supported:
 .. _config_access_log_format_downstream_peer_cert_v_end:
 
 %DOWNSTREAM_PEER_CERT_V_END%
-  HTTP
+  HTTP/TCP/THRIFT
     The validity end date of the client certificate used to establish the downstream TLS connection.
-  TCP
-    The validity end date of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
 
   DOWNSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
+%UPSTREAM_PEER_SUBJECT%
+  HTTP/TCP/THRIFT
+    The subject present in the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_PEER_ISSUER%
+  HTTP/TCP/THRIFT
+    The issuer present in the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_TLS_SESSION_ID%
+  HTTP/TCP/THRIFT
+    The session ID for the established upstream TLS connection.
+  UDP
+    Not implemented (0).
+
+%UPSTREAM_TLS_CIPHER%
+  HTTP/TCP/THRIFT
+    The OpenSSL name for the set of ciphers used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_TLS_VERSION%
+  HTTP/TCP/THRIFT
+    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_PEER_CERT%
+  HTTP/TCP/THRIFT
+    The server certificate in the URL-encoded PEM format used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+.. _config_access_log_format_upstream_peer_cert_v_start:
+
+%UPSTREAM_PEER_CERT_V_START%
+  HTTP/TCP/THRIFT
+    The validity start date of the upstream server certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+  UPSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
+.. _config_access_log_format_upstream_peer_cert_v_end:
+
+%UPSTREAM_PEER_CERT_V_END%
+  HTTP/TCP/THRIFT
+    The validity end date of the upstream server certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+  UPSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 %HOSTNAME%
@@ -715,4 +979,8 @@ The following command operators are supported:
   The body text for the requests rejected by the Envoy.
 
 %FILTER_CHAIN_NAME%
-  The network filter chain name of the downstream connection.
+  The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
+
+%ENVIRONMENT(X):Z%
+  Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
+  Z is an optional parameter denoting string truncation up to Z characters long.

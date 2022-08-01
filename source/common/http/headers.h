@@ -52,6 +52,7 @@ class CustomHeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
   const LowerCaseString AcceptEncoding{"accept-encoding"};
+  const LowerCaseString AccessControlRequestHeaders{"access-control-request-headers"};
   const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
   const LowerCaseString AccessControlAllowOrigin{"access-control-allow-origin"};
   const LowerCaseString AccessControlAllowHeaders{"access-control-allow-headers"};
@@ -59,6 +60,9 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString AccessControlRequestPrviateNetwork{
+      "access-control-request-private-network"};
+  const LowerCaseString AccessControlAllowPrviateNetwork{"access-control-allow-private-network"};
   const LowerCaseString Age{"age"};
   const LowerCaseString AltSvc{"alt-svc"};
   const LowerCaseString Authentication{"authentication"};
@@ -101,6 +105,7 @@ public:
   struct {
     const std::string Brotli{"br"};
     const std::string Gzip{"gzip"};
+    const std::string Zstd{"zstd"};
   } ContentEncodingValues;
 
   struct {
@@ -204,6 +209,7 @@ public:
   const LowerCaseString Path{":path"};
   const LowerCaseString Protocol{":protocol"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
+  const LowerCaseString ProxyStatus{"proxy-status"};
   const LowerCaseString Range{"range"};
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
@@ -273,6 +279,7 @@ public:
     const std::string RetriableStatusCodes{"retriable-status-codes"};
     const std::string RetriableHeaders{"retriable-headers"};
     const std::string Reset{"reset"};
+    const std::string Http3PostConnectFailure{"http3-post-connect-failure"};
   } EnvoyRetryOnValues;
 
   struct {
@@ -316,6 +323,7 @@ public:
     const std::string Deflate{"deflate"};
     const std::string Gzip{"gzip"};
     const std::string Identity{"identity"};
+    const std::string Zstd{"zstd"};
   } TransferEncodingValues;
 
   struct {

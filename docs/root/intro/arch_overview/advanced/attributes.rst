@@ -60,6 +60,7 @@ processing, which makes them suitable for RBAC policies.
    request.time, timestamp, Time of the first byte received
    request.id, string, Request ID corresponding to ``x-request-id`` header value
    request.protocol, string, "Request protocol ('"HTTP/1.0'", '"HTTP/1.1'", '"HTTP/2'", or '"HTTP/3'")"
+   request.query, string, The query portion of the URL in the format of "name1=value1&name2=value2".
 
 Header values in ``request.headers`` associative array are comma-concatenated in case of multiple values.
 
@@ -118,6 +119,7 @@ RBAC):
    connection.dns_san_peer_certificate, string, The first DNS entry in the SAN field of the peer certificate in the downstream TLS connection
    connection.uri_san_local_certificate, string, The first URI entry in the SAN field of the local certificate in the downstream TLS connection
    connection.uri_san_peer_certificate, string, The first URI entry in the SAN field of the peer certificate in the downstream TLS connection
+   connection.sha256_peer_certificate_digest, SHA256 digest of the peer certificate in the downstream TLS connection if present
 
 The following additional attributes are available upon the downstream connection termination:
 
@@ -145,6 +147,7 @@ The following attributes are available once the upstream connection is establish
    upstream.dns_san_peer_certificate, string, The first DNS entry in the SAN field of the peer certificate in the upstream TLS connection
    upstream.uri_san_local_certificate, string, The first URI entry in the SAN field of the local certificate in the upstream TLS connection
    upstream.uri_san_peer_certificate, string, The first URI entry in the SAN field of the peer certificate in the upstream TLS connection
+   upstream.sha256_peer_certificate_digest, SHA256 digest of the peer certificate in the upstream TLS connection if present
    upstream.local_address, string, The local address of the upstream connection
    upstream.transport_failure_reason, string, The upstream transport failure reason e.g. certificate validation failed
 

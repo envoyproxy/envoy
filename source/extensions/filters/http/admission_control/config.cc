@@ -42,7 +42,7 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
     response_evaluator = std::make_unique<SuccessCriteriaEvaluator>(config.success_criteria());
     break;
   case AdmissionControlProto::EvaluationCriteriaCase::EVALUATION_CRITERIA_NOT_SET:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    throw EnvoyException("Evaluation criteria not set");
   }
 
   AdmissionControlFilterConfigSharedPtr filter_config =

@@ -50,6 +50,12 @@ void DelegatingRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& header
                                                            insert_envoy_original_path);
 }
 
+Http::HeaderTransforms
+DelegatingRouteEntry::requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                              bool do_formatting) const {
+  return base_route_->routeEntry()->requestHeaderTransforms(stream_info, do_formatting);
+}
+
 const Http::HashPolicy* DelegatingRouteEntry::hashPolicy() const {
   return base_route_->routeEntry()->hashPolicy();
 }
@@ -168,6 +174,10 @@ const absl::optional<ConnectConfig>& DelegatingRouteEntry::connectConfig() const
 
 const std::string& DelegatingRouteEntry::routeName() const {
   return base_route_->routeEntry()->routeName();
+}
+
+const EarlyDataPolicy& DelegatingRouteEntry::earlyDataPolicy() const {
+  return base_route_->routeEntry()->earlyDataPolicy();
 }
 
 } // namespace Router

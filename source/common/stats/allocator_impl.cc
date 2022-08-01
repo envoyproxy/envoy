@@ -5,7 +5,6 @@
 
 #include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
-#include "envoy/stats/symbol_table.h"
 
 #include "source/common/common/hash.h"
 #include "source/common/common/lock_guard.h"
@@ -15,7 +14,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/stats/metric_impl.h"
 #include "source/common/stats/stat_merger.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/container/flat_hash_set.h"
 

@@ -17,6 +17,11 @@ if [[ -n "${GCP_SERVICE_ACCOUNT_KEY:0:1}" ]]; then
   bash -c 'echo "${GCP_SERVICE_ACCOUNT_KEY}"' | base64 --decode > "${GCP_SERVICE_ACCOUNT_KEY_FILE}"
 
   export BAZEL_BUILD_EXTRA_OPTIONS+=" --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_FILE}"
+
+  if [[ -n "${GOOGLE_BES_PROJECT_ID}" ]]; then
+    export BAZEL_BUILD_EXTRA_OPTIONS+=" --config=google-bes --bes_instance_name=${GOOGLE_BES_PROJECT_ID}"
+  fi
+
 fi
 
 

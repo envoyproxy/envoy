@@ -15,7 +15,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/matchers.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/ocsp/ocsp.h"
@@ -60,9 +60,10 @@ struct TlsContext {
   void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
 
-class ContextImpl : public virtual Envoy::Ssl::Context {
+class ContextImpl : public virtual Envoy::Ssl::Context,
+                    protected Logger::Loggable<Logger::Id::config> {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options);
+  virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptionsConstSharedPtr& options);
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -78,8 +79,9 @@ public:
    */
   static int sslExtendedSocketInfoIndex();
 
+  static int sslSocketIndex();
   // Ssl::Context
-  size_t daysUntilFirstCertExpires() const override;
+  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
@@ -87,6 +89,8 @@ public:
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
   bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
+
+  static void keylogCallback(const SSL* ssl, const char* line);
 
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
@@ -130,6 +134,9 @@ protected:
   const Stats::StatName ssl_curves_;
   const Stats::StatName ssl_sigalgs_;
   const Ssl::HandshakerCapabilities capabilities_;
+  const Network::Address::IpList tls_keylog_local_;
+  const Network::Address::IpList tls_keylog_remote_;
+  AccessLog::AccessLogFileSharedPtr tls_keylog_file_;
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
@@ -139,7 +146,8 @@ public:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
                     TimeSource& time_source);
 
-  bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options) override;
+  bssl::UniquePtr<SSL>
+  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) override;
 
 private:
   int newSessionKey(SSL_SESSION* session);

@@ -135,7 +135,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   }
 
   uint64_t data_to_write = write_buffer_->length();
-  ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
+  ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "closing data_to_write={} type={}", *this,
+                       data_to_write, enumToInt(type));
   const bool delayed_close_timeout_set = delayed_close_timeout_.count() > 0;
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
       !transport_socket_->canFlushClose()) {
@@ -414,7 +415,7 @@ void ConnectionImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::raiseEvent(ConnectionEvent event) {
-  ENVOY_CONN_LOG(trace, "raising connection event {}", *this, event);
+  ENVOY_CONN_LOG(trace, "raising connection event {}", *this, static_cast<int>(event));
   ConnectionImplBase::raiseConnectionEvent(event);
   // We may have pending data in the write buffer on transport handshake
   // completion, which may also have completed in the context of onReadReady(),
@@ -561,7 +562,8 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   ScopeTrackerScopeState scope(this, this->dispatcher_);
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
-  if (immediate_error_event_ != ConnectionEvent::Connected) {
+  if (immediate_error_event_ == ConnectionEvent::LocalClose ||
+      immediate_error_event_ == ConnectionEvent::RemoteClose) {
     if (bind_error_) {
       ENVOY_CONN_LOG(debug, "raising bind error", *this);
       // Update stats here, rather than on bind failure, to give the caller a chance to
@@ -597,7 +599,8 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 }
 
 void ConnectionImpl::onReadReady() {
-  ENVOY_CONN_LOG(trace, "read ready. dispatch_buffered_data={}", *this, dispatch_buffered_data_);
+  ENVOY_CONN_LOG(trace, "read ready. dispatch_buffered_data={}", *this,
+                 static_cast<int>(dispatch_buffered_data_));
   const bool latched_dispatch_buffered_data = dispatch_buffered_data_;
   dispatch_buffered_data_ = false;
 
@@ -677,18 +680,19 @@ void ConnectionImpl::onWriteReady() {
         socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).return_value_ == 0, "");
 
     if (error == 0) {
-      ENVOY_CONN_LOG(debug, "connected", *this);
+      ENVOY_CONN_LOG_EVENT(debug, "connection_connected", "connected", *this);
       connecting_ = false;
       onConnected();
       transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
-        ENVOY_CONN_LOG(debug, "close during connected callback", *this);
+        ENVOY_CONN_LOG_EVENT(debug, "connection_closed_callback", "close during connected callback",
+                             *this);
         return;
       }
     } else {
       setFailureReason(absl::StrCat("delayed connect error: ", error));
-      ENVOY_CONN_LOG(debug, "{}", *this, transportFailureReason());
+      ENVOY_CONN_LOG_EVENT(debug, "connection_error", "{}", *this, transportFailureReason());
       closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
@@ -779,7 +783,16 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
 
 absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
   return socket_->lastRoundTripTime();
-};
+}
+
+void ConnectionImpl::configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                                      std::chrono::microseconds rtt) {
+  return transport_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
+}
+
+absl::optional<uint64_t> ConnectionImpl::congestionWindowInBytes() const {
+  return socket_->congestionWindowInBytes();
+}
 
 void ConnectionImpl::flushWriteBuffer() {
   if (state() == State::Open && write_buffer_->length() > 0) {
@@ -819,6 +832,9 @@ void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::millise
 
 void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
   switch (event) {
+  case ConnectionEvent::ConnectedZeroRtt:
+    // The transport socket is still connecting, so skip changing connect state.
+    break;
   case ConnectionEvent::Connected:
   case ConnectionEvent::RemoteClose:
   case ConnectionEvent::LocalClose:
@@ -839,15 +855,18 @@ ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options)
     : ClientConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
-                           source_address, std::move(transport_socket), options) {}
+                           source_address, std::move(transport_socket), options,
+                           transport_options) {}
 
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
     const Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
@@ -889,13 +908,21 @@ ClientConnectionImpl::ClientConnectionImpl(
       ioHandle().activateFileEvents(Event::FileReadyType::Write);
     }
   }
+
+  if (transport_options) {
+    for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
+      // This does not throw as all objects are distinctly named and the stream info is empty.
+      stream_info_.filterState()->setData(object.name_, object.data_, object.state_type_,
+                                          StreamInfo::FilterState::LifeSpan::Connection,
+                                          object.stream_sharing_);
+    }
+  }
 }
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
                        socket_->connectionInfoProvider().remoteAddress()->asString());
-  const Api::SysCallIntResult result =
-      socket_->connect(socket_->connectionInfoProvider().remoteAddress());
+  const Api::SysCallIntResult result = transport_socket_->connect(*socket_);
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   if (result.return_value_ == 0) {
     // write will become ready.
@@ -913,12 +940,12 @@ void ClientConnectionImpl::connect() {
   if (result.errno_ == SOCKET_ERROR_IN_PROGRESS) {
 #endif
     ASSERT(connecting_);
-    ENVOY_CONN_LOG(debug, "connection in progress", *this);
+    ENVOY_CONN_LOG_EVENT(debug, "connection_in_progress", "connection in progress", *this);
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    setFailureReason(absl::StrCat("immediate connect error: ", result.errno_));
-    ENVOY_CONN_LOG(debug, "{}", *this, failureReason());
+    setFailureReason(absl::StrCat("immediate connect error: ", errorDetails(result.errno_)));
+    ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.
     ioHandle().activateFileEvents(Event::FileReadyType::Write);
@@ -929,12 +956,11 @@ void ClientConnectionImpl::onConnected() {
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
   // There are no meaningful socket source address semantics for non-IP sockets, so skip.
   if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip()) {
-    // interfaceName makes a syscall. Call once to minimize perf hit.
-    const auto maybe_interface_name = ioHandle().interfaceName();
+    socket_->connectionInfoProvider().maybeSetInterfaceName(ioHandle());
+    const auto maybe_interface_name = socket_->connectionInfoProvider().interfaceName();
     if (maybe_interface_name.has_value()) {
       ENVOY_CONN_LOG_EVENT(debug, "conn_interface", "connected on local interface '{}'", *this,
                            maybe_interface_name.value());
-      socket_->connectionInfoProvider().setInterfaceName(maybe_interface_name.value());
     }
   }
   ConnectionImpl::onConnected();

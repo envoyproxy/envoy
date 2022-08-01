@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -18,6 +19,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
+        ":sni_to_header_filter_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
@@ -38,5 +40,20 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "sni_to_header_filter_lib",
+    srcs = [
+        "sni_to_header_filter.cc",
+    ],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//source/common/network:connection_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//test/integration/filters:common_lib",
     ],
 )

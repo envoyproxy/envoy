@@ -102,7 +102,10 @@ public:
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
           envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_dynamic_resources()
+          ->mutable_cds_config()
+          ->mutable_path_config_source()
+          ->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
     });
 
@@ -118,7 +121,8 @@ public:
     auto* eds_cluster_config = cluster_.mutable_eds_cluster_config();
     eds_cluster_config->mutable_eds_config()->set_resource_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
+    eds_cluster_config->mutable_eds_config()->mutable_path_config_source()->set_path(
+        eds_helper_.eds_path());
     if (http_active_hc) {
       auto* health_check = cluster_.add_health_checks();
       health_check->mutable_timeout()->set_seconds(30);

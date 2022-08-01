@@ -159,9 +159,22 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   ON_CALL(*upstream_host, metadata()).WillByDefault(testing::Return(upstream_metadata));
   test_stream_info->setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   test_stream_info->upstreamInfo()->setUpstreamHost(upstream_host);
-  auto address = stream_info.has_address()
-                     ? Envoy::Network::Address::resolveProtoAddress(stream_info.address())
-                     : Network::Utility::resolveUrl("tcp://10.0.0.1:443");
+  Envoy::Network::Address::InstanceConstSharedPtr address;
+  if (stream_info.has_address()) {
+    if (stream_info.address().address_case() ==
+            envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress &&
+        stream_info.address().envoy_internal_address().address_name_specifier_case() ==
+            envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
+                kServerListenerName) {
+      address = std::make_shared<Envoy::Network::Address::EnvoyInternalInstance>(
+          replaceInvalidHostCharacters(
+              stream_info.address().envoy_internal_address().server_listener_name()));
+    } else {
+      address = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+    }
+  } else {
+    address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
+  }
   auto upstream_local_address =
       stream_info.has_upstream_local_address()
           ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
@@ -194,6 +207,17 @@ inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) 
 
   return data_chunks;
 }
+
+// Returns a vector of differences between expected and actual. An empty array indicates
+// expected==actual
+std::vector<std::string> fuzzFindDiffs(absl::string_view expected, absl::string_view actual);
+
+#define FUZZ_ASSERT_EQ(expected, actual, annotation)                                               \
+  {                                                                                                \
+    std::vector<std::string> diffs = fuzzFindDiffs(expected, actual);                              \
+    RELEASE_ASSERT(expected == actual, absl::StrCat(annotation, ": ", expected, " != ", actual,    \
+                                                    "\n  ", absl::StrJoin(diffs, "\n  ")));        \
+  }
 
 } // namespace Fuzz
 } // namespace Envoy

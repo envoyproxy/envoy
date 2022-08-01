@@ -3,11 +3,13 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context.h"
 
 #include "source/common/common/interval_value.h"
@@ -44,9 +46,10 @@ public:
    * Adds a listener to the handler, optionally replacing the existing listener.
    * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
+   * @param runtime the runtime for the server.
    */
-  virtual void addListener(absl::optional<uint64_t> overridden_listener,
-                           ListenerConfig& config) PURE;
+  virtual void addListener(absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
+                           Runtime::Loader& runtime) PURE;
 
   /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed
@@ -176,10 +179,12 @@ public:
   /**
    * Obtain the rebalancer of the tcp listener.
    * @param listener_tag supplies the tag of the tcp listener that was passed to addListener().
+   * @param address is used to query the address specific handler.
    * @return BalancedConnectionHandlerOptRef the balancer attached to the listener. `nullopt` if
    * listener doesn't exist or rebalancer doesn't exist.
    */
-  virtual BalancedConnectionHandlerOptRef getBalancedHandlerByTag(uint64_t listener_tag) PURE;
+  virtual BalancedConnectionHandlerOptRef
+  getBalancedHandlerByTag(uint64_t listener_tag, const Network::Address::Instance& address) PURE;
 
   /**
    * Obtain the rebalancer of the tcp listener.
@@ -197,11 +202,12 @@ public:
 class UdpConnectionHandler : public virtual ConnectionHandler {
 public:
   /**
-   * Get the ``UdpListenerCallbacks`` associated with ``listener_tag``. This will be
+   * Get the ``UdpListenerCallbacks`` associated with ``listener_tag`` and ``address``. This will be
    * absl::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
    * removed.
    */
-  virtual UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) PURE;
+  virtual UdpListenerCallbacksOptRef
+  getUdpListenerCallbacks(uint64_t listener_tag, const Network::Address::Instance& address) PURE;
 };
 
 /**
@@ -214,15 +220,19 @@ public:
   /**
    * Creates an ActiveUdpListener object and a corresponding UdpListener
    * according to given config.
+   * @param runtime the runtime for this server.
    * @param worker_index The index of the worker this listener is being created on.
    * @param parent is the owner of the created ActiveListener objects.
+   * @param listen_socket_ptr is the UDP socket.
    * @param dispatcher is used to create actual UDP listener.
    * @param config provides information needed to create ActiveUdpListener and
    * UdpListener objects.
    * @return the ActiveUdpListener created.
    */
   virtual ConnectionHandler::ActiveUdpListenerPtr
-  createActiveUdpListener(uint32_t worker_index, UdpConnectionHandler& parent,
+  createActiveUdpListener(Runtime::Loader& runtime, uint32_t worker_index,
+                          UdpConnectionHandler& parent,
+                          Network::SocketSharedPtr&& listen_socket_ptr,
                           Event::Dispatcher& dispatcher, Network::ListenerConfig& config) PURE;
 
   /**
@@ -237,6 +247,69 @@ public:
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;
+
+/**
+ * Internal listener callbacks.
+ */
+class InternalListener : public virtual ConnectionHandler::ActiveListener {
+public:
+  /**
+   * Called when a new connection is accepted.
+   * @param socket supplies the socket that is moved into the callee.
+   */
+  virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
+};
+
+using InternalListenerPtr = std::unique_ptr<InternalListener>;
+using InternalListenerOptRef = OptRef<InternalListener>;
+
+/**
+ * The query interface of the registered internal listener callbacks.
+ */
+class InternalListenerManager {
+public:
+  virtual ~InternalListenerManager() = default;
+
+  /**
+   * Return the internal listener binding the listener address.
+   *
+   * @param listen_address the internal address of the expected internal listener.
+   */
+  virtual InternalListenerOptRef
+  findByAddress(const Address::InstanceConstSharedPtr& listen_address) PURE;
+};
+
+using InternalListenerManagerOptRef =
+    absl::optional<std::reference_wrapper<InternalListenerManager>>;
+
+// The thread local registry.
+class LocalInternalListenerRegistry {
+public:
+  virtual ~LocalInternalListenerRegistry() = default;
+
+  // Set the internal listener manager which maintains life of internal listeners. Called by
+  // connection handler.
+  virtual void setInternalListenerManager(InternalListenerManager& internal_listener_manager) PURE;
+
+  // Get the internal listener manager to obtain a listener. Called by client connection factory.
+  virtual InternalListenerManagerOptRef getInternalListenerManager() PURE;
+
+  // Create a new active internal listener. Called by the server connection handler.
+  virtual InternalListenerPtr createActiveInternalListener(ConnectionHandler& conn_handler,
+                                                           ListenerConfig& config,
+                                                           Event::Dispatcher& dispatcher) PURE;
+};
+
+// The central internal listener registry interface providing the thread local accessor.
+class InternalListenerRegistry {
+public:
+  virtual ~InternalListenerRegistry() = default;
+
+  /**
+   * @return The thread local registry.
+   */
+  virtual LocalInternalListenerRegistry* getLocalRegistry() PURE;
+};
 
 } // namespace Network
 } // namespace Envoy

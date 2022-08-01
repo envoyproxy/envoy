@@ -7,7 +7,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 
 #include "test/common/stats/make_elements_helper.h"
@@ -153,8 +153,7 @@ static void bmSortByStatNames(benchmark::State& state) {
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     std::vector<Envoy::Stats::StatName> sort = names;
-    Envoy::Stats::sortByStatNames<Envoy::Stats::StatName>(symbol_table, sort.begin(), sort.end(),
-                                                          getter);
+    symbol_table.sortByStatNames<Envoy::Stats::StatName>(sort.begin(), sort.end(), getter);
   }
 }
 BENCHMARK(bmSortByStatNames);
@@ -179,6 +178,7 @@ static void bmSortStrings(benchmark::State& state) {
   Envoy::Stats::StatNamePool pool(symbol_table);
   const std::vector<Envoy::Stats::StatName> stat_names = prepareNames(pool, 100 * 1000);
   std::vector<std::string> names;
+  names.reserve(stat_names.size());
   for (Envoy::Stats::StatName stat_name : stat_names) {
     names.emplace_back(symbol_table.toString(stat_name));
   }
@@ -197,6 +197,7 @@ static void bmSetStrings(benchmark::State& state) {
   Envoy::Stats::StatNamePool pool(symbol_table);
   const std::vector<Envoy::Stats::StatName> stat_names = prepareNames(pool, 100 * 1000);
   std::vector<std::string> names;
+  names.reserve(stat_names.size());
   for (Envoy::Stats::StatName stat_name : stat_names) {
     names.emplace_back(symbol_table.toString(stat_name));
   }

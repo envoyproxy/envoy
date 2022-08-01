@@ -31,6 +31,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -91,7 +92,16 @@ TEST(ServerInstanceUtil, flushHelper) {
   NiceMock<Stats::MockStore> mock_store;
   Stats::ParentHistogramSharedPtr parent_histogram(new Stats::MockParentHistogram());
   std::vector<Stats::ParentHistogramSharedPtr> parent_histograms = {parent_histogram};
-  ON_CALL(mock_store, histograms).WillByDefault(Return(parent_histograms));
+  ON_CALL(mock_store, forEachHistogram)
+      .WillByDefault([&](std::function<void(std::size_t)> f_size,
+                         std::function<void(Stats::ParentHistogram&)> f_stat) {
+        if (f_size != nullptr) {
+          f_size(parent_histograms.size());
+        }
+        for (auto& histogram : parent_histograms) {
+          f_stat(*histogram);
+        }
+      });
   EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
     EXPECT_TRUE(snapshot.counters().empty());
     EXPECT_TRUE(snapshot.gauges().empty());
@@ -429,6 +439,9 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
 
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
@@ -776,6 +789,9 @@ TEST_P(ServerStatsTest, FlushStats) {
 }
 
 TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
   auto server_thread =
@@ -802,6 +818,9 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
 }
 
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 
@@ -1020,7 +1039,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  EXPECT_FALSE(server_->enableReusePortDefault());
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
@@ -1385,9 +1403,10 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
 }
 
 TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/bootstrap_extensions.yaml"), EnvoyException,
-      "Didn't find a registered implementation for name: 'envoy_test.bootstrap.foo'");
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/bootstrap_extensions.yaml"),
+                          EnvoyException,
+                          "Didn't find a registered implementation for 'envoy_test.bootstrap.foo' "
+                          "with type URL: 'test.common.config.DummyConfig'");
 }
 
 // Insufficient support on Windows.
@@ -1424,7 +1443,7 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
   // Inject Unsafe Factory
   NiceMock<Configuration::MockFatalActionFactory> mock_unsafe_factory;
   EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
-    return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
+    return std::make_unique<ProtobufWkt::Struct>();
   }));
   EXPECT_CALL(mock_unsafe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.unsafe"));
 
@@ -1560,6 +1579,9 @@ public:
 // lifecycle callback is also used to ensure that the cluster update callback is freed during
 // Server::Instance's destruction. See issue #9292 for more details.
 TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   CallbacksStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
 

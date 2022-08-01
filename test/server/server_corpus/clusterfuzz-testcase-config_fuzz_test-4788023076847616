@@ -52,8 +52,6 @@ static_resources {
         alpn_protocols: "/"
       }
     }
-    http2_protocol_options {
-    }
     upstream_bind_config {
       source_address {
         address: "0.0.0.0"
@@ -63,10 +61,15 @@ static_resources {
         value: true
       }
     }
-    common_http_protocol_options {
-      idle_timeout {
-        seconds: 2304
-        nanos: 132
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        common_http_protocol_options {
+          idle_timeout {
+            seconds: 2304
+            nanos: 132
+          }
+        }
       }
     }
     load_assignment {
@@ -170,8 +173,6 @@ static_resources {
         seconds: 8
         nanos: 812933685
       }
-    }
-    upstream_http_protocol_options {
     }
   }
 }

@@ -1,6 +1,7 @@
 #include "test/integration/tcp_proxy_integration_test.h"
 
 #include <memory>
+#include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -31,45 +32,21 @@ using testing::NiceMock;
 
 namespace Envoy {
 
-std::vector<TcpProxyIntegrationTestParams> newPoolTestParams() {
-  std::vector<TcpProxyIntegrationTestParams> ret;
-
-  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    ret.push_back(TcpProxyIntegrationTestParams{ip_version, false});
-  }
-  return ret;
-}
-
-std::vector<TcpProxyIntegrationTestParams> getProtocolTestParams() {
-  std::vector<TcpProxyIntegrationTestParams> ret;
-
-  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    ret.push_back(TcpProxyIntegrationTestParams{ip_version, true});
-    ret.push_back(TcpProxyIntegrationTestParams{ip_version, false});
-  }
-  return ret;
-}
-
-std::string
-protocolTestParamsToString(const ::testing::TestParamInfo<TcpProxyIntegrationTestParams>& params) {
-  return absl::StrCat(
-      (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-      (params.param.test_original_version == true ? "OriginalConnPool" : "NewConnPool"));
-}
-
 void TcpProxyIntegrationTest::initialize() {
-  if (GetParam().test_original_version) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "false");
-  } else {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "true");
-  }
-
   config_helper_.renameListener("tcp_proxy");
   BaseIntegrationTest::initialize();
 }
 
-INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+void TcpProxyIntegrationTest::setupByteMeterAccessLog() {
+  useListenerAccessLog("DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
+                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+                       "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
+                       "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test upstream writing before downstream downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
@@ -135,7 +112,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
 
 // Test proxying data in both directions, and that all data is flushed properly
 // when there is an upstream disconnect.
-TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
+TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnectBytesMeter) {
+  setupByteMeterAccessLog();
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(tcp_client->write("hello"));
@@ -149,11 +127,19 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
   tcp_client->close();
 
   EXPECT_EQ("world", tcp_client->data());
+  test_server_.reset();
+  auto log_result = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(log_result, MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=5 "
+                                                   "DOWNSTREAM_WIRE_BYTES_RECEIVED=5 "
+                                                   "UPSTREAM_WIRE_BYTES_SENT=5 "
+                                                   "UPSTREAM_WIRE_BYTES_RECEIVED=5"
+                                                   "\r?.*")));
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
 // when the client disconnects.
-TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
+TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnectBytesMeter) {
+  setupByteMeterAccessLog();
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(tcp_client->write("hello"));
@@ -168,6 +154,13 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
+  test_server_.reset();
+  auto log_result = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(log_result, MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=5 "
+                                                   "DOWNSTREAM_WIRE_BYTES_RECEIVED=10 "
+                                                   "UPSTREAM_WIRE_BYTES_SENT=10 "
+                                                   "UPSTREAM_WIRE_BYTES_RECEIVED=5"
+                                                   "\r?.*")));
 }
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
@@ -311,9 +304,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   EXPECT_EQ(upstream_pauses, upstream_resumes);
 
   uint32_t downstream_pauses =
-      test_server_->counter("tcp.tcp_stats.downstream_flow_control_paused_reading_total")->value();
+      test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_paused_reading_total")
+          ->value();
   uint32_t downstream_resumes =
-      test_server_->counter("tcp.tcp_stats.downstream_flow_control_resumed_reading_total")->value();
+      test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_resumed_reading_total")
+          ->value();
   EXPECT_EQ(downstream_pauses, downstream_resumes);
 }
 
@@ -376,15 +371,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
 
   ASSERT_TRUE(tcp_client->write(data, true, true, std::chrono::milliseconds(30000)));
 
-  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
+  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 1);
   ASSERT_TRUE(fake_upstream_connection->readDisable(false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
 
-  EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 1);
-  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 0);
+  EXPECT_EQ(test_server_->counter("tcp.tcpproxy_stats.upstream_flush_total")->value(), 1);
+  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 0);
 }
 
 // Test that Envoy doesn't crash or assert when shutting down with an upstream flush active
@@ -407,7 +402,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 
   ASSERT_TRUE(tcp_client->write(data, true));
 
-  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
+  test_server_->waitForGaugeEq("tcp.tcpproxy_stats.upstream_flush_active", 1);
   test_server_.reset();
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -415,9 +410,16 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
   // Success criteria is that no ASSERTs fire and there are no leaks.
 }
 
-TEST_P(TcpProxyIntegrationTest, AccessLog) {
+// Check for basic log access.
+// Tests the values of %UPSTREAM_LOCAL_ADDRESS%, %UPSTREAM_HOST%,
+//  %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%, %BYTES_SENT%, %BYTES_RECEIVED%,
+//  %DOWNSTREAM_WIRE_BYTES_SENT%, %DOWNSTREAM_WIRE_BYTES_RECEIVED%,
+//  %UPSTREAM_WIRE_BYTES_SENT%, %UPSTREAM_WIRE_BYTES_RECEIVED%
+TEST_P(TcpProxyIntegrationTest, AccessLogBytesMeter) {
   std::string access_log_path = TestEnvironment::temporaryPath(
-      fmt::format("access_log{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6"));
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  useListenerAccessLog();
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -434,8 +436,13 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
-        "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
-        "sent=%BYTES_SENT% received=%BYTES_RECEIVED%\n");
+        "upstreamhost=%UPSTREAM_HOST% "
+        "downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
+        "sent=%BYTES_SENT% received=%BYTES_RECEIVED% "
+        "DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
+        "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+        "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
+        "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
     auto* runtime_filter = access_log->mutable_filter()->mutable_runtime_filter();
     runtime_filter->set_runtime_key("unused-key");
@@ -460,11 +467,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  std::string log_result;
-  // Access logs only get flushed to disk periodically, so poll until the log is non-empty
-  do {
-    log_result = api_->fileSystem().fileReadToEnd(access_log_path);
-  } while (log_result.empty());
+  // Guarantee client is done writing to the log.
+  test_server_.reset();
+  auto log_result = waitForAccessLog(access_log_path);
 
   // Regex matching localhost:port
 #ifndef GTEST_USES_SIMPLE_RE
@@ -483,9 +488,145 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
   EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format(
-                  "upstreamlocal={0} upstreamhost={0} downstream={1} sent=5 received=0\r?\n.*",
-                  ip_port_regex, ip_regex)));
+              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1} "
+                                       "sent=5 received=0 "
+                                       "DOWNSTREAM_WIRE_BYTES_SENT=5 "
+                                       "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
+                                       "UPSTREAM_WIRE_BYTES_SENT=0 "
+                                       "UPSTREAM_WIRE_BYTES_RECEIVED=5"
+                                       "\r?.*",
+                                       ip_port_regex, ip_regex)));
+}
+
+// Verifies that access log value for `UPSTREAM_TRANSPORT_FAILURE_REASON` matches the failure
+// message when there is an upstream transport failure.
+TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  useListenerAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_TRANSPORT_FAILURE_REASON%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  // Ensure we don't get an upstream connection.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* lb_endpoint =
+        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
+  });
+
+  config_helper_.skipPortUsageValidation();
+  enableHalfClose(false);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  tcp_client->waitForDisconnect();
+
+  // Guarantee client is done writing to the log.
+  auto log_result = waitForAccessLog(access_log_path);
+
+  EXPECT_THAT(log_result, testing::StartsWith("delayed_connect_error:"));
+}
+
+// Make sure no bytes are logged when no data is sent.
+TEST_P(TcpProxyIntegrationTest, TcpProxyNoDataBytesMeter) {
+  setupByteMeterAccessLog();
+  initialize();
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  auto tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->close());
+
+  test_server_.reset();
+  auto log_result = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(log_result, MatchesRegex(fmt::format("DOWNSTREAM_WIRE_BYTES_SENT=0 "
+                                                   "DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
+                                                   "UPSTREAM_WIRE_BYTES_SENT=0 "
+                                                   "UPSTREAM_WIRE_BYTES_RECEIVED=0"
+                                                   "\r?.*")));
+}
+
+// Test Byte Metering across multiple upstream/downstream connections
+TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
+  setupByteMeterAccessLog();
+  const int client_count = 3;
+  const int upstream_count = 3;
+
+  enableHalfClose(false);
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->clear_endpoints();
+    for (int i = 0; i < upstream_count; ++i) {
+      auto locality = load_assignment->add_endpoints();
+      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+    }
+  });
+
+  setUpstreamCount(upstream_count);
+  initialize();
+
+  std::vector<IntegrationTcpClientPtr> clients{client_count};
+  std::vector<FakeRawConnectionPtr> fake_connections{upstream_count};
+  const auto indicies = std::vector<uint64_t>({0, 1, 2});
+
+  for (int i = 0; i < client_count; ++i) {
+    clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
+    waitForNextRawUpstreamConnection(indicies, fake_connections[i]);
+  }
+
+  ASSERT_TRUE(clients[0]->write("hello")); // send initial client data
+  ASSERT_TRUE(fake_connections[0]->waitForData(5));
+
+  ASSERT_TRUE(fake_connections[0]->write("squack")); // send upstream data
+  ASSERT_TRUE(clients[0]->waitForData(6));
+
+  ASSERT_TRUE(clients[0]->write("hey")); // send more client data
+  ASSERT_TRUE(fake_connections[0]->waitForData(8));
+
+  ASSERT_TRUE(fake_connections[2]->write("bye")); // send data from 3rd client
+  ASSERT_TRUE(clients[2]->waitForData(3));
+
+  for (int i = 0; i < client_count; ++i) {
+    ASSERT_TRUE(fake_connections[i]->close());
+    clients[i]->close();
+    ASSERT_TRUE(fake_connections[i]->waitForDisconnect());
+  }
+  test_server_.reset();
+
+  std::vector<absl::string_view> logs = {
+      "DOWNSTREAM_WIRE_BYTES_SENT=6 DOWNSTREAM_WIRE_BYTES_RECEIVED=8 "
+      "UPSTREAM_WIRE_BYTES_SENT=8 UPSTREAM_WIRE_BYTES_RECEIVED=6",
+      "DOWNSTREAM_WIRE_BYTES_SENT=0 DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
+      "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=0",
+      "DOWNSTREAM_WIRE_BYTES_SENT=3 DOWNSTREAM_WIRE_BYTES_RECEIVED=0 "
+      "UPSTREAM_WIRE_BYTES_SENT=0 UPSTREAM_WIRE_BYTES_RECEIVED=3"};
+  auto log_result = waitForAccessLog(listener_access_log_name_);
+  for (int i = 0; i < client_count; ++i) {
+    EXPECT_THAT(log_result, MatchesRegex(fmt::format(".*{}.*", logs[i])));
+  }
 }
 
 // Test that the server shuts down without crashing when connections are open.
@@ -865,7 +1006,8 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute(
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyMetadataMatchIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Test subset load balancing for a regular cluster when endpoint selector is defined at the top
 // level.
@@ -1093,7 +1235,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyDynamicMetadataMatchIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
@@ -1137,7 +1280,8 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataNonMatch) {
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxySslIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
@@ -1170,9 +1314,9 @@ void TcpProxySslIntegrationTest::setupConnections() {
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
   context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
-  ssl_client_ =
-      dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          context_->createTransportSocket(nullptr), nullptr);
+  ssl_client_ = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      context_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
 
   // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
@@ -1292,37 +1436,13 @@ class MysqlIntegrationTest : public TcpProxyIntegrationTest {
 public:
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
-      Network::TransportSocketFactoryPtr factory =
+      Network::DownstreamTransportSocketFactoryPtr factory =
           upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
-                        : Network::Test::createRawBufferSocketFactory();
+                        : Network::Test::createRawBufferDownstreamSocketFactory();
       auto endpoint = upstream_address_fn_(i);
       fake_upstreams_.emplace_back(
           new FakeMysqlUpstream(std::move(factory), endpoint, upstreamConfig()));
     }
-  }
-
-  absl::optional<uint64_t>
-  waitForNextUpstreamConnection(const std::vector<uint64_t>& upstream_indices,
-                                std::chrono::milliseconds connection_wait_timeout,
-                                FakeRawConnectionPtr& fake_upstream_connection) {
-    AssertionResult result = AssertionFailure();
-    int upstream_index = 0;
-    Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
-    // Loop over the upstreams until the call times out or an upstream request is received.
-    while (!result) {
-      upstream_index = upstream_index % upstream_indices.size();
-      result = fake_upstreams_[upstream_indices[upstream_index]]->waitForRawConnection(
-          fake_upstream_connection, std::chrono::milliseconds(5));
-      if (result) {
-        return upstream_index;
-      } else if (!bound.withinBound()) {
-        RELEASE_ASSERT(0, "Timed out waiting for new connection.");
-        break;
-      }
-      ++upstream_index;
-    }
-    RELEASE_ASSERT(result, result.message());
-    return {};
   }
 
   void globalPreconnect() {
@@ -1420,14 +1540,14 @@ void MysqlIntegrationTest::testPreconnect() {
   for (int i = 0; i < num_clients; ++i) {
     // Start a new request.
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-    waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
-                                  TestUtility::DefaultTimeout, fake_connections[upstream_index]);
+    waitForNextRawUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
+                                     fake_connections[upstream_index]);
     ++upstream_index;
 
     // For every other connection, an extra connection should be preconnected.
     if (i % 2 == 0) {
-      waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
-                                    TestUtility::DefaultTimeout, fake_connections[upstream_index]);
+      waitForNextRawUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
+                                       fake_connections[upstream_index]);
       ++upstream_index;
     }
   }
@@ -1448,6 +1568,6 @@ TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, MysqlIntegrationTest,
-                         testing::ValuesIn(newPoolTestParams()), protocolTestParamsToString);
-
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 } // namespace Envoy

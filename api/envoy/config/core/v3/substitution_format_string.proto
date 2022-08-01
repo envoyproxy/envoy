@@ -97,16 +97,17 @@ message SubstitutionFormatString {
   // * for ``json_format`` the keys with null values are omitted in the output structure.
   bool omit_empty_values = 3;
 
-  // Specify a *content_type* field.
-  // If this field is not set then ``text/plain`` is used for *text_format* and
-  // ``application/json`` is used for *json_format*.
+  // Specify a ``content_type`` field.
+  // If this field is not set then ``text/plain`` is used for ``text_format`` and
+  // ``application/json`` is used for ``json_format``.
   //
   // .. validated-code-block:: yaml
   //   :type-name: envoy.config.core.v3.SubstitutionFormatString
   //
   //   content_type: "text/html; charset=UTF-8"
   //
-  string content_type = 4;
+  string content_type = 4
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // Specifies a collection of Formatter plugins that can be called from the access log configuration.
   // See the formatters extensions documentation for details.

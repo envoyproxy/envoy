@@ -23,20 +23,7 @@
 
 # Deviations from Google C++ style guidelines
 
-* Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add
-  additional error handling that cannot possibly happen in the case an exception is thrown.
-* Do use exceptions for:
-  - Configuration ingestion error handling. Invalid configurations (dynamic and
-    static) should throw meaningful `EnvoyException`s, the configuration
-    ingestion code will catch these.
-  - Constructor failure.
-  - Error handling in deep call stacks, where exceptions provide material
-    improvements to code complexity and readability.
-* Apply caution when using exceptions on the data path for general purpose error
-  handling. Exceptions are not caught on the data path and they should not be
-  used for simple error handling, e.g. with shallow call stacks, where explicit
-  error handling provides a more readable and easier to reason about
-  implementation.
+* Exceptions are allowed on the control plane, though now discouraged in new code. Adding exceptions is disallowed on the data plane.
 * References are always preferred over pointers when the reference cannot be null. This
   includes both const and non-const references.
 * Function names should all use camel case starting with a lower case letter (e.g., `doFoo()`).
@@ -90,7 +77,7 @@
   NiceMock for mocks whose behavior is not the focus of a test.
 * [Thread
   annotations](https://github.com/abseil/abseil-cpp/blob/master/absl/base/thread_annotations.h),
-  such as `GUARDED_BY`, should be used for shared state guarded by
+  such as `ABSL_GUARDED_BY`, should be used for shared state guarded by
   locks/mutexes.
 * Functions intended to be local to a cc file should be declared in an anonymous namespace,
   rather than using the 'static' keyword. Note that the

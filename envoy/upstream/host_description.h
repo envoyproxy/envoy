@@ -13,6 +13,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/resource_manager.h"
 
 #include "absl/strings/string_view.h"
 
@@ -118,6 +119,12 @@ public:
   virtual const ClusterInfo& cluster() const PURE;
 
   /**
+   * @return true if the cluster can create a connection for this priority, false otherwise.
+   * @param priority the priority the connection would have.
+   */
+  virtual bool canCreateConnection(Upstream::ResourcePriority priority) const PURE;
+
+  /**
    * @return the host's outlier detection monitor.
    */
   virtual Outlier::DetectorHostMonitor& outlierDetector() const PURE;
@@ -141,7 +148,7 @@ public:
   /**
    * @return the transport socket factory responsible for this host.
    */
-  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual Network::UpstreamTransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
    * @return the address used to connect to the host.
@@ -213,10 +220,10 @@ struct TransportSocketMatchStats {
 class TransportSocketMatcher {
 public:
   struct MatchData {
-    MatchData(Network::TransportSocketFactory& factory, TransportSocketMatchStats& stats,
+    MatchData(Network::UpstreamTransportSocketFactory& factory, TransportSocketMatchStats& stats,
               std::string name)
         : factory_(factory), stats_(stats), name_(std::move(name)) {}
-    Network::TransportSocketFactory& factory_;
+    Network::UpstreamTransportSocketFactory& factory_;
     TransportSocketMatchStats& stats_;
     std::string name_;
   };

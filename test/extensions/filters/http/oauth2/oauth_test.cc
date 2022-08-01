@@ -86,6 +86,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
                   message->headers().Method()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().ContentTypeValues.FormUrlEncoded,
                   message->headers().ContentType()->value().getStringView());
+        EXPECT_NE("", message->headers().getContentLengthValue());
         EXPECT_TRUE(
             !message->headers().get(Http::CustomHeaders::get().Accept).empty() &&
             message->headers().get(Http::CustomHeaders::get().Accept)[0]->value().getStringView() ==

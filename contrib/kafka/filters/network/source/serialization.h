@@ -1137,6 +1137,14 @@ template <> inline uint32_t EncodingContext::computeCompactSize(const int32_t& a
 }
 
 /**
+ * Template overload for int64_t.
+ * This data type is not compacted, so we just point to non-compact implementation.
+ */
+template <> inline uint32_t EncodingContext::computeCompactSize(const int64_t& arg) const {
+  return computeSize(arg);
+}
+
+/**
  * Template overload for uint32_t.
  * For this data type, we notice that the result's length depends on whether there are any bits set
  * in groups (1-7, 8-14, 15-21, 22-28, 29-32).
@@ -1374,6 +1382,14 @@ inline uint32_t EncodingContext::encodeCompact(const T& arg, Buffer::Instance& d
  */
 template <>
 inline uint32_t EncodingContext::encodeCompact(const int32_t& arg, Buffer::Instance& dst) {
+  return encode(arg, dst);
+}
+
+/**
+ * int64_t is not encoded in compact fashion, so we just delegate to normal implementation.
+ */
+template <>
+inline uint32_t EncodingContext::encodeCompact(const int64_t& arg, Buffer::Instance& dst) {
   return encode(arg, dst);
 }
 

@@ -7,7 +7,7 @@ source_venv() {
     if [[ ! -d "${VENV_DIR}"/venv ]]; then
       virtualenv "${VENV_DIR}"/venv --python=python3
     fi
-    # shellcheck disable=SC1090
+    # shellcheck disable=SC1090 disable=1091
     source "${VENV_DIR}/venv/bin/activate"
   else
     echo "Found existing virtualenv"

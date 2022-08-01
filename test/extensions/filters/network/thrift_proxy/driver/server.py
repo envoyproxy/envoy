@@ -13,7 +13,6 @@ from thrift.server import TServer
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from fbthrift import THeaderTransport
-from finagle import TFinagleServerProcessor, TFinagleServerProtocol
 
 # On Windows we run this test on Python3
 if sys.version_info[0] != 2:
@@ -125,10 +124,6 @@ def main(cfg):
         multi.registerProcessor(cfg.service, processor)
         processor = multi
 
-    if cfg.protocol == "finagle":
-        # wrap processor with finagle request/response header handler
-        processor = TFinagleServerProcessor.TFinagleServerProcessor(processor)
-
     if cfg.unix:
         transport = TSocket.TServerSocket(unix_socket=cfg.addr)
     else:
@@ -156,8 +151,6 @@ def main(cfg):
         protocol_factory = TCompactProtocol.TCompactProtocolFactory()
     elif cfg.protocol == "json":
         protocol_factory = TJSONProtocol.TJSONProtocolFactory()
-    elif cfg.protocol == "finagle":
-        protocol_factory = TFinagleServerProtocol.TFinagleServerProtocolFactory()
     else:
         sys.exit("unknown protocol {0}".format(cfg.protocol))
 
@@ -203,7 +196,7 @@ if __name__ == "__main__":
         help="Selects a protocol.",
         dest="protocol",
         default="binary",
-        choices=["binary", "compact", "json", "finagle"],
+        choices=["binary", "compact", "json"],
     )
     parser.add_argument(
         "-r",

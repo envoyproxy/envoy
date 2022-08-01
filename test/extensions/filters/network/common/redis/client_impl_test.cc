@@ -140,7 +140,7 @@ public:
   std::unique_ptr<Config> config_;
   ClientPtr client_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   std::string auth_username_;
   std::string auth_password_;

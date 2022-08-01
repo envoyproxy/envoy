@@ -20,6 +20,8 @@ namespace NetworkFilters {
 namespace SipProxy {
 namespace TrafficRoutingAssistant {
 
+using TraContextMap = absl::flat_hash_map<std::string, std::string>;
+
 enum class ResponseType {
   CreateResp,
   UpdateResp,
@@ -41,28 +43,27 @@ public:
 };
 
 /**
- * A client used to query a centralized rate limit service.
+ * A client used to query a centralized TRA service.
  */
 class Client {
 public:
   virtual ~Client() = default;
 
   virtual void setRequestCallbacks(RequestCallbacks& callbacks) PURE;
-
-  virtual void cancel() PURE;
-
-  virtual void closeStream() PURE;
-
   virtual void createTrafficRoutingAssistant(
       const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
-      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
+      const absl::optional<TraContextMap> context, Tracing::Span& parent_span,
+      const StreamInfo::StreamInfo& stream_info) PURE;
   virtual void updateTrafficRoutingAssistant(
       const std::string& type, const absl::flat_hash_map<std::string, std::string>& data,
-      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
+      const absl::optional<TraContextMap> context, Tracing::Span& parent_span,
+      const StreamInfo::StreamInfo& stream_info) PURE;
   virtual void retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                               const absl::optional<TraContextMap> context,
                                                Tracing::Span& parent_span,
                                                const StreamInfo::StreamInfo& stream_info) PURE;
   virtual void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                             const absl::optional<TraContextMap> context,
                                              Tracing::Span& parent_span,
                                              const StreamInfo::StreamInfo& stream_info) PURE;
   virtual void subscribeTrafficRoutingAssistant(const std::string& type, Tracing::Span& parent_span,

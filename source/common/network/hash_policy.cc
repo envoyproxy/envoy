@@ -28,8 +28,8 @@ public:
 
   absl::optional<uint64_t> evaluate(const Network::Connection& connection) const override {
     const auto& filter_state = connection.streamInfo().filterState();
-    if (filter_state.hasData<Hashable>(key_)) {
-      return filter_state.getDataReadOnly<Hashable>(key_).hash();
+    if (auto typed_state = filter_state.getDataReadOnly<Hashable>(key_); typed_state != nullptr) {
+      return typed_state->hash();
     }
     return absl::nullopt;
   }

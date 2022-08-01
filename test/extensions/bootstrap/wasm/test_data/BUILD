@@ -108,9 +108,7 @@ envoy_wasm_cc_binary(
 envoy_wasm_cc_binary(
     name = "speed_cpp.wasm",
     srcs = ["speed_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics_full",
-    ],
+    protobuf = "full",
 )
 
 envoy_wasm_cc_binary(

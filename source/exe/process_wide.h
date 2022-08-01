@@ -10,9 +10,6 @@ class ProcessWide {
 public:
   ProcessWide();
   ~ProcessWide();
-
-private:
-  uint32_t initialization_depth_;
 };
 
 } // namespace Envoy

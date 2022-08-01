@@ -39,12 +39,13 @@ using ClusterSetConstSharedPtr = std::shared_ptr<const ClusterSet>;
 
 class Cluster : public Upstream::ClusterImplBase {
 public:
-  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+  Cluster(Server::Configuration::ServerFactoryContext& server_context,
+          const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
           Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
           Random::RandomGenerator& random,
           Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-          Stats::ScopePtr&& stats_scope, bool added_via_api);
+          Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -170,11 +171,12 @@ public:
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
+      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) override;
+      Stats::ScopeSharedPtr&& stats_scope) override;
 };
 
 DECLARE_FACTORY(ClusterFactory);

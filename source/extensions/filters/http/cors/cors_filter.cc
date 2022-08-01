@@ -20,6 +20,8 @@ struct HttpResponseCodeDetailValues {
 using HttpResponseCodeDetails = ConstSingleton<HttpResponseCodeDetailValues>;
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    access_control_request_headers_handle(Http::CustomHeaders::get().AccessControlRequestHeaders);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     access_control_request_method_handle(Http::CustomHeaders::get().AccessControlRequestMethod);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     origin_handle(Http::CustomHeaders::get().Origin);
@@ -36,6 +38,12 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Respons
     access_control_max_age_handle(Http::CustomHeaders::get().AccessControlMaxAge);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     access_control_expose_headers_handle(Http::CustomHeaders::get().AccessControlExposeHeaders);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    access_control_request_private_network_handle(
+        Http::CustomHeaders::get().AccessControlRequestPrviateNetwork);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    access_control_response_private_network_handle(
+        Http::CustomHeaders::get().AccessControlAllowPrviateNetwork);
 
 CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(generateStats(stats_prefix + "cors.", scope)) {}
@@ -97,16 +105,36 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
                                          Http::CustomHeaders::get().CORSValues.True);
   }
 
-  if (!allowMethods().empty()) {
-    response_headers->setInline(access_control_allow_methods_handle.handle(), allowMethods());
+  const absl::string_view allow_methods = allowMethods();
+  if (!allow_methods.empty()) {
+    if (allow_methods == "*") {
+      response_headers->setInline(
+          access_control_allow_methods_handle.handle(),
+          headers.getInlineValue(access_control_request_method_handle.handle()));
+    } else {
+      response_headers->setInline(access_control_allow_methods_handle.handle(), allow_methods);
+    }
   }
 
-  if (!allowHeaders().empty()) {
-    response_headers->setInline(access_control_allow_headers_handle.handle(), allowHeaders());
+  const absl::string_view allow_headers = allowHeaders();
+  if (!allow_headers.empty()) {
+    if (allow_headers == "*") {
+      response_headers->setInline(
+          access_control_allow_headers_handle.handle(),
+          headers.getInlineValue(access_control_request_headers_handle.handle()));
+    } else {
+      response_headers->setInline(access_control_allow_headers_handle.handle(), allow_headers);
+    }
   }
 
   if (!maxAge().empty()) {
     response_headers->setInline(access_control_max_age_handle.handle(), maxAge());
+  }
+
+  // More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
+  if (allowPrivateNetworkAccess() &&
+      headers.getInlineValue(access_control_request_private_network_handle.handle()) == "true") {
+    response_headers->setInline(access_control_response_private_network_handle.handle(), "true");
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true,
@@ -201,6 +229,15 @@ bool CorsFilter::allowCredentials() {
   for (const auto policy : policies_) {
     if (policy && policy->allowCredentials()) {
       return policy->allowCredentials().value();
+    }
+  }
+  return false;
+}
+
+bool CorsFilter::allowPrivateNetworkAccess() {
+  for (const auto policy : policies_) {
+    if (policy && policy->allowPrivateNetworkAccess()) {
+      return policy->allowPrivateNetworkAccess().value();
     }
   }
   return false;

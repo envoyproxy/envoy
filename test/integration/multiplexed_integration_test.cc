@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "socket_interface_swap.h"
+
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
 #endif
@@ -41,6 +43,8 @@ public:
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
 };
 
+constexpr uint32_t GiantPayoadSizeByte = 10 * 1024 * 1024;
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP2, Http::CodecType::HTTP3},
@@ -52,24 +56,23 @@ TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
+  ENVOY_LOG_MISC(warn, "manually lowering logs to error");
+  LogLevelSetter save_levels(spdlog::level::err);
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
-  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
-                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+  testGiantRequestAndResponse(GiantPayoadSizeByte, GiantPayoadSizeByte, false);
 }
 
 TEST_P(MultiplexedIntegrationTest, FlowControlOnAndGiantBody) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
-  config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
-                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+  config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream
+  testGiantRequestAndResponse(GiantPayoadSizeByte, GiantPayoadSizeByte, false);
 }
 
 TEST_P(MultiplexedIntegrationTest, LargeFlowControlOnAndGiantBody) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
-                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+  testGiantRequestAndResponse(GiantPayoadSizeByte, GiantPayoadSizeByte, false);
 }
 
 TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoBuffer) {
@@ -78,23 +81,20 @@ TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyAndContentLen
 
 TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
-  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
-                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+  testGiantRequestAndResponse(GiantPayoadSizeByte, GiantPayoadSizeByte, true);
 }
 
 TEST_P(MultiplexedIntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
-                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+  testGiantRequestAndResponse(GiantPayoadSizeByte, GiantPayoadSizeByte, true);
 }
 
 TEST_P(MultiplexedIntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
-                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+  testGiantRequestAndResponse(GiantPayoadSizeByte, GiantPayoadSizeByte, true);
 }
 
 TEST_P(MultiplexedIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
@@ -201,8 +201,6 @@ TEST_P(MultiplexedIntegrationTest, Http2DownstreamKeepalive) {
 
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 class Http2MetadataIntegrationTest : public HttpProtocolIntegrationTest {
@@ -505,7 +503,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
                                                                         {":path", "/dynamo/url"},
                                                                         {":scheme", "http"},
                                                                         {":authority", "host"},
-                                                                        {"expect", "100-continue"}},
+                                                                        {"expect", "100-contINUE"}},
                                          10);
 
   waitForNextUpstreamRequest();
@@ -692,8 +690,6 @@ TEST_P(Http2MetadataIntegrationTest, RequestMetadataThenTrailers) {
 
 static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
@@ -882,8 +878,6 @@ void Http2MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
 
 static std::string metadata_stop_all_filter = R"EOF(
 name: metadata-stop-all-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
@@ -968,6 +962,7 @@ TEST_P(MultiplexedIntegrationTest, CodecErrorAfterStreamStart) {
 }
 
 TEST_P(MultiplexedIntegrationTest, Http2BadMagic) {
+  config_helper_.disableDelayClose();
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     // The "magic" payload is an HTTP/2 specific thing.
     return;
@@ -979,7 +974,7 @@ TEST_P(MultiplexedIntegrationTest, Http2BadMagic) {
       [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
       });
-  connection->run();
+  ASSERT_TRUE(connection->run());
   EXPECT_EQ("", response);
 }
 
@@ -993,8 +988,12 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
       [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
       });
-  connection->run();
-  EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);
+  ASSERT_TRUE(connection->run());
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    EXPECT_THAT(response, HasSubstr("ParseError"));
+  } else {
+    EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  }
 }
 
 // Send client headers, a GoAway and then a body and ensure the full request and
@@ -1320,14 +1319,18 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseAfterBadFrame) {
         connection.dispatcher().exit();
       });
 
-  connection->run();
-  EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  ASSERT_TRUE(connection->run());
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    EXPECT_THAT(response, HasSubstr("ParseError"));
+  } else {
+    EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  }
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible the delayed close timer could fire and close the server socket
   // prior to the data callback above firing. Therefore, we may either still be connected, or have
   // received a remote close.
   if (connection->lastConnectionEvent() == Network::ConnectionEvent::Connected) {
-    connection->run();
+    ASSERT_TRUE(connection->run());
   }
   EXPECT_EQ(connection->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
@@ -1339,7 +1342,7 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseDisabled) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(0); });
+             hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
   initialize();
   std::string response;
   auto connection = createConnectionDriver(
@@ -1349,13 +1352,17 @@ TEST_P(MultiplexedIntegrationTest, DelayedCloseDisabled) {
         connection.dispatcher().exit();
       });
 
-  connection->run();
-  EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  ASSERT_TRUE(connection->run());
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    EXPECT_THAT(response, HasSubstr("ParseError"));
+  } else {
+    EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  }
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible for the 'connection' to receive the data and exit the dispatcher
   // prior to the FIN being received from the server.
   if (connection->lastConnectionEvent() == Network::ConnectionEvent::Connected) {
-    connection->run();
+    ASSERT_TRUE(connection->run());
   }
   EXPECT_EQ(connection->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
@@ -1705,10 +1712,35 @@ TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
   EXPECT_EQ(served_by.size(), 1);
 }
 
-class Http2FrameIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+struct FrameIntegrationTestParam {
+  Network::Address::IpVersion ip_version;
+  bool enable_new_codec_wrapper;
+};
+
+std::string
+frameIntegrationTestParamToString(const testing::TestParamInfo<FrameIntegrationTestParam>& params) {
+  const bool is_ipv4 = params.param.ip_version == Network::Address::IpVersion::v4;
+  const bool new_codec_wrapper = params.param.enable_new_codec_wrapper;
+  return absl::StrCat(is_ipv4 ? "IPv4" : "IPv6", new_codec_wrapper ? "WrappedNghttp2" : "Nghttp2");
+}
+
+class Http2FrameIntegrationTest : public testing::TestWithParam<FrameIntegrationTestParam>,
                                   public Http2RawFrameIntegrationTest {
 public:
-  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam()) {}
+  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      GetParam().enable_new_codec_wrapper ? "true" : "false");
+  }
+
+  static std::vector<FrameIntegrationTestParam> testParams() {
+    std::vector<FrameIntegrationTestParam> v;
+    for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+      for (bool enable_new_codec_wrapper : {false, true}) {
+        v.push_back({ip_version, enable_new_codec_wrapper});
+      }
+    }
+    return v;
+  }
 };
 
 // Regression test.
@@ -1752,7 +1784,10 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
   const Http2Frame settings_frame = Http2Frame::makeSettingsFrame(
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
-  ASSERT_TRUE(fake_upstream_connection1->write(std::string(settings_frame)));
+  std::string settings_data(settings_frame);
+  ASSERT_TRUE(fake_upstream_connection1->write(settings_data));
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                                 settings_data.size());
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
 
@@ -1765,11 +1800,15 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 2);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
 
-  // Start the third request and adjust the max concurrent streams of one connection created
-  // above to 2.
+  // Adjust the max concurrent streams of one connection created above to 2.
+  auto bytes_read = test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total");
   const Http2Frame settings_frame2 = Http2Frame::makeSettingsFrame(
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 3}});
-  ASSERT_TRUE(fake_upstream_connection1->write(std::string(settings_frame2)));
+  std::string settings_data2(settings_frame2);
+  ASSERT_TRUE(fake_upstream_connection1->write(settings_data2));
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                                 bytes_read + settings_data2.size());
+  // Now create another request.
   sendFrame(Http2Frame::makePostRequest(5, "host", "/path/to/long/url"));
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
@@ -1804,8 +1843,48 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
       Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
   const Http2Frame settings_max_connections_frame = Http2Frame::makeSettingsFrame(
       Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 0}});
-  ASSERT_TRUE(fake_upstream_connection->write(std::string(rst_stream) + std::string(go_away_frame) +
-                                              std::string(settings_max_connections_frame)));
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(rst_stream), std::string(go_away_frame),
+                   std::string(settings_max_connections_frame))));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+// Verify that receiving a WINDOW_UPDATE frame after a GOAWAY does not trigger an assertion failure
+// complaining of continued dispatch after connection close.
+TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = Http2Frame::makeClientStreamId(0);
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  // Start a second request and wait for it to reach the upstream. This is to exercise the case
+  // where numActiveRequests > 0 at the time that GOAWAY is received from upstream, which is needed
+  // to replicate the original assertion failure.
+  sendFrame(
+      Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(1), "host", "/path/to/long/url"));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 2);
+
+  // Send RST_STREAM, GOAWAY followed by WINDOW_UPDATE
+  const Http2Frame rst_stream =
+      Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
+  // Since last_stream_index <= the stream IDs of all active streams, this
+  // results in all active streams being closed, so the connection gets closed
+  // as well.
+  const Http2Frame go_away_frame = Http2Frame::makeEmptyGoAwayFrame(
+      /*last_stream_index=*/client_stream_idx, Http2Frame::ErrorCode::NoError);
+  const Http2Frame window_update_frame = Http2Frame::makeWindowUpdateFrame(0, 10);
+  ASSERT_TRUE(fake_upstream_connection->write(absl::StrCat(
+      std::string(rst_stream), std::string(go_away_frame), std::string(window_update_frame))));
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
 
@@ -1814,8 +1893,8 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(Http2FrameIntegrationTest::testParams()),
+                         frameIntegrationTestParamToString);
 
 // Tests sending an empty metadata map from downstream.
 TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
@@ -1938,8 +2017,6 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
 
 static std::string on_local_reply_filter = R"EOF(
 name: on-local-reply-filter
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(MultiplexedIntegrationTest, OnLocalReply) {
@@ -2021,6 +2098,9 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
+  } else if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.remote_reset"));
   } else {
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
     // http2.violation.of.messaging.rule
@@ -2054,6 +2134,78 @@ TEST_P(MultiplexedIntegrationTest, Reset101SwitchProtocolResponse) {
   ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   EXPECT_FALSE(response->complete());
+}
+
+// Ordering of inheritance is important here, SocketInterfaceSwap must be
+// destroyed after HttpProtocolIntegrationTest.
+class SocketSwappableMultiplexedIntegrationTest : public SocketInterfaceSwap,
+                                                  public HttpProtocolIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SocketSwappableMultiplexedIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpDownstreamConnectionClose) {
+  config_helper_.setBufferLimits(1000, 1000);
+  autonomous_upstream_ = false;
+  initialize();
+
+  // Stop writes to the downstream.
+  write_matcher_->setSourcePort(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  auto response_decoder = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+
+  waitForNextUpstreamRequest();
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1000, false);
+
+  // We should trigger pause at least once, and eventually have at least 1k
+  // bytes buffered.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  test_server_->waitForGaugeGe("http.config_test.downstream_cx_tx_bytes_buffered", 1000);
+
+  // Close downstream, check cleanup.
+  codec_client_->close();
+
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
+  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
+  test_server_->waitForGaugeEq("http.config_test.downstream_cx_tx_bytes_buffered", 0);
+}
+
+TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClose) {
+  config_helper_.setBufferLimits(1000, 1000);
+  autonomous_upstream_ = false;
+  initialize();
+
+  // Stop writes to the upstream.
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(default_request_headers_);
+  codec_client_->sendData(request_encoder, 1000, false);
+
+  // We should trigger pause at least once, and eventually have at least 1k
+  // bytes buffered.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_backed_up_total", 1);
+  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_paused_reading_total",
+                                 1);
+  test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 1000);
+
+  // Close upstream, check cleanup.
+  fake_upstreams_[0].reset();
+
+  ASSERT_TRUE(response_decoder->waitForReset());
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
+  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
+  test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);
 }
 
 } // namespace Envoy

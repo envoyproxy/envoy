@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/filter.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -32,7 +34,7 @@ public:
    * callback is the latest version of the extension configuration, and should
    * generally apply only to new requests and connections.
    */
-  virtual absl::optional<FactoryCallback> config() PURE;
+  virtual OptRef<FactoryCallback> config() PURE;
 };
 
 class DynamicExtensionConfigProviderBase {
@@ -61,6 +63,10 @@ public:
    * Applies the default configuration if one is set, otherwise does nothing.
    */
   virtual void applyDefaultConfiguration() PURE;
+  /**
+   * Return Network::ListenerFilterMatcherSharedPtr& the listener filter matcher.
+   */
+  virtual const Network::ListenerFilterMatcherSharedPtr& getListenerFilterMatcher() PURE;
 };
 
 template <class FactoryCallback>

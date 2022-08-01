@@ -17,7 +17,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
-#include "source/common/http/http3/quic_client_connection_factory.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -25,6 +24,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #endif
 
 #include "test/common/upstream/utility.h"
@@ -125,7 +125,7 @@ private:
   bool connected_{false};
 };
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                                           Ssl::ContextManager& context_manager,
                                                           const std::string& san_to_match) {
@@ -193,6 +193,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                 Filesystem::fileSystemForTest(), random_generator, bootstrap);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   TestConnectionCallbacks connection_callbacks(*dispatcher);
+  Network::TransportSocketOptionsConstSharedPtr options;
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
@@ -200,24 +201,23 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       time_system)};
 
   if (type <= Http::CodecType::HTTP2) {
-    Http::CodecClientProd client(
-        type,
-        dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
-                                           Network::Test::createRawBufferSocket(), nullptr),
-        host_description, *dispatcher, random);
+    Http::CodecClientProd client(type,
+                                 dispatcher->createClientConnection(
+                                     addr, Network::Address::InstanceConstSharedPtr(),
+                                     Network::Test::createRawBufferSocket(), nullptr, nullptr),
+                                 host_description, *dispatcher, random, options);
     return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type,
                                          client);
   }
 
 #ifdef ENVOY_ENABLE_QUIC
   Extensions::TransportSockets::Tls::ContextManagerImpl manager(time_system);
-  Network::TransportSocketFactoryPtr transport_socket_factory =
+  Network::UpstreamTransportSocketFactoryPtr transport_socket_factory =
       createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
                                                "spiffe://lyft.com/backend-team");
-  quic::QuicConfig config;
-  std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
-  persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher, *transport_socket_factory, time_system, addr, config, 0);
+  auto& quic_transport_socket_factory =
+      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
+  auto persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher, 0);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {
@@ -227,9 +227,13 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
   Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
-      *persistent_info, *dispatcher, addr, local_address, quic_stat_names, mock_stats_store);
+      *persistent_info, quic_transport_socket_factory.getCryptoConfig(),
+      quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
+                         static_cast<uint16_t>(addr->ip()->port())),
+      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store, nullptr, nullptr);
   connection->addConnectionCallbacks(connection_callbacks);
-  Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
+  Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random,
+                               options);
   // Quic connection needs to finish handshake.
   dispatcher->run(Event::Dispatcher::RunType::Block);
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);
@@ -265,12 +269,14 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
     : dispatcher_(dispatcher), remaining_bytes_to_send_(0) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
-  callbacks_ = std::make_unique<ConnectionCallbacks>([this, write_request_callback]() {
-    Buffer::OwnedImpl buffer;
-    const bool close_after = write_request_callback(buffer);
-    remaining_bytes_to_send_ += buffer.length();
-    client_->write(buffer, close_after);
-  });
+  callbacks_ = std::make_unique<ConnectionCallbacks>(
+      [this, write_request_callback]() {
+        Buffer::OwnedImpl buffer;
+        const bool close_after = write_request_callback(buffer);
+        remaining_bytes_to_send_ += buffer.length();
+        client_->write(buffer, close_after);
+      },
+      dispatcher);
 
   if (transport_socket == nullptr) {
     transport_socket = Network::Test::createRawBufferSocket();
@@ -279,7 +285,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   client_ = dispatcher_.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr, nullptr);
   // ConnectionCallbacks will call write_request_callback from the connect and low-watermark
   // callbacks. Set a small buffer limit so high-watermark is triggered after every write and
   // low-watermark is triggered every time the buffer is drained.
@@ -305,7 +311,19 @@ void RawConnectionDriver::waitForConnection() {
   }
 }
 
-void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_.run(run_type); }
+testing::AssertionResult RawConnectionDriver::run(Event::Dispatcher::RunType run_type,
+                                                  std::chrono::milliseconds timeout) {
+  Event::TimerPtr timeout_timer = dispatcher_.createTimer([this]() -> void { dispatcher_.exit(); });
+  timeout_timer->enableTimer(timeout);
+
+  dispatcher_.run(run_type);
+
+  if (timeout_timer->enabled()) {
+    timeout_timer->disableTimer();
+    return testing::AssertionSuccess();
+  }
+  return testing::AssertionFailure();
+}
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
 

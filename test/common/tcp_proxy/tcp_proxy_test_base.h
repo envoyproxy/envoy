@@ -133,9 +133,12 @@ public:
                       upstream_hosts_.at(conn_index));
   }
 
-  void raiseEventUpstreamConnectFailed(uint32_t conn_index,
-                                       ConnectionPool::PoolFailureReason reason) {
-    conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, "", upstream_hosts_.at(conn_index));
+  void raiseEventUpstreamConnectFailed(
+      uint32_t conn_index, ConnectionPool::PoolFailureReason reason,
+      absl::optional<absl::string_view> failure_message = absl::nullopt) {
+    conn_pool_callbacks_.at(conn_index)
+        ->onPoolFailure(reason, failure_message ? *failure_message : "",
+                        upstream_hosts_.at(conn_index));
   }
 
   Tcp::ConnectionPool::Cancellable* onNewConnection(Tcp::ConnectionPool::Cancellable* connection) {

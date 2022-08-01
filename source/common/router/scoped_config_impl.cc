@@ -3,6 +3,8 @@
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -68,8 +70,8 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
       return std::make_unique<StringKeyFragment>(elements[header_value_extractor_config_.index()]);
     }
     break;
-  default:                       // EXTRACT_TYPE_NOT_SET
-    NOT_REACHED_GCOVR_EXCL_LINE; // Caught in constructor already.
+  case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor::EXTRACT_TYPE_NOT_SET:
+    PANIC("not reached");
   }
 
   return nullptr;
@@ -77,7 +79,8 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
 
 ScopedRouteInfo::ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration config_proto,
                                  ConfigConstSharedPtr route_config)
-    : config_proto_(config_proto), route_config_(route_config) {
+    : config_proto_(config_proto), route_config_(route_config),
+      config_hash_(MessageUtil::hash(config_proto)) {
   // TODO(stevenzzzz): Maybe worth a KeyBuilder abstraction when there are more than one type of
   // Fragment.
   for (const auto& fragment : config_proto_.key().fragments()) {
@@ -85,8 +88,8 @@ ScopedRouteInfo::ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfigurat
     case envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment::TypeCase::kStringKey:
       scope_key_.addFragment(std::make_unique<StringKeyFragment>(fragment.string_key()));
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment::TypeCase::TYPE_NOT_SET:
+      PANIC("not implemented");
     }
   }
 }
@@ -99,8 +102,8 @@ ScopeKeyBuilderImpl::ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config)
       fragment_builders_.emplace_back(std::make_unique<HeaderValueExtractorImpl>(
           ScopedRoutes::ScopeKeyBuilder::FragmentBuilder(fragment_builder)));
       break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::TYPE_NOT_SET:
+      PANIC("not implemented");
     }
   }
 }

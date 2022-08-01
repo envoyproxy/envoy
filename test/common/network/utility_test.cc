@@ -26,33 +26,6 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-TEST(NetworkUtility, Url) {
-  EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));
-  EXPECT_EQ(1234U, Utility::portFromTcpUrl("tcp://foo:1234"));
-  EXPECT_THROW(Utility::hostFromTcpUrl("bogus://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("bogus://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromTcpUrl("abc://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("abc://foo"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromTcpUrl("tcp://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:bar"), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("tcp://https://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromTcpUrl(""), EnvoyException);
-  EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:999999999999"), EnvoyException);
-}
-
-TEST(NetworkUtility, udpUrl) {
-  EXPECT_EQ("foo", Utility::hostFromUdpUrl("udp://foo:1234"));
-  EXPECT_EQ(1234U, Utility::portFromUdpUrl("udp://foo:1234"));
-  EXPECT_THROW(Utility::hostFromUdpUrl("bogus://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::portFromUdpUrl("bogus://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromUdpUrl("tcp://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromUdpUrl("tcp://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::portFromUdpUrl("udp://https://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromUdpUrl(""), EnvoyException);
-  EXPECT_THROW(Utility::portFromUdpUrl("udp://foo:999999999999"), EnvoyException);
-}
-
 TEST(NetworkUtility, resolveUrl) {
   EXPECT_THROW(Utility::resolveUrl("foo"), EnvoyException);
   EXPECT_THROW(Utility::resolveUrl("abc://foo"), EnvoyException);
@@ -104,6 +77,23 @@ TEST(NetworkUtility, resolveUrl) {
   EXPECT_EQ("[1::2:3]:4", Utility::resolveUrl("udp://[1::2:3]:4")->asString());
   EXPECT_EQ("[a::1]:0", Utility::resolveUrl("udp://[a::1]:0")->asString());
   EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("udp://[a:b:c:d::]:0")->asString());
+}
+
+TEST(NetworkUtility, socketTypeFromUrl) {
+  EXPECT_FALSE(Utility::socketTypeFromUrl("foo").ok());
+  EXPECT_FALSE(Utility::socketTypeFromUrl("abc://foo").ok());
+
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("unix://"));
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("unix://foo"));
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("unix://tmp/server"));
+
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("tcp://1.2.3.4:1234"));
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("tcp://0.0.0.0:0"));
+  EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("tcp://[::1]:1"));
+
+  EXPECT_EQ(Network::Socket::Type::Datagram, *Utility::socketTypeFromUrl("udp://1.2.3.4:1234"));
+  EXPECT_EQ(Network::Socket::Type::Datagram, *Utility::socketTypeFromUrl("udp://0.0.0.0:0"));
+  EXPECT_EQ(Network::Socket::Type::Datagram, *Utility::socketTypeFromUrl("udp://[::1]:1"));
 }
 
 TEST(NetworkUtility, ParseInternetAddress) {
@@ -252,71 +242,71 @@ TEST(NetworkUtility, LocalConnection) {
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("8.8.8.8"));
-  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4", 1234));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("4.4.4.4", 4321));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::1"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::1"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2"));
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::1"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::3"));
-  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2"));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2", 4321));
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("::2", 1234));
-  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv6Instance>("fd00::"));
-  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket));
+  EXPECT_FALSE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 }
 
 TEST(NetworkUtility, InternalAddress) {
@@ -431,6 +421,13 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
     EXPECT_EQ(true, proto_address.has_pipe());
     EXPECT_EQ("/hello", proto_address.pipe().path());
   }
+  {
+    envoy::config::core::v3::Address proto_address;
+    Address::EnvoyInternalInstance address("internal_address");
+    Utility::addressToProtobufAddress(address, proto_address);
+    EXPECT_TRUE(proto_address.has_envoy_internal_address());
+    EXPECT_EQ("internal_address", proto_address.envoy_internal_address().server_listener_name());
+  }
 }
 
 TEST(NetworkUtility, ProtobufAddressSocketType) {
@@ -533,22 +530,29 @@ TEST(PortRangeListTest, Normal) {
   }
 }
 
-// TODO(ccaraman): Support big-endian. These tests operate under the assumption that the machine
-// byte order is little-endian.
 TEST(AbslUint128, TestByteOrder) {
+#if defined(ABSL_IS_BIG_ENDIAN)
+  auto flip_order_for_endianness = [](const absl::uint128& input) {
+    return absl::MakeUint128(__builtin_bswap64(absl::Uint128Low64(input)),
+                             __builtin_bswap64(absl::Uint128High64(input)));
+  };
+#else
+  auto flip_order_for_endianness = [](const absl::uint128& input) { return input; };
+#endif
   {
     Address::Ipv6Instance address("::1");
     uint64_t high = 0x100000000000000;
-    EXPECT_EQ(absl::MakeUint128(high, 0), address.ip()->ipv6()->address());
-    EXPECT_EQ(absl::MakeUint128(high, 0),
+    EXPECT_EQ(flip_order_for_endianness(absl::MakeUint128(high, 0)),
+              address.ip()->ipv6()->address());
+    EXPECT_EQ(flip_order_for_endianness(absl::MakeUint128(high, 0)),
               Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
 
     EXPECT_EQ(absl::uint128(1), Utility::Ip6ntohl(address.ip()->ipv6()->address()));
   }
   {
     Address::Ipv6Instance address("1::");
-    EXPECT_EQ(absl::uint128(256), address.ip()->ipv6()->address());
-    EXPECT_EQ(absl::uint128(256),
+    EXPECT_EQ(flip_order_for_endianness(absl::uint128(256)), address.ip()->ipv6()->address());
+    EXPECT_EQ(flip_order_for_endianness(absl::uint128(256)),
               Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
 
     uint64_t high = 0x001000000000000;
@@ -558,8 +562,9 @@ TEST(AbslUint128, TestByteOrder) {
     Address::Ipv6Instance address("2001:abcd:ef01:2345:6789:abcd:ef01:234");
     uint64_t low = 0x452301EFCDAB0120;
     uint64_t high = 0x340201EFCDAB8967;
-    EXPECT_EQ(absl::MakeUint128(high, low), address.ip()->ipv6()->address());
-    EXPECT_EQ(absl::MakeUint128(high, low),
+    EXPECT_EQ(flip_order_for_endianness(absl::MakeUint128(high, low)),
+              address.ip()->ipv6()->address());
+    EXPECT_EQ(flip_order_for_endianness(absl::MakeUint128(high, low)),
               Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
   }
   {

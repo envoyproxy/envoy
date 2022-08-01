@@ -129,7 +129,8 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
     return nullptr;
   }
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("Unknown config");
+    return nullptr;
   }
 }
 
@@ -144,9 +145,10 @@ CustomTagUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag
     return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
   case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
     return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::type::tracing::v3::CustomTag::TypeCase::TYPE_NOT_SET:
+    break; // Panic below.
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Tracing

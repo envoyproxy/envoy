@@ -1,6 +1,5 @@
-load("@proxy_wasm_cpp_sdk//bazel/wasm:wasm.bzl", "wasm_cc_binary")
-load("@rules_rust//rust:rust.bzl", "rust_binary")
-load("//bazel:envoy_select.bzl", "envoy_select_wasm_v8_bool")
+load("@proxy_wasm_cpp_sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
+load("@rules_rust//rust:defs.bzl", "rust_binary")
 
 def _wasm_rust_transition_impl(settings, attr):
     return {
@@ -66,15 +65,20 @@ wasi_rust_binary_rule = rule(
     attrs = _wasm_attrs(wasi_rust_transition),
 )
 
-def envoy_wasm_cc_binary(name, deps = [], tags = [], **kwargs):
-    wasm_cc_binary(
+def envoy_wasm_cc_binary(name, additional_linker_inputs = [], linkopts = [], tags = [], **kwargs):
+    proxy_wasm_cc_binary(
         name = name,
-        deps = deps + ["@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics"],
+        additional_linker_inputs = additional_linker_inputs + [
+            "@envoy//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_js",
+        ],
+        linkopts = linkopts + [
+            "--js-library=$(location @envoy//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_js)",
+        ],
         tags = tags + ["manual"],
         **kwargs
     )
 
-def wasm_rust_binary(name, tags = [], wasi = False, **kwargs):
+def wasm_rust_binary(name, tags = [], wasi = False, precompile = False, **kwargs):
     wasm_name = "_wasm_" + name.replace(".", "_")
     kwargs.setdefault("visibility", ["//visibility:public"])
 
@@ -93,7 +97,7 @@ def wasm_rust_binary(name, tags = [], wasi = False, **kwargs):
 
     bin_rule(
         name = name,
-        precompile = envoy_select_wasm_v8_bool(),
+        precompile = precompile,
         binary = ":" + wasm_name,
         tags = tags + ["manual"],
     )

@@ -34,6 +34,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cidr_range_interface",
+    hdrs = ["cidr_range.h"],
+    deps = [
+        "//envoy/network:address_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cidr_range_lib",
     srcs = ["cidr_range.cc"],
     hdrs = ["cidr_range.h"],
@@ -54,6 +63,9 @@ envoy_cc_library(
     hdrs = ["connection_balancer_impl.h"],
     deps = [
         "//envoy/network:connection_balancer_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -73,6 +85,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "connection_lib",
+    deps = [
+        ":connection_impl",
+        ":default_client_connection_factory",
+    ],
+)
+
+envoy_cc_library(
+    name = "connection_impl",
     srcs = ["connection_impl.cc"],
     hdrs = ["connection_impl.h"],
     external_deps = ["abseil_optional"],
@@ -105,6 +125,36 @@ envoy_cc_library(
     deps = [
         ":connection_base_lib",
         ":connection_lib",
+        ":multi_connection_base_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "multi_connection_base_impl_lib",
+    srcs = ["multi_connection_base_impl.cc"],
+    hdrs = ["multi_connection_base_impl.h"],
+    deps = [
+        ":connection_base_lib",
+        ":connection_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "default_client_connection_factory",
+    srcs = [
+        "default_client_connection_factory.cc",
+    ],
+    hdrs = [
+        "default_client_connection_factory.h",
+    ],
+    deps = [
+        ":address_lib",
+        ":connection_base_lib",
+        ":connection_impl",
+        "//envoy/network:client_connection_factory",
+        "//envoy/network:connection_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/registry",
     ],
 )
 
@@ -199,6 +249,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/network:io_handle_interface",
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
@@ -229,6 +280,17 @@ envoy_cc_library(
         "//envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "listener_filter_buffer_lib",
+    srcs = ["listener_filter_buffer_impl.cc"],
+    hdrs = ["listener_filter_buffer_impl.h"],
+    deps = [
+        "//envoy/network:io_handle_interface",
+        "//envoy/network:listener_filter_buffer_interface",
+        "//source/common/buffer:buffer_lib",
     ],
 )
 
@@ -275,6 +337,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:headers_lib",
+        "//source/common/network:transport_socket_options_lib",
     ],
 )
 
@@ -390,14 +453,38 @@ envoy_cc_library(
     hdrs = ["transport_socket_options_impl.h"],
     deps = [
         ":application_protocol_lib",
+        ":filter_state_proxy_info_lib",
         ":proxy_protocol_filter_state_lib",
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
+        "//envoy/common:hashable_interface",
         "//envoy/network:proxy_protocol_options_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_state_proxy_info_lib",
+    srcs = ["filter_state_proxy_info.cc"],
+    hdrs = ["filter_state_proxy_info.h"],
+    deps = [
+        "//envoy/network:address_interface",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_state_dst_address_lib",
+    srcs = ["filter_state_dst_address.cc"],
+    hdrs = ["filter_state_dst_address.h"],
+    deps = [
+        "//envoy/network:address_interface",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
     ],
 )
 
