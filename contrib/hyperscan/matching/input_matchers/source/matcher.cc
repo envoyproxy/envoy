@@ -10,12 +10,12 @@ ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database,
                                        const hs_database_t* start_of_match_database) {
   hs_error_t err = hs_alloc_scratch(database, &scratch_);
   if (err != HS_SUCCESS) {
-    throw EnvoyException(fmt::format("unable to allocate scratch space, error code {}.", err));
+    IS_ENVOY_BUG(fmt::format("unable to allocate scratch space, error code {}.", err));
   }
   if (start_of_match_database) {
     err = hs_alloc_scratch(start_of_match_database, &scratch_);
     if (err != HS_SUCCESS) {
-      throw EnvoyException(
+      IS_ENVOY_BUG(
           fmt::format("unable to allocate start of match scratch space, error code {}.", err));
     }
   }
