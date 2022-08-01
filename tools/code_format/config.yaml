@@ -215,6 +215,15 @@ paths:
     - test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc
     - test/test_common/wasm_base.h
 
+dir_order:
+  - envoy
+  - common
+  - source
+  - exe
+  - server
+  - extensions
+  - test
+
 re:
   codeowners_contrib: (/contrib/[^@]*\s+)(@.*)
   codeowners_extensions: .*(extensions[^@]*\s+)(@.*)

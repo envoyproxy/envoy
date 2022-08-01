@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 
 import argparse
-import common
 import functools
 import logging
 import multiprocessing
 import os
-import os.path
 import pathlib
 import re
 import subprocess
@@ -14,18 +12,20 @@ import stat
 import sys
 import traceback
 import shutil
-import paths
 from functools import cached_property
-from typing import Callable, Dict, Pattern, Set, Tuple
+from typing import Callable, Dict, List, Pattern, Tuple
 
 # The way this script is currently used (ie no bazel) it relies on system deps.
 # As `pyyaml` is present in `envoy-build-ubuntu` it should be safe to use here.
 import yaml
 
+import paths
+
 logger = logging.getLogger(__name__)
 
 
 class FormatConfig:
+    """Provides a format config object based on parsed YAML config."""
 
     def __init__(self, path: str) -> None:
         self.path = path
@@ -35,22 +35,33 @@ class FormatConfig:
 
     @cached_property
     def buildifier_path(self) -> str:
+        """Path to the buildifer binary."""
         return paths.get_buildifier()
 
     @cached_property
     def buildozer_path(self) -> str:
+        """Path to the buildozer binary."""
         return paths.get_buildozer()
 
     @cached_property
     def clang_format_path(self) -> str:
+        """Path to the clang-format binary."""
         return os.getenv("CLANG_FORMAT", "clang-format-14")
 
     @cached_property
     def config(self) -> Dict:
+        """Parsed YAML config."""
+        # TODO(phlax): Ensure the YAML is valid/well-formed."""
         return yaml.safe_load(pathlib.Path(self.path).read_text())
 
     @cached_property
+    def dir_order(self) -> List[str]:
+        """Expected order of includes in code."""
+        return self["dir_order"]
+
+    @cached_property
     def paths(self) -> Dict[str, Tuple[str, ...] | Dict[str, Tuple[str, ...]]]:
+        """Mapping of named paths."""
         paths = self._normalize("paths", cb=lambda paths: tuple(f"./{p}" for p in paths))
         paths["build_fixer_py"] = self._build_fixer_path
         paths["header_order_py"] = self._header_order_path
@@ -58,22 +69,22 @@ class FormatConfig:
 
     @cached_property
     def re(self) -> Dict[str, Pattern[str]]:
+        """Mapping of named regular expressions."""
         return {k: re.compile(v) for k, v in self["re"].items()}
 
     @cached_property
     def re_multiline(self) -> Dict[str, Pattern[str]]:
+        """Mapping of named multi-line regular expressions."""
         return {k: re.compile(v, re.MULTILINE) for k, v in self["re_multiline"].items()}
 
     @cached_property
     def replacements(self) -> Dict[str, str]:
+        """Mapping of subsitutions to be replaced in code."""
         return self["replacements"]
 
     @cached_property
-    def subdir_set(self) -> Set[str]:
-        return set(common.include_dir_order())
-
-    @cached_property
     def suffixes(self) -> Dict[str, Tuple[str, ...] | Dict[str, Tuple[str, ...]]]:
+        """Mapping of named file suffixes for target files."""
         return self._normalize("suffixes")
 
     @property
@@ -108,7 +119,7 @@ class FormatChecker:
         self.target_path = args.target_path
         self.api_prefix = args.api_prefix
         self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
-        self.include_dir_order = args.include_dir_order
+        self._include_dir_order = args.include_dir_order
 
     @cached_property
     def build_fixer_check_excluded_paths(self):
@@ -119,6 +130,11 @@ class FormatChecker:
     @cached_property
     def config(self) -> FormatConfig:
         return FormatConfig(self.config_path)
+
+    @cached_property
+    def include_dir_order(self):
+        return ",".join(
+            self._include_dir_order if self._include_dir_order else self.config["dir_order"])
 
     @property
     def namespace_check(self):
@@ -353,7 +369,7 @@ class FormatChecker:
         if slash == -1:
             return False
         subdir = path[0:slash]
-        return subdir in self.config.subdir_set
+        return subdir in self.config.dir_order
 
     # simple check that all flags are sorted.
     def check_runtime_flags(self, file_path, error_messages):
@@ -941,7 +957,7 @@ class FormatChecker:
         self.namespace_check_excluded_paths
         self.namespace_re
         self.config.replacements
-        self.config.subdir_set
+        self.config.dir_order
 
         for file_name in names:
             result = pool.apply_async(
@@ -1034,7 +1050,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--include_dir_order",
         type=str,
-        default=",".join(common.include_dir_order()),
+        default="",
         help="specify the header block include directory order.")
     args = parser.parse_args()
 
