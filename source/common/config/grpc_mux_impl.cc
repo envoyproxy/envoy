@@ -38,19 +38,18 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
                          CustomConfigValidatorsPtr&& config_validators,
-                         ConfigUpdatedCallbackList&& config_updated_callbacks,
-                         KeyValueStore* xds_config_store, const std::string& target_control_plane)
+                         XdsResourcesDelegate* xds_resources_delegate,
+                         const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
       config_validators_(std::move(config_validators)),
-      config_updated_callbacks_(std::move(config_updated_callbacks)), first_stream_request_(true),
-      dispatcher_(dispatcher),
+      xds_resources_delegate_(xds_resources_delegate), target_xds_authority_(target_xds_authority),
+      first_stream_request_(true), dispatcher_(dispatcher),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
-          })),
-      xds_config_store_(xds_config_store), target_control_plane_(target_control_plane) {
+          })) {
   Config::Utility::checkLocalInfo("ads", local_info);
   AllMuxes::get().insert(this);
 }
@@ -277,10 +276,10 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
     }
 
-    // All config updates have been applied without throwing an exception, so we'll call the update
-    // callbacks.
-    for (const auto& callback : config_updated_callbacks_) {
-      callback->onConfigUpdated(target_control_plane_, type_url, all_resource_refs);
+    // All config updates have been applied without throwing an exception, so we'll call the xDS
+    // resources delegate, if any.
+    if (xds_resources_delegate_ != nullptr) {
+      xds_resources_delegate_->onConfigUpdated(target_xds_authority_, type_url, all_resource_refs);
     }
 
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we

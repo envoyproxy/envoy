@@ -1,11 +1,8 @@
 #include "source/common/config/subscription_factory_impl.h"
 
-#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/common/key_value/v3/config.pb.h"
-#include "envoy/config/config_updated_callback.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/xds_resources_delegate.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/filesystem_subscription_impl.h"
 #include "source/common/config/grpc_mux_impl.h"
@@ -26,13 +23,10 @@ namespace Config {
 SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Api::Api& api, const Server::Instance& server, KeyValueStore* xds_store,
-    ConfigUpdatedCallbackFactory* config_updated_callback_factory,
-    const envoy::config::core::v3::TypedExtensionConfig* config_updated_callback_config)
+    Api::Api& api, const Server::Instance& server, XdsResourcesDelegate* xds_resources_delegate)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
-      validation_visitor_(validation_visitor), api_(api), server_(server), xds_store_(xds_store),
-      config_updated_callback_factory_(config_updated_callback_factory),
-      config_updated_callback_config_(config_updated_callback_config) {}
+      validation_visitor_(validation_visitor), api_(api), server_(server),
+      xds_resources_delegate_(xds_resources_delegate) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -82,12 +76,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       CustomConfigValidatorsPtr custom_config_validators =
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
-      ConfigUpdatedCallbackList config_updated_callbacks;
-      if (config_updated_callback_factory_ != nullptr) {
-        config_updated_callbacks.emplace_back(
-            config_updated_callback_factory_->createConfigUpdatedCallback(
-                config_updated_callback_config_->typed_config(), xds_store_, validation_visitor_));
-      }
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
@@ -107,8 +95,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source),
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            std::move(config_updated_callbacks), xds_store_,
-            Utility::getGrpcControlPlane(api_config_source).value_or(""));
+            xds_resources_delegate_, Utility::getGrpcControlPlane(api_config_source).value_or(""));
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,

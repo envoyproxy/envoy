@@ -58,7 +58,8 @@ public:
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, stats_, {}, true, std::move(config_validators_)));
+          random_, stats_, {}, true, std::move(config_validators_),
+          /*xds_resources_delegate=*/nullptr));
     }
     resetCluster(R"EOF(
       name: name

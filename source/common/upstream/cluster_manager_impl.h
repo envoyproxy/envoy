@@ -11,14 +11,12 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/callback.h"
-#include "envoy/common/key_value_store.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/config/config_updated_callback.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/core/v3/extension.pb.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/context.h"
@@ -695,9 +693,6 @@ private:
 
   using ClusterCreationsMap = absl::flat_hash_map<std::string, ClusterCreation>;
 
-  // Initializes the KeyValueStore that holds xDS resources.
-  void initXdsStore(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Api::Api& api,
-                    ProtobufMessage::ValidationContext& validation_context);
   void applyUpdates(ClusterManagerCluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
@@ -768,11 +763,7 @@ private:
   std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
   ClusterSet primary_clusters_;
 
-  std::unique_ptr<KeyValueStore> xds_store_;
-  // Not owned; can be nullptr.
-  Config::ConfigUpdatedCallbackFactory* config_updated_callback_factory_ = nullptr;
-  // Not owned; can be nullptr. Will only be set if config_updated_callback_factory_  is not null.
-  const envoy::config::core::v3::TypedExtensionConfig* config_updated_callback_config_ = nullptr;
+  std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
 };
 
 } // namespace Upstream

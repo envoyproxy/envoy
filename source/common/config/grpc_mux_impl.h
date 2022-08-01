@@ -4,12 +4,11 @@
 #include <memory>
 #include <queue>
 
-#include "envoy/common/key_value_store.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
-#include "envoy/config/config_updated_callback.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -40,8 +39,8 @@ public:
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
               CustomConfigValidatorsPtr&& config_validators,
-              ConfigUpdatedCallbackList&& config_updated_callbacks, KeyValueStore* xds_config_store,
-              const std::string& target_control_plane);
+              XdsResourcesDelegate* xds_resources_delegate,
+              const std::string& target_xds_authority);
 
   ~GrpcMuxImpl() override;
 
@@ -175,7 +174,9 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   CustomConfigValidatorsPtr config_validators_;
-  ConfigUpdatedCallbackList config_updated_callbacks_;
+  // Not owned; can be nullptr.
+  XdsResourcesDelegate* xds_resources_delegate_;
+  const std::string target_xds_authority_;
   bool first_stream_request_;
 
   // Helper function for looking up and potentially allocating a new ApiState.
@@ -194,10 +195,6 @@ private:
 
   Event::Dispatcher& dispatcher_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
-
-  // Not-owned; can be nullptr.
-  KeyValueStore* xds_config_store_;
-  const std::string target_control_plane_;
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.

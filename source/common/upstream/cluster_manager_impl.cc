@@ -10,12 +10,10 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/config/common/key_value/v3/config.pb.h"
-#include "envoy/config/config_updated_callback.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/config/xds/v3/persistent_xds_extension_config.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -323,14 +321,18 @@ ClusterManagerImpl::ClusterManagerImpl(
     local_cluster_name_ = cm_config.local_cluster_name();
   }
 
-  // Initialize the xDS KeyValueStore, if set.
-  if (bootstrap.has_persistent_xds_extension()) {
-    initXdsStore(bootstrap, api, validation_context);
+  // Initialize the XdsResourceDelegate extension, if set on the bootstrap config.
+  if (bootstrap.has_xds_delegate_extension()) {
+    auto& factory = Config::Utility::getAndCheckFactory<Config::XdsResourcesDelegateFactory>(
+        bootstrap.xds_delegate_extension());
+    xds_resources_delegate_ =
+        factory.createXdsResourcesDelegate(bootstrap.xds_delegate_extension().typed_config(),
+                                           validation_context.dynamicValidationVisitor(), api);
   }
 
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
       local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, xds_store_.get(), config_updated_callback_factory_, config_updated_callback_config_);
+      server, xds_resources_delegate_.get());
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
@@ -415,14 +417,6 @@ ClusterManagerImpl::ClusterManagerImpl(
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators));
       } else {
-        Config::ConfigUpdatedCallbackList config_updated_callbacks;
-        if (config_updated_callback_factory_ != nullptr) {
-          ASSERT(config_updated_callback_config_);
-          config_updated_callbacks.emplace_back(
-              config_updated_callback_factory_->createConfigUpdatedCallback(
-                  config_updated_callback_config_->typed_config(), xds_store_.get(),
-                  validation_context.dynamicValidationVisitor()));
-        }
         ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
             local_info,
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
@@ -434,8 +428,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators), std::move(config_updated_callbacks),
-            xds_store_.get(),
+            std::move(custom_config_validators), xds_resources_delegate_.get(),
             Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()).value_or(""));
       }
     }
@@ -524,35 +517,6 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
   const std::string final_prefix = "cluster_manager.";
   return {ALL_CLUSTER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
-}
-
-void ClusterManagerImpl::initXdsStore(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                      Api::Api& api,
-                                      ProtobufMessage::ValidationContext& validation_context) {
-  envoy::extensions::config::xds::v3::PersistentXdsExtensionConfig xds_extension_config;
-  MessageUtil::unpackTo(bootstrap.persistent_xds_extension().typed_config(), xds_extension_config);
-
-  if (xds_extension_config.has_key_value_store_config()) {
-    const auto& kv_store_config = xds_extension_config.key_value_store_config().config();
-    auto& factory = Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(kv_store_config);
-    xds_store_ = factory.createStore(kv_store_config, validation_context.dynamicValidationVisitor(),
-                                     dispatcher_, api.fileSystem());
-  } else {
-    // TODO(abeyad): Not throwing an exception here because we don't want xDS to fail if the
-    // persistent xDS extension is misconfigured, but revisit if we should do some other error
-    // reporting.
-    ENVOY_LOG(error, "Persistent xDS extension configured but key-value store not specified.");
-  }
-
-  if (xds_extension_config.has_config_updated_callback_config()) {
-    config_updated_callback_config_ = &xds_extension_config.config_updated_callback_config();
-    config_updated_callback_factory_ =
-        &Config::Utility::getAndCheckFactory<Config::ConfigUpdatedCallbackFactory>(
-            *config_updated_callback_config_);
-  } else {
-    ENVOY_LOG(error,
-              "Persistent xDS extension configured but config updated callback not specified.");
-  }
 }
 
 void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {

@@ -339,7 +339,7 @@ message Bootstrap {
   // TODO(abeyad): comment this
   // [#extension-category: envoy.xds]
   // [#not-implemented-hide:]
-  core.v3.TypedExtensionConfig persistent_xds_extension = 35;
+  core.v3.TypedExtensionConfig xds_delegate_extension = 35;
 }
 
 // Administration interface :ref:`operations documentation
