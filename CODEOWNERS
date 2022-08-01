@@ -257,6 +257,10 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
 
+# URL Pattern Match and Rewrite
+/*/extensions/path/pattern_template_lib @silverstar195
+/*/extensions/path/pattern_template_lib/proto @silverstar195
+
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
