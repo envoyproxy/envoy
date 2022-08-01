@@ -39,6 +39,7 @@ private:
   Stats::Scope& scope_;
   const int32_t window_bits_;
   const uint32_t chunk_size_;
+  const uint64_t max_inflate_ratio_;
 };
 
 class GzipDecompressorLibraryFactory

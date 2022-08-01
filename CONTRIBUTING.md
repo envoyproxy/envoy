@@ -287,6 +287,7 @@ extension mostly mirrors adding a normal extension above. Some differences are n
   to core).
 * Build config and metadata should be included in [contrib/contrib_build_config.bzl](contrib/contrib_build_config.bzl)
   and [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml).
+* An entrypoint should be added in `docs/root/api-v3/config/contrib/contrib.rst`
 
 # DCO: Sign your work
 
