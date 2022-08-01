@@ -109,21 +109,6 @@ genrule(
 )
 
 envoy_cc_library(
-    name = "admin_html_generator_lib",
-    srcs = [
-        "admin_html_generator.cc",
-        ":generate_admin_html",
-    ],
-    hdrs = ["admin_html_generator.h"],
-    deps = [
-        "//envoy/server:admin_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/html:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "handler_ctx_lib",
     hdrs = ["handler_ctx.h"],
     deps = [

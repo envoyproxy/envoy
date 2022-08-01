@@ -176,7 +176,7 @@ void FilterConfigSubscription::incrementConflictCounter() { stats_.config_confli
 
 std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::getSubscription(
     const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
+    Server::Configuration::ServerFactoryContext& server_context, const std::string& stat_prefix) {
   // FilterConfigSubscriptions are unique based on their config source and filter config name
   // combination.
   // TODO(https://github.com/envoyproxy/envoy/issues/11967) Hash collision can cause subscription
@@ -185,8 +185,7 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::g
   auto it = subscriptions_.find(subscription_id);
   if (it == subscriptions_.end()) {
     auto subscription = std::make_shared<FilterConfigSubscription>(
-        config_source, name, factory_context.getServerFactoryContext(), stat_prefix, *this,
-        subscription_id);
+        config_source, name, server_context, stat_prefix, *this, subscription_id);
     subscriptions_.insert({subscription_id, std::weak_ptr<FilterConfigSubscription>(subscription)});
     return subscription;
   } else {

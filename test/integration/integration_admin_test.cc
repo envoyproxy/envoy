@@ -349,9 +349,10 @@ TEST_P(IntegrationAdminTest, Admin) {
        ++listener_info_it, ++listener_it) {
     auto local_address = (*listener_info_it)->getObject("local_address");
     auto socket_address = local_address->getObject("socket_address");
-    EXPECT_EQ(listener_it->get().listenSocketFactory().localAddress()->ip()->addressAsString(),
-              socket_address->getString("address"));
-    EXPECT_EQ(listener_it->get().listenSocketFactory().localAddress()->ip()->port(),
+    EXPECT_EQ(
+        listener_it->get().listenSocketFactories()[0]->localAddress()->ip()->addressAsString(),
+        socket_address->getString("address"));
+    EXPECT_EQ(listener_it->get().listenSocketFactories()[0]->localAddress()->ip()->port(),
               socket_address->getInteger("port_value"));
 
     std::vector<Json::ObjectSharedPtr> additional_local_addresses =

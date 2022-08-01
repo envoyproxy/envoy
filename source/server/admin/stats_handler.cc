@@ -16,8 +16,6 @@
 
 #include "absl/strings/numbers.h"
 
-#include "absl/strings/numbers.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -492,51 +490,28 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 }
 
 Admin::UrlHandler StatsHandler::statsHandler() {
-  return {"/stats",
-          "Print server stats.",
-          MAKE_ADMIN_HANDLER(handlerStats),
-          false,
-          false,
-          {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
-            "Only include stats that have been written by system since restart"},
-           {Admin::ParamDescriptor::Type::String, "filter",
-            "Regular expression (ecmascript) for filtering stats"},
-           {Admin::ParamDescriptor::Type::Enum,
-            "format",
-            "File format to use.",
-            {"html", "text", "json", "prometheus"}},
-           {Admin::ParamDescriptor::Type::Enum,
-            "type",
-            "Stat types to include.",
-            {AllLabel, CountersLabel, HistogramsLabel, GaugesLabel, TextReadoutsLabel}}}};
-}
-
-absl::string_view StatsHandler::typeToString(StatsHandler::Type type) {
-  static constexpr absl::string_view TextReadouts = "TextReadouts";
-  static constexpr absl::string_view Counters = "Counters";
-  static constexpr absl::string_view Gauges = "Gauges";
-  static constexpr absl::string_view Histograms = "Histograms";
-  static constexpr absl::string_view All = "All";
-
-  absl::string_view ret;
-  switch (type) {
-  case Type::TextReadouts:
-    ret = TextReadouts;
-    break;
-  case Type::Counters:
-    ret = Counters;
-    break;
-  case Type::Gauges:
-    ret = Gauges;
-    break;
-  case Type::Histograms:
-    ret = Histograms;
-    break;
-  case Type::All:
-    ret = All;
-    break;
-  }
-  return ret;
+  return {
+      "/stats",
+      "print server stats",
+      [this](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
+        return makeRequest(path, admin_stream);
+      },
+      false,
+      false,
+      {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+        "Only include stats that have been written by system since restart"},
+       {Admin::ParamDescriptor::Type::String, "filter",
+        "Regular expression (ecmascript) for filtering stats"},
+       {Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {"html", "text", "json"}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "type",
+        "Stat types to include.",
+        {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
+         StatLabels::TextReadouts}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "histogram_buckets",
+        "Histogram bucket display mode",
+        {"cumulative", "disjoint", "none"}}}};
 }
 
 } // namespace Server

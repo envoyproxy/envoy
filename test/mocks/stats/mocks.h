@@ -300,11 +300,8 @@ public:
   MOCK_METHOD(void, forEachCounter, (SizeFn, StatFn<Counter>), (const));
   MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
   MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
-<<<<<<< HEAD
   MOCK_METHOD(void, forEachScope, (SizeFn, StatFn<const Scope>), (const));
-=======
   MOCK_METHOD(void, forEachHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
->>>>>>> admin-params
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));

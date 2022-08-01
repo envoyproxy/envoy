@@ -37,7 +37,6 @@ public:
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
 
-<<<<<<< HEAD
   std::shared_ptr<MockInstance> setupMockedInstance() {
     auto instance = std::make_shared<MockInstance>();
     EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(testing::Return(false));
@@ -73,19 +72,12 @@ public:
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
   Stats::CustomStatNamespaces& customNamespaces() { return custom_namespaces_; }
 
-  void shutdownThreading() {
-=======
   ~StatsHandlerTest() {
->>>>>>> admin-params
     tls_.shutdownGlobalThreading();
     store_->shutdownThreading();
     tls_.shutdownThread();
   }
 
-<<<<<<< HEAD
-  Api::MockApi api_;
-  Configuration::MockStatsConfig stats_config_;
-=======
   // Set buckets for tests.
   void setHistogramBucketSettings(const std::string& prefix, const std::vector<double>& buckets) {
     envoy::config::metrics::v3::StatsConfig config;
@@ -165,7 +157,6 @@ public:
 
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
->>>>>>> admin-params
   Stats::SymbolTableImpl symbol_table_;
   Stats::StatNamePool pool_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
@@ -177,26 +168,12 @@ public:
   MockAdminStream admin_stream_;
   Configuration::MockStatsConfig stats_config_;
   TestScopedRuntime scoped_runtime_;
+  Api::MockApi api_;
+  Configuration::MockStatsConfig stats_config_;
 };
 
 class AdminStatsTest : public StatsHandlerTest, public testing::Test {};
 
-<<<<<<< HEAD
-INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
-  Buffer::OwnedImpl data;
-  Http::Code code = handlerStats("/stats?format=blergh", data);
-  EXPECT_EQ(Http::Code::BadRequest, code);
-  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", data.toString());
-}
-
-TEST_P(AdminStatsTest, HandlerStatsPlainText) {
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-
-=======
 TEST_F(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
   const CodeResponse code_response(handlerStats(url));
@@ -205,7 +182,6 @@ TEST_F(AdminStatsTest, HandlerStatsInvalidFormat) {
 }
 
 TEST_F(AdminStatsTest, HandlerStatsPlainText) {
->>>>>>> admin-params
   const std::string url = "/stats";
   Buffer::OwnedImpl data, used_data;
 
@@ -229,26 +205,18 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
 
   store_->mergeHistograms([]() -> void {});
 
-<<<<<<< HEAD
-  Http::Code code = handlerStats(url, data);
-  EXPECT_EQ(Http::Code::OK, code);
-  constexpr char expected[] =
-      "t: \"hello world\"\n"
-      "c1: 10\n"
-      "c2: 20\n"
-      "h1: P0(200.0,200.0) P25(202.5,202.5) P50(205.0,205.0) P75(207.5,207.5) "
-      "P90(209.0,209.0) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
-      "P99.9(209.99,209.99) P100(210.0,210.0)\n"
-      "h2: P0(100.0,100.0) P25(102.5,102.5) P50(105.0,105.0) P75(107.5,107.5) "
-      "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
-      "P99.9(109.99,109.99) P100(110.0,110.0)\n";
-  EXPECT_EQ(expected, data.toString());
-
-  code = handlerStats(url + "?usedonly", used_data);
-  EXPECT_EQ(Http::Code::OK, code);
-  EXPECT_EQ(expected, used_data.toString());
-
-  shutdownThreading();
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  constexpr char expected[] = "t: \"hello world\"\n"
+                              "c1: 10\n"
+                              "c2: 20\n"
+                              "h1: P0(200,200) P25(202.5,202.5) P50(205,205) P75(207.5,207.5) "
+                              "P90(209,209) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
+                              "P99.9(209.99,209.99) P100(210,210)\n"
+                              "h2: P0(100,100) P25(102.5,102.5) P50(105,105) P75(107.5,107.5) "
+                              "P90(109,109) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
+                              "P99.9(109.99,109.99) P100(110,110)\n";
+  EXPECT_EQ(expected, code_response.second);
 }
 
 #if 0
@@ -391,19 +359,6 @@ TEST_P(AdminStatsTest, HandlerStatsScoped) {
 TEST_P(AdminStatsTest, HandlerStatsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
-=======
-  CodeResponse code_response = handlerStats(url);
-  EXPECT_EQ(Http::Code::OK, code_response.first);
-  constexpr char expected[] = "t: \"hello world\"\n"
-                              "c1: 10\n"
-                              "c2: 20\n"
-                              "h1: P0(200,200) P25(202.5,202.5) P50(205,205) P75(207.5,207.5) "
-                              "P90(209,209) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
-                              "P99.9(209.99,209.99) P100(210,210)\n"
-                              "h2: P0(100,100) P25(102.5,102.5) P50(105,105) P75(107.5,107.5) "
-                              "P90(109,109) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
-                              "P99.9(109.99,109.99) P100(110,110)\n";
-  EXPECT_EQ(expected, code_response.second);
 }
 
 #ifdef ENVOY_ADMIN_HTML
@@ -768,13 +723,8 @@ TEST_F(AdminStatsTest, HandlerStatsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-<<<<<<< HEAD
-  std::string json_out;
-  EXPECT_EQ(Http::Code::OK, statsAsJsonHandler(json_out));
-=======
   const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
->>>>>>> admin-params
 
   const std::string expected_json_old = R"EOF({
     "stats": [
@@ -856,13 +806,7 @@ TEST_F(AdminStatsTest, HandlerStatsJson) {
     ]
 })EOF";
 
-<<<<<<< HEAD
-  EXPECT_THAT(expected_json_old, JsonStringEq(json_out));
-
-  shutdownThreading();
-=======
   EXPECT_THAT(expected_json_old, JsonStringEq(code_response.second));
->>>>>>> admin-params
 }
 
 TEST_F(AdminStatsTest, StatsAsJson) {
@@ -885,12 +829,7 @@ TEST_F(AdminStatsTest, StatsAsJson) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-<<<<<<< HEAD
-  std::string actual_json;
-  ASSERT_EQ(Http::Code::OK, statsAsJsonHandler(actual_json));
-=======
   const std::string actual_json = statsAsJsonHandler(false).second;
->>>>>>> admin-params
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -1028,12 +967,7 @@ TEST_F(AdminStatsTest, UsedOnlyStatsAsJson) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-<<<<<<< HEAD
-  std::string actual_json;
-  ASSERT_EQ(Http::Code::OK, statsAsJsonHandler(actual_json, "&usedonly"));
-=======
   const std::string actual_json = statsAsJsonHandler(true).second;
->>>>>>> admin-params
 
   // Expected JSON should not have h2 values as it is not used.
   const std::string expected_json = R"EOF({
@@ -1127,12 +1061,7 @@ TEST_P(AdminStatsFilterTest, StatsAsJsonFilterString) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-<<<<<<< HEAD
-  std::string actual_json;
-  ASSERT_EQ(Http::Code::OK, statsAsJsonHandler(actual_json, "&filter=[a-z]1"));
-=======
   const std::string actual_json = statsAsJsonHandler(false, "&filter=[a-z]1").second;
->>>>>>> admin-params
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
   // "h1" in their name.
@@ -1236,12 +1165,7 @@ TEST_P(AdminStatsFilterTest, UsedOnlyStatsAsJsonFilterString) {
   h3.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-<<<<<<< HEAD
-  std::string actual_json;
-  ASSERT_EQ(Http::Code::OK, statsAsJsonHandler(actual_json, "&usedonly&filter=h[12]"));
-=======
   const std::string actual_json = statsAsJsonHandler(true, "&filter=h[12]&safe").second;
->>>>>>> admin-params
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
   // they are used but do not match.
@@ -1543,13 +1467,6 @@ TEST_P(AdminInstanceTest, RecentLookups) {
 
 class StatsHandlerPrometheusTest : public StatsHandlerTest {
 public:
-<<<<<<< HEAD
-  Http::TestResponseHeaderMapImpl response_headers;
-  Buffer::OwnedImpl data;
-  MockAdminStream admin_stream;
-
-=======
->>>>>>> admin-params
   void createTestStats() {
     Stats::StatNameTagVector c1Tags{{makeStat("cluster"), makeStat("c1")}};
     Stats::StatNameTagVector c2Tags{{makeStat("cluster"), makeStat("c2")}};
@@ -1591,11 +1508,9 @@ TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
   const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
 envoy_cluster_upstream_cx_total{cluster="c2"} 20
-
 # TYPE envoy_cluster_upstream_cx_active gauge
 envoy_cluster_upstream_cx_active{cluster="c1"} 11
 envoy_cluster_upstream_cx_active{cluster="c2"} 12
-
 )EOF";
 
   const CodeResponse code_response = handlerStats(url);
@@ -1636,14 +1551,11 @@ TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTex
   const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
 envoy_cluster_upstream_cx_total{cluster="c2"} 20
-
 # TYPE envoy_cluster_upstream_cx_active gauge
 envoy_cluster_upstream_cx_active{cluster="c1"} 11
 envoy_cluster_upstream_cx_active{cluster="c2"} 12
-
 # TYPE envoy_control_plane_identifier gauge
 envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
-
 )EOF";
 
   const CodeResponse code_response = handlerStats(url);

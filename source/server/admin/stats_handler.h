@@ -38,14 +38,7 @@ public:
   Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
                                              Http::ResponseHeaderMap& response_headers,
                                              Buffer::Instance& response, AdminStream&);
-<<<<<<< HEAD
-  Http::Code handlerStats(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                          AdminStream&);
-  Http::Code handlerStatsPrometheus(absl::string_view path_and_query,
-=======
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
->>>>>>> admin-params
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
 
@@ -86,66 +79,6 @@ public:
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
-<<<<<<< HEAD
-  Admin::UrlHandler statsHandler();
-
-private:
-  class Context;
-  class HtmlRender;
-  class JsonRender;
-  class Render;
-  class TextRender;
-
-  enum class Format {
-    Html,
-    Json,
-    Prometheus,
-    Text,
-  };
-
-  // The order is used to linearize the ordering of stats of all types.
-  enum class Type {
-    TextReadouts,
-    Counters,
-    Gauges,
-    Histograms,
-    All,
-  };
-
-  struct Params {
-    Http::Code parse(absl::string_view url, Buffer::Instance& response);
-    bool shouldShowMetric(const Stats::Metric& metric) const;
-    bool matchesAny() const;
-
-    bool used_only_{false};
-    bool prometheus_text_readouts_{false};
-    bool pretty_{false};
-    Format format_{
-        Format::Text}; // If no `format=` param we use Text, but the `UI` defaults to HTML.
-    Type type_{Type::All};
-    Type start_type_{Type::TextReadouts};
-    std::string filter_string_;
-    absl::optional<std::regex> filter_;
-    std::string scope_;
-    Http::Utility::QueryParams query_;
-  };
-
-  friend class StatsHandlerTest;
-
-  Http::Code stats(const Params& parmams, Stats::Store& store,
-                   Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
-
-  static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
-                                    Stats::Store& stats,
-                                    Stats::CustomStatNamespaces& custom_namespaces);
-
-  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                 const std::map<std::string, std::string>& text_readouts,
-                                 const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool pretty_print);
-
-  static absl::string_view typeToString(Type type);
-=======
   /**
    * When stats are rendered in HTML mode, we want users to be able to tweak
    * parameters after the stats page is rendered, such as tweaking the filter or
@@ -167,7 +100,27 @@ private:
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
                                     Stats::Store& stats,
                                     Stats::CustomStatNamespaces& custom_namespaces);
->>>>>>> admin-params
+  /**
+   * When stats are rendered in HTML mode, we want users to be able to tweak
+   * parameters after the stats page is rendered, such as tweaking the filter or
+   * `usedonly`. We use the same stats UrlHandler both for the admin home page
+   * and for rendering in /stats?format=html. We share the same UrlHandler in
+   * both contexts by defining an API for it here.
+   *
+   * @return a URL handler for stats.
+   */
+  Admin::UrlHandler statsHandler();
+
+  static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
+                                       StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
+  Admin::RequestPtr makeRequest(absl::string_view path, AdminStream&);
+  // static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
+  //                                     StatsRequest::UrlHandlerFn url_handler_fn);
+
+private:
+  static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
+                                    Stats::Store& stats,
+                                    Stats::CustomStatNamespaces& custom_namespaces);
 };
 
 } // namespace Server

@@ -394,13 +394,16 @@ public:
                                  absl::string_view) const override;
 };
 
-/**
- * FormatterProvider for grpc-status
- */
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
 public:
+  enum Format {
+    CamelString,
+    SnakeString,
+    Number,
+  };
+
   GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,
-                      absl::optional<size_t> max_length, bool format_as_number = false);
+                      absl::optional<size_t> max_length, Format format);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&,
@@ -412,8 +415,10 @@ public:
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view) const override;
 
+  static Format parseFormat(absl::string_view format);
+
 private:
-  const bool format_as_number_;
+  const Format format_;
 };
 
 /**

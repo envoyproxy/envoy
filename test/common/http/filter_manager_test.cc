@@ -27,7 +27,7 @@ namespace {
 class FilterManagerTest : public testing::Test {
 public:
   void initialize() {
-    filter_manager_ = std::make_unique<FilterManager>(
+    filter_manager_ = std::make_unique<DownstreamFilterManager>(
         filter_manager_callbacks_, dispatcher_, connection_, 0, nullptr, true, 10000,
         filter_factory_, local_reply_, protocol_, time_source_, filter_state_,
         StreamInfo::FilterState::LifeSpan::Connection);
@@ -200,13 +200,27 @@ TEST_F(FilterManagerTest, OnLocalReply) {
 
   // Make sure all 3 filters get onLocalReply, and that the reset is preserved
   // even if not the last return.
-  EXPECT_CALL(*decoder_filter, onLocalReply(_));
+  EXPECT_CALL(*decoder_filter, onLocalReply(_))
+      .WillOnce(Invoke(
+          [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return Http::LocalErrorStatus::Continue;
+          }));
   EXPECT_CALL(*stream_filter, onLocalReply(_))
-      .WillOnce(Return(LocalErrorStatus::ContinueAndResetStream));
-  EXPECT_CALL(*encoder_filter, onLocalReply(_));
+      .WillOnce(Invoke(
+          [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return LocalErrorStatus::ContinueAndResetStream;
+          }));
+  EXPECT_CALL(*encoder_filter, onLocalReply(_))
+      .WillOnce(Invoke(
+          [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return Http::LocalErrorStatus::Continue;
+          }));
   EXPECT_CALL(filter_manager_callbacks_, resetStream());
   decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
-                                             absl::nullopt, "details");
+                                             Grpc::Status::Internal, "details");
 
   // The reason for the response (in this case the reset) will still be tracked
   // but as no response is sent the response code will remain absent.

@@ -68,4 +68,6 @@
 /* Rotate the caret/arrow icon when clicked on (using JavaScript) */
 .caret-down::before {
   transform: rotate(90deg);
-}*/
+}
+
+>>>>>>> main

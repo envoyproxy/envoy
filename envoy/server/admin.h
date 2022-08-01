@@ -114,6 +114,20 @@ public:
   };
   using ParamDescriptorVec = std::vector<ParamDescriptor>;
 
+  // Describes a parameter for an endpoint. This structure is used when
+  // admin-html has not been disabled to populate an HTML form to enable a
+  // visitor to the admin console to intuitively specify query-parameters for
+  // each endpoint. The parameter descriptions also appear in the /help
+  // endpoint, independent of how Envoy is compiled.
+  struct ParamDescriptor {
+    enum class Type { Boolean, String, Enum };
+    const Type type_;
+    const std::string id_;   // HTML form ID and query-param name (JS var name rules).
+    const std::string help_; // Help text rendered into UI.
+    std::vector<absl::string_view> enum_choices_{};
+  };
+  using ParamDescriptorVec = std::vector<ParamDescriptor>;
+
   // Represents a request for admin endpoints, enabling streamed responses.
   class Request {
   public:
@@ -180,7 +194,6 @@ public:
       Buffer::Instance& response, AdminStream& admin_stream)>;
 
   /**
-<<<<<<< HEAD
    * Individual admin handler including prefix, help text, and callback.
    */
   struct UrlHandler {
@@ -196,11 +209,9 @@ public:
 
   /**
    * Add an admin handler.
-=======
    * Add a legacy admin handler where the entire response is written in
    * one chunk.
    *
->>>>>>> admin-params
    * @param prefix supplies the URL prefix to handle.
    * @param help_text supplies the help text for the handler.
    * @param callback supplies the callback to invoke when the prefix matches.
@@ -211,9 +222,6 @@ public:
    */
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,
                           HandlerCb callback, bool removable, bool mutates_server_state,
-<<<<<<< HEAD
-                          const ParamDescriptorVec& params) PURE;
-=======
                           const ParamDescriptorVec& params = {}) PURE;
 
   /**
@@ -231,7 +239,6 @@ public:
                                    GenRequestFn gen_request, bool removable,
                                    bool mutates_server_state,
                                    const ParamDescriptorVec& params = {}) PURE;
->>>>>>> admin-params
 
   /**
    * Remove an admin handler if it is removable.
@@ -297,7 +304,7 @@ public:
    * @param response_text the text to populate response with
    * @param code the Http::Code for the response
    * @return the request
-   */
+b   */
   static RequestPtr makeStaticTextRequest(absl::string_view response_text, Http::Code code);
   static RequestPtr makeStaticTextRequest(Buffer::Instance& response_text, Http::Code code);
 };

@@ -10,10 +10,10 @@ Lua filter
    :ref:`curl <start_sandboxes_setup_curl>`
         Used to make ``HTTP`` requests.
 
-In this example, we show how a `Lua <https://www.lua.org/>`_ filter can be used with the Envoy
+In this example, we show how the `Lua <https://www.lua.org/>`_ filter can be used with the Envoy
 proxy.
 
-The Envoy proxy configuration includes a Lua filter that contains two functions:
+The example Envoy proxy configuration includes two Lua filters that contain two different functions:
 
 - ``envoy_on_request(request_handle)``
 - ``envoy_on_response(response_handle)``
@@ -42,59 +42,29 @@ Change to the ``examples/lua`` directory.
 Step 2: Send a request to the service
 *************************************
 
-The output from the ``curl`` command below should include the headers ``foo``.
+The output from the ``curl`` command below should include the header added by the Lua filter.
 
 Terminal 1
 
 .. code-block:: console
 
-  $ curl -v localhost:8000
+   $ curl -v localhost:8000 2>&1 | grep Foo
+   Foo: bar                              <-- This is added by the common Lua filter. --<
 
-     Trying ::1...
-  * TCP_NODELAY set
-  * Connected to localhost (::1) port 8000 (#0)
-  > GET / HTTP/1.1
-  > Host: localhost:8000
-  > User-Agent: curl/7.64.1
-  > Accept: */*
-  >
-  < HTTP/1.1 200 OK
-  < x-powered-by: Express
-  < content-type: application/json; charset=utf-8
-  < content-length: 544
-  < etag: W/"220-IhsqVTh4HjcpuJQ3C+rEL1Cw1jA"
-  < date: Thu, 31 Oct 2019 03:13:24 GMT
-  < x-envoy-upstream-service-time: 1
-  < response-body-size: 544                      <-- This is added to the response header by our Lua script. --<
-  < server: envoy
-  <
-  {
-    "path": "/",
-    "headers": {
-      "host": "localhost:8000",
-      "user-agent": "curl/7.64.1",
-      "accept": "*/*",
-      "x-forwarded-proto": "http",
-      "x-request-id": "a78fcce7-2d67-4eeb-890a-73eebb942a17",
-      "foo": "bar",                              <-- This is added to the request header by our Lua script. --<
-      "x-envoy-expected-rq-timeout-ms": "15000",
-      "content-length": "0"
-    },
-    "method": "GET",
-    "body": "",
-    "fresh": false,
-    "hostname": "localhost",
-    "ip": "::ffff:172.20.0.2",
-    "ips": [],
-    "protocol": "http",
-    "query": {},
-    "subdomains": [],
-    "xhr": false,
-    "os": {
-      "hostname": "7ca39ead805a"
-    }
-  * Connection #0 to host localhost left intact
-  }* Closing connection 0
+Step 3: Using multiple Lua filters at the same time
+*********************************************************
+
+Two Lua filters are configured in the example Envoy proxy configuration. But the second one can only work at a
+specfic route.
+
+The output from the ``curl`` command below should include the headers that added by multiple Lua filters.
+
+Terminal 1
+
+.. code-block:: console
+
+   curl -v localhost:8000/multiple/lua/scripts 2>&1 | grep header_key_1
+   < header_key_1: header_value_1        <-- This is added by the second route-specific Lua filter. --<
 
 .. seealso::
 

@@ -137,11 +137,11 @@ TEST_P(AdminInstanceTest, Help) {
   /config_dump: dump current Envoy configs (experimental)
       resource: The resource to dump
       mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask
+      name_regex: Dump only the currently loaded configurations whose names match the specified regex. Can be used with both resource and mask query parameters.
+      include_eds: Dump currently loaded configuration including EDS. See the response definition for more information
   /contention: dump current Envoy mutex contention stats (if enabled)
   /cpuprofiler: enable/disable the CPU profiler
   /drain_listeners: drain listeners
-      graceful: When draining listeners, enter a graceful drain period prior to closing listeners. This behaviour and duration is configurable via server options or CLI
-      inboundonly: Drains all inbound listeners. traffic_direction field in envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a listener is inbound or outbound.
   /healthcheck/fail: cause the server to fail health checks
   /healthcheck/ok: cause the server to pass health checks
   /heapprofiler: enable/disable the heap profiler
@@ -150,7 +150,7 @@ TEST_P(AdminInstanceTest, Help) {
   /init_dump: dump current Envoy init manager information (experimental)
       mask: The desired component to dump unready targets. The mask is parsed as a ProtobufWkt::FieldMask. For example, get the unready targets of all listeners with /init_dump?mask=listener`
   /listeners: print listener info
-      format: File format to use; One of text json
+      format: File format to use; One of (text, json)
   /logging: query/change logging levels
   /memory: print current allocation/heap usage
   /quitquitquit: exit the server
@@ -163,9 +163,9 @@ TEST_P(AdminInstanceTest, Help) {
   /stats: print server stats
       usedonly: Only include stats that have been written by system since restart
       filter: Regular expression (ecmascript) for filtering stats
-      format: Format to use; One of html text json
-      type: Stat types to include.; One of All Counters Histograms Gauges TextReadouts
-      histogram_buckets: Histogram bucket display mode; One of cumulative disjoint none
+      format: Format to use; One of (html, text, json)
+      type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, none)
   /stats/prometheus: print server stats in prometheus format
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
@@ -290,12 +290,6 @@ public:
   AdminImpl::AdminListenSocketFactory& socketFactory() { return socket_factory_; }
   AdminImpl::AdminListener& listener() { return listener_; }
 
-<<<<<<< HEAD
-  // It's OK to have help text with HTML characters in it, but when we render the home
-  // page they need to be escaped.
-  const std::string planets = "jupiter>saturn>mars";
-  EXPECT_TRUE(admin_.addHandler("/planets", planets, callback, true, false, {}));
-=======
 private:
   AdminImpl& admin_;
   Server::Instance& server_;
@@ -306,7 +300,6 @@ private:
   Stats::ScopeSharedPtr listener_scope_;
   AdminImpl::AdminListener listener_{admin_, std::move(listener_scope_)};
 };
->>>>>>> admin-params
 
 // Covers override methods for admin-specific implementations of classes in
 // admin.h, reducing a major source of reduced coverage-percent expectations in
@@ -315,18 +308,6 @@ private:
 TEST_P(AdminInstanceTest, Overrides) {
   admin_.http1Settings();
   admin_.originalIpDetectionExtensions();
-
-<<<<<<< HEAD
-TEST_P(AdminInstanceTest, HelpUsesPostForMutations) {
-  Http::TestResponseHeaderMapImpl header_map;
-  Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
-  const std::string logging_post = "<form action='logging' method='post'";
-  const std::string stats_get = "<form action='stats' method='get'";
-  EXPECT_NE(-1, response.search(logging_post.data(), logging_post.size(), 0, 0))
-      << response.toString();
-  EXPECT_NE(-1, response.search(stats_get.data(), stats_get.size(), 0, 0)) << response.toString();
-=======
   AdminTestingPeer peer(admin_);
 
   peer.routeConfigProvider().config();
@@ -356,7 +337,6 @@ TEST_P(AdminInstanceTest, HelpUsesPostForMutations) {
   peer.listener().udpListenerConfig();
   peer.listener().direction();
   peer.listener().tcpBacklogSize();
->>>>>>> admin-params
 }
 
 } // namespace Server

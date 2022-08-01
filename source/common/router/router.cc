@@ -1177,7 +1177,6 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
 
     auto request_ptr = upstream_request.removeFromList(upstream_requests_);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-      request_ptr->cleanUp();
       callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
     }
     return true;
@@ -1215,7 +1214,6 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   chargeUpstreamAbort(error_code, dropped, upstream_request);
   auto request_ptr = upstream_request.removeFromList(upstream_requests_);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-    request_ptr->cleanUp();
     callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
   }
 
@@ -1327,7 +1325,6 @@ void Filter::resetAll() {
     auto request_ptr = upstream_requests_.back()->removeFromList(upstream_requests_);
     request_ptr->resetStream();
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-      request_ptr->cleanUp();
       callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
     }
   }
@@ -1418,7 +1415,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         auto request_ptr = upstream_request.removeFromList(upstream_requests_);
         if (Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.allow_upstream_inline_write")) {
-          request_ptr->cleanUp();
           callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
         }
         return;
@@ -1453,7 +1449,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     auto request_ptr = upstream_request.removeFromList(upstream_requests_);
     request_ptr->resetStream();
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-      request_ptr->cleanUp();
       callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
     }
     return;
