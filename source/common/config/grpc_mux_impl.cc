@@ -44,7 +44,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
       config_validators_(std::move(config_validators)),
-      config_updated_callbacks_(std::move(config_updated_callbacks)) first_stream_request_(true),
+      config_updated_callbacks_(std::move(config_updated_callbacks)), first_stream_request_(true),
       dispatcher_(dispatcher),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {

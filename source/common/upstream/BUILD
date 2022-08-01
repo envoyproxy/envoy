@@ -126,6 +126,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/config/xds/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/http/http3:conn_pool_lib",
         "//source/common/http:conn_pool_grid",

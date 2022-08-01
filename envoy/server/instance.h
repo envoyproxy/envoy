@@ -249,7 +249,7 @@ public:
   /**
    * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
    */
-  virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() const PURE;
+  virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
 
   /**
    * @return Configuration::ServerFactoryContext& factory context for filters.

@@ -696,7 +696,8 @@ private:
   using ClusterCreationsMap = absl::flat_hash_map<std::string, ClusterCreation>;
 
   // Initializes the KeyValueStore that holds xDS resources.
-  void initXdsStore();
+  void initXdsStore(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Api::Api& api,
+                    ProtobufMessage::ValidationContext& validation_context);
   void applyUpdates(ClusterManagerCluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
@@ -769,9 +770,9 @@ private:
 
   std::unique_ptr<KeyValueStore> xds_store_;
   // Not owned; can be nullptr.
-  ConfigUpdatedCallbackFactory* config_updated_callback_factory_ = nullptr;
+  Config::ConfigUpdatedCallbackFactory* config_updated_callback_factory_ = nullptr;
   // Not owned; can be nullptr. Will only be set if config_updated_callback_factory_  is not null.
-  envoy::config::core::v3::TypedExtensionConfig* config_updated_callback_config_ = nullptr;
+  const envoy::config::core::v3::TypedExtensionConfig* config_updated_callback_config_ = nullptr;
 };
 
 } // namespace Upstream

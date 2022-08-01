@@ -1,10 +1,9 @@
 #include "source/common/config/subscription_factory_impl.h"
 
-#include "envoy/common/key_value/v3/config.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/common/key_value/v3/config.pb.h"
 #include "envoy/config/config_updated_callback.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/extensions/config/xds/persistent_xds_extension_config.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/config/custom_config_validators_impl.h"
@@ -29,7 +28,7 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
     Api::Api& api, const Server::Instance& server, KeyValueStore* xds_store,
     ConfigUpdatedCallbackFactory* config_updated_callback_factory,
-    envoy::config::core::v3::TypedExtensionConfig* config_updated_callback_config)
+    const envoy::config::core::v3::TypedExtensionConfig* config_updated_callback_config)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
       validation_visitor_(validation_visitor), api_(api), server_(server), xds_store_(xds_store),
       config_updated_callback_factory_(config_updated_callback_factory),

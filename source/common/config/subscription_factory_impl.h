@@ -24,7 +24,7 @@ public:
       Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
       Api::Api& api, const Server::Instance& server, KeyValueStore* xds_store,
       ConfigUpdatedCallbackFactory* config_updated_callback_factory,
-      envoy::config::core::v3::TypedExtensionConfig* config_updated_callback_config);
+      const envoy::config::core::v3::TypedExtensionConfig* config_updated_callback_config);
 
   // Config::SubscriptionFactory
   SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
@@ -51,7 +51,7 @@ private:
   // Not owned; can be nullptr.
   ConfigUpdatedCallbackFactory* config_updated_callback_factory_ = nullptr;
   // Not owned; can be nullptr. Will only be set if config_updated_callback_factory_  is not null.
-  envoy::config::core::v3::TypedExtensionConfig* config_updated_callback_config_ = nullptr;
+  const envoy::config::core::v3::TypedExtensionConfig* config_updated_callback_config_ = nullptr;
 };
 
 } // namespace Config
