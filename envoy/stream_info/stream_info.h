@@ -728,6 +728,16 @@ public:
     downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
     upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
   }
+
+  /**
+   * Dump the info to the specified ostream.
+   *
+   * @param os the ostream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

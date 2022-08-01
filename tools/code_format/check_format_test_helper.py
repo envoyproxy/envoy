@@ -221,9 +221,6 @@ def run_checks():
     errors += check_unfixable_error("clang_format_double_off.cc", "clang-format nested off")
     errors += check_unfixable_error("clang_format_trailing_off.cc", "clang-format remains off")
     errors += check_unfixable_error("clang_format_double_on.cc", "clang-format nested on")
-    errors += fix_file_expecting_failure(
-        "api/missing_package.proto",
-        "Unable to find package name for proto file: ./api/missing_package.proto")
     errors += check_unfixable_error(
         "proto_enum_mangling.cc", "Don't use mangled Protobuf names for enum constants")
     errors += check_unfixable_error(

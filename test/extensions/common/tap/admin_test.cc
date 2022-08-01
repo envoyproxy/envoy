@@ -70,7 +70,7 @@ class BaseAdminHandlerTest : public testing::Test {
 public:
   void setup(Network::Address::Type socket_type = Network::Address::Type::Ip) {
     ON_CALL(admin_.socket_, addressType()).WillByDefault(Return(socket_type));
-    EXPECT_CALL(admin_, addHandler("/tap", "tap filter control", _, true, true))
+    EXPECT_CALL(admin_, addHandler("/tap", "tap filter control", _, true, true, _))
         .WillOnce(DoAll(SaveArg<2>(&cb_), Return(true)));
     EXPECT_CALL(admin_, socket());
     handler_ = std::make_unique<AdminHandler>(admin_, main_thread_dispatcher_);

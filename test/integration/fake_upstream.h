@@ -826,9 +826,6 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::ListenSocketFactory& listenSocketFactory() override {
-      return *parent_.socket_factories_[0];
-    }
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return parent_.socket_factories_;
     }
