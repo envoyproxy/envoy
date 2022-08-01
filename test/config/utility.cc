@@ -1373,10 +1373,18 @@ void ConfigHelper::initializeTls(
   } else {
     if (options.client_with_intermediate_cert_) {
       validation_context->add_verify_certificate_hash(TEST_CLIENT2_CERT_HASH);
-      std::string cert_yaml = R"EOF(
+      std::string cert_yaml;
+      if (options.broken_chain_) {
+        cert_yaml = R"EOF(
+        trusted_ca:
+          filename: "{{ test_rundir }}/test/config/integration/certs/broken_partial_ca_cert_chain.pem"
+      )EOF";
+      } else {
+        cert_yaml = R"EOF(
         trusted_ca:
           filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_partial_ca_cert_chain.pem"
       )EOF";
+      }
       if (options.max_verify_depth_.has_value()) {
         cert_yaml += R"EOF(
         max_verify_depth:

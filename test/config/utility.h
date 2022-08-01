@@ -110,6 +110,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setBrokenChain(bool broken_chain) {
+      broken_chain_ = broken_chain;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
@@ -129,6 +134,7 @@ public:
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
     bool client_with_intermediate_cert_{false};
+    bool broken_chain_{false};
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 

@@ -80,5 +80,34 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithVerifyDepth) {
   codec->close();
 }
 
+// With broken chain set, certificate validation fails without max depth
+TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedWithBrokenChain) {
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true)
+                                  .setClientWithIntermediateCert(true)
+                                  .setBrokenChain(true));
+  initialize();
+  auto conn = makeSslClientConnection({});
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
+  ASSERT_TRUE(codec->waitForDisconnect());
+}
+
+// With broken chain set, certificate validation fails with max depth
+TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedWithBrokenChainAndDepth) {
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true)
+                                  .setClientWithIntermediateCert(true)
+                                  .setBrokenChain(true)
+                                  .setVerifyDepth(1));
+  initialize();
+  auto conn = makeSslClientConnection({});
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
+  ASSERT_TRUE(codec->waitForDisconnect());
+}
+
 } // namespace Ssl
 } // namespace Envoy
