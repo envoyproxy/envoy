@@ -466,7 +466,7 @@ public:
     healthy_threshold: 2
     http_health_check:
       path: /healthcheck
-      response_bytes_matcher: 
+      response_bytes_matcher:
         contains: {0}
     )EOF",
                                    response);
@@ -484,7 +484,7 @@ public:
     healthy_threshold: 2
     http_health_check:
       path: /healthcheck
-      response_string_matcher: 
+      response_string_matcher:
         contains: {0}
     )EOF",
                                    expected_response);
@@ -503,7 +503,7 @@ public:
     healthy_threshold: 2
     http_health_check:
       path: /healthcheck
-      response_bytes_matcher: 
+      response_bytes_matcher:
         contains: RXZlcnl0aGluZyBPSw==
       codec_client_type: Http2
     )EOF";
