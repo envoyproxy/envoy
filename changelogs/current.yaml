@@ -70,6 +70,6 @@ new_features:
     updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
 - area: http
   change: |
-    added the support of :ref:`expected response string matcher <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_string_matcher>` and :ref:`expected response bytes matcher <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_bytes_matcher>`for HTTP health check.
+    added the support of :ref:`expected response string matcher <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_string_matcher>` and :ref:`expected response bytes matcher <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_bytes_matcher>` for HTTP health check.
 
 deprecated:
