@@ -28,11 +28,11 @@ public:
    * Used to rewrite the current url to the specified output. Can return a failure in case rewrite
    * is not successful.
    *
-   * @param current_pattern current url of route
+   * @param url current url of route
    * @param matched_path pattern to rewrite the url to
    * @return the name of the rewrite pattern current predicate.
    */
-  virtual absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
+  virtual absl::StatusOr<std::string> rewritePattern(absl::string_view url,
                                                      absl::string_view matched_path) const PURE;
 
   /**

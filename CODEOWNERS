@@ -266,9 +266,9 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @snowp @JuniorHsu
 # path match by pattern
-/*/extensions/path/match/pattern_template @silverstar194
+/*/extensions/path/match/pattern_template @alyssawilk
 # path rewrite by pattern
-/*/extensions/path/rewrite/pattern_template @silverstar194
+/*/extensions/path/rewrite/pattern_template @alyssawilk
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

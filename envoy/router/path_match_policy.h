@@ -27,10 +27,10 @@ public:
   /**
    * Used to determine if the current url matches the predicate pattern.
    *
-   * @param pattern current url of route
-   * @return vaild is route url matches the precidate pattern.
+   * @param url current url of route
+   * @return valid if route url matches the predicate pattern.
    */
-  virtual bool match(absl::string_view pattern) const PURE;
+  virtual bool match(absl::string_view url) const PURE;
 
   /**
    * @return the match pattern of the predicate.
