@@ -19,16 +19,6 @@
 namespace Envoy {
 namespace Server {
 
-namespace {
-
-constexpr absl::string_view AllLabel = "All";
-constexpr absl::string_view CountersLabel = "Counters";
-constexpr absl::string_view GaugesLabel = "Gauges";
-constexpr absl::string_view HistogramsLabel = "Histograms";
-constexpr absl::string_view TextReadoutsLabel = "TextReadouts";
-
-} // namespace
-
 const uint64_t RecentLookupsCapacity = 100;
 
 StatsHandler::StatsHandler(Server::Instance& server) : HandlerContextBase(server) {}
@@ -84,52 +74,8 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code StatsHandler::handlerStats(absl::string_view url,
-                                      Http::ResponseHeaderMap& response_headers,
-                                      Buffer::Instance& response, AdminStream&) {
-  Params params;
-  Http::Code code = params.parse(url, response);
-  if (code != Http::Code::OK) {
-    return code;
-  }
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-  Stats::Store& store = server_.stats();
-  if (params.format_ == Format::Prometheus) {
-    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-        params.prometheus_text_readouts_ ? store.textReadouts()
-                                         : std::vector<Stats::TextReadoutSharedPtr>();
-    PrometheusStatsFormatter::statsAsPrometheus(
-        store.counters(), store.gauges(), store.histograms(), text_readouts_vec, response,
-        params.used_only_, params.filter_, server_.api().customStatNamespaces());
-    return Http::Code::OK;
-  }
-
-  return stats(params, server_.stats(), response_headers, response);
-}
-
 class StatsHandler::HtmlRender : public StatsHandler::TextRender {
 public:
-  HtmlRender(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-             StatsHandler& stats_handler, const Params& params)
-      : response_(response), html_(response) {
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-    html_.setVisibleSubmit(false);
-    html_.setSubmitOnChange(true);
-    html_.renderHead();
-    html_.renderTableBegin();
-    html_.renderUrlHandler(stats_handler.statsHandler(), params.query_);
-    html_.renderInput("scope", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
-    html_.renderTableEnd();
-  }
-
-  ~HtmlRender() override { response_.add("</body>\n"); }
-
-  void noStats(Type type) override {
-    groups_[type]; // Make an empty group for this type.
-  }
-
   void render(Buffer::Instance&) override {
     for (const auto& iter : groups_) {
       absl::string_view label = StatsHandler::typeToString(iter.first);
@@ -396,123 +342,125 @@ Http::Code StatsHandler::handlerStatsPrometheus(absl::string_view path_and_query
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
                                               text_readouts_vec, response, params.used_only_,
                                               params.filter_, server_.api().customStatNamespaces());
-Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream& /*admin_stream*/) {
-  StatsParams params;
-  Buffer::OwnedImpl response;
-  Http::Code code = params.parse(path, response);
-  if (code != Http::Code::OK) {
-    return Admin::makeStaticTextRequest(response, code);
-  }
-
-  if (params.format_ == StatsFormat::Prometheus) {
-    // TODO(#16139): modify streaming algorithm to cover Prometheus.
-    //
-    // This may be easiest to accomplish by populating the set
-    // with tagExtractedName(), and allowing for vectors of
-    // stats as multiples will have the same tag-extracted names.
-    // Ideally we'd find a way to do this without slowing down
-    // the non-Prometheus implementations.
+  Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream &
+                                              /*admin_stream*/) {
+    StatsParams params;
     Buffer::OwnedImpl response;
+    Http::Code code = params.parse(path, response);
+    if (code != Http::Code::OK) {
+      return Admin::makeStaticTextRequest(response, code);
+    }
+
+    if (params.format_ == StatsFormat::Prometheus) {
+      // TODO(#16139): modify streaming algorithm to cover Prometheus.
+      //
+      // This may be easiest to accomplish by populating the set
+      // with tagExtractedName(), and allowing for vectors of
+      // stats as multiples will have the same tag-extracted names.
+      // Ideally we'd find a way to do this without slowing down
+      // the non-Prometheus implementations.
+      Buffer::OwnedImpl response;
+      prometheusFlushAndRender(params, response);
+      return Admin::makeStaticTextRequest(response, code);
+    }
+
+    if (server_.statsConfig().flushOnAdmin()) {
+      server_.flushStats();
+    }
+
+    return makeRequest(server_.stats(), params,
+                       [this]() -> Admin::UrlHandler { return statsHandler(); });
+  }
+
+  Admin::RequestPtr StatsHandler::makeRequest(Stats::Store & stats, const StatsParams& params,
+                                              StatsRequest::UrlHandlerFn url_handler_fn) {
+    return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
+  }
+
+  Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
+                                                  Http::ResponseHeaderMap&,
+                                                  Buffer::Instance & response, AdminStream&) {
+    return prometheusStats(path_and_query, response);
+  }
+
+  Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
+                                           Buffer::Instance & response) {
+    StatsParams params;
+    Http::Code code = params.parse(path_and_query, response);
+    if (code != Http::Code::OK) {
+      return code;
+    }
+
+    if (server_.statsConfig().flushOnAdmin()) {
+      server_.flushStats();
+    }
+
     prometheusFlushAndRender(params, response);
-    return Admin::makeStaticTextRequest(response, code);
+    return Http::Code::OK;
   }
 
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
+  void StatsHandler::prometheusFlushAndRender(const StatsParams& params,
+                                              Buffer::Instance& response) {
+    if (server_.statsConfig().flushOnAdmin()) {
+      server_.flushStats();
+    }
+    prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
   }
 
-  return makeRequest(server_.stats(), params,
-                     [this]() -> Admin::UrlHandler { return statsHandler(); });
-}
-
-Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
-                                            StatsRequest::UrlHandlerFn url_handler_fn) {
-  return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
-}
-
-Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
-                                                Http::ResponseHeaderMap&,
-                                                Buffer::Instance& response, AdminStream&) {
-  return prometheusStats(path_and_query, response);
-}
-
-Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
-                                         Buffer::Instance& response) {
-  StatsParams params;
-  Http::Code code = params.parse(path_and_query, response);
-  if (code != Http::Code::OK) {
-    return code;
+  void StatsHandler::prometheusRender(Stats::Store & stats,
+                                      const Stats::CustomStatNamespaces& custom_namespaces,
+                                      const StatsParams& params, Buffer::Instance& response) {
+    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
+        params.prometheus_text_readouts_ ? stats.textReadouts()
+                                         : std::vector<Stats::TextReadoutSharedPtr>();
+    PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(),
+                                                stats.histograms(), text_readouts_vec, response,
+                                                params, custom_namespaces);
   }
 
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
+  Http::Code StatsHandler::handlerContention(absl::string_view,
+                                             Http::ResponseHeaderMap & response_headers,
+                                             Buffer::Instance & response, AdminStream&) {
+
+    if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
+      response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+
+      envoy::admin::v3::MutexStats mutex_stats;
+      mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
+      mutex_stats.set_current_wait_cycles(server_.mutexTracer()->currentWaitCycles());
+      mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer()->lifetimeWaitCycles());
+      response.add(MessageUtil::getJsonStringFromMessageOrError(mutex_stats, true, true));
+    } else {
+      response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
+                   "--enable-mutex-tracing.");
+    }
+    return Http::Code::OK;
   }
 
-  prometheusFlushAndRender(params, response);
-  return Http::Code::OK;
-}
-
-void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response) {
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
+  Admin::UrlHandler StatsHandler::statsHandler() {
+    return {
+        "/stats",
+        "print server stats",
+        [this](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
+          return makeRequest(path, admin_stream);
+        },
+        false,
+        false,
+        {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+          "Only include stats that have been written by system since restart"},
+         {Admin::ParamDescriptor::Type::String, "filter",
+          "Regular expression (ecmascript) for filtering stats"},
+         {Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {"html", "text", "json"}},
+         {Admin::ParamDescriptor::Type::Enum,
+          "type",
+          "Stat types to include.",
+          {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
+           StatLabels::TextReadouts}},
+         {Admin::ParamDescriptor::Type::Enum,
+          "histogram_buckets",
+          "Histogram bucket display mode",
+          {"cumulative", "disjoint", "none"}}}};
   }
-  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
-}
-
-void StatsHandler::prometheusRender(Stats::Store& stats,
-                                    const Stats::CustomStatNamespaces& custom_namespaces,
-                                    const StatsParams& params, Buffer::Instance& response) {
-  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-      params.prometheus_text_readouts_ ? stats.textReadouts()
-                                       : std::vector<Stats::TextReadoutSharedPtr>();
-  PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
-                                              text_readouts_vec, response, params,
-                                              custom_namespaces);
-}
-
-Http::Code StatsHandler::handlerContention(absl::string_view,
-                                           Http::ResponseHeaderMap& response_headers,
-                                           Buffer::Instance& response, AdminStream&) {
-
-  if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-
-    envoy::admin::v3::MutexStats mutex_stats;
-    mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
-    mutex_stats.set_current_wait_cycles(server_.mutexTracer()->currentWaitCycles());
-    mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer()->lifetimeWaitCycles());
-    response.add(MessageUtil::getJsonStringFromMessageOrError(mutex_stats, true, true));
-  } else {
-    response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
-                 "--enable-mutex-tracing.");
-  }
-  return Http::Code::OK;
-}
-
-Admin::UrlHandler StatsHandler::statsHandler() {
-  return {
-      "/stats",
-      "print server stats",
-      [this](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
-        return makeRequest(path, admin_stream);
-      },
-      false,
-      false,
-      {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
-        "Only include stats that have been written by system since restart"},
-       {Admin::ParamDescriptor::Type::String, "filter",
-        "Regular expression (ecmascript) for filtering stats"},
-       {Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {"html", "text", "json"}},
-       {Admin::ParamDescriptor::Type::Enum,
-        "type",
-        "Stat types to include.",
-        {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
-         StatLabels::TextReadouts}},
-       {Admin::ParamDescriptor::Type::Enum,
-        "histogram_buckets",
-        "Histogram bucket display mode",
-        {"cumulative", "disjoint", "none"}}}};
-}
 
 } // namespace Server
 } // namespace Envoy

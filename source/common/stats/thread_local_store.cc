@@ -167,7 +167,6 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
                  if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
                    ret.emplace_back(GaugeSharedPtr(&gauge));
                  }
-                 return true;
                });
   return ret;
 }

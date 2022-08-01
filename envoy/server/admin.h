@@ -91,28 +91,7 @@ public:
  */
 class Admin {
 public:
-  struct ParamDescriptor {
-    enum class Type { Boolean, String, Enum, Mask, Hidden };
-    const Type type_;
-    const std::string id_;   // HTML form ID and query-param name (JS var name rules).
-    const std::string help_; // Help text rendered into UI.
-    std::vector<absl::string_view> choices_{}; // Valid values for enums or masks
-  };
-  using ParamDescriptorVec = std::vector<ParamDescriptor>;
-
-  // Describes a parameter for an endpoint. This structure is used when
-  // admin-html has not been disabled to populate an HTML form to enable a
-  // visitor to the admin console to intuitively specify query-parameters for
-  // each endpoint. The parameter descriptions also appear in the /help
-  // endpoint, independent of how Envoy is compiled.
-  struct ParamDescriptor {
-    enum class Type { Boolean, String, Enum };
-    const Type type_;
-    const std::string id_;   // HTML form ID and query-param name (JS var name rules).
-    const std::string help_; // Help text rendered into UI.
-    std::vector<absl::string_view> enum_choices_{};
-  };
-  using ParamDescriptorVec = std::vector<ParamDescriptor>;
+  virtual ~Admin() = default;
 
   // Describes a parameter for an endpoint. This structure is used when
   // admin-html has not been disabled to populate an HTML form to enable a
@@ -192,20 +171,6 @@ public:
   using HandlerCb = std::function<Http::Code(
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::Instance& response, AdminStream& admin_stream)>;
-
-  /**
-   * Individual admin handler including prefix, help text, and callback.
-   */
-  struct UrlHandler {
-    const std::string prefix_;
-    const std::string help_text_;
-    const HandlerCb handler_;
-    const bool removable_;
-    const bool mutates_server_state_;
-    const ParamDescriptorVec params_;
-  };
-
-  virtual ~Admin() = default;
 
   /**
    * Add an admin handler.
@@ -304,7 +269,7 @@ public:
    * @param response_text the text to populate response with
    * @param code the Http::Code for the response
    * @return the request
-b   */
+   */
   static RequestPtr makeStaticTextRequest(absl::string_view response_text, Http::Code code);
   static RequestPtr makeStaticTextRequest(Buffer::Instance& response_text, Http::Code code);
 };

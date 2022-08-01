@@ -33,7 +33,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/extensions/request_id/uuid/config.h"
-#include "source/server/admin/admin_html_generator.h"
 #include "source/server/admin/utils.h"
 #include "source/server/listener_impl.h"
 
@@ -148,17 +147,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true),
           makeHandler("/reset_counters", "reset all counters to zero",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true),
-          makeHandler(
-              "/drain_listeners", "drain listeners",
-              MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true,
-              {{ParamDescriptor::Type::Boolean, "graceful",
-                "When draining listeners, enter a graceful drain period prior to closing "
-                "listeners. This behaviour and duration is configurable via server options "
-                "or CLI"},
-               {ParamDescriptor::Type::Boolean, "inboundonly",
-                "Drains all inbound listeners. traffic_direction field in "
-                "envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a "
-                "listener is inbound or outbound."}}),
+          makeHandler("/drain_listeners", "drain listeners",
+                      MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true),
           makeHandler("/server_info", "print server version/status information",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
           makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
