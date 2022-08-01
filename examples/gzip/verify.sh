@@ -21,10 +21,10 @@ responds_without_header \
     -i -H "Accept-Encoding: gzip"
 
 run_log "Test service: localhost:${PORT_PROXY}/upload with decompression"
-curl -s -H "Accept-Encoding: gzip" -o file.gz http://localhost:${PORT_PROXY}/file.json
+curl -s -H "Accept-Encoding: gzip" -o file.gz "http://localhost:${PORT_PROXY}/file.json"
 responds_with \
     "decompressed-size: 10485760" \
-    http://localhost:${PORT_PROXY}/upload \
+    "http://localhost:${PORT_PROXY}/upload" \
     -X POST -i -H "Content-Encoding: gzip" --data-binary "@file.gz"
 rm file.gz
 
