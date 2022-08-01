@@ -257,9 +257,9 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
 
-# URL Pattern Match and Rewrite
-/*/extensions/path/pattern_template_lib @alyssawilk
-/*/extensions/path/pattern_template_lib/proto @alyssawilk
+# URL Pattern Match and Rewrite Library
+/*/extensions/path/pattern_template_lib @alyssawilk @yanjunxiang
+/*/extensions/path/pattern_template_lib/proto @alyssawilk @yanjunxiang
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
