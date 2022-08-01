@@ -173,7 +173,6 @@ public:
       Buffer::Instance& response, AdminStream& admin_stream)>;
 
   /**
-   * Add an admin handler.
    * Add a legacy admin handler where the entire response is written in
    * one chunk.
    *

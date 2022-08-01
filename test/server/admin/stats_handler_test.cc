@@ -307,20 +307,20 @@ TEST_P(AdminStatsTest, HandlerStatsScoped) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   store_->counterFromStatName(makeStat("foo.c0")).add(0);
-  Stats::ScopePtr scope0 = store_->createScope("");
+  Stats::ScopeSharedPtr scope0 = store_->createScope("");
   store_->counterFromStatName(makeStat("foo.c1")).add(1);
-  Stats::ScopePtr scope = store_->createScope("scope");
+  Stats::ScopeSharedPtr scope = store_->createScope("scope");
   scope->counterFromStatName(makeStat("c2")).add(2);
-  Stats::ScopePtr scope2 = store_->createScope("scope1.scope2");
+  Stats::ScopeSharedPtr scope2 = store_->createScope("scope1.scope2");
   scope2->counterFromStatName(makeStat("c3")).add(3);
-  Stats::ScopePtr scope3 = store_->createScope("scope1.scope2.scope3");
+  Stats::ScopeSharedPtr scope3 = store_->createScope("scope1.scope2.scope3");
   scope3->counterFromStatName(makeStat("c4")).add(4);
-  Stats::ScopePtr scope4 = store_->createScope("scope4");
+  Stats::ScopeSharedPtr scope4 = store_->createScope("scope4");
   scope4->counterFromStatName(makeStat("c5")).add(500);
 
   // Duplicate created with the same name, overriding the stat value. This
   // will all be de-duped by the handlers, and the values combined.
-  Stats::ScopePtr scope4a = store_->createScope("scope4");
+  Stats::ScopeSharedPtr scope4a = store_->createScope("scope4");
   scope4->counterFromStatName(makeStat("c5")).add(55);
 
   auto test = [this](absl::string_view params, const std::string& expected) {
@@ -704,7 +704,6 @@ TEST_P(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsDisjoint) {
 }
 
 TEST_F(AdminStatsTest, HandlerStatsJson) {
->>>>>>> admin-params
   const std::string url = "/stats?format=json";
 
   Stats::Counter& c1 = store_->counterFromString("c1");
