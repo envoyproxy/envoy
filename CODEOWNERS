@@ -258,8 +258,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
 
 # URL Pattern Match and Rewrite
-/*/extensions/path/pattern_template_lib @silverstar195
-/*/extensions/path/pattern_template_lib/proto @silverstar195
+/*/extensions/path/pattern_template_lib @silverstar194
+/*/extensions/path/pattern_template_lib/proto @silverstar194
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
