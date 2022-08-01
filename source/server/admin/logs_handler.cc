@@ -42,7 +42,7 @@ Http::Code LogsHandler::handlerLogging(absl::string_view, Http::ResponseHeaderMa
   Http::Utility::QueryParams query_params = admin_stream.queryParams();
 
   Http::Code rc = Http::Code::OK;
-  absl::Status status = changeLogLevel(query_params);
+  const absl::Status status = changeLogLevel(query_params);
   if (!status.ok()) {
     rc = Http::Code::BadRequest;
     response.add(fmt::format("error: {}\n\n", status.message()));
@@ -106,7 +106,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
 
   if (level != params.end()) {
     // Change all log levels.
-    absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level->second);
+    const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level->second);
     if (!level_to_use.ok()) {
       return level_to_use.status();
     }
@@ -124,14 +124,14 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
     std::vector<absl::string_view> pairs =
         absl::StrSplit(paths->second, ',', absl::SkipWhitespace());
     for (const auto& name_level : pairs) {
-      std::pair<absl::string_view, absl::string_view> name_level_pair =
+      const std::pair<absl::string_view, absl::string_view> name_level_pair =
           absl::StrSplit(name_level, absl::MaxSplits(':', 1), absl::SkipWhitespace());
       auto [name, level] = name_level_pair;
       if (name.empty() || level.empty()) {
         return absl::InvalidArgumentError("empty logger name or empty logger level");
       }
 
-      absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level);
+      const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(level);
       if (!level_to_use.ok()) {
         return level_to_use.status();
       }
@@ -152,7 +152,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParams& params) {
     const std::string& key = it->first;
     const std::string& value = it->second;
 
-    absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(value);
+    const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(value);
     if (!level_to_use.ok()) {
       return level_to_use.status();
     }
