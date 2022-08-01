@@ -169,9 +169,9 @@ private:
 
   const std::string path_;
   const std::string host_value_;
-  const std::string expected_response_;
   absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
       service_name_matcher_;
+  Matchers::BytesMatcherUniquePtr expected_response_matcher_;
   Router::HeaderParserPtr request_headers_parser_;
   const HttpStatusChecker http_status_checker_;
 

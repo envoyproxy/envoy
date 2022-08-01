@@ -32,6 +32,8 @@ namespace Upstream {
 
 namespace {
 
+using HttpHealthCheck = envoy::config::core::v3::HealthCheck::HttpHealthCheck;
+
 // Helper functions to get the correct hostname for an L7 health check.
 const std::string& getHostname(const HostSharedPtr& host, const std::string& config_hostname,
                                const ClusterInfoConstSharedPtr& cluster) {
@@ -134,7 +136,6 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
-      expected_response_(config.http_health_check().expected_response_in_prefix()),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
@@ -145,6 +146,27 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       random_generator_(random) {
   if (config.http_health_check().has_service_name_matcher()) {
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
+  }
+
+  switch (config.http_health_check().expected_response_matcher_case()) {
+  case HttpHealthCheck::ExpectedResponseMatcherCase::kResponseBytesMatcher:
+    expected_response_matcher_ = std::make_unique<const Matchers::BinaryMatcher>(
+        config.http_health_check().response_bytes_matcher());
+    break;
+  case HttpHealthCheck::ExpectedResponseMatcherCase::kResponseStringMatcher:
+    expected_response_matcher_ = std::make_unique<
+        const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+        config.http_health_check().response_string_matcher());
+    break;
+  case HttpHealthCheck::ExpectedResponseMatcherCase::EXPECTED_RESPONSE_MATCHER_NOT_SET:
+    break;
+  }
+
+  if (expected_response_matcher_ != nullptr &&
+      expected_response_matcher_->getMatcherPatternLength() > kMaxBytesInBuffer) {
+    throw EnvoyException(fmt::format(
+        "The expected response length '{}' is over than http health response buffer size '{}'",
+        expected_response_matcher_->getMatcherPatternLength(), kMaxBytesInBuffer));
   }
 }
 
@@ -260,7 +282,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeData(Buffer::Instance& data,
                                                                      bool end_stream) {
-  if (!parent_.expected_response_.empty() && response_body_->length() < kMaxBytesInBuffer) {
+  if (parent_.expected_response_matcher_ != nullptr &&
+      response_body_->length() < kMaxBytesInBuffer) {
     response_body_->move(data, kMaxBytesInBuffer - response_body_->length());
   }
   if (end_stream) {
@@ -363,16 +386,15 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response_code={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (!parent_.expected_response_.empty()) {
+  if (parent_.expected_response_matcher_ != nullptr) {
     // If the expected response is set, check the first 1024 bytes of actual response if contains
     // the expected response.
     absl::string_view response_data = absl::string_view(
         static_cast<const char*>(response_body_->linearize(response_body_->length())),
         response_body_->length());
-    ENVOY_CONN_LOG(debug, "hc response_body={} expected_response={}", *client_, response_data,
-                   parent_.expected_response_);
+    ENVOY_CONN_LOG(debug, "hc http response check response_body={} ", *client_, response_data);
 
-    if (!absl::StrContains(response_data, parent_.expected_response_)) {
+    if (!parent_.expected_response_matcher_->match(response_data)) {
       if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
         host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
       }

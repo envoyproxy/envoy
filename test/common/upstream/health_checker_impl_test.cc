@@ -455,7 +455,7 @@ public:
     addCompletionCallback();
   }
 
-  void setupServiceValidationWithExpectedResponseHC(const std::string& expected_response) {
+  void setupServiceValidationWithBytesMatcherHC(const std::string& expected_response) {
     Buffer::OwnedImpl response_test(expected_response);
     std::string response = Base64::encode(response_test, response_test.length());
     std::string yaml = fmt::format(R"EOF(
@@ -466,9 +466,28 @@ public:
     healthy_threshold: 2
     http_health_check:
       path: /healthcheck
-      expected_response_in_prefix: {0}
+      response_bytes_matcher: 
+        contains: {0}
     )EOF",
                                    response);
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
+  void setupServiceValidationWithStringMatcherHC(const std::string& expected_response) {
+    std::string yaml = fmt::format(R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      response_string_matcher: 
+        contains: {0}
+    )EOF",
+                                   expected_response);
 
     allocHealthChecker(yaml);
     addCompletionCallback();
@@ -484,7 +503,8 @@ public:
     healthy_threshold: 2
     http_health_check:
       path: /healthcheck
-      expected_response_in_prefix: RXZlcnl0aGluZyBPSw==
+      response_bytes_matcher: 
+        contains: RXZlcnl0aGluZyBPSw==
       codec_client_type: Http2
     )EOF";
 
@@ -1082,7 +1102,29 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostSets) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheck) {
-  setupServiceValidationWithExpectedResponseHC("Everything OK");
+  setupServiceValidationWithBytesMatcherHC("Everything OK");
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondBody(0, "200", {"Test Everything OK"});
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseStringContainsCheck) {
+  setupServiceValidationWithStringMatcherHC("Everything OK");
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1104,7 +1146,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheck) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckBuffer) {
-  setupServiceValidationWithExpectedResponseHC("Everything OK");
+  setupServiceValidationWithBytesMatcherHC("Everything OK");
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1127,7 +1169,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckBuffer) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckMaxBuffer) {
   std::string expected_string(1024, 'A');
-  setupServiceValidationWithExpectedResponseHC(expected_string);
+  setupServiceValidationWithBytesMatcherHC(expected_string);
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1148,6 +1190,13 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckMaxBuffer) {
   std::string data_piece(512, 'A');
   respondBody(0, "200", {data_piece, data_piece, data_piece});
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+TEST_F(HttpHealthCheckerImplTest, ExpectedResponseSettingOverSize) {
+  std::string expected_string(2048, 'A');
+  EXPECT_THROW_WITH_MESSAGE(
+      setupServiceValidationWithBytesMatcherHC(expected_string), EnvoyException,
+      "The expected response length '2048' is over than http health response buffer size '1024'");
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckHttp2) {
@@ -1173,7 +1222,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckHttp2) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, FailExpectedResponseCheck) {
-  setupServiceValidationWithExpectedResponseHC("Everything OK");
+  setupServiceValidationWithBytesMatcherHC("Everything OK");
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
@@ -1199,7 +1248,7 @@ TEST_F(HttpHealthCheckerImplTest, FailExpectedResponseCheck) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, FailStatusCheckWithExpectedResponseCheck) {
-  setupServiceValidationWithExpectedResponseHC("Everything OK");
+  setupServiceValidationWithBytesMatcherHC("Everything OK");
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
@@ -1224,7 +1273,7 @@ TEST_F(HttpHealthCheckerImplTest, FailStatusCheckWithExpectedResponseCheck) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, ImmediateFailExpectedResponseCheck) {
-  setupServiceValidationWithExpectedResponseHC("Everything OK");
+  setupServiceValidationWithBytesMatcherHC("Everything OK");
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));

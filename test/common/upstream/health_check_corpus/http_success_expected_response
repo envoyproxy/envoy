@@ -22,7 +22,9 @@ health_check_config {
         service_name_matcher {
             prefix: "locations"
         }
-        expected_response_in_prefix:  "\x02"
+        response_bytes_matcher:  {
+            contains: "\x02"
+        }
     }
 }
 actions {
