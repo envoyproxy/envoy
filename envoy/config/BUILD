@@ -30,6 +30,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "config_updated_callback_interface",
+    hdrs = ["config_updated_callback.h"],
+    deps = [
+        ":subscription_interface",
+        ":typed_config_interface",
+        "//envoy/common:key_value_store_interface",
+        "//envoy/protobuf:message_validator_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "config_validator_interface",
     hdrs = ["config_validator.h"],
     deps = [

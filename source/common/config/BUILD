@@ -325,6 +325,7 @@ envoy_cc_library(
         ":type_to_endpoint_lib",
         ":utility_lib",
         ":xds_resource_lib",
+        "//envoy/config:config_updated_callback_interface",
         "//envoy/config:subscription_factory_interface",
         "//envoy/config:subscription_interface",
         "//envoy/server:instance_interface",
@@ -333,7 +334,10 @@ envoy_cc_library(
         "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/common/key_value/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/config/xds/v3:pkg_cc_proto",
     ],
 )
 
@@ -381,6 +385,7 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",

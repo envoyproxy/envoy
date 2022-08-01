@@ -94,7 +94,7 @@ public:
     http_context_.setDefaultTracingConfig(tracing_config);
   }
 
-  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() const override { return bootstrap_; }
 
   TimeSource& timeSource() override { return time_system_; }
 

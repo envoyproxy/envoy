@@ -280,7 +280,7 @@ public:
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
-  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() const override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;

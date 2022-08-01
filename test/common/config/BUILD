@@ -436,6 +436,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//source/common/config:api_version_lib",
         "//source/common/config:utility_lib",
