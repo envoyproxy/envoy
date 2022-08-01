@@ -336,8 +336,8 @@ message Bootstrap {
   // [#extension-category: envoy.regex_engines]
   core.v3.TypedExtensionConfig default_regex_engine = 34;
 
-  // TODO(abeyad): comment this
-  // [#extension-category: envoy.xds]
+  // Optional XdsResourcesDelegate configuration.
+  // If a value is not specified, no XdsResourcesDelegate will be used.
   // [#not-implemented-hide:]
   core.v3.TypedExtensionConfig xds_delegate_extension = 35;
 }

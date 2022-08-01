@@ -69,7 +69,7 @@ public:
                              ProtobufMessage::ValidationVisitor& validation_visitor,
                              Api::Api& api) PURE;
 
-  std::string category() const override { return "envoy.config.xds_resources_delegate"; }
+  std::string category() const override { return "envoy.config.xds"; }
 };
 
 } // namespace Config

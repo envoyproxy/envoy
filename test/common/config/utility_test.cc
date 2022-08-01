@@ -572,7 +572,7 @@ TEST(UtilityTest, GetGrpcControlPlane) {
       api_type: GRPC
       grpc_services:
         google_grpc:
-          target_uri: trafficdirector.googleapis.com 
+          target_uri: trafficdirector.googleapis.com
     )EOF";
     TestUtility::loadFromYaml(config_yaml, api_config_source);
     EXPECT_THAT(Utility::getGrpcControlPlane(api_config_source),
@@ -585,7 +585,7 @@ TEST(UtilityTest, GetGrpcControlPlane) {
       api_type: GRPC
       grpc_services:
         envoy_grpc:
-          cluster_name: some_xds_cluster 
+          cluster_name: some_xds_cluster
     )EOF";
     TestUtility::loadFromYaml(config_yaml, api_config_source);
     EXPECT_THAT(Utility::getGrpcControlPlane(api_config_source), Optional(Eq("some_xds_cluster")));
