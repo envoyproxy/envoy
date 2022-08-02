@@ -27,7 +27,7 @@ For more information on Signed HTTP Exchanges see `this doc <https://developers.
 
 .. note::
 
- These features are not supported on Windows.
+ These features are only supported on Linux amd64.
 
 
 Example configuration
