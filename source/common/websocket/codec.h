@@ -96,13 +96,18 @@ public:
 
 protected:
   virtual bool frameStart(uint8_t) { return true; }
-  virtual uint8_t frameMaskAndLength(uint8_t) { return 0; }
+  virtual void frameMaskFlag(uint8_t) {}
+  virtual void frameMaskingKey() {}
+  virtual void frameExtendedLength(uint64_t) {}
   virtual void frameDataStart() {}
   virtual void frameData(uint8_t*, uint64_t) {}
   virtual void frameDataEnd() {}
 
   State state_{State::FhFlagsAndOpcode};
   uint64_t length_{0};
+  uint8_t length_of_extended_length_{0};
+  uint32_t masking_key_{0};
+  uint8_t masking_key_length_{0};
   uint64_t count_{0};
 };
 
@@ -127,7 +132,9 @@ public:
 
 protected:
   bool frameStart(uint8_t) override;
-  uint8_t frameMaskAndLength(uint8_t) override;
+  void frameMaskFlag(uint8_t) override;
+  void frameMaskingKey() override;
+  void frameExtendedLength(uint64_t) override;
   void frameDataStart() override;
   void frameData(uint8_t*, uint64_t) override;
   void frameDataEnd() override;

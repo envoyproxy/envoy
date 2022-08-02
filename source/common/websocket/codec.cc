@@ -36,17 +36,17 @@ bool Decoder::frameStart(uint8_t flags_and_opcode) {
   return false;
 }
 
-uint8_t Decoder::frameMaskAndLength(uint8_t mask_and_length) {
+void Decoder::frameMaskFlag(uint8_t mask_and_length) {
   // Set masked flag
   if (mask_and_length & 0x80) {
     frame_.is_masked_ = true;
+    masking_key_length_ = 4;
   }
   // Set length (0 to 125) or length flag (126 or 127)
-  uint8_t length = mask_and_length & 0x7F;
-  frame_.payload_length_ = length;
-  frame_.payload_ = std::make_unique<Buffer::OwnedImpl>();
-  return length;
+  length_ = mask_and_length & 0x7F;
 }
+
+void Decoder::frameMaskingKey() { frame_.masking_key_ = masking_key_; }
 
 void Decoder::frameDataStart() {
   frame_.payload_length_ = length_;
@@ -81,17 +81,87 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
         j++;
         break;
       case State::FhMaskFlagAndLength:
-        frameMaskAndLength(c);
-        state_ = State::FhExtendedLength;
+        frameMaskFlag(c);
+        if (length_ == 0x7e) {
+          length_of_extended_length_ = 2;
+          length_ = 0;
+          state_ = State::FhExtendedLength;
+        } else if (length_ == 0x7f) {
+          length_of_extended_length_ = 8;
+          length_ = 0;
+          state_ = State::FhExtendedLength;
+        } else if (masking_key_length_ > 0) {
+          state_ = State::FhMaskingKey;
+        } else {
+          frameDataStart();
+          if (length_ == 0) {
+            frameDataEnd();
+            state_ = State::FhFlagsAndOpcode;
+          } else {
+            state_ = State::Payload;
+          }
+        }
         mem++;
         j++;
         break;
       case State::FhExtendedLength:
-      case State::FhMaskingKey:
-      case State::Payload:
-      default:
+        if (length_of_extended_length_ == 1) {
+          length_ |= static_cast<uint32_t>(c);
+        } else {
+          length_ |= static_cast<uint32_t>(c) << 8 * (length_of_extended_length_ - 1);
+        }
+        length_of_extended_length_--;
+        if (length_of_extended_length_ == 0) {
+          if (masking_key_length_ > 0) {
+            state_ = State::FhMaskingKey;
+          } else {
+            frameDataStart();
+            if (length_ == 0) {
+              frameDataEnd();
+              state_ = State::FhFlagsAndOpcode;
+            } else {
+              state_ = State::Payload;
+            }
+          }
+        }
         mem++;
         j++;
+      case State::FhMaskingKey:
+        if (masking_key_length_ == 1) {
+          masking_key_ |= static_cast<uint32_t>(c);
+        } else {
+          masking_key_ |= static_cast<uint32_t>(c) << 8 * (masking_key_length_ - 1);
+        }
+        masking_key_length_--;
+        if (masking_key_length_ == 0) {
+          frameMaskingKey();
+          frameDataStart();
+          if (length_ == 0) {
+            frameDataEnd();
+            state_ = State::FhFlagsAndOpcode;
+          } else {
+            state_ = State::Payload;
+          }
+        }
+        mem++;
+        j++;
+      case State::Payload:
+        uint64_t remain_in_buffer = slice.len_ - j;
+        if (remain_in_buffer <= length_) {
+          frameData(mem, remain_in_buffer);
+          mem += remain_in_buffer;
+          j += remain_in_buffer;
+          length_ -= remain_in_buffer;
+        } else {
+          frameData(mem, length_);
+          mem += length_;
+          j += length_;
+          length_ = 0;
+        }
+        if (length_ == 0) {
+          frameDataEnd();
+          state_ = State::FhFlagsAndOpcode;
+        }
         break;
       }
     }
@@ -101,6 +171,3 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
 
 } // namespace WebSocket
 } // namespace Envoy
-
-// there is a reason to go one byte at a time as 
-// the consecutive bytes might be in consecutive slices
