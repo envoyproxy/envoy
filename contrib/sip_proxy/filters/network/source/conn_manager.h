@@ -121,7 +121,7 @@ class ConnectionManager : public Network::ReadFilter,
 public:
   ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                     TimeSource& time_system, Server::Configuration::FactoryContext& context,
-                    std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connections_info);
+                    std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connections_info, std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstream_transaction_info);
   ~ConnectionManager() override;
 
   // Network::ReadFilter
@@ -163,6 +163,8 @@ public:
 private:
   friend class SipConnectionManagerTest;
   friend class DownstreamConnectionInfos; // Needs to access DownstreamConnectionInfoItem private inner class
+  friend class UpstreamTransactionsInfo; // Needs to access UpstreamActiveTrans private inner class
+  friend struct ThreadLocalUpstreamTransactionsInfo; // Needs to access UpstreamActiveTrans private inner class
 
   struct ActiveTrans;
 
@@ -226,6 +228,9 @@ private:
     std::shared_ptr<DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return parent_.downstreamConnectionInfos();
     }
+    std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstreamTransactionInfo() override {
+      return parent_.upstreamTransactionInfo();
+    }
     std::shared_ptr<SipSettings> settings() const override { return parent_.settings(); }
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
       return parent_.traHandler();
@@ -278,16 +283,7 @@ private:
           metadata_(metadata) {
       parent.stats_.request_active_.inc();
     }
-    ~ActiveTrans() override {
-      ENVOY_LOG(info, "ActiveTrans Dtor");
-      request_timer_->complete();
-      parent_.stats_.request_active_.dec();
-
-      parent_.eraseActiveTransFromPendingList(transaction_id_);
-      for (auto& filter : decoder_filters_) {
-        filter->handle_->onDestroy();
-      }
-    }
+    ~ActiveTrans() override {}
 
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
@@ -299,16 +295,21 @@ private:
     void pushIntoPendingList(const std::string& type, const std::string& key,
                              SipFilters::DecoderFilterCallbacks& activetrans,
                              std::function<void(void)> func) override {
-      return parent_.pushIntoPendingList(type, key, activetrans, func);
+      UNREFERENCED_PARAMETER(type);
+      UNREFERENCED_PARAMETER(key);
+      UNREFERENCED_PARAMETER(activetrans);
+      UNREFERENCED_PARAMETER(func);   
     }
     void onResponseHandleForPendingList(
         const std::string& type, const std::string& key,
         std::function<void(MessageMetadataSharedPtr metadata, DecoderEventHandler&)> func)
         override {
-      return parent_.onResponseHandleForPendingList(type, key, func);
+      UNREFERENCED_PARAMETER(type);
+      UNREFERENCED_PARAMETER(key);
+      UNREFERENCED_PARAMETER(func);
     }
     void eraseActiveTransFromPendingList(std::string& transaction_id) override {
-      return parent_.eraseActiveTransFromPendingList(transaction_id);
+      UNREFERENCED_PARAMETER(transaction_id);
     }
 
     // SipFilters::DecoderFilterCallbacks
@@ -329,6 +330,9 @@ private:
     }
     std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return parent_.downstream_connection_infos_;
+    }
+    std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstreamTransactionInfo() override {
+      return parent_.upstream_transaction_info_;
     }
     std::shared_ptr<SipSettings> settings() const override { return parent_.config_.settings(); }
     void onReset() override;
@@ -377,12 +381,44 @@ private:
     std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   };
 
+  struct DownstreamActiveTrans : public ActiveTrans {
+    DownstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
+        : ActiveTrans(parent, metadata) {}
+
+    ~DownstreamActiveTrans() override {
+      ENVOY_LOG(debug, "DownstreamActiveTrans Dtor");
+      request_timer_->complete();
+      parent_.stats_.request_active_.dec();
+
+      parent_.eraseActiveTransFromPendingList(transaction_id_);
+      for (auto& filter : decoder_filters_) {
+        filter->handle_->onDestroy();
+      }
+    }
+
+    // PendingListHandler
+    void pushIntoPendingList(const std::string& type, const std::string& key,
+                             SipFilters::DecoderFilterCallbacks& activetrans,
+                             std::function<void(void)> func) override {
+      return parent_.pushIntoPendingList(type, key, activetrans, func);
+    }
+    void onResponseHandleForPendingList(
+        const std::string& type, const std::string& key,
+        std::function<void(MessageMetadataSharedPtr metadata, DecoderEventHandler&)> func)
+        override {
+      return parent_.onResponseHandleForPendingList(type, key, func);
+    }
+    void eraseActiveTransFromPendingList(std::string& transaction_id) override {
+      return parent_.eraseActiveTransFromPendingList(transaction_id);
+    }
+  };
+
   struct UpstreamActiveTrans : public ActiveTrans {
     UpstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
         : ActiveTrans(parent, metadata) {}
 
     ~UpstreamActiveTrans() override {
-       ENVOY_LOG(info, "UpstreamActiveTrans Dtor");
+       ENVOY_LOG(debug, "UpstreamActiveTrans Dtor");
     }
 
     // DecoderEventHandler
@@ -390,27 +426,6 @@ private:
       ENVOY_LOG(debug, "Setting destination for response recvd from downstream: {}", destination_);
       metadata->setDestination(destination_); // response should have affinity to the upstream request
       return ActiveTrans::transportBegin(metadata);
-    }
-
-    // PendingListHandler
-    void pushIntoPendingList(const std::string& type, const std::string& key,
-                             SipFilters::DecoderFilterCallbacks& activetrans,
-                             std::function<void(void)> func) override {
-      UNREFERENCED_PARAMETER(type);
-      UNREFERENCED_PARAMETER(key);
-      UNREFERENCED_PARAMETER(activetrans);
-      UNREFERENCED_PARAMETER(func);   
-    }
-    void onResponseHandleForPendingList(
-        const std::string& type, const std::string& key,
-        std::function<void(MessageMetadataSharedPtr metadata, DecoderEventHandler&)> func)
-        override {
-      UNREFERENCED_PARAMETER(type);
-      UNREFERENCED_PARAMETER(key);
-      UNREFERENCED_PARAMETER(func);
-    }
-    void eraseActiveTransFromPendingList(std::string& transaction_id) override {
-      UNREFERENCED_PARAMETER(transaction_id);
     }
 
     // SipFilters::DecoderFilterCallbacks
@@ -482,6 +497,9 @@ private:
     std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return nullptr;
     }
+    std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstreamTransactionInfo() override {
+      return parent_.upstream_transaction_info_;
+    }
     
     void onReset() override {};
 
@@ -546,12 +564,10 @@ private:
 
   std::optional<IngressID> local_ingress_id_;
 
-  // could probably use unique_ptr..
-  absl::flat_hash_map<std::string, std::shared_ptr<UpstreamActiveTrans>> upstream_transactions_;
-
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos_;
+  std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstream_transaction_info_;
   PendingList pending_list_;
 };
 
@@ -577,6 +593,49 @@ public:
 private:
   ThreadLocal::SlotPtr tls_;
 };
+
+// TODO Idea for getting upstream transactions cache in TLS as common to all, review it
+
+struct ThreadLocalUpstreamTransactionsInfo : public ThreadLocal::ThreadLocalObject,
+                                    public Logger::Loggable<Logger::Id::filter> {
+  ThreadLocalUpstreamTransactionsInfo(std::shared_ptr<UpstreamTransactionsInfo> parent, Event::Dispatcher& dispatcher, std::chrono::milliseconds transaction_timeout)
+      : parent_(parent), dispatcher_(dispatcher), transaction_timeout_(transaction_timeout) {
+    if (!Thread::MainThread::isMainThread()) {
+      audit_timer_ = dispatcher.createTimer([this]() -> void { auditTimerAction(); });
+      audit_timer_->enableTimer(std::chrono::seconds(2));
+    }
+  }
+  
+  void auditTimerAction();
+
+  absl::flat_hash_map<std::string, std::shared_ptr<ConnectionManager::UpstreamActiveTrans>> upstream_transaction_info_map_{};
+
+  std::shared_ptr<UpstreamTransactionsInfo> parent_;
+  Event::Dispatcher& dispatcher_;
+  Event::TimerPtr audit_timer_;
+  std::chrono::milliseconds transaction_timeout_;
+};
+
+class UpstreamTransactionsInfo : public std::enable_shared_from_this<UpstreamTransactionsInfo>,
+                        Logger::Loggable<Logger::Id::connection> {
+public:
+  UpstreamTransactionsInfo(ThreadLocal::SlotAllocator& tls, std::chrono::milliseconds transaction_timeout)
+      : tls_(tls.allocateSlot()), transaction_timeout_(transaction_timeout) {}
+  ~UpstreamTransactionsInfo() = default;
+
+  void init();
+
+  void insertTransaction(std::string transaction_id, std::shared_ptr<ConnectionManager::UpstreamActiveTrans> active_trans);
+  void deleteTransaction(std::string&& transaction_id);
+  bool hasTransaction(std::string& transaction_id);
+  std::shared_ptr<ConnectionManager::UpstreamActiveTrans> getTransaction(std::string& transaction_id);
+  size_t size();
+
+private:
+  ThreadLocal::SlotPtr tls_;
+  std::chrono::milliseconds transaction_timeout_;
+};
+
 } // namespace SipProxy
 } // namespace NetworkFilters
 } // namespace Extensions

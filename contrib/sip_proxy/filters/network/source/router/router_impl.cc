@@ -820,8 +820,6 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       return FilterStatus::StopIteration;
     }
 
-    //TODO This parent_ can write over the upstream channel
-
     ENVOY_LOG(debug, "Got upstream request from host={},cluster={}. For downstream-connection={}",
               parent_.getUpstreamHost()->address()->ip()->addressAsString(),  parent_.route()->routeEntry()->clusterName(), downstream_conn_id);
 

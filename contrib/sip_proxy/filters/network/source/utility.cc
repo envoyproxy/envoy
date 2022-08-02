@@ -30,6 +30,7 @@ void PendingList::pushIntoPendingList(const std::string& type, const std::string
 void PendingList::eraseActiveTransFromPendingList(std::string& transaction_id) {
   ENVOY_LOG(debug, "ERASE {} from PendigList", transaction_id);
   for (auto& item : pending_list_) {
+    ENVOY_LOG(debug, "ERASING TEST {} from PendigList", item.first);
     for (auto it = item.second.begin(); it != item.second.end();) {
       if ((*it).get().transactionId() == transaction_id) {
         // TODO timeout handle this transaction, need send 408 timeout
