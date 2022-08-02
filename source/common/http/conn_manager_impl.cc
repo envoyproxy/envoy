@@ -867,7 +867,7 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
   return ip->port();
 }
 
-bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
+bool ConnectionManagerImpl::ActiveStream::validateHeaders(bool end_stream) {
   if (header_validator_) {
     auto validation_result = header_validator_->validateRequestHeaderMap(*request_headers_);
     if (!validation_result.ok()) {
@@ -887,6 +887,8 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
       }
 
+      // We have to make sure that the stream is ready to be closed.
+      maybeEndDecode(end_stream);
       sendLocalReply(response_code, "", modify_headers, grpc_status, validation_result.details());
       return false;
     }
@@ -931,6 +933,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   const Protocol protocol = connection_manager_.codec_->protocol();
   state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
 
+  ENVOY_STREAM_LOG(debug, "validating headers: saw_connection_close={}", *this, static_cast<int>(state_.saw_connection_close_));
+  if (!validateHeaders(end_stream)) {
+    ENVOY_STREAM_LOG(debug, "request headers validation failed: saw_connection_close={}\n{}", *this, static_cast<int>(state_.saw_connection_close_), *request_headers_);
+    return;
+  }
+
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_.isRoutable()) {
     if (connection_manager_.config_.routeConfigProvider() != nullptr) {
@@ -946,11 +954,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   // We end the decode here to mark that the downstream stream is complete.
   maybeEndDecode(end_stream);
-
-  if (!validateHeaders()) {
-    ENVOY_STREAM_LOG(debug, "request headers validation failed:\n{}", *this, *request_headers_);
-    return;
-  }
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.random_generator_.bernoulli(
