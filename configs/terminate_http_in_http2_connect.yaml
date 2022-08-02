@@ -1,7 +1,5 @@
-# This configuration terminates a CONNECT request and sends the CONNECT payload upstream.
-# It can be used to test TCP tunneling as described in
-# https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
-# or used to test CONNECT directly, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com`
+# This configuration terminates h2 CONNECT on port 10001 and then chains an HTTP filter that always responds with 200 using
+# an internal listener.
 admin:
   address:
     socket_address:
