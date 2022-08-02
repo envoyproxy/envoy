@@ -394,7 +394,8 @@ void AdminImpl::getHelp(Buffer::Instance& response) {
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   for (const UrlHandler* handler : sortedHandlers()) {
-    response.add(fmt::format("  {}: {}\n", handler->prefix_, handler->help_text_));
+    const absl::string_view method = handler->mutates_server_state_ ? " (POST)" : "";
+    response.add(fmt::format("  {}{}: {}\n", handler->prefix_, method, handler->help_text_));
     for (const ParamDescriptor& param : handler->params_) {
       response.add(fmt::format("      {}: {}", param.id_, param.help_));
       if (param.type_ == ParamDescriptor::Type::Enum) {
