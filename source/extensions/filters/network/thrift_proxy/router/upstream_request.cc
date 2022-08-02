@@ -234,6 +234,7 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
 
   releaseConnection(false);
   if (!end_downstream && request_complete_) {
+    ENVOY_LOG(debug, "reset parent callbacks");
     parent_.onReset();
   }
 }
@@ -321,6 +322,11 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     // downstream.
     if (response_underflow_ || response_state_ == ResponseState::Started) {
       ENVOY_LOG(debug, "reset downstream connection for a partial or underflow response");
+      if (response_underflow_) {
+        stats_.incCloseUnderflowResponse(parent_.cluster());
+      } else {
+        stats_.incClosePartialResponse(parent_.cluster());
+      }
       parent_.resetDownstreamConnection();
     } else if (response_state_ == ResponseState::None) {
       close_downstream = close_downstream_on_error_;
