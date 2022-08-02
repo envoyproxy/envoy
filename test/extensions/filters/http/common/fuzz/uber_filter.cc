@@ -98,8 +98,8 @@ void UberFilterFuzzer::fuzz(
   // Most filters should have finished processing during runData, but filters that
   // rely on an additional thread (e.g. for file system interaction) may need to wait
   // for the worker thread to complete the filter's task.
-  // We can't use a time-based timeout for this, as the linter forbids use of clock
-  // time, and fake time isn't useful for allowing other threads to complete work.
+  // We can't use a time-based timeout for this, as lint forbids use of clock time,
+  // and fake time isn't useful for allowing other threads to complete work.
   int loop_cycles = 5000;
   while (!isFilterFinished() && --loop_cycles > 0) {
     worker_thread_dispatcher_->run(Event::DispatcherImpl::RunType::NonBlock);
