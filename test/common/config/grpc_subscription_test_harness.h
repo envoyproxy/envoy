@@ -61,7 +61,8 @@ public:
       mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *method_descriptor_, random_, stats_store_, rate_limit_settings_, true,
-          std::move(config_validators_), /*xds_resources_delegate=*/nullptr);
+          std::move(config_validators_), /*xds_resources_delegate=*/nullptr,
+          /*target_xds_authority=*/"");
     }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         mux_, callbacks_, resource_decoder_, stats_, Config::TypeUrl::get().ClusterLoadAssignment,

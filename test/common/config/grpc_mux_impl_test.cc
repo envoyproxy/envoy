@@ -62,7 +62,7 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, stats_, rate_limit_settings_, true, std::move(config_validators_),
-        /*xds_resources_delegate=*/nullptr);
+        /*xds_resources_delegate=*/nullptr, /*target_xds_authority=*/"");
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
@@ -71,7 +71,7 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, stats_, custom_rate_limit_settings, true, std::move(config_validators_),
-        /*xds_resources_delegate=*/nullptr);
+        /*xds_resources_delegate=*/nullptr, /*target_xds_authority=*/"");
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -888,7 +888,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, stats_, rate_limit_settings_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
-          /*xds_resources_delegate=*/nullptr),
+          /*xds_resources_delegate=*/nullptr, /*target_xds_authority=*/""),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -903,7 +903,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, stats_, rate_limit_settings_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
-          /*xds_resources_delegate=*/nullptr),
+          /*xds_resources_delegate=*/nullptr, /*target_xds_authority=*/""),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
