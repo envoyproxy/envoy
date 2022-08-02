@@ -132,6 +132,10 @@ void MessageMetadata::removeXEnvoyOriginIngressHeader() {
   removeMsgHeader(HeaderType::XEnvoyOriginIngress);
 }
 
+bool MessageMetadata::checkXEnvoyOriginIngressHeaderExists() {
+  return checkMsgHeaderExists(HeaderType::XEnvoyOriginIngress);
+}
+
 void MessageMetadata::addNewMsgHeader(HeaderType type,  absl::string_view value) {
   if (new_headers_pos_ == 0) {
     // place new headers before the content headers
@@ -145,6 +149,8 @@ void MessageMetadata::addNewMsgHeader(HeaderType type,  absl::string_view value)
   setOperation(
     Operation(OperationType::Insert, new_headers_pos_, 
     InsertOperationValue(std::move(header))));
+
+  addMsgHeader(type, value);
 }
 
 void MessageMetadata::removeMsgHeader(HeaderType type) {
@@ -154,6 +160,13 @@ void MessageMetadata::removeMsgHeader(HeaderType type) {
     auto len_removal = end_removal_pos - init_removal_pos + 2;
     setOperation(Operation(OperationType::Delete, init_removal_pos, DeleteOperationValue(len_removal)));
   }
+  headers_[type].clear();
+}
+
+bool MessageMetadata::checkMsgHeaderExists(HeaderType type) {
+  auto init_removal_pos = raw_msg_.find(HeaderTypes::get().header2Str(type).data());
+  auto end_removal_pos = raw_msg_.find("\r\n", init_removal_pos);
+  return ((init_removal_pos != std::string::npos) && (end_removal_pos != std::string::npos));
 }
 
 void MessageMetadata::addEPOperation(

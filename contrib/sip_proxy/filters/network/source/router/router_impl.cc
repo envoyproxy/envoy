@@ -293,6 +293,11 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   // - move this somewhere more appropriate??
   // - only add the header if does not already exist - / need to revisit this - see security considerations
   // - only add the header if the outbound-transactions feature is enabled for the cluster (may need to move this to the router where we have the route config)
+  if (metadata->checkXEnvoyOriginIngressHeaderExists()) {
+    ENVOY_STREAM_LOG(info, "X-Envoy-Origin-Ingress header existing in incoming message, removing it for being replaced ...", *callbacks_);
+    metadata->removeXEnvoyOriginIngressHeader();
+  }
+  ENVOY_STREAM_LOG(debug, "Adding X-Envoy-Origin-Ingress header ...", *callbacks_);
   metadata->addXEnvoyOriginIngressHeader(callbacks_->ingressID());
   
   if (upstream_request_ != nullptr) {
