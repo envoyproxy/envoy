@@ -137,7 +137,7 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
 absl::StatusOr<Matchers::StringMatcherPtr>
 buildNameMatcher(const Http::Utility::QueryParams& params) {
   const auto name_regex = Utility::queryParam(params, "name_regex");
-  if (!name_regex.has_value()) {
+  if (!name_regex.has_value() || name_regex->empty()) {
     return std::make_unique<Matchers::UniversalStringMatcher>();
   }
   envoy::type::matcher::v3::RegexMatcher matcher;
