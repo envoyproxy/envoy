@@ -200,6 +200,22 @@ void Utility::extractCommonAccessLogProperties(
 
     auto* local_tls_cipher_suite = tls_properties->mutable_tls_cipher_suite();
     local_tls_cipher_suite->set_value(downstream_ssl_connection->ciphersuiteId());
+    
+    if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
+     tls_properties->set_ja3_fingerprint(
+        std::string(stream_info.downstreamAddressProvider().ja3Hash()));
+    }
+  } else if (stream_info.downstreamAddressProvider().requestedServerName() != nullptr) {
+    // Otherwise check if the requested server name is present if when the conection is not a tls connection.
+    // This is true when the TLS inspector is used to check the sni name, but envoy does not terminate the tls connection.
+    auto* tls_properties = common_access_log.mutable_tls_properties();
+    tls_properties->set_tls_sni_hostname(
+      std::string(stream_info.downstreamAddressProvider().requestedServerName()));
+    
+    if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
+      tls_properties->set_ja3_fingerprint(
+        std::string(stream_info.downstreamAddressProvider().ja3Hash()));
+    }
   }
   common_access_log.mutable_start_time()->MergeFrom(
       Protobuf::util::TimeUtil::NanosecondsToTimestamp(
@@ -207,8 +223,14 @@ void Utility::extractCommonAccessLogProperties(
               stream_info.startTime().time_since_epoch())
               .count()));
 
+  absl::optional<std::chrono::nanoseconds> dur = stream_info.requestComplete();
+  if (dur) {
+    common_access_log.mutable_duration()->MergeFrom(
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
+  }
+
   StreamInfo::TimingUtility timing(stream_info);
-  absl::optional<std::chrono::nanoseconds> dur = timing.lastDownstreamRxByteReceived();
+  dur = timing.lastDownstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_last_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
@@ -270,6 +292,14 @@ void Utility::extractCommonAccessLogProperties(
   }
   if (!stream_info.getRouteName().empty()) {
     common_access_log.set_route_name(stream_info.getRouteName());
+  }
+  if (stream_info.attemptCount().has_value()) {
+    common_access_log.set_upstream_request_attempt_count(
+       stream_info.attemptCount().value());
+  }
+  if (stream_info.connectionTerminationDetails().has_value()) {
+    common_access_log.set_connection_termination_details(
+       stream_info.connectionTerminationDetails().value());
   }
 
   responseFlagsToAccessLogResponseFlags(common_access_log, stream_info);
