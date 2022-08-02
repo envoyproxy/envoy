@@ -8,9 +8,33 @@ using the system network API. A listener that accepts user space connections is 
 internal listener :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>` identifies the server for a client
 :ref:`internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>`.
 
-.. note::
-  Internal listeners require :ref:`the bootstrap extension
-  <envoy_v3_api_msg_extensions.bootstrap.internal_listener.v3.InternalListener>` to be enabled.
+To utilize internal listeners, several components need to be configured in conjunction. First, :ref:`the bootstrap
+extension <envoy_v3_api_msg_extensions.bootstrap.internal_listener.v3.InternalListener>` must be enabled. This extension
+registers a client connection factory that allows internal listeners to accept connections from within Envoy. Second, an
+internal listener must be defined:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.config.listener.v3.Listener
+
+  name: internal_listener
+  internal_listener: {}
+  filter_chains:
+  - filters: []
+
+Third, an upstream cluster must include an endpoint with an internal address referencing the internal listener by name:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.config.cluster.v3.Cluster
+
+  name: cluster_0
+  load_assignment:
+    cluster_name: cluster_0
+    endpoints:
+    - lb_endpoints:
+      - endpoint:
+          address:
+            envoy_internal_address:
+              server_listener_name: internal_listener
 
 Internal upstream transport
 ---------------------------
@@ -20,7 +44,8 @@ Internal upstream transport
 extension enables exchange of the filter state from the downstream listener to
 the internal listener through a user space socket. This additional state can be
 in the form of the resource metadata obtained from the upstream host or
-:ref:`the filter state objects <arch_overview_data_sharing_between_filters>`.
+:ref:`the filter state objects <arch_overview_data_sharing_between_filters>`. This is an optional
+extension that may be added to the upstream clusters with internal addresses.
 
 This extension emits the following statistics:
 
@@ -29,6 +54,15 @@ This extension emits the following statistics:
    :widths: 1, 1, 2
 
    no_metadata, Counter, Metadata key is absent from the import location.
+
+
+Endpoint disambiguation
+-----------------------
+
+In case there are multiple endpoints referencing the same internal listener in a single upstream cluster, use
+:ref:`endpoint ID field <envoy_v3_api_field_config.core.v3.EnvoyInternalAddress.endpoint_id>` to improve change tracking
+in the cluster pool. This field in combination with the internal listener name uniquely identify an endpoint in the
+pool.
 
 Examples
 --------

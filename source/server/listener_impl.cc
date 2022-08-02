@@ -532,14 +532,15 @@ void ListenerImpl::buildAccessLog() {
 
 void ListenerImpl::buildInternalListener() {
   if (config_.has_internal_listener()) {
-    if (config_.has_address()) {
+    if (config_.has_address() || !config_.additional_addresses().empty()) {
       throw EnvoyException(fmt::format("error adding listener '{}': address should not be used "
                                        "when an internal listener config is provided",
                                        name_));
     }
     if (config_.has_api_listener()) {
       throw EnvoyException(fmt::format(
-          "error adding listener '{}': internal address cannot be used in api listener", name_));
+          "error adding listener named '{}': internal address cannot be used in api listener",
+          name_));
     }
     if ((config_.has_connection_balance_config() &&
          config_.connection_balance_config().has_exact_balance()) ||
@@ -548,26 +549,32 @@ void ListenerImpl::buildInternalListener() {
         || (config_.has_freebind() && config_.freebind().value()) ||
         config_.has_tcp_backlog_size() || config_.has_tcp_fast_open_queue_length() ||
         (config_.has_transparent() && config_.transparent().value())) {
-      throw EnvoyException(
-          fmt::format("error adding listener '{}': has unsupported tcp listener feature", name_));
+      throw EnvoyException(fmt::format(
+          "error adding listener named '{}': has unsupported tcp listener feature", name_));
     }
     if (!config_.socket_options().empty()) {
       throw EnvoyException(
-          fmt::format("error adding listener '{}': does not support socket option", name_));
+          fmt::format("error adding listener named '{}': does not support socket option", name_));
     }
     std::shared_ptr<Network::InternalListenerRegistry> internal_listener_registry =
         parent_.server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
             "internal_listener_registry_singleton");
     if (internal_listener_registry == nullptr) {
       throw EnvoyException(fmt::format(
-          "error adding listener '{}': internal listener registry is not initialized.", name_));
+          "error adding listener named '{}': internal listener registry is not initialized.",
+          name_));
     }
     internal_listener_config_ =
         std::make_unique<InternalListenerConfigImpl>(*internal_listener_registry);
-  } else if (config_.address().has_envoy_internal_address()) {
-    throw EnvoyException(fmt::format(
-        "error adding listener '{}': use internal listener field instead of internal address",
-        name_));
+  } else if (config_.address().has_envoy_internal_address() ||
+             std::any_of(config_.additional_addresses().begin(),
+                         config_.additional_addresses().end(),
+                         [](const envoy::config::listener::v3::AdditionalAddress& proto_address) {
+                           return proto_address.address().has_envoy_internal_address();
+                         })) {
+    throw EnvoyException(fmt::format("error adding listener named '{}': use internal_listener "
+                                     "field instead of address for internal listeners",
+                                     name_));
   }
 }
 

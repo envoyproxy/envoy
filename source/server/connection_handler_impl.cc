@@ -131,11 +131,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       }
     } else if (absl::holds_alternative<std::reference_wrapper<Network::InternalListener>>(
                    per_address_details->typed_listener_)) {
-      if (per_address_details->address_->type() == Network::Address::Type::EnvoyInternal) {
-        internal_listener_map_by_address_.insert_or_assign(
-            per_address_details->address_->envoyInternalAddress()->addressId(),
-            per_address_details);
-      }
+      internal_listener_map_by_address_.insert_or_assign(
+          per_address_details->address_->envoyInternalAddress()->addressId(), per_address_details);
     }
   }
   listener_map_by_tag_.emplace(config.listenerTag(), std::move(details));
@@ -286,7 +283,7 @@ ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstShared
   if (auto listener_it =
           internal_listener_map_by_address_.find(address->envoyInternalAddress()->addressId());
       listener_it != internal_listener_map_by_address_.end()) {
-    return Network::InternalListenerOptRef(listener_it->second->internalListener().value().get());
+    return {listener_it->second->internalListener().value().get()};
   }
   return OptRef<Network::InternalListener>();
 }

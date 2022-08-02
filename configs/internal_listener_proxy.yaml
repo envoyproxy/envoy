@@ -1,11 +1,5 @@
 # This configuration listens on port 9999 and creates TCP connections to port 10000 using an
 # intermediate internal listener.
-admin:
-  address:
-    socket_address:
-      protocol: TCP
-      address: 127.0.0.1
-      port_value: 9904
 bootstrap_extensions:
   - name: envoy.bootstrap.internal_listener
     typed_config:

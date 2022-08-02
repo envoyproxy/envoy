@@ -808,7 +808,8 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
                             EnvoyException,
-                            "listener foo: internal address doesn't support multiple addresses.");
+                            "error adding listener named 'foo': use internal_listener field "
+                            "instead of address for internal listeners");
 
   const std::string yaml2 = R"EOF(
     name: "foo"
@@ -830,7 +831,8 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true),
                             EnvoyException,
-                            "listener foo: internal address doesn't support multiple addresses.");
+                            "error adding listener named 'foo': use internal_listener field "
+                            "instead of address for internal listeners");
 
   const std::string yaml3 = R"EOF(
     name: "foo"
@@ -849,7 +851,8 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml3), "", true),
                             EnvoyException,
-                            "listener foo: internal address doesn't support multiple addresses.");
+                            "error adding listener named 'foo': use internal_listener field "
+                            "instead of address for internal listeners");
 }
 
 TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
@@ -979,9 +982,9 @@ TEST_P(ListenerManagerImplTest, RejectListenerWithInternalListenerAddress) {
     - filters: []
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-      "error adding listener 'foo': use internal listener field instead of internal address");
+  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+                            "error adding listener named 'foo': use internal_listener field "
+                            "instead of address for internal listeners");
 }
 
 TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
@@ -1010,14 +1013,14 @@ TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
     EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(new_listener, "version", *manager_, "foo", true,
                                                false, /*hash=*/static_cast<uint64_t>(0)),
                               EnvoyException,
-                              "error adding listener 'foo': has "
+                              "error adding listener named 'foo': has "
                               "unsupported tcp listener feature");
   }
   {
     auto new_listener = listener;
     new_listener.mutable_socket_options()->Add();
     EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(new_listener), EnvoyException,
-                              "error adding listener 'foo': does "
+                              "error adding listener named 'foo': does "
                               "not support socket option")
   }
   {
