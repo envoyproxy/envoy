@@ -9,7 +9,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/test_common/utility.h"
-#include <chrono>
 
 namespace Envoy {
 namespace Extensions {
