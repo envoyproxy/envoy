@@ -119,7 +119,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: service
                 port_value: 8080
 admin:
   address:
