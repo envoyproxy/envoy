@@ -227,8 +227,8 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
     }
     ENVOY_BUG(false,
               absl::StrCat(
-                  "Unhandled CacheEntryStatus encountered when retrieving request cache status: ",
-                  filter_state));
+                  "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
+                  std::to_string(static_cast<int>(filter_state))));
     return LookupStatus::Unknown;
   }
   // Either decodeHeaders decided not to do a cache lookup (because the
