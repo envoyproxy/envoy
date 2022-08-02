@@ -2966,11 +2966,6 @@ TEST_P(Http1ServerConnectionImplTest, ManyTrailersIgnored) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   std::string exception_reason;
