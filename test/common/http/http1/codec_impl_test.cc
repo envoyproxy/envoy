@@ -3008,11 +3008,6 @@ TEST_P(Http1ServerConnectionImplTest, ManyRequestHeadersRejected) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   // Default limit of 60 KiB
   initialize();
 
@@ -3042,11 +3037,6 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejectedMaxConfigurable) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   max_request_headers_kb_ = 8192;
   max_request_headers_count_ = 150;
   initialize();
