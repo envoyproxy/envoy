@@ -1559,9 +1559,11 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ResponseTrailerMap& tra
   response_encoder_->encodeTrailers(trailers);
 }
 
-void ConnectionManagerImpl::ActiveStream::encodeMetadata(MetadataMapVector& metadata) {
-  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata);
-  response_encoder_->encodeMetadata(metadata);
+void ConnectionManagerImpl::ActiveStream::encodeMetadata(MetadataMapPtr&& metadata) {
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.emplace_back(std::move(metadata));
+  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata_map_vector);
+  response_encoder_->encodeMetadata(metadata_map_vector);
 }
 
 void ConnectionManagerImpl::ActiveStream::onDecoderFilterBelowWriteBufferLowWatermark() {

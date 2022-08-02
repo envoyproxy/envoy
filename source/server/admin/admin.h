@@ -83,10 +83,11 @@ public:
   //
   // The prefix must start with "/" and contain at least one additional character.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
-                  bool removable, bool mutates_server_state) override;
+                  bool removable, bool mutates_server_state,
+                  const ParamDescriptorVec& params = {}) override;
   bool addStreamingHandler(const std::string& prefix, const std::string& help_text,
-                           GenRequestFn callback, bool removable,
-                           bool mutates_server_state) override;
+                           GenRequestFn callback, bool removable, bool mutates_server_state,
+                           const ParamDescriptorVec& params = {}) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
@@ -220,17 +221,6 @@ private:
   friend class AdminTestingPeer;
 
   /**
-   * Individual admin handler including prefix, help text, and callback.
-   */
-  struct UrlHandler {
-    const std::string prefix_;
-    const std::string help_text_;
-    const GenRequestFn handler_;
-    const bool removable_;
-    const bool mutates_server_state_;
-  };
-
-  /**
    * Creates a Request from a url.
    */
   RequestPtr makeRequest(absl::string_view path_and_query, AdminStream& admin_stream);
@@ -239,7 +229,8 @@ private:
    * Creates a UrlHandler structure from a non-chunked callback.
    */
   UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
-                         HandlerCb callback, bool removable, bool mutates_state);
+                         HandlerCb callback, bool removable, bool mutates_state,
+                         const ParamDescriptorVec& params = {});
 
   /**
    * Creates a URL prefix bound to chunked handler. Handler is expected to
@@ -393,10 +384,6 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::ListenSocketFactory& listenSocketFactory() override {
-      ASSERT(parent_.socket_factories_.size() == 1);
-      return *parent_.socket_factories_[0];
-    }
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return parent_.socket_factories_;
     }

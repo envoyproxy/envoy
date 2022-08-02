@@ -185,21 +185,32 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
   }
 }
 
-Network::UdpListenerCallbacksOptRef
-ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag,
-                                               const Network::Address::Instance& address) {
-  auto listener = findActiveListenerByTag(listener_tag);
-  if (listener.has_value()) {
+ConnectionHandlerImpl::PerAddressActiveListenerDetailsOptRef
+ConnectionHandlerImpl::findPerAddressActiveListenerDetails(
+    const ConnectionHandlerImpl::ActiveListenerDetailsOptRef active_listener_details,
+    const Network::Address::Instance& address) {
+  if (active_listener_details.has_value()) {
     // If the tag matches this must be a UDP listener.
-    for (auto& details : listener->get().per_address_details_list_) {
+    for (auto& details : active_listener_details->get().per_address_details_list_) {
       if (*details->address_ == address) {
-        auto udp_listener = details->udpListener();
-        ASSERT(udp_listener.has_value());
-        return details->udpListener();
+        return *details;
       }
     }
   }
 
+  return absl::nullopt;
+}
+
+Network::UdpListenerCallbacksOptRef
+ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag,
+                                               const Network::Address::Instance& address) {
+  auto listener =
+      findPerAddressActiveListenerDetails(findActiveListenerByTag(listener_tag), address);
+  if (listener.has_value()) {
+    // If the tag matches this must be a UDP listener.
+    ASSERT(listener->get().udpListener().has_value());
+    return listener->get().udpListener();
+  }
   return absl::nullopt;
 }
 
@@ -313,16 +324,12 @@ ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
 Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
                                                const Network::Address::Instance& address) {
-  auto active_listener = findActiveListenerByTag(listener_tag);
+  auto active_listener =
+      findPerAddressActiveListenerDetails(findActiveListenerByTag(listener_tag), address);
   if (active_listener.has_value()) {
-    for (auto& details : active_listener->get().per_address_details_list_) {
-      if (*details->address_ == address) {
-        ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-                   details->typed_listener_) &&
-               details->listener_->listener() != nullptr);
-        return {details->tcpListener().value().get()};
-      }
-    }
+    // If the tag matches this must be a TCP listener.
+    ASSERT(active_listener->get().tcpListener().has_value());
+    return active_listener->get().tcpListener().value().get();
   }
   return absl::nullopt;
 }
