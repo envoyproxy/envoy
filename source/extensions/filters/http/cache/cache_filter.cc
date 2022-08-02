@@ -249,7 +249,7 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
   case FilterState::ResponseServedFromCache:
     ABSL_FALLTHROUGH_INTENDED;
   case FilterState::Destroyed:
-    ENVOY_BUG(false, absl::StrCat("Unexpected filter state in requestCacheStatus: "
+    ENVOY_LOG(error, absl::StrCat("Unexpected filter state in requestCacheStatus: "
                                   "lookup_result_ is empty but filter state is ",
                                   filter_state));
   }
@@ -458,7 +458,7 @@ void CacheFilter::handleCacheHit() {
 
 void CacheFilter::handleCacheHitWithRangeRequest() {
   if (!lookup_result_->range_details_.has_value()) {
-    ENVOY_BUG(false, "handleCacheHitWithRangeRequest() should not be called without "
+    ENVOY_LOG(error, "handleCacheHitWithRangeRequest() should not be called without "
                      "range_details being populated in lookup_result_");
     return;
   }
