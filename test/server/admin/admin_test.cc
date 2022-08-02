@@ -141,6 +141,7 @@ TEST_P(AdminInstanceTest, Help) {
       include_eds: Dump currently loaded configuration including EDS. See the response definition for more information
   /contention: dump current Envoy mutex contention stats (if enabled)
   /cpuprofiler: enable/disable the CPU profiler
+      enable: enables the CPU profiler; One of (y, n)
   /drain_listeners: drain listeners
       graceful: When draining listeners, enter a graceful drain period prior to closing listeners. This behaviour and duration is configurable via server options or CLI
       inboundonly: Drains all inbound listeners. traffic_direction field in envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a listener is inbound or outbound.

@@ -46,13 +46,13 @@ TEST_F(UtilsTest, HistogramMode) {
               HasSubstr("usage: /stats?histogram_buckets=(cumulative|disjoint|none)"));
 }
 
-TEST_F(UtilsTest, Query) {
-  EXPECT_FALSE(Utility::query("key").has_value());
+TEST_F(UtilsTest, QueryParam) {
+  EXPECT_FALSE(Utility::queryParam(query_, "key").has_value());
   query_["key"] = "";
-  EXPECT_FALSE(Utility::query("key").has_value());
+  EXPECT_FALSE(Utility::queryParam(query_, "key").has_value());
   query_["key"] = "value";
-  EXPECT_TRUE(Utility::query("key").has_value());
-  EXPECT_EQ("value", Utility::query("key").value());
+  EXPECT_TRUE(Utility::queryParam(query_, "key").has_value());
+  EXPECT_EQ("value", Utility::queryParam(query_, "key").value());
 }
 
 } // namespace Server

@@ -131,7 +131,7 @@ absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) 
 
 // Helper method to get the eds parameter.
 bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
-  return Utility::queryParam(params, "include_eds") != absl::nullopt;
+  return params.find("include_eds") != params.end();
 }
 
 absl::StatusOr<Matchers::StringMatcherPtr>
