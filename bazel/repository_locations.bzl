@@ -1209,6 +1209,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-03-30",
         cpe = "N/A",
     ),
+    com_github_yasm_yasm = dict(
+        project_name = "Yasm assembler",
+        project_desc = "The Yasm Modular Assembler Project",
+        project_url = "https://yasm.tortall.net/",
+        version = "ffbd22cdc9d80f09decbfe5d5c6e6fdabba7f627",
+        sha256 = "953f762a8b88b4137e088aeced0cca1d85e7d4bbb8a43414c38c8408dc77a239",
+        strip_prefix = "yasm-{version}",
+        urls = ["https://github.com/yasm/yasm/archive/{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        release_date = "2022-01-27",
+        extensions = ["envoy.tls.key_providers.qat"],
+        cpe = "N/A",
+    ),
 )
 
 def _compiled_protoc_deps(locations, versions):

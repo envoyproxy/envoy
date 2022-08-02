@@ -1,0 +1,40 @@
+From 197aec7d0a7be6eaf0bbbb0c440a5b007ebd200a Mon Sep 17 00:00:00 2001
+From: Ismo Puustinen <ismo.puustinen@intel.com>
+Date: Tue, 2 Aug 2022 15:37:14 +0300
+Subject: [PATCH] autoconf: get exact path to YASM binary.
+
+Signed-off-by: Ismo Puustinen <ismo.puustinen@intel.com>
+---
+ Makefile.am  | 2 +-
+ configure.ac | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index c9ea85f..c411c1a 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -124,7 +124,7 @@ libcrc_SOURCES_DIR = quickassist/lookaside/access_layer/src/common/compression/
+ %.lo:
+ 	@echo "  CCAS     $(libcrc_SOURCES_DIR)$@"
+ 	@$(LIBTOOL) --mode=compile --quiet \
+-	yasm -f x64 -f elf64 -D LINUX -X gnu -g dwarf2 $(libcrc_SOURCES_DIR)$(@:.lo=.S) -o $@ -prefer-non-pic
++	$(YASM) -f x64 -f elf64 -D LINUX -X gnu -g dwarf2 $(libcrc_SOURCES_DIR)$(@:.lo=.S) -o $@ -prefer-non-pic
+ 
+ lib_LTLIBRARIES += lib@LIBQATNAME@.la
+ lib@LIBQATNAME@_la_SOURCES = \
+diff --git a/configure.ac b/configure.ac
+index 5c20fd4..c29461d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -122,7 +122,7 @@ else
+ fi
+ 
+ # Check for yasm
+-AC_CHECK_PROG(YASM, yasm, yes , no)
++AC_PATH_PROG(YASM, yasm, no)
+ if test "$YASM" = "no"; then
+     AC_MSG_ERROR([yasm required])
+ fi
+-- 
+2.37.1
+
