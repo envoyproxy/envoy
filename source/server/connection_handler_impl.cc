@@ -285,7 +285,7 @@ ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstShared
       listener_it != internal_listener_map_by_address_.end()) {
     return {listener_it->second->internalListener().value().get()};
   }
-  return OptRef<Network::InternalListener>();
+  return {};
 }
 
 ConnectionHandlerImpl::ActiveTcpListenerOptRef
