@@ -932,10 +932,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
   state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
-
-  ENVOY_STREAM_LOG(debug, "validating headers: saw_connection_close={}", *this, static_cast<int>(state_.saw_connection_close_));
   if (!validateHeaders(end_stream)) {
-    ENVOY_STREAM_LOG(debug, "request headers validation failed: saw_connection_close={}\n{}", *this, static_cast<int>(state_.saw_connection_close_), *request_headers_);
+    ENVOY_STREAM_LOG(debug, "request headers validation failed\n{}", *this, *request_headers_);
     return;
   }
 
