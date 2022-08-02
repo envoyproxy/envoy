@@ -99,13 +99,11 @@ void UberFilterFuzzer::fuzz(
   // Most filters should have finished processing during runData, but filters that
   // rely on an additional thread (e.g. for file system interaction) may need to wait
   // for the worker thread to complete the filter's task.
-  auto timeout = std::chrono::system_clock::now() + std::chrono::milliseconds(5000);
-  while (!isFilterFinished()) {
+  // We can't use a time-based timeout for this, as the linter forbids use of clock
+  // time, and fake time isn't useful for allowing other threads to complete work.
+  int loop_cycles = 5000;
+  while (!isFilterFinished() && --loop_cycles > 0) {
     worker_thread_dispatcher_->run(Event::DispatcherImpl::RunType::NonBlock);
-    auto now = std::chrono::system_clock::now();
-    if (now > timeout) {
-      throw EnvoyException("filter did not finish processing within timeout");
-    }
     // Apparently RunType::Block doesn't actually block if there's only a timer
     // event not ready to fire, so we use NonBlock for clarity, and this loop
     // spins. We yield to keep it from spinning too wildly. For almost all cases
@@ -113,6 +111,9 @@ void UberFilterFuzzer::fuzz(
     // the cases where the loop is useful, a few cycles should be enough to
     // complete unless the test is genuinely failing.
     std::this_thread::yield();
+  }
+  if (!isFilterFinished()) {
+    throw EnvoyException("filter did not finish processing");
   }
 
   reset();
