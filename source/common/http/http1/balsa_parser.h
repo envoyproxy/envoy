@@ -38,6 +38,7 @@ private:
   void OnRawBodyInput(absl::string_view input) override;
   void OnBodyChunkInput(absl::string_view input) override;
   void OnHeaderInput(absl::string_view input) override;
+  void OnHeader(absl::string_view key, absl::string_view value) override;
   void OnTrailerInput(absl::string_view input) override;
   void ProcessHeaders(const quiche::BalsaHeaders& headers) override;
   void ProcessTrailers(const quiche::BalsaHeaders& trailer) override;
@@ -65,6 +66,7 @@ private:
   quiche::BalsaHeaders trailers_;
 
   ParserCallbacks* connection_ = nullptr;
+  bool headers_done_ = false;
   ParserStatus status_ = ParserStatus::Ok;
   absl::string_view error_message_;
 };

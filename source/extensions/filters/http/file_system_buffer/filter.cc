@@ -399,9 +399,10 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
       // We can't use getSafeDispatcher here because we need to close the file if the filter
       // was deleted before the callback, not just do nothing.
       cancel_in_flight_async_action_ = config_->asyncFileManager().createAnonymousFile(
-          config_->storageBufferPath(), [this, me = std::weak_ptr(shared_from_this()),
-                                         dispatcher = &request_callbacks_->dispatcher(),
-                                         &state](absl::StatusOr<AsyncFileHandle> file_handle) {
+          config_->storageBufferPath(),
+          [this, me = std::weak_ptr<FileSystemBufferFilter>(shared_from_this()),
+           dispatcher = &request_callbacks_->dispatcher(),
+           &state](absl::StatusOr<AsyncFileHandle> file_handle) {
             dispatcher->post([this, me = std::move(me), &state, file_handle]() {
               if (!me.lock()) {
                 // If we opened a file but the filter went away in the meantime, close the file

@@ -65,7 +65,7 @@ message HTTPFault {
   common.fault.v3.FaultDelay delay = 1;
 
   // If specified, the filter will abort requests based on the values in
-  // the object. At least *abort* or *delay* must be specified.
+  // the object. At least ``abort`` or ``delay`` must be specified.
   FaultAbort abort = 2;
 
   // Specifies the name of the (destination) upstream cluster that the
@@ -81,7 +81,7 @@ message HTTPFault {
   // The filter will check the request's headers against all the specified
   // headers in the filter config. A match will happen if all the headers in the
   // config are present in the request with the same values (or based on
-  // presence if the *value* field is not in the config).
+  // presence if the ``value`` field is not in the config).
   repeated config.route.v3.HeaderMatcher headers = 4;
 
   // Faults are injected for the specified list of downstream hosts. If this

@@ -11,7 +11,10 @@ configure_make(
     name = "liburing",
     configure_in_place = True,
     lib_source = "@com_github_axboe_liburing//:all",
-    tags = ["skip_on_windows"],
+    tags = [
+        "nocompdb",
+        "skip_on_windows",
+    ],
 )
 
 # autotools packages are unusable on Windows as-is

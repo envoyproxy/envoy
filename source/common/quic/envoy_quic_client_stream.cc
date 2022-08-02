@@ -12,7 +12,7 @@
 
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
-#include "quiche/spdy/core/spdy_header_block.h"
+#include "quiche/spdy/core/http2_header_block.h"
 
 namespace Envoy {
 namespace Quic {
@@ -44,7 +44,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  auto spdy_headers = envoyHeadersToSpdyHeaderBlock(headers);
+  auto spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
   if (headers.Method()) {
     if (headers.Method()->value() == "CONNECT") {
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
@@ -131,7 +131,7 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
 
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
-    size_t bytes_sent = WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+    size_t bytes_sent = WriteTrailers(envoyHeadersToHttp2HeaderBlock(trailers), nullptr);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers");
   }
 
@@ -300,7 +300,7 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
       return;
     }
     quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
-    auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
+    auto trailers = http2HeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
         received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
         transform_rst);
     if (trailers == nullptr) {

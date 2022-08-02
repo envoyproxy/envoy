@@ -426,7 +426,6 @@ public:
 
   MOCK_METHOD(FilterChainManager&, filterChainManager, ());
   MOCK_METHOD(FilterChainFactory&, filterChainFactory, ());
-  MOCK_METHOD(ListenSocketFactory&, listenSocketFactory, ());
   MOCK_METHOD(std::vector<ListenSocketFactoryPtr>&, listenSocketFactories, ());
   MOCK_METHOD(bool, bindToPort, (), (const));
   MOCK_METHOD(bool, handOffRestoredDestinationConnections, (), (const));
@@ -453,7 +452,7 @@ public:
   }
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
-  MockListenSocketFactory socket_factory_;
+  std::vector<ListenSocketFactoryPtr> socket_factories_;
   SocketSharedPtr socket_;
   Stats::IsolatedStoreImpl scope_;
   std::string name_;

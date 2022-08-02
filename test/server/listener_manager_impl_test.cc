@@ -687,7 +687,7 @@ public:
   std::string name() const override { return "stats_test"; }
 
   bool isTerminalFilterByProto(const Protobuf::Message&,
-                               Server::Configuration::FactoryContext&) override {
+                               Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
 
@@ -952,27 +952,7 @@ TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonIpv4MappedIpv6address) {
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
 }
 
-TEST_P(ListenerManagerImplTest, UnsupportedInternalListener) {
-  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-  // Workaround of triggering death at windows platform.
-  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "false"}});
-
-  const std::string yaml = R"EOF(
-    name: "foo"
-    address:
-      envoy_internal_address:
-        server_listener_name: a_listener_name
-    filter_chains:
-    - filters: []
-  )EOF";
-
-  EXPECT_DEATH(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), ".*");
-}
-
 TEST_P(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListenerConfig) {
-  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
-
   const std::string yaml = R"EOF(
     name: "foo"
     address:
@@ -990,9 +970,6 @@ TEST_P(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListe
 }
 
 TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
-  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
-
   const std::string yaml = R"EOF(
     name: "foo"
     address:
@@ -6178,8 +6155,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
   if (use_matcher_) {
     GTEST_SKIP() << "Filter chain match is auto-inserted in the config dump";
   }
-  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-  scoped_runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
 
   InSequence s;
@@ -7248,7 +7223,7 @@ address:
   addOrUpdateListener(listener);
   EXPECT_EQ(1U, manager_->listeners().size());
   Network::SocketSharedPtr listen_socket =
-      manager_->listeners().front().get().listenSocketFactory().getListenSocket(0);
+      manager_->listeners().front().get().listenSocketFactories()[0]->getListenSocket(0);
   Network::UdpPacketWriterPtr udp_packet_writer =
       manager_->listeners()
           .front()

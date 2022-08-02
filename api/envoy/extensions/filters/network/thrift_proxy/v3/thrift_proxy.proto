@@ -65,7 +65,7 @@ enum ProtocolType {
 
 message Trds {
   // Configuration source specifier.
-  // In case of *api_config_source* only aggregated *api_type* is supported.
+  // In case of ``api_config_source`` only aggregated ``api_type`` is supported.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
   // The name of the route configuration. This allows to use different route
@@ -91,11 +91,11 @@ message ThriftProxy {
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The route table for the connection manager is static and is specified in this property.
-  // It is invalid to define both *route_config* and *trds*.
+  // It is invalid to define both ``route_config`` and ``trds``.
   RouteConfiguration route_config = 4
       [(udpa.annotations.field_migrate).oneof_promotion = "route_specifier"];
 
-  // Use xDS to fetch the route configuration. It is invalid to define both *route_config* and *trds*.
+  // Use xDS to fetch the route configuration. It is invalid to define both ``route_config`` and ``trds``.
   Trds trds = 8 [(udpa.annotations.field_migrate).oneof_promotion = "route_specifier"];
 
   // A list of individual Thrift filters that make up the filter chain for requests made to the

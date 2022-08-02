@@ -167,6 +167,8 @@ For details on each command's usage see the official
   HSETNX, Hash
   HSTRLEN, Hash
   HVALS, Hash
+  PFADD, HyperLogLog
+  PFCOUNT, HyperLogLog
   LINDEX, List
   LINSERT, List
   LLEN, List

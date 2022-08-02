@@ -58,14 +58,17 @@ public:
   }
 
   void establishNewStream() {
-    ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
+    ENVOY_LOG(debug, "Establishing new gRPC bidi stream to {} for {}", async_client_.destination(),
+              service_method_.DebugString());
     if (stream_ != nullptr) {
-      ENVOY_LOG(warn, "gRPC bidi stream for {} already exists!", service_method_.DebugString());
+      ENVOY_LOG(warn, "gRPC bidi stream to {} for {} already exists!", async_client_.destination(),
+                service_method_.DebugString());
       return;
     }
     stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     if (stream_ == nullptr) {
-      ENVOY_LOG(debug, "Unable to establish new stream to configuration server");
+      ENVOY_LOG(debug, "Unable to establish new stream to configuration server {}",
+                async_client_.destination());
       callbacks_->onEstablishmentFailure();
       setRetryTimer();
       return;
@@ -149,22 +152,22 @@ private:
   // been occurring for a short amount of time.
   void logClose(Grpc::Status::GrpcStatus status, const std::string& message) {
     if (Grpc::Status::WellKnownGrpcStatus::Ok == status) {
-      ENVOY_LOG(debug, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
-                message);
+      ENVOY_LOG(debug, "{} gRPC config stream to {} closed: {}, {}", service_method_.name(),
+                async_client_.destination(), status, message);
       return;
     }
 
     if (!isNonRetriableFailure(status)) {
       // When the failure is considered non-retriable, warn.
-      ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
-                message);
+      ENVOY_LOG(warn, "{} gRPC config stream to {} closed: {}, {}", service_method_.name(),
+                async_client_.destination(), status, message);
       return;
     }
 
     if (!isCloseStatusSet()) {
       // For the first failure, record its occurrence and log at the debug level.
-      ENVOY_LOG(debug, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
-                message);
+      ENVOY_LOG(debug, "{} gRPC config stream to {} closed: {}, {}", service_method_.name(),
+                async_client_.destination(), status, message);
       setCloseStatus(status, message);
       return;
     }
@@ -176,9 +179,10 @@ private:
 
     if (status != close_status) {
       // This is a different failure. Warn on both statuses and remember the new one.
-      ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {} (previously {}, {} since {}s ago)",
-                service_method_.name(), status, message, close_status, last_close_message_,
-                seconds_since_first_close);
+      ENVOY_LOG(warn,
+                "{} gRPC config stream to {} closed: {}, {} (previously {}, {} since {}s ago)",
+                service_method_.name(), async_client_.destination(), status, message, close_status,
+                last_close_message_, seconds_since_first_close);
       setCloseStatus(status, message);
       return;
     }
@@ -192,14 +196,15 @@ private:
         std::chrono::duration_cast<std::chrono::milliseconds>(duration_since_first_close).count();
     if (ms_since_first_close > RetryMaxDelayMs) {
       // Warn if we are over the time limit.
-      ENVOY_LOG(warn, "{} gRPC config stream closed since {}s ago: {}, {}", service_method_.name(),
-                seconds_since_first_close, close_status, message);
+      ENVOY_LOG(warn, "{} gRPC config stream to {} closed since {}s ago: {}, {}",
+                service_method_.name(), async_client_.destination(), seconds_since_first_close,
+                close_status, message);
       return;
     }
 
     // Failure is retriable and new enough to only log at the debug level.
-    ENVOY_LOG(debug, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
-              message);
+    ENVOY_LOG(debug, "{} gRPC config stream to {} closed: {}, {}", service_method_.name(),
+              async_client_.destination(), status, message);
   }
 
   bool isNonRetriableFailure(Grpc::Status::GrpcStatus status) {

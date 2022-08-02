@@ -1307,6 +1307,13 @@ TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
   EXPECT_EQ(max_observed.count(), max_expected.count());
 }
 
+TEST_P(Http2CodecImplTest, EarlyReset) {
+  initialize();
+
+  // Reset the stream before sending headers to make sure this corner case is handled.
+  request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+}
+
 TEST_P(Http2CodecImplTest, IdlePing) {
   client_http2_options_.mutable_connection_keepalive()
       ->mutable_connection_idle_interval()

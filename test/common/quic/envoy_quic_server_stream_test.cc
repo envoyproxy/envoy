@@ -179,10 +179,10 @@ protected:
   EnvoyQuicServerStream* quic_stream_;
   Http::MockRequestDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
-  spdy::SpdyHeaderBlock spdy_request_headers_;
+  spdy::Http2HeaderBlock spdy_request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
-  spdy::SpdyHeaderBlock spdy_trailers_;
+  spdy::Http2HeaderBlock spdy_trailers_;
   std::string host_{"www.abc.com"};
   std::string request_body_{"Hello world"};
 };
@@ -199,7 +199,7 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
                   headers->get(Http::Headers::get().Cookie)[0]->value().getStringView());
       }));
   EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
-  spdy::SpdyHeaderBlock spdy_headers;
+  spdy::Http2HeaderBlock spdy_headers;
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";
   spdy_headers[":path"] = "/";
@@ -617,7 +617,7 @@ TEST_F(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
-  spdy::SpdyHeaderBlock spdy_headers;
+  spdy::Http2HeaderBlock spdy_headers;
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "POST";
   spdy_headers[":path"] = "/";
@@ -641,7 +641,7 @@ TEST_F(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
-  spdy::SpdyHeaderBlock spdy_trailers;
+  spdy::Http2HeaderBlock spdy_trailers;
   // This header exceeds max header size limit and should cause stream reset.
   spdy_trailers["long_header"] = std::string(16 * 1024 + 1, 'a');
   std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers);

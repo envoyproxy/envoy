@@ -240,6 +240,7 @@ RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
 
 void Router::onDestroy() {
   if (upstream_request_ != nullptr) {
+    ENVOY_LOG(debug, "router on destroy reset stream");
     upstream_request_->resetStream();
     cleanup();
   }
