@@ -20,7 +20,7 @@ ENV CGO_ENABLED=0
 RUN go build -o server
 
 # Build the main container (Linux Runtime)
-FROM debian:bullseye-slim@sha256:f576b8067b77ff85c70725c976b7b6cde960898e2f19b9abab3fb148407614e2
+FROM debian:bullseye-slim@sha256:a811e62769a642241b168ac34f615fb02da863307a14c4432cea8e5a0f9782b8
 WORKDIR /root/
 
 # Copy the linux amd64 binary
