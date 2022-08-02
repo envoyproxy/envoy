@@ -106,13 +106,14 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
     StatOrScopes variant = std::move(iter->second);
     StatOrScopesIndex index = static_cast<StatOrScopesIndex>(variant.index());
     switch (index) {
-    case StatOrScopesIndex::Scopes:
+    case StatOrScopesIndex::Scopes: {
       // Erase the current element before adding new ones, as absl::btree_map
       // does not have stable iterators. When we hit leaf stats we will erase
       // second, so that we can use the name held as a map key, and don't need
       // to re-serialize the name from the symbol table.
+      std::string name = iter->first; // Copy out the name before erasing the iterator.
       stat_map_.erase(iter);
-      populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
+      populateStatsForCurrentPhase(name, absl::get<ScopeVec>(variant));
       break;
     case StatOrScopesIndex::TextReadout:
       renderStat<Stats::TextReadoutSharedPtr>(iter->first, response, variant);
@@ -158,26 +159,28 @@ void StatsRequest::startPhase() {
   }
 }
 
-void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
+void StatsRequest::populateStatsForCurrentPhase(absl::string_view scope_name,
+                                                const ScopeVec& scope_vec) {
   switch (phase_) {
   case Phase::TextReadouts:
-    populateStatsFromScopes<Stats::TextReadout>(scope_vec);
+    populateStatsFromScopes<Stats::TextReadout>(scope_name, scope_vec);
     break;
   case Phase::CountersAndGauges:
     if (params_.type_ != StatsType::Gauges) {
-      populateStatsFromScopes<Stats::Counter>(scope_vec);
+      populateStatsFromScopes<Stats::Counter>(scope_name, scope_vec);
     }
     if (params_.type_ != StatsType::Counters) {
-      populateStatsFromScopes<Stats::Gauge>(scope_vec);
+      populateStatsFromScopes<Stats::Gauge>(scope_name, scope_vec);
     }
     break;
   case Phase::Histograms:
-    populateStatsFromScopes<Stats::Histogram>(scope_vec);
+    populateStatsFromScopes<Stats::Histogram>(scope_name, scope_vec);
     break;
   }
 }
 
-template <class StatType> void StatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
+template <class StatType> void StatsRequest::populateStatsFromScopes(absl::string_view scope_name,
+                                                                     const ScopeVec& scope_vec) {
   Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
     if (params_.used_only_ && !stat->used()) {
       return true;
@@ -203,10 +206,19 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
     stat_map_[name] = stat;
     return true;
   };
+
+  if (params_.scope_.has_value()) {
+    if (params_.scope_->empty() && !scope_name.empty() &&
+        scope_name.find('.') == absl::string_view::npos) {
+      renderScope(scope_name);
+    } else if (params_.scope_->empty() && !absl::StartsWith(params_.scope_, scope_name)) {
+    }
+  }
+
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
-    if (params_.scope_.has_value()) {
-      std::string scope_name = scope->symbolTable().toString(scope->prefix());
-      if (!absl::StartsWith(params_.scope_, scope_name)) {
+    // If the scope-name param is specified, and non-empty, then we filter
+
+      if (!
         continue;
       }
     }
