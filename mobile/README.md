@@ -4,11 +4,11 @@ Multiplatform client HTTP/networking library built on the [Envoy](https://www.en
 
 ## Documentation
 
-- **[Official documentation](https://envoy-mobile.github.io/docs/envoy-mobile/latest/index.html)**
-- [Project website](https://envoy-mobile.github.io)
-- [Getting started demos](https://envoy-mobile.github.io/docs/envoy-mobile/latest/start/start.html)
-- [API and usage](https://envoy-mobile.github.io/docs/envoy-mobile/latest/api/api.html)
-- [Additional resources](https://envoy-mobile.github.io/docs/envoy-mobile/latest/intro/additional_resources.html)
+- **[Official documentation](https://envoymobile.io/docs/envoy-mobile/latest/index.html)**
+- [Project website](https://envoymobile.io)
+- [Getting started demos](https://envoymobile.io/docs/envoy-mobile/latest/start/start.html)
+- [API and usage](https://envoymobile.io/docs/envoy-mobile/latest/api/api.html)
+- [Additional resources](https://envoymobile.io/docs/envoy-mobile/latest/intro/additional_resources.html)
 
 ## Contact
 
