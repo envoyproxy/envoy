@@ -4,7 +4,7 @@ Internal Listener
 =================
 
 Envoy supports user-space sockets that enable establishing TCP streams from an upstream cluster to a listener without
-using the system network API. A listener that accepts user space connections is called an _internal listener_. The
+using the system network API. A listener that accepts user space connections is called an *internal listener*. The
 internal listener :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>` identifies the server for a client
 :ref:`internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>`.
 
