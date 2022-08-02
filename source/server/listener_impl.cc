@@ -335,7 +335,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, this, *this,
           parent.factory_.createDrainManager(config.drain_type()))),
-      reuse_port_(getReusePortOrDefault(parent_.server_, config_)),
+      reuse_port_(getReusePortOrDefault(parent_.server_, config_, socket_type_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
                             ".connection_limit"),
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
@@ -1029,7 +1029,8 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
 }
 
 bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
-                                         const envoy::config::listener::v3::Listener& config) {
+                                         const envoy::config::listener::v3::Listener& config,
+                                         Network::Socket::Type socket_type) {
   bool initial_reuse_port_value = [&server, &config]() {
     // If someone set the new field, adhere to it.
     if (config.has_enable_reuse_port()) {
@@ -1053,7 +1054,7 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
   }();
 
 #ifndef __linux__
-  if (initial_reuse_port_value && socket_type_ == Network::Socket::Type::Stream) {
+  if (initial_reuse_port_value && socket_type == Network::Socket::Type::Stream) {
     // reuse_port is the default on Linux for TCP. On other platforms even if set it is disabled
     // and the user is warned. For UDP it's always the default even if not effective.
     ENVOY_LOG(warn,
@@ -1062,6 +1063,8 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
               config.name());
     initial_reuse_port_value = false;
   }
+#else
+  UNREFERENCED_PARAMETER(socket_type);
 #endif
 
   return initial_reuse_port_value;
