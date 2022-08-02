@@ -77,13 +77,11 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
 }
 
 namespace {
+// Prepends an element to an array, modifying it as passed in.
 std::vector<absl::string_view> prepend(const absl::string_view first,
-                                       const std::vector<absl::string_view>& strings) {
-  std::vector<absl::string_view> v;
-  v.reserve(strings.size() + 1);
-  v.push_back(first);
-  v.insert(v.end(), strings.begin(), strings.end());
-  return v;
+                                       std::vector<absl::string_view>&& strings) {
+  strings.insert(strings.begin(), first);
+  return strings;
 }
 } // namespace
 
@@ -150,9 +148,10 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion), false,
                       false),
 
-          // TODO(jmarantz): add support for param-passing through a POST. Browsers send
-          // those params as the post-body rather than query-params and that requires some
-          // re-plumbing through the admin callback API. See also drain_listeners.
+          // The logging "level" parameter, if specified as a non-blank entry,
+          // changes all the logging-paths to that level. So the enum parameter
+          // needs to include a an empty string as the default (first) option.
+          // Thus we prepend an empty string to the logging-levels list.
           makeHandler("/logging", "query/change logging levels",
                       MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true,
                       {{Admin::ParamDescriptor::Type::String, "paths",
