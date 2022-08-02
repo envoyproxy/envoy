@@ -810,8 +810,8 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
   if (metadata->msgType() == MsgType::Request) {  
     auto ingress_id = metadata->ingressId();
     if (ingress_id == nullptr) {
-      ENVOY_LOG(error, "Dropping upstream request with no X-Envoy-Origin-Ingress header: \n{}", metadata->rawMsg());
-      parent_.onError(metadata, ErrorCode::bad_request, "Missing X-Envoy-Origin-Ingress header");
+      ENVOY_LOG(error, "Dropping upstream request with no well formatted X-Envoy-Origin-Ingress header: \n{}", metadata->rawMsg());
+      parent_.onError(metadata, ErrorCode::bad_request, "Missing or bad formatted X-Envoy-Origin-Ingress header");
       return FilterStatus::StopIteration;
     }
 
