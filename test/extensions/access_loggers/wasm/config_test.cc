@@ -178,10 +178,6 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   StreamInfo::MockStreamInfo log_stream_info;
   filter_instance = factory->createAccessLogInstance(proto_config, nullptr, context_);
   filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
-
-  TestUtility::loadFromYaml(invalid_yaml, proto_config);
-  filter_instance = factory->createAccessLogInstance(proto_config, nullptr, context_);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
 }
 
 TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {

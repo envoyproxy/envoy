@@ -222,10 +222,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
   cb(filter_callback);
-
-  TestUtility::loadFromYaml(invalid_yaml, proto_config);
-  auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
-  EXPECT_EQ(filter_config->createFilter(), nullptr);
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {
@@ -899,6 +895,88 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpen) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   // The filter is not registered.
   cb(filter_callback);
+}
+
+TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
+  const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+  const std::string sha256 = Hex::encode(
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      code:
+        remote:
+          http_uri:
+            uri: https://example.com/data
+            cluster: cluster_1
+            timeout: 5s
+          sha256: )EOF",
+                                                                    sha256));
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  WasmFilterConfig factory;
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  cluster_manager_.initializeThreadLocalClusters({"cluster_1"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
+  Http::AsyncClient::Callbacks* async_callbacks = nullptr;
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            if (!async_callbacks) {
+              async_callbacks = &callbacks;
+            }
+            return &request;
+          }));
+  NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
+  EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(threadlocal));
+  threadlocal.registered_ = false;
+  auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
+  EXPECT_EQ(filter_config->createFilter(), nullptr);
+  EXPECT_CALL(init_watcher_, ready());
+  context_.initManager().initialize(init_watcher_);
+  auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})};
+  response->body().add(code);
+  async_callbacks->onSuccess(request, std::move(response));
+  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  threadlocal.registered_ = true;
+  EXPECT_NE(filter_config->createFilter(), nullptr);
+}
+
+TEST_P(WasmFilterConfigTest, FailedToGetThreadLocalPlugin) {
+  NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    fail_open: true
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_CALL(context_, threadLocal()).WillOnce(ReturnRef(threadlocal));
+  threadlocal.registered_ = true;
+  auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
+  ASSERT_EQ(threadlocal.current_slot_, 1);
+  ASSERT_NE(filter_config->createFilter(), nullptr);
+
+  // If the thread local plugin handle returns nullptr, `createFilter` should return nullptr
+  threadlocal.data_[0] = std::make_shared<PluginHandleSharedPtrThreadLocal>(nullptr);
+  EXPECT_EQ(filter_config->createFilter(), nullptr);
 }
 
 } // namespace Wasm
