@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: build
+  change: |
+    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
 - area: http
   change: |
     Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
@@ -56,9 +59,15 @@ new_features:
 - area: gzip
   change: |
     added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
+- area: build
+  change: |
+    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
+- area: thrift
+  change: |
+    added stats for downstream connection close to detect SR drop.
 - area: cors
   change: |
     added support for cors PNA. This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_cors_private_network_access`` to false. More details refer to https://developer.chrome.com/blog/private-network-access-preflight.

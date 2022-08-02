@@ -2183,7 +2183,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
               socket_address: { address: 192.168.1.2, port_value: 44 }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
+  EXPECT_THROW(
       {
         envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
         Envoy::Stats::ScopeSharedPtr scope =
@@ -2196,7 +2196,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
         StaticClusterImpl cluster(server_context_, cluster_config, runtime_, factory_context,
                                   std::move(scope), false);
       },
-      EnvoyException, "invalid value \"fakelbtype\"");
+      EnvoyException);
 }
 
 // load_balancing_policy should be used when lb_policy is set to LOAD_BALANCING_POLICY_CONFIG.

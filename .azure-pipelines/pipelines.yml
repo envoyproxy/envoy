@@ -16,7 +16,7 @@ stages:
   - job: format
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -46,7 +46,7 @@ stages:
   - job: proto_format
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -76,7 +76,7 @@ stages:
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     condition: ne(variables['PostSubmit'], true)
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -107,7 +107,7 @@ stages:
   - job: dependencies
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -134,7 +134,7 @@ stages:
   - job: filter_example
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: InstallSSHKey@0
       inputs:
@@ -152,7 +152,7 @@ stages:
   - job: data_plane_api
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: InstallSSHKey@0
       inputs:
@@ -170,7 +170,7 @@ stages:
   - job: go_control_plane
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: InstallSSHKey@0
       inputs:
@@ -199,7 +199,7 @@ stages:
   - job: release
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - template: bazel.yml
       parameters:
@@ -229,7 +229,7 @@ stages:
     dependsOn: []
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - template: bazel.yml
       parameters:
@@ -250,7 +250,7 @@ stages:
     dependsOn: ["package_x64"]
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
@@ -318,7 +318,7 @@ stages:
           CI_TARGET: "bazel.compile_time_options"
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - template: bazel.yml
       parameters:
@@ -360,7 +360,7 @@ stages:
     displayName: "linux multiarch"
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - bash: |
         echo "disk space at beginning of build:"
@@ -431,7 +431,7 @@ stages:
   jobs:
   - job: publish
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -479,7 +479,7 @@ stages:
   jobs:
   - job: examples
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
