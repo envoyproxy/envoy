@@ -89,6 +89,7 @@ envoy_cc_test(
     name = "stats_params_test",
     srcs = ["stats_params_test.cc"],
     deps = [
+        "//source/common/buffer:buffer_lib",
         "//source/server/admin:stats_params_lib",
         "//test/test_common:test_runtime_lib",
     ],
@@ -96,10 +97,22 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "stats_render_test",
-    srcs = ["stats_render_test.cc"],
+    srcs = ["stats_render_test.cc"] + envoy_select_admin_html([
+        "stats_html_render_test.cc",
+    ]),
+    deps = [
+        ":stats_render_test_base",
+        "//source/server/admin:admin_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "stats_render_test_base",
+    srcs = ["stats_render_test_base.cc"],
+    hdrs = ["stats_render_test_base.h"],
     deps = [
         "//source/common/stats:thread_local_store_lib",
-        "//source/server/admin:stats_render_lib",
+        "//source/server/admin:stats_request_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",

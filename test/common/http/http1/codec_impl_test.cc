@@ -125,7 +125,7 @@ public:
   void expect400(Buffer::OwnedImpl& buffer, absl::string_view expected_details,
                  absl::string_view expected_message);
   void testRequestHeadersExceedLimit(std::string header_string, std::string error_message,
-                                     absl::string_view details = "");
+                                     absl::string_view details);
   void testTrailersExceedLimit(std::string trailer_string, std::string error_message,
                                bool enable_trailers);
   void testRequestHeadersAccepted(std::string header_string);
@@ -317,9 +317,7 @@ void Http1ServerConnectionImplTest::testRequestHeadersExceedLimit(std::string he
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), error_message);
-  if (!details.empty()) {
-    EXPECT_EQ(details, response_encoder->getStream().responseDetails());
-  }
+  EXPECT_EQ(details, response_encoder->getStream().responseDetails());
 }
 
 void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string header_string) {
@@ -2991,14 +2989,14 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
   testRequestHeadersExceedLimit(long_string, "http/1.1 protocol error: headers size exceeds limit",
-                                "");
+                                "http1.headers_too_large");
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejectedBeyondMaxConfigurable) {
   max_request_headers_kb_ = 8192;
   std::string long_string = "big: " + std::string(8193 * 1024, 'q') + "\r\n";
   testRequestHeadersExceedLimit(long_string, "http/1.1 protocol error: headers size exceeds limit",
-                                "");
+                                "http1.headers_too_large");
 }
 
 // Tests that the default limit for the number of request headers is 100.

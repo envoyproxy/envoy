@@ -1,4 +1,3 @@
-#include "source/common/html/utility.h"
 #include "source/server/admin/admin.h"
 
 namespace Envoy {

@@ -651,8 +651,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                       connection_manager_.read_callbacks_->connection().streamInfo().filterState(),
                       StreamInfo::FilterState::LifeSpan::Connection),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
-          connection_manager_.stats_.named_.downstream_rq_time_,
-          connection_manager_.timeSource())) {
+          connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
+      header_validator_(connection_manager.config_.makeHeaderValidator(
+          connection_manager.codec_->protocol(), filter_manager_.streamInfo())) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
                connection_manager.config_.scopedRouteConfigProvider() != nullptr) ||
@@ -866,6 +867,33 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
   return ip->port();
 }
 
+bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
+  if (header_validator_) {
+    auto validation_result = header_validator_->validateRequestHeaderMap(*request_headers_);
+    if (!validation_result.ok()) {
+      std::function<void(ResponseHeaderMap & headers)> modify_headers;
+      Code response_code = Code::BadRequest;
+      absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+      bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
+      if (validation_result.action() ==
+              Http::HeaderValidator::RequestHeaderMapValidationResult::Action::Redirect &&
+          !is_grpc) {
+        response_code = Code::TemporaryRedirect;
+        modify_headers = [new_path = request_headers_->Path()->value().getStringView()](
+                             Http::ResponseHeaderMap& response_headers) -> void {
+          response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
+        };
+      } else if (is_grpc) {
+        grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
+      }
+
+      sendLocalReply(response_code, "", modify_headers, grpc_status, validation_result.details());
+      return false;
+    }
+  }
+  return true;
+}
+
 void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
   if (end_stream && !filter_manager_.remoteDecodeComplete()) {
@@ -887,6 +915,8 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
 // modifications which may themselves affect route selection.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& headers,
                                                         bool end_stream) {
+  ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
+                   *headers);
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
@@ -901,6 +931,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   const Protocol protocol = connection_manager_.codec_->protocol();
   state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
 
+  if (!validateHeaders()) {
+    ENVOY_STREAM_LOG(debug, "request headers validation failed:\n{}", *this, *request_headers_);
+    return;
+  }
+
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_.isRoutable()) {
     if (connection_manager_.config_.routeConfigProvider() != nullptr) {
@@ -913,9 +948,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   } else {
     snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->configCast();
   }
-
-  ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
-                   *request_headers_);
 
   // We end the decode here to mark that the downstream stream is complete.
   maybeEndDecode(end_stream);
@@ -1527,9 +1559,11 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ResponseTrailerMap& tra
   response_encoder_->encodeTrailers(trailers);
 }
 
-void ConnectionManagerImpl::ActiveStream::encodeMetadata(MetadataMapVector& metadata) {
-  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata);
-  response_encoder_->encodeMetadata(metadata);
+void ConnectionManagerImpl::ActiveStream::encodeMetadata(MetadataMapPtr&& metadata) {
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.emplace_back(std::move(metadata));
+  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata_map_vector);
+  response_encoder_->encodeMetadata(metadata_map_vector);
 }
 
 void ConnectionManagerImpl::ActiveStream::onDecoderFilterBelowWriteBufferLowWatermark() {

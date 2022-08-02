@@ -63,16 +63,15 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
                                    HistogramBucketsMode& histogram_buckets_mode) {
   absl::optional<std::string> histogram_buckets_query_param =
       queryParam(params, "histogram_buckets");
+  histogram_buckets_mode = HistogramBucketsMode::NoBuckets;
   if (histogram_buckets_query_param.has_value()) {
     if (histogram_buckets_query_param.value() == "cumulative") {
       histogram_buckets_mode = HistogramBucketsMode::Cumulative;
     } else if (histogram_buckets_query_param.value() == "disjoint") {
       histogram_buckets_mode = HistogramBucketsMode::Disjoint;
-    } else if (histogram_buckets_query_param.value() == "none") {
-      histogram_buckets_mode = HistogramBucketsMode::NoBuckets;
-    } else {
+    } else if (histogram_buckets_query_param.value() != "none") {
       return absl::InvalidArgumentError(
-          "usage: /stats?histogram_buckets=cumulative  or /stats?histogram_buckets=disjoint \n");
+          "usage: /stats?histogram_buckets=(cumulative|disjoint|none)\n");
     }
   }
   return absl::OkStatus();

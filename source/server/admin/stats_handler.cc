@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/admin/v3/mutex_stats.pb.h"
+#include "envoy/server/admin.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
@@ -11,6 +12,8 @@
 #include "source/common/http/utility.h"
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/stats_request.h"
+
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Server {
@@ -95,11 +98,13 @@ Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream&
     server_.flushStats();
   }
 
-  return makeRequest(server_.stats(), params);
+  return makeRequest(server_.stats(), params,
+                     [this]() -> Admin::UrlHandler { return statsHandler(); });
 }
 
-Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params) {
-  return std::make_unique<StatsRequest>(stats, params);
+Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
+                                            StatsRequest::UrlHandlerFn url_handler_fn) {
+  return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
@@ -115,6 +120,11 @@ Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
   if (code != Http::Code::OK) {
     return code;
   }
+
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+
   prometheusFlushAndRender(params, response);
   return Http::Code::OK;
 }
@@ -154,6 +164,31 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
                  "--enable-mutex-tracing.");
   }
   return Http::Code::OK;
+}
+
+Admin::UrlHandler StatsHandler::statsHandler() {
+  return {
+      "/stats",
+      "print server stats",
+      [this](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
+        return makeRequest(path, admin_stream);
+      },
+      false,
+      false,
+      {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+        "Only include stats that have been written by system since restart"},
+       {Admin::ParamDescriptor::Type::String, "filter",
+        "Regular expression (ecmascript) for filtering stats"},
+       {Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {"html", "text", "json"}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "type",
+        "Stat types to include.",
+        {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
+         StatLabels::TextReadouts}},
+       {Admin::ParamDescriptor::Type::Enum,
+        "histogram_buckets",
+        "Histogram bucket display mode",
+        {"cumulative", "disjoint", "none"}}}};
 }
 
 } // namespace Server

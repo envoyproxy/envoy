@@ -1045,8 +1045,8 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
         draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
         [&listener](const DrainingFilterChainsManager& draining_filter_chain) {
           return draining_filter_chain.getDrainingListener()
-                     .listenSocketFactory()
-                     .getListenSocket(0)
+                     .listenSocketFactories()[0]
+                     ->getListenSocket(0)
                      ->isOpen() &&
                  listener.hasCompatibleAddress(draining_filter_chain.getDrainingListener());
         });
