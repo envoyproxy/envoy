@@ -79,7 +79,7 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
 namespace {
 // Prepends an element to an array, modifying it as passed in.
 std::vector<absl::string_view> prepend(const absl::string_view first,
-                                       std::vector<absl::string_view>&& strings) {
+                                       std::vector<absl::string_view> strings) {
   strings.insert(strings.begin(), first);
   return strings;
 }
