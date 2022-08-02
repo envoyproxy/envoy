@@ -2,7 +2,7 @@
 
 Envoy Mobile's docs are generated using [Sphinx](http://www.sphinx-doc.org),
 and are published
-[here](https://envoy-mobile.github.io/docs/envoy-mobile/latest/index.html).
+[here](https://envoymobile.io/docs/envoy-mobile/latest/index.html).
 
 ## Generating docs locally
 
