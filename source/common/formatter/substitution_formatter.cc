@@ -28,6 +28,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
 
@@ -184,8 +185,7 @@ StructFormatter::FormatBuilder::toFormatMapValue(const ProtobufWkt::Struct& stru
       break;
 
     case ProtobufWkt::Value::kNumberValue:
-      output->emplace(pair.first,
-                      PlainNumberFormatter::toFormatNumberValue(pair.second.number_value()));
+      output->emplace(pair.first, toFormatNumberValue(pair.second.number_value()));
       break;
 
     default:
@@ -214,7 +214,7 @@ StructFormatter::StructFormatListWrapper StructFormatter::FormatBuilder::toForma
       break;
 
     case ProtobufWkt::Value::kNumberValue:
-      output->emplace_back(PlainNumberFormatter::toFormatNumberValue(value.number_value()));
+      output->emplace_back(toFormatNumberValue(value.number_value()));
       break;
 
     default:
@@ -261,6 +261,15 @@ ProtobufWkt::Value StructFormatter::providersCallback(
     str += bit.value_or(empty_value_);
   }
   return ValueUtil::stringValue(str);
+}
+
+std::vector<FormatterProviderPtr>
+StructFormatter::FormatBuilder::toFormatNumberValue(double number_format) const {
+  double current_number;
+  current_number = number_format;
+  std::vector<FormatterProviderPtr> formatters;
+  formatters.emplace_back(FormatterProviderPtr{new PlainNumberFormatter(current_number)});
+  return formatters;
 }
 
 ProtobufWkt::Value StructFormatter::structFormatMapCallback(
@@ -1551,16 +1560,14 @@ ProtobufWkt::Value PlainStringFormatter::formatValue(const Http::RequestHeaderMa
   return str_;
 }
 
-PlainNumberFormatter::PlainNumberFormatter(const double& num) { num_.set_number_value(num); }
+PlainNumberFormatter::PlainNumberFormatter(double num) { num_.set_number_value(num); }
 
 absl::optional<std::string> PlainNumberFormatter::format(const Http::RequestHeaderMap&,
                                                          const Http::ResponseHeaderMap&,
                                                          const Http::ResponseTrailerMap&,
                                                          const StreamInfo::StreamInfo&,
                                                          absl::string_view) const {
-  std::string str = std::to_string(num_.number_value());
-  str = str.substr(0, str.find_last_not_of('0') + 1);
-  str = str.substr(0, str.find_last_not_of('.') + 1);
+  std::string str = absl::StrFormat("%g", num_.number_value());
   return str;
 }
 
@@ -1570,15 +1577,6 @@ ProtobufWkt::Value PlainNumberFormatter::formatValue(const Http::RequestHeaderMa
                                                      const StreamInfo::StreamInfo&,
                                                      absl::string_view) const {
   return num_;
-}
-
-std::vector<FormatterProviderPtr>
-PlainNumberFormatter::toFormatNumberValue(const double& number_format) {
-  double current_number;
-  current_number = number_format;
-  std::vector<FormatterProviderPtr> formatters;
-  formatters.emplace_back(FormatterProviderPtr{new PlainNumberFormatter(current_number)});
-  return formatters;
 }
 
 absl::optional<std::string>

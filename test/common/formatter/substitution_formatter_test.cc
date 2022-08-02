@@ -187,18 +187,18 @@ TEST(SubstitutionFormatterTest, plainStringFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, plainNumberFormatter) {
-  PlainNumberFormatter formatter(500);
+  PlainNumberFormatter formatter(400);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
   std::string body;
 
-  EXPECT_EQ("500", formatter.format(request_headers, response_headers, response_trailers,
+  EXPECT_EQ("400", formatter.format(request_headers, response_headers, response_trailers,
                                     stream_info, body));
   EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
                                     stream_info, body),
-              ProtoEq(ValueUtil::numberValue(500)));
+              ProtoEq(ValueUtil::numberValue(400)));
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
