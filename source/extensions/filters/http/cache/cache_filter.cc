@@ -212,9 +212,7 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
       case FilterState::DecodeServingFromCache:
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::Destroyed:
-        // TODO (capoferro): ENVOY_BUG prevents code coverage from working. When we fix that, we
-        // should convert this to an ENVOY_BUG.
-        ENVOY_LOG(error, absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
+        ENVOY_BUG(false, absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
                                       "response required validation, but filter state is ",
                                       filter_state));
       }
@@ -227,12 +225,10 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
     case CacheEntryStatus::LookupError:
       return LookupStatus::LookupError;
     }
-    // TODO (capoferro): ENVOY_BUG prevents code coverage from working. When we fix that, we should
-    // convert this to an ENVOY_BUG.
-    ENVOY_LOG(error,
+    ENVOY_BUG(false,
               absl::StrCat(
-                  "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
-                  std::to_string(static_cast<int>(filter_state))));
+                  "Unhandled CacheEntryStatus encountered when retrieving request cache status: ",
+                  filter_state));
     return LookupStatus::Unknown;
   }
   // Either decodeHeaders decided not to do a cache lookup (because the
@@ -253,7 +249,7 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
   case FilterState::ResponseServedFromCache:
     ABSL_FALLTHROUGH_INTENDED;
   case FilterState::Destroyed:
-    ENVOY_LOG(error, absl::StrCat("Unexpected filter state in requestCacheStatus: "
+    ENVOY_BUG(false, absl::StrCat("Unexpected filter state in requestCacheStatus: "
                                   "lookup_result_ is empty but filter state is ",
                                   filter_state));
   }
@@ -462,7 +458,7 @@ void CacheFilter::handleCacheHit() {
 
 void CacheFilter::handleCacheHitWithRangeRequest() {
   if (!lookup_result_->range_details_.has_value()) {
-    ENVOY_LOG(error, "handleCacheHitWithRangeRequest() should not be called without "
+    ENVOY_BUG(false, "handleCacheHitWithRangeRequest() should not be called without "
                      "range_details being populated in lookup_result_");
     return;
   }
