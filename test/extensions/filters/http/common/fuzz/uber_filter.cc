@@ -9,6 +9,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/test_common/utility.h"
+#include <chrono>
 
 namespace Envoy {
 namespace Extensions {
@@ -98,16 +99,19 @@ void UberFilterFuzzer::fuzz(
   // Most filters should have finished processing during runData, but filters that
   // rely on an additional thread (e.g. for file system interaction) may need to wait
   // for the worker thread to complete the filter's task.
+  auto timeout = std::chrono::system_clock::now() + std::chrono::milliseconds(5000);
   while (!isFilterFinished()) {
-    auto end_timer = worker_thread_dispatcher_->createTimer(
-        []() { throw EnvoyException("filter did not finish processing within timeout"); });
-    // This timer doesn't work because, from the log,
-    // "Simulated timer enabled. Use advanceTimeWait or advanceTimeAsync functions to ensure it is
-    // called."
-    end_timer->enableTimer(std::chrono::milliseconds(5000));
-    worker_thread_dispatcher_->run(Event::DispatcherImpl::RunType::Block);
-    // Apparently RunType::Block doesn't actually block if there's no events ready to
-    // fire, so this loop spins. Yield to keep it from spinning too wildly.
+    worker_thread_dispatcher_->run(Event::DispatcherImpl::RunType::NonBlock);
+    auto now = std::chrono::system_clock::now();
+    if (now > timeout) {
+      throw EnvoyException("filter did not finish processing within timeout");
+    }
+    // Apparently RunType::Block doesn't actually block if there's only a timer
+    // event not ready to fire, so we use NonBlock for clarity, and this loop
+    // spins. We yield to keep it from spinning too wildly. For almost all cases
+    // this shouldn't matter as even entering the loop at all is rare, and for
+    // the cases where the loop is useful, a few cycles should be enough to
+    // complete unless the test is genuinely failing.
     std::this_thread::yield();
   }
 
