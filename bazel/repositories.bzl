@@ -210,6 +210,8 @@ def envoy_dependencies(skip_targets = []):
     _net_zlib()
     _intel_dlb()
     _com_github_zlib_ng_zlib_ng()
+    _com_github_intel_isa_l()
+    _com_github_netwide_assembler_nasm()
     _org_boost()
     _org_brotli()
     _com_github_facebook_zstd()
@@ -461,6 +463,28 @@ def _com_github_zlib_ng_zlib_ng():
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
+    )
+
+def _com_github_intel_isa_l():
+    external_http_archive(
+        name = "com_github_intel_isa_l",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+    native.bind(
+        name = "isa_l",
+        actual = "@envoy//bazel/foreign_cc:isa",
+    )
+
+def _com_github_netwide_assembler_nasm():
+    external_http_archive(
+        name = "com_github_netwide_assembler_nasm",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+    native.bind(
+        name = "libnasm",
+        actual = "@envoy//bazel/foreign_cc:libnasm",
     )
 
 # Boost in general is not approved for Envoy use, and the header-only
