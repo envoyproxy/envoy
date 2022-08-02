@@ -15,87 +15,21 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-- area: auto_config
-  change: |
-    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
-- area: grpc
-  change: |
-    remove ``envoy.reloadable_features.enable_grpc_async_client_cache`` and legacy code paths.
-- area: hcm
-  change: |
-    removed ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding`` and legacy code paths.
 - area: http
   change: |
     removed ``envoy.reloadable_features.proxy_120_103`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.sanitize_http_header_referer`` and legacy code paths.
+
 - area: lightstep
   change: |
     removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
-- area: listener
-  change: |
-    removed ``envoy.reloadable_features.internal_address`` and legacy code paths.
-- area: router
-  change: |
-    removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
 
 new_features:
-- area: http
-  change: |
-    added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
 - area: dns_resolver
   change: |
     added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
-    added :ref:`include_unroutable_families<envoy_v3_api_field_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig.include_unroutable_families>`
-    to the Apple DNS resolver.
-- area: dns_resolver
-  change: |
-    added support for multiple addresses. This is most valuable when used in conjunction with
-    :ref:`ALL <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.ALL>` enabling full happy eyeballs support
-    for Envoy (see detailed documentation :ref:`here <arch_overview_conn_pool>` but will also result in trying multiple addresses
-    for resolvers doing only IPv4 or IPv6. This behavioral change can be temporarily disabled by setting runtime guard
-    ``envoy.restart_features.remove_runtime_singleton`` to ``false``.
-  change: |
-    added :ref:`GetAddrInfoDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig>`,
-    a new DNS resolver that uses the system's ``getaddrinfo()`` function to resolve DNS. This was primarily added for use on Android
-    but can also be used in other situations in which the system resolver is desired.
-- area: dubbo_proxy
-  change: |
-    added :ref:`dynamic routes discovery <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.DubboProxy.drds>` support to dubbo proxy.
-- area: ext_proc
-  change: |
-    added support for per-route :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`.
-- area: http
-  change: |
-    added new :ref:`file_system_buffer <config_http_filters_file_system_buffer>` HTTP filter.
 - area: http
   change: |
     added downstream handshake timing to connection streamInfo. Can be accessed by custom access loggers.
-- area: http
-  change: |
-    added a :ref:`send_fully_qualified_url <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.send_fully_qualified_url>` configuration option
-    to send absolute URLs for HTTP/1.1.
-- area: http
-  change: |
-    preserve case header formatter support innner formatter on Envoy headers in
-    :ref:`formatter_type_on_envoy_headers <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.formatter_type_on_envoy_headers>`.
-- area: http3
-  change: |
-    added :ref:`early_data_policy <envoy_v3_api_field_config.route.v3.RouteAction.early_data_policy>` extension to allow upstream HTTP/3 sending
-    requests over early data. If no extension is configured, HTTP/3 pool will send safe requests as early data to the host
-    if the pool already cached 0-RTT credentials of that host. If those requests fail and the underlying connection pool supports
-    TCP fallback, the request may be retried automatically. If the :ref:`default extension <envoy_v3_api_msg_extensions.early_data.v3.DefaultEarlyDataPolicy>`
-    is configured, no requests are allowed to be sent as early data. Note that if any customized extension configures non-safe requests to be allowed over early data,
-    the Envoy will not automatically retry them. If desired, explicitly config their :ref:`retry_policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>`.
-    Sending early data requires both ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3`` and ``envoy.reloadable_features.http3_sends_early_data``
-    runtime flags to be set to ``true``.
-- area: gzip
-  change: |
-    added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
