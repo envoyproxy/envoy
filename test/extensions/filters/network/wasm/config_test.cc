@@ -353,10 +353,6 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
-
-  TestUtility::loadFromYaml(invalid_yaml, proto_config);
-  auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
-  EXPECT_EQ(filter_config->createFilter(), nullptr);
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
