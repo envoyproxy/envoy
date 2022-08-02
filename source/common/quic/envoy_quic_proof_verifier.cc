@@ -35,8 +35,9 @@ class QuicValidateResultCallback : public Ssl::ValidateResultCallback {
 public:
   QuicValidateResultCallback(Event::Dispatcher& dispatcher,
                              std::unique_ptr<quic::ProofVerifierCallback>&& quic_callback,
-                             const std::string& hostname)
-      : dispatcher_(dispatcher), quic_callback_(std::move(quic_callback)), hostname_(hostname) {}
+                             const std::string& hostname, const std::string& leaf_cert)
+      : dispatcher_(dispatcher), quic_callback_(std::move(quic_callback)), hostname_(hostname),
+        leaf_cert_(leaf_cert) {}
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
@@ -57,13 +58,12 @@ public:
     quic_callback_->Run(succeeded, error, &details);
   }
 
-  void storeLeafCert(const std::string& leaf_cert) { leaf_cert_ = leaf_cert; }
-
 private:
   Event::Dispatcher& dispatcher_;
   std::unique_ptr<quic::ProofVerifierCallback> quic_callback_;
-  std::string leaf_cert_;
   const std::string hostname_;
+  // Leaf cert needs to be retained in case of asynchronous validation.
+  std::string leaf_cert_;
 };
 
 } // namespace
@@ -108,10 +108,8 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     return quic::QUIC_FAILURE;
   }
 
-  auto envoy_callback = std::make_unique<QuicValidateResultCallback>(verify_context->dispatcher(),
-                                                                     std::move(callback), hostname);
-  // Keep a reference to the callback before hand it over to context.
-  QuicValidateResultCallback& envoy_callback_ref = *envoy_callback;
+  auto envoy_callback = std::make_unique<QuicValidateResultCallback>(
+      verify_context->dispatcher(), std::move(callback), hostname, certs[0]);
   ASSERT(dynamic_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get()) !=
          nullptr);
   // We down cast rather than add customVerifyCertChainForQuic to Envoy::Ssl::Context because
@@ -123,9 +121,6 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
               *cert_chain, std::move(envoy_callback), verify_context->isServer(),
               verify_context->transportSocketOptions(), verify_context->extraValidationContext());
   if (result.status == ValidationResults::ValidationStatus::Pending) {
-    // Retain leaf cert in the callback which outlives this call while asynchronously verifying the
-    // cert chain.
-    envoy_callback_ref.storeLeafCert(certs[0]);
     return quic::QUIC_PENDING;
   }
   if (result.status == ValidationResults::ValidationStatus::Successful) {
