@@ -28,7 +28,7 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
 bool Decoder::frameStart(uint8_t flags_and_opcode) {
   // Validate opcode (last 4 bits)
   uint8_t opcode = flags_and_opcode & 0x0f;
-  if (std::find(frame_opcodes.begin(), frame_opcodes.end(), opcode) != frame_opcodes.end()) {
+  if (std::find(frame_opcodes_.begin(), frame_opcodes_.end(), opcode) != frame_opcodes_.end()) {
     frame_.flags_and_opcode_ = flags_and_opcode;
     return true;
   }
@@ -41,6 +41,9 @@ void Decoder::frameMaskFlag(uint8_t mask_and_length) {
   if (mask_and_length & 0x80) {
     frame_.is_masked_ = true;
     masking_key_length_ = 4;
+  } else {
+    frame_.is_masked_ = false;
+    masking_key_length_ = 0;
   }
   // Set length (0 to 125) or length flag (126 or 127)
   length_ = mask_and_length & 0x7F;
@@ -106,9 +109,9 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
         break;
       case State::FhExtendedLength:
         if (length_of_extended_length_ == 1) {
-          length_ |= static_cast<uint32_t>(c);
+          length_ |= static_cast<uint64_t>(c);
         } else {
-          length_ |= static_cast<uint32_t>(c) << 8 * (length_of_extended_length_ - 1);
+          length_ |= static_cast<uint64_t>(c) << 8 * (length_of_extended_length_ - 1);
         }
         length_of_extended_length_--;
         if (length_of_extended_length_ == 0) {
@@ -126,6 +129,7 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
         }
         mem++;
         j++;
+        break;
       case State::FhMaskingKey:
         if (masking_key_length_ == 1) {
           masking_key_ |= static_cast<uint32_t>(c);
@@ -145,6 +149,7 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
         }
         mem++;
         j++;
+        break;
       case State::Payload:
         uint64_t remain_in_buffer = slice.len_ - j;
         if (remain_in_buffer <= length_) {
@@ -171,3 +176,5 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
 
 } // namespace WebSocket
 } // namespace Envoy
+
+// TODO: Check the possibility of inspect works without full decode functionality

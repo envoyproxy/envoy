@@ -14,10 +14,8 @@ constexpr uint8_t FRAME_OPCODE_CONT = 0x0;
 constexpr uint8_t FRAME_OPCODE_TEXT = 0x1;
 constexpr uint8_t FRAME_OPCODE_BIN = 0x2;
 constexpr uint8_t FRAME_OPCODE_CLOSE = 0x8;
-constexpr uint8_t FRAME_OPCODE_PING = 0xA;
-constexpr uint8_t FRAME_OPCODE_PONG = 0xB;
-std::vector<uint8_t> frame_opcodes = {FRAME_OPCODE_CONT,  FRAME_OPCODE_TEXT, FRAME_OPCODE_BIN,
-                                      FRAME_OPCODE_CLOSE, FRAME_OPCODE_PING, FRAME_OPCODE_PONG};
+constexpr uint8_t FRAME_OPCODE_PING = 0x9;
+constexpr uint8_t FRAME_OPCODE_PONG = 0xA;
 
 // wire format (https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
 // of WebSocket frame:
@@ -43,11 +41,11 @@ std::vector<uint8_t> frame_opcodes = {FRAME_OPCODE_CONT,  FRAME_OPCODE_TEXT, FRA
 
 struct Frame {
   // |F|R|R|R| opcode(4) |
-  bool flags_and_opcode_;
+  uint8_t flags_and_opcode_;
   // |M|     length(7)   | max is 125, 126/127 indicates to use 16/64 bits as the length
   bool is_masked_;
   // 7 bits, 7+16 bits, or 7+64 bits (only 63 bits are used in the last case)
-  uint8_t payload_length_;
+  uint64_t payload_length_;
   // This field is present if the mask bit is set to 1 and
   // is absent if the mask bit is set to 0
   uint32_t masking_key_;
@@ -92,13 +90,14 @@ public:
   // Returns the current state in the frame parsing.
   State state() const { return state_; }
 
+  uint8_t maskingKeyLength() const { return masking_key_length_; }
+
   virtual ~FrameInspector() = default;
 
 protected:
   virtual bool frameStart(uint8_t) { return true; }
   virtual void frameMaskFlag(uint8_t) {}
   virtual void frameMaskingKey() {}
-  virtual void frameExtendedLength(uint64_t) {}
   virtual void frameDataStart() {}
   virtual void frameData(uint8_t*, uint64_t) {}
   virtual void frameDataEnd() {}
@@ -129,12 +128,12 @@ public:
 
   // Indicates whether it has buffered any partial data.
   // bool hasBufferedData() const { return state_ != State::FhFlag; }
+  Frame& getFrame() { return frame_; };
 
 protected:
   bool frameStart(uint8_t) override;
   void frameMaskFlag(uint8_t) override;
   void frameMaskingKey() override;
-  void frameExtendedLength(uint64_t) override;
   void frameDataStart() override;
   void frameData(uint8_t*, uint64_t) override;
   void frameDataEnd() override;
@@ -145,6 +144,8 @@ private:
   // Data holder for successfully decoded frames
   std::vector<Frame>* output_{nullptr};
   bool decoding_error_{false};
+  std::vector<uint8_t> frame_opcodes_ = {FRAME_OPCODE_CONT,  FRAME_OPCODE_TEXT, FRAME_OPCODE_BIN,
+                                         FRAME_OPCODE_CLOSE, FRAME_OPCODE_PING, FRAME_OPCODE_PONG};
 };
 
 } // namespace WebSocket
