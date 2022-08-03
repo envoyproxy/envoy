@@ -23,6 +23,7 @@ import paths
 
 logger = logging.getLogger(__name__)
 
+
 class FormatConfig:
     """Provides a format config object based on parsed YAML config."""
 
