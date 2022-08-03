@@ -23,12 +23,12 @@ static_resources:
     load_assignment:
       cluster_name: some_service
       endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1 # Kafka broker's host
-                  port_value: 9092 # Kafka broker's port.
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1 # Kafka broker's host
+                port_value: 9092 # Kafka broker's port.
 
 admin:
   address:

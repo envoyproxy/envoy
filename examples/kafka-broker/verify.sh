@@ -1,6 +1,8 @@
 #!/bin/bash -e
 
 export NAME=kafka-broker
+export PORT_PROXY="${KAFKA_PORT_PROXY:-11100}"
+export PORT_ADMIN="${KAFKA_PORT_ADMIN:-11101}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"

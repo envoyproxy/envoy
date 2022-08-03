@@ -9,9 +9,8 @@ services:
     depends_on:
     - kafka
     ports:
-    - 19092:19092
-    - 8001:8001
-
+    - "${PORT_PROXY:-19092}:19092"
+    - "${PORT_ADMIN:-8001}:8001"
   kafka:
     image: confluentinc/cp-kafka:latest
     container_name: kafka
