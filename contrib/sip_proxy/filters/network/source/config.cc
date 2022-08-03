@@ -5,7 +5,6 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "router/router.h"
 #include "source/common/config/utility.h"
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.h"
@@ -16,6 +15,7 @@
 #include "contrib/sip_proxy/filters/network/source/filters/well_known_names.h"
 #include "contrib/sip_proxy/filters/network/source/router/router_impl.h"
 #include "contrib/sip_proxy/filters/network/source/stats.h"
+#include "router/router.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -69,29 +69,32 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
     transaction_infos->emplace(cluster, transaction_info_ptr);
   }
 
-  auto upstream_transaction_info = std::make_shared<SipProxy::UpstreamTransactionsInfo>(context.threadLocal(),
-      static_cast<std::chrono::milliseconds>(
-          PROTOBUF_GET_MS_OR_DEFAULT(proto_config.settings(), transaction_timeout, 32000)));
+  auto upstream_transaction_info = std::make_shared<SipProxy::UpstreamTransactionsInfo>(
+      context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
+                                 proto_config.settings(), transaction_timeout, 32000)));
   upstream_transaction_info->init();
 
   // We need a map of downstream connections per worker thread,
-  // to enable demultiplexing of new upstream transactions to the correct downstream 
+  // to enable demultiplexing of new upstream transactions to the correct downstream
   // Shouldn't really need to use a TLS I don't think, but we need a common place in a worker thread
   // to share out the map from
-  auto downstream_connection_info = std::make_shared<SipProxy::DownstreamConnectionInfos>(context.threadLocal());
+  auto downstream_connection_info =
+      std::make_shared<SipProxy::DownstreamConnectionInfos>(context.threadLocal());
   downstream_connection_info->init();
 
-  std::cerr << "Main Thread: " << context.api().threadFactory().currentThreadId().debugString() << std::endl;
+  std::cerr << "Main Thread: " << context.api().threadFactory().currentThreadId().debugString()
+            << std::endl;
 
-  return
-      [filter_config, &context, transaction_infos, downstream_connection_info, upstream_transaction_info](Network::FilterManager& filter_manager) -> void {
+  return [filter_config, &context, transaction_infos, downstream_connection_info,
+          upstream_transaction_info](Network::FilterManager& filter_manager) -> void {
+    std::cerr << "Creating New ConnectionManager. Thread: "
+              << context.api().threadFactory().currentThreadId().debugString() << std::endl;
 
-        std::cerr << "Creating New ConnectionManager. Thread: " << context.api().threadFactory().currentThreadId().debugString() << std::endl;  
-
-        filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-            *filter_config, context.api().randomGenerator(),
-            context.mainThreadDispatcher().timeSource(), context, transaction_infos, downstream_connection_info, upstream_transaction_info));
-      };
+    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
+        *filter_config, context.api().randomGenerator(),
+        context.mainThreadDispatcher().timeSource(), context, transaction_infos,
+        downstream_connection_info, upstream_transaction_info));
+  };
 }
 
 /**

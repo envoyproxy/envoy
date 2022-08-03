@@ -47,10 +47,9 @@ public:
    */
   virtual std::string transactionId() const PURE;
 
-
   /**
    * @return  ID for this Ingress worker thread + downstream connection.
-      // alternative option for passing the ingressID is to set it on the metadata 
+      // alternative option for passing the ingressID is to set it on the metadata
       // in somewhere such as  ConnectionManager::ActiveTrans::transportBegin(
      fixme - should return a const ref
    */
@@ -88,7 +87,10 @@ public:
    * @return ResponseStatus indicating if the upstream response requires more data, is complete,
    *         or if an error occurred requiring the upstream connection to be reset.
    */
-  virtual ResponseStatus upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination, Network::Connection* return_connection) PURE;
+  virtual ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
+                                      Router::RouteConstSharedPtr return_route,
+                                      std::string return_destination,
+                                      Network::Connection* return_connection) PURE;
 
   /**
    * Reset the downstream connection.

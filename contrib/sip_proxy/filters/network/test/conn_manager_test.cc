@@ -3,8 +3,8 @@
 #include "source/common/buffer/buffer_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -89,7 +89,7 @@ public:
     Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
     EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
-    
+
     EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
@@ -692,7 +692,7 @@ TEST_F(SipConnectionManagerTest, SendLocalReply_Exception) {
 }
 
 // broken in main
-//TEST_F(SipConnectionManagerTest, UpstreamData) { upstreamDataTest(); }
+// TEST_F(SipConnectionManagerTest, UpstreamData) { upstreamDataTest(); }
 
 TEST_F(SipConnectionManagerTest, ResetLocalTrans) {
   resetAllTransTest(true);
@@ -704,7 +704,7 @@ TEST_F(SipConnectionManagerTest, ResetRemoteTrans) {
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
 // broken in main
-//TEST_F(SipConnectionManagerTest, ResumeResponse) { resumeResponseTest(); }
+// TEST_F(SipConnectionManagerTest, ResumeResponse) { resumeResponseTest(); }
 
 TEST_F(SipConnectionManagerTest, EncodeInsertOpaque) {
   const std::string SIP_OK200_FULL =
@@ -816,7 +816,7 @@ TEST_F(SipConnectionManagerTest, EncodeModify) {
 }
 
 TEST_F(SipConnectionManagerTest, EncodeAddNewMsgHeaders) {
-  
+
   const std::string SIP_INVITE_FULL =
       "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
       "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
@@ -840,7 +840,7 @@ TEST_F(SipConnectionManagerTest, EncodeAddNewMsgHeaders) {
       "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
       "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
       "X-Envoy-Origin-Ingress: dummy-origin-id\x0d\x0a"
-      "Authorization: dummy-auth-value\x0d\x0a" 
+      "Authorization: dummy-auth-value\x0d\x0a"
       "Content-Type: application/sdp\x0d\x0a"
       "Content-Length:  127\x0d\x0a"
       "\x0d\x0a"
@@ -851,7 +851,6 @@ TEST_F(SipConnectionManagerTest, EncodeAddNewMsgHeaders) {
       "a=rtpmap:0 PCMU/8000\x0d\x0a"
       "a=rtpmap:8 PCMU/8000\x0d\x0a";
 
-
   buffer_.add(SIP_INVITE_FULL);
 
   metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
@@ -860,7 +859,7 @@ TEST_F(SipConnectionManagerTest, EncodeAddNewMsgHeaders) {
   std::string auth = "dummy-auth-value";
   metadata_->addNewMsgHeader(HeaderType::XEnvoyOriginIngress, origin_ingress_id);
   metadata_->addNewMsgHeader(HeaderType::Auth, auth);
-  
+
   Buffer::OwnedImpl request_buffer;
 
   std::shared_ptr<EncoderImpl> encoder = std::make_shared<EncoderImpl>();
@@ -873,9 +872,8 @@ TEST_F(SipConnectionManagerTest, EncodeAddNewMsgHeaders) {
   EXPECT_EQ(request_buffer.toString(), expected_buffer_.toString());
 }
 
-
 TEST_F(SipConnectionManagerTest, EncodeAddXEnvoyOriginIngressHeader) {
-  
+
   const std::string SIP_INVITE_FULL =
       "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
       "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
@@ -906,16 +904,21 @@ TEST_F(SipConnectionManagerTest, EncodeAddXEnvoyOriginIngressHeader) {
 
   metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
 
-  std::unique_ptr<IngressID> origin_ingress_id = std::make_unique<IngressID>("thread_id_123", "xyz");
+  std::unique_ptr<IngressID> origin_ingress_id =
+      std::make_unique<IngressID>("thread_id_123", "xyz");
   metadata_->addXEnvoyOriginIngressHeader(*origin_ingress_id);
-  
+
   Buffer::OwnedImpl request_buffer;
 
   std::shared_ptr<EncoderImpl> encoder = std::make_shared<EncoderImpl>();
   encoder->encode(metadata_, request_buffer);
 
   std::cout << request_buffer.toString() << std::endl;
-  EXPECT_EQ(request_buffer.length(), buffer_.length() + (std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress)) + ": " + origin_ingress_id->toHeaderValue() + "\r\n").length() );
+  EXPECT_EQ(request_buffer.length(),
+            buffer_.length() +
+                (std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress)) +
+                 ": " + origin_ingress_id->toHeaderValue() + "\r\n")
+                    .length());
 }
 
 } // namespace SipProxy

@@ -100,7 +100,6 @@ struct RouterStats {
   ALL_SIP_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
-
 class UpstreamRequest;
 class TransactionInfoItem : public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -144,7 +143,7 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr audit_timer_;
   std::chrono::milliseconds transaction_timeout_;
-  
+
   void auditTimerAction() {
     const auto p1 = dispatcher_.timeSource().systemTime();
     for (auto it = transaction_info_map_.cbegin(); it != transaction_info_map_.cend();) {
@@ -209,7 +208,7 @@ public:
     tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.emplace(std::make_pair(
         transaction_id, std::make_shared<TransactionInfoItem>(active_trans, upstream_request)));
   }
- 
+
   void deleteTransaction(std::string&& transaction_id) {
     if (hasTransaction(transaction_id)) {
       tls_->getTyped<ThreadLocalTransactionInfo>()
@@ -364,12 +363,11 @@ public:
   void releaseConnection(bool close);
 
   SipFilters::DecoderFilterCallbacks* getTransaction(std::string&& transaction_id);
-  SipFilters::DecoderFilterCallbacks* getDownstreamConnection(std::string& downstream_connection_id); 
+  SipFilters::DecoderFilterCallbacks*
+  getDownstreamConnection(std::string& downstream_connection_id);
   std::string dumpDownstreamConnection();
-  
-  Upstream::HostDescriptionConstSharedPtr getUpstreamHost() {
-    return upstream_host_;
-  } 
+
+  Upstream::HostDescriptionConstSharedPtr getUpstreamHost() { return upstream_host_; }
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -388,7 +386,8 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
-  void onError(MessageMetadataSharedPtr metadata, const ErrorCode error_code, const std::string& what);
+  void onError(MessageMetadataSharedPtr metadata, const ErrorCode error_code,
+               const std::string& what);
 
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
   void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
@@ -399,9 +398,7 @@ public:
   void write(Buffer::Instance& data, bool end_stream) {
     return conn_data_->connection().write(data, end_stream);
   }
-  Envoy::Network::Connection* getUpstreamConnection() {
-    return &conn_data_->connection();
-  }
+  Envoy::Network::Connection* getUpstreamConnection() { return &conn_data_->connection(); }
 
   std::shared_ptr<TransactionInfo> transactionInfo() { return transaction_info_; }
   void setMetadata(MessageMetadataSharedPtr metadata) { metadata_ = metadata; }
@@ -409,13 +406,10 @@ public:
 
   std::shared_ptr<SipSettings> settings() { return settings_; }
 
-  RouteConstSharedPtr route() {
-    return route_;
-  }
+  RouteConstSharedPtr route() { return route_; }
 
-  SipFilterStats* stats() {
-    return stats_;
-  }
+  SipFilterStats* stats() { return stats_; }
+
 private:
   std::shared_ptr<Upstream::TcpPoolData> conn_pool_;
 

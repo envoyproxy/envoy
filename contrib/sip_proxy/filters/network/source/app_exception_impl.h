@@ -24,8 +24,7 @@ struct AppException : public EnvoyException,
 
   const AppExceptionType type_;
 
-  const ErrorCode error_code_ {ErrorCode::service_unavailable};
-
+  const ErrorCode error_code_{ErrorCode::service_unavailable};
 };
 
 } // namespace SipProxy

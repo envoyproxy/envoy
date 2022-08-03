@@ -216,10 +216,13 @@ public:
 
 class MockConnectionManager : public ConnectionManager {
 public:
-  MockConnectionManager(Config& config, Random::RandomGenerator& random_generator,
-                        TimeSource& time_system, Server::Configuration::FactoryContext& context,
-                        std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipProxy::DownstreamConnectionInfo> downstream_connection_infos)
-      : ConnectionManager(config, random_generator, time_system, context, transaction_infos, downstream_connection_infos) {}
+  MockConnectionManager(
+      Config& config, Random::RandomGenerator& random_generator, TimeSource& time_system,
+      Server::Configuration::FactoryContext& context,
+      std::shared_ptr<Router::TransactionInfos> transaction_infos,
+      std::shared_ptr<SipProxy::DownstreamConnectionInfo> downstream_connection_infos)
+      : ConnectionManager(config, random_generator, time_system, context, transaction_infos,
+                          downstream_connection_infos) {}
 
   ~MockConnectionManager() override;
 

@@ -1,21 +1,23 @@
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
-#include "sip.h"
 
 #include <sstream>
+
+#include "sip.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
 
-std::vector<std::string> errorCodeStr{"400 Bad Request", "481 Call/Transaction Does Not Exist", "503 Service Unavailable"};
+std::vector<std::string> errorCodeStr{"400 Bad Request", "481 Call/Transaction Does Not Exist",
+                                      "503 Service Unavailable"};
 
 DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
                                                   Buffer::Instance& buffer) const {
   std::stringstream output;
 
   // Top line
-  output << "SIP/2.0 " <<  errorCodeStr[error_code_] << "\r\n";
+  output << "SIP/2.0 " << errorCodeStr[error_code_] << "\r\n";
 
   // To
   if (!metadata.header(HeaderType::To).empty()) {

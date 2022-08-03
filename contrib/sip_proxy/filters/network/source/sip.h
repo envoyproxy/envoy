@@ -119,7 +119,8 @@ private:
       {"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap},
       {"X-Envoy-Origin-Ingress", HeaderType::XEnvoyOriginIngress}};
 
-  // fixme - consider building this map from the sip_header_type_map_ or some other pattern which avoids dups
+  // fixme - consider building this map from the sip_header_type_map_ or some other pattern which
+  // avoids dups
   const std::map<HeaderType, absl::string_view> sip_header_type_reverse_map_{
       {HeaderType::CallId, "Call-ID"},
       {HeaderType::Via, "Via"},
@@ -129,7 +130,7 @@ private:
       {HeaderType::RRoute, "Record-Route"},
       {HeaderType::Cseq, "CSeq"},
       {HeaderType::Route, "Route"},
-      {HeaderType::Path,"Path"},
+      {HeaderType::Path, "Path"},
       {HeaderType::Event, "Event"},
       {HeaderType::SRoute, "Service-Route"},
       {HeaderType::WAuth, "WWW-Authenticate"},

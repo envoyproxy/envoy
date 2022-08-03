@@ -1,7 +1,7 @@
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
 
-#include <utility>
 #include <regex>
+#include <utility>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
@@ -236,7 +236,8 @@ Decoder::HeaderHandler::HeaderHandler(MessageHandler& parent)
                            {HeaderType::WAuth, &HeaderHandler::processWwwAuth},
                            {HeaderType::Auth, &HeaderHandler::processAuth},
                            {HeaderType::PCookieIPMap, &HeaderHandler::processPCookieIPMap},
-                           {HeaderType::XEnvoyOriginIngress, &HeaderHandler::processXEnvoyOriginIngress},
+                           {HeaderType::XEnvoyOriginIngress,
+                            &HeaderHandler::processXEnvoyOriginIngress},
                        } {}
 
 int Decoder::HeaderHandler::processPath(absl::string_view& header) {
@@ -309,12 +310,15 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
   std::regex rgx("thread=(.+);downstream-connection=(.+)");
   std::match_results<absl::string_view::iterator> match;
 
-  if(std::regex_search<absl::string_view::iterator>(header.begin(), header.end(), match, rgx) && (match.size() == 3)) {
+  if (std::regex_search<absl::string_view::iterator>(header.begin(), header.end(), match, rgx) &&
+      (match.size() == 3)) {
     auto worker_thread_id = match[1].str();
     auto downstream_conn_id = match[2].str();
-    auto ingress_id = std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
+    auto ingress_id =
+        std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
     metadata()->setIngressId(std::move(ingress_id));
-    ENVOY_LOG(trace, "X-Envoy_origin-Ingress header processed: thread={}, downstream-connection={}", worker_thread_id, downstream_conn_id);
+    ENVOY_LOG(trace, "X-Envoy_origin-Ingress header processed: thread={}, downstream-connection={}",
+              worker_thread_id, downstream_conn_id);
   } else {
     ENVOY_LOG(error, "No processable match found for X-Envoy_origin-Ingress={}", header);
   }

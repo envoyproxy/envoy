@@ -95,17 +95,15 @@ private:
 // rename to IngressId for consistency
 // think about using string-view here if possible, and adding a move ctr
 class IngressID {
-public: 
+public:
   IngressID(const std::string& thread_id, const std::string& connection_id)
-    : thread_id_(thread_id), downstream_connection_id_(connection_id) {}
-  
+      : thread_id_(thread_id), downstream_connection_id_(connection_id) {}
+
   std::string toHeaderValue() {
     return "thread=" + thread_id_ + ";downstream-connection=" + downstream_connection_id_;
   }
 
-  std::string getDownstreamConnectionID() {
-    return downstream_connection_id_;
-  }
+  std::string getDownstreamConnectionID() { return downstream_connection_id_; }
 
 private:
   std::string thread_id_;
@@ -156,7 +154,7 @@ public:
 
   IngressID* ingressId() { return ingress_id_.get(); };
   void setIngressId(std::unique_ptr<IngressID> ingress_id);
-  
+
   std::string destination() { return destination_; }
   void setDestination(std::string destination) { destination_ = destination; }
   void resetDestination() { destination_.clear(); }
@@ -181,7 +179,7 @@ public:
   void addXEnvoyOriginIngressHeader(IngressID ingress_id);
   void removeXEnvoyOriginIngressHeader();
   bool checkXEnvoyOriginIngressHeaderExists();
-  void addNewMsgHeader(HeaderType type,  absl::string_view value);
+  void addNewMsgHeader(HeaderType type, absl::string_view value);
   void removeMsgHeader(HeaderType type);
   bool checkMsgHeaderExists(HeaderType type);
 

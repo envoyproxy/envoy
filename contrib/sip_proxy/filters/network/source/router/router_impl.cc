@@ -120,7 +120,7 @@ void Router::onDestroy() {
     for (auto& kv : *transaction_infos_) {
       auto transaction_info = kv.second;
       transaction_info->deleteTransaction(callbacks_->transactionId());
-    } 
+    }
   }
 
   if (upstream_request_) {
@@ -200,7 +200,7 @@ FilterStatus Router::handleAffinity() {
           SipFilters::SipFilterNames::get().SipProxy);
 
   if (!metadata->destination().empty()) {
-    ENVOY_LOG(info, "Got message with pre-set destination: {}", metadata->destination() );
+    ENVOY_LOG(info, "Got message with pre-set destination: {}", metadata->destination());
     return FilterStatus::Continue;
   }
 
@@ -287,19 +287,23 @@ FilterStatus Router::handleAffinity() {
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
 
-  
-  //metadata_->addXEnvoyOriginIngressHeader()
-   // fixme 
+  // metadata_->addXEnvoyOriginIngressHeader()
+  //  fixme
   // - move this somewhere more appropriate??
-  // - only add the header if does not already exist - / need to revisit this - see security considerations
-  // - only add the header if the outbound-transactions feature is enabled for the cluster (may need to move this to the router where we have the route config)
+  // - only add the header if does not already exist - / need to revisit this - see security
+  // considerations
+  // - only add the header if the outbound-transactions feature is enabled for the cluster (may need
+  // to move this to the router where we have the route config)
   if (metadata->checkXEnvoyOriginIngressHeaderExists()) {
-    ENVOY_STREAM_LOG(info, "X-Envoy-Origin-Ingress header existing in incoming message, removing it for being replaced ...", *callbacks_);
+    ENVOY_STREAM_LOG(info,
+                     "X-Envoy-Origin-Ingress header existing in incoming message, removing it for "
+                     "being replaced ...",
+                     *callbacks_);
     metadata->removeXEnvoyOriginIngressHeader();
   }
   ENVOY_STREAM_LOG(debug, "Adding X-Envoy-Origin-Ingress header ...", *callbacks_);
   metadata->addXEnvoyOriginIngressHeader(callbacks_->ingressID());
-  
+
   if (upstream_request_ != nullptr) {
     return FilterStatus::Continue;
   }
@@ -390,8 +394,8 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
   }
 
   if (metadata->msgType() == MsgType::Request) {
-     transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
-                                          upstream_request_);
+    transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
+                                        upstream_request_);
   }
 
   lb_ret = true;
@@ -410,12 +414,12 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
   if (!metadata->destination().empty() && metadata->msgType() == MsgType::Response) {
-      ENVOY_LOG(info, "Using preset destination for response from downstream");
-      std::string host = metadata->destination();
-      metadata->setStopLoadBalance(true);
+    ENVOY_LOG(info, "Using preset destination for response from downstream");
+    std::string host = metadata->destination();
+    metadata->setStopLoadBalance(true);
 
     if (auto upstream_request = transaction_info->getUpstreamRequest(std::string(host));
-      upstream_request != nullptr) {
+        upstream_request != nullptr) {
       // There is action connection, reuse it.
       ENVOY_STREAM_LOG(trace, "reuse upstream request from {}", *callbacks_, host);
       upstream_request_ = upstream_request;
@@ -433,7 +437,9 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       return FilterStatus::Continue;
     }
 
-    ENVOY_STREAM_LOG(trace, "no pre-existing upstream connection, select with load balancer host= {}", *callbacks_, host);
+    ENVOY_STREAM_LOG(trace,
+                     "no pre-existing upstream connection, select with load balancer host= {}",
+                     *callbacks_, host);
 
     upstream_request_started = false;
     auto ret =
@@ -446,17 +452,17 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     }
 
   } else if (!metadata->affinity().empty() &&
-      metadata->affinityIteration() != metadata->affinity().end()) {
+             metadata->affinityIteration() != metadata->affinity().end()) {
     std::string host;
 
     metadata->resetDestination();
 
     ENVOY_STREAM_LOG(debug, "handle affinity of header:{} type:{} key:{}", *callbacks_,
-                    metadata->affinityIteration()->header(), metadata->affinityIteration()->type(),
-                    metadata->affinityIteration()->key());
+                     metadata->affinityIteration()->header(), metadata->affinityIteration()->type(),
+                     metadata->affinityIteration()->key());
     auto handle_ret = handleCustomizedAffinity(metadata->affinityIteration()->header(),
-                                              metadata->affinityIteration()->type(),
-                                              metadata->affinityIteration()->key(), metadata);
+                                               metadata->affinityIteration()->type(),
+                                               metadata->affinityIteration()->key(), metadata);
 
     if (QueryStatus::Continue == handle_ret) {
       // has already get the destination from affinity
@@ -464,14 +470,14 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       ENVOY_STREAM_LOG(debug, "has already get destination {} from affinity", *callbacks_, host);
     } else if (QueryStatus::Pending == handle_ret) {
       ENVOY_STREAM_LOG(debug, "do remote query for {}", *callbacks_,
-                      metadata->affinityIteration()->key());
+                       metadata->affinityIteration()->key());
       // Need to wait remote query response,
       // after response back, still back with current affinity
       metadata->setState(State::HandleAffinity);
       return FilterStatus::StopIteration;
     } else {
       ENVOY_STREAM_LOG(debug, "no existing destintion for {}", *callbacks_,
-                      metadata->affinityIteration()->key());
+                       metadata->affinityIteration()->key());
       // Need to try next affinity
       metadata->nextAffinityIteration();
       metadata->setState(State::HandleAffinity);
@@ -702,7 +708,8 @@ SipFilters::DecoderFilterCallbacks* UpstreamRequest::getTransaction(std::string&
   }
 }
 
-SipFilters::DecoderFilterCallbacks* UpstreamRequest::getDownstreamConnection(std::string& downstream_connection_id) {
+SipFilters::DecoderFilterCallbacks*
+UpstreamRequest::getDownstreamConnection(std::string& downstream_connection_id) {
   if (downstream_connection_info_ == nullptr) {
     return nullptr;
   }
@@ -763,7 +770,8 @@ void UpstreamRequest::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbac
   route_ = callbacks_->route();
   settings_ = callbacks_->settings();
   stats_ = &callbacks_->stats();
-  ENVOY_LOG(debug, "Downstream connection map dumped: \n{}\n", downstream_connection_info_->dumpDownstreamConnection());
+  ENVOY_LOG(debug, "Downstream connection map dumped: \n{}\n",
+            downstream_connection_info_->dumpDownstreamConnection());
 }
 
 void UpstreamRequest::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
@@ -772,7 +780,7 @@ void UpstreamRequest::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbac
   }
 }
 
-void UpstreamRequest::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, 
+void UpstreamRequest::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
                                      bool end_stream) {
   if (conn_data_->connection().state() == Network::Connection::State::Closed) {
     ENVOY_LOG(debug, "Connection state is closed for upstream local reply");
@@ -781,19 +789,20 @@ void UpstreamRequest::sendLocalReply(MessageMetadata& metadata, const DirectResp
 
   Buffer::OwnedImpl buffer;
 
-  metadata.setEP(conn_data_->connection().connectionInfoProvider().localAddress()->ip()->addressAsString());
+  metadata.setEP(
+      conn_data_->connection().connectionInfoProvider().localAddress()->ip()->addressAsString());
   response.encode(metadata, buffer);
 
-  ENVOY_CONN_LOG(
-      debug, "send upstreamlocal reply {} --> {} bytes {}\n{}", conn_data_->connection(),
-      conn_data_->connection().connectionInfoProvider().localAddress()->asStringView(),
-      conn_data_->connection().connectionInfoProvider().remoteAddress()->asStringView(),
-      buffer.length(), buffer.toString());
+  ENVOY_CONN_LOG(debug, "send upstreamlocal reply {} --> {} bytes {}\n{}", conn_data_->connection(),
+                 conn_data_->connection().connectionInfoProvider().localAddress()->asStringView(),
+                 conn_data_->connection().connectionInfoProvider().remoteAddress()->asStringView(),
+                 buffer.length(), buffer.toString());
 
   write(buffer, end_stream);
 }
 
-void UpstreamRequest::onError(MessageMetadataSharedPtr metadata, const ErrorCode error_code, const std::string& what) {
+void UpstreamRequest::onError(MessageMetadataSharedPtr metadata, const ErrorCode error_code,
+                              const std::string& what) {
   auto response = AppException(AppExceptionType::ProtocolError, error_code, what);
   sendLocalReply(*metadata, response, false);
 }
@@ -807,33 +816,43 @@ bool ResponseDecoder::onData(Buffer::Instance& data) {
 FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) {
   ENVOY_LOG(trace, "ResponseDecoder\n{}", metadata->rawMsg());
 
-  if (metadata->msgType() == MsgType::Request) {  
+  if (metadata->msgType() == MsgType::Request) {
     auto ingress_id = metadata->ingressId();
     if (ingress_id == nullptr) {
-      ENVOY_LOG(error, "Dropping upstream request with no well formatted X-Envoy-Origin-Ingress header: \n{}", metadata->rawMsg());
-      parent_.onError(metadata, ErrorCode::bad_request, "Missing or bad formatted X-Envoy-Origin-Ingress header");
+      ENVOY_LOG(
+          error,
+          "Dropping upstream request with no well formatted X-Envoy-Origin-Ingress header: \n{}",
+          metadata->rawMsg());
+      parent_.onError(metadata, ErrorCode::bad_request,
+                      "Missing or bad formatted X-Envoy-Origin-Ingress header");
       return FilterStatus::StopIteration;
     }
 
-    auto downstream_conn_id = ingress_id->getDownstreamConnectionID();  
+    auto downstream_conn_id = ingress_id->getDownstreamConnectionID();
     auto downstream_conn = parent_.getDownstreamConnection(downstream_conn_id);
     if (downstream_conn == nullptr) {
       ENVOY_LOG(debug, "No downstream connection found for: '{}'\n", downstream_conn_id);
-      ENVOY_LOG(debug, "Downstream connection map dumped: \n{}\n", parent_.dumpDownstreamConnection());
-      ENVOY_LOG(debug, "Raw message failing to get a valid downstream connection: \n{}\n", metadata->rawMsg());
-      parent_.onError(metadata, ErrorCode::transaction_not_exist, "No downstream connection found for provided ID");
+      ENVOY_LOG(debug, "Downstream connection map dumped: \n{}\n",
+                parent_.dumpDownstreamConnection());
+      ENVOY_LOG(debug, "Raw message failing to get a valid downstream connection: \n{}\n",
+                metadata->rawMsg());
+      parent_.onError(metadata, ErrorCode::transaction_not_exist,
+                      "No downstream connection found for provided ID");
       return FilterStatus::StopIteration;
     }
 
     ENVOY_LOG(debug, "Got upstream request from host={},cluster={}. For downstream-connection={}",
-              parent_.getUpstreamHost()->address()->ip()->addressAsString(),  parent_.route()->routeEntry()->clusterName(), downstream_conn_id);
+              parent_.getUpstreamHost()->address()->ip()->addressAsString(),
+              parent_.route()->routeEntry()->clusterName(), downstream_conn_id);
 
     // remove the X-Envoy-Origin-Ingress header before pushing it
     metadata->removeXEnvoyOriginIngressHeader();
 
-    // pass the destination and route, so responses to this request have affinity 
+    // pass the destination and route, so responses to this request have affinity
     // to upstream host where we recvd this request from
-    downstream_conn->upstreamData(metadata, parent_.route(), parent_.getUpstreamHost()->address()->ip()->addressAsString(), parent_.getUpstreamConnection());
+    downstream_conn->upstreamData(metadata, parent_.route(),
+                                  parent_.getUpstreamHost()->address()->ip()->addressAsString(),
+                                  parent_.getUpstreamConnection());
 
     return FilterStatus::Continue;
   }

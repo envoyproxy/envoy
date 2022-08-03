@@ -123,7 +123,6 @@ void MessageMetadata::setIngressId(std::unique_ptr<IngressID> ingress_id) {
   ingress_id_ = std::move(ingress_id);
 }
 
-
 void MessageMetadata::addXEnvoyOriginIngressHeader(IngressID ingress_id) {
   addNewMsgHeader(HeaderType::XEnvoyOriginIngress, ingress_id.toHeaderValue());
 }
@@ -136,7 +135,7 @@ bool MessageMetadata::checkXEnvoyOriginIngressHeaderExists() {
   return checkMsgHeaderExists(HeaderType::XEnvoyOriginIngress);
 }
 
-void MessageMetadata::addNewMsgHeader(HeaderType type,  absl::string_view value) {
+void MessageMetadata::addNewMsgHeader(HeaderType type, absl::string_view value) {
   if (new_headers_pos_ == 0) {
     // place new headers before the content headers
     new_headers_pos_ = raw_msg_.find("Content");
@@ -147,8 +146,7 @@ void MessageMetadata::addNewMsgHeader(HeaderType type,  absl::string_view value)
   std::string header = std::string(str_type) + ": " + std::string(value) + "\r\n";
 
   setOperation(
-    Operation(OperationType::Insert, new_headers_pos_, 
-    InsertOperationValue(std::move(header))));
+      Operation(OperationType::Insert, new_headers_pos_, InsertOperationValue(std::move(header))));
 
   addMsgHeader(type, value);
 }
@@ -158,7 +156,8 @@ void MessageMetadata::removeMsgHeader(HeaderType type) {
   auto end_removal_pos = raw_msg_.find("\r\n", init_removal_pos);
   if ((init_removal_pos != std::string::npos) && (end_removal_pos != std::string::npos)) {
     auto len_removal = end_removal_pos - init_removal_pos + 2;
-    setOperation(Operation(OperationType::Delete, init_removal_pos, DeleteOperationValue(len_removal)));
+    setOperation(
+        Operation(OperationType::Delete, init_removal_pos, DeleteOperationValue(len_removal)));
   }
   headers_[type].clear();
 }

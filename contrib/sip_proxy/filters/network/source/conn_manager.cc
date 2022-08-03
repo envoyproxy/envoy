@@ -3,11 +3,11 @@
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 
-#include "router/router.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
 #include "contrib/sip_proxy/filters/network/source/encoder.h"
+#include "router/router.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -156,36 +156,47 @@ void TrafficRoutingAssistantHandler::doSubscribe(
   }
 }
 
-ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
-                                     TimeSource& time_source,
-                                     Server::Configuration::FactoryContext& context,
-                                     std::shared_ptr<Router::TransactionInfos> transaction_infos, std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos, std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstream_transaction_info)
+ConnectionManager::ConnectionManager(
+    Config& config, Random::RandomGenerator& random_generator, TimeSource& time_source,
+    Server::Configuration::FactoryContext& context,
+    std::shared_ptr<Router::TransactionInfos> transaction_infos,
+    std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos,
+    std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstream_transaction_info)
     : config_(config), stats_(config_.stats()), decoder_(std::make_unique<Decoder>(*this)),
       random_generator_(random_generator), time_source_(time_source), context_(context),
-      transaction_infos_(transaction_infos), downstream_connection_infos_(downstream_connection_infos), upstream_transaction_info_(upstream_transaction_info) {}
+      transaction_infos_(transaction_infos),
+      downstream_connection_infos_(downstream_connection_infos),
+      upstream_transaction_info_(upstream_transaction_info) {}
 
 ConnectionManager::~ConnectionManager() = default;
 
-  Network::FilterStatus ConnectionManager::onNewConnection() {
-    std::string remote_address = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
-    std::string local_ip = read_callbacks_->connection().connectionInfoProvider().localAddress()->ip()->addressAsString();
+Network::FilterStatus ConnectionManager::onNewConnection() {
+  std::string remote_address =
+      read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString();
+  std::string local_ip = read_callbacks_->connection()
+                             .connectionInfoProvider()
+                             .localAddress()
+                             ->ip()
+                             ->addressAsString();
 
-    // fixme - we might need to define it somewhere else
-    std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() + "@" + local_ip;
-    
-    Random::RandomGeneratorImpl random;
-    std::string uuid = random.uuid();
-    std::string downstream_conn_id = remote_address + "@" + uuid;
-    local_ingress_id_ = IngressID(thread_id, downstream_conn_id);
+  // fixme - we might need to define it somewhere else
+  std::string thread_id =
+      this->context_.api().threadFactory().currentThreadId().debugString() + "@" + local_ip;
 
-    downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
-    ENVOY_LOG(info, "XXXXXXXXXXXXXXXXXX thread_id={}, downstream_connection_id={}, n-connections={}", thread_id, downstream_conn_id, downstream_connection_infos_->size());
-    
-    ENVOY_LOG(debug, "XXXXXXXXXXXXXXXXX Inserted into Downstream connection map {}: {}\n", 
-      downstream_connection_infos_, downstream_conn_id);
+  Random::RandomGeneratorImpl random;
+  std::string uuid = random.uuid();
+  std::string downstream_conn_id = remote_address + "@" + uuid;
+  local_ingress_id_ = IngressID(thread_id, downstream_conn_id);
 
-    return Network::FilterStatus::Continue; 
-  }
+  downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
+  ENVOY_LOG(info, "XXXXXXXXXXXXXXXXXX thread_id={}, downstream_connection_id={}, n-connections={}",
+            thread_id, downstream_conn_id, downstream_connection_infos_->size());
+
+  ENVOY_LOG(debug, "XXXXXXXXXXXXXXXXX Inserted into Downstream connection map {}: {}\n",
+            downstream_connection_infos_, downstream_conn_id);
+
+  return Network::FilterStatus::Continue;
+}
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(
@@ -350,10 +361,12 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   ENVOY_CONN_LOG(info, "received event {}", read_callbacks_->connection(), static_cast<int>(event));
   resetAllTrans(event == Network::ConnectionEvent::LocalClose);
 
-  if (local_ingress_id_.has_value() && ((event == Network::ConnectionEvent::RemoteClose) || (event == Network::ConnectionEvent::LocalClose))) {
-      downstream_connection_infos_->deleteDownstreamConnection(local_ingress_id_->getDownstreamConnectionID());
-      ENVOY_LOG(debug, "XXXXXXXXXXXXXXXXX Deleted from Downstream connection map {}: {}\n", 
-          downstream_connection_infos_, local_ingress_id_->getDownstreamConnectionID());
+  if (local_ingress_id_.has_value() && ((event == Network::ConnectionEvent::RemoteClose) ||
+                                        (event == Network::ConnectionEvent::LocalClose))) {
+    downstream_connection_infos_->deleteDownstreamConnection(
+        local_ingress_id_->getDownstreamConnectionID());
+    ENVOY_LOG(debug, "XXXXXXXXXXXXXXXXX Deleted from Downstream connection map {}: {}\n",
+              downstream_connection_infos_, local_ingress_id_->getDownstreamConnectionID());
   }
 }
 
@@ -361,7 +374,7 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSh
   std::string&& k = std::string(metadata->transactionId().value());
 
   if (metadata->msgType() == MsgType::Response) {
-    if (upstream_transaction_info_->hasTransaction(k)) {      
+    if (upstream_transaction_info_->hasTransaction(k)) {
       ENVOY_LOG(debug, "Response from upstream transaction ID {} received.", k);
       return *(upstream_transaction_info_->getTransaction(k));
     }
@@ -372,7 +385,6 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSh
   
   stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
 
-  
   // if (metadata->methodType() == MethodType::Ack) {
   if (transactions_.find(k) != transactions_.end()) {
     // ACK_4XX metadata will updated later.
@@ -571,8 +583,9 @@ void ConnectionManager::ActiveTrans::startUpstreamResponse() {
   response_decoder_ = std::make_unique<ResponseDecoder>(*this);
 }
 
-SipFilters::ResponseStatus
-ConnectionManager::ActiveTrans::upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination, Network::Connection* return_connection) {
+SipFilters::ResponseStatus ConnectionManager::ActiveTrans::upstreamData(
+    MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
+    std::string return_destination, Network::Connection* return_connection) {
   ASSERT(response_decoder_ != nullptr);
   UNREFERENCED_PARAMETER(return_route);
   UNREFERENCED_PARAMETER(return_destination);
@@ -619,23 +632,23 @@ const Network::Connection* ConnectionManager::UpstreamActiveTrans::connection() 
 }
 
 void ConnectionManager::UpstreamActiveTrans::sendLocalReply(const DirectResponse& response,
-                                                    bool end_stream) {
+                                                            bool end_stream) {
   UNREFERENCED_PARAMETER(end_stream);
 
   Buffer::OwnedImpl buffer;
-  
-  metadata_->setEP(return_connection_->connectionInfoProvider().localAddress()->ip()->addressAsString());
+
+  metadata_->setEP(
+      return_connection_->connectionInfoProvider().localAddress()->ip()->addressAsString());
   const DirectResponse::ResponseType result = response.encode(*metadata_, buffer);
 
-  ENVOY_CONN_LOG(
-      debug, "send upstream local reply {} --> {} bytes {}\n{}", *return_connection_,
-      return_connection_->connectionInfoProvider().localAddress()->asStringView(),
-      return_connection_->connectionInfoProvider().remoteAddress()->asStringView(),
-      buffer.length(), buffer.toString());
+  ENVOY_CONN_LOG(debug, "send upstream local reply {} --> {} bytes {}\n{}", *return_connection_,
+                 return_connection_->connectionInfoProvider().localAddress()->asStringView(),
+                 return_connection_->connectionInfoProvider().remoteAddress()->asStringView(),
+                 buffer.length(), buffer.toString());
 
-  return_connection_->write(buffer, false);            
-  
-  //TODO implement stats related to upstream requests
+  return_connection_->write(buffer, false);
+
+  // TODO implement stats related to upstream requests
   switch (result) {
   case DirectResponse::ResponseType::SuccessReply:
     stats().upstream_response_success_.inc();
@@ -656,12 +669,13 @@ void ConnectionManager::UpstreamActiveTrans::sendLocalReply(const DirectResponse
 }
 
 void ConnectionManager::UpstreamActiveTrans::startUpstreamResponse() {
-  ASSERT(false, "startUpstreamResponse() Not implemented");    
-  //response_decoder_ = std::make_unique<ResponseDecoder>(*this);
+  ASSERT(false, "startUpstreamResponse() Not implemented");
+  // response_decoder_ = std::make_unique<ResponseDecoder>(*this);
 }
 
-SipFilters::ResponseStatus
-ConnectionManager::UpstreamActiveTrans::upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination, Network::Connection* return_connection) {
+SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
+    MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
+    std::string return_destination, Network::Connection* return_connection) {
   route_ = return_route;
   destination_ = return_destination;
   return_connection_ = return_connection;
@@ -681,7 +695,9 @@ ConnectionManager::UpstreamActiveTrans::upstreamData(MessageMetadataSharedPtr me
     std::unique_ptr<Encoder> encoder = std::make_unique<EncoderImpl>();
     encoder->encode(metadata, buffer);
 
-    ENVOY_LOG(debug, "sending upstream request downstream to {}. {} bytes \n{}", parent_.local_ingress_id_->getDownstreamConnectionID(), buffer.length(), buffer.toString());
+    ENVOY_LOG(debug, "sending upstream request downstream to {}. {} bytes \n{}",
+              parent_.local_ingress_id_->getDownstreamConnectionID(), buffer.length(),
+              buffer.toString());
     parent_.read_callbacks_->connection().write(buffer, false);
 
     return SipFilters::ResponseStatus::Complete;
@@ -704,45 +720,53 @@ void ConnectionManager::UpstreamActiveTrans::resetDownstreamConnection() {
 
 // end of upstreamActiveTrans
 
-ConnectionManager::DownstreamConnectionInfoItem::DownstreamConnectionInfoItem(ConnectionManager& parent)
-    : parent_(parent), stream_info_(parent.time_source_, parent.read_callbacks_->connection().connectionInfoProviderSharedPtr())  {}
+ConnectionManager::DownstreamConnectionInfoItem::DownstreamConnectionInfoItem(
+    ConnectionManager& parent)
+    : parent_(parent),
+      stream_info_(parent.time_source_,
+                   parent.read_callbacks_->connection().connectionInfoProviderSharedPtr()) {}
 
 // // // SipFilters::DecoderFilterCallbacks
-const Network::Connection* 
-ConnectionManager::DownstreamConnectionInfoItem::connection() const   { 
+const Network::Connection* ConnectionManager::DownstreamConnectionInfoItem::connection() const {
   return &parent_.read_callbacks_->connection();
 }
 
-SipFilterStats& ConnectionManager::DownstreamConnectionInfoItem::stats() { return parent_.config_.stats(); }
+SipFilterStats& ConnectionManager::DownstreamConnectionInfoItem::stats() {
+  return parent_.config_.stats();
+}
 
-std::shared_ptr<SipSettings> ConnectionManager::DownstreamConnectionInfoItem::settings() const  { 
-  return parent_.config_.settings(); 
+std::shared_ptr<SipSettings> ConnectionManager::DownstreamConnectionInfoItem::settings() const {
+  return parent_.config_.settings();
 }
 
 void ConnectionManager::DownstreamConnectionInfoItem::startUpstreamResponse() {
-    // message_decoder_ = std::make_unique<ResponseDecoder>(*this);
+  // message_decoder_ = std::make_unique<ResponseDecoder>(*this);
 }
 
-SipFilters::ResponseStatus ConnectionManager::DownstreamConnectionInfoItem::upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, std::string return_destination, Network::Connection* return_connection) { 
+SipFilters::ResponseStatus ConnectionManager::DownstreamConnectionInfoItem::upstreamData(
+    MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
+    std::string return_destination, Network::Connection* return_connection) {
   std::string&& k = std::string(metadata->transactionId().value());
 
-  if (upstreamTransactionInfo()->hasTransaction(k)) {;
+  if (upstreamTransactionInfo()->hasTransaction(k)) {
+    ;
     auto active_trans = upstreamTransactionInfo()->getTransaction(k);
-    return active_trans->upstreamData(metadata, return_route, return_destination, return_connection);
+    return active_trans->upstreamData(metadata, return_route, return_destination,
+                                      return_connection);
   }
-  
+
   auto active_trans = std::make_shared<UpstreamActiveTrans>(parent_, metadata);
   active_trans->createFilterChain();
   upstreamTransactionInfo()->insertTransaction(k, active_trans);
 
-  // keep the counter happy to avoid crashes when the UpstreamActiveTrans decrements 
+  // keep the counter happy to avoid crashes when the UpstreamActiveTrans decrements
   // Todo decide what if this should be a different stat..
-  //parent_.stats_.request_active_.inc();
-  
+  // parent_.stats_.request_active_.inc();
+
   return active_trans->upstreamData(metadata, return_route, return_destination, return_connection);
 }
 
-void DownstreamConnectionInfos::init()  {
+void DownstreamConnectionInfos::init() {
   // Note: `this` and `cluster_name` have a lifetime of the filter.
   // That may be shorter than the tls callback if the listener is torn down shortly after it is
   // created. We use a weak pointer to make sure this object outlives the tls callbacks.
@@ -757,54 +781,66 @@ void DownstreamConnectionInfos::init()  {
       });
 }
 
-void DownstreamConnectionInfos::insertDownstreamConnection(std::string conn_id, ConnectionManager& conn_manager) {
+void DownstreamConnectionInfos::insertDownstreamConnection(std::string conn_id,
+                                                           ConnectionManager& conn_manager) {
   if (hasDownstreamConnection(conn_id)) {
     return;
   }
-  
-  tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(std::make_pair(
-      conn_id, std::make_shared<ConnectionManager::DownstreamConnectionInfoItem>(conn_manager)));
+
+  tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(
+      std::make_pair(conn_id, std::make_shared<ConnectionManager::DownstreamConnectionInfoItem>(
+                                  conn_manager)));
 }
 
 size_t DownstreamConnectionInfos::size() {
-  return tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.size();
+  return tls_->getTyped<ThreadLocalDownstreamConnectionInfo>()
+      .downstream_connection_info_map_.size();
 }
 
 void DownstreamConnectionInfos::deleteDownstreamConnection(std::string&& conn_id) {
   if (hasDownstreamConnection(conn_id)) {
     // fixme - probably need to have this run on the main thread?
-    tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.erase(conn_id);
+    tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.erase(
+        conn_id);
   }
 }
 
 bool DownstreamConnectionInfos::hasDownstreamConnection(std::string& conn_id) {
-  return tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.contains(conn_id);
+  return tls_->getTyped<ThreadLocalDownstreamConnectionInfo>()
+      .downstream_connection_info_map_.contains(conn_id);
 }
 
-SipFilters::DecoderFilterCallbacks& DownstreamConnectionInfos::getDownstreamConnection(std::string& conn_id) {
-  return *(tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.at(conn_id));
+SipFilters::DecoderFilterCallbacks&
+DownstreamConnectionInfos::getDownstreamConnection(std::string& conn_id) {
+  return *(tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.at(
+      conn_id));
 }
 
 std::string DownstreamConnectionInfos::dumpDownstreamConnection() {
   std::stringstream output;
-  absl::flat_hash_map<std::string, std::shared_ptr<SipFilters::DecoderFilterCallbacks>> dc_map = tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_;
+  absl::flat_hash_map<std::string, std::shared_ptr<SipFilters::DecoderFilterCallbacks>> dc_map =
+      tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_;
   for (auto element = dc_map.begin(); element != dc_map.end(); element++) {
-    output << "   Downstream Connection ID: '" << element->first << "'; Downstream Connection pointer '" << element->second << "'\n";
+    output << "   Downstream Connection ID: '" << element->first
+           << "'; Downstream Connection pointer '" << element->second << "'\n";
   }
   return output.str();
 }
 
 void SipProxy::ThreadLocalUpstreamTransactionsInfo::auditTimerAction() {
   const auto p1 = dispatcher_.timeSource().systemTime();
-  for (auto it = upstream_transaction_info_map_.cbegin(); it != upstream_transaction_info_map_.cend(); ) {
+  for (auto it = upstream_transaction_info_map_.cbegin();
+       it != upstream_transaction_info_map_.cend();) {
     auto key = it->first;
     auto trans_to_end = it->second;
-    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(p1 - trans_to_end->streamInfo().startTime());
+    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
+        p1 - trans_to_end->streamInfo().startTime());
     if (diff.count() >= transaction_timeout_.count()) {
       it++;
       trans_to_end->onReset();
       upstream_transaction_info_map_.erase(key);
-      ENVOY_LOG(info, "Removing from cache upstream transaction with ID {} due to timeout reached", key);
+      ENVOY_LOG(info, "Removing from cache upstream transaction with ID {} due to timeout reached",
+                key);
       continue;
     }
     it++;
@@ -827,14 +863,16 @@ void SipProxy::UpstreamTransactionsInfo::init() {
       });
 }
 
-void SipProxy::UpstreamTransactionsInfo::insertTransaction(std::string transaction_id, std::shared_ptr<ConnectionManager::UpstreamActiveTrans> active_trans) {
+void SipProxy::UpstreamTransactionsInfo::insertTransaction(
+    std::string transaction_id,
+    std::shared_ptr<ConnectionManager::UpstreamActiveTrans> active_trans) {
   ENVOY_LOG(debug, "Inserting into cache upstream transaction with ID {} ... ", transaction_id);
   if (hasTransaction(transaction_id)) {
     return;
   }
 
-  tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transaction_info_map_.emplace(std::make_pair(
-      transaction_id, active_trans));
+  tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transaction_info_map_.emplace(
+      std::make_pair(transaction_id, active_trans));
 }
 
 void SipProxy::UpstreamTransactionsInfo::deleteTransaction(std::string&& transaction_id) {
@@ -843,23 +881,26 @@ void SipProxy::UpstreamTransactionsInfo::deleteTransaction(std::string&& transac
     tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>()
         .upstream_transaction_info_map_.at(transaction_id)
         ->onReset();
-    tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>()
-        .upstream_transaction_info_map_.erase(transaction_id);
+    tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transaction_info_map_.erase(
+        transaction_id);
   }
 }
 
 bool SipProxy::UpstreamTransactionsInfo::hasTransaction(std::string& transaction_id) {
   return tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transaction_info_map_.find(
-              transaction_id) !=
-          tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transaction_info_map_.end();
+             transaction_id) !=
+         tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transaction_info_map_.end();
 }
 
-std::shared_ptr<SipProxy::ConnectionManager::UpstreamActiveTrans> SipProxy::UpstreamTransactionsInfo::getTransaction(std::string& transaction_id) {
-  return tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transaction_info_map_.at(transaction_id);
+std::shared_ptr<SipProxy::ConnectionManager::UpstreamActiveTrans>
+SipProxy::UpstreamTransactionsInfo::getTransaction(std::string& transaction_id) {
+  return tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transaction_info_map_.at(
+      transaction_id);
 }
 
 size_t SipProxy::UpstreamTransactionsInfo::size() {
-  return tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transaction_info_map_.size();
+  return tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>()
+      .upstream_transaction_info_map_.size();
 }
 
 } // namespace SipProxy

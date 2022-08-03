@@ -63,11 +63,11 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
         "//source/common/common:logger_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/network:filter_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/common/common:random_generator_lib"
     ],
 )
 

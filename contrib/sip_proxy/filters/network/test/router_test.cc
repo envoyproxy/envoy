@@ -26,11 +26,11 @@
 
 using testing::_;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::HasSubstr;
 
 namespace Envoy {
 namespace Extensions {
@@ -114,8 +114,8 @@ public:
     SipFilterStats stat = SipFilterStats::generateStats("test.", store_);
     EXPECT_CALL(config_, stats()).WillRepeatedly(ReturnRef(stat));
 
-    filter_ =
-        new NiceMock<MockConnectionManager>(config_, random_, time_source_, context_, nullptr, nullptr);
+    filter_ = new NiceMock<MockConnectionManager>(config_, random_, time_source_, context_, nullptr,
+                                                  nullptr);
     sip_settings_ = std::make_shared<SipSettings>(sip_proxy_config_.settings());
 
     EXPECT_CALL(*filter_, settings()).WillRepeatedly(Return(sip_settings_));
@@ -156,14 +156,14 @@ public:
                           bool set_destination = true) {
 
     const std::string SIP_INVITE = // addNewMsgHeader needs a raw_msg with a Content header
-      "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
-      "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
-      "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
-      "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
-      "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
-      "Content-Type: application/sdp\x0d\x0a"
-      "Content-Length:  0\x0d\x0a"
-      "\x0d\x0a";
+        "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
+        "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+        "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
+        "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
+        "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+        "Content-Type: application/sdp\x0d\x0a"
+        "Content-Length:  0\x0d\x0a"
+        "\x0d\x0a";
     Buffer::OwnedImpl buffer_;
     buffer_.add(SIP_INVITE);
 
@@ -379,12 +379,15 @@ TEST_F(SipRouterTest, AddXEnvoyOriginIngressHeader) {
   initializeMetadata(MsgType::Request);
   startRequest();
   connectUpstream();
- 
-  EXPECT_CALL(upstream_connection_, write(_, _)).WillOnce(Invoke([this](Buffer::Instance& buffer, bool) -> void {
-    auto header_name = std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress));
-    EXPECT_THAT(buffer.toString(), HasSubstr(header_name + ": " + callbacks_.ingress_id_.toHeaderValue()));
-    buffer.drain(buffer.length());
-  }));
+
+  EXPECT_CALL(upstream_connection_, write(_, _))
+      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool) -> void {
+        auto header_name =
+            std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress));
+        EXPECT_THAT(buffer.toString(),
+                    HasSubstr(header_name + ": " + callbacks_.ingress_id_.toHeaderValue()));
+        buffer.drain(buffer.length());
+      }));
 
   completeRequest();
   destroyRouter();
