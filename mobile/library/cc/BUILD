@@ -26,6 +26,7 @@ envoy_cc_library(
         "engine_callbacks.cc",
         "headers.cc",
         "headers_builder.cc",
+        "key_value_store.cc",
         "log_level.cc",
         "request_headers.cc",
         "request_headers_builder.cc",
@@ -50,6 +51,7 @@ envoy_cc_library(
         "envoy_error.h",
         "headers.h",
         "headers_builder.h",
+        "key_value_store.h",
         "log_level.h",
         "pulse_client.h",
         "request_headers.h",
@@ -75,6 +77,7 @@ envoy_cc_library(
     deps = [
         "//library/common:envoy_main_interface_lib_no_stamp",
         "//library/common/data:utility_lib",
+        "//library/common/extensions/key_value/platform:config",
     ],
 )
 
