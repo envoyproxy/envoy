@@ -14,7 +14,7 @@ This image has all software needed to build Envoy. From your Envoy directory::
 
   $ pwd
   src/envoy
-  $ ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release'
+  $ ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release.server_only'
 
 That command will take some time to run because it is compiling an Envoy binary and running tests.
 
