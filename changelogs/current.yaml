@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: build
+  change: |
+    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
 - area: http
   change: |
     Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
@@ -12,26 +15,73 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: prometheus_stats
+  change: |
+    removed blank line for being compatible with OpenMetrics.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: transport_socket
+  change: |
+    fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: auto_config
+  change: |
+    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
+- area: grpc
+  change: |
+    remove ``envoy.reloadable_features.enable_grpc_async_client_cache`` and legacy code paths.
+- area: hcm
+  change: |
+    removed ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding`` and legacy code paths.
 - area: http
   change: |
     removed ``envoy.reloadable_features.proxy_120_103`` and legacy code paths.
-
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.sanitize_http_header_referer`` and legacy code paths.
 - area: lightstep
   change: |
     removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
+- area: listener
+  change: |
+    removed ``envoy.reloadable_features.internal_address`` and legacy code paths.
+- area: router
+  change: |
+    removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
+- area: dns_resolver
+  change: |
+    added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
+- area: gzip
+  change: |
+    added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
+- area: build
+  change: |
+    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
+- area: thrift
+  change: |
+    added stats for downstream connection close to detect SR drop.
+- area: cors
+  change: |
+    added support for cors PNA. This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_cors_private_network_access`` to false. More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
 - area: upstream
   change: |
     added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
+- area: access_log
+  change: |
+    updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
 
 deprecated:

@@ -16,8 +16,7 @@ ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
                                    const envoy::config::core::v3::GrpcService& grpc_service,
                                    const StreamInfo::StreamInfo& stream_info) {
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(
-      client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true,
-                                                Grpc::CacheOption::AlwaysCache));
+      client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true));
   return std::make_unique<ExternalProcessorStreamImpl>(std::move(grpcClient), callbacks,
                                                        stream_info);
 }
