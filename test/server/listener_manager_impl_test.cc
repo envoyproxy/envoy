@@ -687,7 +687,7 @@ public:
   std::string name() const override { return "stats_test"; }
 
   bool isTerminalFilterByProto(const Protobuf::Message&,
-                               Server::Configuration::FactoryContext&) override {
+                               Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
 
@@ -7223,7 +7223,7 @@ address:
   addOrUpdateListener(listener);
   EXPECT_EQ(1U, manager_->listeners().size());
   Network::SocketSharedPtr listen_socket =
-      manager_->listeners().front().get().listenSocketFactory().getListenSocket(0);
+      manager_->listeners().front().get().listenSocketFactories()[0]->getListenSocket(0);
   Network::UdpPacketWriterPtr udp_packet_writer =
       manager_->listeners()
           .front()

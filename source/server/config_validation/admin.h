@@ -23,9 +23,10 @@ public:
       : socket_(address ? std::make_shared<Network::TcpListenSocket>(nullptr, std::move(address),
                                                                      nullptr)
                         : nullptr) {}
-  bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) override;
-  bool addStreamingHandler(const std::string&, const std::string&, GenRequestFn, bool,
-                           bool) override;
+  bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool,
+                  const ParamDescriptorVec& = {}) override;
+  bool addStreamingHandler(const std::string&, const std::string&, GenRequestFn, bool, bool,
+                           const ParamDescriptorVec& = {}) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
   ConfigTracker& getConfigTracker() override;

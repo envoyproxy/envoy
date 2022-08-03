@@ -32,6 +32,9 @@ public:
 
   // Completes rendering any buffered data.
   virtual void finalize(Buffer::Instance& response) PURE;
+
+  // Indicates that no stats for a particular type have been found.
+  virtual void noStats(Buffer::Instance&, absl::string_view) {}
 };
 
 // Implements the Render interface for simple textual representation of stats.

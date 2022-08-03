@@ -198,9 +198,6 @@ bug_fixes:
     fixed a bug where an expired certificate sets a big number for ``days_until_expiration``. After this fix, ``0`` is set.
 
 removed_config_or_runtime:
-- area: auto_config
-  change: |
-    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
 - area: compressor
   change: |
     removed ``envoy.reloadable_features.fix_added_trailers`` and legacy code paths.
@@ -210,33 +207,18 @@ removed_config_or_runtime:
 - area: ext_authz
   change: |
     removed ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` and legacy code paths.
-- area: hcm
-  change: |
-    removed ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding`` and legacy code paths.
 - area: http
   change: |
     removed ``envoy.reloadable_features.correct_scheme_and_xfp`` and legacy code paths.
 - area: http
   change: |
     removed ``envoy.reloadable_features.validate_connect`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings`` and legacy code paths.
-- area: listener
-  change: |
-    removed ``envoy.reloadable_features.internal_address`` and legacy code paths.
 - area: tcp_proxy
   change: |
     removed ``envoy.reloadable_features.new_tcp_connection_pool`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.sanitize_http_header_referer`` and legacy code paths.
 - area: conn pool
   change: |
     removed ``envoy.reloadable_features.conn_pool_delete_when_idle`` and legacy code paths.
-- area: router
-  change: |
-    removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
 - area: runtime
   change: |
     removed ``envoy.restart_features.no_runtime_singleton`` and replaced with ``envoy.restart_features.remove_runtime_singleton``.
