@@ -663,14 +663,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "nlohmann JSON",
         project_desc = "Fast JSON parser/generator for C++",
         project_url = "https://nlohmann.github.io/json",
-        version = "3.10.5",
-        sha256 = "5daca6ca216495edf89d167f808d1d03c4a4d929cef7da5e10f135ae1540c7e4",
+        version = "3.11.1",
+        sha256 = "598becb62ee0e01cf32795073c8ae09b6e95335cd43a4417b785d93ce105b0d0",
         strip_prefix = "json-{version}",
         urls = ["https://github.com/nlohmann/json/archive/v{version}.tar.gz"],
         # This will be a replacement for rapidJSON used in extensions and may also be a fast
         # replacement for protobuf JSON.
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-01-03",
+        release_date = "2022-08-01",
         cpe = "cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp:*",
     ),
     # This is an external dependency needed while running the
