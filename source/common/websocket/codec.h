@@ -36,9 +36,9 @@ constexpr uint8_t MASKING_KEY_LENGTH = 4;
 //  +-------------------------------+-------------------------------+
 //  | Masking-key (continued)       |          Payload Data         |
 //  +-------------------------------- - - - - - - - - - - - - - - - +
-//  :   Payload Data continued ...    Payload Data continued ...    :                                                             :
+//  : .... Payload Data continued .... Payload Data continued ..... :
 //  + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
-//  |   Payload Data continued ...    Payload Data continued ...    |
+//  | .... Payload Data continued .... Payload Data continued ..... |
 //  +---------------------------------------------------------------+
 
 struct Frame {
