@@ -18,6 +18,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: transport_socket
+  change: |
+    fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

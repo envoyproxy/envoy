@@ -125,7 +125,7 @@ public:
   void expect400(Buffer::OwnedImpl& buffer, absl::string_view expected_details,
                  absl::string_view expected_message);
   void testRequestHeadersExceedLimit(std::string header_string, std::string error_message,
-                                     absl::string_view details = "");
+                                     absl::string_view details);
   void testTrailersExceedLimit(std::string trailer_string, std::string error_message,
                                bool enable_trailers);
   void testRequestHeadersAccepted(std::string header_string);
@@ -317,9 +317,7 @@ void Http1ServerConnectionImplTest::testRequestHeadersExceedLimit(std::string he
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), error_message);
-  if (!details.empty()) {
-    EXPECT_EQ(details, response_encoder->getStream().responseDetails());
-  }
+  EXPECT_EQ(details, response_encoder->getStream().responseDetails());
 }
 
 void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string header_string) {
@@ -922,11 +920,6 @@ TEST_P(Http1ServerConnectionImplTest, Http11AbsoluteEnabledNoOp) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http11InvalidRequest) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   // Invalid because www.somewhere.com is not an absolute path nor an absolute url
@@ -1794,14 +1787,7 @@ TEST_P(Http1ServerConnectionImplTest, DoubleRequest) {
 
 TEST_P(Http1ServerConnectionImplTest, RequestWithTrailersDropped) { expectTrailersTest(false); }
 
-TEST_P(Http1ServerConnectionImplTest, RequestWithTrailersKept) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
-  expectTrailersTest(true);
-}
+TEST_P(Http1ServerConnectionImplTest, RequestWithTrailersKept) { expectTrailersTest(true); }
 
 TEST_P(Http1ServerConnectionImplTest, IgnoreUpgradeH2c) {
   initialize();
@@ -2951,11 +2937,6 @@ TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_P(Http1ServerConnectionImplTest, ManyTrailersRejected) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   // Send a request with 101 headers.
   testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n",
                           "http/1.1 protocol error: trailers count exceeds limit", true);
@@ -3028,7 +3009,7 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
   testRequestHeadersExceedLimit(long_string, "http/1.1 protocol error: headers size exceeds limit",
-                                "");
+                                "http1.headers_too_large");
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejectedBeyondMaxConfigurable) {
@@ -3040,7 +3021,7 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersRejectedBeyondMaxConfig
   max_request_headers_kb_ = 8192;
   std::string long_string = "big: " + std::string(8193 * 1024, 'q') + "\r\n";
   testRequestHeadersExceedLimit(long_string, "http/1.1 protocol error: headers size exceeds limit",
-                                "");
+                                "http1.headers_too_large");
 }
 
 // Tests that the default limit for the number of request headers is 100.

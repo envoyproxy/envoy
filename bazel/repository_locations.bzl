@@ -663,14 +663,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "nlohmann JSON",
         project_desc = "Fast JSON parser/generator for C++",
         project_url = "https://nlohmann.github.io/json",
-        version = "3.10.5",
-        sha256 = "5daca6ca216495edf89d167f808d1d03c4a4d929cef7da5e10f135ae1540c7e4",
+        version = "3.11.1",
+        sha256 = "598becb62ee0e01cf32795073c8ae09b6e95335cd43a4417b785d93ce105b0d0",
         strip_prefix = "json-{version}",
         urls = ["https://github.com/nlohmann/json/archive/v{version}.tar.gz"],
         # This will be a replacement for rapidJSON used in extensions and may also be a fast
         # replacement for protobuf JSON.
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-01-03",
+        release_date = "2022-08-01",
         cpe = "cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp:*",
     ),
     # This is an external dependency needed while running the
@@ -737,11 +737,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Go rules for Bazel",
         project_desc = "Bazel rules for the Go language",
         project_url = "https://github.com/bazelbuild/rules_go",
-        version = "0.33.0",
-        sha256 = "685052b498b6ddfe562ca7a97736741d87916fe536623afb7da2824c0211c369",
+        version = "0.34.0",
+        sha256 = "16e9fca53ed6bd4ff4ad76facc9b7b651a89db1689a2877d6fd7b82aa824e366",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
         use_category = ["build", "api"],
-        release_date = "2022-06-06",
+        release_date = "2022-07-19",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
@@ -1212,7 +1212,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2022-01-28",
+            release_date = "2022-04-22",
             cpe = "N/A",
         )
 
