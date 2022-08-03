@@ -212,9 +212,9 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
       case FilterState::DecodeServingFromCache:
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::Destroyed:
-        ENVOY_BUG(false, absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
-                                      "response required validation, but filter state is ",
-                                      filter_state));
+        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
+                                  "response required validation, but filter state is ",
+                                  filter_state));
       }
       return LookupStatus::Unknown;
     }
@@ -225,10 +225,9 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
     case CacheEntryStatus::LookupError:
       return LookupStatus::LookupError;
     }
-    ENVOY_BUG(false,
-              absl::StrCat(
-                  "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
-                  std::to_string(static_cast<int>(filter_state))));
+    IS_ENVOY_BUG(absl::StrCat(
+        "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
+        std::to_string(static_cast<int>(filter_state))));
     return LookupStatus::Unknown;
   }
   // Either decodeHeaders decided not to do a cache lookup (because the
