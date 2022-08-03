@@ -14,7 +14,7 @@ By enabling compression in Envoy you can save some network bandwidth, at the exp
 
 Envoy supports compression and decompression for both requests and responses.
 
-This sandbox provides an example of response compression and request decompression served over ``HTTP``. Although ``HTTPS`` is not demonstrated, compression can be used for this also.
+This sandbox provides examples of response compression and request decompression served over ``HTTP``. Although ``HTTPS`` is not demonstrated, compression can be used for this also.
 
 The sandbox covers three scenarios:
 
@@ -67,11 +67,11 @@ As only files with a content-type of ``application/json`` are configured to be g
 Step 3: Test Envoy’s decompression of downstream files
 ******************************************************
 
-The sandbox is configured with one endpoint on port ``10000`` for uploading downstream files:
+The sandbox is configured with an endpoint for uploading downstream files:
 
 - ``/upload``
 
-Use ``curl`` to get compressed file ``file.gz``
+Use ``curl`` to get the compressed file ``file.gz``
 
 .. code-block:: console
 
@@ -79,7 +79,7 @@ Use ``curl`` to get compressed file ``file.gz``
 
 Use ``curl`` to check that the response from uploading ``file.gz`` contains the ``decompressed-size`` header.
 
-You will need to add an ``content-encoding: gzip`` request header.
+You will need to add the ``content-encoding: gzip`` request header.
 
 .. code-block:: console
 
