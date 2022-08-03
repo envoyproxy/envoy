@@ -401,15 +401,6 @@ envoy.filters.http.ratelimit:
   type_urls:
   - envoy.extensions.filters.http.ratelimit.v3.RateLimit
   - envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
-envoy.filters.http.rate_limit_quota:
-  categories:
-  - envoy.filters.http
-  security_posture: unknown
-  status: alpha
-  type_urls:
-  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
-  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride
-  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
 envoy.filters.http.rbac:
   categories:
   - envoy.filters.http
