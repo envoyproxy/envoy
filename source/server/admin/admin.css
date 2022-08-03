@@ -1,0 +1,42 @@
+.home-table {
+  font-family: sans-serif;
+  font-size: medium;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.home-data {
+  text-align: left;
+  padding: 4px;
+}
+
+.home-form {
+  margin-bottom: 0;
+}
+
+.button-as-link {
+  background: none!important;
+  border: none;
+  padding: 0!important;
+  font-family: sans-serif;
+  font-size: medium;
+  color: #069;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gray {
+  background-color: #dddddd;
+}
+
+.vert-space {
+  height: 4px;
+}
+
+.option {
+  padding-bottom: 4px;
+  padding-top: 4px;
+  padding-right: 4px;
+  padding-left: 20px;
+  text-align: right;
+}

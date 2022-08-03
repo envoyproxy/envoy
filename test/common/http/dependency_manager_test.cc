@@ -1,12 +1,10 @@
-#include "source/extensions/filters/network/http_connection_manager/dependency_manager.h"
+#include "source/common/http/dependency_manager.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
-namespace HttpConnectionManager {
+namespace Http {
 namespace {
 
 using envoy::extensions::filters::common::dependency::v3::Dependency;
@@ -134,7 +132,5 @@ TEST(DependencyManagerTest, MisorderedFiltersInvalid) {
 }
 
 } // namespace
-} // namespace HttpConnectionManager
-} // namespace NetworkFilters
-} // namespace Extensions
+} // namespace Http
 } // namespace Envoy

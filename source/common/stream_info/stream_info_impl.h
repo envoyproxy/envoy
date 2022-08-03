@@ -260,7 +260,7 @@ struct StreamInfoImpl : public StreamInfo {
   void setTraceReason(Tracing::Reason reason) override { trace_reason_ = reason; }
   Tracing::Reason traceReason() const override { return trace_reason_; }
 
-  void dumpState(std::ostream& os, int indent_level = 0) const {
+  void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
