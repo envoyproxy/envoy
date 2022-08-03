@@ -987,6 +987,32 @@ TEST_P(ListenerManagerImplTest, RejectListenerWithInternalListenerAddress) {
                             "instead of address for internal listeners");
 }
 
+TEST_P(ListenerManagerImplTest, RejectListenerWithInternalAndApiListener) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    internal_listener: {}
+    api_listener:
+      api_listener:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        stat_prefix: hcm
+        route_config:
+          name: api_router
+          virtual_hosts:
+            - name: api
+              domains:
+                - "*"
+              routes:
+                - match:
+                    prefix: "/"
+                  route:
+                    cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+      "error adding listener named 'foo': api_listener and internal_listener cannot be both set");
+}
+
 TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
   const std::string yaml = R"EOF(
     name: "foo"

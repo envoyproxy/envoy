@@ -43,7 +43,7 @@ message EnvoyInternalAddress {
   }
 
   // Specifies an endpoint identifier to distinguish between multiple endpoints for the same internal listener in a
-  // single upstream pool.
+  // single upstream pool. Only used in the upstream addresses.
   string endpoint_id = 2;
 }
 

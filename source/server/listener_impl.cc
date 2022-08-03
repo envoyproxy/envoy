@@ -537,11 +537,6 @@ void ListenerImpl::buildInternalListener() {
                                        "when an internal listener config is provided",
                                        name_));
     }
-    if (config_.has_api_listener()) {
-      throw EnvoyException(fmt::format(
-          "error adding listener named '{}': internal address cannot be used in api listener",
-          name_));
-    }
     if ((config_.has_connection_balance_config() &&
          config_.connection_balance_config().has_exact_balance()) ||
         config_.enable_mptcp() ||

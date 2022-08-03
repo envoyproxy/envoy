@@ -336,6 +336,9 @@ message Listener {
     // Used to represent an internal listener which does not listen on OSI L4 address but can be used by the
     // :ref:`envoy cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` to create a user space connection to.
     // The internal listener acts as a TCP listener. It supports listener filters and network filter chains.
+    // Upstream clusters refer to the internal listeners by their :ref:`name
+    // <envoy_v3_api_field_config.listener.v3.Listener.name>`. :ref:`Address
+    // <envoy_v3_api_field_config.listener.v3.Listener.address>` must not be set on the internal listeners.
     //
     // There are some limitations that are derived from the implementation. The known limitations include:
     //

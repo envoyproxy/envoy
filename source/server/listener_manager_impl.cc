@@ -387,6 +387,11 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
   if (config.has_api_listener()) {
+    if (config.has_internal_listener()) {
+      throw EnvoyException(fmt::format(
+          "error adding listener named '{}': api_listener and internal_listener cannot be both set",
+          name));
+    }
     if (!api_listener_ && !added_via_api) {
       // TODO(junr03): dispatch to different concrete constructors when there are other
       // ApiListenerImplBase derived classes.
