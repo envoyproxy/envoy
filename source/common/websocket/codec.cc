@@ -40,7 +40,7 @@ void Decoder::frameMaskFlag(uint8_t mask_and_length) {
   // Set masked flag
   if (mask_and_length & 0x80) {
     frame_.is_masked_ = true;
-    masking_key_length_ = 4;
+    masking_key_length_ = MASKING_KEY_LENGTH;
   } else {
     frame_.is_masked_ = false;
     masking_key_length_ = 0;
@@ -64,6 +64,7 @@ void Decoder::frameDataEnd() {
   frame_.payload_length_ = 0;
   frame_.payload_ = nullptr;
   frame_.is_masked_ = false;
+  frame_.masking_key_ = 0;
 }
 
 uint64_t FrameInspector::inspect(const Buffer::Instance& data) {

@@ -17,6 +17,7 @@ constexpr uint8_t FRAME_OPCODE_CLOSE = 0x8;
 constexpr uint8_t FRAME_OPCODE_PING = 0x9;
 constexpr uint8_t FRAME_OPCODE_PONG = 0xA;
 
+constexpr uint8_t MASKING_KEY_LENGTH = 4;
 // wire format (https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
 // of WebSocket frame:
 //
@@ -51,10 +52,6 @@ struct Frame {
   uint32_t masking_key_;
   // websocket payload data (extension data and application data)
   Buffer::InstancePtr payload_;
-
-  // Data frames (e.g., non-control frames) are identified by opcodes
-  // where the most significant bit of the opcode is 0
-  bool isDataFrame;
 };
 
 enum class State {
@@ -76,9 +73,11 @@ enum class State {
 
 class FrameInspector {
 public:
-  // Inspects the given buffer with WebSocket data frame and updates the frame count.
+  // Inspects the given buffer with WebSocket data frames and updates the frame count.
   // Invokes visitor callbacks for each frame in the following sequence:
-  //   "frameStart frameDataStart frameData* frameDataEnd"
+  // ----------------------------------------------------------------------------------
+  //  frameStart frameMaskFlag frameMaskingKey? frameDataStart frameData* frameDataEnd
+  // ----------------------------------------------------------------------------------
   // If frameStart returns false, then the inspector aborts.
   // Returns the increase in the frame count.
   uint64_t inspect(const Buffer::Instance& input);
@@ -90,13 +89,14 @@ public:
   // Returns the current state in the frame parsing.
   State state() const { return state_; }
 
-  uint8_t maskingKeyLength() const { return masking_key_length_; }
-
   virtual ~FrameInspector() = default;
 
 protected:
   virtual bool frameStart(uint8_t) { return true; }
-  virtual void frameMaskFlag(uint8_t) {}
+  virtual void frameMaskFlag(uint8_t mask_and_length) {
+    masking_key_length_ = (mask_and_length & 0x80) ? MASKING_KEY_LENGTH : 0;
+    length_ = mask_and_length & 0x7F;
+  }
   virtual void frameMaskingKey() {}
   virtual void frameDataStart() {}
   virtual void frameData(uint8_t*, uint64_t) {}
