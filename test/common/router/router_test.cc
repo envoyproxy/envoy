@@ -1135,10 +1135,14 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
                         absl::optional<uint64_t>(absl::nullopt)));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  // The reset will be converted into a local reply.
+  EXPECT_CALL(
+      callbacks_,
+      sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, UpstreamTimeoutNoStatsEmissionWhenRuntimeGuardFalse) {
@@ -5676,11 +5680,17 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
         return Http::okStatus();
       }));
 
+  EXPECT_CALL(
+      callbacks_,
+      sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
+      .WillOnce(InvokeWithoutArgs([] {}));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_.route_->route_entry_, appendXfh()).WillOnce(Return(true));
   router_.decodeHeaders(incoming_headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, AutoHostRewriteDisabled) {
@@ -5710,6 +5720,7 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   router_.decodeHeaders(incoming_headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, UpstreamSocketOptionsReturnedEmpty) {

@@ -758,8 +758,13 @@ public:
   std::vector<Http::Protocol>
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
-  void createUpstreamFilterChain(Http::FilterChainManager& manager) const override {
+  // Http::FilterChainFactory
+  void createFilterChain(Http::FilterChainManager& manager) const override {
     Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
+  }
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
+                                Http::FilterChainManager&) const override {
+    return false;
   }
 
   Http::Http1::CodecStats& http1CodecStats() const override;

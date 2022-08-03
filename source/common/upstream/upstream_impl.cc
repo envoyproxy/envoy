@@ -979,17 +979,19 @@ ClusterInfoImpl::ClusterInfoImpl(
     filter_factories_.push_back(std::move(callback));
   }
 
-  std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
-      Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
-          server_factory_context_);
-  Http::FilterChainUtility::FiltersList http_filters = config.http_filters();
+  if (http_protocol_options_ && !http_protocol_options_->http_filters_.empty()) {
+    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
+        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+            server_factory_context_);
+    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
 
-  std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
-  Http::FilterChainHelper<Server::Configuration::ServerFactoryContext,
-                          Server::Configuration::UpstreamHttpFilterConfigFactory>
-      helper(*filter_config_provider_manager, server_factory_context_, server_factory_context_,
-             prefix);
-  helper.processFilters(http_filters, "http", "http", http_filter_factories_, false);
+    std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
+    Http::FilterChainHelper<Server::Configuration::ServerFactoryContext,
+                            Server::Configuration::UpstreamHttpFilterConfigFactory>
+        helper(*filter_config_provider_manager, server_factory_context_, server_factory_context_,
+               prefix);
+    helper.processFilters(http_filters, "http", "http", http_filter_factories_, false);
+  }
 }
 
 // Configures the load balancer based on config.load_balancing_policy

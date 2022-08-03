@@ -36,15 +36,6 @@ class UpstreamRequestFilterManagerCallbacks;
 class UpstreamFilterManager;
 class CodecFilter;
 
-// TODO(alyssawilk) make the cluster implement this.
-class FakeFilterChainFactory : public Http::FilterChainFactory {
-public:
-  void createFilterChain(Http::FilterChainManager&) {}
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&) {
-    return false;
-  }
-};
-
 // The base request for Upstream.
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public UpstreamToDownstream,
@@ -119,7 +110,6 @@ public:
   };
 
   void readEnable();
-  void encodeBodyAndTrailers();
 
   // Getters and setters
   Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }
@@ -150,12 +140,6 @@ private:
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return stream_info_.upstreamInfo()->upstreamTiming();
   }
-  bool shouldSendEndStream() {
-    // Only encode end stream if the full request has been received, the body
-    // has been sent, and any trailers or metadata have also been sent.
-    return router_sent_end_stream_ && !buffered_request_body_ && !encode_trailers_ &&
-           downstream_metadata_map_vector_.empty();
-  }
   void addResponseHeadersSize(uint64_t size) {
     response_headers_size_ = response_headers_size_.value_or(0) + size;
   }
@@ -170,7 +154,6 @@ private:
   Event::TimerPtr per_try_idle_timeout_;
   std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
-  Buffer::InstancePtr buffered_request_body_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   DownstreamWatermarkManager downstream_watermark_manager_{*this};
   Tracing::SpanPtr span_;
@@ -183,7 +166,6 @@ private:
   // access logging is configured.
   Http::ResponseHeaderMapPtr upstream_headers_;
   Http::ResponseTrailerMapPtr upstream_trailers_;
-  Http::MetadataMapVector downstream_metadata_map_vector_;
   std::shared_ptr<CodecFilter> codec_filter_;
 
   // Tracks the number of times the flow of data from downstream has been disabled.
@@ -213,7 +195,6 @@ private:
   Event::TimerPtr max_stream_duration_timer_;
 
   std::unique_ptr<UpstreamRequestFilterManagerCallbacks> fm_callbacks_;
-  FakeFilterChainFactory fake_factory_;
   std::unique_ptr<Http::FilterManager> filter_manager_;
 };
 
@@ -342,6 +323,8 @@ public:
   virtual Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
+  void shipHeadersIfPaused(Http::RequestHeaderMap& headers);
+
   // This bridge connects the upstream stream to the filter manager.
   class CodecBridge : public UpstreamToDownstream {
   public:
@@ -377,6 +360,7 @@ public:
   Http::StreamDecoderFilterCallbacks* callbacks_;
   UpstreamRequest& request_;
   CodecBridge bridge_;
+  absl::optional<bool> latched_end_stream_;
 };
 
 } // namespace Router
