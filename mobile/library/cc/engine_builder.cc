@@ -83,6 +83,12 @@ EngineBuilder& EngineBuilder::addVirtualClusters(const std::string& virtual_clus
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addKeyValueStore(const std::string& name,
+                                               KeyValueStoreSharedPtr key_value_store) {
+  this->key_value_stores_[name] = key_value_store;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setAppVersion(const std::string& app_version) {
   this->app_version_ = app_version;
   return *this;
@@ -203,6 +209,14 @@ EngineSharedPtr EngineBuilder::build() {
   }
   auto envoy_engine =
       init_engine(this->callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
+
+  for (auto it = key_value_stores_.begin(); it != key_value_stores_.end(); ++it) {
+    // TODO(goaway): This leaks, but it's tied to the life of the engine.
+    envoy_kv_store* api = static_cast<envoy_kv_store*>(safe_malloc(sizeof(envoy_kv_store)));
+    *api = it->second->asEnvoyKeyValueStore();
+    register_platform_api(it->first.c_str(), api);
+  }
+
   run_engine(envoy_engine, config_str.c_str(), logLevelToString(this->log_level_).c_str(),
              this->admin_address_path_for_tests_.c_str());
 

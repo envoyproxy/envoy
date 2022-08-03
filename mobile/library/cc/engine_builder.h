@@ -3,8 +3,10 @@
 #include <memory>
 #include <string>
 
+#include "absl/container/flat_hash_map.h"
 #include "engine.h"
 #include "engine_callbacks.h"
+#include "key_value_store.h"
 #include "log_level.h"
 
 namespace Envoy {
@@ -31,6 +33,7 @@ public:
   addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds);
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
   EngineBuilder& addVirtualClusters(const std::string& virtual_clusters);
+  EngineBuilder& addKeyValueStore(const std::string& name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& setAppVersion(const std::string& app_version);
   EngineBuilder& setAppId(const std::string& app_id);
   EngineBuilder& setDeviceOs(const std::string& app_id);
@@ -78,6 +81,8 @@ private:
   int per_try_idle_timeout_seconds_ = 15;
   bool gzip_filter_ = true;
   bool brotli_filter_ = false;
+
+  absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
   // TODO(crockeo): add after filter integration
   // private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
