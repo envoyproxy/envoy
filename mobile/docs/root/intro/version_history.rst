@@ -45,6 +45,7 @@ Features:
 - iOS: A documentation archive is now included in the GitHub release artifact (:issue: `#2335 <2335>`)
 - api: improved C++ APIs compatibility with Java / Kotlin / Swift (:issue `#2362 <2362>`)
 - api: add option to use the a ``getaddrinfo``-based system DNS resolver instead of c-ares (:issue: `#2419 <2419>`)
+- iOS: add ``KeyValueStore`` protocol conformance to ``UserDefaults`` (:issue: `#2452 <2452>`)
 
 0.4.6 (April 26, 2022)
 ========================
