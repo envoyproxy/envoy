@@ -35,6 +35,7 @@ final class ViewController: UITableViewController {
       )
       .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
       .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
+      .addKeyValueStore(name: "demo-kv-store", keyValueStore: UserDefaults.standard)
       .setEventTracker { NSLog("Envoy event emitted: \($0)") }
       .forceIPv6(true)
       .build()
