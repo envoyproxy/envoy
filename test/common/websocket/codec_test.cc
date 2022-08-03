@@ -15,6 +15,78 @@ namespace Envoy {
 namespace WebSocket {
 namespace {
 
+TEST(WebSocketCodecTest, encodeHeader) {
+  Encoder encoder;
+  std::vector<uint8_t> buffer;
+
+  encoder.newFrameHeader(0x81, 5, false, 0, buffer);
+  EXPECT_EQ(buffer.size(), 2);
+  EXPECT_EQ(buffer[0], 0x81);
+  EXPECT_EQ(buffer[1], 0x05);
+
+  buffer.clear();
+  encoder.newFrameHeader(0x81, 5, true, 0x37fa213d, buffer);
+  EXPECT_EQ(buffer.size(), 6);
+  EXPECT_EQ(buffer[0], 0x81);
+  EXPECT_EQ(buffer[1], 0x85);
+  EXPECT_EQ(buffer[2], 0x37);
+  EXPECT_EQ(buffer[3], 0xfa);
+  EXPECT_EQ(buffer[4], 0x21);
+  EXPECT_EQ(buffer[5], 0x3d);
+
+  buffer.clear();
+  encoder.newFrameHeader(0x82, 256, false, 0, buffer);
+  EXPECT_EQ(buffer.size(), 4);
+  EXPECT_EQ(buffer[0], 0x82);
+  EXPECT_EQ(buffer[1], 0x7e);
+  EXPECT_EQ(buffer[2], 0x01);
+  EXPECT_EQ(buffer[3], 0x00);
+
+  buffer.clear();
+  encoder.newFrameHeader(0x82, 256, true, 0x37fa213d, buffer);
+  EXPECT_EQ(buffer.size(), 8);
+  EXPECT_EQ(buffer[0], 0x82);
+  EXPECT_EQ(buffer[1], 0xfe);
+  EXPECT_EQ(buffer[2], 0x01);
+  EXPECT_EQ(buffer[3], 0x00);
+  EXPECT_EQ(buffer[4], 0x37);
+  EXPECT_EQ(buffer[5], 0xfa);
+  EXPECT_EQ(buffer[6], 0x21);
+  EXPECT_EQ(buffer[7], 0x3d);
+
+  buffer.clear();
+  encoder.newFrameHeader(0x82, 77777, false, 0, buffer);
+  EXPECT_EQ(buffer.size(), 10);
+  EXPECT_EQ(buffer[0], 0x82);
+  EXPECT_EQ(buffer[1], 0x7f);
+  EXPECT_EQ(buffer[2], 0x00);
+  EXPECT_EQ(buffer[3], 0x00);
+  EXPECT_EQ(buffer[4], 0x00);
+  EXPECT_EQ(buffer[5], 0x00);
+  EXPECT_EQ(buffer[6], 0x00);
+  EXPECT_EQ(buffer[7], 0x01);
+  EXPECT_EQ(buffer[8], 0x2f);
+  EXPECT_EQ(buffer[9], 0xd1);
+
+  buffer.clear();
+  encoder.newFrameHeader(0x82, 77777, true, 0x37fa213d, buffer);
+  EXPECT_EQ(buffer.size(), 14);
+  EXPECT_EQ(buffer[0], 0x82);
+  EXPECT_EQ(buffer[1], 0xff);
+  EXPECT_EQ(buffer[2], 0x00);
+  EXPECT_EQ(buffer[3], 0x00);
+  EXPECT_EQ(buffer[4], 0x00);
+  EXPECT_EQ(buffer[5], 0x00);
+  EXPECT_EQ(buffer[6], 0x00);
+  EXPECT_EQ(buffer[7], 0x01);
+  EXPECT_EQ(buffer[8], 0x2f);
+  EXPECT_EQ(buffer[9], 0xd1);
+  EXPECT_EQ(buffer[10], 0x37);
+  EXPECT_EQ(buffer[11], 0xfa);
+  EXPECT_EQ(buffer[12], 0x21);
+  EXPECT_EQ(buffer[13], 0x3d);
+}
+
 // A single-frame unmasked text message
 // 0x81 0x05 0x48 0x65 0x6c 0x6c 0x6f (contains "Hello")
 //                   H        e        l        l        o
@@ -88,7 +160,7 @@ TEST(WebSocketCodecTest, decodeFragmentedUnmaskedTextMessage) {
 // mask bit - 1
 // length - 5 bytes 0000101
 //
-// H - M1 XOR B1      01001000 = 00110111 xor 01111111
+// H - M1 XOR B1   01001000 = 00110111 xor 01111111
 // e - M2 XOR B2
 // l - M3 XOR B3
 // l - M4 XOR B4

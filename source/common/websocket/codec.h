@@ -18,6 +18,7 @@ constexpr uint8_t FRAME_OPCODE_PING = 0x9;
 constexpr uint8_t FRAME_OPCODE_PONG = 0xA;
 
 constexpr uint8_t MASKING_KEY_LENGTH = 4;
+
 // wire format (https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
 // of WebSocket frame:
 //
@@ -31,7 +32,7 @@ constexpr uint8_t MASKING_KEY_LENGTH = 4;
 //  +-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
 //  |     Extended payload length continued, if payload len == 127  |
 //  + - - - - - - - - - - - - - - - +-------------------------------+
-//  |                               |Masking-key, if MASK set to 1  |
+//  |                               | Masking-key, if MASK set to 1 |
 //  +-------------------------------+-------------------------------+
 //  | Masking-key (continued)       |          Payload Data         |
 //  +-------------------------------- - - - - - - - - - - - - - - - +
@@ -52,6 +53,30 @@ struct Frame {
   uint32_t masking_key_;
   // websocket payload data (extension data and application data)
   Buffer::InstancePtr payload_;
+};
+
+class Encoder {
+public:
+  Encoder();
+
+  // Creates a new Websocket data frame with the given frame header data.
+  // @param flags_and_opcode supplies the first fixed byte with flags and opcode.
+  // @param length supplies the WebSocket data frame length.
+  // @param is_masked supplies whether the frame is masked ot not.
+  // @param masking_key supplies the masking key if the is_masked is true.
+  // @param output the buffer to store the encoded data. Its size can vary depending on
+  // payload length and presence of masking key.
+  void newFrameHeader(uint8_t flags_and_opcode, uint64_t length, bool is_masked,
+                      uint32_t masking_key, std::vector<uint8_t>& output);
+
+  // Prepend the WebSocket frame header into the buffer.
+  // @param flags_and_opcode supplies the first fixed byte with flags and opcode.
+  // @param length supplies the WebSocket data frame length.
+  // @param is_masked supplies whether the frame is masked ot not.
+  // @param masking_key supplies the masking key if the is_masked is true.
+  // @param buffer the complete buffer with the payload.
+  void prependFrameHeader(uint8_t flags_and_opcode, uint64_t length, bool is_masked,
+                          uint32_t masking_key, Buffer::Instance& buffer);
 };
 
 enum class State {
@@ -144,8 +169,9 @@ private:
   // Data holder for successfully decoded frames
   std::vector<Frame>* output_{nullptr};
   bool decoding_error_{false};
-  std::vector<uint8_t> frame_opcodes_ = {FRAME_OPCODE_CONT,  FRAME_OPCODE_TEXT, FRAME_OPCODE_BIN,
-                                         FRAME_OPCODE_CLOSE, FRAME_OPCODE_PING, FRAME_OPCODE_PONG};
+  std::array<uint8_t, 6> frame_opcodes_ = {FRAME_OPCODE_CONT, FRAME_OPCODE_TEXT,
+                                           FRAME_OPCODE_BIN,  FRAME_OPCODE_CLOSE,
+                                           FRAME_OPCODE_PING, FRAME_OPCODE_PONG};
 };
 
 } // namespace WebSocket

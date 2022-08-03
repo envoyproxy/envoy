@@ -13,6 +13,42 @@
 namespace Envoy {
 namespace WebSocket {
 
+Encoder::Encoder() = default;
+
+void Encoder::newFrameHeader(uint8_t flags_and_opcode, uint64_t length, bool is_masked,
+                             uint32_t masking_key, std::vector<uint8_t>& output) {
+  // Set flags and opcode
+  output.push_back(flags_and_opcode);
+  // Set payload length
+  if (length <= 125) {
+    output.push_back(is_masked ? static_cast<uint8_t>(length) | 0x80
+                               : static_cast<uint8_t>(length));
+  } else if (length <= 65535) {
+    output.push_back(is_masked ? 0xfe : 0x7e);
+    // Set 16-bit length
+    output.push_back((length >> 8) & 0xff);
+    output.push_back(length & 0xff);
+  } else {
+    output.push_back(is_masked ? 0xff : 0x7f);
+    // Set 64-bit length
+    output.push_back((length >> 56) & 0xff);
+    output.push_back((length >> 48) & 0xff);
+    output.push_back((length >> 40) & 0xff);
+    output.push_back((length >> 32) & 0xff);
+    output.push_back((length >> 24) & 0xff);
+    output.push_back((length >> 16) & 0xff);
+    output.push_back((length >> 8) & 0xff);
+    output.push_back(length & 0xff);
+  }
+  // Set masking key
+  if (is_masked) {
+    output.push_back((masking_key >> 24) & 0xff);
+    output.push_back((masking_key >> 16) & 0xff);
+    output.push_back((masking_key >> 8) & 0xff);
+    output.push_back(masking_key & 0xff);
+  }
+}
+
 bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   decoding_error_ = false;
   output_ = &output;
@@ -177,5 +213,3 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
 
 } // namespace WebSocket
 } // namespace Envoy
-
-// TODO: Check the possibility of inspect works without full decode functionality
