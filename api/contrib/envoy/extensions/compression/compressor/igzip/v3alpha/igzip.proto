@@ -22,12 +22,12 @@ message Igzip {
   enum CompressionLevel {
     option allow_alias = true;
 
-    DEFAULT_COMPRESSION = 2;
-    BEST_SPEED = 1;
-    COMPRESSION_LEVEL_1 = 1;
-    COMPRESSION_LEVEL_2 = 2;
-    COMPRESSION_LEVEL_3 = 3;
-    BEST_COMPRESSION = 3;
+    BEST_SPEED = 0;
+    COMPRESSION_LEVEL_1 = 0;
+    DEFAULT_COMPRESSION = 1;
+    COMPRESSION_LEVEL_2 = 1;
+    BEST_COMPRESSION = 2;
+    COMPRESSION_LEVEL_3 = 2;
   }
 
   // A value used for selecting the isa-l compression level. This setting will affect speed and

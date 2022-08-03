@@ -31,6 +31,6 @@ envoy_cc_contrib_extension(
         ":igzip_compressor_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/compression/common/compressor:compressor_factory_base_lib",
-        "@envoy_api//envoy/extensions/compression/compressor/igzip/v3alpha:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/compression/compressor/igzip/v3alpha:pkg_cc_proto",
     ],
 )
