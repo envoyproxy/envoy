@@ -1392,12 +1392,12 @@ PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
 
 void PathTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                    bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, nullptr, insert_envoy_original_path);
+  finalizePathHeader(headers, "", insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathTemplateRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, nullptr);
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, "");
 }
 
 RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
