@@ -120,12 +120,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Aspect Bazel helpers",
         project_desc = "Base Starlark libraries and basic Bazel rules which are useful for constructing rulesets and BUILD files",
         project_url = "https://github.com/aspect-build/bazel-lib",
-        version = "1.7.0",
-        sha256 = "58fab45b4419a5eaa340489d567a013e80334c8e4bd998288149cd7e39437586",
+        version = "1.9.2",
+        sha256 = "e034e4aea098c91ac05ac7e08f01a302275378a0bc0814c4939e96552c912212",
         strip_prefix = "bazel-lib-{version}",
         urls = ["https://github.com/aspect-build/bazel-lib/archive/v{version}.tar.gz"],
         use_category = ["build"],
-        release_date = "2022-07-15",
+        release_date = "2022-08-01",
         cpe = "N/A",
     ),
     com_google_absl = dict(
@@ -1136,7 +1136,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2022-07-30",
+        release_date = "2022-07-31",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(
@@ -1212,7 +1212,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2022-01-28",
+            release_date = "2022-04-22",
             cpe = "N/A",
         )
 
