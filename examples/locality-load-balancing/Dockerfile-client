@@ -1,5 +1,8 @@
 FROM envoyproxy/envoy-dev:latest
-RUN apt-get update && apt-get install -y bash curl python3
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -qq update && apt-get -qq install -y bash curl python3
 
 COPY ./envoy-proxy.yaml /etc/envoy.yaml
 COPY ./client.py /client.py

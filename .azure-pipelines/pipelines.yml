@@ -16,7 +16,7 @@ stages:
   - job: format
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -27,22 +27,26 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        AZP_BRANCH: $(Build.SourceBranch)
       displayName: "Run format checks"
     - task: PublishBuildArtifacts@1
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
         artifactName: format
+      timeoutInMinutes: 10
       # not all have fixes so improve condition/handling
       condition: failed()
 
   - job: proto_format
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -53,6 +57,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -63,13 +69,14 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/fix_proto_format.diff"
         artifactName: format
+      timeoutInMinutes: 10
       condition: failed()
 
   - job: docs
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     condition: ne(variables['PostSubmit'], true)
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -80,6 +87,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
@@ -98,7 +107,7 @@ stages:
   - job: dependencies
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -109,6 +118,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -123,7 +134,7 @@ stages:
   - job: filter_example
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: InstallSSHKey@0
       inputs:
@@ -141,7 +152,7 @@ stages:
   - job: data_plane_api
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: InstallSSHKey@0
       inputs:
@@ -159,7 +170,7 @@ stages:
   - job: go_control_plane
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: InstallSSHKey@0
       inputs:
@@ -188,7 +199,7 @@ stages:
   - job: release
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - template: bazel.yml
       parameters:
@@ -218,7 +229,7 @@ stages:
     dependsOn: []
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - template: bazel.yml
       parameters:
@@ -239,7 +250,7 @@ stages:
     dependsOn: ["package_x64"]
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
@@ -307,7 +318,7 @@ stages:
           CI_TARGET: "bazel.compile_time_options"
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - template: bazel.yml
       parameters:
@@ -349,7 +360,7 @@ stages:
     displayName: "linux multiarch"
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - bash: |
         echo "disk space at beginning of build:"
@@ -411,6 +422,7 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/build_images"
         artifactName: docker
+      timeoutInMinutes: 10
       condition: always()
 
 - stage: docs
@@ -419,7 +431,7 @@ stages:
   jobs:
   - job: publish
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -430,6 +442,8 @@ stages:
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
       env:
+        ENVOY_RBE: "true"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         AZP_BRANCH: $(Build.SourceBranch)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
@@ -465,7 +479,7 @@ stages:
   jobs:
   - job: examples
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
@@ -474,21 +488,6 @@ stages:
         itemPattern: "docker/envoy*.tar"
         targetPath: $(Build.StagingDirectory)
     - bash: ./ci/do_ci.sh verify_examples
-      env:
-        ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-        NO_BUILD_SETUP: 1
-  - job: examples_build
-    dependsOn: []
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-    - task: DownloadBuildArtifacts@0
-      inputs:
-        buildType: current
-        artifactName: "docker"
-        itemPattern: "docker/envoy*.tar"
-        targetPath: $(Build.StagingDirectory)
-    - bash: ./ci/do_ci.sh verify_build_examples
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         NO_BUILD_SETUP: 1
@@ -516,6 +515,7 @@ stages:
       inputs:
         testResultsFiles: "**/bazel-testlogs/**/test.xml"
         testRunTitle: "macOS"
+      timeoutInMinutes: 10
       condition: always()
 
     - script: bazel run //ci/flaky_test:process_xml
@@ -553,16 +553,19 @@ stages:
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+
     - task: PublishTestResults@2
       inputs:
         testResultsFiles: "**/bazel-out/**/testlogs/**/test.xml"
         testRunTitle: "windows"
         searchFolder: $(Build.StagingDirectory)/tmp
+      timeoutInMinutes: 10
       condition: always()
     - task: PublishBuildArtifacts@1
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/envoy"
         artifactName: windows.release
+      timeoutInMinutes: 10
       condition: always()
 
   - job: docker
@@ -609,4 +612,5 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/build_images"
         artifactName: docker_windows
+      timeoutInMinutes: 10
       condition: always()

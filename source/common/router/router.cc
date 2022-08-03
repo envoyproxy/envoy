@@ -557,7 +557,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      callbacks_->streamInfo().filterState());
+      *callbacks_->streamInfo().filterState());
 
   if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
     if (auto typed_state = downstream_connection->streamInfo()
@@ -974,7 +974,7 @@ void Filter::onResponseTimeout() {
   }
 
   onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,
-                         StreamInfo::ResponseCodeDetails::get().UpstreamTimeout);
+                         StreamInfo::ResponseCodeDetails::get().ResponseTimeout);
 }
 
 // Called when the per try timeout is hit but we didn't reset the request
@@ -1177,7 +1177,6 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
 
     auto request_ptr = upstream_request.removeFromList(upstream_requests_);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-      request_ptr->cleanUp();
       callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
     }
     return true;
@@ -1215,7 +1214,6 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   chargeUpstreamAbort(error_code, dropped, upstream_request);
   auto request_ptr = upstream_request.removeFromList(upstream_requests_);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-    request_ptr->cleanUp();
     callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
   }
 
@@ -1327,7 +1325,6 @@ void Filter::resetAll() {
     auto request_ptr = upstream_requests_.back()->removeFromList(upstream_requests_);
     request_ptr->resetStream();
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-      request_ptr->cleanUp();
       callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
     }
   }
@@ -1418,7 +1415,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         auto request_ptr = upstream_request.removeFromList(upstream_requests_);
         if (Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.allow_upstream_inline_write")) {
-          request_ptr->cleanUp();
           callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
         }
         return;
@@ -1453,7 +1449,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     auto request_ptr = upstream_request.removeFromList(upstream_requests_);
     request_ptr->resetStream();
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
-      request_ptr->cleanUp();
       callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
     }
     return;
@@ -1805,24 +1800,19 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.update_expected_rq_timeout_on_retry")) {
-    // If not enabled, then it will re-use the previous headers (if any.)
+  // The request timeouts only account for time elapsed since the downstream request completed
+  // which might not have happened yet (in which case zero time has elapsed.)
+  std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
 
-    // The request timeouts only account for time elapsed since the downstream request completed
-    // which might not have happened yet (in which case zero time has elapsed.)
-    std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
-
-    if (DateUtil::timePointValid(downstream_request_complete_time_)) {
-      Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-      elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-    }
-
-    FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
-                                     *downstream_headers_, !config_.suppress_envoy_headers_,
-                                     grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
+  if (DateUtil::timePointValid(downstream_request_complete_time_)) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
   }
+
+  FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
+                                   *downstream_headers_, !config_.suppress_envoy_headers_,
+                                   grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);

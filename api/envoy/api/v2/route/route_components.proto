@@ -301,7 +301,7 @@ message WeightedCluster {
     // An integer between 0 and :ref:`total_weight
     // <envoy_api_field_route.WeightedCluster.total_weight>`. When a request matches the route,
     // the choice of an upstream cluster is determined by its weight. The sum of weights across all
-    // entries in the clusters array must add up to the total_weight, which defaults to 100.
+    // entries in the clusters array must add up to the total_weight, if total_weight is greater than 0.
     google.protobuf.UInt32Value weight = 2;
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in

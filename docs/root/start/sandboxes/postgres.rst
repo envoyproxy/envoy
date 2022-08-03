@@ -32,9 +32,9 @@ Build and start the containers.
   $ docker-compose ps
 
          Name                      Command             State                             Ports
-  ----------------------------------------------------------------------------------------------------------------------
+  --------------------------------------------------------------------------------------------------------
   postgres_postgres_1   docker-entrypoint.sh postgres  Up      5432/tcp
-  postgres_proxy_1      /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
+  postgres_proxy_1      /docker-entrypoint.sh /usr ... Up      10000/tcp, 1999/tcp, 0.0.0.0:8001->8001/tcp
 
 Step 2: Issue commands using psql
 *********************************

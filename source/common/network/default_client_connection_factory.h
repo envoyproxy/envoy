@@ -20,12 +20,12 @@ public:
   std::string name() const override { return "default"; }
 
   // Network::ClientConnectionFactory
-  Network::ClientConnectionPtr
-  createClientConnection(Event::Dispatcher& dispatcher,
-                         Network::Address::InstanceConstSharedPtr address,
-                         Network::Address::InstanceConstSharedPtr source_address,
-                         Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  Network::ClientConnectionPtr createClientConnection(
+      Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr address,
+      Network::Address::InstanceConstSharedPtr source_address,
+      Network::TransportSocketPtr&& transport_socket,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options) override;
 };
 
 } // namespace Network

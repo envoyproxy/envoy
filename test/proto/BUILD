@@ -25,7 +25,6 @@ envoy_proto_library(
 envoy_proto_library(
     name = "bookstore_proto",
     srcs = [":bookstore.proto"],
-    external_deps = ["api_httpbody_protos"],
 )
 
 envoy_proto_descriptor(

@@ -40,8 +40,6 @@ public:
             kind: { host: {}}
           - name: cluster_metadata
             kind: { cluster: {}}
-          passthrough_filter_state_objects:
-          - name: internal_state
           transport_socket:
             name: envoy.transport_sockets.raw_buffer
             typed_config:
@@ -115,7 +113,7 @@ public:
       "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
       header_name: internal-header
       state_name: internal_state
-      read_only: false
+      shared: true
     )EOF");
     HttpIntegrationTest::initialize();
   }

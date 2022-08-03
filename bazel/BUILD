@@ -19,6 +19,11 @@ exports_files([
     "exported_symbols.txt",
 ])
 
+sh_library(
+    name = "volatile_env",
+    srcs = ["volatile_env.sh"],
+)
+
 genrule(
     name = "gnu_build_id",
     outs = ["gnu_build_id.ldscript"],
@@ -702,7 +707,7 @@ platform(
 platform(
     name = "android_armeabi",
     constraint_values = [
-        "@platforms//cpu:arm",  # TODO(keith): This should be armv7 https://github.com/bazelbuild/bazel/issues/14982
+        "@platforms//cpu:armv7",
         "@platforms//os:android",
     ],
 )

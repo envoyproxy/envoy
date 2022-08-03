@@ -199,12 +199,12 @@ public:
   using FcContextMap =
       absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
                           Network::DrainableFilterChainSharedPtr, MessageUtil, MessageUtil>;
-  FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
+  FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager)
-      : address_(address), parent_context_(factory_context), init_manager_(init_manager) {}
+      : addresses_(addresses), parent_context_(factory_context), init_manager_(init_manager) {}
 
-  FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
+  FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager);
 
@@ -379,7 +379,7 @@ private:
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
 
-  const Network::Address::InstanceConstSharedPtr address_;
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addresses_;
   // This is the reference to a factory context which all the generations of listener share.
   Configuration::FactoryContext& parent_context_;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;

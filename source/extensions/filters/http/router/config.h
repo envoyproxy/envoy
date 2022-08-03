@@ -22,7 +22,7 @@ public:
 
 private:
   bool isTerminalFilterByProtoTyped(const envoy::extensions::filters::http::router::v3::Router&,
-                                    Server::Configuration::FactoryContext&) override {
+                                    Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
