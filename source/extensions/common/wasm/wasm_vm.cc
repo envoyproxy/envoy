@@ -72,15 +72,20 @@ bool EnvoyWasmVmIntegration::getNullVmFunction(std::string_view function_name, b
   return false;
 }
 
-absl::string_view getDefaultWasmEngineName() {
-  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
-    if (ext.first == "envoy.wasm.runtime") {
-      for (auto engine_name : ext.second->registeredNames()) {
-        if (engine_name != "envoy.wasm.runtime.null") {
-          return engine_name;
-        }
-      }
-    }
+bool isWasmEngineAvailable(absl::string_view runtime) {
+  auto runtime_factory = Registry::FactoryRegistry<WasmRuntimeFactory>::getFactory(runtime);
+  return runtime_factory != nullptr;
+}
+
+absl::string_view getFirstAvailableWasmEngineName() {
+  if (isWasmEngineAvailable("envoy.wasm.runtime.v8")) {
+    return "envoy.wasm.runtime.v8";
+  } else if (isWasmEngineAvailable("envoy.wasm.runtime.wasmtime")) {
+    return "envoy.wasm.runtime.wasmtime";
+  } else if (isWasmEngineAvailable("envoy.wasm.runtime.wamr")) {
+    return "envoy.wasm.runtime.wamr";
+  } else if (isWasmEngineAvailable("envoy.wasm.runtime.wavm")) {
+    return "envoy.wasm.runtime.wavm";
   }
   return "";
 }
@@ -88,7 +93,7 @@ absl::string_view getDefaultWasmEngineName() {
 WasmVmPtr createWasmVm(absl::string_view runtime) {
   // Set wasm runtime to build-in wasm engine if it is not specified
   if (runtime.empty()) {
-    runtime = getDefaultWasmEngineName();
+    runtime = getFirstAvailableWasmEngineName();
   }
 
   auto runtime_factory = Registry::FactoryRegistry<WasmRuntimeFactory>::getFactory(runtime);
