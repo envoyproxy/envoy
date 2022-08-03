@@ -1,12 +1,8 @@
-#include <memory>
-
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/xds_resources_delegate.h"
-#include "envoy/registry/registry.h"
 
 #include "source/common/config/xds_resource.h"
 #include "source/common/network/raw_buffer_socket.h"
@@ -16,7 +12,6 @@
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
-#include "test/common/upstream/xds_delegate_test_config.pb.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
@@ -89,33 +84,6 @@ void verifyCaresDnsConfigAndUnpack(
       "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
   typed_dns_resolver_config.typed_config().UnpackTo(&cares);
 }
-
-class TestXdsResourcesDelegate : public Config::XdsResourcesDelegate {
-public:
-  static inline int OnConfigUpdatedCount = 0;
-
-  void onConfigUpdated(const std::string&, const std::string&,
-                       const std::vector<Config::DecodedResourceRef>&) override {
-    ++OnConfigUpdatedCount;
-  }
-};
-
-class TestXdsResourcesDelegateFactory : public Config::XdsResourcesDelegateFactory {
-public:
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::envoy::config::xds::TestXdsResourcesDelegateConfig>();
-  }
-
-  std::string name() const override { return "envoy.config.xds.test_delegate"; };
-
-  Config::XdsResourcesDelegatePtr createXdsResourcesDelegate(const ProtobufWkt::Any&,
-                                                             ProtobufMessage::ValidationVisitor&,
-                                                             Api::Api&) override {
-    return std::make_unique<TestXdsResourcesDelegate>();
-  }
-};
-
-REGISTER_FACTORY(TestXdsResourcesDelegateFactory, Config::XdsResourcesDelegateFactory);
 
 class ClusterManagerImplTest : public testing::Test {
 public:
@@ -1704,104 +1672,6 @@ dynamic_warming_clusters:
   checkStats(1 /*added*/, 0 /*modified*/, 1 /*removed*/, 0 /*active*/, 0 /*warming*/);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
-}
-
-TEST_F(ClusterManagerImplTest, XdsResourcesDelegate) {
-  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
-
-  const std::string json = fmt::sprintf(R"EOF(
-  {
-    "dynamic_resources": {
-      "cds_config": {
-        "api_config_source": {
-          "api_type": "0",
-          "refresh_delay": "30s",
-          "cluster_names": ["cds_cluster"]
-        }
-      }
-    },
-    "static_resources": {
-      %s
-    },
-    "xds_delegate_extension": {
-      "name": "envoy.config.xds.test_delegate",
-      "typed_config": {
-        "@type": "type.googleapis.com/test.envoy.config.xds.TestXdsResourcesDelegateConfig",
-      }
-    } 
-  }
-  )EOF",
-                                        clustersJson({defaultStaticClusterJson("cds_cluster")}));
-
-  MockCdsApi* cds = new MockCdsApi();
-  std::shared_ptr<MockClusterMockPrioritySet> cds_cluster(
-      new NiceMock<MockClusterMockPrioritySet>());
-  cds_cluster->info_->name_ = "cds_cluster";
-
-  // This part tests static init.
-  InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
-      .WillOnce(Return(std::make_pair(cds_cluster, nullptr)));
-  ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
-  EXPECT_CALL(*cds, setInitializedCb(_));
-  EXPECT_CALL(*cds_cluster, initialize(_));
-
-  create(parseBootstrapFromV3Json(json));
-
-  // TODO(abeyad): remove
-  std::cout << "==> AAB, created from bootstrap\n";
-  ReadyWatcher initialized;
-  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
-
-  cds_cluster->initialize_callback_();
-
-  EXPECT_CALL(*cds, initialize());
-
-  // This part tests CDS init.
-  std::shared_ptr<MockClusterMockPrioritySet> cluster3(new NiceMock<MockClusterMockPrioritySet>());
-  cluster3->info_->name_ = "cluster3";
-  std::shared_ptr<MockClusterMockPrioritySet> cluster4(new NiceMock<MockClusterMockPrioritySet>());
-  cluster4->info_->name_ = "cluster4";
-  std::shared_ptr<MockClusterMockPrioritySet> cluster5(new NiceMock<MockClusterMockPrioritySet>());
-  cluster5->info_->name_ = "cluster5";
-
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
-      .WillOnce(Return(std::make_pair(cluster3, nullptr)));
-  ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"), "version1");
-
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
-      .WillOnce(Return(std::make_pair(cluster4, nullptr)));
-  ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(*cluster4, initialize(_));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"), "version2");
-
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
-      .WillOnce(Return(std::make_pair(cluster5, nullptr)));
-  ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"), "version3");
-
-  cds->initialized_callback_();
-  EXPECT_CALL(*cds, versionInfo()).WillOnce(Return("version3"));
-
-  EXPECT_CALL(*cluster3, initialize(_));
-  cluster4->initialize_callback_();
-
-  // Test cluster 5 getting removed before everything is initialized.
-  cluster_manager_->removeCluster("cluster5");
-
-  EXPECT_CALL(initialized, ready());
-  cluster3->initialize_callback_();
-
-  factory_.tls_.shutdownThread();
-
-  // TODO(abeyad): remove
-  std::cout << "==> AAB, static value=" << TestXdsResourcesDelegate::OnConfigUpdatedCount << "\n";
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cds_cluster.get()));
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster3.get()));
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster4.get()));
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster5.get()));
 }
 
 TEST_F(ClusterManagerImplTest, TestModifyWarmingClusterDuringInitialization) {

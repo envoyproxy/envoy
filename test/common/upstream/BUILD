@@ -70,9 +70,6 @@ envoy_cc_test(
     ],
     deps = [
         ":test_cluster_manager",
-        ":xds_delegate_test_config_proto_cc_proto",
-        "//envoy/config:xds_resources_delegate_interface",
-        "//envoy/registry",
         "//source/common/router:context_lib",
         "//source/common/upstream:load_balancer_factory_base_lib",
         "//source/extensions/network/dns_resolver/cares:config",
@@ -915,9 +912,4 @@ envoy_cc_benchmark_binary(
         "//source/common/common:random_generator_lib",
         "//source/common/upstream:scheduler_lib",
     ],
-)
-
-envoy_proto_library(
-    name = "xds_delegate_test_config_proto",
-    srcs = ["xds_delegate_test_config.proto"],
 )

@@ -31,9 +31,8 @@ public:
    * @param resource_type_url The URL for the type of the resource (e.g. Secrets, Clusters, etc).
    * @return A set of xDS resources for the given authority and type.
    */
-  // TODO(abeyad): uncomment out
-  // virtual std::vector<envoy::service::discovery::v3::Resource>
-  // getResources(const std::string& authority_id, const std::string& resource_type_url) PURE;
+  virtual std::vector<envoy::service::discovery::v3::Resource>
+  getResources(const std::string& authority_id, const std::string& resource_type_url) PURE;
 
   /**
    * Invoked when SotW xDS configuration updates have been received from an xDS authority, have been
