@@ -243,14 +243,14 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
   parent_.onUpstreamHostSelected(host);
 }
 
-void UpstreamRequest::encodeHeaders(bool end_stream) {
+void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   ASSERT(!encode_complete_);
   encode_complete_ = end_stream;
 
   conn_pool_->newStream(this);
 }
 
-void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
+void UpstreamRequest::acceptDataFromRouter(Buffer::Instance& data, bool end_stream) {
   ASSERT(!encode_complete_);
   encode_complete_ = end_stream;
 
@@ -277,7 +277,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
+void UpstreamRequest::acceptTrailersFromRouter(const Http::RequestTrailerMap& trailers) {
   ASSERT(!encode_complete_);
   encode_complete_ = true;
   encode_trailers_ = true;
@@ -293,7 +293,7 @@ void UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   }
 }
 
-void UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
+void UpstreamRequest::acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr) {
   if (!upstream_) {
     ENVOY_STREAM_LOG(trace, "upstream_ not ready. Store metadata_map to encode later: {}",
                      *parent_.callbacks(), *metadata_map_ptr);

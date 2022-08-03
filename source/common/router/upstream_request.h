@@ -46,10 +46,10 @@ public:
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();
 
-  void encodeHeaders(bool end_stream);
-  void encodeData(Buffer::Instance& data, bool end_stream);
-  void encodeTrailers(const Http::RequestTrailerMap& trailers);
-  void encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
+  void acceptHeadersFromRouter(bool end_stream);
+  void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
+  void acceptTrailersFromRouter(const Http::RequestTrailerMap& trailers);
+  void acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr);
 
   void resetStream();
   void setupPerTryTimeout();
