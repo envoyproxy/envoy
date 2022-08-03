@@ -109,11 +109,6 @@ public:
                                     Server::Configuration::ServerFactoryContext& context) PURE;
 };
 
-#define REGISTER_DUAL_HTTP_FACTORY(FactoryName) \
-using Upstream##FactoryName = FactoryName; \
-REGISTER_FACTORY(FactoryName, Server::Configuration::NamedHttpFilterConfigFactory); \
-REGISTER_FACTORY(Upstream##FactoryName, Server::Configuration::NamedHttpFilterConfigFactory); \
-
 } // namespace Common
 } // namespace HttpFilters
 } // namespace Extensions
