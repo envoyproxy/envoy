@@ -32,7 +32,7 @@ namespace SipProxy {
   COUNTER(upstream_response_reply)                                                                 \
   COUNTER(upstream_response_success)                                                               \
   GAUGE(upstream_request_active, Accumulate)                                                       \
-  HISTOGRAM(upstream_request_time_ms, Milliseconds)
+  HISTOGRAM(upstream_request_time, Milliseconds)
 
 /**
  * Struct definition for all sip proxy stats. @see stats_macros.h

@@ -577,7 +577,7 @@ private:
 
   std::shared_ptr<TrafficRoutingAssistantHandler> tra_handler_;
 
-  std::optional<IngressID> local_ingress_id_;
+  absl::optional<IngressID> local_ingress_id_;
 
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;

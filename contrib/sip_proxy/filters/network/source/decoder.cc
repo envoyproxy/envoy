@@ -307,21 +307,38 @@ int Decoder::HeaderHandler::processPCookieIPMap(absl::string_view& header) {
 int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header) {
   // X-Envoy-Origin-Ingress: thread=xxxxxx;downstream-connection=yyyyyy
 
-  std::regex rgx("thread=(.+);downstream-connection=(.+)");
-  std::match_results<absl::string_view::iterator> match;
-
-  if (std::regex_search<absl::string_view::iterator>(header.begin(), header.end(), match, rgx) &&
-      (match.size() == 3)) {
-    auto worker_thread_id = match[1].str();
-    auto downstream_conn_id = match[2].str();
-    auto ingress_id =
-        std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
-    metadata()->setIngressId(std::move(ingress_id));
-    ENVOY_LOG(trace, "X-Envoy_origin-Ingress header processed: thread={}, downstream-connection={}",
-              worker_thread_id, downstream_conn_id);
-  } else {
-    ENVOY_LOG(error, "No processable match found for X-Envoy_origin-Ingress={}", header);
+  auto thread_start = header.find("thread=");
+  if (thread_start == absl::string_view::npos) {
+    ENVOY_LOG(error, "Not found start of thread field for X-Envoy_origin-Ingress={}", header);
+    return 0;
   }
+  thread_start += 7;
+  auto thread_end = header.find(";", thread_start);
+  if ((thread_end == absl::string_view::npos) || (thread_end <= thread_start)) {
+    ENVOY_LOG(error, "Not found end of thread field for X-Envoy_origin-Ingress={}", header);
+    return 0;
+  }
+
+  auto downstream_conn_start = header.find("downstream-connection=", thread_end);
+  if (downstream_conn_start == absl::string_view::npos) {
+    ENVOY_LOG(error, "Not found start of thread downstream-connection for X-Envoy_origin-Ingress={}", header);
+    return 0;
+  }
+  downstream_conn_start += 22;
+  auto downstream_conn_end = header.length();
+  if (downstream_conn_end <= downstream_conn_start) {
+    ENVOY_LOG(error, "Not found end of thread downstream-connection for X-Envoy_origin-Ingress={}", header);
+    return 0;
+  }
+
+  // todo error checks
+  auto worker_thread_id = header.substr(thread_start, thread_end - thread_start);
+  auto downstream_conn_id = header.substr(downstream_conn_start, downstream_conn_end - downstream_conn_start);
+  auto ingress_id = std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
+  ENVOY_LOG(trace, "X-Envoy_origin-Ingress header processed: thread={}, downstream-connection={}",
+            worker_thread_id, downstream_conn_id);
+  metadata()->setIngressId(std::move(ingress_id));
+  
   return 0;
 }
 
