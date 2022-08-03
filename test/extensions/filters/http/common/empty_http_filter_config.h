@@ -44,7 +44,7 @@ private:
   const std::string name_;
 };
 
-class UpstreamFilterConfig : public virtual Server::Configuration::UpstreamHttpFilterConfigFactory {
+class UpstreamFilterConfig : public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
   virtual Http::FilterFactoryCb
   createDualFilter(const std::string& stat_prefix,
