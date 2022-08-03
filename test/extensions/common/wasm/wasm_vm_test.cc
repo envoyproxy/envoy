@@ -52,11 +52,11 @@ protected:
 TEST_F(BaseVmTest, UnspecifiedRuntime) {
   auto wasm_vm = createWasmVm("");
   // Envoy is built with "--define wasm=disabled", so no Wasm engine is available
-  if (getDefaultWasmEngineName().empty()) {
+  if (getFirstAvailableWasmEngineName().empty()) {
     EXPECT_TRUE(wasm_vm.get() == nullptr);
   } else {
     EXPECT_TRUE(wasm_vm.get() != nullptr);
-    EXPECT_TRUE(std::string(getDefaultWasmEngineName()).find(wasm_vm->getEngineName()));
+    EXPECT_TRUE(std::string(getFirstAvailableWasmEngineName()).find(wasm_vm->getEngineName()));
   }
 }
 

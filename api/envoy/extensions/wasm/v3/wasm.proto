@@ -49,7 +49,8 @@ message VmConfig {
   // [#comment: TODO: add ref for details.]
   string vm_id = 1;
 
-  // The Wasm runtime type, defaults to wasm engine used at Envoy build-time.
+  // The Wasm runtime type, defaults to the first available wasm engine used at Envoy build-time.
+  // The priority to search for the available engine is: v8 -> wasmtime -> wamr -> wavm.
   // Available Wasm runtime types are registered as extensions. The following runtimes are included
   // in Envoy code base:
   //
