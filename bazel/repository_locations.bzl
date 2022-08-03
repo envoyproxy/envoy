@@ -1136,7 +1136,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2022-07-30",
+        release_date = "2022-07-31",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(
@@ -1212,7 +1212,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2022-01-28",
+            release_date = "2022-04-22",
             cpe = "N/A",
         )
 
