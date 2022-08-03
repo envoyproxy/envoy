@@ -91,7 +91,7 @@ absl::string_view getFirstAvailableWasmEngineName() {
 }
 
 WasmVmPtr createWasmVm(absl::string_view runtime) {
-  // Set wasm runtime to build-in wasm engine if it is not specified
+  // Set wasm runtime to built-in Wasm engine if it is not specified
   if (runtime.empty()) {
     runtime = getFirstAvailableWasmEngineName();
   }

@@ -46,6 +46,7 @@ bool isWasmEngineAvailable(absl::string_view runtime);
 
 // Get the name of the first available Wasm Engine compiled with Envoy
 absl::string_view getFirstAvailableWasmEngineName();
+
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions
