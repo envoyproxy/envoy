@@ -14,6 +14,7 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/filter_factory.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
@@ -30,6 +31,10 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+namespace Http {
+class FilterChainManager;
+}
+
 namespace Upstream {
 
 /**
@@ -713,7 +718,7 @@ class TypedLoadBalancerFactory;
 /**
  * Information about a given upstream cluster.
  */
-class ClusterInfo {
+class ClusterInfo : public Http::FilterChainFactory {
 public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.

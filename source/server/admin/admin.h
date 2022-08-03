@@ -112,9 +112,9 @@ public:
                                     Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) override;
+  void createFilterChain(Http::FilterChainManager& manager) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainManager&) override {
+                                Http::FilterChainManager&) const override {
     return false;
   }
 
@@ -203,7 +203,7 @@ public:
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
-  GenRequestFn createRequestFunction() {
+  GenRequestFn createRequestFunction() const {
     return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> RequestPtr {
       return makeRequest(path_and_query, admin_stream);
     };
@@ -223,7 +223,7 @@ private:
   /**
    * Creates a Request from a url.
    */
-  RequestPtr makeRequest(absl::string_view path_and_query, AdminStream& admin_stream);
+  RequestPtr makeRequest(absl::string_view path_and_query, AdminStream& admin_stream) const;
 
   /**
    * Creates a UrlHandler structure from a non-chunked callback.
@@ -348,7 +348,7 @@ private:
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
-  void getHelp(Buffer::Instance& response);
+  void getHelp(Buffer::Instance& response) const;
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:

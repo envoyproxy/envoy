@@ -227,7 +227,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-void AdminImpl::createFilterChain(Http::FilterChainManager& manager) {
+void AdminImpl::createFilterChain(Http::FilterChainManager& manager) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
   };
@@ -313,7 +313,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 }
 
 Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
-                                         AdminStream& admin_stream) {
+                                         AdminStream& admin_stream) const {
   std::string::size_type query_index = path_and_query.find('?');
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
@@ -361,7 +361,7 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
   return Http::Code::OK;
 }
 
-void AdminImpl::getHelp(Buffer::Instance& response) {
+void AdminImpl::getHelp(Buffer::Instance& response) const {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.

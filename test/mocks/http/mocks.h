@@ -200,10 +200,11 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  MOCK_METHOD(void, createFilterChain, (FilterChainManager & manager));
+  MOCK_METHOD(void, createFilterChain, (FilterChainManager & manager), (const));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
-               FilterChainManager& manager));
+               FilterChainManager& manager),
+              (const));
 };
 
 class MockStreamFilterCallbacksBase {
