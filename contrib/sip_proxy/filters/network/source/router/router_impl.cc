@@ -823,7 +823,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
           error,
           "Dropping upstream request with no well formatted X-Envoy-Origin-Ingress header: \n{}",
           metadata->rawMsg());
-      parent_.onError(metadata, ErrorCode::bad_request,
+      parent_.onError(metadata, ErrorCode::BadRequest,
                       "Missing or bad formatted X-Envoy-Origin-Ingress header");
       return FilterStatus::StopIteration;
     }
@@ -836,7 +836,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
                 parent_.dumpDownstreamConnection());
       ENVOY_LOG(debug, "Raw message failing to get a valid downstream connection: \n{}\n",
                 metadata->rawMsg());
-      parent_.onError(metadata, ErrorCode::transaction_not_exist,
+      parent_.onError(metadata, ErrorCode::TransactionNotExist,
                       "No downstream connection found for provided ID");
       return FilterStatus::StopIteration;
     }

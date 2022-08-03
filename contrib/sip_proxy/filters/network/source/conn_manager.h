@@ -290,7 +290,7 @@ private:
           metadata_(metadata) {
       parent.stats_.request_active_.inc();
     }
-    ~ActiveTrans() override {}
+    ~ActiveTrans() override = default;
 
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
