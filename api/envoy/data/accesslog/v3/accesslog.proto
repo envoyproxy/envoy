@@ -365,7 +365,7 @@ message TLSProperties {
   // The TLS session ID.
   string tls_session_id = 6;
 
-  // The JA3 fingerprint when JA3 fingerprinting is enabled.
+  // The ``JA3`` fingerprint when ``JA3`` fingerprinting is enabled.
   string ja3_fingerprint = 7;
 }
 
