@@ -157,7 +157,7 @@ paths:
   register_factory_test:
     include:
     - test/common/config/registry_test.cc
-    - test/extensions/transport_sockets/tls/integration/
+    - test/extensions/transport_sockets/tls/
     - test/integration/clusters/
     - test/integration/filters/
     - test/integration/load_balancers/
