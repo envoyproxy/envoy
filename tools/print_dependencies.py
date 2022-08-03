@@ -39,7 +39,8 @@ if __name__ == '__main__':
 
     # Bazel target to print
     target = sys.argv[1]
-    output = subprocess.check_output(['bazel', 'query', 'deps(%s)' % target])
+    output = subprocess.check_output(['bazel', 'query', 'deps(%s)' % target],
+                                     text=True)
 
     repos = set()
 
@@ -50,5 +51,5 @@ if __name__ == '__main__':
         if match:
             repos.add(match.group(1))
 
-    deps = filter(lambda dep: dep['identifier'] in repos, deps)
+    deps = list(filter(lambda dep: dep['identifier'] in repos, deps))
     print_deps(deps)
