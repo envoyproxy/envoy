@@ -30,6 +30,7 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryHttpTracer) {
           envoy_grpc:
             cluster_name: fake_cluster
           timeout: 0.250s
+        service_name: fake_service_name
   )EOF";
   envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
