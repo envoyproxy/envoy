@@ -55,6 +55,7 @@ Open source reference implementation of the rate limiting service is currently u
 quota extension can be presently used with the Google Cloud Rate Limit Service.
 
 .. TODO(yavlasov): Add links to GCP docs and reference implementation when available.
+
 Quota based global rate limit can only be applied to HTTP requests. Envoy will bucketize requests and
 request quota assignments from the rate limit quota service using the HTTP filter
 :ref:`configuration <config_http_filters_rate_limit_quota>`.
