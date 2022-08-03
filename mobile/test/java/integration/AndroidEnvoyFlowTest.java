@@ -15,6 +15,8 @@ import io.envoyproxy.envoymobile.ResponseTrailers;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.UpstreamHttpProtocol;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.testing.RequestScenario;
+import io.envoyproxy.envoymobile.engine.testing.Response;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -192,7 +194,7 @@ public class AndroidEnvoyFlowTest {
                                           .useByteBufferPosition()
                                           .setHttpMethod(RequestMethod.POST)
                                           .setUrl(mockWebServer.url("get/flowers").toString())
-                                          .addBody("This is my request body")
+                                          .addBody(requestBody)
                                           .closeBodyStream();
 
     Response response = sendRequest(requestScenario);
@@ -324,148 +326,5 @@ public class AndroidEnvoyFlowTest {
     latch.await();
     response.get().throwAssertionErrorIfAny();
     return response.get();
-  }
-
-  private static class RequestScenario {
-
-    private URL url;
-    private RequestMethod method = null;
-    private final List<ByteBuffer> bodyChunks = new ArrayList<>();
-    private final List<Map.Entry<String, String>> headers = new ArrayList<>();
-    private boolean closeBodyStream = false;
-    private boolean cancelBeforeSendingRequestBody = false;
-    private boolean useByteBufferPosition;
-
-    RequestHeaders getHeaders() {
-      RequestHeadersBuilder requestHeadersBuilder =
-          new RequestHeadersBuilder(method, url.getProtocol(), url.getAuthority(), url.getPath());
-      headers.forEach(entry -> requestHeadersBuilder.add(entry.getKey(), entry.getValue()));
-      // HTTP1 is the only way to send HTTP requests (not HTTPS)
-      return requestHeadersBuilder.addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP1).build();
-    }
-
-    List<ByteBuffer> getBodyChunks() {
-      return closeBodyStream
-          ? Collections.unmodifiableList(bodyChunks.subList(0, bodyChunks.size() - 1))
-          : Collections.unmodifiableList(bodyChunks);
-    }
-
-    Optional<ByteBuffer> getClosingBodyChunk() {
-      return closeBodyStream ? Optional.of(bodyChunks.get(bodyChunks.size() - 1))
-                             : Optional.empty();
-    }
-
-    boolean hasBody() { return !bodyChunks.isEmpty(); }
-
-    RequestScenario setHttpMethod(RequestMethod requestMethod) {
-      this.method = requestMethod;
-      return this;
-    }
-
-    RequestScenario setUrl(String url) throws MalformedURLException {
-      this.url = new URL(url);
-      return this;
-    }
-
-    RequestScenario addBody(String requestBodyChunk) {
-      return addBody(requestBodyChunk.getBytes());
-    }
-
-    RequestScenario addBody(byte[] requestBodyChunk) {
-      ByteBuffer byteBuffer = ByteBuffer.allocateDirect(requestBodyChunk.length);
-      byteBuffer.put(requestBodyChunk);
-      return addBody(byteBuffer);
-    }
-
-    RequestScenario addBody(ByteBuffer requestBodyChunk) {
-      bodyChunks.add(requestBodyChunk);
-      return this;
-    }
-
-    RequestScenario addHeader(String key, String value) {
-      headers.add(new SimpleImmutableEntry<>(key, value));
-      return this;
-    }
-
-    RequestScenario closeBodyStream() {
-      closeBodyStream = true;
-      return this;
-    }
-
-    RequestScenario cancelBeforeSendingRequestBody() {
-      cancelBeforeSendingRequestBody = true;
-      return this;
-    }
-
-    RequestScenario useByteBufferPosition() {
-      useByteBufferPosition = true;
-      return this;
-    }
-  }
-
-  private static class Response {
-    private final AtomicReference<ResponseHeaders> headers = new AtomicReference<>();
-    private final AtomicReference<ResponseTrailers> trailers = new AtomicReference<>();
-    private final AtomicReference<EnvoyError> envoyError = new AtomicReference<>();
-    private final List<ByteBuffer> bodies = new ArrayList<>();
-    private final AtomicBoolean cancelled = new AtomicBoolean(false);
-    private final AtomicReference<AssertionError> assertionError = new AtomicReference<>();
-
-    void setHeaders(ResponseHeaders headers) {
-      if (!this.headers.compareAndSet(null, headers)) {
-        assertionError.compareAndSet(
-            null, new AssertionError("setOnResponseHeaders called more than once."));
-      }
-    }
-
-    void addBody(ByteBuffer body) { bodies.add(body); }
-
-    void setTrailers(ResponseTrailers trailers) {
-      if (!this.trailers.compareAndSet(null, trailers)) {
-        assertionError.compareAndSet(
-            null, new AssertionError("setOnResponseTrailers called more than once."));
-      }
-    }
-
-    void setEnvoyError(EnvoyError envoyError) {
-      if (!this.envoyError.compareAndSet(null, envoyError)) {
-        assertionError.compareAndSet(null, new AssertionError("setOnError called more than once."));
-      }
-    }
-
-    void setCancelled() {
-      if (!cancelled.compareAndSet(false, true)) {
-        assertionError.compareAndSet(null,
-                                     new AssertionError("setOnCancel called more than once."));
-      }
-    }
-
-    EnvoyError getEnvoyError() { return envoyError.get(); }
-
-    ResponseHeaders getHeaders() { return headers.get(); }
-
-    ResponseTrailers getTrailers() { return trailers.get(); }
-
-    boolean isCancelled() { return cancelled.get(); }
-
-    String getBodyAsString() {
-      int totalSize = bodies.stream().mapToInt(ByteBuffer::limit).sum();
-      byte[] body = new byte[totalSize];
-      int pos = 0;
-      for (ByteBuffer buffer : bodies) {
-        int bytesToRead = buffer.limit();
-        buffer.get(body, pos, bytesToRead);
-        pos += bytesToRead;
-      }
-      return new String(body);
-    }
-
-    int getNbResponseChunks() { return bodies.size(); }
-
-    void throwAssertionErrorIfAny() {
-      if (assertionError.get() != null) {
-        throw assertionError.get();
-      }
-    }
   }
 }

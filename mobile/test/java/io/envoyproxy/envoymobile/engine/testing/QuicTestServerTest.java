@@ -17,6 +17,8 @@ import io.envoyproxy.envoymobile.ResponseTrailers;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
+import io.envoyproxy.envoymobile.engine.testing.RequestScenario;
+import io.envoyproxy.envoymobile.engine.testing.Response;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -126,12 +128,11 @@ public class QuicTestServerTest {
 
   @Test
   public void get_simpleTxt() throws Exception {
-    QuicTestServerTest.RequestScenario requestScenario =
-        new QuicTestServerTest.RequestScenario()
-            .setHttpMethod(RequestMethod.GET)
-            .setUrl(QuicTestServer.getServerURL() + "/simple.txt");
+    RequestScenario requestScenario = new RequestScenario()
+                                          .setHttpMethod(RequestMethod.GET)
+                                          .setUrl(QuicTestServer.getServerURL() + "/simple.txt");
 
-    QuicTestServerTest.Response response = sendRequest(requestScenario);
+    Response response = sendRequest(requestScenario);
 
     assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
     assertThat(response.getBodyAsString())
@@ -139,11 +140,9 @@ public class QuicTestServerTest {
     assertThat(response.getEnvoyError()).isNull();
   }
 
-  private QuicTestServerTest.Response sendRequest(RequestScenario requestScenario)
-      throws Exception {
+  private Response sendRequest(RequestScenario requestScenario) throws Exception {
     final CountDownLatch latch = new CountDownLatch(1);
-    final AtomicReference<QuicTestServerTest.Response> response =
-        new AtomicReference<>(new QuicTestServerTest.Response());
+    final AtomicReference<Response> response = new AtomicReference<>(new Response());
 
     Stream stream = engine.streamClient()
                         .newStreamPrototype()
@@ -177,108 +176,8 @@ public class QuicTestServerTest {
                         .sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody());
     requestScenario.getBodyChunks().forEach(stream::sendData);
     requestScenario.getClosingBodyChunk().ifPresent(stream::close);
-
     latch.await();
     response.get().throwAssertionErrorIfAny();
     return response.get();
-  }
-
-  private static class RequestScenario {
-
-    private URL url;
-    private RequestMethod method = null;
-    private final List<ByteBuffer> bodyChunks = new ArrayList<>();
-    private final boolean closeBodyStream = false;
-
-    RequestHeaders getHeaders() {
-      RequestHeadersBuilder requestHeadersBuilder =
-          new RequestHeadersBuilder(method, url.getProtocol(), url.getAuthority(), url.getPath());
-      requestHeadersBuilder.add("no_trailers", "0");
-      return requestHeadersBuilder.build();
-    }
-
-    List<ByteBuffer> getBodyChunks() {
-      return closeBodyStream
-          ? Collections.unmodifiableList(bodyChunks.subList(0, bodyChunks.size() - 1))
-          : Collections.unmodifiableList(bodyChunks);
-    }
-
-    Optional<ByteBuffer> getClosingBodyChunk() {
-      return closeBodyStream ? Optional.of(bodyChunks.get(bodyChunks.size() - 1))
-                             : Optional.empty();
-    }
-
-    boolean hasBody() { return !bodyChunks.isEmpty(); }
-
-    QuicTestServerTest.RequestScenario setHttpMethod(RequestMethod requestMethod) {
-      this.method = requestMethod;
-      return this;
-    }
-
-    QuicTestServerTest.RequestScenario setUrl(String url) throws MalformedURLException {
-      this.url = new URL(url);
-      return this;
-    }
-  }
-
-  private static class Response {
-
-    private final AtomicReference<ResponseHeaders> headers = new AtomicReference<>();
-    private final AtomicReference<ResponseTrailers> trailers = new AtomicReference<>();
-    private final AtomicReference<EnvoyError> envoyError = new AtomicReference<>();
-    private final List<ByteBuffer> bodies = new ArrayList<>();
-    private final AtomicBoolean cancelled = new AtomicBoolean(false);
-    private final AtomicReference<AssertionError> assertionError = new AtomicReference<>();
-
-    void setHeaders(ResponseHeaders headers) {
-      if (!this.headers.compareAndSet(null, headers)) {
-        assertionError.compareAndSet(
-            null, new AssertionError("setOnResponseHeaders called more than once."));
-      }
-    }
-
-    void addBody(ByteBuffer body) { bodies.add(body); }
-
-    void setTrailers(ResponseTrailers trailers) {
-      if (!this.trailers.compareAndSet(null, trailers)) {
-        assertionError.compareAndSet(
-            null, new AssertionError("setOnResponseTrailers called more than once."));
-      }
-    }
-
-    void setEnvoyError(EnvoyError envoyError) {
-      if (!this.envoyError.compareAndSet(null, envoyError)) {
-        assertionError.compareAndSet(null, new AssertionError("setOnError called more than once."));
-      }
-    }
-
-    void setCancelled() {
-      if (!cancelled.compareAndSet(false, true)) {
-        assertionError.compareAndSet(null,
-                                     new AssertionError("setOnCancel called more than once."));
-      }
-    }
-
-    EnvoyError getEnvoyError() { return envoyError.get(); }
-
-    ResponseHeaders getHeaders() { return headers.get(); }
-
-    String getBodyAsString() {
-      int totalSize = bodies.stream().mapToInt(ByteBuffer::limit).sum();
-      byte[] body = new byte[totalSize];
-      int pos = 0;
-      for (ByteBuffer buffer : bodies) {
-        int bytesToRead = buffer.limit();
-        buffer.get(body, pos, bytesToRead);
-        pos += bytesToRead;
-      }
-      return new String(body);
-    }
-
-    void throwAssertionErrorIfAny() {
-      if (assertionError.get() != null) {
-        throw assertionError.get();
-      }
-    }
   }
 }

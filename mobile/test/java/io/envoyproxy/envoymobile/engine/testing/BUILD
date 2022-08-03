@@ -11,8 +11,13 @@ android_library(
     testonly = True,
     srcs = [
         "QuicTestServer.java",
+        "RequestScenario.java",
+        "Response.java",
     ],
     visibility = ["//test:__subpackages__"],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
+    ],
 )
 
 envoy_mobile_android_test(
