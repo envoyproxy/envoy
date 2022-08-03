@@ -184,7 +184,7 @@ TEST(WebSocketCodecTest, decodeSingleMaskedFrame) {
   std::string text_payload;
   text_payload.resize(5);
   (*(frames[0].payload_)).copyOut(0, 5, text_payload.data());
-  // Unmasking the text paylaod
+  // Unmasking the text payload
   for (size_t i = 0; i < text_payload.size(); ++i) {
     text_payload[i] ^= (frames[0].masking_key_ >> (8 * (3 - i % 4))) & 0xff;
   }
@@ -223,7 +223,7 @@ TEST(WebSocketCodecTest, decodePingFrames) {
   std::string ping_response_payload;
   ping_response_payload.resize(5);
   (*(frames[1].payload_)).copyOut(0, 5, ping_response_payload.data());
-  // Unmasking the ping response paylaod
+  // Unmasking the ping response payload
   for (size_t i = 0; i < ping_response_payload.size(); ++i) {
     ping_response_payload[i] ^= (frames[1].masking_key_ >> (8 * (3 - i % 4))) & 0xff;
   }

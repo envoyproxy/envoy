@@ -36,9 +36,9 @@ constexpr uint8_t MASKING_KEY_LENGTH = 4;
 //  +-------------------------------+-------------------------------+
 //  | Masking-key (continued)       |          Payload Data         |
 //  +-------------------------------- - - - - - - - - - - - - - - - +
-//  :                     Payload Data continued ...                :
+//  :   Payload Data continued ...    Payload Data continued ...    :                                                             :
 //  + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
-//  |                     Payload Data continued ...                |
+//  |   Payload Data continued ...    Payload Data continued ...    |
 //  +---------------------------------------------------------------+
 
 struct Frame {
@@ -152,7 +152,8 @@ public:
   uint32_t length() const { return frame_.payload_length_; }
 
   // Indicates whether it has buffered any partial data.
-  // bool hasBufferedData() const { return state_ != State::FhFlag; }
+  bool hasBufferedData() const { return state_ != State::FhFlagsAndOpcode; }
+
   Frame& getFrame() { return frame_; };
 
 protected:

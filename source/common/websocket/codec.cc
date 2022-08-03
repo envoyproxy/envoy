@@ -1,10 +1,10 @@
 #include "source/common/websocket/codec.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
-#include <algorithm>
 
 #include "source/common/buffer/buffer_impl.h"
 
