@@ -94,7 +94,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   uint64_t streamId() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   Tracing::Span& activeSpan() override;
-  Tracing::Config& tracingConfig() override;
+  const Tracing::Config& tracingConfig() override;
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
@@ -250,7 +250,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   void requestRouteConfigUpdate(
       Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-  absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
@@ -381,9 +380,9 @@ public:
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
 
   /**
-   * Updates response code stats based on the details in the headers.
+   * Optionally updates response code stats based on the details in the headers.
    */
-  virtual void chargeStats(const ResponseHeaderMap& headers) PURE;
+  virtual void chargeStats(const ResponseHeaderMap& /*headers*/) {}
 
   // TODO(snowp): We should consider moving filter access to headers/trailers to happen via the
   // callbacks instead of via the encode/decode callbacks on the filters.
@@ -484,11 +483,6 @@ public:
   virtual void clearRouteCache() PURE;
 
   /**
-   * Returns the current route configuration.
-   */
-  virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
-
-  /**
    * Update the current route configuration.
    */
   virtual void
@@ -525,7 +519,7 @@ public:
   /**
    * Returns the tracing configuration to use for this stream.
    */
-  virtual Tracing::Config& tracingConfig() PURE;
+  virtual const Tracing::Config& tracingConfig() PURE;
 
   /**
    * Returns the tracked scope to use for this stream.
@@ -611,9 +605,9 @@ class FilterManager : public ScopeTrackedObject,
                       Logger::Loggable<Logger::Id::http> {
 public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
-                const Network::Connection& connection, uint64_t stream_id,
+                const Network::Connection* connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
-                uint32_t buffer_limit, FilterChainFactory& filter_chain_factory)
+                uint32_t buffer_limit, const FilterChainFactory& filter_chain_factory)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
@@ -718,6 +712,7 @@ public:
    * @param end_stream whether the request is header only.
    */
   void decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
+    state_.remote_decode_complete_ = end_stream;
     decodeHeaders(nullptr, headers, end_stream);
   }
 
@@ -727,6 +722,7 @@ public:
    * @param end_stream whether this data is the end of the request.
    */
   void decodeData(Buffer::Instance& data, bool end_stream) {
+    state_.remote_decode_complete_ = end_stream;
     decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
   }
 
@@ -734,7 +730,10 @@ public:
    * Decodes the provided trailers starting at the first filter in the chain.
    * @param trailers the trailers to decode.
    */
-  void decodeTrailers(RequestTrailerMap& trailers) { decodeTrailers(nullptr, trailers); }
+  void decodeTrailers(RequestTrailerMap& trailers) {
+    state_.remote_decode_complete_ = true;
+    decodeTrailers(nullptr, trailers);
+  }
 
   /**
    * Decodes the provided metadata starting at the first filter in the chain.
@@ -790,10 +789,7 @@ public:
   /**
    * Whether remote processing has been marked as complete.
    */
-  bool remoteDecodeComplete() const {
-    return streamInfo().downstreamTiming() &&
-           streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
-  }
+  virtual bool remoteDecodeComplete() const { return state_.remote_decode_complete_; }
 
   /**
    * Instructs the FilterManager to not create a filter chain. This makes it possible to issue
@@ -810,7 +806,7 @@ public:
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
 
-  const Network::Connection* connection() const { return &connection_; }
+  const Network::Connection* connection() const { return connection_; }
 
   uint64_t streamId() const { return stream_id_; }
   Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
@@ -922,7 +918,7 @@ private:
 
   FilterManagerCallbacks& filter_manager_callbacks_;
   Event::Dispatcher& dispatcher_;
-  const Network::Connection& connection_;
+  const Network::Connection* connection_;
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
@@ -945,7 +941,7 @@ private:
       std::make_shared<Network::Socket::Options>();
   absl::optional<absl::string_view> upstream_override_host_;
 
-  FilterChainFactory& filter_chain_factory_;
+  const FilterChainFactory& filter_chain_factory_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;
@@ -976,13 +972,14 @@ private:
 
   struct State {
     State()
-        : remote_encode_complete_(false), local_complete_(false), has_1xx_headers_(false),
-          created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
-          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
-          saw_downstream_reset_(false) {}
+        : remote_decode_complete_(false), remote_encode_complete_(false), local_complete_(false),
+          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
+          is_grpc_request_(false), non_100_response_headers_encoded_(false),
+          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
+          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
     uint32_t filter_call_state_{0};
 
+    bool remote_decode_complete_ : 1;
     bool remote_encode_complete_ : 1;
     bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
                               // A filter can still stop the stream from being complete as seen
@@ -1016,6 +1013,7 @@ private:
     ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
   };
 
+protected:
   State state_;
 };
 
@@ -1025,7 +1023,7 @@ private:
 class DownstreamFilterManager : public FilterManager {
 public:
   DownstreamFilterManager(FilterManagerCallbacks& filter_manager_callbacks,
-                          Event::Dispatcher& dispatcher, const Network::Connection& connection,
+                          Event::Dispatcher& dispatcher, const Network::Connection* connection,
                           uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
                           bool proxy_100_continue, uint32_t buffer_limit,
                           FilterChainFactory& filter_chain_factory,
@@ -1035,7 +1033,7 @@ public:
                           StreamInfo::FilterState::LifeSpan filter_state_life_span)
       : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
                       proxy_100_continue, buffer_limit, filter_chain_factory),
-        stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
+        stream_info_(protocol, time_source, connection->connectionInfoProviderSharedPtr(),
                      parent_filter_state, filter_state_life_span),
         local_reply_(local_reply) {}
 
@@ -1075,6 +1073,16 @@ public:
                             const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                             bool is_head_request,
                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+
+  /**
+   * Whether remote processing has been marked as complete.
+   * For the DownstreamFilterManager rely on external state, to handle the case
+   * of internal redirects.
+   */
+  bool remoteDecodeComplete() const override {
+    return streamInfo().downstreamTiming() &&
+           streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
+  }
 
 private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;

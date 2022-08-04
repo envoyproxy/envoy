@@ -279,7 +279,7 @@ private:
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void setRoute(Router::RouteConstSharedPtr route) override;
     void clearRouteCache() override;
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;

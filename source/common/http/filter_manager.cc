@@ -251,7 +251,7 @@ void ActiveStreamFilterBase::restoreContextOnContinue(
   parent_.contextOnContinue(tracked_object_stack);
 }
 
-Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
+const Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
   return parent_.filter_manager_callbacks_.tracingConfig();
 }
 
@@ -1335,7 +1335,9 @@ void FilterManager::setBufferLimit(uint32_t new_limit) {
 }
 
 void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) {
-  tracked_object_stack.add(connection_);
+  if (connection_) {
+    tracked_object_stack.add(*connection_);
+  }
   tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
@@ -1449,10 +1451,6 @@ Network::Socket::OptionsSharedPtr ActiveStreamDecoderFilter::getUpstreamSocketOp
 void ActiveStreamDecoderFilter::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   parent_.filter_manager_callbacks_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
-}
-
-absl::optional<Router::ConfigConstSharedPtr> ActiveStreamDecoderFilter::routeConfig() {
-  return parent_.filter_manager_callbacks_.routeConfig();
 }
 
 Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
