@@ -74,7 +74,6 @@ categories:
 - envoy.http.header_validators
 - envoy.http.stateful_header_formatters
 - envoy.internal_redirect_predicates
-- envoy.pattern_template
 - envoy.io_socket
 - envoy.http.original_ip_detection
 - envoy.matching.common_inputs

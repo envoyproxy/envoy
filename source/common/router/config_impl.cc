@@ -1262,7 +1262,6 @@ RouteEntryImplBase::buildPathRewritePolicy(envoy::config::route::v3::Route route
   return PathRewritePolicyImpl();
 }
 
-// TODO
 PathMatchPolicyImpl
 RouteEntryImplBase::buildPathMatchPolicy(envoy::config::route::v3::Route route,
                                          ProtobufMessage::ValidationVisitor& validator) const {
