@@ -13,7 +13,7 @@ namespace Rewrite {
 
 class PatternTemplateRewritePredicateFactory : public Router::PathRewritePredicateFactory {
 public:
-  Router::PathRewritePredicateSharedPtr
+  absl::StatusOr<Router::PathRewritePredicateSharedPtr>
   createPathRewritePredicate(const Protobuf::Message& rewrite_config) override {
     auto path_rewrite_config =
         MessageUtil::downcastAndValidate<const envoy::extensions::path::rewrite::pattern_template::
@@ -23,8 +23,9 @@ public:
     if (!PatternTemplate::isValidPathTemplateRewritePattern(
              path_rewrite_config.path_template_rewrite())
              .ok()) {
-      throw EnvoyException(fmt::format("path_rewrite_policy.path_template_rewrite {} is invalid",
-                                       path_rewrite_config.path_template_rewrite()));
+      return absl::InvalidArgumentError(
+          fmt::format("path_rewrite_policy.path_template_rewrite {} is invalid",
+                      path_rewrite_config.path_template_rewrite()));
     }
     return std::make_shared<PatternTemplateRewritePredicate>(path_rewrite_config);
   }

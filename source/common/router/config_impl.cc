@@ -359,8 +359,8 @@ PathRewritePolicyImpl::PathRewritePolicyImpl() : enabled_(false){};
 
 PathRewritePolicyImpl::PathRewritePolicyImpl(
     const envoy::config::core::v3::TypedExtensionConfig typed_config,
-    ProtobufMessage::ValidationVisitor& validator, std::string path)
-    : path_(path), enabled_(true) {
+    ProtobufMessage::ValidationVisitor& validator, std::string route_url)
+    : route_url_(route_url), enabled_(true) {
 
   predicate_factory_ =
       &Envoy::Config::Utility::getAndCheckFactory<PathRewritePredicateFactory>(typed_config);
@@ -373,7 +373,14 @@ PathRewritePolicyImpl::PathRewritePolicyImpl(
   // Validate config format and inputs when creating factory.
   // As the validation and create are nearly 1:1 store for later use.
   // Predicate is only ever created once.
-  predicate_ = predicate_factory_->createPathRewritePredicate(*predicate_config_);
+  absl::StatusOr<PathRewritePredicateSharedPtr> config_or_error =
+      predicate_factory_->createPathRewritePredicate(*predicate_config_);
+
+  if (!config_or_error.ok()) {
+    throw EnvoyException(std::string(config_or_error.status().message()));
+  }
+
+  predicate_ = config_or_error.value();
 }
 
 PathRewritePredicateSharedPtr PathRewritePolicyImpl::predicate() const { return predicate_; }
@@ -382,8 +389,8 @@ PathMatchPolicyImpl::PathMatchPolicyImpl() : enabled_(false){};
 
 PathMatchPolicyImpl::PathMatchPolicyImpl(
     const envoy::config::core::v3::TypedExtensionConfig typed_config,
-    ProtobufMessage::ValidationVisitor& validator, std::string route_url)
-    : route_url_(route_url), enabled_(true) {
+    ProtobufMessage::ValidationVisitor& validator, std::string path)
+    : path_(path), enabled_(true) {
 
   predicate_factory_ =
       &Envoy::Config::Utility::getAndCheckFactory<PathMatchPredicateFactory>(typed_config);
@@ -396,7 +403,14 @@ PathMatchPolicyImpl::PathMatchPolicyImpl(
   // Validate config format and inputs when creating factory.
   // As the validation and create are nearly 1:1 store for later use.
   // Predicate is only ever created once.
-  predicate_ = predicate_factory_->createPathMatchPredicate(*predicate_config_);
+  absl::StatusOr<PathMatchPredicateSharedPtr> config_or_error =
+      predicate_factory_->createPathMatchPredicate(*predicate_config_);
+
+  if (!config_or_error.ok()) {
+    throw EnvoyException(std::string(config_or_error.status().message()));
+  }
+
+  predicate_ = config_or_error.value();
 }
 
 PathMatchPredicateSharedPtr PathMatchPolicyImpl::predicate() const { return predicate_; }

@@ -51,7 +51,7 @@ public:
    * @param config contains the proto stored in TypedExtensionConfig.typed_config for the predicate.
    * @return an PathMatchPredicateSharedPtr.
    */
-  virtual PathMatchPredicateSharedPtr
+  virtual absl::StatusOr<PathMatchPredicateSharedPtr>
   createPathMatchPredicate(const Protobuf::Message& config) PURE;
 
   /**

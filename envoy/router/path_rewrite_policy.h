@@ -50,7 +50,7 @@ class PathRewritePredicateFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~PathRewritePredicateFactory() override = default;
 
-  virtual PathRewritePredicateSharedPtr
+  virtual absl::StatusOr<PathRewritePredicateSharedPtr>
   createPathRewritePredicate(const Protobuf::Message& rewrite_config) PURE;
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
