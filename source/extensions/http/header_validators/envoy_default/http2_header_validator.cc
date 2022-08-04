@@ -17,8 +17,8 @@ using HeaderValidatorFunction = ::Envoy::Http::HeaderValidator::HeaderEntryValid
     Http2HeaderValidator::*)(const HeaderString&);
 
 struct Http2ResponseCodeDetailValues {
-  const absl::string_view InvalidTE = "uhv.http2.invalid_te";
-  const absl::string_view ConnectionHeaderSanitization = "uhv.http2.connection_header_rejected";
+  const std::string InvalidTE = "uhv.http2.invalid_te";
+  const std::string ConnectionHeaderSanitization = "uhv.http2.connection_header_rejected";
 };
 
 using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
@@ -198,7 +198,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   //
   const auto& allowed_headers =
       is_connect_method ? kAllowedPseudoHeadersForConnect : kAllowedPseudoHeaders;
-  absl::string_view reject_details{""};
+  std::string reject_details;
 
   header_map.iterate(
       [this, &reject_details, &allowed_headers](
@@ -217,7 +217,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
         } else {
           auto entry_result = validateRequestHeaderEntry(header_name, header_value);
           if (!entry_result) {
-            reject_details = entry_result.details();
+            reject_details = static_cast<std::string>(entry_result.details());
           }
         }
 
@@ -250,7 +250,7 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   //
   // Step 2: Verify each response header
   //
-  absl::string_view reject_details{""};
+  std::string reject_details;
   header_map.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
                          -> ::Envoy::Http::HeaderMap::Iterate {
     const auto& header_name = header_entry.key();
@@ -266,7 +266,7 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
     } else {
       auto entry_result = validateResponseHeaderEntry(header_name, header_value);
       if (!entry_result) {
-        reject_details = entry_result.details();
+        reject_details = static_cast<std::string>(entry_result.details());
       }
     }
 

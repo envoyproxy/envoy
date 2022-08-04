@@ -17,10 +17,10 @@ using HeaderValidatorFunction = ::Envoy::Http::HeaderValidator::HeaderEntryValid
     Http1HeaderValidator::*)(const HeaderString&);
 
 struct Http1ResponseCodeDetailValues {
-  const absl::string_view InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
-  const absl::string_view TransferEncodingNotAllowed = "uhv.http1.transfer_encoding_not_allowed";
-  const absl::string_view ContentLengthNotAllowed = "uhv.http1.content_length_not_allowed";
-  const absl::string_view ChunkedContentLength = "uhv.http1.content_length_and_chunked_not_allowed";
+  const std::string InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
+  const std::string TransferEncodingNotAllowed = "uhv.http1.transfer_encoding_not_allowed";
+  const std::string ContentLengthNotAllowed = "uhv.http1.content_length_not_allowed";
+  const std::string ChunkedContentLength = "uhv.http1.content_length_and_chunked_not_allowed";
 };
 
 using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
@@ -262,7 +262,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   //
   // Step 4: Verify each request header
   //
-  absl::string_view reject_details{""};
+  std::string reject_details;
   header_map.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
                          -> ::Envoy::Http::HeaderMap::Iterate {
     const auto& header_name = header_entry.key();
@@ -278,7 +278,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     } else {
       auto entry_result = validateRequestHeaderEntry(header_name, header_value);
       if (!entry_result) {
-        reject_details = entry_result.details();
+        reject_details = static_cast<std::string>(entry_result.details());
       }
     }
 
@@ -310,7 +310,7 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   //
   // Step 2: Verify each response header
   //
-  absl::string_view reject_details{""};
+  std::string reject_details;
   header_map.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
                          -> ::Envoy::Http::HeaderMap::Iterate {
     const auto& header_name = header_entry.key();
@@ -326,7 +326,7 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
     } else {
       auto entry_result = validateResponseHeaderEntry(header_name, header_value);
       if (!entry_result) {
-        reject_details = entry_result.details();
+        reject_details = static_cast<std::string>(entry_result.details());
       }
     }
 

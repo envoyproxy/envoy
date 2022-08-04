@@ -96,16 +96,16 @@ protected:
 };
 
 struct UhvResponseCodeDetailValues {
-  const absl::string_view InvalidCharacters = "uhv.invalid_characters";
-  const absl::string_view InvalidUrl = "uhv.invalid_url";
-  const absl::string_view InvalidHost = "uhv.invalid_host";
-  const absl::string_view InvalidScheme = "uhv.invalid_scheme";
-  const absl::string_view InvalidMethod = "uhv.invalid_method";
-  const absl::string_view InvalidContentLength = "uhv.invalid_content_length";
-  const absl::string_view InvalidUnderscore = "uhv.unexpected_underscore";
-  const absl::string_view InvalidStatus = "uhv.invalid_status";
-  const absl::string_view EmptyHeaderName = "uhv.empty_header_name";
-  const absl::string_view InvalidPseudoHeader = "uhv.invalid_pseudo_header";
+  const std::string InvalidCharacters = "uhv.invalid_characters";
+  const std::string InvalidUrl = "uhv.invalid_url";
+  const std::string InvalidHost = "uhv.invalid_host";
+  const std::string InvalidScheme = "uhv.invalid_scheme";
+  const std::string InvalidMethod = "uhv.invalid_method";
+  const std::string InvalidContentLength = "uhv.invalid_content_length";
+  const std::string InvalidUnderscore = "uhv.unexpected_underscore";
+  const std::string InvalidStatus = "uhv.invalid_status";
+  const std::string EmptyHeaderName = "uhv.empty_header_name";
+  const std::string InvalidPseudoHeader = "uhv.invalid_pseudo_header";
 };
 
 using UhvResponseCodeDetail = ConstSingleton<UhvResponseCodeDetailValues>;
