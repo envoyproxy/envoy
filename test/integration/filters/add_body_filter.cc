@@ -132,7 +132,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::AddBodyFilterConfig& proto_config, const std::string&,
-      Server::Configuration::ServerFactoryContext&) override {
+      DualInfo, Server::Configuration::ServerFactoryContext&) override {
     auto filter_config = std::make_shared<AddBodyFilterConfig>(
         proto_config.where_to_add_body(), proto_config.body_size(),
         proto_config.where_to_stop_and_buffer());

@@ -86,9 +86,11 @@ public:
       : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
 
   struct DualInfo {
-    DualInfo(Server::Configuration::UpstreamHttpFactoryContext& context) : init_manager(context.initManager()) {}
-    DualInfo(Server::Configuration::FactoryContext& context) : init_manager(context.initManager()) {}
-    InitManager& init_manager;
+    DualInfo(Server::Configuration::UpstreamHttpFactoryContext& context)
+        : init_manager(context.initManager()) {}
+    DualInfo(Server::Configuration::FactoryContext& context)
+        : init_manager(context.initManager()) {}
+    Init::Manager& init_manager;
   };
 
   Http::FilterFactoryCb
@@ -97,22 +99,22 @@ public:
                                Server::Configuration::FactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
-                                             stats_prefix, context.getServerFactoryContext());
+                                             stats_prefix, DualInfo(context),
+                                             context.getServerFactoryContext());
   }
 
-  Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::UpstreamHttpFactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                                 proto_config, context.getServerFactoryContext().messageValidationVisitor()),
-                                             stats_prefix, context.getServerFactoryContext());
+  Http::FilterFactoryCb createFilterFactoryFromProto(
+      const Protobuf::Message& proto_config, const std::string& stats_prefix,
+      Server::Configuration::UpstreamHttpFactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            proto_config, context.getServerFactoryContext().messageValidationVisitor()),
+        stats_prefix, DualInfo(context), context.getServerFactoryContext());
   }
 
   virtual Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                    const std::string& stats_prefix,
-                                    DualInfo info,
+                                    const std::string& stats_prefix, DualInfo info,
                                     Server::Configuration::ServerFactoryContext& context) PURE;
 };
 

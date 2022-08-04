@@ -300,7 +300,7 @@ using ProtocolOptionsFactoryContext = Server::Configuration::TransportSocketFact
  * FactoryContext for upstream HTTP filters.
  */
 class UpstreamHttpFactoryContext {
- public:
+public:
   virtual ~UpstreamHttpFactoryContext() = default;
 
   /**

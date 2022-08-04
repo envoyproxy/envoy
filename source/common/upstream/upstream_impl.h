@@ -597,17 +597,18 @@ protected:
 };
 
 class UpstreamHttpFactoryContextImpl : public Server::Configuration::UpstreamHttpFactoryContext {
- public:
+public:
   UpstreamHttpFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
-                                 Init::Manager& init_manager) : server_context_(context), init_manager_(init_manager) {}
+                                 Init::Manager& init_manager)
+      : server_context_(context), init_manager_(init_manager) {}
 
-  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override { return server_context_; }
-
-  Init::Manager& initManager() override {
-    return init_manager_;
+  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
+    return server_context_;
   }
 
- private:
+  Init::Manager& initManager() override { return init_manager_; }
+
+private:
   Server::Configuration::ServerFactoryContext& server_context_;
   Init::Manager& init_manager_;
 };
@@ -621,8 +622,7 @@ class ClusterInfoImpl : public ClusterInfo,
 public:
   using HttpProtocolOptionsConfigImpl =
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
-  ClusterInfoImpl(Init::Manager& info,
-                  Server::Configuration::ServerFactoryContext& server_context,
+  ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
                   const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,

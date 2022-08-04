@@ -436,9 +436,9 @@ public:
 
     ProtobufTypes::MessagePtr default_config;
     if (config_source.has_default_config()) {
-      default_config = getDefaultConfig(
-          config_source.default_config(), filter_config_name, server_context,
-          last_filter_in_filter_chain, filter_chain_type, require_type_urls);
+      default_config =
+          getDefaultConfig(config_source.default_config(), filter_config_name, server_context,
+                           last_filter_in_filter_chain, filter_chain_type, require_type_urls);
     }
 
     auto provider = createFilterConfigProviderImpl(subscription, require_type_urls, server_context,
@@ -483,8 +483,7 @@ protected:
   ProtobufTypes::MessagePtr
   getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
                    Server::Configuration::ServerFactoryContext& server_context,
-                   bool last_filter_in_filter_chain,
-                   const std::string& filter_chain_type,
+                   bool last_filter_in_filter_chain, const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string>& require_type_urls) const {
     auto* default_factory = Config::Utility::getFactoryByType<Factory>(proto_config);
     validateProtoConfigDefaultFactory(default_factory == nullptr, filter_config_name,
