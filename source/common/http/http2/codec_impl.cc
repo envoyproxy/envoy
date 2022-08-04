@@ -882,6 +882,10 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
 }
 
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
+  if (stream_id_ == -1) {
+    // Handle the case where client streams are reset before headers are created.
+    return;
+  }
   if (parent_.use_new_codec_wrapper_) {
     parent_.adapter_->SubmitRst(stream_id_,
                                 static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));

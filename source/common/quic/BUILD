@@ -131,6 +131,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_utils_lib",
+        ":quic_ssl_connection_info_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
     ],
 )

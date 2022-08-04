@@ -111,9 +111,9 @@ public:
                                     Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) override;
+  void createFilterChain(Http::FilterChainManager& manager) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainManager&) override {
+                                Http::FilterChainManager&) const override {
     return false;
   }
 
@@ -202,7 +202,7 @@ public:
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
-  GenRequestFn createRequestFunction() {
+  GenRequestFn createRequestFunction() const {
     return [this](AdminStream& admin_stream) -> RequestPtr { return makeRequest(admin_stream); };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
@@ -218,9 +218,9 @@ private:
   friend class AdminTestingPeer;
 
   /**
-   * Creates a Request from a url.
+   * Creates a Request from the request in the admin stream.
    */
-  RequestPtr makeRequest(AdminStream& admin_stream);
+  RequestPtr makeRequest(AdminStream& admin_stream) const;
 
   /**
    * Creates a UrlHandler structure from a non-chunked callback.
@@ -343,7 +343,7 @@ private:
 
   Http::Code handlerHelp(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
-  void getHelp(Buffer::Instance& response);
+  void getHelp(Buffer::Instance& response) const;
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -379,10 +379,6 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::ListenSocketFactory& listenSocketFactory() override {
-      ASSERT(parent_.socket_factories_.size() == 1);
-      return *parent_.socket_factories_[0];
-    }
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return parent_.socket_factories_;
     }
