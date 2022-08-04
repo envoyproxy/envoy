@@ -1190,11 +1190,11 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
     auto* cluster = static_resources->mutable_clusters(i);
 
     HttpProtocolOptions old_protocol_options;
-    if(cluster->typed_extension_protocol_options().contains(
-          "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+    if (cluster->typed_extension_protocol_options().contains(
+            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
       old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
-            (*cluster->mutable_typed_extension_protocol_options())
-            ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+          (*cluster->mutable_typed_extension_protocol_options())
+              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     }
     auto* filter_list_back = old_protocol_options.add_http_filters();
     TestUtility::loadFromYaml(config, *filter_list_back);
@@ -1203,7 +1203,7 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
     }
     (*cluster->mutable_typed_extension_protocol_options())
         ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-        .PackFrom(old_protocol_options);
+            .PackFrom(old_protocol_options);
   }
 }
 

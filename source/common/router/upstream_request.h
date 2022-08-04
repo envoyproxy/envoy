@@ -51,10 +51,15 @@ public:
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();
 
-  void encodeHeaders(bool end_stream);
-  void encodeData(Buffer::Instance& data, bool end_stream);
-  void encodeTrailers(Http::RequestTrailerMap& trailers);
-  void encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
+  void acceptHeadersFromRouter(bool end_stream);
+  void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
+  void acceptTrailersFromRouter(Http::RequestTrailerMap& trailers);
+  void acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr);
+
+  void acceptHeadersFromRouterOld(bool end_stream);
+  void acceptDataFromRouterOld(Buffer::Instance& data, bool end_stream);
+  void acceptTrailersFromRouterOld(Http::RequestTrailerMap& trailers);
+  void acceptMetadataFromRouterOld(Http::MetadataMapPtr&& metadata_map_ptr);
 
   void resetStream();
   void setupPerTryTimeout();
@@ -110,6 +115,7 @@ public:
   };
 
   void readEnable();
+  void encodeBodyAndTrailers();
 
   // Getters and setters
   Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }
@@ -140,6 +146,13 @@ private:
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return stream_info_.upstreamInfo()->upstreamTiming();
   }
+  bool shouldSendEndStream() {
+    // Only encode end stream if the full request has been received, the body
+    // has been sent, and any trailers or metadata have also been sent.
+    return router_sent_end_stream_ && !buffered_request_body_ && !encode_trailers_ &&
+           downstream_metadata_map_vector_.empty();
+  }
+
   void addResponseHeadersSize(uint64_t size) {
     response_headers_size_ = response_headers_size_.value_or(0) + size;
   }
@@ -191,11 +204,16 @@ private:
   // Track if one time clean up has been performed.
   bool cleaned_up_ : 1;
   bool had_upstream_ : 1;
+  bool allow_upstream_filters_ : 1;
   Http::ConnectionPool::Instance::StreamOptions stream_options_;
   Event::TimerPtr max_stream_duration_timer_;
 
   std::unique_ptr<UpstreamRequestFilterManagerCallbacks> fm_callbacks_;
   std::unique_ptr<Http::FilterManager> filter_manager_;
+
+  // TODO(alyssawilk) remove these with allow_upstream_filters_
+  Buffer::InstancePtr buffered_request_body_;
+  Http::MetadataMapVector downstream_metadata_map_vector_;
 };
 
 class UpstreamRequestFilterManagerCallbacks : public Http::FilterManagerCallbacks,
