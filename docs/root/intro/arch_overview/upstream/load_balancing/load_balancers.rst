@@ -132,17 +132,16 @@ host B has a weight of 2, then host A will have 21,846 entries and host B will h
 regardless of the configured host and locality weights, so in some extreme cases the actual
 proportions may differ from the configured weights. For example, if the total number of hosts is
 larger than the fixed table size, then some hosts will get 1 entry each and the rest will get 0,
-regardless of weight.
+regardless of weight. Best practice is to monitor the :ref:`min_entries_per_host and
+max_entries_per_host gauges <config_cluster_manager_cluster_stats_maglev_lb>` to ensure no hosts
+are underrepresented or missing.
 
 In general, when compared to the ring hash ("ketama") algorithm, Maglev has substantially faster
 table lookup build times as well as host selection times (approximately 10x and 5x respectively
 when using a large ring size of 256K entries). While Maglev aims for minimal disruption, it is not
 as stable as ring hash when upstream hosts change. More keys will move position when hosts are removed
 (simulations show approximately double the keys will move).
-Best practice is to set
-:ref:`table_size<envoy_v3_api_field_config.cluster.v3.Cluster.MaglevLbConfig.table_size>` and monitor
-the :ref:`min_entries_per_host and max_entries_per_host gauges <config_cluster_manager_cluster_stats_maglev_lb>`
-to ensure no hosts are under-represented or missing. With that said, for many applications
+ With that said, for many applications
 including Redis, Maglev is very likely a superior drop in replacement for ring hash. The advanced reader can use
 :repo:`this benchmark </test/common/upstream/load_balancer_benchmark.cc>` to compare ring hash
 versus Maglev with different parameters.
