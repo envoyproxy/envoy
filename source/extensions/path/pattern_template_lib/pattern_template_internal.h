@@ -22,7 +22,7 @@ namespace PatternTemplate {
 namespace PatternTemplateInternal {
 
 using Literal = absl::string_view;
-enum class Operator { kPathGlob, kTextGlob };
+enum class Operator { KPathGlob, KTextGlob };
 
 struct RewriteSegment {
   // Represents a segment of the rewritten URL, including any path segments,
@@ -42,7 +42,7 @@ struct Variable {
   Variable(absl::string_view name, std::vector<absl::variant<Operator, Literal>> match)
       : var_name(name), var_match(match) {}
 
-  std::string DebugString() const;
+  std::string debugString() const;
 };
 
 using ParsedSegment = absl::variant<Operator, Variable, Literal>;
@@ -52,7 +52,7 @@ struct ParsedUrlPattern {
   absl::optional<absl::string_view> suffix;
   absl::flat_hash_set<absl::string_view> captured_variables;
 
-  std::string DebugString() const;
+  std::string debugString() const;
 };
 
 bool isValidLiteral(absl::string_view pattern);

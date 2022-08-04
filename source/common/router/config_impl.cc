@@ -358,8 +358,8 @@ std::vector<InternalRedirectPredicateSharedPtr> InternalRedirectPolicyImpl::pred
 PathRewritePolicyImpl::PathRewritePolicyImpl() : enabled_(false){};
 
 PathRewritePolicyImpl::PathRewritePolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
-                                         ProtobufMessage::ValidationVisitor& validator, std::string route_url)
-    : route_url_(route_url), enabled_(true) {
+                                         ProtobufMessage::ValidationVisitor& validator, std::string path)
+    : path_(path), enabled_(true) {
 
     predicate_factory_ = &Envoy::Config::Utility::getAndCheckFactory<PathRewritePredicateFactory>(typed_config);
   ASSERT(predicate_factory_); // factory not found

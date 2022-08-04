@@ -84,8 +84,8 @@ TEST_P(ParseRewriteHelperFailure, ParseRewriteHelperFailureTest) {
 
 class ParseRewriteSuccess : public testing::TestWithParam<std::pair<std::string, std::string>> {
 protected:
-  const std::string& rewrite_pattern() const { return std::get<0>(GetParam()); }
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments expected_proto() const {
+  const std::string& rewritePattern() const { return std::get<0>(GetParam()); }
+  envoy::extensions::pattern_template::PatternTemplateRewriteSegments expectedProto() const {
     envoy::extensions::pattern_template::PatternTemplateRewriteSegments expected_proto;
     Envoy::TestUtility::loadFromYaml(std::get<1>(GetParam()), expected_proto);
     return expected_proto;
@@ -147,7 +147,7 @@ INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
 
 TEST_P(ParseRewriteSuccess, ParseRewriteSuccessTest) {
   absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments> rewrite =
-      parseRewritePattern(rewrite_pattern(), kCaptureRegex);
+      parseRewritePattern(rewritePattern(), kCaptureRegex);
   ASSERT_OK(rewrite);
   // EXPECT_THAT(rewrite.value(), testing::EqualsProto(expected_proto()));
 }
@@ -174,7 +174,7 @@ protected:
     Envoy::TestUtility::loadFromYaml(std::get<0>(GetParam()), proto);
     return proto;
   }
-  const std::string& expected_rewritten_url() const { return std::get<1>(GetParam()); }
+  const std::string& expectedRewrittenUrl() const { return std::get<1>(GetParam()); }
 };
 
 INSTANTIATE_TEST_SUITE_P(RewriteUrlTemplateSuccessTestSuite, RewriteUrlTemplateSuccess,
@@ -230,7 +230,7 @@ TEST_P(RewriteUrlTemplateSuccess, RewriteUrlTemplateSuccessTest) {
   absl::StatusOr<std::string> rewritten_url =
       rewriteURLTemplatePattern(kMatchUrl, kCaptureRegex, rewrite_proto());
   ASSERT_OK(rewritten_url);
-  EXPECT_EQ(rewritten_url.value(), expected_rewritten_url());
+  EXPECT_EQ(rewritten_url.value(), expectedRewrittenUrl());
 }
 
 TEST(RewriteUrlTemplateFailure, BadRegex) {
@@ -297,9 +297,9 @@ class URLPatternMatchAndRewrite
           std::tuple<std::string, std::string, std::string, std::string>> {
 protected:
   const std::string& url_pattern() const { return std::get<0>(GetParam()); }
-  const std::string& rewrite_pattern() const { return std::get<1>(GetParam()); }
-  const std::string& match_url() const { return std::get<2>(GetParam()); }
-  const std::string& expected_rewritten_url() const { return std::get<3>(GetParam()); }
+  const std::string& rewritePattern() const { return std::get<1>(GetParam()); }
+  const std::string& matchUrl() const { return std::get<2>(GetParam()); }
+  const std::string& expectedRewrittenUrl() const { return std::get<3>(GetParam()); }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -320,11 +320,11 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
   ASSERT_OK(regex);
 
   absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments>
-      rewrite_proto = parseRewritePattern(rewrite_pattern(), regex.value());
+      rewrite_proto = parseRewritePattern(rewritePattern(), regex.value());
   ASSERT_OK(rewrite_proto);
 
   absl::StatusOr<std::string> rewritten_url =
-      rewriteURLTemplatePattern(match_url(), regex.value(), rewrite_proto.value());
+      rewriteURLTemplatePattern(matchUrl(), regex.value(), rewrite_proto.value());
   ASSERT_OK(rewritten_url);
 
   EXPECT_EQ(rewritten_url.value(), expected_rewritten_url());

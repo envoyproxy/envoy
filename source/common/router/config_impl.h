@@ -469,10 +469,10 @@ public:
 
   PathMatchPredicateSharedPtr predicate() const override;
 
-  std::string route_url() const { return route_url_; }
+  std::string path() const { return path_; }
 
 private:
-  const std::string route_url_;
+  const std::string path_;
   const bool enabled_;
   ProtobufTypes::MessagePtr predicate_config_;
   PathMatchPredicateFactory* predicate_factory_;

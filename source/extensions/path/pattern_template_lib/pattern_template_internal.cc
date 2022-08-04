@@ -44,7 +44,7 @@ constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
                                        ":@";
 
 // Default operator used for the variable when none specified.
-constexpr Operator kDefaultVariableOperator = Operator::kPathGlob;
+constexpr Operator kDefaultVariableOperator = Operator::KPathGlob;
 
 // Visitor for displaying debug info of a ParsedSegment/Variable.var_match.
 struct ToStringVisitor {
@@ -74,9 +74,9 @@ std::string toString(const Literal val) { return std::string(val); }
 
 std::string toString(const Operator val) {
   switch (val) {
-  case Operator::kPathGlob:
+  case Operator::KPathGlob:
     return "*";
-  case Operator::kTextGlob:
+  case Operator::KTextGlob:
     return "**";
   }
 }
@@ -95,7 +95,7 @@ template <typename T> std::string ToStringVisitor::operator()(const T& val) cons
 }
 
 template <typename T>
-absl::StatusOr<T> AlsoUpdatePattern(
+absl::StatusOr<T> alsoUpdatePattern(
     absl::FunctionRef<absl::StatusOr<ParsedResult<T>>(absl::string_view)> consume_func,
     absl::string_view* patt) {
 
@@ -111,9 +111,9 @@ absl::StatusOr<T> AlsoUpdatePattern(
 
 } // namespace
 
-std::string Variable::DebugString() const { return toString(*this); }
+std::string Variable::debugString() const { return toString(*this); }
 
-std::string ParsedUrlPattern::DebugString() const {
+std::string ParsedUrlPattern::debugString() const {
   return absl::StrCat("/", absl::StrJoin(parsed_segments, "/", ToStringFormatter()),
                       suffix.value_or(""));
 }
@@ -149,10 +149,10 @@ absl::StatusOr<ParsedResult<Literal>> consumeLiteral(absl::string_view pattern) 
 
 absl::StatusOr<ParsedResult<Operator>> consumeOperator(absl::string_view pattern) {
   if (absl::StartsWith(pattern, "**")) {
-    return ParsedResult<Operator>(Operator::kTextGlob, pattern.substr(2));
+    return ParsedResult<Operator>(Operator::KTextGlob, pattern.substr(2));
   }
   if (absl::StartsWith(pattern, "*")) {
-    return ParsedResult<Operator>(Operator::kPathGlob, pattern.substr(1));
+    return ParsedResult<Operator>(Operator::KPathGlob, pattern.substr(1));
   }
   return absl::InvalidArgumentError("Invalid Operator");
 }
@@ -187,7 +187,7 @@ absl::StatusOr<ParsedResult<Variable>> consumeVariable(absl::string_view pattern
     absl::variant<Operator, Literal> var_match;
     if (var_patt[0] == '*') {
 
-      absl::StatusOr<Operator> status = AlsoUpdatePattern<Operator>(consumeOperator, &var_patt);
+      absl::StatusOr<Operator> status = alsoUpdatePattern<Operator>(consumeOperator, &var_patt);
       if (!status.ok()) {
         return status.status();
       }
@@ -195,7 +195,7 @@ absl::StatusOr<ParsedResult<Variable>> consumeVariable(absl::string_view pattern
 
     } else {
 
-      absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(consumeLiteral, &var_patt);
+      absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(consumeLiteral, &var_patt);
       if (!status.ok()) {
         return status.status();
       }
@@ -246,7 +246,7 @@ absl::Status validateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
       if (seen_text_glob) {
         return absl::InvalidArgumentError("Glob after text glob.");
       }
-      seen_text_glob = (absl::get<Operator>(segment) == Operator::kTextGlob);
+      seen_text_glob = (absl::get<Operator>(segment) == Operator::KTextGlob);
     } else if (absl::holds_alternative<Variable>(segment)) {
       const Variable& var = absl::get<Variable>(segment);
       if (var.var_match.empty()) {
@@ -262,7 +262,7 @@ absl::Status validateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
           if (seen_text_glob) {
             return absl::InvalidArgumentError("Glob after text glob.");
           }
-          seen_text_glob = (absl::get<Operator>(var_seg) == Operator::kTextGlob);
+          seen_text_glob = (absl::get<Operator>(var_seg) == Operator::KTextGlob);
         }
       }
     }
@@ -287,21 +287,21 @@ absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pat
     ParsedSegment segment;
     if (url_pattern[0] == '*') {
 
-      absl::StatusOr<Operator> status = AlsoUpdatePattern<Operator>(consumeOperator, &url_pattern);
+      absl::StatusOr<Operator> status = alsoUpdatePattern<Operator>(consumeOperator, &url_pattern);
       if (!status.ok()) {
         return status.status();
       }
       segment = *std::move(status);
     } else if (url_pattern[0] == '{') {
 
-      absl::StatusOr<Variable> status = AlsoUpdatePattern<Variable>(consumeVariable, &url_pattern);
+      absl::StatusOr<Variable> status = alsoUpdatePattern<Variable>(consumeVariable, &url_pattern);
       if (!status.ok()) {
         return status.status();
       }
       segment = *std::move(status);
     } else {
 
-      absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(consumeLiteral, &url_pattern);
+      absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(consumeLiteral, &url_pattern);
       if (!status.ok()) {
         return status.status();
       }
@@ -321,7 +321,7 @@ absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pat
       } else {
         // Not followed by '/', treat as suffix.
 
-        absl::StatusOr<Literal> status = AlsoUpdatePattern<Literal>(consumeLiteral, &url_pattern);
+        absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(consumeLiteral, &url_pattern);
         if (!status.ok()) {
           return status.status();
         }
@@ -358,9 +358,9 @@ std::string toRegexPattern(Operator pattern) {
   static const std::string* kPathGlobRegex = new std::string(absl::StrCat("[", kLiteral, "]+"));
   static const std::string* kTextGlobRegex = new std::string(absl::StrCat("[", kLiteral, "/]*"));
   switch (pattern) {
-  case Operator::kPathGlob: // "*"
+  case Operator::KPathGlob: // "*"
     return *kPathGlobRegex;
-  case Operator::kTextGlob: // "**"
+  case Operator::KTextGlob: // "**"
     return *kTextGlobRegex;
   }
 }

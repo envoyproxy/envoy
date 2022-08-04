@@ -367,9 +367,9 @@ struct GenPatternTestCase {
 
 class GenPatternRegexWithMatch : public testing::TestWithParam<struct GenPatternTestCase> {
 protected:
-  const std::string& request_path() const { return GetParam().path; }
-  const std::string& url_pattern() const { return GetParam().pattern; }
-  std::vector<std::pair<std::string, std::string>> const var_values() {
+  const std::string& requestPath() const { return GetParam().path; }
+  const std::string& urlPattern() const { return GetParam().pattern; }
+  std::vector<std::pair<std::string, std::string>> const varValues() {
     return GetParam().captures;
   }
 };
@@ -414,22 +414,22 @@ INSTANTIATE_TEST_SUITE_P(
                            {{"VERSION", "v1"}, {"version", "v2"}, {"verSION", "v3"}})));
 
 TEST_P(GenPatternRegexWithMatch, WithCapture) {
-  absl::StatusOr<ParsedUrlPattern> pattern = parseURLPatternSyntax(url_pattern());
+  absl::StatusOr<ParsedUrlPattern> pattern = parseURLPatternSyntax(urlPattern());
   ASSERT_OK(pattern);
 
   RE2 regex = RE2(toRegexPattern(pattern.value()));
   ASSERT_TRUE(regex.ok()) << regex.error();
-  ASSERT_EQ(regex.NumberOfCapturingGroups(), var_values().size());
+  ASSERT_EQ(regex.NumberOfCapturingGroups(), varValues().size());
 
   int capture_num = regex.NumberOfCapturingGroups() + 1;
   std::vector<re2::StringPiece> captures(capture_num);
-  ASSERT_TRUE(regex.Match(request_path(), /*startpos=*/0,
-                          /*endpos=*/request_path().size(), RE2::ANCHOR_BOTH, captures.data(),
+  ASSERT_TRUE(regex.Match(requestPath(), /*startpos=*/0,
+                          /*endpos=*/requestPath().size(), RE2::ANCHOR_BOTH, captures.data(),
                           captures.size()));
 
-  EXPECT_EQ(captures[0], toStringPiece(request_path()));
+  EXPECT_EQ(captures[0], toStringPiece(requestPath()));
 
-  for (const auto& [name, value] : var_values()) {
+  for (const auto& [name, value] : varValues()) {
     int capture_index = regex.NamedCapturingGroups().at(name);
     ASSERT_GE(capture_index, 0);
     EXPECT_EQ(captures.at(capture_index), value);
@@ -439,8 +439,8 @@ TEST_P(GenPatternRegexWithMatch, WithCapture) {
 class GenPatternRegexWithoutMatch
     : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
-  const std::string& request_path() const { return std::get<0>(GetParam()); }
-  const std::string& url_pattern() const { return std::get<1>(GetParam()); }
+  const std::string& requestPath() const { return std::get<0>(GetParam()); }
+  const std::string& urlPattern() const { return std::get<1>(GetParam()); }
 };
 
 INSTANTIATE_TEST_SUITE_P(GenPatternRegexWithoutMatchTestSuite, GenPatternRegexWithoutMatch,
@@ -453,14 +453,14 @@ INSTANTIATE_TEST_SUITE_P(GenPatternRegexWithoutMatchTestSuite, GenPatternRegexWi
                               {"/api/*/1234/", "/api/*/1234/"}})));
 
 TEST_P(GenPatternRegexWithoutMatch, WithCapture) {
-  absl::StatusOr<ParsedUrlPattern> pattern = parseURLPatternSyntax(url_pattern());
+  absl::StatusOr<ParsedUrlPattern> pattern = parseURLPatternSyntax(urlPattern());
   ASSERT_OK(pattern);
 
   RE2 regex = RE2(toRegexPattern(pattern.value()));
   ASSERT_TRUE(regex.ok()) << regex.error();
 
-  EXPECT_FALSE(regex.Match(request_path(), /*startpos=*/0,
-                           /*endpos=*/request_path().size(), RE2::ANCHOR_BOTH, nullptr, 0));
+  EXPECT_FALSE(regex.Match(requestPath(), /*startpos=*/0,
+                           /*endpos=*/requestPath().size(), RE2::ANCHOR_BOTH, nullptr, 0));
 }
 
 } // namespace

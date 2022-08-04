@@ -25,7 +25,7 @@ using PatternTemplateInternal::ParsedUrlPattern;
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-inline re2::StringPiece ToStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
+inline re2::StringPiece toStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
 
 absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url_pattern) {
 
@@ -44,7 +44,7 @@ parseRewritePatternHelper(absl::string_view pattern) {
 
   // Don't allow contiguous '/' patterns.
   static const LazyRE2 invalid_regex = {"^.*//.*$"};
-  if (RE2::FullMatch(ToStringPiece(pattern), *invalid_regex)) {
+  if (RE2::FullMatch(toStringPiece(pattern), *invalid_regex)) {
     return absl::InvalidArgumentError("Invalid rewrite literal pattern");
   }
 
@@ -59,7 +59,7 @@ parseRewritePatternHelper(absl::string_view pattern) {
       if (!PatternTemplateInternal::isValidRewriteLiteral(segments1[0])) {
         return absl::InvalidArgumentError("Invalid rewrite literal pattern");
       }
-      result.emplace_back(segments1[0], RewriteStringKind::kLiteral);
+      result.emplace_back(segments1[0], RewriteStringKind::KLiteral);
     }
 
     if (segments1.size() < 2) {
@@ -77,7 +77,7 @@ parseRewritePatternHelper(absl::string_view pattern) {
     if (!PatternTemplateInternal::isValidIndent(segments2[0])) {
       return absl::InvalidArgumentError("Invalid variable name");
     }
-    result.emplace_back(segments2[0], RewriteStringKind::kVariable);
+    result.emplace_back(segments2[0], RewriteStringKind::KVariable);
   }
   return result;
 }
@@ -85,7 +85,7 @@ parseRewritePatternHelper(absl::string_view pattern) {
 absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments>
 parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) {
   envoy::extensions::pattern_template::PatternTemplateRewriteSegments parsed_pattern;
-  RE2 regex = RE2(ToStringPiece(capture_regex));
+  RE2 regex = RE2(toStringPiece(capture_regex));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
   }
@@ -100,10 +100,10 @@ parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) 
 
   for (const auto& [str, kind] : processed_pattern) {
     switch (kind) {
-    case RewriteStringKind::kLiteral:
+    case RewriteStringKind::KLiteral:
       parsed_pattern.add_segments()->set_literal(std::string(str));
       break;
-    case RewriteStringKind::kVariable:
+    case RewriteStringKind::KVariable:
       auto it = capture_index_map.find(std::string(str));
       if (it == capture_index_map.end()) {
         return absl::InvalidArgumentError("Nonexisting variable name");

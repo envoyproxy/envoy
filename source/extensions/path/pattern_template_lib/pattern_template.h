@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace PatternTemplate {
 
-enum class RewriteStringKind { kVariable, kLiteral };
+enum class RewriteStringKind { KVariable, KLiteral };
 
 struct RewritePatternSegment {
   RewritePatternSegment(absl::string_view str, RewriteStringKind kind) : str(str), kind(kind) {}
