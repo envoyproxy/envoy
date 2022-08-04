@@ -176,6 +176,19 @@ Stats::ParentHistogramSharedPtr TestUtility::findHistogram(Stats::Store& store,
   return findByName(store.histograms(), name);
 }
 
+AssertionResult TestUtility::waitForCondition(std::function<bool()> condition,
+                                              Event::TestTimeSystem& time_system,
+                                              std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (!condition()) {
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return AssertionFailure() << "timed out waiting for condition";
+    }
+  }
+  return AssertionSuccess();
+}
+
 AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
                                               uint64_t value, Event::TestTimeSystem& time_system,
                                               std::chrono::milliseconds timeout,

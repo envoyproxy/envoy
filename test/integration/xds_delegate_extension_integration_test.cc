@@ -1,6 +1,8 @@
+#include <atomic>
+
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
-#include "envoy/config/xds_resources_delegate.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
@@ -10,7 +12,6 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include <atomic>
 
 namespace Envoy {
 namespace {
@@ -18,22 +19,10 @@ namespace {
 // A test implementation of the XdsResourcesDelegate extension.
 class TestXdsResourcesDelegate : public Config::XdsResourcesDelegate {
 public:
-  static std::atomic<int> OnConfigUpdatedCount;
-
-  static int getOnConfigUpdatedCount() {
-    // TODO(abeyad):remove
-    std::cout << "==> AAB getOnConfigUpdatedCount()=" << OnConfigUpdatedCount << "\n";
-    return OnConfigUpdatedCount;
-  }
-
-  void onConfigUpdated(const std::string& authority_id, const std::string& resource_type_url,
-                       const std::vector<Config::DecodedResourceRef>& resources) override {
+  void onConfigUpdated(const std::string& /*authority_id*/,
+                       const std::string& /*resource_type_url*/,
+                       const std::vector<Config::DecodedResourceRef>& /*resources*/) override {
     OnConfigUpdatedCount++;
-    // OnConfigUpdatedCount.fetch_add(1);
-    // TODO(abeyad):remove
-    std::cout << "==> AAB onConfigUpdated, authority_id=" << authority_id
-              << ", url=" << resource_type_url << ", resources.count=" << resources.size()
-              << ", updated count=" << OnConfigUpdatedCount << "\n";
   }
 
   std::vector<envoy::service::discovery::v3::Resource>
@@ -43,6 +32,11 @@ public:
     // delegate in a subsequent PR.
     return {};
   }
+
+  static int getOnConfigUpdatedCount() { return OnConfigUpdatedCount; }
+
+private:
+  static std::atomic<int> OnConfigUpdatedCount;
 };
 std::atomic<int> TestXdsResourcesDelegate::OnConfigUpdatedCount{0};
 
@@ -181,6 +175,14 @@ public:
     return "";
   }
 
+  void waitforOnConfigUpdatedCount(const int expected_count) {
+    TestUtility::waitForCondition(
+        [expected_count]() {
+          return TestXdsResourcesDelegate::getOnConfigUpdatedCount() == expected_count;
+        },
+        timeSystem(), TestUtility::DefaultTimeout);
+  }
+
   uint32_t initial_load_success_{0};
 };
 
@@ -195,8 +197,6 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   acceptXdsConnection();
 
   int current_on_config_updated_count = TestXdsResourcesDelegate::getOnConfigUpdatedCount();
-  // TODO(abeyad):remove
-  std::cout << "==> AAB current value(1)=" << current_on_config_updated_count << "\n";
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
@@ -208,12 +208,10 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+  int expected_on_config_updated_count = ++current_on_config_updated_count;
+  waitforOnConfigUpdatedCount(expected_on_config_updated_count);
 
-  // TODO(abeyad):remove
-  current_on_config_updated_count = TestXdsResourcesDelegate::getOnConfigUpdatedCount();
-  std::cout << "==> AAB current value(2)=" << current_on_config_updated_count << "\n";
-  EXPECT_EQ(current_on_config_updated_count + 1,
-            TestXdsResourcesDelegate::getOnConfigUpdatedCount());
+  EXPECT_EQ(expected_on_config_updated_count, TestXdsResourcesDelegate::getOnConfigUpdatedCount());
   EXPECT_EQ("bar", getRuntimeKey("foo"));
   EXPECT_EQ("meh", getRuntimeKey("baz"));
 
@@ -227,16 +225,11 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 2);
+  expected_on_config_updated_count = ++current_on_config_updated_count;
+  waitforOnConfigUpdatedCount(expected_on_config_updated_count);
 
-  // TODO(abeyad):remove
-  current_on_config_updated_count = TestXdsResourcesDelegate::getOnConfigUpdatedCount();
-  std::cout << "==> AAB current value(3)=" << current_on_config_updated_count << "\n";
-  EXPECT_EQ(current_on_config_updated_count + 1,
-            TestXdsResourcesDelegate::getOnConfigUpdatedCount());
+  EXPECT_EQ(expected_on_config_updated_count, TestXdsResourcesDelegate::getOnConfigUpdatedCount());
   EXPECT_EQ("saz", getRuntimeKey("baz"));
-  // TODO(abeyad):remove
-  current_on_config_updated_count = TestXdsResourcesDelegate::getOnConfigUpdatedCount();
-  std::cout << "==> AAB current value(4)=" << current_on_config_updated_count << "\n";
 }
 
 } // namespace
