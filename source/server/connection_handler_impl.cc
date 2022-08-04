@@ -134,8 +134,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
                                                           details);
           }
         }
-        // This is for the case of the v6 only listener overrides an orignal listener which isn't v6
-        // only, then cleanup the map for corressponding Ipv4-mapped address item.
+        // This is for the case of the v6 only listener overrides an original listener which isn't v6
+        // only, then cleanup the map for corresponding Ipv4-mapped address item.
       } else if (is_override) {
         if (address->ip()->isAnyAddress()) {
           auto ipv4_any_address =
