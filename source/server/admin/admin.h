@@ -203,9 +203,7 @@ public:
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
   GenRequestFn createRequestFunction() {
-    return [this](AdminStream& admin_stream) -> RequestPtr {
-      return makeRequest(admin_stream);
-    };
+    return [this](AdminStream& admin_stream) -> RequestPtr { return makeRequest(admin_stream); };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {

@@ -8,7 +8,8 @@ namespace Server {
 
 ProfilingHandler::ProfilingHandler(const std::string& profile_path) : profile_path_(profile_path) {}
 
-Http::Code ProfilingHandler::handlerCpuProfiler(Http::ResponseHeaderMap&, Buffer::Instance& response,
+Http::Code ProfilingHandler::handlerCpuProfiler(Http::ResponseHeaderMap&,
+                                                Buffer::Instance& response,
                                                 AdminStream& admin_stream) {
   Http::Utility::QueryParams query_params = admin_stream.queryParams();
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||

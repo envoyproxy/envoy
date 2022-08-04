@@ -22,8 +22,8 @@ const uint64_t RecentLookupsCapacity = 100;
 
 StatsHandler::StatsHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code StatsHandler::handlerResetCounters(Http::ResponseHeaderMap&,
-                                              Buffer::Instance& response, AdminStream&) {
+Http::Code StatsHandler::handlerResetCounters(Http::ResponseHeaderMap&, Buffer::Instance& response,
+                                              AdminStream&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
@@ -105,7 +105,8 @@ Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsPara
   return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
 }
 
-Http::Code StatsHandler::handlerPrometheusStats(Http::ResponseHeaderMap&, Buffer::Instance& response,
+Http::Code StatsHandler::handlerPrometheusStats(Http::ResponseHeaderMap&,
+                                                Buffer::Instance& response,
                                                 AdminStream& admin_stream) {
   return prometheusStats(admin_stream.getRequestHeaders().getPathValue(), response);
 }
@@ -166,9 +167,7 @@ Admin::UrlHandler StatsHandler::statsHandler() {
   return {
       "/stats",
       "print server stats",
-      [this](AdminStream& admin_stream) -> Admin::RequestPtr {
-        return makeRequest(admin_stream);
-      },
+      [this](AdminStream& admin_stream) -> Admin::RequestPtr { return makeRequest(admin_stream); },
       false,
       false,
       {{Admin::ParamDescriptor::Type::Boolean, "usedonly",

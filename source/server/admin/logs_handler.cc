@@ -75,7 +75,7 @@ Http::Code LogsHandler::handlerLogging(Http::ResponseHeaderMap&, Buffer::Instanc
   return rc;
 }
 
-Http::Code LogsHandler::handlerReopenLogs(Http::ResponseHeaderMap&,Buffer::Instance& response,
+Http::Code LogsHandler::handlerReopenLogs(Http::ResponseHeaderMap&, Buffer::Instance& response,
                                           AdminStream&) {
   server_.accessLogManager().reopen();
   response.add("OK\n");

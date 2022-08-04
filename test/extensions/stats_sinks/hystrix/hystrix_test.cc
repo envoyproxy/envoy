@@ -524,9 +524,9 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
       addr_instance_);
 
   EXPECT_CALL(stream_encoder_options, disableChunkEncoding());
-  ASSERT_EQ(sink_->handlerHystrixEventStream(response_headers,
-                                             cluster_stats_buffer_, admin_stream_mock),
-            Http::Code::OK);
+  ASSERT_EQ(
+      sink_->handlerHystrixEventStream(response_headers, cluster_stats_buffer_, admin_stream_mock),
+      Http::Code::OK);
 
   // Check that response_headers has been set correctly
   EXPECT_EQ(response_headers.ContentType()->value(), "text/event-stream");

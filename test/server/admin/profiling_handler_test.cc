@@ -72,9 +72,8 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   request_headers_.setMethod(Http::Headers::get().MethodValues.Post);
   request_headers_.setPath("/cpuprofiler?enable=y");
   admin_filter_.decodeHeaders(request_headers_, false);
-  EXPECT_NO_LOGS(
-      EXPECT_EQ(Http::Code::InternalServerError,
-                admin_bad_profile_path.runCallback(header_map, data, admin_filter_)));
+  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
+                           admin_bad_profile_path.runCallback(header_map, data, admin_filter_)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 

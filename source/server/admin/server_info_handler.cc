@@ -53,8 +53,8 @@ Http::Code ServerInfoHandler::handlerMemory(Http::ResponseHeaderMap& response_he
   return Http::Code::OK;
 }
 
-Http::Code ServerInfoHandler::handlerReady(Http::ResponseHeaderMap&,
-                                           Buffer::Instance& response, AdminStream&) {
+Http::Code ServerInfoHandler::handlerReady(Http::ResponseHeaderMap&, Buffer::Instance& response,
+                                           AdminStream&) {
   const envoy::admin::v3::ServerInfo::State state =
       Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
