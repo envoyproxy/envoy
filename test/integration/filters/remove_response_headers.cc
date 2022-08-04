@@ -29,5 +29,8 @@ public:
 static Registry::RegisterFactory<SimpleFilterConfig<RemoveResponseHeadersFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
+static Registry::RegisterFactory<SimpleFilterConfig<RemoveResponseHeadersFilter>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy
