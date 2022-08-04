@@ -84,7 +84,7 @@ HeaderValidator::validateMethodHeader(const HeaderString& value) {
   } else {
     is_valid = !method.empty();
     for (std::size_t i = 0; i < method.size() && is_valid; ++i) {
-      is_valid = test_char(kMethodHeaderCharTable, method.at(i));
+      is_valid = testChar(kMethodHeaderCharTable, method.at(i));
     }
   }
 
@@ -125,7 +125,7 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
   }
 
   for (++character_it; character_it != value_string_view.end(); ++character_it) {
-    if (!test_char(kSchemeHeaderCharTable, *character_it)) {
+    if (!testChar(kSchemeHeaderCharTable, *character_it)) {
       return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
     }
   }
@@ -219,7 +219,7 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 
   for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
     c = key_string_view.at(i);
-    is_valid = test_char(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores);
+    is_valid = testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores);
   }
 
   if (!is_valid) {
@@ -251,7 +251,7 @@ HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
   bool is_valid = true;
 
   for (std::size_t i{0}; i < value_string_view.size() && is_valid; ++i) {
-    is_valid = test_char(kGenericHeaderValueCharTable, value_string_view.at(i));
+    is_valid = testChar(kGenericHeaderValueCharTable, value_string_view.at(i));
   }
 
   if (!is_valid) {
@@ -345,7 +345,7 @@ HeaderValidator::validateGenericPathHeader(const HeaderString& value) {
   bool is_valid = size > 0;
 
   for (std::size_t i{0}; i < size && is_valid; ++i) {
-    is_valid = test_char(kPathHeaderCharTable, path.at(i));
+    is_valid = testChar(kPathHeaderCharTable, path.at(i));
   }
 
   if (!is_valid) {
