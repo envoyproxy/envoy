@@ -231,6 +231,13 @@ StructFormatter::FormatBuilder::toFormatStringValue(const std::string& string_fo
   return SubstitutionFormatParser::parse(string_format, commands_.value_or(commands));
 }
 
+std::vector<FormatterProviderPtr>
+StructFormatter::FormatBuilder::toFormatNumberValue(double value) const {
+  std::vector<FormatterProviderPtr> formatters;
+  formatters.emplace_back(FormatterProviderPtr{new PlainNumberFormatter(value)});
+  return formatters;
+}
+
 ProtobufWkt::Value StructFormatter::providersCallback(
     const std::vector<FormatterProviderPtr>& providers,
     const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
@@ -261,15 +268,6 @@ ProtobufWkt::Value StructFormatter::providersCallback(
     str += bit.value_or(empty_value_);
   }
   return ValueUtil::stringValue(str);
-}
-
-std::vector<FormatterProviderPtr>
-StructFormatter::FormatBuilder::toFormatNumberValue(double number_format) const {
-  double current_number;
-  current_number = number_format;
-  std::vector<FormatterProviderPtr> formatters;
-  formatters.emplace_back(FormatterProviderPtr{new PlainNumberFormatter(current_number)});
-  return formatters;
 }
 
 ProtobufWkt::Value StructFormatter::structFormatMapCallback(
