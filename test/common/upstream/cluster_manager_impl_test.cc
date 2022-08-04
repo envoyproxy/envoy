@@ -4249,7 +4249,6 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
   EXPECT_CALL(*pool_mock, addIdleCallback(_));
   opt_cp.value().addIdleCallback(drained_cb);
 
-
   EXPECT_CALL(*pool_mock, drainConnections(ConnectionPool::DrainBehavior::DrainAndDelete));
   opt_cp.value().drainConnections(ConnectionPool::DrainBehavior::DrainAndDelete);
 }
