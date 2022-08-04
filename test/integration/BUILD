@@ -1881,6 +1881,8 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
+        "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         ":http_integration_lib",
         "//source/common/quic:client_connection_factory_lib",
         "//source/common/quic:envoy_quic_client_connection_lib",
