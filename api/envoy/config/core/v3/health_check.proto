@@ -72,10 +72,10 @@ message HealthCheck {
     oneof payload {
       option (validate.required) = true;
 
-      // Hex encoded payload. E.g., "000000FF".
+      // String payload.
       string text = 1 [(validate.rules).string = {min_len: 1}];
 
-      // [#not-implemented-hide:] Binary payload.
+      // Binary payload.
       bytes binary = 2;
     }
   }
@@ -103,7 +103,13 @@ message HealthCheck {
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
 
-    // [#not-implemented-hide:] HTTP specific response.
+    // HTTP specific expected response.
+    // An optional string or byte-string to match in the first 1024 bytes of the response body.
+    // A proto string is using UTF-8, and a bytes field can be used to carry any characters.
+    // If it is set, both the expected response check and status code determine the health check.
+    //
+    // .. note::
+    // Only the first 1024 bytes of the response body is used to match.
     Payload receive = 4;
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
@@ -163,6 +169,7 @@ message HealthCheck {
     // When checking the response, “fuzzy” matching is performed such that each
     // binary block must be found, and in the order specified, but not
     // necessarily contiguous.
+    // The text payload should be Hex encoded payload. E.g., "000000FF", and binary is not implemented.
     repeated Payload receive = 2;
   }
 

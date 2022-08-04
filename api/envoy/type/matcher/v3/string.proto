@@ -76,20 +76,3 @@ message ListStringMatcher {
 
   repeated StringMatcher patterns = 1 [(validate.rules).repeated = {min_items: 1}];
 }
-
-// [#protodoc-title: Binary matcher]
-
-// Specifies the way to match Bytes.
-message BinaryMatcher {
-  oneof match_pattern {
-    option (validate.required) = true;
-
-    // The input bytes string must have the sub-bytes specified here.
-    // Note: empty contains match is not allowed.
-    //
-    // Examples:
-    //
-    // * ``abc`` matches the value ``xyz.abc.def``
-    bytes contains = 1 [(validate.rules).bytes = {min_len: 1}];
-  }
-}

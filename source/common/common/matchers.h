@@ -27,9 +27,6 @@ using ValueMatcherConstSharedPtr = std::shared_ptr<const ValueMatcher>;
 class PathMatcher;
 using PathMatcherConstSharedPtr = std::shared_ptr<const PathMatcher>;
 
-class BytesMatcher;
-using BytesMatcherUniquePtr = std::unique_ptr<const BytesMatcher>;
-
 class ValueMatcher {
 public:
   virtual ~ValueMatcher() = default;
@@ -43,24 +40,6 @@ public:
    * Create the matcher object.
    */
   static ValueMatcherConstSharedPtr create(const envoy::type::matcher::v3::ValueMatcher& value);
-};
-
-/**
- * Generic bytes matching interface.
- */
-class BytesMatcher {
-public:
-  virtual ~BytesMatcher() = default;
-
-  /**
-   * Return whether a passed byte-string matches.
-   */
-  virtual bool match(const absl::string_view value) const PURE;
-
-  /**
-   * Return the length of match pattern.
-   */
-  virtual int getMatcherPatternLength() const PURE;
 };
 
 class NullMatcher : public ValueMatcher {
@@ -107,34 +86,19 @@ public:
 };
 
 template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
-class StringMatcherImpl : public ValueMatcher, public StringMatcher, public BytesMatcher {
+class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
   explicit StringMatcherImpl(const StringMatcherType& matcher) : matcher_(matcher) {
-    switch (matcher.match_pattern_case()) {
-    case StringMatcherType::MatchPatternCase::kSafeRegex:
+    if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kSafeRegex) {
       if (matcher.ignore_case()) {
         ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
       }
       regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
-      break;
-    case StringMatcherType::MatchPatternCase::kContains:
-      matcher_pattern_length_ = matcher_.contains().length();
+    } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kContains) {
       if (matcher_.ignore_case()) {
         // Cache the lowercase conversion of the Contains matcher for future use
         lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
       }
-      break;
-    case StringMatcherType::MatchPatternCase::kExact:
-      matcher_pattern_length_ = matcher_.exact().length();
-      break;
-    case StringMatcherType::MatchPatternCase::kPrefix:
-      matcher_pattern_length_ = matcher_.prefix().length();
-      break;
-    case StringMatcherType::MatchPatternCase::kSuffix:
-      matcher_pattern_length_ = matcher_.suffix().length();
-      break;
-    case StringMatcherType::MatchPatternCase::MATCH_PATTERN_NOT_SET:
-      break;
     }
   }
 
@@ -189,13 +153,10 @@ public:
     return false;
   }
 
-  int getMatcherPatternLength() const override { return matcher_pattern_length_; }
-
 private:
   const StringMatcherType matcher_;
   Regex::CompiledMatcherPtr regex_;
   std::string lowercase_contains_match_;
-  int matcher_pattern_length_ = 0;
 };
 
 class ListMatcher : public ValueMatcher {
@@ -243,19 +204,6 @@ public:
 
 private:
   const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
-};
-
-class BinaryMatcher : public BytesMatcher {
-public:
-  BinaryMatcher(const envoy::type::matcher::v3::BinaryMatcher& matcher);
-
-  bool match(const absl::string_view value) const override;
-
-  int getMatcherPatternLength() const override { return matcher_pattern_length_; };
-
-private:
-  const envoy::type::matcher::v3::BinaryMatcher matcher_;
-  int matcher_pattern_length_ = 0;
 };
 
 } // namespace Matchers

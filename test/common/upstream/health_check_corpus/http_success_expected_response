@@ -22,8 +22,8 @@ health_check_config {
         service_name_matcher {
             prefix: "locations"
         }
-        response_bytes_matcher:  {
-            contains: "\x02"
+        receive:  {
+            binary: "\x02"
         }
     }
 }

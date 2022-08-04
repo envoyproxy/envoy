@@ -158,25 +158,16 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }
 
-  switch (config.http_health_check().expected_response_matcher_case()) {
-  case HttpHealthCheck::ExpectedResponseMatcherCase::kResponseBytesMatcher:
-    expected_response_matcher_ = std::make_unique<const Matchers::BinaryMatcher>(
-        config.http_health_check().response_bytes_matcher());
-    break;
-  case HttpHealthCheck::ExpectedResponseMatcherCase::kResponseStringMatcher:
-    expected_response_matcher_ = std::make_unique<
-        const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-        config.http_health_check().response_string_matcher());
-    break;
-  case HttpHealthCheck::ExpectedResponseMatcherCase::EXPECTED_RESPONSE_MATCHER_NOT_SET:
-    break;
+  if (config.http_health_check().has_receive()) {
+    expected_response_ = config.http_health_check().receive().has_text()
+                             ? config.http_health_check().receive().text()
+                             : config.http_health_check().receive().binary();
   }
 
-  if (expected_response_matcher_ != nullptr &&
-      expected_response_matcher_->getMatcherPatternLength() > kMaxBytesInBuffer) {
+  if (!expected_response_.empty() && expected_response_.length() > kMaxBytesInBuffer) {
     throw EnvoyException(fmt::format(
         "The expected response length '{}' is over than http health response buffer size '{}'",
-        expected_response_matcher_->getMatcherPatternLength(), kMaxBytesInBuffer));
+        expected_response_.length(), kMaxBytesInBuffer));
   }
 }
 
@@ -292,8 +283,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeData(Buffer::Instance& data,
                                                                      bool end_stream) {
-  if (parent_.expected_response_matcher_ != nullptr &&
-      response_body_->length() < kMaxBytesInBuffer) {
+  if (!parent_.expected_response_.empty() && response_body_->length() < kMaxBytesInBuffer) {
     response_body_->move(data, kMaxBytesInBuffer - response_body_->length());
   }
   if (end_stream) {
@@ -396,7 +386,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response_code={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (parent_.expected_response_matcher_ != nullptr) {
+  if (!parent_.expected_response_.empty()) {
     // If the expected response is set, check the first 1024 bytes of actual response if contains
     // the expected response.
     absl::string_view response_data = absl::string_view(
@@ -404,7 +394,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
         response_body_->length());
     ENVOY_CONN_LOG(debug, "hc http response check response_body={} ", *client_, response_data);
 
-    if (!parent_.expected_response_matcher_->match(response_data)) {
+    if (!absl::StrContains(response_data, parent_.expected_response_)) {
       if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
         host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
       }

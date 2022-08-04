@@ -296,25 +296,6 @@ TEST(MetadataTest, InvertMatch) {
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
-TEST(StringMatcher, MatchPatternLength) {
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("exact");
-  EXPECT_EQ(5, Matchers::StringMatcherImpl(matcher).getMatcherPatternLength());
-
-  matcher.set_prefix("prefix");
-  EXPECT_EQ(6, Matchers::StringMatcherImpl(matcher).getMatcherPatternLength());
-
-  matcher.set_suffix("suffix");
-  EXPECT_EQ(6, Matchers::StringMatcherImpl(matcher).getMatcherPatternLength());
-
-  matcher.set_contains("contained-str");
-  EXPECT_EQ(13, Matchers::StringMatcherImpl(matcher).getMatcherPatternLength());
-
-  matcher.mutable_safe_regex()->mutable_google_re2();
-  matcher.mutable_safe_regex()->set_regex("foo");
-  EXPECT_EQ(0, Matchers::StringMatcherImpl(matcher).getMatcherPatternLength());
-}
-
 TEST(StringMatcher, ExactMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("exact");
@@ -392,23 +373,6 @@ TEST(StringMatcher, SafeRegexValueIgnoreCase) {
   matcher.mutable_safe_regex()->set_regex("foo");
   EXPECT_THROW_WITH_MESSAGE(Matchers::StringMatcherImpl(matcher).match("foo"), EnvoyException,
                             "ignore_case has no effect for safe_regex.");
-}
-
-TEST(BinaryMatcher, MatchBytesPatternLength) {
-  envoy::type::matcher::v3::BinaryMatcher matcher;
-  char match_bytes[] = {0x29, 0x2A};
-  matcher.set_contains(std::string(match_bytes, 2));
-  EXPECT_EQ(2, Matchers::BinaryMatcher(matcher).getMatcherPatternLength());
-}
-
-TEST(BinaryMatcher, ContainsMatch) {
-  envoy::type::matcher::v3::BinaryMatcher matcher;
-  char match_bytes[] = {0x29, 0x2A};
-  char full_bytes[] = {0x21, 0x29, 0x2A};
-  matcher.set_contains(std::string(match_bytes, 2));
-  EXPECT_TRUE(Matchers::BinaryMatcher(matcher).match(std::string(match_bytes, 2)));
-  EXPECT_TRUE(Matchers::BinaryMatcher(matcher).match(std::string(full_bytes, 3)));
-  EXPECT_FALSE(Matchers::BinaryMatcher(matcher).match("other"));
 }
 
 TEST(PathMatcher, MatchExactPath) {
