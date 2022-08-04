@@ -30,7 +30,7 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
 
 void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                                            CallbackState next_state) {
-  stopTimers();
+  stopMessageTimer();
 
   if (call_start_time_.has_value()) {
     std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -42,7 +42,7 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
   callback_state_ = next_state;
 }
 
-void ProcessorState::stopTimers() {
+void ProcessorState::stopMessageTimer() {
   if (message_timer_) {
     message_timer_->disableTimer();
   }
