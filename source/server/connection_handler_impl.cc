@@ -103,12 +103,15 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           details->typed_listener_)) {
     bool is_override = false;
     uint64_t override_listener_tag = 0;
-    if (tcp_listener_map_by_address_.contains(config.listenSocketFactory().localAddress()->asStringView())) {
+    if (tcp_listener_map_by_address_.contains(
+            config.listenSocketFactory().localAddress()->asStringView())) {
       is_override = true;
-      override_listener_tag = tcp_listener_map_by_address_[config.listenSocketFactory().localAddress()->asStringView()]->listener_tag_;
+      override_listener_tag =
+          tcp_listener_map_by_address_[config.listenSocketFactory().localAddress()->asStringView()]
+              ->listener_tag_;
     }
-    tcp_listener_map_by_address_
-      .insert_or_assign(config.listenSocketFactory().localAddress()->asStringView(), details);
+    tcp_listener_map_by_address_.insert_or_assign(
+        config.listenSocketFactory().localAddress()->asStringView(), details);
 
     auto& address = details->address_;
 
@@ -138,19 +141,23 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
                                                           details);
           }
         }
-        // This is for the case of the v6 only listener overrides an original listener which isn't v6
-        // only, then cleanup the map for corresponding Ipv4-mapped address item.
+        // This is for the case of the v6 only listener overrides an original listener which isn't
+        // v6 only, then cleanup the map for corresponding Ipv4-mapped address item.
       } else if (is_override) {
         if (address->ip()->isAnyAddress()) {
           auto ipv4_any_address =
               Network::Address::Ipv4Instance(address->ip()->port()).asStringView();
-          if (tcp_listener_map_by_address_.contains(ipv4_any_address) && tcp_listener_map_by_address_[ipv4_any_address]->listener_tag_ == override_listener_tag) {
+          if (tcp_listener_map_by_address_.contains(ipv4_any_address) &&
+              tcp_listener_map_by_address_[ipv4_any_address]->listener_tag_ ==
+                  override_listener_tag) {
             tcp_listener_map_by_address_.erase(ipv4_any_address);
           }
         } else {
           auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
           if (v4_compatible_addr != nullptr) {
-            if (tcp_listener_map_by_address_.contains(v4_compatible_addr->asStringView()) && tcp_listener_map_by_address_[v4_compatible_addr->asStringView()]->listener_tag_ == override_listener_tag) {
+            if (tcp_listener_map_by_address_.contains(v4_compatible_addr->asStringView()) &&
+                tcp_listener_map_by_address_[v4_compatible_addr->asStringView()]->listener_tag_ ==
+                    override_listener_tag) {
               tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
             }
           }
