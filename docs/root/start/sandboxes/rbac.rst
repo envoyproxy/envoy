@@ -90,5 +90,11 @@ Checking the admin interface we should now see that the RBAC stats are updated, 
    :ref:`Role Based Access Control <arch_overview_rbac>`
       Learn more about using Envoy's ``RBAC`` filter.
 
+    :ref:`RBAC Network Filter API <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>`
+      API and configuration reference for Envoy's ``RBAC`` network filter.
+
+    :ref:`RBAC HTTP Filter API <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`
+      API and configuration reference for Envoy's ``RBAC`` HTTP filter.
+
    :ref:`Envoy admin quick start guide <start_quick_start_admin>`
       Quick start guide to the Envoy admin interface.
