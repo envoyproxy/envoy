@@ -660,14 +660,14 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) {
+void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) const {
   Http::FilterChainUtility::createFilterChainForFactories(manager, filter_factories_);
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainManager& callbacks) {
+    Http::FilterChainManager& callbacks) const {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
@@ -687,7 +687,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     // or neither is configured for this upgrade.
     return false;
   }
-  FilterFactoriesList* filters_to_use = &filter_factories_;
+  const FilterFactoriesList* filters_to_use = &filter_factories_;
   if (it != upgrade_filter_factories_.end() && it->second.filter_factories != nullptr) {
     filters_to_use = it->second.filter_factories.get();
   }

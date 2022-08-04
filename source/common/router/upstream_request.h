@@ -125,7 +125,6 @@ public:
     return create_per_try_timeout_on_request_complete_;
   }
   bool encodeComplete() const { return router_sent_end_stream_; }
-  RouterFilterInterface& parent() { return parent_; }
   // Exposes streamInfo for the upstream stream.
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
   bool hadUpstream() const { return had_upstream_; }

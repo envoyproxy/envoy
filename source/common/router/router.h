@@ -405,7 +405,6 @@ public:
     if (!is_retry_) {
       return original_priority_load;
     }
-
     return retry_state_->priorityLoadForRetry(priority_set, original_priority_load,
                                               priority_mapping_func);
   }
@@ -414,7 +413,6 @@ public:
     if (!is_retry_) {
       return 1;
     }
-
     return retry_state_->hostSelectionMaxAttempts();
   }
 
@@ -431,7 +429,6 @@ public:
     if (is_retry_) {
       return {};
     }
-
     return callbacks_->upstreamOverrideHost();
   }
 
