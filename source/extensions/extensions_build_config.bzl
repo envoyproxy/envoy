@@ -242,7 +242,6 @@ EXTENSIONS = {
     #
     # Path Pattern Match and Path Pattern Rewrite
     #
-
     "envoy.path.match.pattern_template.v3.pattern_template_match_predicate": "//source/extensions/path/match/pattern_template:config",
     "envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate": "//source/extensions/path/rewrite/pattern_template:config",
 
