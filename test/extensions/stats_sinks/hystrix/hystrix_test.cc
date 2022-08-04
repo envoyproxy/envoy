@@ -507,7 +507,6 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   sink_->registerConnection(&callbacks_);
 
   // This value doesn't matter in handlerHystrixEventStream
-  absl::string_view path_and_query;
 
   Http::TestResponseHeaderMapImpl response_headers;
 
@@ -525,7 +524,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
       addr_instance_);
 
   EXPECT_CALL(stream_encoder_options, disableChunkEncoding());
-  ASSERT_EQ(sink_->handlerHystrixEventStream(path_and_query, response_headers,
+  ASSERT_EQ(sink_->handlerHystrixEventStream(response_headers,
                                              cluster_stats_buffer_, admin_stream_mock),
             Http::Code::OK);
 

@@ -48,7 +48,7 @@ using ClusterStatsCachePtr = std::unique_ptr<ClusterStatsCache>;
 class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
   HystrixSink(Server::Configuration::ServerFactoryContext& server, uint64_t num_buckets);
-  Http::Code handlerHystrixEventStream(absl::string_view, Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerHystrixEventStream(Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminStream& admin_stream);
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override{};
