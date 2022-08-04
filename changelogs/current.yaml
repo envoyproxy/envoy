@@ -86,5 +86,8 @@ new_features:
 - area: access_log
   change: |
     updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
+- area: http
+  change: |
+    added the support of :ref:`expected response <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.receive>` for HTTP health check.
 
 deprecated:

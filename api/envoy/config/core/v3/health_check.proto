@@ -109,7 +109,8 @@ message HealthCheck {
     // If it is set, both the expected response check and status code determine the health check.
     //
     // .. note::
-    // Only the first 1024 bytes of the response body is used to match.
+    //
+    //   Only the first 1024 bytes of the response body is used to match.
     Payload receive = 4;
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
@@ -169,7 +170,10 @@ message HealthCheck {
     // When checking the response, “fuzzy” matching is performed such that each
     // binary block must be found, and in the order specified, but not
     // necessarily contiguous.
-    // The text payload should be Hex encoded payload. E.g., "000000FF", and binary is not implemented.
+    //
+    // .. note::
+    //
+    //   The text payload should be Hex encoded payload. E.g., "000000FF", and binary is not implemented.
     repeated Payload receive = 2;
   }
 

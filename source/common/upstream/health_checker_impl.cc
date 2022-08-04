@@ -392,7 +392,8 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     absl::string_view response_data = absl::string_view(
         static_cast<const char*>(response_body_->linearize(response_body_->length())),
         response_body_->length());
-    ENVOY_CONN_LOG(debug, "hc http response check response_body={} ", *client_, response_data);
+    ENVOY_CONN_LOG(debug, "hc http response check response_body={}, expected response={}.",
+                   *client_, response_data, parent_.expected_response_);
 
     if (!absl::StrContains(response_data, parent_.expected_response_)) {
       if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
