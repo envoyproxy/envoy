@@ -15,7 +15,6 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
-using ::Envoy::Http::RequestHeaderMap;
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
                                  StreamInfo::StreamInfo& stream_info)
@@ -90,8 +89,7 @@ HeaderValidator::validateMethodHeader(const HeaderString& value) {
   }
 
   if (!is_valid) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidMethod);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidMethod};
   }
 
   return HeaderEntryValidationResult::success();
@@ -114,8 +112,7 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
   const auto& value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidScheme);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
   }
 
   auto character_it = value_string_view.begin();
@@ -124,14 +121,12 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
   auto valid_first_character = (*character_it >= 'a' && *character_it <= 'z') ||
                                (*character_it >= 'A' && *character_it <= 'Z');
   if (!valid_first_character) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidScheme);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
   }
 
   for (++character_it; character_it != value_string_view.end(); ++character_it) {
     if (!test_char(kSchemeHeaderCharTable, *character_it)) {
-      return HeaderEntryValidationResult(RejectAction::Reject,
-                                         UhvResponseCodeDetail::get().InvalidScheme);
+      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
     }
   }
 
@@ -164,8 +159,7 @@ HeaderValidator::validateStatusHeader(const StatusPseudoHeaderValidationMode& mo
   std::uint32_t status_value{};
   auto result = std::from_chars(buffer_start, buffer_end, status_value);
   if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidStatus);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
 
   bool is_valid = false;
@@ -189,8 +183,7 @@ HeaderValidator::validateStatusHeader(const StatusPseudoHeaderValidationMode& mo
   }
 
   if (!is_valid) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidStatus);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
 
   return HeaderEntryValidationResult::success();
@@ -218,8 +211,7 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // This header name is initially invalid if the name is empty or if the name
   // matches an incompatible connection-specific header.
   if (key_string_view.empty()) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().EmptyHeaderName);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
   bool is_valid = true;
@@ -233,7 +225,7 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   if (!is_valid) {
     auto details = c == '_' ? UhvResponseCodeDetail::get().InvalidUnderscore
                             : UhvResponseCodeDetail::get().InvalidCharacters;
-    return HeaderEntryValidationResult(RejectAction::Reject, details);
+    return {RejectAction::Reject, details};
   }
 
   return HeaderEntryValidationResult::success();
@@ -263,8 +255,7 @@ HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
   }
 
   if (!is_valid) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidCharacters);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidCharacters};
   }
 
   return HeaderEntryValidationResult::success();
@@ -280,8 +271,7 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   const auto& value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidContentLength);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidContentLength};
   }
 
   auto buffer_start = value_string_view.data();
@@ -290,8 +280,7 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   std::uint32_t int_value{};
   auto result = std::from_chars(buffer_start, buffer_end, int_value);
   if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidContentLength);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidContentLength};
   }
 
   return HeaderEntryValidationResult::success();
@@ -311,8 +300,7 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   auto user_info_delimiter = value_string_view.find('@');
   if (user_info_delimiter != absl::string_view::npos) {
     // :authority cannot contain user info, reject the header
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidHost);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
   }
 
   // identify and validate the port, if present
@@ -321,8 +309,7 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
 
   if (host_string_view.empty()) {
     // reject empty host, which happens if the authority is just the port (e.g.- ":80").
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidHost);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
   }
 
   if (port_delimiter != absl::string_view::npos) {
@@ -331,8 +318,7 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
 
     auto port_string_view_size = port_string_view.size();
     if (port_string_view_size == 0 || port_string_view_size > 5) {
-      return HeaderEntryValidationResult(RejectAction::Reject,
-                                         UhvResponseCodeDetail::get().InvalidHost);
+      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
     }
 
     auto buffer_start = port_string_view.data();
@@ -341,13 +327,11 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
     std::uint32_t port_integer_value{};
     auto result = std::from_chars(buffer_start, buffer_end, port_integer_value);
     if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
-      return HeaderEntryValidationResult(RejectAction::Reject,
-                                         UhvResponseCodeDetail::get().InvalidHost);
+      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
     }
 
     if (port_integer_value == 0 || port_integer_value >= 65535) {
-      return HeaderEntryValidationResult(RejectAction::Reject,
-                                         UhvResponseCodeDetail::get().InvalidHost);
+      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
     }
   }
 
@@ -365,8 +349,7 @@ HeaderValidator::validateGenericPathHeader(const HeaderString& value) {
   }
 
   if (!is_valid) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().InvalidUrl);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
   return HeaderEntryValidationResult::success();

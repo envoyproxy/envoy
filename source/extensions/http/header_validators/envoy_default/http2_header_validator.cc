@@ -53,8 +53,7 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().EmptyHeaderName);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
   auto validator_it = kHeaderValidatorMap.find(key_string_view);
@@ -80,8 +79,7 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().EmptyHeaderName);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
   if (key_string_view == ":status") {
@@ -119,8 +117,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   // The method pseudo header is always mandatory.
   //
   if (header_map.getMethodValue().empty()) {
-    return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject,
-                                            UhvResponseCodeDetail::get().InvalidMethod);
+    return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidMethod};
   }
 
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
@@ -139,7 +136,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     //
     auto details = path.empty() ? UhvResponseCodeDetail::get().InvalidUrl
                                 : UhvResponseCodeDetail::get().InvalidScheme;
-    return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject, details);
+    return {RejectOrRedirectAction::Reject, details};
   } else if (is_connect_method) {
     //
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
@@ -162,7 +159,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     }
 
     if (!details.empty()) {
-      return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject, details);
+      return {RejectOrRedirectAction::Reject, details};
     }
   }
 
@@ -180,8 +177,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     // include a path component; these MUST include a ":path" pseudo-header field with a value
     // of '*'.
     //
-    return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject,
-                                            UhvResponseCodeDetail::get().InvalidUrl);
+    return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
   if (path_is_absolute && !config_.uri_path_normalization_options().skip_path_normalization()) {
@@ -248,8 +244,7 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   // all responses; otherwise, the response is malformed.
   //
   if (header_map.getStatusValue().empty()) {
-    return ResponseHeaderMapValidationResult(RejectAction::Reject,
-                                             UhvResponseCodeDetail::get().InvalidStatus);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
 
   //
@@ -295,8 +290,7 @@ Http2HeaderValidator::validateTEHeader(const ::Envoy::Http::HeaderString& value)
   // than "trailers".
   //
   if (!absl::EqualsIgnoreCase(value.getStringView(), header_values_.TEValues.Trailers)) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       Http2ResponseCodeDetail::get().InvalidTE);
+    return {RejectAction::Reject, Http2ResponseCodeDetail::get().InvalidTE};
   }
 
   return HeaderEntryValidationResult::success();
@@ -333,8 +327,7 @@ Http2HeaderValidator::validateGenericHeaderName(const ::Envoy::Http::HeaderStrin
 
   const auto& key_string_view = key.getStringView();
   if (kRejectHeaderNames.contains(key_string_view)) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       Http2ResponseCodeDetail::get().ConnectionHeaderSanitization);
+    return {RejectAction::Reject, Http2ResponseCodeDetail::get().ConnectionHeaderSanitization};
   }
 
   return HeaderValidator::validateGenericHeaderName(key);

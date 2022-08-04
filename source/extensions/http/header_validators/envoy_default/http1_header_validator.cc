@@ -54,8 +54,7 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().EmptyHeaderName);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
   auto validator_it = kHeaderValidatorMap.find(key_string_view);
@@ -81,8 +80,7 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       UhvResponseCodeDetail::get().EmptyHeaderName);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
   if (key_string_view == ":status") {
@@ -116,13 +114,11 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // request-line   = method SP request-target SP HTTP-version CRLF
   //
   if (path.empty()) {
-    return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject,
-                                            UhvResponseCodeDetail::get().InvalidUrl);
+    return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
   if (header_map.getMethodValue().empty()) {
-    return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject,
-                                            UhvResponseCodeDetail::get().InvalidMethod);
+    return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidMethod};
   }
 
   //
@@ -138,8 +134,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // client MUST send a Host header field with an empty field-value.
   //
   if (header_map.getHostValue().empty()) {
-    return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject,
-                                            UhvResponseCodeDetail::get().InvalidHost);
+    return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
   }
 
   //
@@ -173,8 +168,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // asterisk-form  = "*"
   //
   if (!is_options_method && path_is_asterisk) {
-    return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject,
-                                            UhvResponseCodeDetail::get().InvalidUrl);
+    return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
   //
@@ -202,16 +196,15 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     bool is_chunked = absl::EqualsIgnoreCase(header_map.getTransferEncodingValue(),
                                              header_values_.TransferEncodingValues.Chunked);
     if (!is_chunked || is_connect_method) {
-      return RequestHeaderMapValidationResult(
-          RejectOrRedirectAction::Reject,
-          Http1ResponseCodeDetail::get().TransferEncodingNotAllowed);
+      return {RejectOrRedirectAction::Reject,
+              Http1ResponseCodeDetail::get().TransferEncodingNotAllowed};
     }
 
     if (header_map.ContentLength()) {
       if (!config_.http1_protocol_options().allow_chunked_length()) {
         // Configuration does not allow chunked length, reject the request
-        return RequestHeaderMapValidationResult(
-            RejectOrRedirectAction::Reject, Http1ResponseCodeDetail::get().ChunkedContentLength);
+        return {RejectOrRedirectAction::Reject,
+                Http1ResponseCodeDetail::get().ChunkedContentLength};
       } else {
         // Allow a chunked transfer encoding and remove the content length.
         header_map.removeContentLength();
@@ -223,8 +216,8 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
       header_map.removeContentLength();
     } else {
       // A content length in a CONNECT request is malformed
-      return RequestHeaderMapValidationResult(
-          RejectOrRedirectAction::Reject, Http1ResponseCodeDetail::get().ContentLengthNotAllowed);
+      return {RejectOrRedirectAction::Reject,
+              Http1ResponseCodeDetail::get().ContentLengthNotAllowed};
     }
   }
 
@@ -249,8 +242,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     // return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject,
     auto host_result = validateHostHeader(header_map.Path()->value());
     if (!host_result) {
-      return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject,
-                                              host_result.details());
+      return {RejectOrRedirectAction::Reject, host_result.details()};
     }
   } else if (!config_.uri_path_normalization_options().skip_path_normalization() &&
              path_is_absolute) {
@@ -312,8 +304,7 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   // status-line = HTTP-version SP status-code SP reason-phrase CRLF
   //
   if (header_map.getStatusValue().empty()) {
-    return ResponseHeaderMapValidationResult(RejectAction::Reject,
-                                             UhvResponseCodeDetail::get().InvalidStatus);
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
 
   //
@@ -359,8 +350,7 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   //
   const auto& encoding = value.getStringView();
   if (!absl::EqualsIgnoreCase(encoding, header_values_.TransferEncodingValues.Chunked)) {
-    return HeaderEntryValidationResult(RejectAction::Reject,
-                                       Http1ResponseCodeDetail::get().InvalidTransferEncoding);
+    return {RejectAction::Reject, Http1ResponseCodeDetail::get().InvalidTransferEncoding};
   }
   return HeaderEntryValidationResult::success();
 }

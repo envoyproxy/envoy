@@ -8,7 +8,7 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
-inline bool test_char(const uint32_t table[8], char c) {
+inline bool testChar(const uint32_t table[8], char c) {
   uint8_t uc = static_cast<uint8_t>(c);
   return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
 }

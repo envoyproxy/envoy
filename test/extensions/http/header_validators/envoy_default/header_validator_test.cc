@@ -9,7 +9,6 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 
 using ::Envoy::Http::HeaderString;
-using ::Envoy::Http::HeaderValidatorFactory;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::ResponseHeaderMap;
@@ -22,21 +21,21 @@ public:
       Protocol protocol, StreamInfo::StreamInfo& stream_info)
       : HeaderValidator(config, protocol, stream_info) {}
 
-  virtual HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString&,
-                                                                 const HeaderString&) override {
+  HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString&,
+                                                         const HeaderString&) override {
     return HeaderEntryValidationResult::success();
   }
 
-  virtual HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString&,
-                                                                  const HeaderString&) override {
+  HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString&,
+                                                          const HeaderString&) override {
     return HeaderEntryValidationResult::success();
   }
 
-  virtual RequestHeaderMapValidationResult validateRequestHeaderMap(RequestHeaderMap&) override {
+  RequestHeaderMapValidationResult validateRequestHeaderMap(RequestHeaderMap&) override {
     return RequestHeaderMapValidationResult::success();
   }
 
-  virtual ResponseHeaderMapValidationResult validateResponseHeaderMap(ResponseHeaderMap&) override {
+  ResponseHeaderMapValidationResult validateResponseHeaderMap(ResponseHeaderMap&) override {
     return ResponseHeaderMapValidationResult::success();
   }
 };

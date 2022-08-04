@@ -39,7 +39,7 @@ public:
    */
   HeaderEntryValidationResult validateAuthorityHeader(const ::Envoy::Http::HeaderString& value);
 
-  virtual HeaderEntryValidationResult
+  HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;
 };
 
