@@ -229,6 +229,8 @@ message RateLimitQuotaResponse {
 // * the control plane sends an assignment for the bucket with ``BucketId`` to the data plane
 //   Bucket ID.
 //
+// Example:
+//
 // .. validated-code-block:: yaml
 //   :type-name: envoy.service.rate_limit_quota.v3.BucketId
 //
