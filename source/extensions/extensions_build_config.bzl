@@ -56,6 +56,7 @@ EXTENSIONS = {
     #
 
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
+    "envoy.health_checkers.thrift":                     "//source/extensions/health_checkers/thrift:config",
 
     #
     # Input Matchers
