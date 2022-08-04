@@ -101,34 +101,51 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   // This map only store the new listener.
   if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
           details->typed_listener_)) {
-    tcp_listener_map_by_address_.insert_or_assign(
-        config.listenSocketFactory().localAddress()->asStringView(), details);
+    bool is_override =
+        !tcp_listener_map_by_address_
+             .insert_or_assign(config.listenSocketFactory().localAddress()->asStringView(), details)
+             .second;
 
     auto& address = details->address_;
+
     // If the address is Ipv6 and isn't v6only, parse out the ipv4 compatible address from the Ipv6
     // address and put an item to the map. Then this allows the `getBalancedHandlerByAddress`
     // can match the Ipv4 request to Ipv4-mapped address also.
     if (address->type() == Network::Address::Type::Ip &&
-        address->ip()->version() == Network::Address::IpVersion::v6 &&
-        !address->ip()->ipv6()->v6only()) {
-      if (address->ip()->isAnyAddress()) {
-        // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
-        // If there already one and it isn't shutdown for compatible addr,
-        // then won't insert a new one.
-        auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port()).asString();
-        auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
-        if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
-            ipv4_any_listener->second->listener_->listener() == nullptr) {
-          tcp_listener_map_by_address_.insert_or_assign(ipv4_any_address, details);
+        address->ip()->version() == Network::Address::IpVersion::v6) {
+      if (!address->ip()->ipv6()->v6only()) {
+        if (address->ip()->isAnyAddress()) {
+          // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
+          // If there already one and it isn't shutdown for compatible addr,
+          // then won't insert a new one.
+          auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port()).asString();
+          auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
+          if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
+              ipv4_any_listener->second->listener_->listener() == nullptr) {
+            tcp_listener_map_by_address_.insert_or_assign(ipv4_any_address, details);
+          }
+        } else {
+          auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
+          // Remove this check when runtime flag
+          // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
+          // If this isn't a valid Ipv4-mapped address, then do nothing.
+          if (v4_compatible_addr != nullptr) {
+            tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
+                                                          details);
+          }
         }
-      } else {
-        auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-        // Remove this check when runtime flag
-        // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
-        // If this isn't a valid Ipv4-mapped address, then do nothing.
-        if (v4_compatible_addr != nullptr) {
-          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
-                                                        details);
+        // This is for the case of the v6 only listener overrides an orignal listener which isn't v6
+        // only, then cleanup the map for corressponding Ipv4-mapped address item.
+      } else if (is_override) {
+        if (address->ip()->isAnyAddress()) {
+          auto ipv4_any_address =
+              Network::Address::Ipv4Instance(address->ip()->port()).asStringView();
+          tcp_listener_map_by_address_.erase(ipv4_any_address);
+        } else {
+          auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
+          if (v4_compatible_addr != nullptr) {
+            tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
+          }
         }
       }
     }

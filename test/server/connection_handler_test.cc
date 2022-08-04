@@ -1614,6 +1614,94 @@ TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
   EXPECT_CALL(*access_log_, log(_, _, _, _));
 }
 
+// This tests the case a listener listening on "[::]:80" with v4_compat as true,
+// then a update for this listener with ipv4_compat as false. Expects the
+// ipv4 request won't go to this listener since the update will cleanup
+// the mapping of ipv4-mapped address for the listener.
+TEST_F(ConnectionHandlerTest, NoMatchhIpv4WhenIpv4CompatFlagWasUpdated) {
+  // Listener1 is response for redirect the connection.
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  auto listener1 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener1 =
+      addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1);
+  Network::Address::InstanceConstSharedPtr normal_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  EXPECT_CALL(test_listener1->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(normal_address));
+  handler_->addListener(absl::nullopt, *test_listener1, runtime_);
+
+  // Listener2 is listening on an ipv4-mapped ipv6 address.
+  auto ipv6_overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  Network::TcpListenerCallbacks* ipv6_any_listener_callbacks;
+  auto listener2 = new NiceMock<Network::MockListener>();
+  TestListener* ipv6_listener =
+      addListener(2, false, false, "ipv6_test_listener", listener2, &ipv6_any_listener_callbacks,
+                  nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
+                  false, ipv6_overridden_filter_chain_manager);
+  // Set the ipv6only as false.
+  Network::Address::InstanceConstSharedPtr ipv6_any_address(
+      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
+  EXPECT_CALL(ipv6_listener->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(ipv6_any_address));
+  handler_->addListener(absl::nullopt, *ipv6_listener, runtime_);
+
+  // Listener3 is listening on the same ipv4-mapped ipv6 address but with v6 only flag as true.
+  auto ipv6_with_v6only_overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  Network::TcpListenerCallbacks* ipv6_with_v6only_listener_callbacks;
+  auto listener3 = new NiceMock<Network::MockListener>();
+  TestListener* ipv6_with_v6only_listener = addListener(
+      3, false, false, "ipv6_test_listener", listener3, &ipv6_with_v6only_listener_callbacks,
+      nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
+      ipv6_with_v6only_overridden_filter_chain_manager);
+  Network::Address::InstanceConstSharedPtr ipv6_any_address_with_v6only(
+      new Network::Address::Ipv6Instance("::", 80, nullptr, true));
+  EXPECT_CALL(ipv6_with_v6only_listener->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(ipv6_any_address_with_v6only));
+  handler_->addListener(absl::nullopt, *ipv6_with_v6only_listener, runtime_);
+
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
+  EXPECT_CALL(*test_filter, destroy_());
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  bool redirected = false;
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        // Insert the Mock filter.
+        if (!redirected) {
+          manager.addAcceptFilter(listener_filter_matcher_,
+                                  Network::ListenerFilterPtr{test_filter});
+          redirected = true;
+        }
+        return true;
+      }));
+
+  Network::Address::InstanceConstSharedPtr alt_address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
+  EXPECT_CALL(*test_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
+        return Network::FilterStatus::Continue;
+      }));
+  // The listener1 will get the connection since no balance listener found.
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  // The listener2 won't get the connection since it is override.
+  EXPECT_CALL(*ipv6_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
+  // The listener3 won't get the connection also.
+  EXPECT_CALL(*ipv6_with_v6only_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
+
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  listener_callbacks1->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  EXPECT_CALL(*listener3, onDestroy());
+  EXPECT_CALL(*listener2, onDestroy());
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*access_log_, log(_, _, _, _));
+}
+
 TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDstInbound) {
   Network::TcpListenerCallbacks* listener_callbacks1;
   auto listener1 = new NiceMock<Network::MockListener>();
