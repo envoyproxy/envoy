@@ -101,10 +101,14 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   // This map only store the new listener.
   if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
           details->typed_listener_)) {
-    bool is_override =
-        !tcp_listener_map_by_address_
-             .insert_or_assign(config.listenSocketFactory().localAddress()->asStringView(), details)
-             .second;
+    bool is_override = false;
+    uint64_t override_listener_tag = 0;
+    if (tcp_listener_map_by_address_.contains(config.listenSocketFactory().localAddress()->asStringView())) {
+      is_override = true;
+      override_listener_tag = tcp_listener_map_by_address_[config.listenSocketFactory().localAddress()->asStringView()]->listener_tag_;
+    }
+    tcp_listener_map_by_address_
+      .insert_or_assign(config.listenSocketFactory().localAddress()->asStringView(), details);
 
     auto& address = details->address_;
 
@@ -140,11 +144,15 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         if (address->ip()->isAnyAddress()) {
           auto ipv4_any_address =
               Network::Address::Ipv4Instance(address->ip()->port()).asStringView();
-          tcp_listener_map_by_address_.erase(ipv4_any_address);
+          if (tcp_listener_map_by_address_.contains(ipv4_any_address) && tcp_listener_map_by_address_[ipv4_any_address]->listener_tag_ == override_listener_tag) {
+            tcp_listener_map_by_address_.erase(ipv4_any_address);
+          }
         } else {
           auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
           if (v4_compatible_addr != nullptr) {
-            tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
+            if (tcp_listener_map_by_address_.contains(v4_compatible_addr->asStringView()) && tcp_listener_map_by_address_[v4_compatible_addr->asStringView()]->listener_tag_ == override_listener_tag) {
+              tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
+            }
           }
         }
       }
