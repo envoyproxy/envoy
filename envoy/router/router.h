@@ -299,42 +299,6 @@ public:
  */
 enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
 
-class PathMatchPolicy {
-public:
-  virtual ~PathMatchPolicy() = default;
-
-  /**
-   * @return whether internal redirect is enabled on this route.
-   */
-  virtual bool enabled() const PURE;
-
-  /**
-   * Creates the target route predicates. This should really be called only once for each upstream
-   * redirect response. Creating the predicates lazily to avoid wasting CPU cycles on non-redirect
-   * responses, which should be the most common case.
-   * @return a vector of newly constructed InternalRedirectPredicate instances.
-   */
-  virtual PathMatchPredicateSharedPtr predicate() const PURE;
-};
-
-class PathRewritePolicy {
-public:
-  virtual ~PathRewritePolicy() = default;
-
-  /**
-   * @return whether internal redirect is enabled on this route.
-   */
-  virtual bool enabled() const PURE;
-
-  /**
-   * Creates the target route predicates. This should really be called only once for each upstream
-   * redirect response. Creating the predicates lazily to avoid wasting CPU cycles on non-redirect
-   * responses, which should be the most common case.
-   * @return a vector of newly constructed InternalRedirectPredicate instances.
-   */
-  virtual PathRewritePredicateSharedPtr predicate() const PURE;
-};
-
 /**
  * PathMatchPolicy from the route configuration.
  */

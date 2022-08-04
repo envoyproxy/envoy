@@ -20,11 +20,6 @@ public:
   virtual ~PathRewritePredicate() = default;
 
   /**
-   * @return the name of the current predicate.
-   */
-  virtual absl::string_view name() const PURE;
-
-  /**
    * Used to rewrite the current url to the specified output. Can return a failure in case rewrite
    * is not successful.
    *
@@ -38,7 +33,12 @@ public:
   /**
    * @return the rewrite pattern of the predicate.
    */
-  virtual absl::string_view pattern() const PURE;
+  virtual std::string pattern() const PURE;
+
+  /**
+   * @return the name of the rewrite predicate.
+   */
+  virtual absl::string_view name() const PURE;
 };
 
 using PathRewritePredicateSharedPtr = std::shared_ptr<PathRewritePredicate>;

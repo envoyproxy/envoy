@@ -361,19 +361,21 @@ PathRewritePolicyImpl::PathRewritePolicyImpl(const envoy::config::core::v3::Type
                                          ProtobufMessage::ValidationVisitor& validator, std::string route_url)
     : route_url_(route_url), enabled_(true) {
 
-  absl::string_view name = "envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate";
-  auto* factory = Registry::FactoryRegistry<Router::PathRewritePredicateFactory>::getFactory(name);
-    ASSERT(factory); // factory not found
+    predicate_factory_ = &Envoy::Config::Utility::getAndCheckFactory<PathRewritePredicateFactory>(typed_config);
+  ASSERT(predicate_factory_); // factory not found
 
-    ProtobufTypes::MessagePtr proto_config = factory->createEmptyConfigProto();
-    Envoy::Config::Utility::translateOpaqueConfig(typed_config.typed_config(), validator, *proto_config);
+  predicate_config_ = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      typed_config.typed_config(), validator, *predicate_factory_);
+  ASSERT(predicate_config_); // config translation failed
 
-    predicate_factory_ = factory;
-    rewrite_predicate_config_ = std::move(proto_config);
+  // Validate config format and inputs when creating factory.
+  // As the validation and create are nearly 1:1 store for later use.
+  // Predicate is only ever created once.
+  predicate_ = predicate_factory_->createPathRewritePredicate(*predicate_config_);
 }
 
 PathRewritePredicateSharedPtr PathRewritePolicyImpl::predicate() const {
-  return predicate_factory_->createPathRewritePredicate(*rewrite_predicate_config_);
+  return predicate_;
 }
 
 PathMatchPolicyImpl::PathMatchPolicyImpl() : enabled_(false){};
@@ -383,18 +385,22 @@ PathMatchPolicyImpl::PathMatchPolicyImpl(
     ProtobufMessage::ValidationVisitor& validator, std::string route_url)
     : route_url_(route_url), enabled_(true) {
 
-  absl::string_view name = "envoy.path.match.pattern_template.v3.pattern_template_match_predicate";
-  auto* factory = Registry::FactoryRegistry<Router::PathMatchPredicateFactory>::getFactory(name);
-    ASSERT(factory); // factory not found
-    ProtobufTypes::MessagePtr proto_config = factory->createEmptyConfigProto();
-    Envoy::Config::Utility::translateOpaqueConfig(typed_config.typed_config(), validator, *proto_config);
+  predicate_factory_ =
+      &Envoy::Config::Utility::getAndCheckFactory<PathMatchPredicateFactory>(typed_config);
+  ASSERT(predicate_factory_); // factory not found
 
-    predicate_factory_ = factory;
-    predicate_config_ = std::move(proto_config);
+  predicate_config_ = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      typed_config.typed_config(), validator, *predicate_factory_);
+  ASSERT(predicate_config_); // config translation failed
+
+  // Validate config format and inputs when creating factory.
+  // As the validation and create are nearly 1:1 store for later use.
+  // Predicate is only ever created once.
+  predicate_ = predicate_factory_->createPathMatchPredicate(*predicate_config_);
 }
 
 PathMatchPredicateSharedPtr PathMatchPolicyImpl::predicate() const {
-  return predicate_factory_->createPathMatchPredicate(*predicate_config_);
+  return predicate_;
 }
 
 absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectResponseCodes(
@@ -684,51 +690,53 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
-  if (route.route().has_regex_rewrite()) {
-    if (!prefix_rewrite_.empty() || path_match_policy_.enabled()) {
-      throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
+  if (path_rewrite_policy_.enabled()) {
+    if (!prefix_rewrite_.empty() || route.route().has_regex_rewrite()) {
+      throw EnvoyException(
+          "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
     }
+  }
+
+  if (!prefix_rewrite_.empty()) {
+    if (route.route().has_regex_rewrite() || path_rewrite_policy_.enabled()) {
+      throw EnvoyException(
+          "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
+    }
+  }
+
+  if(route.route().has_regex_rewrite()) {
+    if (!prefix_rewrite_.empty() || path_rewrite_policy_.enabled()) {
+      throw EnvoyException(
+          "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
+    }
+  }
+
+  if (route.route().has_regex_rewrite()) {
     auto rewrite_spec = route.route().regex_rewrite();
     regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
-  if (path_match_policy_.enabled()) {
-    if (!prefix_rewrite_.empty() || route.route().has_regex_rewrite()) {
-      throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
+  // Check if pattern rewrite is enabled that the pattern matching is also enabled.
+  // This is needed to match up variable values.
+  if (path_rewrite_policy_.enabled() &&
+      path_rewrite_policy_.predicate()->name() == Extensions::PatternTemplate::Rewrite::NAME) {
+    if (!path_match_policy_.enabled() ||
+        path_match_policy_.predicate()->name() != Extensions::PatternTemplate::Match::NAME) {
+      throw EnvoyException(fmt::format("unable to use {} extension without {} extension",
+                                       Extensions::PatternTemplate::Rewrite::NAME,
+                                       Extensions::PatternTemplate::Match::NAME));
     }
   }
 
-  if (path_match_policy_.enabled()) {
-    // TODO: validate path_match_policy is of kind the pattern template
-    if (!Extensions::PatternTemplate::isValidMatchPattern(path_match_policy_.predicate()->pattern())
-             .ok()) {
-      throw EnvoyException(fmt::format("path_match_policy {} is invalid",
-                                       path_match_policy_.predicate()->pattern()));
-    }
-  }
-
-  if (path_rewrite_policy_.enabled()) {
-    // TODO: validate path_rewrite_policy is of kind the pattern template
-    if (!Extensions::PatternTemplate::isValidPathTemplateRewritePattern(
-             path_rewrite_policy_.predicate()->pattern())
-             .ok()) {
-      throw EnvoyException(fmt::format("path_rewrite_policy {} is invalid",
-                                       path_match_policy_.predicate()->pattern()));
-    }
-
+  // Validation between extensions as they share rewrite pattern variables.
+  if (path_rewrite_policy_.enabled() && path_match_policy_.enabled()) {
     if (!Extensions::PatternTemplate::isValidSharedVariableSet(
              path_rewrite_policy_.predicate()->pattern(), path_match_policy_.predicate()->pattern())
              .ok()) {
       throw EnvoyException(fmt::format(
-          "mismatch between path_match_policy {} and path_rewrite_policy {}",
+          "mismatch between variables in path_match_policy {} and path_rewrite_policy {}",
           path_match_policy_.predicate()->pattern(), path_rewrite_policy_.predicate()->pattern()));
-    }
-  }
-
-  if (!prefix_rewrite_.empty()) {
-    if (route.route().has_regex_rewrite() || path_match_policy_.enabled()) {
-      throw EnvoyException("Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
     }
   }
 

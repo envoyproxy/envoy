@@ -16,6 +16,8 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Match {
 
+const absl::string_view NAME = "envoy.path.match.pattern_template.pattern_template_match_predicate";
+
 class PatternTemplateMatchPredicate : public Router::PathMatchPredicate {
 public:
   explicit PatternTemplateMatchPredicate(
@@ -23,12 +25,10 @@ public:
           config)
       : path_template_(config.path_template()){}
 
-  absl::string_view name() const override {
-    return "envoy.path.match.pattern_template.v3.pattern_template_match_predicate";
-  }
-
   bool match(absl::string_view pattern) const override;
+
   std::string pattern() const override;
+  absl::string_view name() const override { return NAME; }
 
 private:
   const std::string path_template_;

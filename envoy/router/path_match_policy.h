@@ -20,11 +20,6 @@ public:
   virtual ~PathMatchPredicate() = default;
 
   /**
-   * @return the name of the current predicate.
-   */
-  virtual std::string name() const PURE;
-
-  /**
    * Used to determine if the current url matches the predicate pattern.
    *
    * @param url current url of route
@@ -35,7 +30,12 @@ public:
   /**
    * @return the match pattern of the predicate.
    */
-  virtual absl::string_view pattern() const PURE;
+  virtual std::string pattern() const PURE;
+
+  /**
+   * @return the name of the current predicate.
+   */
+  virtual absl::string_view name() const PURE;
 };
 
 using PathMatchPredicateSharedPtr = std::shared_ptr<PathMatchPredicate>;
@@ -55,7 +55,12 @@ public:
   createPathMatchPredicate(const Protobuf::Message& config) PURE;
 
   /**
-   * @return the category of the rewrite pattern predicate to be created.
+   * @return the name of the match pattern predicate to be created.
+   */
+  virtual std::string name() const override PURE;
+
+  /**
+   * @return the category of the match pattern predicate to be created.
    */
   std::string category() const override { return "envoy.path.match"; }
 };

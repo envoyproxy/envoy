@@ -22,6 +22,8 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Rewrite {
 
+const absl::string_view NAME = "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate";
+
 class PatternTemplateRewritePredicate : public Router::PathRewritePredicate {
 public:
   explicit PatternTemplateRewritePredicate(
@@ -29,16 +31,14 @@ public:
           rewrite_config)
       : url_rewrite_pattern_(rewrite_config.path_template_rewrite()) {}
 
-  absl::string_view name() const override {
-    return "envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate";
-  }
-
   std::string pattern() const override { return url_rewrite_pattern_; }
 
   absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
                                              absl::string_view matched_path) const override;
 
   static absl::Status isValidRewritePattern(std::string match_pattern, std::string rewrite_pattern);
+
+  absl::string_view name() const override { return NAME;}
 
 private:
   // Returns the rewritten URL path based on the given parsed rewrite pattern.

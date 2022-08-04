@@ -746,12 +746,12 @@ envoy.matching.matchers.ip:
   status: stable
   type_urls:
   - envoy.extensions.matching.input_matchers.ip.v3.Ip
-envoy.path.match.pattern_template.v3.pattern_template_match_predicate:
+envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig:
     categories:
     - envoy.path.match
     security_posture: robust_to_untrusted_downstream_and_upstream
     status: stable
-envoy.path.rewrite.pattern_template.v3.pattern_template_rewrite_predicate:
+envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig:
       categories:
       - envoy.path.rewrite
       security_posture: robust_to_untrusted_downstream_and_upstream
