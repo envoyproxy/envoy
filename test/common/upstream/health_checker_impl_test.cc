@@ -12,7 +12,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
-#include "source/common/common/base64.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/headers.h"
 #include "source/common/json/json_loader.h"
@@ -455,9 +454,7 @@ public:
     addCompletionCallback();
   }
 
-  void setupServiceValidationWithBytesMatcherHC(const std::string& expected_response) {
-    Buffer::OwnedImpl response_test(expected_response);
-    std::string response = Base64::encode(response_test, response_test.length());
+  void setupMethodValidationHC(const std::string method) {
     std::string yaml = fmt::format(R"EOF(
     timeout: 1s
     interval: 1s
@@ -466,47 +463,9 @@ public:
     healthy_threshold: 2
     http_health_check:
       path: /healthcheck
-      response_bytes_matcher:
-        contains: {0}
+      method: {0}
     )EOF",
-                                   response);
-
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
-
-  void setupServiceValidationWithStringMatcherHC(const std::string& expected_response) {
-    std::string yaml = fmt::format(R"EOF(
-    timeout: 1s
-    interval: 1s
-    interval_jitter: 1s
-    unhealthy_threshold: 2
-    healthy_threshold: 2
-    http_health_check:
-      path: /healthcheck
-      response_string_matcher:
-        contains: {0}
-    )EOF",
-                                   expected_response);
-
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
-
-  void setupServiceHTTP2ValidationWithExpectedResponseHC() {
-    // Response: Base64 string of "Everything OK".
-    std::string yaml = R"EOF(
-    timeout: 1s
-    interval: 1s
-    interval_jitter: 1s
-    unhealthy_threshold: 2
-    healthy_threshold: 2
-    http_health_check:
-      path: /healthcheck
-      response_bytes_matcher:
-        contains: RXZlcnl0aGluZyBPSw==
-      codec_client_type: Http2
-    )EOF";
+                                   method);
 
     allocHealthChecker(yaml);
     addCompletionCallback();
@@ -692,24 +651,6 @@ public:
       test_sessions_[index]->stream_response_callbacks_->decodeTrailers(
           Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"some", "trailer"}}});
     }
-  }
-
-  void respondBody(size_t index, const std::string& code,
-                   const std::vector<std::string>& response_body, bool immediate_hc_fail = false) {
-    std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
-        new Http::TestResponseHeaderMapImpl{{":status", code}});
-    if (immediate_hc_fail) {
-      response_headers->setEnvoyImmediateHealthCheckFail("true");
-    }
-    test_sessions_[index]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
-                                                                     false);
-
-    for (const auto& body : response_body) {
-      Buffer::OwnedImpl response_data(body);
-      test_sessions_[index]->stream_response_callbacks_->decodeData(response_data, false);
-    }
-    test_sessions_[index]->stream_response_callbacks_->decodeTrailers(
-        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"some", "trailer"}}});
   }
 
   void expectSessionCreate() { expectSessionCreate(health_checker_map_); }
@@ -1099,205 +1040,6 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostSets) {
   respond(1, "200", false, false, true);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(1)->hosts_[0]->health());
-}
-
-TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheck) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  cluster_->info_->stats().upstream_cx_total_.inc();
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respondBody(0, "200", {"Test Everything OK"});
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-}
-
-TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseStringContainsCheck) {
-  setupServiceValidationWithStringMatcherHC("Everything OK");
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  cluster_->info_->stats().upstream_cx_total_.inc();
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respondBody(0, "200", {"Test Everything OK"});
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-}
-
-TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckBuffer) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  cluster_->info_->stats().upstream_cx_total_.inc();
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respondBody(0, "200", {"Test OK", "Everything", " OK", "OK", "This is a Test"});
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-}
-
-TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckMaxBuffer) {
-  std::string expected_string(1024, 'A');
-  setupServiceValidationWithBytesMatcherHC(expected_string);
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  cluster_->info_->stats().upstream_cx_total_.inc();
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-
-  std::string data_piece(512, 'A');
-  respondBody(0, "200", {data_piece, data_piece, data_piece});
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-}
-
-TEST_F(HttpHealthCheckerImplTest, ExpectedResponseSettingOverSize) {
-  std::string expected_string(2048, 'A');
-  EXPECT_THROW_WITH_MESSAGE(
-      setupServiceValidationWithBytesMatcherHC(expected_string), EnvoyException,
-      "The expected response length '2048' is over than http health response buffer size '1024'");
-}
-
-TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckHttp2) {
-  setupServiceHTTP2ValidationWithExpectedResponseHC();
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  cluster_->info_->stats().upstream_cx_total_.inc();
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respondBody(0, "200", {"Test Everything OK"});
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-}
-
-TEST_F(HttpHealthCheckerImplTest, FailExpectedResponseCheck) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  cluster_->info_->stats().upstream_cx_total_.inc();
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-
-  respondBody(0, "200", {"Test Everything Not OK"});
-  EXPECT_EQ(Host::Health::Unhealthy,
-            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-}
-
-TEST_F(HttpHealthCheckerImplTest, FailStatusCheckWithExpectedResponseCheck) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  cluster_->info_->stats().upstream_cx_total_.inc();
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respondBody(0, "203", {"Test Everything OK"});
-  EXPECT_EQ(Host::Health::Unhealthy,
-            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-}
-
-TEST_F(HttpHealthCheckerImplTest, ImmediateFailExpectedResponseCheck) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  cluster_->info_->stats().upstream_cx_total_.inc();
-  expectSessionCreate();
-  expectStreamCreate(0);
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  health_checker_->start();
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-
-  respondBody(0, "200", {"Something Not OK"}, true);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
-  EXPECT_EQ(Host::Health::Unhealthy,
-            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
 // Validate that runtime settings can't force a zero lengthy retry duration (and hence livelock).
@@ -3319,6 +3061,78 @@ TEST_F(HttpHealthCheckerImplTest, ServiceNameMismatch) {
       Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+TEST_F(HttpHealthCheckerImplTest, DefaultMethodGet) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
+                  std::string(headers.Method()->value().getStringView()));
+        return Http::okStatus();
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+TEST_F(HttpHealthCheckerImplTest, MethodHead) {
+  setupMethodValidationHC("HEAD");
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        EXPECT_EQ(Http::Headers::get().MethodValues.Head,
+                  std::string(headers.Method()->value().getStringView()));
+        return Http::okStatus();
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+TEST_F(HttpHealthCheckerImplTest, MethodConnectDisallowedValidation) {
+  std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: "CONNECT"
+    )EOF";
+
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
+                          "Proto constraint validation failed.*")
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
