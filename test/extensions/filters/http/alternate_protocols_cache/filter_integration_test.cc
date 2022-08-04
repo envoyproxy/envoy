@@ -24,6 +24,7 @@ namespace {
 class FilterIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
   void initialize() override {
+    TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
     const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
     envoy::config::core::v3::AlternateProtocolsCacheOptions alt_cache;
     alt_cache.set_name("default_alternate_protocols_cache");
@@ -147,6 +148,8 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
   const uint64_t response_size = 0;
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
 
+  config_helper_.setConnectTimeout(std::chrono::seconds(2));
+
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
@@ -267,10 +270,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
 // an HTTP/2 or an HTTP/3 upstream (but not both).
 class MixedUpstreamIntegrationTest : public FilterIntegrationTest {
 protected:
-  MixedUpstreamIntegrationTest() {
-    TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
-    default_request_headers_.setHost("sni.lyft.com");
-  }
+  MixedUpstreamIntegrationTest() { default_request_headers_.setHost("sni.lyft.com"); }
 
   void writeFile() {
     uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();

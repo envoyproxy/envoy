@@ -19,11 +19,23 @@ public:
   PathMatchPredicate() = default;
   virtual ~PathMatchPredicate() = default;
 
-  virtual absl::string_view name() const PURE;
+  /**
+   * @return the name of the current predicate.
+   */
+  virtual std::string name() const PURE;
 
-  virtual bool match(absl::string_view pattern) const PURE;
+  /**
+   * Used to determine if the current url matches the predicate pattern.
+   *
+   * @param url current url of route
+   * @return valid if route url matches the predicate pattern.
+   */
+  virtual bool match(absl::string_view url) const PURE;
 
-  virtual std::string pattern() const PURE;
+  /**
+   * @return the match pattern of the predicate.
+   */
+  virtual absl::string_view pattern() const PURE;
 };
 
 using PathMatchPredicateSharedPtr = std::shared_ptr<PathMatchPredicate>;
@@ -35,9 +47,16 @@ class PathMatchPredicateFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~PathMatchPredicateFactory() = default;
 
+  /**
+   * @param config contains the proto stored in TypedExtensionConfig.typed_config for the predicate.
+   * @return an PathMatchPredicateSharedPtr.
+   */
   virtual PathMatchPredicateSharedPtr
   createPathMatchPredicate(const Protobuf::Message& config) PURE;
 
+  /**
+   * @return the category of the rewrite pattern predicate to be created.
+   */
   std::string category() const override { return "envoy.path.match"; }
 };
 

@@ -240,7 +240,7 @@ EXTENSIONS = {
     "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
 
     #
-    # Path match and rewrite
+    # Path Pattern Match and Path Pattern Rewrite
     #
 
     "envoy.path.match.pattern_template.v3.pattern_template_match_predicate": "//source/extensions/path/match/pattern_template:config",

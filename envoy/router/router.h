@@ -336,6 +336,48 @@ public:
 };
 
 /**
+ * PathMatchPolicy from the route configuration.
+ */
+class PathMatchPolicy {
+public:
+  virtual ~PathMatchPolicy() = default;
+
+  /**
+   * @return whether path match based on custom policy is enabled on this route.
+   */
+  virtual bool enabled() const PURE;
+
+  /**
+   * Creates the target route predicates. This should really be called only once for each upstream
+   * match. Creating the predicate lazily to avoid wasting CPU cycles on non-matching
+   * responses, which should be the most common case.
+   * @return a newly constructed PathMatchPredicate instance.
+   */
+  virtual PathMatchPredicateSharedPtr predicate() const PURE;
+};
+
+/**
+ * PathRewritePolicy from the route configuration.
+ */
+class PathRewritePolicy {
+public:
+  virtual ~PathRewritePolicy() = default;
+
+  /**
+   * @return whether path rewrite based on custom policy is enabled on this route.
+   */
+  virtual bool enabled() const PURE;
+
+  /**
+   * Creates the target route predicates. This should really be called only once for each upstream
+   * rewrite. Creating the predicate lazily to avoid wasting CPU cycles on non-rewrite
+   * responses, which should be the most common case.
+   * @return a newly constructed PathRewritePredicate instances.
+   */
+  virtual PathRewritePredicateSharedPtr predicate() const PURE;
+};
+
+/**
  * InternalRedirectPolicy from the route configuration.
  */
 class InternalRedirectPolicy {

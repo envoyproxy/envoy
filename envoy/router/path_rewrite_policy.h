@@ -19,13 +19,26 @@ public:
   PathRewritePredicate() = default;
   virtual ~PathRewritePredicate() = default;
 
+  /**
+   * @return the name of the current predicate.
+   */
   virtual absl::string_view name() const PURE;
 
-  virtual absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
-                                           absl::string_view matched_path) const PURE;
+  /**
+   * Used to rewrite the current url to the specified output. Can return a failure in case rewrite
+   * is not successful.
+   *
+   * @param url current url of route
+   * @param matched_path pattern to rewrite the url to
+   * @return the name of the rewrite pattern current predicate.
+   */
+  virtual absl::StatusOr<std::string> rewritePattern(absl::string_view url,
+                                                     absl::string_view matched_path) const PURE;
 
-  virtual std::string pattern() const PURE;
-
+  /**
+   * @return the rewrite pattern of the predicate.
+   */
+  virtual absl::string_view pattern() const PURE;
 };
 
 using PathRewritePredicateSharedPtr = std::shared_ptr<PathRewritePredicate>;
@@ -42,7 +55,14 @@ public:
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
 
+  /**
+   * @return the name of the rewrite pattern predicate to be created.
+   */
   virtual std::string name() const override PURE;
+
+  /**
+   * @return the category of the rewrite pattern predicate to be created.
+   */
   virtual std::string category() const override PURE;
 };
 
