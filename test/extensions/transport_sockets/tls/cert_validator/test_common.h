@@ -24,8 +24,17 @@ public:
     return status_;
   }
 
+  Ssl::ValidateResultCallbackPtr createValidateResultCallback() override { return nullptr; };
+
+  void onCertificateValidationCompleted(bool succeeded) override {
+    validate_result_ = succeeded ? Ssl::ValidateStatus::Successful : Ssl::ValidateStatus::Failed;
+  }
+  Ssl::ValidateStatus certificateValidationResult() const override { return validate_result_; }
+  uint8_t certificateValidationAlert() const override { return SSL_AD_CERTIFICATE_UNKNOWN; }
+
 private:
   Envoy::Ssl::ClientValidationStatus status_;
+  Ssl::ValidateStatus validate_result_{Ssl::ValidateStatus::NotStarted};
 };
 
 class TestCertificateValidationContextConfig
