@@ -39,8 +39,7 @@ if __name__ == '__main__':
 
     # Bazel target to print
     target = sys.argv[1]
-    output = subprocess.check_output(['bazel', 'query', 'deps(%s)' % target],
-                                     text=True)
+    output = subprocess.check_output(['bazel', 'query', 'deps(%s)' % target], text=True)
 
     repos = set()
 
