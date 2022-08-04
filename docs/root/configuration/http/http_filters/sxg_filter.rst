@@ -29,7 +29,6 @@ For more information on Signed HTTP Exchanges see `this doc <https://developers.
 
  These features are only supported on Linux amd64.
 
-
 Example configuration
 ---------------------
 

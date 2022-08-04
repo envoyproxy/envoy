@@ -11,7 +11,7 @@ VCL Socket Interface
 
 .. note::
 
- These features are not supported on Windows, details refer to `VPP Supported Architectures <https://s3-docs.fd.io/vpp/22.10/aboutvpp/supported.html>`_.
+ These features are not supported on Windows, for details please refer to `VPP Supported Architectures <https://s3-docs.fd.io/vpp/22.10/aboutvpp/supported.html>`_.
 
 
 This socket interface extension provides Envoy with high speed L2-L7 user space networking by integrating with `fd.io VPP <https://fd.io>`_ through VPP's ``Comms`` Library (VCL).
