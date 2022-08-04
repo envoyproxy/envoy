@@ -233,11 +233,13 @@ message RateLimitQuotaResponse {
 //
 // .. validated-code-block:: yaml
 //   :type-name: envoy.service.rate_limit_quota.v3.BucketId
+//
 //   bucket:
 //     name: my_bucket
 //     env: staging
 //
 // .. note::
+//
 //   The order of ``BucketId`` keys do not matter. Buckets ``{ a: 'A', b: 'B' }`` and
 //   ``{ b: 'B', a: 'A' }`` are identical.
 message BucketId {
