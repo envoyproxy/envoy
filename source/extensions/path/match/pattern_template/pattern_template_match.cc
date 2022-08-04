@@ -19,13 +19,12 @@ namespace Match {
 
 bool PatternTemplateMatchPredicate::match(absl::string_view pattern) const {
   RE2 matching_pattern_regex = RE2(convertURLPatternSyntaxToRegex(path_template_).value());
-  return RE2::FullMatch(PatternTemplateInternal::toStringPiece(Http::PathUtil::removeQueryAndFragment(pattern)),
-                        matching_pattern_regex);
+  return RE2::FullMatch(
+      PatternTemplateInternal::toStringPiece(Http::PathUtil::removeQueryAndFragment(pattern)),
+      matching_pattern_regex);
 }
 
-std::string PatternTemplateMatchPredicate::pattern() const {
-  return path_template_;
-}
+std::string PatternTemplateMatchPredicate::pattern() const { return path_template_; }
 
 } // namespace Match
 } // namespace PatternTemplate

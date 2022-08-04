@@ -3,17 +3,16 @@
 
 #include <string>
 
-#include "envoy/router/path_rewrite_policy.h"
-
-#include "source/extensions/path/pattern_template_lib/pattern_template.h"
-#include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.h"
-#include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.validate.h"
-
 #include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.h"
 #include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.validate.h"
+#include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.h"
+#include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.validate.h"
+#include "envoy/router/path_rewrite_policy.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/path/pattern_template_lib/pattern_template.h"
+
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
@@ -22,7 +21,8 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Rewrite {
 
-const absl::string_view NAME = "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate";
+const absl::string_view NAME =
+    "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate";
 
 class PatternTemplateRewritePredicate : public Router::PathRewritePredicate {
 public:
@@ -38,7 +38,7 @@ public:
 
   static absl::Status isValidRewritePattern(std::string match_pattern, std::string rewrite_pattern);
 
-  absl::string_view name() const override { return NAME;}
+  absl::string_view name() const override { return NAME; }
 
 private:
   // Returns the rewritten URL path based on the given parsed rewrite pattern.

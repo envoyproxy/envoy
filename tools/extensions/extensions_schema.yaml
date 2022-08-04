@@ -108,6 +108,8 @@ categories:
 - envoy.matching.http.input
 - envoy.matching.network.input
 - envoy.matching.network.custom_matchers
+- envoy.path.rewrite
+- envoy.path.match
 
 status_values:
 - name: stable

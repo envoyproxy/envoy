@@ -8790,8 +8790,7 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
-  const auto& pattern_template_policy =
-      config.route(headers, 0)->routeEntry()->pathMatchPolicy();
+  const auto& pattern_template_policy = config.route(headers, 0)->routeEntry()->pathMatchPolicy();
   EXPECT_FALSE(pattern_template_policy.enabled());
 }
 

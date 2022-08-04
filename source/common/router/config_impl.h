@@ -463,8 +463,8 @@ private:
  */
 class PathMatchPolicyImpl : public PathMatchPolicy {
 public:
- PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
-    ProtobufMessage::ValidationVisitor& validator, std::string route_url);
+  PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
+                      ProtobufMessage::ValidationVisitor& validator, std::string route_url);
 
   // Default constructor that disables internal redirect.
   PathMatchPolicyImpl();
@@ -489,8 +489,8 @@ private:
  */
 class PathRewritePolicyImpl : public PathRewritePolicy {
 public:
-   PathRewritePolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
-                                         ProtobufMessage::ValidationVisitor& validator, std::string route_url);
+  PathRewritePolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
+                        ProtobufMessage::ValidationVisitor& validator, std::string route_url);
 
   // Default constructor that disables internal redirect.
   PathRewritePolicyImpl();
@@ -989,13 +989,11 @@ private:
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
 
-  PathMatchPolicyImpl
-  buildPathMatchPolicy(envoy::config::route::v3::Route route,
-                                         ProtobufMessage::ValidationVisitor& validator) const;
+  PathMatchPolicyImpl buildPathMatchPolicy(envoy::config::route::v3::Route route,
+                                           ProtobufMessage::ValidationVisitor& validator) const;
 
-  PathRewritePolicyImpl
-  buildPathRewritePolicy(envoy::config::route::v3::Route route,
-                                         ProtobufMessage::ValidationVisitor& validator) const;
+  PathRewritePolicyImpl buildPathRewritePolicy(envoy::config::route::v3::Route route,
+                                               ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
                                                   const Http::HeaderMap& headers) const;
@@ -1080,10 +1078,10 @@ private:
 class PathMatchPolicyRouteEntryImpl : public RouteEntryImplBase {
 public:
   PathMatchPolicyRouteEntryImpl(const VirtualHostImpl& vhost,
-                             const envoy::config::route::v3::Route& route,
-                             const OptionalHttpFilters& optional_http_filters,
-                             Server::Configuration::ServerFactoryContext& factory_context,
-                             ProtobufMessage::ValidationVisitor& validator);
+                                const envoy::config::route::v3::Route& route,
+                                const OptionalHttpFilters& optional_http_filters,
+                                Server::Configuration::ServerFactoryContext& factory_context,
+                                ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return match_pattern_; }
@@ -1101,8 +1099,9 @@ public:
   // Router::RouteEntry
   absl::optional<std::string>
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
-  private:
-    const std::string match_pattern_;
+
+private:
+  const std::string match_pattern_;
 };
 
 /**

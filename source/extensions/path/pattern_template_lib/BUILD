@@ -28,8 +28,6 @@ envoy_cc_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
-        "@envoy_api//envoy/extensions/path/match/pattern_template/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/path/rewrite/pattern_template/v3:pkg_cc_proto",
     ],
 )
 

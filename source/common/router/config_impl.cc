@@ -1505,22 +1505,14 @@ PathMatchPolicyRouteEntryImpl::PathMatchPolicyRouteEntryImpl(
 
 void PathMatchPolicyRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                       bool insert_envoy_original_path) const {
-<<<<<<< HEAD
   finalizePathHeader(headers, path_match_policy_.predicate()->pattern(),
                      insert_envoy_original_path);
-=======
-  finalizePathHeader(headers, "", insert_envoy_original_path);
->>>>>>> upstream/main
 }
 
 absl::optional<std::string> PathMatchPolicyRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-<<<<<<< HEAD
   return currentUrlPathAfterRewriteWithMatchedPath(headers,
                                                    path_match_policy_.predicate()->pattern());
-=======
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, "");
->>>>>>> upstream/main
 }
 
 RouteConstSharedPtr

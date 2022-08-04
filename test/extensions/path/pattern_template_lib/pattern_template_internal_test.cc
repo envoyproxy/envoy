@@ -369,9 +369,7 @@ class GenPatternRegexWithMatch : public testing::TestWithParam<struct GenPattern
 protected:
   const std::string& requestPath() const { return GetParam().path; }
   const std::string& urlPattern() const { return GetParam().pattern; }
-  std::vector<std::pair<std::string, std::string>> const varValues() {
-    return GetParam().captures;
-  }
+  std::vector<std::pair<std::string, std::string>> const varValues() { return GetParam().captures; }
 };
 
 INSTANTIATE_TEST_SUITE_P(

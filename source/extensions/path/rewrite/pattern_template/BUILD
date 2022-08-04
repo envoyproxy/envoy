@@ -2,7 +2,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_cc_test",
     "envoy_extension_package",
 )
 
@@ -24,6 +23,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/path/pattern_template_lib",
+        "@envoy_api//envoy/extensions/path/match/pattern_template/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/path/rewrite/pattern_template/v3:pkg_cc_proto",
     ],
 )

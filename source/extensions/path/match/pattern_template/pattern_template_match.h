@@ -23,7 +23,7 @@ public:
   explicit PatternTemplateMatchPredicate(
       const envoy::extensions::path::match::pattern_template::v3::PatternTemplateMatchConfig&
           config)
-      : path_template_(config.path_template()){}
+      : path_template_(config.path_template()) {}
 
   bool match(absl::string_view pattern) const override;
 
