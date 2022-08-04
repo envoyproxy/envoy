@@ -49,7 +49,7 @@ absl::Status PatternTemplateRewritePredicate::isValidRewritePattern(std::string 
 };
 
 absl::StatusOr<std::string>
-PatternTemplateRewritePredicate::rewritePattern(absl::string_view current_pattern,
+PatternTemplateRewritePredicate::rewriteUrl(absl::string_view current_pattern,
                                                 absl::string_view matched_path) const {
   absl::StatusOr<std::string> regex_pattern = convertURLPatternSyntaxToRegex(matched_path);
   if (!regex_pattern.ok()) {

@@ -33,7 +33,7 @@ public:
 
   std::string pattern() const override { return url_rewrite_pattern_; }
 
-  absl::StatusOr<std::string> rewritePattern(absl::string_view current_pattern,
+  absl::StatusOr<std::string> rewriteUrl(absl::string_view current_pattern,
                                              absl::string_view matched_path) const override;
 
   static absl::Status isValidRewritePattern(std::string match_pattern, std::string rewrite_pattern);

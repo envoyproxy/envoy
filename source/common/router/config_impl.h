@@ -484,8 +484,8 @@ private:
 };
 
 /**
- * Implementation of InternalRedirectPolicy that reads from the proto
- * InternalRedirectPolicy of the RouteAction.
+ * Implementation of PathRewritePolicyImpl that reads from the proto
+ * PathRewritePolicyImpl of the RouteAction.
  */
 class PathRewritePolicyImpl : public PathRewritePolicy {
 public:

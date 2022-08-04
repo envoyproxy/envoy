@@ -25,9 +25,9 @@ public:
    *
    * @param url current url of route
    * @param matched_path pattern to rewrite the url to
-   * @return the name of the rewrite pattern current predicate.
+   * @return the rewritten url.
    */
-  virtual absl::StatusOr<std::string> rewritePattern(absl::string_view url,
+  virtual absl::StatusOr<std::string> rewriteUrl(absl::string_view url,
                                                      absl::string_view matched_path) const PURE;
 
   /**
