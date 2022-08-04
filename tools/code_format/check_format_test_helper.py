@@ -18,7 +18,8 @@ import tempfile
 curr_dir = os.path.dirname(os.path.realpath(__file__))
 tools = os.path.dirname(curr_dir)
 src = os.path.join(tools, 'testdata', 'check_format')
-check_format = sys.executable + " " + os.path.join(curr_dir, 'check_format.py')
+check_format = f"{sys.executable}  {os.path.join(curr_dir, 'check_format.py')}"
+check_format_config = f"{os.path.join(curr_dir, 'config.yaml')}"
 errors = 0
 
 
@@ -26,7 +27,7 @@ errors = 0
 # the comamnd run and the status code as well as the stdout, and returning
 # all of that to the caller.
 def run_check_format(operation, filename):
-    command = check_format + " " + operation + " " + filename
+    command = f"{check_format} {operation} {filename} --config_path={check_format_config}"
     status, stdout, stderr = run_command(command)
     return (command, status, stdout + stderr)
 

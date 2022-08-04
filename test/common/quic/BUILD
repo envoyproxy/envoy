@@ -101,6 +101,8 @@ envoy_cc_test(
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         "//test/mocks/event:event_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",

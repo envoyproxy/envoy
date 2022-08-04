@@ -83,3 +83,8 @@ envoy.network.connection_balance.dlb:
   - envoy.network.connection_balance
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.regex_engines.hyperscan:
+  categories:
+  - envoy.regex_engines
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
