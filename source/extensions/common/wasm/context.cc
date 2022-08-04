@@ -1807,10 +1807,14 @@ void Context::onHttpCallSuccess(uint32_t token, Envoy::Http::ResponseMessagePtr&
   }
   http_call_response_ = &response;
   uint32_t body_size = response->body().length();
-  onHttpCallResponse(token, response->headers().size(), body_size,
-                     headerSize(response->trailers()));
-  http_call_response_ = nullptr;
-  http_request_.erase(handler);
+  // Deferred "after VM call" actions are going to be executed upon returning from
+  // ContextBase::*, which might include deleting Context object via proxy_done().
+  wasm()->addAfterVmCallAction([this, handler] {
+    http_call_response_ = nullptr;
+    http_request_.erase(handler);
+  });
+  ContextBase::onHttpCallResponse(token, response->headers().size(), body_size,
+                                  headerSize(response->trailers()));
 }
 
 void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason reason) {
@@ -1827,21 +1831,34 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
   // This is the only value currently.
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   status_message_ = "reset";
-  onHttpCallResponse(token, 0, 0, 0);
-  status_message_ = "";
-  http_request_.erase(handler);
+  // Deferred "after VM call" actions are going to be executed upon returning from
+  // ContextBase::*, which might include deleting Context object via proxy_done().
+  wasm()->addAfterVmCallAction([this, handler] {
+    status_message_ = "";
+    http_request_.erase(handler);
+  });
+  ContextBase::onHttpCallResponse(token, 0, 0, 0);
 }
 
 void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response) {
   ASSERT(proxy_wasm::current_context_ == nullptr); // Non-reentrant.
+  auto cleanup = [this, token] {
+    if (wasm()->isGrpcCallId(token)) {
+      grpc_call_request_.erase(token);
+    }
+  };
   if (wasm()->on_grpc_receive_) {
     grpc_receive_buffer_ = std::move(response);
     uint32_t response_size = grpc_receive_buffer_->length();
+    // Deferred "after VM call" actions are going to be executed upon returning from
+    // ContextBase::*, which might include deleting Context object via proxy_done().
+    wasm()->addAfterVmCallAction([this, cleanup] {
+      grpc_receive_buffer_.reset();
+      cleanup();
+    });
     ContextBase::onGrpcReceive(token, response_size);
-    grpc_receive_buffer_.reset();
-  }
-  if (wasm()->isGrpcCallId(token)) {
-    grpc_call_request_.erase(token);
+  } else {
+    cleanup();
   }
 }
 
@@ -1854,21 +1871,30 @@ void Context::onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus&
     });
     return;
   }
+  auto cleanup = [this, token] {
+    if (wasm()->isGrpcCallId(token)) {
+      grpc_call_request_.erase(token);
+    } else if (wasm()->isGrpcStreamId(token)) {
+      auto it = grpc_stream_.find(token);
+      if (it != grpc_stream_.end()) {
+        if (it->second.local_closed_) {
+          grpc_stream_.erase(token);
+        }
+      }
+    }
+  };
   if (wasm()->on_grpc_close_) {
     status_code_ = static_cast<uint32_t>(status);
     status_message_ = toAbslStringView(message);
-    onGrpcClose(token, status_code_);
-    status_message_ = "";
-  }
-  if (wasm()->isGrpcCallId(token)) {
-    grpc_call_request_.erase(token);
-  } else if (wasm()->isGrpcStreamId(token)) {
-    auto it = grpc_stream_.find(token);
-    if (it != grpc_stream_.end()) {
-      if (it->second.local_closed_) {
-        grpc_stream_.erase(token);
-      }
-    }
+    // Deferred "after VM call" actions are going to be executed upon returning from
+    // ContextBase::*, which might include deleting Context object via proxy_done().
+    wasm()->addAfterVmCallAction([this, cleanup] {
+      status_message_ = "";
+      cleanup();
+    });
+    ContextBase::onGrpcClose(token, status_code_);
+  } else {
+    cleanup();
   }
 }
 

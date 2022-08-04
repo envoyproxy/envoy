@@ -220,7 +220,7 @@ private:
     void encode1xxHeaders(ResponseHeaderMap& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(ResponseTrailerMap& trailers) override;
-    void encodeMetadata(MetadataMapVector& metadata) override;
+    void encodeMetadata(MetadataMapPtr&& metadata) override;
     void setRequestTrailers(Http::RequestTrailerMapPtr&& request_trailers) override {
       ASSERT(!request_trailers_);
       request_trailers_ = std::move(request_trailers);
@@ -370,7 +370,7 @@ private:
 
     // Note: The FM must outlive the above headers, as they are possibly accessed during filter
     // destruction.
-    FilterManager filter_manager_;
+    DownstreamFilterManager filter_manager_;
 
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;

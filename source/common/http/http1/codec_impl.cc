@@ -516,7 +516,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
   }
 }
 
-Status ConnectionImpl::completeLastHeader() {
+Status ConnectionImpl::completeCurrentHeader() {
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
@@ -761,7 +761,7 @@ Status ConnectionImpl::onHeaderFieldImpl(const char* data, size_t length) {
     allocTrailers();
   }
   if (header_parsing_state_ == HeaderParsingState::Value) {
-    RETURN_IF_ERROR(completeLastHeader());
+    RETURN_IF_ERROR(completeCurrentHeader());
   }
 
   current_header_field_.append(data, length);
@@ -791,8 +791,8 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
   if (current_header_value_.empty()) {
     // Strip leading whitespace if the current header value input contains the first bytes of the
     // encoded header value. Trailing whitespace is stripped once the full header value is known in
-    // ConnectionImpl::completeLastHeader. http_parser does not strip leading or trailing whitespace
-    // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4 .
+    // ConnectionImpl::completeCurrentHeader. http_parser does not strip leading or trailing
+    // whitespace as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4 .
     header_value = StringUtil::ltrim(header_value);
   }
   current_header_value_.append(header_value.data(), header_value.length());
@@ -804,7 +804,7 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   ASSERT(!processing_trailers_);
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "onHeadersCompleteBase", connection_);
-  RETURN_IF_ERROR(completeLastHeader());
+  RETURN_IF_ERROR(completeCurrentHeader());
 
   if (!parser_->isHttp11()) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
@@ -917,7 +917,7 @@ StatusOr<CallbackResult> ConnectionImpl::onMessageCompleteImpl() {
   // If true, this indicates we were processing trailers and must
   // move the last header into current_header_map_
   if (header_parsing_state_ == HeaderParsingState::Value) {
-    RETURN_IF_ERROR(completeLastHeader());
+    RETURN_IF_ERROR(completeCurrentHeader());
   }
 
   return onMessageCompleteBase();
