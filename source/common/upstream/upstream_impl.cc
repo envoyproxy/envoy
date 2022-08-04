@@ -798,7 +798,9 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
-    Server::Configuration::ServerFactoryContext&, const envoy::config::cluster::v3::Cluster& config,
+    Init::Manager& init_manager,
+    Server::Configuration::ServerFactoryContext& server_context,
+    const envoy::config::cluster::v3::Cluster& config,
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
     bool added_via_api, Server::Configuration::TransportSocketFactoryContext& factory_context)
@@ -868,7 +870,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                     config.cluster_type())
               : absl::nullopt),
       factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
+      upstream_context_(server_context, init_manager) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
@@ -1099,7 +1102,7 @@ ClusterImplBase::ClusterImplBase(
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = factory_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
-      new ClusterInfoImpl(server_context, cluster, factory_context.clusterManager().bindConfig(),
+      new ClusterInfoImpl(init_manager_, server_context, cluster, factory_context.clusterManager().bindConfig(),
                           runtime, std::move(socket_matcher), std::move(stats_scope), added_via_api,
                           factory_context),
       [&dispatcher](const ClusterInfoImpl* self) {

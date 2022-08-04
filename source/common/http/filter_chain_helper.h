@@ -18,7 +18,7 @@ using DownstreamFilterConfigProviderManager =
                                         Server::Configuration::FactoryContext>;
 using UpstreamFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
-                                        Server::Configuration::ServerFactoryContext>;
+                                        Server::Configuration::UpstreamHttpFactoryContext>;
 
 class FilterChainUtility : Logger::Loggable<Logger::Id::config> {
 public:
@@ -105,7 +105,7 @@ private:
       return;
     }
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        proto_config, factory_context_.messageValidationVisitor(), *factory);
+        proto_config, server_context_.messageValidationVisitor(), *factory);
     Http::FilterFactoryCb callback =
         factory->createFilterFactoryFromProto(*message, stats_prefix_, factory_context_);
     dependency_manager.registerFilter(factory->name(), *factory->dependencies());

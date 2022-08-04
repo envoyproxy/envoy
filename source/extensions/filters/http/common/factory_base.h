@@ -85,6 +85,12 @@ public:
   DualFactoryBase(const std::string& name)
       : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
 
+  struct DualInfo {
+    DualInfo(Server::Configuration::UpstreamHttpFactoryContext& context) : init_manager(context.initManager()) {}
+    DualInfo(Server::Configuration::FactoryContext& context) : init_manager(context.initManager()) {}
+    InitManager& init_manager;
+  };
+
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
@@ -97,15 +103,16 @@ public:
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
-                               Server::Configuration::ServerFactoryContext& context) override {
+                               Server::Configuration::UpstreamHttpFactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                                 proto_config, context.messageValidationVisitor()),
-                                             stats_prefix, context);
+                                                 proto_config, context.getServerFactoryContext().messageValidationVisitor()),
+                                             stats_prefix, context.getServerFactoryContext());
   }
 
   virtual Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
+                                    DualInfo info,
                                     Server::Configuration::ServerFactoryContext& context) PURE;
 };
 

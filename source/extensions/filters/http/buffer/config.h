@@ -27,7 +27,7 @@ private:
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::buffer::v3::BufferPerRoute&,
-      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
+      DualInfo info, Server::Configuration::ServerFactoryContext&) override;
 };
 
 using UpstreamBufferFilterFactory = BufferFilterFactory;
