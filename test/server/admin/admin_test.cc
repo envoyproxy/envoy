@@ -100,7 +100,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&,
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
 
   // Test removable handler.
@@ -197,7 +197,7 @@ private:
 };
 
 TEST_P(AdminInstanceTest, CustomChunkedHandler) {
-  auto callback = [](absl::string_view, AdminStream&) -> Admin::RequestPtr {
+  auto callback = [](AdminStream&) -> Admin::RequestPtr {
     Admin::RequestPtr handler = Admin::RequestPtr(new ChunkedHandler);
     return handler;
   };
@@ -265,7 +265,7 @@ TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&,
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
@@ -274,7 +274,7 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&,
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",

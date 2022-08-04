@@ -71,8 +71,7 @@ public:
   AdminImpl(const std::string& profile_path, Server::Instance& server,
             bool ignore_global_conn_limit);
 
-  Http::Code runCallback(absl::string_view path_and_query,
-                         Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code runCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutableSocket() { return *socket_; }
@@ -204,8 +203,8 @@ public:
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
   GenRequestFn createRequestFunction() {
-    return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> RequestPtr {
-      return makeRequest(path_and_query, admin_stream);
+    return [this](AdminStream& admin_stream) -> RequestPtr {
+      return makeRequest(admin_stream);
     };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
@@ -223,7 +222,7 @@ private:
   /**
    * Creates a Request from a url.
    */
-  RequestPtr makeRequest(absl::string_view path_and_query, AdminStream& admin_stream);
+  RequestPtr makeRequest(AdminStream& admin_stream);
 
   /**
    * Creates a UrlHandler structure from a non-chunked callback.
@@ -234,7 +233,7 @@ private:
 
   /**
    * Creates a URL prefix bound to chunked handler. Handler is expected to
-   * supply a method makeRequest(absl::string_view, AdminStream&).
+   * supply a method makeRequest(AdminStream&).
    *
    * @param prefix the prefix to register
    * @param help_text a help text ot display in a table in the admin home page
@@ -248,8 +247,8 @@ private:
   UrlHandler makeStreamingHandler(const std::string& prefix, const std::string& help_text,
                                   Handler& handler, bool removable, bool mutates_state) {
     return {prefix, help_text,
-            [&handler](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
-              return handler.makeRequest(path, admin_stream);
+            [&handler](AdminStream& admin_stream) -> Admin::RequestPtr {
+              return handler.makeRequest(admin_stream);
             },
             removable, mutates_state};
   }
@@ -341,12 +340,10 @@ private:
   /**
    * URL handlers.
    */
-  Http::Code handlerAdminHome(absl::string_view path_and_query,
-                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code handlerAdminHome(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                               AdminStream&);
 
-  Http::Code handlerHelp(absl::string_view path_and_query,
-                         Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code handlerHelp(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
   void getHelp(Buffer::Instance& response);
 
