@@ -25,6 +25,10 @@ If there is an error generating the SXG package we fall back to the original HTM
 
 For more information on Signed HTTP Exchanges see `this doc <https://developers.google.com/web/updates/2018/11/signed-exchanges>`_.
 
+.. note::
+
+ These features are only supported on Linux amd64.
+
 Example configuration
 ---------------------
 

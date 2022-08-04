@@ -153,6 +153,11 @@ public:
   virtual const absl::optional<bool>& allowCredentials() const PURE;
 
   /**
+   * @return const absl::optional<bool>& How to handle access-control-request-private-network.
+   */
+  virtual const absl::optional<bool>& allowPrivateNetworkAccess() const PURE;
+
+  /**
    * @return bool Whether CORS is enabled for the route or virtual host.
    */
   virtual bool enabled() const PURE;
