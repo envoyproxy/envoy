@@ -764,6 +764,7 @@ public:
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {
+    // Upgrade filter chains not yet supported for upstream filters.
     return false;
   }
 

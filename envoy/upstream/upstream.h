@@ -717,6 +717,7 @@ class TypedLoadBalancerFactory;
 
 /**
  * Information about a given upstream cluster.
+ * This includes the information and interfaces for building an upstream filter chain.
  */
 class ClusterInfo : public Http::FilterChainFactory {
 public:

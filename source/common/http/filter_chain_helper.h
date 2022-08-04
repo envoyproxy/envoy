@@ -62,6 +62,11 @@ public:
   using FiltersList = Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
 
+  // Process the filters in this filter chain.
+  // For upstream filters, the codec filter is currently manually instantiated,
+  // so |validate_last_filter| is supplied to allow opting out of checks that
+  // the final filter in the chain is terminal.
+  // TODO(alyssawilk) sort this out before moving upstream filters out of alpha.
   void processFilters(const FiltersList& filters, const std::string& prefix,
                       const std::string& filter_chain_type, FilterFactoriesList& filter_factories,
                       bool validate_last_filter = true) {

@@ -990,6 +990,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*filter_config_provider_manager, server_factory_context_, server_factory_context_,
                prefix);
+    // TODO(alyssawilk) make sure we have easy to debug logs about what filters are set up.
     helper.processFilters(http_filters, "http", "http", http_filter_factories_, false);
   }
 }
