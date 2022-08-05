@@ -200,10 +200,10 @@ public:
                       const std::function<void(Http::ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override {
-    state_.decoder_filter_chain_aborted_ = true;
-    state_.encoder_filter_chain_aborted_ = true;
-    state_.remote_encode_complete_ = true;
-    state_.local_complete_ = true;
+    state().decoder_filter_chain_aborted_ = true;
+    state().encoder_filter_chain_aborted_ = true;
+    state().remote_encode_complete_ = true;
+    state().local_complete_ = true;
     upstream_request_.parent_.callbacks()->sendLocalReply(code, body, modify_headers, grpc_status,
                                                           details);
   }

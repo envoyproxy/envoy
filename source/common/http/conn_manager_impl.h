@@ -279,7 +279,6 @@ private:
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void setRoute(Router::RouteConstSharedPtr route) override;
     void clearRouteCache() override;
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
@@ -288,6 +287,7 @@ private:
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
 
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is

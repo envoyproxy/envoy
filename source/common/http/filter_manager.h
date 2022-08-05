@@ -806,6 +806,7 @@ public:
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
 
+  // TODO(alyssawilk) this should probably be an optref.
   const Network::Connection* connection() const { return connection_; }
 
   uint64_t streamId() const { return stream_id_; }
@@ -816,6 +817,52 @@ public:
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
   void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
+
+protected:
+  struct State {
+    State()
+        : remote_decode_complete_(false), remote_encode_complete_(false), local_complete_(false),
+          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
+          is_grpc_request_(false), non_100_response_headers_encoded_(false),
+          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
+          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
+    uint32_t filter_call_state_{0};
+
+    bool remote_decode_complete_ : 1;
+    bool remote_encode_complete_ : 1;
+    bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
+                              // A filter can still stop the stream from being complete as seen
+                              // by the codec.
+    // By default, we will assume there are no 1xx. If encode1xxHeaders
+    // is ever called, this is set to true so commonContinue resumes processing the 1xx.
+    bool has_1xx_headers_ : 1;
+    bool created_filter_chain_ : 1;
+    // These two are latched on initial header read, to determine if the original headers
+    // constituted a HEAD or gRPC request, respectively.
+    bool is_head_request_ : 1;
+    bool is_grpc_request_ : 1;
+    // Tracks if headers other than 100-Continue have been encoded to the codec.
+    bool non_100_response_headers_encoded_ : 1;
+    // True under the stack of onLocalReply, false otherwise.
+    bool under_on_local_reply_ : 1;
+    // True when the filter chain iteration was aborted with local reply.
+    bool decoder_filter_chain_aborted_ : 1;
+    bool encoder_filter_chain_aborted_ : 1;
+    bool saw_downstream_reset_ : 1;
+
+    // The following 3 members are booleans rather than part of the space-saving bitfield as they
+    // are passed as arguments to functions expecting bools. Extend State using the bitfield
+    // where possible.
+    bool encoder_filters_streaming_{true};
+    bool decoder_filters_streaming_{true};
+    bool destroyed_{false};
+
+    // Used to track which filter is the latest filter that has received data.
+    ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
+    ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
+  };
+
+  State& state() { return state_; }
 
 private:
   friend class DownstreamFilterManager;
@@ -970,50 +1017,6 @@ private:
     };
   // clang-format on
 
-  struct State {
-    State()
-        : remote_decode_complete_(false), remote_encode_complete_(false), local_complete_(false),
-          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
-          is_grpc_request_(false), non_100_response_headers_encoded_(false),
-          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
-          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
-    uint32_t filter_call_state_{0};
-
-    bool remote_decode_complete_ : 1;
-    bool remote_encode_complete_ : 1;
-    bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
-                              // A filter can still stop the stream from being complete as seen
-                              // by the codec.
-    // By default, we will assume there are no 1xx. If encode1xxHeaders
-    // is ever called, this is set to true so commonContinue resumes processing the 1xx.
-    bool has_1xx_headers_ : 1;
-    bool created_filter_chain_ : 1;
-    // These two are latched on initial header read, to determine if the original headers
-    // constituted a HEAD or gRPC request, respectively.
-    bool is_head_request_ : 1;
-    bool is_grpc_request_ : 1;
-    // Tracks if headers other than 100-Continue have been encoded to the codec.
-    bool non_100_response_headers_encoded_ : 1;
-    // True under the stack of onLocalReply, false otherwise.
-    bool under_on_local_reply_ : 1;
-    // True when the filter chain iteration was aborted with local reply.
-    bool decoder_filter_chain_aborted_ : 1;
-    bool encoder_filter_chain_aborted_ : 1;
-    bool saw_downstream_reset_ : 1;
-
-    // The following 3 members are booleans rather than part of the space-saving bitfield as they
-    // are passed as arguments to functions expecting bools. Extend State using the bitfield
-    // where possible.
-    bool encoder_filters_streaming_{true};
-    bool decoder_filters_streaming_{true};
-    bool destroyed_{false};
-
-    // Used to track which filter is the latest filter that has received data.
-    ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
-    ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
-  };
-
-protected:
   State state_;
 };
 
