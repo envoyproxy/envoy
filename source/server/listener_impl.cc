@@ -961,9 +961,16 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
 }
 
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
-  return *address() == *other.address() &&
-         Network::Utility::protobufAddressSocketType(config_.address()) ==
-             Network::Utility::protobufAddressSocketType(other.config_.address());
+  if (*address() == *other.address() &&
+      Network::Utility::protobufAddressSocketType(config_.address()) ==
+          Network::Utility::protobufAddressSocketType(other.config_.address())) {
+    if (address()->type() == Network::Address::Type::Ip &&
+        address()->ip()->version() == Network::Address::IpVersion::v6) {
+      return address()->ip()->ipv6()->v6only() == other.address()->ip()->ipv6()->v6only();
+    }
+    return true;
+  }
+  return false;
 }
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
