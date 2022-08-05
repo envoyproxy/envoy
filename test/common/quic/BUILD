@@ -342,7 +342,7 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
         "@com_github_google_quiche//:quic_test_tools_first_flight_lib",
-        "@com_github_google_quiche//:quic_test_tools_qpack_qpack_encoder_test_utils_lib",
+        "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
     ],
 )
 
