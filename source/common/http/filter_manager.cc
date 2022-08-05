@@ -314,6 +314,12 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
   route->traversePerFilterConfig(filter_context_.filter_name, cb);
 }
 
+Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOptions() {
+  // TODO(mattklein123): At some point we might want to actually wrap this interface but for now
+  // we give the filter direct access to the encoder options.
+  return parent_.filter_manager_callbacks_.http1StreamEncoderOptions();
+}
+
 bool ActiveStreamDecoderFilter::canContinue() {
   // It is possible for the connection manager to respond directly to a request even while
   // a filter is trying to continue. If a response has already happened, we should not
@@ -1556,12 +1562,6 @@ void ActiveStreamEncoderFilter::sendLocalReply(
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
-}
-
-Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOptions() {
-  // TODO(mattklein123): At some point we might want to actually wrap this interface but for now
-  // we give the filter direct access to the encoder options.
-  return parent_.filter_manager_callbacks_.http1StreamEncoderOptions();
 }
 
 void ActiveStreamEncoderFilter::responseDataTooLarge() {
