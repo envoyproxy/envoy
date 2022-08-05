@@ -32,8 +32,6 @@ namespace Upstream {
 
 namespace {
 
-using HttpHealthCheck = envoy::config::core::v3::HealthCheck::HttpHealthCheck;
-
 // Helper functions to get the correct hostname for an L7 health check.
 const std::string& getHostname(const HostSharedPtr& host, const std::string& config_hostname,
                                const ClusterInfoConstSharedPtr& cluster) {
