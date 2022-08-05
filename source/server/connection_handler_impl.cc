@@ -101,19 +101,16 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   // This map only store the new listener.
   if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
           details->typed_listener_)) {
+    auto& address = details->address_;
     bool is_override = false;
     uint64_t override_listener_tag = 0;
-    if (tcp_listener_map_by_address_.contains(
-            config.listenSocketFactory().localAddress()->asStringView())) {
-      is_override = true;
-      override_listener_tag =
-          tcp_listener_map_by_address_[config.listenSocketFactory().localAddress()->asStringView()]
-              ->listener_tag_;
-    }
-    tcp_listener_map_by_address_.insert_or_assign(
-        config.listenSocketFactory().localAddress()->asStringView(), details);
 
-    auto& address = details->address_;
+    if (tcp_listener_map_by_address_.contains(address->asStringView())) {
+      is_override = true;
+      override_listener_tag = tcp_listener_map_by_address_[address->asStringView()]->listener_tag_;
+    }
+
+    tcp_listener_map_by_address_.insert_or_assign(address->asStringView(), details);
 
     // If the address is Ipv6 and isn't v6only, parse out the ipv4 compatible address from the Ipv6
     // address and put an item to the map. Then this allows the `getBalancedHandlerByAddress`
