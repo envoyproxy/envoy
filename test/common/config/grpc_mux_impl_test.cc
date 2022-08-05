@@ -2,6 +2,7 @@
 
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/empty_string.h"
@@ -62,7 +63,7 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, stats_, rate_limit_settings_, true, std::move(config_validators_),
-        /*xds_resources_delegate=*/absl::nullopt_t, /*target_xds_authority=*/"");
+        /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/"");
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
@@ -71,7 +72,7 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, stats_, custom_rate_limit_settings, true, std::move(config_validators_),
-        /*xds_resources_delegate=*/absl::nullopt_t, /*target_xds_authority=*/"");
+        /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/"");
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -888,7 +889,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, stats_, rate_limit_settings_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
-          /*xds_resources_delegate=*/absl::nullopt_t, /*target_xds_authority=*/""),
+          /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/""),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -903,7 +904,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, stats_, rate_limit_settings_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
-          /*xds_resources_delegate=*/absl::nullopt_t, /*target_xds_authority=*/""),
+          /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/""),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");

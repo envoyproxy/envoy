@@ -153,6 +153,7 @@ envoy_cc_test(
     name = "grpc_mux_impl_test",
     srcs = ["grpc_mux_impl_test.cc"],
     deps = [
+        "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:api_version_lib",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
@@ -261,6 +262,7 @@ envoy_cc_test_library(
     hdrs = ["grpc_subscription_test_harness.h"],
     deps = [
         ":subscription_test_harness",
+        "//envoy/config:xds_resources_delegate_interface",
         "//source/common/common:hash_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:grpc_mux_lib",
@@ -347,6 +349,7 @@ envoy_cc_test(
     name = "subscription_factory_impl_test",
     srcs = ["subscription_factory_impl_test.cc"],
     deps = [
+        "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:xds_resource_lib",
         "//test/config:v2_link_hacks",
