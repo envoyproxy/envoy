@@ -84,6 +84,8 @@ public:
   Upstream::ResourcePriority priority() const override;
   const RateLimitPolicy& rateLimitPolicy() const override;
   const RetryPolicy& retryPolicy() const override;
+  const Router::PathMatchPolicy& pathMatchPolicy() const override;
+  const Router::PathRewritePolicy& pathRewritePolicy() const override;
   const InternalRedirectPolicy& internalRedirectPolicy() const override;
   uint32_t retryShadowBufferLimit() const override;
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override;

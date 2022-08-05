@@ -76,6 +76,14 @@ const RetryPolicy& DelegatingRouteEntry::retryPolicy() const {
   return base_route_->routeEntry()->retryPolicy();
 }
 
+const PathMatchPolicy& DelegatingRouteEntry::pathMatchPolicy() const {
+  return base_route_->routeEntry()->pathMatchPolicy();
+}
+
+const PathRewritePolicy& DelegatingRouteEntry::pathRewritePolicy() const {
+  return base_route_->routeEntry()->pathRewritePolicy();
+}
+
 const InternalRedirectPolicy& DelegatingRouteEntry::internalRedirectPolicy() const {
   return base_route_->routeEntry()->internalRedirectPolicy();
 }
