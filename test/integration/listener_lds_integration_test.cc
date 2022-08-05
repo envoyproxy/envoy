@@ -237,8 +237,7 @@ TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
         - filters:
           - name: http
             typed_config:
-              "@type":
-              type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
               codec_type: HTTP2
               stat_prefix: config_test
               route_config:
@@ -254,14 +253,12 @@ TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
                           cluster: cluster_0
                     typed_per_filter_config:
                       set-response-code:
-                        "@type":
-                        type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                        "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
                         code: 403
               http_filters:
                 - name: set-response-code
                   typed_config:
-                    "@type":
-                    type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                    "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
                     code: 402
           - name: envoy.filters.http.router
         )EOF");

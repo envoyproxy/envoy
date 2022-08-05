@@ -148,15 +148,15 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       } else if (is_override) {
         if (address->ip()->isAnyAddress()) {
           auto ipv4_any_address =
-              Network::Address::Ipv4Instance(address->ip()->port()).asStringView();
+              Network::Address::Ipv4Instance(address->ip()->port());
           ENVOY_LOG_MISC(
               error, "found any addres should be cleanup {}, tag = {}, override tag = {}",
-              tcp_listener_map_by_address_.contains(ipv4_any_address),
-              tcp_listener_map_by_address_[ipv4_any_address]->listener_tag_, override_listener_tag);
-          if (tcp_listener_map_by_address_.contains(ipv4_any_address) &&
-              tcp_listener_map_by_address_[ipv4_any_address]->listener_tag_ ==
+              tcp_listener_map_by_address_.contains(ipv4_any_address.asStringView()),
+              tcp_listener_map_by_address_[ipv4_any_address.asStringView()]->listener_tag_, override_listener_tag);
+          if (tcp_listener_map_by_address_.contains(ipv4_any_address.asStringView()) &&
+              tcp_listener_map_by_address_[ipv4_any_address.asStringView()]->listener_tag_ ==
                   override_listener_tag) {
-            tcp_listener_map_by_address_.erase(ipv4_any_address);
+            tcp_listener_map_by_address_.erase(ipv4_any_address.asStringView());
           }
         } else {
           auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
