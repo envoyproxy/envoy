@@ -16,7 +16,7 @@ static_resources:
               runtime: "envoy.wasm.runtime.v8"
               code:
                 local:
-                  filename: "/lib/envoy_filter_http_wasm_example.wasm"
+                  filename: "/etc/envoy_filter_http_wasm_example.wasm"
               allow_precompiled: true
       - name: envoy.filters.network.tcp_proxy
         typed_config:
