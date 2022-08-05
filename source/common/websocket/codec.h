@@ -9,17 +9,21 @@
 namespace Envoy {
 namespace WebSocket {
 
-// opcodes
-constexpr uint8_t FRAME_OPCODE_CONT = 0x0;
-constexpr uint8_t FRAME_OPCODE_TEXT = 0x1;
-constexpr uint8_t FRAME_OPCODE_BIN = 0x2;
-constexpr uint8_t FRAME_OPCODE_CLOSE = 0x8;
-constexpr uint8_t FRAME_OPCODE_PING = 0x9;
-constexpr uint8_t FRAME_OPCODE_PONG = 0xA;
+// Opcodes (https://datatracker.ietf.org/doc/html/rfc6455#section-11.8)
+constexpr uint8_t FRAME_OPCODE_CONTINUATION = 0;
+constexpr uint8_t FRAME_OPCODE_TEXT = 1;
+constexpr uint8_t FRAME_OPCODE_BINARY = 2;
+constexpr uint8_t FRAME_OPCODE_CLOSE = 8;
+constexpr uint8_t FRAME_OPCODE_PING = 9;
+constexpr uint8_t FRAME_OPCODE_PONG = 10;
+constexpr std::array<uint8_t, 6> FRAME_OPCODES = {FRAME_OPCODE_CONTINUATION, FRAME_OPCODE_TEXT,
+                                                  FRAME_OPCODE_BINARY,       FRAME_OPCODE_CLOSE,
+                                                  FRAME_OPCODE_PING,         FRAME_OPCODE_PONG};
 
+// Length of the masking key which is 4 bytes fixed size
 constexpr uint8_t MASKING_KEY_LENGTH = 4;
 
-// wire format (https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
+// Wire format (https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
 // of WebSocket frame:
 //
 //   0                   1                   2                   3
@@ -41,20 +45,23 @@ constexpr uint8_t MASKING_KEY_LENGTH = 4;
 //  | .... Payload Data continued .... Payload Data continued ..... |
 //  +---------------------------------------------------------------+
 
+// In-memory representation of the contents of a WebSocket frame.
 struct Frame {
+  // First byte of the WebSocket frame.
   // |F|R|R|R| opcode(4) |
   uint8_t flags_and_opcode_;
-  // |M|     length(7)   | max is 125, 126/127 indicates to use 16/64 bits as the length
+  // Indicator whether the frame payload is masked or not.
   bool is_masked_;
-  // 7 bits, 7+16 bits, or 7+64 bits (only 63 bits are used in the last case)
+  // Length of the payload as the number of bytes.
   uint64_t payload_length_;
-  // This field is present if the mask bit is set to 1 and
-  // is absent if the mask bit is set to 0
+  // This should be used when when is_masked_ is set to true to unmasked the payload
+  // as described in https://datatracker.ietf.org/doc/html/rfc6455#section-5.3
   uint32_t masking_key_;
-  // websocket payload data (extension data and application data)
+  // WebSocket payload data (extension data and application data).
   Buffer::InstancePtr payload_;
 };
 
+// Encoder encodes in memory WebSocket frames into frames in the wire format
 class Encoder {
 public:
   Encoder();
@@ -79,6 +86,7 @@ public:
                           uint32_t masking_key, Buffer::Instance& buffer);
 };
 
+// Current state of the frame that is being processed.
 enum class State {
   // Decoding the first byte. Waiting for decoding the final frame flag (1 bit)
   // and reserved flags (3 bits) and opcode (4 bits) of the WebSocket data frame.
@@ -96,8 +104,11 @@ enum class State {
   Payload,
 };
 
+// Inspects the number of frames contains in an input buffer without decoding into frames.
 class FrameInspector {
 public:
+  virtual ~FrameInspector() = default;
+
   // Inspects the given buffer with WebSocket data frames and updates the frame count.
   // Invokes visitor callbacks for each frame in the following sequence:
   // ----------------------------------------------------------------------------------
@@ -109,12 +120,10 @@ public:
 
   // Returns the current frame count, corresponding to the request/response
   // message count. Counter is incremented on a frame start.
-  uint64_t frameCount() const { return count_; }
+  uint64_t frameCount() const { return total_frames_count_; }
 
   // Returns the current state in the frame parsing.
   State state() const { return state_; }
-
-  virtual ~FrameInspector() = default;
 
 protected:
   virtual bool frameStart(uint8_t) { return true; }
@@ -124,17 +133,20 @@ protected:
   }
   virtual void frameMaskingKey() {}
   virtual void frameDataStart() {}
-  virtual void frameData(uint8_t*, uint64_t) {}
+  virtual void frameData(const uint8_t*, uint64_t) {}
   virtual void frameDataEnd() {}
 
-  State state_{State::FhFlagsAndOpcode};
-  uint64_t length_{0};
-  uint8_t length_of_extended_length_{0};
-  uint32_t masking_key_{0};
-  uint8_t masking_key_length_{0};
-  uint64_t count_{0};
+  State state_ = State::FhFlagsAndOpcode;
+  uint32_t masking_key_ = 0;
+  uint64_t length_ = 0;
+  uint8_t masking_key_length_ = 0;
+
+private:
+  uint8_t length_of_extended_length_ = 0;
+  uint64_t total_frames_count_ = 0;
 };
 
+// Decoder decodes bytes in input buffer into in-memory WebSocket frames.
 class Decoder : public FrameInspector {
 public:
   // Decodes the given buffer with WebSocket frame. Drains the input buffer when
@@ -161,18 +173,15 @@ protected:
   void frameMaskFlag(uint8_t) override;
   void frameMaskingKey() override;
   void frameDataStart() override;
-  void frameData(uint8_t*, uint64_t) override;
+  void frameData(const uint8_t*, uint64_t) override;
   void frameDataEnd() override;
 
 private:
-  // Current frame that is being decoded
+  // Current frame that is being decoded.
   Frame frame_;
-  // Data holder for successfully decoded frames
-  std::vector<Frame>* output_{nullptr};
-  bool decoding_error_{false};
-  std::array<uint8_t, 6> frame_opcodes_ = {FRAME_OPCODE_CONT, FRAME_OPCODE_TEXT,
-                                           FRAME_OPCODE_BIN,  FRAME_OPCODE_CLOSE,
-                                           FRAME_OPCODE_PING, FRAME_OPCODE_PONG};
+  // Data holder for successfully decoded frames.
+  std::vector<Frame>* output_ = nullptr;
+  bool decoding_error_ = false;
 };
 
 } // namespace WebSocket

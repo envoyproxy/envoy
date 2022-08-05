@@ -16,5 +16,6 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:scalar_to_byte_vector_lib",
     ],
 )

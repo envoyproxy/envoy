@@ -7,8 +7,7 @@
 #include <vector>
 
 #include "source/common/buffer/buffer_impl.h"
-
-#include "absl/container/fixed_array.h"
+#include "source/common/common/scalar_to_byte_vector.h"
 
 namespace Envoy {
 namespace WebSocket {
@@ -18,34 +17,38 @@ Encoder::Encoder() = default;
 void Encoder::newFrameHeader(uint8_t flags_and_opcode, uint64_t length, bool is_masked,
                              uint32_t masking_key, std::vector<uint8_t>& output) {
   // Set flags and opcode
-  output.push_back(flags_and_opcode);
+  pushScalarToByteVector(flags_and_opcode, output);
+
   // Set payload length
   if (length <= 125) {
-    output.push_back(is_masked ? static_cast<uint8_t>(length) | 0x80
-                               : static_cast<uint8_t>(length));
+    // Set mask bit and 7-bit length
+    pushScalarToByteVector(
+        is_masked ? static_cast<uint8_t>(length | 0x80) : static_cast<uint8_t>(length), output);
   } else if (length <= 65535) {
-    output.push_back(is_masked ? 0xfe : 0x7e);
+    // Set mask bit and 16-bit length indicator
+    pushScalarToByteVector(static_cast<uint8_t>(is_masked ? 0xfe : 0x7e), output);
     // Set 16-bit length
-    output.push_back((length >> 8) & 0xff);
-    output.push_back(length & 0xff);
+    pushScalarToByteVector(static_cast<uint8_t>((length >> 8) & 0xff), output);
+    pushScalarToByteVector(static_cast<uint8_t>(length & 0xff), output);
   } else {
-    output.push_back(is_masked ? 0xff : 0x7f);
+    // Set mask bit and 64-bit length indicator
+    pushScalarToByteVector(static_cast<uint8_t>(is_masked ? 0xff : 0x7f), output);
     // Set 64-bit length
-    output.push_back((length >> 56) & 0xff);
-    output.push_back((length >> 48) & 0xff);
-    output.push_back((length >> 40) & 0xff);
-    output.push_back((length >> 32) & 0xff);
-    output.push_back((length >> 24) & 0xff);
-    output.push_back((length >> 16) & 0xff);
-    output.push_back((length >> 8) & 0xff);
-    output.push_back(length & 0xff);
+    pushScalarToByteVector(static_cast<uint8_t>(length >> 56), output);
+    pushScalarToByteVector(static_cast<uint8_t>(length >> 48), output);
+    pushScalarToByteVector(static_cast<uint8_t>(length >> 40), output);
+    pushScalarToByteVector(static_cast<uint8_t>(length >> 32), output);
+    pushScalarToByteVector(static_cast<uint8_t>(length >> 24), output);
+    pushScalarToByteVector(static_cast<uint8_t>(length >> 16), output);
+    pushScalarToByteVector(static_cast<uint8_t>(length >> 8), output);
+    pushScalarToByteVector(static_cast<uint8_t>(length), output);
   }
   // Set masking key
   if (is_masked) {
-    output.push_back((masking_key >> 24) & 0xff);
-    output.push_back((masking_key >> 16) & 0xff);
-    output.push_back((masking_key >> 8) & 0xff);
-    output.push_back(masking_key & 0xff);
+    pushScalarToByteVector(static_cast<uint8_t>(masking_key >> 24), output);
+    pushScalarToByteVector(static_cast<uint8_t>(masking_key >> 16), output);
+    pushScalarToByteVector(static_cast<uint8_t>(masking_key >> 8), output);
+    pushScalarToByteVector(static_cast<uint8_t>(masking_key), output);
   }
 }
 
@@ -64,7 +67,7 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
 bool Decoder::frameStart(uint8_t flags_and_opcode) {
   // Validate opcode (last 4 bits)
   uint8_t opcode = flags_and_opcode & 0x0f;
-  if (std::find(frame_opcodes_.begin(), frame_opcodes_.end(), opcode) != frame_opcodes_.end()) {
+  if (std::find(FRAME_OPCODES.begin(), FRAME_OPCODES.end(), opcode) != FRAME_OPCODES.end()) {
     frame_.flags_and_opcode_ = flags_and_opcode;
     return true;
   }
@@ -92,7 +95,7 @@ void Decoder::frameDataStart() {
   frame_.payload_ = std::make_unique<Buffer::OwnedImpl>();
 }
 
-void Decoder::frameData(uint8_t* mem, uint64_t length) { frame_.payload_->add(mem, length); }
+void Decoder::frameData(const uint8_t* mem, uint64_t length) { frame_.payload_->add(mem, length); }
 
 void Decoder::frameDataEnd() {
   output_->push_back(std::move(frame_));
@@ -104,18 +107,18 @@ void Decoder::frameDataEnd() {
 }
 
 uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
-  uint64_t delta = 0;
+  uint64_t frames_count_ = 0;
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
-    uint8_t* mem = reinterpret_cast<uint8_t*>(slice.mem_);
+    const uint8_t* mem = reinterpret_cast<uint8_t*>(slice.mem_);
     for (uint64_t j = 0; j < slice.len_;) {
       uint8_t c = *mem;
       switch (state_) {
       case State::FhFlagsAndOpcode:
         if (!frameStart(c)) {
-          return delta;
+          return frames_count_;
         }
-        count_ += 1;
-        delta += 1;
+        total_frames_count_ += 1;
+        frames_count_ += 1;
         state_ = State::FhMaskFlagAndLength;
         mem++;
         j++;
@@ -208,7 +211,7 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
       }
     }
   }
-  return delta;
+  return frames_count_;
 }
 
 } // namespace WebSocket
