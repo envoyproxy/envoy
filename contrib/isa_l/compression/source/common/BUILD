@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_contrib_extension",
     "envoy_cc_library",
     "envoy_contrib_package",
 )
@@ -14,7 +13,7 @@ envoy_cc_library(
     srcs = ["base.cc"],
     hdrs = ["base.h"],
     deps = [
+        "//bazel/foreign_cc:isa_l",
         "//source/common/buffer:buffer_lib",
-        "@envoy//bazel/foreign_cc:isa_l",
     ],
 )

@@ -3,7 +3,6 @@
 #include "envoy/compression/compressor/compressor.h"
 
 #include "contrib/isa_l/compression/source/common/base.h"
-
 #include "isa-l.h"
 
 namespace Envoy {
@@ -31,7 +30,7 @@ public:
     Standard = 2,
   };
 
-  void init(CompressionLevel level, int64_t window_bits);
+  void init(CompressionLevel level, int64_t window_bits, int64_t memory_level);
 
   // Compression::Compressor::Compressor
   void compress(Buffer::Instance& buffer, Envoy::Compression::Compressor::State state) override;

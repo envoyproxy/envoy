@@ -189,19 +189,19 @@ cc_library(
 
 configure_make(
     name = "libnasm",
+    autogen = True,
+    configure_in_place = True,
     configure_options = ["CFLAGS='-Dredacted=\"redacted\"'"],
     lib_source = "@com_github_netwide_assembler_nasm//:all",
     out_binaries = ["nasm"],
-    configure_in_place = True,
-    autogen = True,
 )
 
 configure_make(
     name = "isa_l",
+    autogen = True,
+    configure_in_place = True,
     lib_source = "@com_github_intel_isa_l//:all",
     out_static_libs = ["libisal.a"],
-    configure_in_place = True,
-    autogen = True,
     deps = [":libnasm"],
 )
 

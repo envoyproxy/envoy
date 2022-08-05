@@ -7,6 +7,10 @@ namespace Igzip {
 namespace Compressor {
 
 namespace {
+
+// Default memory level.
+const uint64_t DefaultMemoryLevel = 5;
+
 // Default compression window size.
 const uint64_t DefaultWindowBits = 15;
 
@@ -17,12 +21,12 @@ const uint32_t DefaultChunkSize = 4096;
 IgzipCompressorFactory::IgzipCompressorFactory(
     const envoy::extensions::compression::compressor::igzip::v3alpha::Igzip& igzip)
     : compression_level_(compressionLevelEnum(igzip.compression_level())),
-      // memory_level_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(gzip, memory_level, DefaultMemoryLevel)),
+      memory_level_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(igzip, memory_level, DefaultMemoryLevel)),
       window_bits_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(igzip, window_bits, DefaultWindowBits)),
       chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(igzip, chunk_size, DefaultChunkSize)) {}
 
 IgzipCompressorImpl::CompressionLevel IgzipCompressorFactory::compressionLevelEnum(
-   envoy::extensions::compression::compressor::igzip::v3alpha::Igzip::CompressionLevel
+    envoy::extensions::compression::compressor::igzip::v3alpha::Igzip::CompressionLevel
         compression_level) {
   switch (compression_level) {
   case envoy::extensions::compression::compressor::igzip::v3alpha::Igzip::COMPRESSION_LEVEL_1:
@@ -38,7 +42,7 @@ IgzipCompressorImpl::CompressionLevel IgzipCompressorFactory::compressionLevelEn
 
 Envoy::Compression::Compressor::CompressorPtr IgzipCompressorFactory::createCompressor() {
   auto compressor = std::make_unique<IgzipCompressorImpl>(chunk_size_);
-  compressor->init(compression_level_, window_bits_);
+  compressor->init(compression_level_, window_bits_, memory_level_);
   return compressor;
 }
 

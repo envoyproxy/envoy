@@ -1,11 +1,11 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/hex.h"
-#include "contrib/isa_l/compression/source/compressor/config.h"
-#include "contrib/isa_l/compression/source/compressor/igzip_compressor_impl.h"
 
 #include "test/test_common/utility.h"
 
 #include "absl/container/fixed_array.h"
+#include "contrib/isa_l/compression/source/compressor/config.h"
+#include "contrib/isa_l/compression/source/compressor/igzip_compressor_impl.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -80,7 +80,7 @@ public:
 class IgzipCompressorImplTest : public testing::Test {
 protected:
   static constexpr int64_t igzip_window_bits{31};
-  // static constexpr int64_t memory_level{8};
+  static constexpr int64_t memory_level{5};
   static constexpr uint64_t default_input_size{796};
 };
 
@@ -94,23 +94,23 @@ protected:
   }
 };
 
-class IgzipCompressorImplFactoryTest
-    : public ::testing::TestWithParam<std::string> {};
+class IgzipCompressorImplFactoryTest : public ::testing::TestWithParam<std::string> {};
 
-INSTANTIATE_TEST_SUITE_P(
-    CreateCompressorTests, IgzipCompressorImplFactoryTest,
-    ::testing::Values("COMPRESSION_LEVEL_1", "COMPRESSION_LEVEL_2","COMPRESSION_LEVEL_3"));
+INSTANTIATE_TEST_SUITE_P(CreateCompressorTests, IgzipCompressorImplFactoryTest,
+                         ::testing::Values("COMPRESSION_LEVEL_1", "COMPRESSION_LEVEL_2",
+                                           "COMPRESSION_LEVEL_3"));
 
 TEST_P(IgzipCompressorImplFactoryTest, CreateCompressorTest) {
   Buffer::OwnedImpl buffer;
   envoy::extensions::compression::compressor::igzip::v3alpha::Igzip igzip;
   absl::string_view compression_level = GetParam();
 
-  std::string  json{fmt::format(R"EOF({{
+  std::string json{fmt::format(R"EOF({{
       "compression_level": "{}",
+      "memory_level": 5,
       "chunk_size": 4096
     }})EOF",
-          compression_level)};
+                               compression_level)};
   TestUtility::loadFromJson(json, igzip);
   Envoy::Compression::Compressor::CompressorPtr compressor =
       IgzipCompressorFactory(igzip).createCompressor();
@@ -134,7 +134,7 @@ TEST_F(IgzipCompressorImplTest, CallingChecksum) {
   IgzipCompressorImplTester compressor;
   EXPECT_EQ(0, compressor.checksum());
 
-  compressor.init(IgzipCompressorImpl::CompressionLevel::Standard,igzip_window_bits);
+  compressor.init(IgzipCompressorImpl::CompressionLevel::Standard, igzip_window_bits, memory_level);
   EXPECT_EQ(0, compressor.checksum());
 
   TestUtility::feedBufferWithRandomCharacters(buffer, 4096);
@@ -150,7 +150,7 @@ TEST_F(IgzipCompressorImplTest, CallingFinishOnly) {
   Buffer::OwnedImpl buffer;
 
   IgzipCompressorImplTester compressor;
-  compressor.init(IgzipCompressorImpl::CompressionLevel::Standard,igzip_window_bits);
+  compressor.init(IgzipCompressorImpl::CompressionLevel::Standard, igzip_window_bits, memory_level);
   EXPECT_EQ(0, compressor.checksum());
 
   TestUtility::feedBufferWithRandomCharacters(buffer, 4096);
@@ -163,7 +163,7 @@ TEST_F(IgzipCompressorImplTest, CompressWithSmallChunkSize) {
   Buffer::OwnedImpl accumulation_buffer;
 
   IgzipCompressorImplTester compressor(8);
-  compressor.init(IgzipCompressorImpl::CompressionLevel::Standard,igzip_window_bits);
+  compressor.init(IgzipCompressorImpl::CompressionLevel::Standard, igzip_window_bits, memory_level);
 
   uint64_t input_size = 0;
   for (uint64_t i = 0; i < 10; i++) {
@@ -188,7 +188,7 @@ TEST_F(IgzipCompressorImplTest, CompressWithNotCommonParams) {
   Buffer::OwnedImpl accumulation_buffer;
 
   IgzipCompressorImplTester compressor;
-  compressor.init(IgzipCompressorImpl::CompressionLevel::Speed, igzip_window_bits);
+  compressor.init(IgzipCompressorImpl::CompressionLevel::Speed, igzip_window_bits, 1);
 
   uint64_t input_size = 0;
   for (uint64_t i = 0; i < 10; i++) {

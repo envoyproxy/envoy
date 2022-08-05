@@ -1,11 +1,12 @@
 #pragma once
 
 #include "envoy/compression/compressor/factory.h"
-#include "contrib/envoy/extensions/compression/compressor/igzip/v3alpha/igzip.pb.h"
-#include "contrib/envoy/extensions/compression/compressor/igzip/v3alpha/igzip.pb.validate.h"
 
 #include "source/common/http/headers.h"
 #include "source/extensions/compression/common/compressor/factory_base.h"
+
+#include "contrib/envoy/extensions/compression/compressor/igzip/v3alpha/igzip.pb.h"
+#include "contrib/envoy/extensions/compression/compressor/igzip/v3alpha/igzip.pb.validate.h"
 #include "contrib/isa_l/compression/source/compressor/igzip_compressor_impl.h"
 
 namespace Envoy {
@@ -25,7 +26,8 @@ const std::string& igzipExtensionName() {
 
 class IgzipCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
-  IgzipCompressorFactory(const envoy::extensions::compression::compressor::igzip::v3alpha::Igzip& igzip);
+  IgzipCompressorFactory(
+      const envoy::extensions::compression::compressor::igzip::v3alpha::Igzip& igzip);
 
   // Envoy::Compression::Compressor::CompressorFactory
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override;
@@ -35,12 +37,12 @@ public:
   }
 
 private:
-  static IgzipCompressorImpl::CompressionLevel
-  compressionLevelEnum(envoy::extensions::compression::compressor::igzip::v3alpha::Igzip::CompressionLevel
-                           compression_level);
+  static IgzipCompressorImpl::CompressionLevel compressionLevelEnum(
+      envoy::extensions::compression::compressor::igzip::v3alpha::Igzip::CompressionLevel
+          compression_level);
 
   IgzipCompressorImpl::CompressionLevel compression_level_;
-  // const int32_t memory_level_;
+  const int32_t memory_level_;
   const int32_t window_bits_;
   const uint32_t chunk_size_;
 };
