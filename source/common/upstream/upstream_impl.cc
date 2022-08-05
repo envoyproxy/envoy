@@ -51,6 +51,7 @@
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/logical_dns_cluster.h"
 #include "source/common/upstream/original_dst_cluster.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -976,6 +977,21 @@ ClusterInfoImpl::ClusterInfoImpl(
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(std::move(callback));
+  }
+
+  if (http_protocol_options_ && !http_protocol_options_->http_filters_.empty()) {
+    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
+        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+            upstream_context_.getServerFactoryContext());
+    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
+
+    std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
+    Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
+                            Server::Configuration::UpstreamHttpFilterConfigFactory>
+        helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
+               upstream_context_, prefix);
+    // TODO(alyssawilk) make sure we have easy to debug logs about what filters are set up.
+    helper.processFilters(http_filters, "http", "http", http_filter_factories_, false);
   }
 }
 
