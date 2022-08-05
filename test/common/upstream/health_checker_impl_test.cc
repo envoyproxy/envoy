@@ -475,7 +475,26 @@ public:
     addCompletionCallback();
   }
 
-  void setupServiceValidationWithStringMatcherHC(const std::string& expected_response) {
+  void setupServiceValidationWithUtf8StringMatcherHC(const std::string& expected_response) {
+    std::string yaml = fmt::format(R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      receive:
+        text: {0}
+        utf8: true
+    )EOF",
+                                   expected_response);
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
+  void setupServiceValidationWithHexStringMatcherHC(const std::string& expected_response) {
     std::string yaml = fmt::format(R"EOF(
     timeout: 1s
     interval: 1s
@@ -1141,7 +1160,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheck) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseStringContainsCheck) {
-  setupServiceValidationWithStringMatcherHC("Everything OK");
+  setupServiceValidationWithUtf8StringMatcherHC("Everything OK");
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1159,6 +1178,29 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseStringContainsCheck) {
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respondBody(0, "200", {"Test Everything OK"});
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseHexStringContainsCheck) {
+  // Set the expected response to "OK".
+  setupServiceValidationWithHexStringMatcherHC("4F4B");
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondBody(0, "200", {"Test OK"});
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
@@ -3748,14 +3790,13 @@ TEST(HttpStatusChecker, InvalidRetriableRange) {
                             "start=200 and end=200");
 }
 
-TEST(TcpHealthCheckMatcher, loadJsonBytes) {
+TEST(PayloadMatcher, loadJsonBytes) {
   {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("39000000");
     repeated_payload.Add()->set_text("EEEEEEEE");
 
-    TcpHealthCheckMatcher::MatchSegments segments =
-        TcpHealthCheckMatcher::loadProtoBytes(repeated_payload);
+    PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
     EXPECT_EQ(2U, segments.size());
   }
 
@@ -3763,14 +3804,14 @@ TEST(TcpHealthCheckMatcher, loadJsonBytes) {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("4");
 
-    EXPECT_THROW(TcpHealthCheckMatcher::loadProtoBytes(repeated_payload), EnvoyException);
+    EXPECT_THROW(PayloadMatcher::loadProtoBytes(repeated_payload), EnvoyException);
   }
 
   {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("gg");
 
-    EXPECT_THROW(TcpHealthCheckMatcher::loadProtoBytes(repeated_payload), EnvoyException);
+    EXPECT_THROW(PayloadMatcher::loadProtoBytes(repeated_payload), EnvoyException);
   }
 }
 
@@ -3778,33 +3819,61 @@ static void addUint8(Buffer::Instance& buffer, uint8_t addend) {
   buffer.add(&addend, sizeof(addend));
 }
 
-TEST(TcpHealthCheckMatcher, match) {
+TEST(PayloadMatcher, matchHexText) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
   repeated_payload.Add()->set_text("01");
   repeated_payload.Add()->set_text("02");
 
-  TcpHealthCheckMatcher::MatchSegments segments =
-      TcpHealthCheckMatcher::loadProtoBytes(repeated_payload);
+  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
 
   Buffer::OwnedImpl buffer;
-  EXPECT_FALSE(TcpHealthCheckMatcher::match(segments, buffer));
+  EXPECT_FALSE(PayloadMatcher::match(segments, buffer));
   addUint8(buffer, 1);
-  EXPECT_FALSE(TcpHealthCheckMatcher::match(segments, buffer));
+  EXPECT_FALSE(PayloadMatcher::match(segments, buffer));
   addUint8(buffer, 2);
-  EXPECT_TRUE(TcpHealthCheckMatcher::match(segments, buffer));
+  EXPECT_TRUE(PayloadMatcher::match(segments, buffer));
 
   buffer.drain(2);
   addUint8(buffer, 1);
   addUint8(buffer, 3);
   addUint8(buffer, 2);
-  EXPECT_TRUE(TcpHealthCheckMatcher::match(segments, buffer));
+  EXPECT_TRUE(PayloadMatcher::match(segments, buffer));
 
   buffer.drain(3);
   addUint8(buffer, 0);
   addUint8(buffer, 3);
   addUint8(buffer, 1);
   addUint8(buffer, 2);
-  EXPECT_TRUE(TcpHealthCheckMatcher::match(segments, buffer));
+  EXPECT_TRUE(PayloadMatcher::match(segments, buffer));
+}
+
+TEST(PayloadMatcher, matchUtf8Text) {
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
+  envoy::config::core::v3::HealthCheck_Payload* payload = repeated_payload.Add();
+  payload->set_text("01"), payload->set_utf8(true);
+
+  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
+
+  Buffer::OwnedImpl buffer("0");
+  EXPECT_FALSE(PayloadMatcher::match(segments, buffer));
+  addUint8(buffer, 0x31);
+  EXPECT_TRUE(PayloadMatcher::match(segments, buffer));
+  addUint8(buffer, 0x32);
+  EXPECT_TRUE(PayloadMatcher::match(segments, buffer));
+}
+
+TEST(PayloadMatcher, matchBinary) {
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
+  repeated_payload.Add()->set_binary(std::string({0x01, 0x02}));
+
+  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_FALSE(PayloadMatcher::match(segments, buffer));
+  addUint8(buffer, 0x01);
+  EXPECT_FALSE(PayloadMatcher::match(segments, buffer));
+  addUint8(buffer, 0x02);
+  EXPECT_TRUE(PayloadMatcher::match(segments, buffer));
 }
 
 class TcpHealthCheckerImplTest : public testing::Test,

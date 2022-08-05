@@ -137,6 +137,44 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+PayloadMatcher::MatchSegments PayloadMatcher::loadProtoBytes(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array) {
+  MatchSegments result;
+
+  for (const auto& entry : byte_array) {
+    std::vector<uint8_t> decoded;
+    if (entry.has_text()) {
+      if (entry.utf8()) {
+        decoded.assign(entry.text().begin(), entry.text().end());
+      } else {
+        decoded = Hex::decode(entry.text());
+        if (decoded.empty()) {
+          throw EnvoyException(fmt::format("invalid hex string '{}'", entry.text()));
+        }
+      }
+    } else {
+      decoded.assign(entry.binary().begin(), entry.binary().end());
+    }
+    result.push_back(decoded);
+  }
+
+  return result;
+}
+
+bool PayloadMatcher::match(const MatchSegments& expected, const Buffer::Instance& buffer) {
+  uint64_t start_index = 0;
+  for (const std::vector<uint8_t>& segment : expected) {
+    ssize_t search_result = buffer.search(segment.data(), segment.size(), start_index);
+    if (search_result == -1) {
+      return false;
+    }
+
+    start_index = search_result + segment.size();
+  }
+
+  return true;
+}
+
 HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              const envoy::config::core::v3::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
@@ -145,6 +183,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
+      receive_bytes_(PayloadMatcher::loadProtoBytes(config.http_health_check().receive())),
       method_(getMethod(config.http_health_check().method())),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
@@ -158,16 +197,16 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }
 
-  if (config.http_health_check().has_receive()) {
-    expected_response_ = config.http_health_check().receive().has_text()
-                             ? config.http_health_check().receive().text()
-                             : config.http_health_check().receive().binary();
-  }
-
-  if (!expected_response_.empty() && expected_response_.length() > kMaxBytesInBuffer) {
-    throw EnvoyException(fmt::format(
-        "The expected response length '{}' is over than http health response buffer size '{}'",
-        expected_response_.length(), kMaxBytesInBuffer));
+  if (!receive_bytes_.empty()) {
+    int total = 0;
+    for (auto const& bytes : receive_bytes_) {
+      total += bytes.size();
+    }
+    if (total > kMaxBytesInBuffer) {
+      throw EnvoyException(fmt::format(
+          "The expected response length '{}' is over than http health response buffer size '{}'",
+          total, kMaxBytesInBuffer));
+    }
   }
 }
 
@@ -283,7 +322,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeData(Buffer::Instance& data,
                                                                      bool end_stream) {
-  if (!parent_.expected_response_.empty() && response_body_->length() < kMaxBytesInBuffer) {
+  if (!parent_.receive_bytes_.empty() && response_body_->length() < kMaxBytesInBuffer) {
     response_body_->move(data, kMaxBytesInBuffer - response_body_->length());
   }
   if (end_stream) {
@@ -386,21 +425,16 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response_code={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (!parent_.expected_response_.empty()) {
+  if (!parent_.receive_bytes_.empty()) {
     // If the expected response is set, check the first 1024 bytes of actual response if contains
     // the expected response.
-    absl::string_view response_data = absl::string_view(
-        static_cast<const char*>(response_body_->linearize(response_body_->length())),
-        response_body_->length());
-    ENVOY_CONN_LOG(debug, "hc http response check response_body={}, expected response={}.",
-                   *client_, response_data, parent_.expected_response_);
-
-    if (!absl::StrContains(response_data, parent_.expected_response_)) {
+    if (!PayloadMatcher::match(parent_.receive_bytes_, *response_body_)) {
       if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
         host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
       }
       return HealthCheckResult::Failed;
     }
+    ENVOY_CONN_LOG(debug, "hc http response body healthcheck passed", *client_);
   }
 
   if (!parent_.http_status_checker_.inExpectedRanges(response_code)) {
@@ -514,35 +548,6 @@ ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionDat
                                    transportSocketOptions());
 }
 
-TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array) {
-  MatchSegments result;
-
-  for (const auto& entry : byte_array) {
-    const auto decoded = Hex::decode(entry.text());
-    if (decoded.empty()) {
-      throw EnvoyException(fmt::format("invalid hex string '{}'", entry.text()));
-    }
-    result.push_back(decoded);
-  }
-
-  return result;
-}
-
-bool TcpHealthCheckMatcher::match(const MatchSegments& expected, const Buffer::Instance& buffer) {
-  uint64_t start_index = 0;
-  for (const std::vector<uint8_t>& segment : expected) {
-    ssize_t search_result = buffer.search(segment.data(), segment.size(), start_index);
-    if (search_result == -1) {
-      return false;
-    }
-
-    start_index = search_result + segment.size();
-  }
-
-  return true;
-}
-
 TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
                                            const envoy::config::core::v3::HealthCheck& config,
                                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
@@ -554,9 +559,9 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
         if (!config.tcp_health_check().send().text().empty()) {
           send_repeated.Add()->CopyFrom(config.tcp_health_check().send());
         }
-        return TcpHealthCheckMatcher::loadProtoBytes(send_repeated);
+        return PayloadMatcher::loadProtoBytes(send_repeated);
       }()),
-      receive_bytes_(TcpHealthCheckMatcher::loadProtoBytes(config.tcp_health_check().receive())) {}
+      receive_bytes_(PayloadMatcher::loadProtoBytes(config.tcp_health_check().receive())) {}
 
 TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);
@@ -574,7 +579,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
   // TODO(lilika): The TCP health checker does generic pattern matching so we can't differentiate
   // between wrong data and not enough data. We could likely do better here and figure out cases in
   // which a match is not possible but that is not done now.
-  if (TcpHealthCheckMatcher::match(parent_.receive_bytes_, data)) {
+  if (PayloadMatcher::match(parent_.receive_bytes_, data)) {
     ENVOY_CONN_LOG(trace, "healthcheck passed", *client_);
     data.drain(data.length());
     handleSuccess(false);
