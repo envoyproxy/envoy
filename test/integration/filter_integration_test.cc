@@ -1186,5 +1186,20 @@ TEST_P(FilterIntegrationTest, OverflowDecoderBufferFromDecodeTrailers) {
   EXPECT_EQ("413", response->headers().getStatusValue());
 }
 
+// Verify filters can reset the stream
+TEST_P(FilterIntegrationTest, ResetFilter) {
+  // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
+  prependFilter(R"EOF(
+  name: reset-stream-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+}
+
 } // namespace
 } // namespace Envoy

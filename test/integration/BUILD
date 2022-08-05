@@ -569,6 +569,7 @@ envoy_cc_test(
         "//test/integration/filters:local_reply_with_metadata_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:remove_response_headers_lib",
+        "//test/integration/filters:reset_stream_filter_config_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/integration/filters:stop_iteration_headers_inject_body",
         "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
