@@ -54,6 +54,7 @@ void IgzipCompressorImpl::init(CompressionLevel comp_level,
 
 void IgzipCompressorImpl::compress(Buffer::Instance& buffer,
                                   Envoy::Compression::Compressor::State state) {
+  ASSERT(initialized_);
   for (const Buffer::RawSlice& input_slice : buffer.getRawSlices()) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<uint8_t*>(input_slice.mem_);
