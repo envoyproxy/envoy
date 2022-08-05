@@ -105,14 +105,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     bool is_override = false;
     uint64_t override_listener_tag = 0;
 
-    ENVOY_LOG_MISC(error, "add listener with tag {} on address {}", config.listenerTag(),
-                   address->asStringView());
     if (tcp_listener_map_by_address_.contains(address->asStringView())) {
       is_override = true;
       override_listener_tag = tcp_listener_map_by_address_[address->asStringView()]->listener_tag_;
-      ENVOY_LOG_MISC(error,
-                     "the listener with tag {} override the listener with tag = {} for address {}",
-                     config.listenerTag(), override_listener_tag, address->asStringView());
     }
 
     tcp_listener_map_by_address_.insert_or_assign(address->asStringView(), details);
@@ -149,11 +144,6 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       } else if (is_override) {
         if (address->ip()->isAnyAddress()) {
           auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port());
-          ENVOY_LOG_MISC(
-              error, "found any addres should be cleanup {}, tag = {}, override tag = {}",
-              tcp_listener_map_by_address_.contains(ipv4_any_address.asStringView()),
-              tcp_listener_map_by_address_[ipv4_any_address.asStringView()]->listener_tag_,
-              override_listener_tag);
           if (tcp_listener_map_by_address_.contains(ipv4_any_address.asStringView()) &&
               tcp_listener_map_by_address_[ipv4_any_address.asStringView()]->listener_tag_ ==
                   override_listener_tag) {
