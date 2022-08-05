@@ -749,13 +749,19 @@ envoy.matching.matchers.ip:
 envoy.path.match.pattern_template.pattern_template_match_predicate:
     categories:
     - envoy.path.match
-    security_posture: robust_to_untrusted_downstream_and_upstream
+    security_posture: unknown
     status: stable
+    undocumented: true
+    type_urls:
+    - envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
 envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate:
       categories:
       - envoy.path.rewrite
-      security_posture: robust_to_untrusted_downstream_and_upstream
+      security_posture: unknown
       status: stable
+      undocumented: true
+      type_urls:
+      - envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
