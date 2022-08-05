@@ -7,6 +7,8 @@
 #include "gtest/gtest.h"
 #include "test/test_common/test_runtime.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
@@ -48,10 +50,11 @@ TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
   config.set_max_heap_size_bytes(1000);
   auto stats_reader = std::make_unique<MockMemoryStatsReader>();
-  EXPECT_CALL(*stats_reader, reservedHeapBytes()).WillOnce(testing::Return(800));
-  EXPECT_CALL(*stats_reader, unmappedHeapBytes()).WillOnce(testing::Return(100));
-  EXPECT_CALL(*stats_reader, freeMappedHeapBytes()).WillOnce(testing::Return(200));
-  std::unique_ptr<FixedHeapMonitor> monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
+  EXPECT_CALL(*stats_reader, reservedHeapBytes()).WillOnce(Return(800));
+  EXPECT_CALL(*stats_reader, unmappedHeapBytes()).WillOnce(Return(100));
+  EXPECT_CALL(*stats_reader, freeMappedHeapBytes()).WillOnce(Return(200));
+  //std::unique_ptr<FixedHeapMonitor> monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
+  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
@@ -68,9 +71,10 @@ TEST(FixedHeapMonitorTest, LegacyComputesCorrectUsage) {
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
   config.set_max_heap_size_bytes(1000);
   auto stats_reader = std::make_unique<MockMemoryStatsReader>();
-  EXPECT_CALL(*stats_reader, reservedHeapBytes()).WillOnce(testing::Return(800));
-  EXPECT_CALL(*stats_reader, unmappedHeapBytes()).WillOnce(testing::Return(100));
-  std::unique_ptr<FixedHeapMonitor> monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
+  EXPECT_CALL(*stats_reader, reservedHeapBytes()).WillOnce(Return(800));
+  EXPECT_CALL(*stats_reader, unmappedHeapBytes()).WillOnce(Return(100));
+  //std::unique_ptr<FixedHeapMonitor> monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
+  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
@@ -85,14 +89,15 @@ TEST(FixedHeapMonitorTest, ComputeUsageWithRealMemoryStats) {
   scoped_runtime.mergeValues({{"envoy.reloadable_features.do_not_count_mapped_pages_as_free", "false"}});
 
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
-  uint64_t max_heap = 1024 * 1024 * 1024;
+  const uint64_t max_heap = 1024 * 1024 * 1024;
   config.set_max_heap_size_bytes(max_heap);
   auto stats_reader = std::make_unique<MemoryStatsReader>();
   const double expected_usage =
       (stats_reader->reservedHeapBytes() -
        stats_reader->unmappedHeapBytes() - stats_reader->freeMappedHeapBytes()) /
       static_cast<double>(max_heap);
-  std::unique_ptr<FixedHeapMonitor> monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
+  //std::unique_ptr<FixedHeapMonitor> monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
+  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
@@ -105,13 +110,14 @@ TEST(FixedHeapMonitorTest, LegacyComputeUsageWithRealMemoryStats) {
   scoped_runtime.mergeValues({{"envoy.reloadable_features.do_not_count_mapped_pages_as_free", "true"}});
 
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
-  uint64_t max_heap = 1024 * 1024 * 1024;
+  const uint64_t max_heap = 1024 * 1024 * 1024;
   config.set_max_heap_size_bytes(max_heap);
   auto stats_reader = std::make_unique<MemoryStatsReader>();
   const double expected_usage =
       (stats_reader->reservedHeapBytes() - stats_reader->unmappedHeapBytes()) /
       static_cast<double>(max_heap);
-  std::unique_ptr<FixedHeapMonitor> monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
+  //std::unique_ptr<FixedHeapMonitor> monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
+  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);

@@ -26,24 +26,23 @@ FixedHeapMonitor::FixedHeapMonitor(
 
 void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
 
-  size_t used;
+  auto computeUsedMemory = [this] ()  -> size_t {
+    if(!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.do_not_count_mapped_pages_as_free")) {
+      const size_t physical = stats_->reservedHeapBytes();
+      const size_t unmapped = stats_->unmappedHeapBytes();
+      const size_t free_mapped = stats_->freeMappedHeapBytes();
+      ASSERT(physical >= (unmapped + free_mapped));
+      return (physical - unmapped - free_mapped);
+    }
+    else {
+      const size_t physical = stats_->reservedHeapBytes();
+      const size_t unmapped = stats_->unmappedHeapBytes();
+      ASSERT(physical >= unmapped);
+      return (physical - unmapped);
+    }
+  };
 
-  if(!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.do_not_count_mapped_pages_as_free"))
-  {
-    const size_t physical = stats_->reservedHeapBytes();
-    const size_t unmapped = stats_->unmappedHeapBytes();
-    const size_t freeMapped = stats_->freeMappedHeapBytes();
-    ASSERT(physical >= (unmapped + freeMapped));
-    used = physical - unmapped - freeMapped;
-  }
-  else
-  {
-    const size_t physical = stats_->reservedHeapBytes();
-    const size_t unmapped = stats_->unmappedHeapBytes();
-    ASSERT(physical >= unmapped);
-    used = physical - unmapped;
-  }
-
+  const size_t used = computeUsedMemory();
 
   Server::ResourceUsage usage;
   usage.resource_pressure_ = used / static_cast<double>(max_heap_);
