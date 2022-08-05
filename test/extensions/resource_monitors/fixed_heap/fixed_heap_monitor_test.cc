@@ -59,8 +59,8 @@ TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
-  EXPECT_TRUE(resource.hasPressure());
-  EXPECT_FALSE(resource.hasError());
+  ASSERT_TRUE(resource.hasPressure());
+  ASSERT_FALSE(resource.hasError());
   EXPECT_EQ(resource.pressure(), 0.5);
 }
 
