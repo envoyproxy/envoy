@@ -28,7 +28,7 @@ public:
    * @return the rewritten url.
    */
   virtual absl::StatusOr<std::string> rewriteUrl(absl::string_view url,
-                                                     absl::string_view matched_path) const PURE;
+                                                 absl::string_view matched_path) const PURE;
 
   /**
    * @return the rewrite pattern of the predicate.
