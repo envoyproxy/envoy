@@ -1,0 +1,29 @@
+From 2c95e927c7cea03539a0e60ac6fbc929fd104724 Mon Sep 17 00:00:00 2001
+From: Tianyu Xia <tyxia@google.com>
+Date: Fri, 5 Aug 2022 19:15:20 +0000
+Subject: [PATCH] Stop the iteration for headers as well as data and trailers
+
+Signed-off-by: Tianyu Xia <tyxia@google.com>
+---
+ source/extensions/filters/http/gcp_authn/gcp_authn_filter.cc | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/source/extensions/filters/http/gcp_authn/gcp_authn_filter.cc b/source/extensions/filters/http/gcp_authn/gcp_authn_filter.cc
+index c391a2c7c3..ae8c19adb0 100644
+--- a/source/extensions/filters/http/gcp_authn/gcp_authn_filter.cc
++++ b/source/extensions/filters/http/gcp_authn/gcp_authn_filter.cc
+@@ -77,8 +77,10 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap&
+     state_ = State::Complete;
+   }
+ 
++  // Stop the iteration for headers as well as data and trailers for the current filter and the filters
++  // following.
+   return state_ == State::Complete ? FilterHeadersStatus::Continue
+-                                   : Http::FilterHeadersStatus::StopIteration;
++                                   : Http::FilterHeadersStatus::StopAllIterationAndWatermark,;
+ }
+ 
+ void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+-- 
+2.37.1.559.g78731f0fdb-goog
+
