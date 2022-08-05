@@ -148,7 +148,7 @@ enum {
 // DFATAL is FATAL in debug mode, ERROR in release mode.
 #ifdef NDEBUG
   LogLevelDFATAL = LogLevelERROR,
-#else // NDEBUG
+#else  // NDEBUG
   LogLevelDFATAL = LogLevelFATAL,
 #endif // NDEBUG
 };
