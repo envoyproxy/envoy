@@ -38,7 +38,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
                          CustomConfigValidatorsPtr&& config_validators,
-                         XdsResourcesDelegate* xds_resources_delegate,
+                         XdsResourcesDelegateOptRef xds_resources_delegate,
                          const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
@@ -278,7 +278,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     // All config updates have been applied without throwing an exception, so we'll call the xDS
     // resources delegate, if any.
-    if (xds_resources_delegate_ != nullptr) {
+    if (xds_resources_delegate_.has_value()) {
       xds_resources_delegate_->onConfigUpdated(target_xds_authority_, type_url, all_resource_refs);
     }
 

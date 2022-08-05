@@ -225,18 +225,6 @@ public:
                                                        const std::string& name);
 
   /**
-   * Wait for the condition function to evaluate to true.
-   * @param condition the function to evaluate, waiting until it returns true.
-   * @param time_system the time system to use for waiting.
-   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
-   * @return AssertionSuccess() if the condition function evaluated to true within the timeout, else
-   *   AssertionFailure().
-   */
-  static AssertionResult
-  waitForCondition(std::function<bool()> condition, Event::TestTimeSystem& time_system,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
-
-  /**
    * Wait for a counter to == a given value.
    * @param store supplies the stats store.
    * @param name supplies the name of the counter to wait for.

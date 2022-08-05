@@ -45,7 +45,7 @@ public:
       : http_request_(&cm_.thread_local_cluster_.async_client_),
         api_(Api::createApiForTest(stats_store_, random_)),
         subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, server_,
-                              /*xds_resources_delegate=*/nullptr) {}
+                              /*xds_resources_delegate=*/absl::nullopt_t) {}
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {

@@ -11,6 +11,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -176,13 +177,15 @@ public:
   }
 
   void waitforOnConfigUpdatedCount(const int expected_count) {
-    TestUtility::waitForCondition(
-        [expected_count]() {
-          return TestXdsResourcesDelegate::getOnConfigUpdatedCount() == expected_count;
-        },
-        timeSystem(), TestUtility::DefaultTimeout);
+    absl::MutexLock l(&lock_);
+    const auto reached_expected_count = [expected_count]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+      return TestXdsResourcesDelegate::getOnConfigUpdatedCount() == expected_count;
+    };
+    timeSystem().waitFor(lock_, absl::Condition(&reached_expected_count),
+                         TestUtility::DefaultTimeout);
   }
 
+  absl::Mutex lock_;
   uint32_t initial_load_success_{0};
 };
 

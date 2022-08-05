@@ -59,7 +59,7 @@ public:
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
           random_, stats_, {}, true, std::move(config_validators_),
-          /*xds_resources_delegate=*/nullptr, /*target_xds_authority=*/""));
+          /*xds_resources_delegate=*/absl::nullopt_t, /*target_xds_authority=*/""));
     }
     resetCluster(R"EOF(
       name: name

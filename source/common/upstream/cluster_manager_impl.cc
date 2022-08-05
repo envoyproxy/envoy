@@ -332,7 +332,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
       local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, xds_resources_delegate_.get());
+      server, makeOptRefFromPtr(xds_resources_delegate_.get()));
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
@@ -428,7 +428,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators), xds_resources_delegate_.get(),
+            std::move(custom_config_validators), makeOptRefFromPtr(xds_resources_delegate_.get()),
             Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()).value_or(""));
       }
     }

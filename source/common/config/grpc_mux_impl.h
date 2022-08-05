@@ -39,7 +39,7 @@ public:
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
               CustomConfigValidatorsPtr&& config_validators,
-              XdsResourcesDelegate* xds_resources_delegate,
+              XdsResourcesDelegateOptRef xds_resources_delegate,
               const std::string& target_xds_authority);
 
   ~GrpcMuxImpl() override;
@@ -174,8 +174,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   CustomConfigValidatorsPtr config_validators_;
-  // Not owned; can be nullptr.
-  XdsResourcesDelegate* xds_resources_delegate_;
+  XdsResourcesDelegateOptRef xds_resources_delegate_;
   const std::string target_xds_authority_;
   bool first_stream_request_;
 

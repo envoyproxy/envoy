@@ -23,7 +23,8 @@ namespace Config {
 SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Api::Api& api, const Server::Instance& server, XdsResourcesDelegate* xds_resources_delegate)
+    Api::Api& api, const Server::Instance& server,
+    XdsResourcesDelegateOptRef xds_resources_delegate)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
       validation_visitor_(validation_visitor), api_(api), server_(server),
       xds_resources_delegate_(xds_resources_delegate) {}

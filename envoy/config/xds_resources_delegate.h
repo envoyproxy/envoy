@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/typed_config.h"
@@ -49,6 +50,7 @@ public:
 };
 
 using XdsResourcesDelegatePtr = std::unique_ptr<XdsResourcesDelegate>;
+using XdsResourcesDelegateOptRef = OptRef<XdsResourcesDelegate>;
 
 /**
  * A factory abstract class for creating instances of XdsResourcesDelegate.
