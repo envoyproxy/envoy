@@ -7,17 +7,20 @@ import multiprocessing
 import os
 import pathlib
 import re
-import subprocess
+import shutil
 import stat
+import subprocess
 import sys
 import traceback
-import shutil
-from functools import cached_property
-from typing import Callable, Dict, List, Pattern, Tuple
-
 # The way this script is currently used (ie no bazel) it relies on system deps.
 # As `pyyaml` is present in `envoy-build-ubuntu` it should be safe to use here.
 import yaml
+from functools import cached_property
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Pattern
+from typing import Tuple
 
 import paths
 
@@ -1079,6 +1082,7 @@ if __name__ == "__main__":
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
+                error_messages.append(command)
                 error_messages.append(
                     "This change appears to add visibility rules. Please get senior maintainer "
                     "approval to add an exemption to check_visibility tools/code_format/check_format.py"
