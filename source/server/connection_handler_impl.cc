@@ -149,10 +149,10 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         if (address->ip()->isAnyAddress()) {
           auto ipv4_any_address =
               Network::Address::Ipv4Instance(address->ip()->port()).asStringView();
-          ENVOY_LOG_MISC(error, "found any addres should be cleanup {}, tag = {}, override tag = {}",
-                         tcp_listener_map_by_address_.contains(ipv4_any_address),
-                         tcp_listener_map_by_address_[ipv4_any_address]->listener_tag_,
-                         override_listener_tag);
+          ENVOY_LOG_MISC(
+              error, "found any addres should be cleanup {}, tag = {}, override tag = {}",
+              tcp_listener_map_by_address_.contains(ipv4_any_address),
+              tcp_listener_map_by_address_[ipv4_any_address]->listener_tag_, override_listener_tag);
           if (tcp_listener_map_by_address_.contains(ipv4_any_address) &&
               tcp_listener_map_by_address_[ipv4_any_address]->listener_tag_ ==
                   override_listener_tag) {
