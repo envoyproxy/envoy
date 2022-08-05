@@ -142,7 +142,7 @@ PayloadMatcher::MatchSegments PayloadMatcher::loadProtoBytes(
   for (const auto& entry : byte_array) {
     std::vector<uint8_t> decoded;
     if (entry.has_text()) {
-      if (entry.utf8()) {
+      if (entry.text_decoder() == envoy::config::core::v3::HealthCheck::Payload::UTF8) {
         decoded.assign(entry.text().begin(), entry.text().end());
       } else {
         decoded = Hex::decode(entry.text());

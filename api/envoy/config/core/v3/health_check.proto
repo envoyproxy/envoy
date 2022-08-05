@@ -69,6 +69,11 @@ message HealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.Payload";
 
+    enum Decoder {
+      HEX = 0;
+      UTF8 = 1;
+    }
+
     oneof payload {
       option (validate.required) = true;
 
@@ -79,8 +84,8 @@ message HealthCheck {
       bytes binary = 2;
     }
 
-    // Treat the text as a sequence of UTF-8 characters. Don't impact on binary.
-    bool utf8 = 3;
+    // Specify the text decode format. It doesn't impact on the binary field.
+    Decoder text_decoder = 3 [(validate.rules).enum = {defined_only: true}];
   }
 
   // [#next-free-field: 14]

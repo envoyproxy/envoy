@@ -486,7 +486,7 @@ public:
       path: /healthcheck
       receive:
         text: {0}
-        utf8: true
+        text_decoder: UTF8
     )EOF",
                                    expected_response);
 
@@ -3850,7 +3850,8 @@ TEST(PayloadMatcher, matchHexText) {
 TEST(PayloadMatcher, matchUtf8Text) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
   envoy::config::core::v3::HealthCheck_Payload* payload = repeated_payload.Add();
-  payload->set_text("01"), payload->set_utf8(true);
+  payload->set_text("01");
+  payload->set_text_decoder(envoy::config::core::v3::HealthCheck::Payload::UTF8);
 
   PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
 
