@@ -198,79 +198,79 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Tests that an update with an unknown filter config proto is rejected.
-// TEST_P(ListenerIntegrationTest, CleanlyRejectsUnknownFilterConfigProto) {
-//   on_server_init_function_ = [&]() {
-//     createLdsStream();
-//     envoy::config::listener::v3::Listener listener =
-//         TestUtility::parseYaml<envoy::config::listener::v3::Listener>(R"EOF(
-//     name: fake_listener
-//     address:
-//       socket_address:
-//         address: "::"
-//         port_value: 4242
-//     filter_chains:
-//       - filters:
-//         - name: "filter_name"
-//         )EOF");
-//     auto* typed_config =
-//         listener.mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config();
-//     typed_config->set_type_url("type.googleapis.com/unknown.type.url");
-//     typed_config->set_value("non-empty config contents");
-//     sendLdsResponse({listener}, "1");
-//   };
-//   initialize();
-//   registerTestServerPorts({listener_name_});
-//   test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
-// }
+TEST_P(ListenerIntegrationTest, CleanlyRejectsUnknownFilterConfigProto) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    envoy::config::listener::v3::Listener listener =
+        TestUtility::parseYaml<envoy::config::listener::v3::Listener>(R"EOF(
+    name: fake_listener
+    address:
+      socket_address:
+        address: "::"
+        port_value: 4242
+    filter_chains:
+      - filters:
+        - name: "filter_name"
+        )EOF");
+    auto* typed_config =
+        listener.mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config();
+    typed_config->set_type_url("type.googleapis.com/unknown.type.url");
+    typed_config->set_value("non-empty config contents");
+    sendLdsResponse({listener}, "1");
+  };
+  initialize();
+  registerTestServerPorts({listener_name_});
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
 
-// TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
-//   on_server_init_function_ = [&]() {
-//     createLdsStream();
-//     envoy::config::listener::v3::Listener listener =
-//         TestUtility::parseYaml<envoy::config::listener::v3::Listener>(R"EOF(
-//       name: fake_listener
-//       address:
-//         socket_address:
-//           address: 127.0.0.1
-//           port_value: 0
-//       filter_chains:
-//         - filters:
-//           - name: http
-//             typed_config:
-//               "@type":
-//               type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-//               codec_type: HTTP2
-//               stat_prefix: config_test
-//               route_config:
-//                 name: route_config_0
-//                 virtual_hosts:
-//                   - name: integration
-//                     domains:
-//                       - "*"
-//                     routes:
-//                       - match:
-//                           prefix: /
-//                         route:
-//                           cluster: cluster_0
-//                     typed_per_filter_config:
-//                       set-response-code:
-//                         "@type":
-//                         type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-//                         code: 403
-//               http_filters:
-//                 - name: set-response-code
-//                   typed_config:
-//                     "@type":
-//                     type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-//                     code: 402
-//           - name: envoy.filters.http.router
-//         )EOF");
-//     sendLdsResponse({listener}, "2");
-//   };
-//   initialize();
-//   registerTestServerPorts({listener_name_});
-//   test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
-// }
+TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    envoy::config::listener::v3::Listener listener =
+        TestUtility::parseYaml<envoy::config::listener::v3::Listener>(R"EOF(
+      name: fake_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 0
+      filter_chains:
+        - filters:
+          - name: http
+            typed_config:
+              "@type":
+              type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              codec_type: HTTP2
+              stat_prefix: config_test
+              route_config:
+                name: route_config_0
+                virtual_hosts:
+                  - name: integration
+                    domains:
+                      - "*"
+                    routes:
+                      - match:
+                          prefix: /
+                        route:
+                          cluster: cluster_0
+                    typed_per_filter_config:
+                      set-response-code:
+                        "@type":
+                        type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                        code: 403
+              http_filters:
+                - name: set-response-code
+                  typed_config:
+                    "@type":
+                    type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                    code: 402
+          - name: envoy.filters.http.router
+        )EOF");
+    sendLdsResponse({listener}, "2");
+  };
+  initialize();
+  registerTestServerPorts({listener_name_});
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
 
 TEST_P(ListenerIntegrationTest, RejectsUnknownHttpFilter) {
   on_server_init_function_ = [&]() {
@@ -694,23 +694,23 @@ TEST_P(ListenerIntegrationTest, ChangeListenerAddressV4CompatFlag) {
   // Make a connection to the listener from version 1.
   codec_client_ = makeHttpConnection(old_port);
 
-  // Change the listener address from loopback to wildcard.
-  ENVOY_LOG_MISC(warn, "########### set ipv4 compat as false again");
+  // Update the `ipv4_compat` flag as false.
   listener_config_.mutable_address()->mutable_socket_address()->set_ipv4_compat(false);
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
   test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 1);
-
   test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
 
-  ENVOY_LOG_MISC(warn, "########### set ipv4 compat as true again");
-  // Change the listener address from loopback to wildcard.
+  // Update the `ipv4_compat` flag back to true.
   listener_config_.mutable_address()->mutable_socket_address()->set_ipv4_compat(true);
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "3");
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "3");
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 3);
+
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
 }
 
 TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
