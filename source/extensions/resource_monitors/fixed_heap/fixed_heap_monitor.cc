@@ -26,15 +26,15 @@ FixedHeapMonitor::FixedHeapMonitor(
 
 void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
 
-  auto computeUsedMemory = [this] ()  -> size_t {
-    if(!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.do_not_count_mapped_pages_as_free")) {
+  auto computeUsedMemory = [this]() -> size_t {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.do_not_count_mapped_pages_as_free")) {
       const size_t physical = stats_->reservedHeapBytes();
       const size_t unmapped = stats_->unmappedHeapBytes();
       const size_t free_mapped = stats_->freeMappedHeapBytes();
       ASSERT(physical >= (unmapped + free_mapped));
       return (physical - unmapped - free_mapped);
-    }
-    else {
+    } else {
       const size_t physical = stats_->reservedHeapBytes();
       const size_t unmapped = stats_->unmappedHeapBytes();
       ASSERT(physical >= unmapped);
