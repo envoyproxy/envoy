@@ -20,6 +20,8 @@ Example filter configuration:
 
 .. literalinclude:: _include/wasm-filter-proxy.yaml
     :language: yaml
+    :linenos:
+    :caption: :download:`wasm-filter-proxy.yaml <_include/wasm-filter-proxy.yaml>`
 
 
 The preceding snippet configures a filter from a Wasm binary on local disk.
