@@ -8,7 +8,7 @@ namespace Compressor {
 
 namespace {
 // Default compression window size.
-const uint64_t DefaultWindowBits = 0;
+const uint64_t DefaultWindowBits = 15;
 
 // Default chunk size.
 const uint32_t DefaultChunkSize = 4096;
@@ -27,10 +27,12 @@ IgzipCompressorImpl::CompressionLevel IgzipCompressorFactory::compressionLevelEn
   switch (compression_level) {
   case envoy::extensions::compression::compressor::igzip::v3alpha::Igzip::COMPRESSION_LEVEL_1:
     return IgzipCompressorImpl::CompressionLevel::Level1;
+  case envoy::extensions::compression::compressor::igzip::v3alpha::Igzip::COMPRESSION_LEVEL_2:
+    return IgzipCompressorImpl::CompressionLevel::Level2;
   case envoy::extensions::compression::compressor::igzip::v3alpha::Igzip::COMPRESSION_LEVEL_3:
     return IgzipCompressorImpl::CompressionLevel::Level3;
   default:
-    return IgzipCompressorImpl::CompressionLevel::Level2;
+    return IgzipCompressorImpl::CompressionLevel::Standard;
   }
 }
 

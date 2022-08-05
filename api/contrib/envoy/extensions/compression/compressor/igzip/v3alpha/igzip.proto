@@ -22,12 +22,12 @@ message Igzip {
   enum CompressionLevel {
     option allow_alias = true;
 
-    BEST_SPEED = 0;
-    COMPRESSION_LEVEL_1 = 0;
-    DEFAULT_COMPRESSION = 1;
-    COMPRESSION_LEVEL_2 = 1;
-    BEST_COMPRESSION = 2;
-    COMPRESSION_LEVEL_3 = 2;
+    DEFAULT_COMPRESSION = 0;
+    BEST_SPEED = 1;
+    COMPRESSION_LEVEL_1 = 1;
+    COMPRESSION_LEVEL_2 = 2;
+    COMPRESSION_LEVEL_3 = 3;
+    BEST_COMPRESSION = 3;
   }
 
   // A value used for selecting the isa-l compression level. This setting will affect speed and
@@ -39,8 +39,7 @@ message Igzip {
   CompressionLevel compression_level = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Value from 0 to 15 that represents the base two logarithmic of the compressor's window size.
-  // Larger window results in better compression at the expense of memory usage. The default is 0
-  // which is equal to 15. 
+  // Larger window results in better compression at the expense of memory usage. The default is 15.
   google.protobuf.UInt32Value window_bits = 2 [(validate.rules).uint32 = {lte: 15 gte: 0}];
 
   // Value for Zlib's next output buffer. If not set, defaults to 4096.

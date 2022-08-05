@@ -28,11 +28,12 @@ IgzipCompressorImpl::IgzipCompressorImpl(uint64_t chunk_size)
 void IgzipCompressorImpl::init(CompressionLevel comp_level,
                               int64_t window_bits) {
   ASSERT(initialized_ == false);
-  (void)window_bits;
   isal_deflate_init(zstream_ptr_.get());
   zstream_ptr_->avail_out = chunk_size_;
   zstream_ptr_->next_out = chunk_char_ptr_.get();
   zstream_ptr_->gzip_flag = IGZIP_GZIP;
+  zstream_ptr_->hist_bits = window_bits;
+  // (void)window_bits;
 
   if (comp_level == CompressionLevel::Level1) {
 		zstream_ptr_->level = 1;
@@ -73,6 +74,7 @@ bool IgzipCompressorImpl::deflateNext() {
 
 void IgzipCompressorImpl::process(Buffer::Instance& output_buffer, int64_t flush_state) {
   zstream_ptr_->end_of_stream = (flush_state == FULL_FLUSH);
+  zstream_ptr_->flush = flush_state;
   while (deflateNext()) {
     if (zstream_ptr_->avail_out == 0) {
       updateOutput(output_buffer);
