@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.extensions.dso.v3;
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.dso.v3";
+option java_outer_classname = "DsoProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/dso/v3;dsov3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dso]
+// [#extension: envoy.bootstrap.dso]
+
+// TODO(wangfakang): Suppport remote dynamic library resourse.
+// The dso type is used to support add specialized functionality into
+// Envoy dynamically at runtime.
+// For example, to enable the go plugin `plugin_x1` dynamic libraries into
+// Envoy, which can avoid rebuilding Envoy.
+// bootstrap_extensions:
+//  - name: envoy.bootstrap.dso
+//    typed_config:
+//      "@type": type.googleapis.com/envoy.extensions.dso.v3.dso
+//      so_id: plugin_x1
+//      so_path: "/lib64/libgo_plugin_x1_extension.so"
+message dso {
+  // so_id is a unique ID for a dynamic library file, must be unique globally.
+  string so_id = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // so_path is an absolute path for loads spec dynamic library file.
+  string so_path = 2 [(validate.rules).string = {min_bytes: 1}];
+}
