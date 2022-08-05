@@ -51,4 +51,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.network.connection_balance.dlb":                     "//contrib/network/connection_balance/dlb/source:connection_balancer",
+
+    #
+    # Regex engines
+    #
+
+    "envoy.regex_engines.hyperscan":                            "//contrib/hyperscan/regex_engines/source:config",
 }

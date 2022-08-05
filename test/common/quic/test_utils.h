@@ -280,6 +280,8 @@ public:
   MOCK_METHOD(bool, isServer, (), (const));
   MOCK_METHOD(const Network::TransportSocketOptionsConstSharedPtr&, transportSocketOptions, (),
               (const));
+  MOCK_METHOD(Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext,
+              extraValidationContext, (), (const));
 };
 
 } // namespace Quic
