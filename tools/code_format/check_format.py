@@ -1082,6 +1082,7 @@ if __name__ == "__main__":
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
+                error_messages.append(output)
                 error_messages.append(command)
                 error_messages.append(
                     "This change appears to add visibility rules. Please get senior maintainer "
