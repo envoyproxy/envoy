@@ -59,7 +59,7 @@ public:
         http_context_(http_context), stat_names_(scope.symbolTable()),
         rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
         response_headers_parser_(
-          Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {}
+            Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }

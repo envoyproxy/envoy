@@ -529,8 +529,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitResponseHeadersToAdd) {
               Http::HeaderValueOf(Http::Headers::get().EnvoyRateLimited,
                                   Http::Headers::get().EnvoyRateLimitedValues.True));
   EXPECT_THAT(responses_[0].get()->headers(),
-              Http::HeaderValueOf("x-global-ratelimit-service",
-                                  "rate_limit_service"));
+              Http::HeaderValueOf("x-global-ratelimit-service", "rate_limit_service"));
   cleanup();
 
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
