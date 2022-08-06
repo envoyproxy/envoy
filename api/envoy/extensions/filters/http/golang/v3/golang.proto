@@ -5,8 +5,9 @@ package envoy.extensions.filters.http.golang.v3;
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.golang.v3";
@@ -14,9 +15,10 @@ option java_outer_classname = "GolangProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/golang/v3;golangv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: golang extension filter]
-// [#extension: envoy.filters.http.golang]
+// golang extension filter.
 
 // In the below example, we configured two go plugins plugin1 and plugin2 by way of go extension.
 // bootstrap_extensions:
@@ -95,7 +97,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //                    "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3.Config
 //                    so_id: plugin1
 //                    merge_policy: MERGE_VIRTUALHOST_ROUTER_FILTER
-//                    plugine-name: plugin1
+//                    plugin_name: plugin1
 //                    plugin_config:
 //                      "@type": type.googleapis.com/envoy.extensions.filters.http.golang.plugins.plugin1.v3.Config
 //                      xxx1: xx1
@@ -105,21 +107,20 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //                    "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3.Config
 //                    so_id: plugin2
 //                    merge_policy: OVERRIDE
-//                    plugine-name: plugin2
+//                    plugin_name: plugin2
 //                    plugin_config:
 //                      "@type": type.googleapis.com/envoy.extensions.filters.http.golang.plugins.plugin2.v3.Config
 //                      xxx1: xx1
 //                      xxx2: xx2
-
+// [#not-implemented-hide:]
 message Config {
-  // TODO add more merge policy
   enum MergePolicy {
     MERGE_VIRTUALHOST_ROUTER_FILTER = 0;
     MERGE_VIRTUALHOST_ROUTER = 1;
     OVERRIDE = 3;
   }
 
-  // A unique ID for a set of sepc go plugin dynamic libraries.
+  // A unique ID for a set of go plugin library.
   string so_id = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // plugin_name is the name of the go plugin, which needs to be consistent with the name
@@ -135,12 +136,13 @@ message Config {
   // the route’s typed_per_filter_config or filter's config.
   // The meanings are as follows:
   // MERGE_VIRTUALHOST_ROUTER_FILTER: pass all configuration into go plugin.
-  // MERGE_VIRTUALHOST_ROUTER: pass Virtual-Host and Router configuration into gol plugin.
+  // MERGE_VIRTUALHOST_ROUTER: pass Virtual-Host and Router configuration into go plugin.
   // OVERRIDE: override according to Router > Virtual_host > Filter priority and pass the
   // configuration to the go plugin.
   MergePolicy merge_policy = 4 [(validate.rules).enum = {defined_only: true}];
 }
 
+// [#not-implemented-hide:]
 message RouterPlugin {
   // The extension_plugin_options field is used to provide extension options for plugin.
   google.protobuf.Struct extension_plugin_options = 1;
@@ -149,23 +151,24 @@ message RouterPlugin {
   google.protobuf.Any config = 2;
 }
 
+// [#not-implemented-hide:]
 message ConfigsPerRoute {
   // plugins_config is the configuration of the go plugin at the per-router, and
   // key is the name of the go plugin.
   // Example
-  //typed_per_filter_config:
-  //  golang:
-  //    "@type": type.googleapis.com/golang.http.ConfigsPerRoute
-  //    plugins_config:
-  //      plugin1:
-  //       extension_plugin_options:
-  //         disabled: true
-  //       config:
-  //         "@type": type.googleapis.com/golang.http.plugin1
-  //         xxx: xxx
-  //      plugin2:
-  //       config:
-  //         "@type": type.googleapis.com/golang.http.plugin2
-  //         xxx: xxx
+  // typed_per_filter_config:
+  //   golang:
+  //     "@type": type.googleapis.com/golang.http.ConfigsPerRoute
+  //     plugins_config:
+  //       plugin1:
+  //        extension_plugin_options:
+  //          disabled: true
+  //        config:
+  //          "@type": type.googleapis.com/golang.http.plugin1
+  //          xxx: xxx
+  //       plugin2:
+  //        config:
+  //          "@type": type.googleapis.com/golang.http.plugin2
+  //          xxx: xxx
   map<string, RouterPlugin> plugins_config = 1;
 }

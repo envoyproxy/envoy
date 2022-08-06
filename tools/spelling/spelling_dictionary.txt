@@ -28,6 +28,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+Dso
 GiB
 Repick
 TRA
@@ -154,6 +155,8 @@ FUZZERS
 dereferencing
 differentially
 dnsresolvers
+dso
+golang
 guarddog
 GC
 GCC
@@ -220,6 +223,7 @@ LEDS
 LEV
 LF
 LHS
+libgo
 libsxg
 LLVM
 LPT
