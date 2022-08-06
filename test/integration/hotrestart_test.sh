@@ -164,7 +164,7 @@ function run_testsuite() {
   echo "fetching hot restart version from http://${ADMIN_ADDRESS_0}/hot_restart_version ..."
   ADMIN_HOT_RESTART_VERSION=$(curl -sg "http://${ADMIN_ADDRESS_0}/hot_restart_version")
   echo "Fetched ADMIN_HOT_RESTART_VERSION is ${ADMIN_HOT_RESTART_VERSION}"
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1 | sed -n '$p')
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1)
   check [ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]
 
   start_test "Checking server.hot_restart_generation 1"
@@ -286,7 +286,7 @@ done
 run_testsuite "${HOT_RESTART_JSON_V4}" "${SOCKET_DIR}/envoy_domain_socket" "600" || exit 1
 
 start_test "disabling hot_restart by command line."
-CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --disable-hot-restart 2>&1 | sed -n '$p')
+CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --disable-hot-restart 2>&1)
 check [ "disabled" = "${CLI_HOT_RESTART_VERSION}" ]
 
 # Validating socket-path permission
