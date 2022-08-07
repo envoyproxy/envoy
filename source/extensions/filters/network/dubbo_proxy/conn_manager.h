@@ -34,6 +34,7 @@ public:
   virtual DubboFilterStats& stats() PURE;
   virtual ProtocolPtr createProtocol() PURE;
   virtual Router::Config& routerConfig() PURE;
+  virtual Tracer::Config& tracerConfig() PURE;
 };
 
 // class ActiveMessagePtr;

@@ -13,6 +13,7 @@
 #include "source/extensions/filters/network/dubbo_proxy/metadata.h"
 #include "source/extensions/filters/network/dubbo_proxy/protocol.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
+#include "source/extensions/filters/network/dubbo_proxy/tracer/tracer.h"
 #include "source/extensions/filters/network/dubbo_proxy/serializer.h"
 
 namespace Envoy {
@@ -83,6 +84,8 @@ public:
    * @return RouteConstSharedPtr the route for the current request.
    */
   virtual DubboProxy::Router::RouteConstSharedPtr route() PURE;
+
+  virtual Tracer::Config& tracerConfig() PURE;
 
   /**
    * @return SerializationType the originating protocol.

@@ -102,6 +102,11 @@ const Network::Connection* ActiveMessageFilterBase::connection() const {
 
 Router::RouteConstSharedPtr ActiveMessageFilterBase::route() { return parent_.route(); }
 
+Tracer::Config& ActiveMessageFilterBase::tracerConfig() {
+  return parent_.tracerConfig();
+}
+
+
 SerializationType ActiveMessageFilterBase::serializationType() const {
   return parent_.serializationType();
 }
@@ -303,6 +308,10 @@ DubboProxy::Router::RouteConstSharedPtr ActiveMessage::route() {
   }
 
   return nullptr;
+}
+
+Tracer::Config& ActiveMessage::tracerConfig() {
+  return parent_.config().tracerConfig();
 }
 
 FilterStatus ActiveMessage::applyDecoderFilters(ActiveMessageDecoderFilter* filter,

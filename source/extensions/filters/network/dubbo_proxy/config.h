@@ -1,10 +1,14 @@
 #pragma once
 
 #include <algorithm>
+#include <functional>
+#include <memory>
 #include <string>
 
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
+
+#include "envoy/tracing/http_tracer_manager.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
@@ -12,6 +16,7 @@
 #include "source/extensions/filters/network/dubbo_proxy/router/rds.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/tracer/tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -42,7 +47,8 @@ public:
   using DubboFilterConfig = envoy::extensions::filters::network::dubbo_proxy::v3::DubboFilter;
 
   ConfigImpl(const DubboProxyConfig& config, Server::Configuration::FactoryContext& context,
-             Router::RouteConfigProviderManager& route_config_provider_manager);
+             Router::RouteConfigProviderManager& route_config_provider_manager,
+             Tracing::HttpTracerManager& tracing_config_manager);
   ~ConfigImpl() override = default;
 
   // DubboFilters::FilterChainFactory
@@ -56,10 +62,20 @@ public:
   DubboFilterStats& stats() override { return stats_; }
   DubboFilters::FilterChainFactory& filterFactory() override { return *this; }
   Router::Config& routerConfig() override { return *this; }
+  Tracer::Config& tracerConfig() override { return *tracer_config_; }
   ProtocolPtr createProtocol() override;
 
 private:
-  void registerFilter(const DubboFilterConfig& proto_config);
+  using TracingProtoConfig = envoy::extensions::filters::network::http_connection_manager::v3::
+      HttpConnectionManager::Tracing;
+  using InitTracerCallback = std::function<void(const Protobuf::Message&)>;
+  void registerFilter(const DubboFilterConfig& proto_config, InitTracerCallback tracer_callback);
+  void initTracingConfig(const Protobuf::Message& proto_config,
+                         Server::Configuration::FactoryContext& context,
+                         Tracing::HttpTracerManager& tracing_config_manager);
+  std::unique_ptr<Http::TracingConnectionManagerConfig>
+  createTracingConfig(const TracingProtoConfig& config,
+                      Server::Configuration::FactoryContext& context);
 
   Server::Configuration::FactoryContext& context_;
   const std::string stats_prefix_;
@@ -67,6 +83,7 @@ private:
   const SerializationType serialization_type_;
   const ProtocolType protocol_type_;
   Router::RouteConfigImplPtr route_matcher_;
+  Tracer::TracerConfigImplPtr tracer_config_{std::make_unique<Tracer::NullTracerConfig>()};
   Rds::RouteConfigProviderSharedPtr route_config_provider_;
 
   std::list<DubboFilters::FilterFactoryCb> filter_factories_;

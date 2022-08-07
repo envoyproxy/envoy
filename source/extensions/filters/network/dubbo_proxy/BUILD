@@ -110,6 +110,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network/dubbo_proxy/router:rds_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
         "//source/extensions/filters/network/dubbo_proxy/router:router_lib",
+        "//source/extensions/filters/network/dubbo_proxy/tracer:config",
         "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )

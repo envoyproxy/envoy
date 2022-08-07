@@ -69,6 +69,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
         "//source/extensions/filters/network/dubbo_proxy:serializer_interface",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_interface",
+        "//source/extensions/filters/network/dubbo_proxy/tracer:tracer_util",
     ],
 )
 

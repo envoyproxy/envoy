@@ -71,6 +71,7 @@ public:
   uint64_t streamId() const override;
   const Network::Connection* connection() const override;
   DubboProxy::Router::RouteConstSharedPtr route() override;
+  Tracer::Config& tracerConfig() override;
   SerializationType serializationType() const override;
   ProtocolType protocolType() const override;
   StreamInfo::StreamInfo& streamInfo() override;
@@ -164,6 +165,7 @@ public:
   ProtocolType protocolType() const;
   StreamInfo::StreamInfo& streamInfo();
   Router::RouteConstSharedPtr route();
+  Tracer::Config& tracerConfig();
   void sendLocalReply(const DubboFilters::DirectResponse& response, bool end_stream);
   void startUpstreamResponse();
   DubboFilters::UpstreamResponseStatus upstreamData(Buffer::Instance& buffer);

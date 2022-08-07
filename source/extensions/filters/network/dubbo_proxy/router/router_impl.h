@@ -10,6 +10,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 
@@ -24,7 +25,8 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public DubboFilters::CodecFilter,
                Logger::Loggable<Logger::Id::dubbo> {
 public:
-  Router(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
+  Router(Upstream::ClusterManager& cluster_manager, Random::RandomGenerator& random_generator, Envoy::Runtime::Loader& runtime)
+      : cluster_manager_(cluster_manager), random_generator_(random_generator), runtime_(runtime) {}
   ~Router() override = default;
 
   // DubboFilters::DecoderFilter
@@ -92,6 +94,10 @@ private:
 
   void cleanup();
 
+  void prepareUpstreamRequestBuffer();
+
+  void sendLocalReply(const DubboFilters::DirectResponse& response, bool end_stream);
+
   Upstream::ClusterManager& cluster_manager_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_;
 
@@ -99,7 +105,14 @@ private:
   DubboFilters::EncoderFilterCallbacks* encoder_callbacks_{};
   RouteConstSharedPtr route_{};
   const RouteEntry* route_entry_{};
+  Tracing::SpanPtr downstream_span_;
+  Tracing::SpanPtr upstream_span_;
+  std::unique_ptr<Http::RequestHeaderMapImpl> downstream_request_headers_;
+  const RpcInvocationImpl* invocation_;
+  ContextSharedPtr ctx_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  Random::RandomGenerator& random_generator_;
+  Envoy::Runtime::Loader& runtime_;
 
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Envoy::Buffer::OwnedImpl upstream_request_buffer_;

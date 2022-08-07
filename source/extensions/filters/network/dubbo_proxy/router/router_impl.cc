@@ -5,6 +5,12 @@
 
 #include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
 #include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/tracer/tracer_util.h"
+
+#include "source/common/http/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
+
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -24,8 +30,11 @@ void Router::setDecoderFilterCallbacks(DubboFilters::DecoderFilterCallbacks& cal
 }
 
 FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) {
+  ctx_ = ctx;
   ASSERT(metadata->hasInvocationInfo());
   const auto& invocation = metadata->invocationInfo();
+  invocation_ = dynamic_cast<const RpcInvocationImpl*>(&invocation);
+  ASSERT(invocation_);
 
   route_ = callbacks_->route();
   if (!route_) {
@@ -53,6 +62,8 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
   }
 
   cluster_ = cluster->info();
+  callbacks_->streamInfo().setUpstreamClusterInfo(cluster_);
+
   ENVOY_STREAM_LOG(debug, "dubbo router: cluster '{}' match for interface '{}'", *callbacks_,
                    route_entry_->clusterName(), invocation.serviceName());
 
@@ -77,44 +88,63 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
 
   ENVOY_STREAM_LOG(debug, "dubbo router: decoding request", *callbacks_);
 
-  const auto* invocation_impl = dynamic_cast<const RpcInvocationImpl*>(&invocation);
-  ASSERT(invocation_impl);
-
-  if (invocation_impl->hasAttachment() && invocation_impl->attachment().attachmentUpdated()) {
-    constexpr size_t body_length_size = sizeof(uint32_t);
-
-    const size_t attachment_offset = invocation_impl->attachment().attachmentOffset();
-    const size_t request_header_size = ctx->headerSize();
-
-    ASSERT(attachment_offset <= ctx->originMessage().length());
-
-    // Move the other parts of the request headers except the body size to the upstream request
-    // buffer.
-    upstream_request_buffer_.move(ctx->originMessage(), request_header_size - body_length_size);
-    // Discard the old body size.
-    ctx->originMessage().drain(body_length_size);
-
-    // Re-serialize the updated attachment.
-    Buffer::OwnedImpl attachment_buffer;
-    Hessian2::Encoder encoder(std::make_unique<BufferWriter>(attachment_buffer));
-    encoder.encode(invocation_impl->attachment().attachment());
-
-    size_t new_body_size = attachment_offset - request_header_size + attachment_buffer.length();
-
-    upstream_request_buffer_.writeBEInt<uint32_t>(new_body_size);
-    upstream_request_buffer_.move(ctx->originMessage(), attachment_offset - request_header_size);
-    upstream_request_buffer_.move(attachment_buffer);
-
-    // Discard the old attachment.
-    ctx->originMessage().drain(ctx->messageSize() - attachment_offset);
-  } else {
-    upstream_request_buffer_.move(ctx->originMessage(), ctx->messageSize());
+  const auto& tracer_config = callbacks_->tracerConfig();
+  auto tracer = tracer_config.tracer();
+  if (tracer) {
+    downstream_request_headers_ =
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(invocation_->attachment().headers());
+    auto& stream_info = callbacks_->streamInfo();
+    Tracer::DubboTracerUtility::prepareStreamInfoTraceReason(
+        tracer_config, downstream_request_headers_, stream_info, random_generator_, runtime_);
+    downstream_span_ = Tracer::DubboTracerUtility::createDownstreamSpan(
+        tracer, tracer_config, downstream_request_headers_, invocation, stream_info);
   }
 
   upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool_data, metadata,
                                                         callbacks_->serializationType(),
                                                         callbacks_->protocolType());
   return upstream_request_->start();
+}
+
+void Router::prepareUpstreamRequestBuffer() {
+  invocation_->parameters();
+  if (invocation_->hasAttachment() && invocation_->attachment().attachmentUpdated()) {
+    constexpr size_t body_length_size = sizeof(uint32_t);
+
+    const size_t attachment_offset = invocation_->attachment().attachmentOffset();
+    const size_t request_header_size = ctx_->headerSize();
+
+    ASSERT(attachment_offset <= ctx_->originMessage().length());
+
+    // Move the other parts of the request headers except the body size to the upstream request
+    // buffer.
+    upstream_request_buffer_.move(ctx_->originMessage(), request_header_size - body_length_size);
+    // Discard the old body size.
+    ctx_->originMessage().drain(body_length_size);
+
+    // Re-serialize the updated attachment.
+    Buffer::OwnedImpl attachment_buffer;
+    Hessian2::Encoder encoder(std::make_unique<BufferWriter>(attachment_buffer));
+    encoder.encode(invocation_->attachment().attachment());
+
+    size_t new_body_size = attachment_offset - request_header_size + attachment_buffer.length();
+
+    upstream_request_buffer_.writeBEInt<uint32_t>(new_body_size);
+    upstream_request_buffer_.move(ctx_->originMessage(), attachment_offset - request_header_size);
+    upstream_request_buffer_.move(attachment_buffer);
+
+    // Discard the old attachment.
+    ctx_->originMessage().drain(ctx_->messageSize() - attachment_offset);
+  } else {
+    upstream_request_buffer_.move(ctx_->originMessage(), ctx_->messageSize());
+  }
+}
+
+void Router::sendLocalReply(const DubboFilters::DirectResponse& response, bool end_stream) {
+  if (downstream_span_) {
+    downstream_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  }
+  callbacks_->sendLocalReply(response, end_stream);
 }
 
 void Router::setEncoderFilterCallbacks(DubboFilters::EncoderFilterCallbacks& callbacks) {
@@ -129,9 +159,12 @@ FilterStatus Router::onMessageEncoded(MessageMetadataSharedPtr metadata, Context
   ENVOY_STREAM_LOG(trace, "dubbo router: response status: {}", *encoder_callbacks_,
                    static_cast<int>(metadata->responseStatus()));
 
+  bool error = false;
+
   switch (metadata->responseStatus()) {
   case ResponseStatus::Ok:
     if (metadata->messageType() == MessageType::Exception) {
+      error = true;
       upstream_request_->upstream_host_->outlierDetector().putResult(
           Upstream::Outlier::Result::ExtOriginRequestFailed);
     } else {
@@ -140,6 +173,7 @@ FilterStatus Router::onMessageEncoded(MessageMetadataSharedPtr metadata, Context
     }
     break;
   case ResponseStatus::ServerTimeout:
+    error = true;
     upstream_request_->upstream_host_->outlierDetector().putResult(
         Upstream::Outlier::Result::LocalOriginTimeout);
     break;
@@ -148,11 +182,21 @@ FilterStatus Router::onMessageEncoded(MessageMetadataSharedPtr metadata, Context
   case ResponseStatus::ServerError:
     FALLTHRU;
   case ResponseStatus::ServerThreadpoolExhaustedError:
+    error = true;
     upstream_request_->upstream_host_->outlierDetector().putResult(
         Upstream::Outlier::Result::ExtOriginRequestFailed);
     break;
   default:
     break;
+  }
+
+  if (downstream_span_) {
+    if (error) {
+      downstream_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    }
+    Tracer::DubboTracerUtility::finalizeDownstreamSpan(
+        downstream_span_, downstream_request_headers_, callbacks_->streamInfo(),
+        callbacks_->connection(), callbacks_->tracerConfig());
   }
 
   return FilterStatus::Continue;
@@ -257,9 +301,17 @@ const Network::Connection* Router::downstreamConnection() const {
 }
 
 void Router::cleanup() {
-  if (upstream_request_) {
-    upstream_request_.reset();
+  if (!upstream_request_) {
+    return;
   }
+
+  if (upstream_span_) {
+    Tracer::DubboTracerUtility::finalizeUpstreamSpan(
+        upstream_span_, encoder_callbacks_->streamInfo(), upstream_request_->upstream_host_,
+        callbacks_->tracerConfig());
+  }
+
+  upstream_request_.reset();
 }
 
 Router::UpstreamRequest::UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
@@ -275,6 +327,13 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Upstream::TcpPoolData& 
 Router::UpstreamRequest::~UpstreamRequest() = default;
 
 FilterStatus Router::UpstreamRequest::start() {
+  if (parent_.downstream_span_) {
+    parent_.upstream_span_ = Tracer::DubboTracerUtility::createUpstreamSpan(
+        parent_.downstream_span_, parent_.callbacks_->tracerConfig(),
+        parent_.route_entry_->clusterName(),
+        parent_.callbacks_->dispatcher().timeSource().systemTime());
+  }
+
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.newConnection(*this);
   if (handle) {
     // Pause while we wait for a connection.
@@ -352,6 +411,17 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
   conn_data_->addUpstreamCallbacks(parent_);
   conn_pool_handle_ = nullptr;
 
+  const auto& invocation = metadata_->invocationInfo();
+  const auto* invocation_impl = dynamic_cast<const RpcInvocationImpl*>(&invocation);
+  ASSERT(invocation_impl);
+
+  if (parent_.upstream_span_) {
+    Tracer::DubboTracerUtility::updateUpstreamRequestAttachment(parent_.upstream_span_, host,
+                                                                parent_.invocation_);
+  }
+
+  parent_.prepareUpstreamRequestBuffer();
+
   onRequestStart(continue_decoding);
   encodeData(parent_.upstream_request_buffer_);
 }
@@ -387,16 +457,19 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
     return;
   }
 
+  Http::StreamResetReason reason_for_tracer;
   // When the filter's callback does not end, the sendLocalReply function call
   // triggers the release of the current stream at the end of the filter's callback.
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
+    reason_for_tracer = Http::StreamResetReason::Overflow;
     parent_.callbacks_->sendLocalReply(
         AppException(ResponseStatus::ServerError,
                      fmt::format("dubbo upstream request: too many connections")),
         false);
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+    reason_for_tracer = Http::StreamResetReason::ConnectionFailure;
     // Should only happen if we closed the connection, due to an error condition, in which case
     // we've already handled any possible downstream response.
     parent_.callbacks_->sendLocalReply(
@@ -406,6 +479,7 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
         false);
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    reason_for_tracer = Http::StreamResetReason::ConnectionFailure;
     parent_.callbacks_->sendLocalReply(
         AppException(ResponseStatus::ServerError,
                      fmt::format("dubbo upstream request: remote connection failure '{}'",
@@ -413,6 +487,7 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
         false);
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
+    reason_for_tracer = Http::StreamResetReason::ConnectionFailure;
     parent_.callbacks_->sendLocalReply(
         AppException(ResponseStatus::ServerError,
                      fmt::format("dubbo upstream request: connection failure '{}' due to timeout",
@@ -421,11 +496,20 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
     break;
   }
 
+  if (parent_.upstream_span_) {
+    parent_.upstream_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    parent_.upstream_span_->setTag(Tracing::Tags::get().ErrorReason,
+                                   Http::Utility::resetReasonToString(reason_for_tracer));
+  }
+
   if (parent_.filter_complete_ && !response_complete_) {
     // When the filter's callback has ended and the reply message has not been processed,
     // call resetStream to release the current stream.
     // the resetStream eventually triggers the onDestroy function call.
     parent_.callbacks_->resetStream();
+    if (parent_.upstream_span_) {
+      parent_.upstream_span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
+    }
   }
 }
 
