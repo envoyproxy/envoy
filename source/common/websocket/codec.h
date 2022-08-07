@@ -23,6 +23,12 @@ constexpr std::array<uint8_t, 6> FRAME_OPCODES = {FRAME_OPCODE_CONTINUATION, FRA
 // Length of the masking key which is 4 bytes fixed size
 constexpr uint8_t MASKING_KEY_LENGTH = 4;
 
+// 16 bit payload length
+constexpr uint8_t PAYLOAD_LENGTH_SIXTEEN_BIT = 2;
+
+// 64 bit payload length
+constexpr uint8_t PAYLOAD_LENGTH_SIXTY_FOUR_BIT = 8;
+
 // Wire format (https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
 // of WebSocket frame:
 //
@@ -50,13 +56,11 @@ struct Frame {
   // First byte of the WebSocket frame.
   // |F|R|R|R| opcode(4) |
   uint8_t flags_and_opcode_;
-  // Indicator whether the frame payload is masked or not.
-  bool is_masked_;
   // Length of the payload as the number of bytes.
   uint64_t payload_length_;
-  // This should be used when when is_masked_ is set to true to unmasked the payload
-  // as described in https://datatracker.ietf.org/doc/html/rfc6455#section-5.3
-  uint32_t masking_key_;
+  // The 4 byte fixed size masking key used to mask the payload. Masking/unmasking should be
+  // performed as described in https://datatracker.ietf.org/doc/html/rfc6455#section-5.3
+  absl::optional<uint32_t> masking_key_;
   // WebSocket payload data (extension data and application data).
   Buffer::InstancePtr payload_;
 };
@@ -66,42 +70,28 @@ class Encoder {
 public:
   Encoder();
 
-  // Creates a new Websocket data frame with the given frame header data.
-  // @param flags_and_opcode supplies the first fixed byte with flags and opcode.
-  // @param length supplies the WebSocket data frame length.
-  // @param is_masked supplies whether the frame is masked ot not.
-  // @param masking_key supplies the masking key if the is_masked is true.
-  // @param output the buffer to store the encoded data. Its size can vary depending on
-  // payload length and presence of masking key.
-  void newFrameHeader(uint8_t flags_and_opcode, uint64_t length, bool is_masked,
-                      uint32_t masking_key, std::vector<uint8_t>& output);
-
-  // Prepend the WebSocket frame header into the buffer.
-  // @param flags_and_opcode supplies the first fixed byte with flags and opcode.
-  // @param length supplies the WebSocket data frame length.
-  // @param is_masked supplies whether the frame is masked ot not.
-  // @param masking_key supplies the masking key if the is_masked is true.
-  // @param buffer the complete buffer with the payload.
-  void prependFrameHeader(uint8_t flags_and_opcode, uint64_t length, bool is_masked,
-                          uint32_t masking_key, Buffer::Instance& buffer);
+  // Creates a new Websocket data frame header with the given frame data.
+  // @param frame supplies the frame to be encoded.
+  // @param output the buffer to store the encoded header data.
+  void newFrameHeader(const Frame& frame, std::vector<uint8_t>& output);
 };
 
 // Current state of the frame that is being processed.
 enum class State {
   // Decoding the first byte. Waiting for decoding the final frame flag (1 bit)
   // and reserved flags (3 bits) and opcode (4 bits) of the WebSocket data frame.
-  FhFlagsAndOpcode,
+  FrameHeaderFinalFlagReservedFlagsOpcode,
   // Decoding the second byte. Waiting for decoding the mask flag (1 bit) and
   // length/length flag (7 bit) of the WebSocket data frame.
-  FhMaskFlagAndLength,
+  FrameHeaderMaskFlagAndLength,
   // Waiting for decoding the extended length of the frame if length read previously
   // is either 126 or 127. Respectively 2 bytes or 8 bytes will be decoded from the
   // WebSocket data frame.
-  FhExtendedLength,
+  FrameHeaderExtendedLength,
   // Waiting for decoding the masking key (4 bytes) only if the mask bit is set.
-  FhMaskingKey,
+  FrameHeaderMaskingKey,
   // Waiting for decoding the payload (both extension data and application data).
-  Payload,
+  FramePayload,
 };
 
 // Inspects the number of frames contains in an input buffer without decoding into frames.
@@ -136,7 +126,7 @@ protected:
   virtual void frameData(const uint8_t*, uint64_t) {}
   virtual void frameDataEnd() {}
 
-  State state_ = State::FhFlagsAndOpcode;
+  State state_ = State::FrameHeaderFinalFlagReservedFlagsOpcode;
   uint32_t masking_key_ = 0;
   uint64_t length_ = 0;
   uint8_t masking_key_length_ = 0;
@@ -164,7 +154,7 @@ public:
   uint32_t length() const { return frame_.payload_length_; }
 
   // Indicates whether it has buffered any partial data.
-  bool hasBufferedData() const { return state_ != State::FhFlagsAndOpcode; }
+  bool hasBufferedData() const { return state_ != State::FrameHeaderFinalFlagReservedFlagsOpcode; }
 
   Frame& getFrame() { return frame_; };
 
