@@ -32,7 +32,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tracing:96.1"
 "source/common/upstream:96.0"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/common/websocket:92.3"
 "source/exe:92.6"
 "source/extensions/common:95.8"
 "source/extensions/common/tap:92.9"
