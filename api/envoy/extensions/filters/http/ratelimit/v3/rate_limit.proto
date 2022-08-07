@@ -125,7 +125,7 @@ message RateLimit {
   // Specifies a list of HTTP headers that should be added to each response for requests that
   // have been rate limited.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 11
-  [(validate.rules).repeated = {max_items: 10}];
+      [(validate.rules).repeated = {max_items: 10}];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
