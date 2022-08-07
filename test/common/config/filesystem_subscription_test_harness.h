@@ -34,6 +34,8 @@ public:
   FilesystemSubscriptionTestHarness()
       : path_(makePathConfigSource(TestEnvironment::temporaryPath("eds.json"))),
         api_(Api::createApiForTest(stats_store_, simTime())), dispatcher_(setupDispatcher()),
+        resource_decoder_(std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+                              envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")),
         subscription_(*dispatcher_, path_, callbacks_, resource_decoder_, stats_,
                       validation_visitor_, *api_) {}
 
@@ -133,8 +135,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   Filesystem::Watcher::OnChangedCb on_changed_cb_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   FilesystemSubscriptionImpl subscription_;
   bool file_at_start_{false};
 };
