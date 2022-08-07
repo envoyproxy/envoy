@@ -86,12 +86,13 @@ public:
 
   // Iterates over scope_vec and populates the metric types associated with the
   // current phase.
-  void populateStatsForCurrentPhase(const ScopeVec& scope_vec);
+  void populateStatsForCurrentPhase(absl::string_view scope_name, const ScopeVec& scope_vec);
 
   // Populates all the metrics of the templatized type from scope_vec. Here we
   // exploit that Scope::iterate is a generic templatized function to avoid code
   // duplication.
-  template <class StatType> void populateStatsFromScopes(const ScopeVec& scope_vec);
+  template <class StatType> void populateStatsFromScopes(absl::string_view scope_name,
+                                                         const ScopeVec& scope_vec);
 
   // Renders the templatized type, exploiting the fact that Render::generate is
   // generic to avoid code duplication.
@@ -100,6 +101,8 @@ public:
 
   // Sets the chunk size.
   void setChunkSize(uint64_t chunk_size) { chunk_size_ = chunk_size; }
+
+  void renderScope(absl::string_view scope_name, Buffer::Instance& response);
 
 private:
   StatsParams params_;

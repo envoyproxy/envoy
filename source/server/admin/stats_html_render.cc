@@ -210,12 +210,12 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
     }
     response.add("    </select>\n  ");
     break;
+    /*
   case Admin::ParamDescriptor::Type::Hidden:
     response_.add(absl::StrCat("<input type='hidden' name='", id, "' id='", id, "' form='", path,
                                "'", on_change,
                                value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
     break;
-    /*
   case Admin::ParamDescriptor::Type::Mask: {
     response_.add("<table class='home-table'><tbody>\n");
     for (size_t row = 0; row < (choices.size() + 1) / 2; ++row) {
@@ -234,7 +234,8 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
   }
 }
 
-void render(Buffer::Instance&) override {
+#if 0
+void render(Buffer::Instance&) {
   for (const auto& iter : groups_) {
     absl::string_view label = StatsHandler::typeToString(iter.first);
     const Group& group = iter.second;
@@ -865,6 +866,8 @@ Http::Code StatsHandler::handlerStatsPrometheus(absl::string_view path_and_query
         {"cumulative", "disjoint", "none"}}}};
   }
 };
+
+#endif
 
 } // namespace Server
 } // namespace Envoy

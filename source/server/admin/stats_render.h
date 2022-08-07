@@ -30,6 +30,9 @@ public:
   virtual void generate(Buffer::Instance& response, const std::string& name,
                         const Stats::ParentHistogram& histogram) PURE;
 
+  // Writes a scope name.
+  virtual void scope(Buffer::Instance&, absl::string_view) {}
+
   // Completes rendering any buffered data.
   virtual void finalize(Buffer::Instance& response) PURE;
 

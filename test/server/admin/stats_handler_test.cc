@@ -37,41 +37,6 @@ public:
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
 
-  std::shared_ptr<MockInstance> setupMockedInstance() {
-    auto instance = std::make_shared<MockInstance>();
-    EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(testing::Return(false));
-    store_->initializeThreading(main_thread_dispatcher_, tls_);
-    EXPECT_CALL(*instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
-    EXPECT_CALL(*instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config_));
-    EXPECT_CALL(api_, customStatNamespaces())
-        .WillRepeatedly(testing::ReturnRef(customNamespaces()));
-    EXPECT_CALL(*instance, api()).WillRepeatedly(testing::ReturnRef(api_));
-    return instance;
-  }
-
-  Http::Code handlerStats(absl::string_view url, Buffer::Instance& response) {
-    Http::TestResponseHeaderMapImpl response_headers;
-    StatsHandler::Params params;
-    Http::Code code = params.parse(url, response);
-    if (code != Http::Code::OK) {
-      return code;
-    }
-    std::shared_ptr<MockInstance> instance = setupMockedInstance();
-    StatsHandler handler(*instance);
-    return handler.stats(params, *store_, response_headers, response);
-  }
-
-  Http::Code statsAsJsonHandler(std::string& data, absl::string_view params = "") {
-    std::string url = absl::StrCat("/stats?format=json&pretty", params);
-    Buffer::OwnedImpl response;
-    Http::Code code = handlerStats(url, response);
-    data = response.toString();
-    return code;
-  }
-
-  Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
-  Stats::CustomStatNamespaces& customNamespaces() { return custom_namespaces_; }
-
   ~StatsHandlerTest() {
     tls_.shutdownGlobalThreading();
     store_->shutdownThreading();
@@ -161,6 +126,7 @@ public:
   Stats::StatNamePool pool_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Api::MockApi> api_;
   Stats::AllocatorImpl alloc_;
   Stats::MockSink sink_;
   Stats::ThreadLocalStoreImplPtr store_;
@@ -168,8 +134,6 @@ public:
   MockAdminStream admin_stream_;
   Configuration::MockStatsConfig stats_config_;
   TestScopedRuntime scoped_runtime_;
-  Api::MockApi api_;
-  Configuration::MockStatsConfig stats_config_;
 };
 
 class AdminStatsTest : public StatsHandlerTest, public testing::Test {};
@@ -219,8 +183,45 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
   EXPECT_EQ(expected, code_response.second);
 }
 
+#ifdef ENVOY_ADMIN_HTML
+TEST_F(AdminStatsTest, HandlerStatsHtml) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  store_->counterFromStatName(makeStat("foo.c0")).add(0);
+  Stats::ScopeSharedPtr scope0 = store_->createScope("");
+  store_->counterFromStatName(makeStat("foo.c1")).add(1);
+  Stats::ScopeSharedPtr scope = store_->createScope("scope");
+  scope->gaugeFromStatName(makeStat("g2"), Stats::Gauge::ImportMode::Accumulate).set(2);
+  Stats::ScopeSharedPtr scope2 = store_->createScope("scope1.scope2");
+  scope2->textReadoutFromStatName(makeStat("t3")).set("text readout value");
+  scope2->counterFromStatName(makeStat("unset"));
+
+  auto test = [this](absl::string_view params, const std::vector<std::string>& expected,
+                     const std::vector<std::string>& not_expected) {
+    std::string url = absl::StrCat("/stats?format=html", params);
+    CodeResponse code_response = handlerStats(url);
+    EXPECT_EQ(Http::Code::OK, code_response.first);
+    for (const std::string& expect : expected) {
+      EXPECT_THAT(code_response.second, HasSubstr(expect)) << "params=" << params;
+    }
+    for (const std::string& not_expect : not_expected) {
+      EXPECT_THAT(code_response.second, Not(HasSubstr(not_expect))) << "params=" << params;
+    }
+  };
+  test("",
+       {"foo.c0: 0", "foo.c1: 1", "scope.g2: 2", "scope1.scope2.unset: 0", // expected
+        "scope1.scope2.t3: \"text readout value\"", "No Histograms found"},
+       {"No TextReadouts found"});                   // not expected
+  test("&type=Counters", {"foo.c0: 0", "foo.c1: 1"}, // expected
+       {"No Histograms found", "scope.g2: 2"});      // not expected
+  test("&usedonly", {"foo.c0: 0", "foo.c1: 1"},      // expected
+       {"scope1.scope2.unset"});                     // not expected
+}
+#endif
+
 #if 0
-TEST_P(AdminStatsTest, HandlerStatsPage) {
+TEST_F(AdminStatsTest, HandlerStatsPage) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
@@ -302,7 +303,7 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
 }
 #endif
 
-TEST_P(AdminStatsTest, HandlerStatsScoped) {
+TEST_F(AdminStatsTest, HandlerStatsScoped) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
@@ -324,10 +325,10 @@ TEST_P(AdminStatsTest, HandlerStatsScoped) {
   scope4->counterFromStatName(makeStat("c5")).add(55);
 
   auto test = [this](absl::string_view params, const std::string& expected) {
-    Buffer::OwnedImpl data;
     std::string url = absl::StrCat("/stats?format=json&pretty", params);
-    EXPECT_EQ(Http::Code::OK, handlerStats(url, data));
-    EXPECT_THAT(data.toString(), JsonStringEq(expected)) << "params=" << params;
+    CodeResponse code_response = handlerStats(url);
+    EXPECT_EQ(Http::Code::OK, code_response.first);
+    EXPECT_THAT(code_response.second, JsonStringEq(expected)) << "params=" << params;
   };
   test("", R"({
     "stats": [
@@ -353,50 +354,7 @@ TEST_P(AdminStatsTest, HandlerStatsScoped) {
     "stats": [
        {"name":"scope4.c5", "value": 555}],
     "scopes": []})");
-  shutdownThreading();
 }
-
-TEST_P(AdminStatsTest, HandlerStatsJson) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-}
-
-#ifdef ENVOY_ADMIN_HTML
-TEST_F(AdminStatsTest, HandlerStatsHtml) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-
-  store_->counterFromStatName(makeStat("foo.c0")).add(0);
-  Stats::ScopeSharedPtr scope0 = store_->createScope("");
-  store_->counterFromStatName(makeStat("foo.c1")).add(1);
-  Stats::ScopeSharedPtr scope = store_->createScope("scope");
-  scope->gaugeFromStatName(makeStat("g2"), Stats::Gauge::ImportMode::Accumulate).set(2);
-  Stats::ScopeSharedPtr scope2 = store_->createScope("scope1.scope2");
-  scope2->textReadoutFromStatName(makeStat("t3")).set("text readout value");
-  scope2->counterFromStatName(makeStat("unset"));
-
-  auto test = [this](absl::string_view params, const std::vector<std::string>& expected,
-                     const std::vector<std::string>& not_expected) {
-    std::string url = absl::StrCat("/stats?format=html", params);
-    CodeResponse code_response = handlerStats(url);
-    EXPECT_EQ(Http::Code::OK, code_response.first);
-    for (const std::string& expect : expected) {
-      EXPECT_THAT(code_response.second, HasSubstr(expect)) << "params=" << params;
-    }
-    for (const std::string& not_expect : not_expected) {
-      EXPECT_THAT(code_response.second, Not(HasSubstr(not_expect))) << "params=" << params;
-    }
-  };
-  test("",
-       {"foo.c0: 0", "foo.c1: 1", "scope.g2: 2", "scope1.scope2.unset: 0", // expected
-        "scope1.scope2.t3: \"text readout value\"", "No Histograms found"},
-       {"No TextReadouts found"});                   // not expected
-  test("&type=Counters", {"foo.c0: 0", "foo.c1: 1"}, // expected
-       {"No Histograms found", "scope.g2: 2"});      // not expected
-  test("&usedonly", {"foo.c0: 0", "foo.c1: 1"},      // expected
-       {"scope1.scope2.unset"});                     // not expected
-}
-#endif
 
 TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
   const std::string url = "/stats?histogram_buckets=cumulative";
