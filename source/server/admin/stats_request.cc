@@ -74,6 +74,7 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
   // nextChunk's contract is to add up to chunk_size_ additional bytes. The
   // caller is not required to drain the bytes after each call to nextChunk.
   const uint64_t starting_response_length = response.length();
+  std::string scope_name;
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
       if (phase_stat_count_ == 0) {
@@ -106,14 +107,14 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
     StatOrScopes variant = std::move(iter->second);
     StatOrScopesIndex index = static_cast<StatOrScopesIndex>(variant.index());
     switch (index) {
-    case StatOrScopesIndex::Scopes: {
+    case StatOrScopesIndex::Scopes:
       // Erase the current element before adding new ones, as absl::btree_map
       // does not have stable iterators. When we hit leaf stats we will erase
       // second, so that we can use the name held as a map key, and don't need
       // to re-serialize the name from the symbol table.
-      std::string name = iter->first; // Copy out the name before erasing the iterator.
+      scope_name = iter->first; // Copy out the name before erasing the iterator.
       stat_map_.erase(iter);
-      populateStatsForCurrentPhase(name, absl::get<ScopeVec>(variant));
+      populateStatsForCurrentPhase(scope_name, absl::get<ScopeVec>(variant));
       break;
     case StatOrScopesIndex::TextReadout:
       renderStat<Stats::TextReadoutSharedPtr>(iter->first, response, variant);
@@ -181,6 +182,12 @@ void StatsRequest::populateStatsForCurrentPhase(absl::string_view scope_name,
 
 template <class StatType> void StatsRequest::populateStatsFromScopes(absl::string_view scope_name,
                                                                      const ScopeVec& scope_vec) {
+  // If the 'scope' parameter is specified, then we want to skip iteration
+  // over scopes that mismatch the parameter.
+  if (!scope_name.startsWith(params_.scope())) {
+    return;
+  }
+
   Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
     if (params_.used_only_ && !stat->used()) {
       return true;
@@ -207,21 +214,7 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(absl::strin
     return true;
   };
 
-  if (params_.scope_.has_value()) {
-    if (params_.scope_->empty() && !scope_name.empty() &&
-        scope_name.find('.') == absl::string_view::npos) {
-      renderScope(scope_name);
-    } else if (params_.scope_->empty() && !absl::StartsWith(params_.scope_, scope_name)) {
-    }
-  }
-
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
-    // If the scope-name param is specified, and non-empty, then we filter
-
-      if (!
-        continue;
-      }
-    }
     scope->iterate(check_stat);
   }
 }

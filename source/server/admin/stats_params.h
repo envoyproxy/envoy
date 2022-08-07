@@ -62,7 +62,7 @@ struct StatsParams {
   std::string filter_string_;
   std::shared_ptr<std::regex> filter_;
   std::shared_ptr<re2::RE2> re2_filter_;
-  absl::optional<std::string> scope_;
+  std::string scope_;
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
   Http::Utility::QueryParams query_;
 };

@@ -29,6 +29,7 @@ class StatsRequest : public Admin::Request {
   // co-mingle the types. Note that histograms are groups together in the data
   // JSON data model, so we won't be able to fully co-mingle.
   enum class Phase {
+    Scopes,
     TextReadouts,
     CountersAndGauges,
     Histograms,
