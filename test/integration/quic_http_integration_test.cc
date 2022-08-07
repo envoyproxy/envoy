@@ -1,3 +1,4 @@
+#include <openssl/ssl.h>
 #include <openssl/x509_vfy.h>
 
 #include <cstddef>
@@ -19,11 +20,14 @@
 #include "source/common/quic/quic_transport_socket_factory.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/common/quic/test_utils.h"
 #include "test/common/upstream/utility.h"
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/utility.h"
+#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/ssl_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -35,6 +39,9 @@
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 namespace Envoy {
+
+using Extensions::TransportSockets::Tls::ContextImplPeer;
+
 namespace Quic {
 
 class CodecClientCallbacksForTest : public Http::CodecClientCallbacks {
@@ -246,11 +253,26 @@ public:
         });
 
     HttpIntegrationTest::initialize();
-    // Latch quic_transport_socket_factory_ which is instantiated in initialize().
-    transport_socket_factory_ =
-        static_cast<QuicClientTransportSocketFactory*>(quic_transport_socket_factory_.get());
     registerTestServerPorts({"http"});
 
+    // Initialize the transport socket factory using a customized ssl option.
+    ssl_client_option_.setAlpn(true).setSan(san_to_match_).setSni("lyft.com");
+    NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
+    ON_CALL(context, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(stats_store_));
+    ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager_));
+    envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
+        quic_transport_socket_config;
+    auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
+    initializeUpstreamTlsContextConfig(ssl_client_option_, *tls_context);
+
+    envoy::config::core::v3::TransportSocket message;
+    message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    auto& config_factory = Config::Utility::getAndCheckFactory<
+        Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
+    transport_socket_factory_.reset(static_cast<QuicClientTransportSocketFactory*>(
+        config_factory.createTransportSocketFactory(quic_transport_socket_config, context)
+            .release()));
     ASSERT(&transport_socket_factory_->clientContextConfig());
   }
 
@@ -341,7 +363,8 @@ protected:
   envoy::config::core::v3::QuicProtocolOptions client_quic_options_;
   TestEnvoyQuicClientConnection* quic_connection_{nullptr};
   std::list<quic::QuicConnectionId> designated_connection_ids_;
-  Quic::QuicClientTransportSocketFactory* transport_socket_factory_{nullptr};
+  Ssl::ClientSslTransportOptions ssl_client_option_;
+  std::unique_ptr<Quic::QuicClientTransportSocketFactory> transport_socket_factory_;
   bool validation_failure_on_path_response_{false};
 };
 
@@ -1018,6 +1041,108 @@ TEST_P(QuicHttpIntegrationTest, NoStreams) {
   // Make sure the time out closes the stream.
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+}
+
+TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationSucceeds) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
+    return;
+  }
+
+  // Config the client to defer cert validation by 5ms.
+  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
+      new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "envoy.tls.cert_validator.timed_cert_validator"
+typed_config:
+  "@type": type.googleapis.com/test.common.config.DummyConfig
+  )EOF"),
+                            *custom_validator_config);
+  ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config);
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_TRUE(codec_client_->connected());
+}
+
+TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationAfterDisconnect) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
+    return;
+  }
+
+  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
+      new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "envoy.tls.cert_validator.timed_cert_validator"
+typed_config:
+  "@type": type.googleapis.com/test.common.config.DummyConfig
+  )EOF"),
+                            *custom_validator_config);
+  ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config);
+
+  // Change the configured cert validation to defer 1s.
+  auto cert_validator_factory =
+      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
+          getFactory("envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
+  initialize();
+  // Change the handshake timeout to be 500ms to fail the handshake while the cert validation is
+  // pending.
+  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(500);
+  auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
+  persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
+  persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_TRUE(codec_client_->disconnected());
+
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
+  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  EXPECT_TRUE(cert_validator.validationPending());
+  while (cert_validator.validationPending()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+TEST_P(QuicHttpIntegrationTest, AsyncCertVerificationAfterTearDown) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
+    return;
+  }
+
+  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
+      new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "envoy.tls.cert_validator.timed_cert_validator"
+typed_config:
+  "@type": type.googleapis.com/test.common.config.DummyConfig
+  )EOF"),
+                            *custom_validator_config);
+  ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config);
+  // Change the configured cert validation to defer 1s.
+  auto cert_validator_factory =
+      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
+          getFactory("envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
+  initialize();
+  // Change the handshake timeout to be 500ms to fail the handshake while the cert validation is
+  // pending.
+  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(500);
+  auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
+  persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
+  persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_TRUE(codec_client_->disconnected());
+
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
+  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  EXPECT_TRUE(cert_validator.validationPending());
+  codec_client_.reset();
+  while (cert_validator.validationPending()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 }
 
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {

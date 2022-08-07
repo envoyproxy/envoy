@@ -170,6 +170,7 @@ private:
 
   const std::string path_;
   const std::string host_value_;
+  const envoy::config::core::v3::RequestMethod method_;
   absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
       service_name_matcher_;
   Router::HeaderParserPtr request_headers_parser_;
