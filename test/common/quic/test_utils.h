@@ -13,10 +13,10 @@
 #include "test/test_common/environment.h"
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
+#include "quiche/quic/core/qpack/qpack_encoder.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/first_flight.h"
-#include "quiche/quic/test_tools/qpack/qpack_encoder_test_utils.h"
 #include "quiche/quic/test_tools/qpack/qpack_test_utils.h"
 #include "quiche/quic/test_tools/quic_config_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
@@ -234,7 +234,7 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
 
 std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
-  quic::test::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
+  quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate);
   qpack_encoder->set_qpack_stream_sender_delegate(&encoder_stream_sender_delegate);
   // QpackEncoder does not use the dynamic table by default,
