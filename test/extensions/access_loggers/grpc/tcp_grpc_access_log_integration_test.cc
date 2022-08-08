@@ -1,6 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/service/accesslog/v3/als.pb.h"
 
@@ -8,6 +10,7 @@
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
 #include "source/common/version/version.h"
+#include "source/extensions/filters/network/rbac/config.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -96,6 +99,7 @@ public:
     clearPort(*log_entry->mutable_common_properties()->mutable_upstream_remote_address());
     clearPort(*log_entry->mutable_common_properties()->mutable_upstream_local_address());
     log_entry->mutable_common_properties()->clear_start_time();
+    log_entry->mutable_common_properties()->clear_duration();
     log_entry->mutable_common_properties()->clear_time_to_last_rx_byte();
     log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
@@ -176,6 +180,88 @@ tcp_logs:
         socket_address:
           address: {}
       upstream_cluster: cluster_0
+      upstream_request_attempt_count: 1
+      downstream_direct_remote_address:
+        socket_address:
+          address: {}
+    connection_properties:
+      received_bytes: 3
+      sent_bytes: 5
+)EOF",
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+
+  cleanup();
+}
+
+// Test RBAC.
+TEST_P(TcpGrpcAccessLogIntegrationTest, RBACAccessLogFlow) {
+  config_helper_.addNetworkFilter(R"EOF(
+name: envoy.filters.network.rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  rules:
+    action: ALLOW
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+)EOF");
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(fake_upstream_connection->write("hello"));
+  tcp_client->waitForData("hello");
+  ASSERT_TRUE(tcp_client->write("bar", false));
+
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(tcp_client->write("", true));
+
+  // ASSERT_TRUE(fake_upstream_connection->waitForData(3));
+  // ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(
+      waitForAccessLogRequest(fmt::format(R"EOF(
+identifier:
+  node:
+    id: node_name
+    cluster: cluster_name
+    locality:
+      zone: zone_name
+    user_agent_name: "envoy"
+  log_name: foo
+tcp_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: {}
+      downstream_local_address:
+        socket_address:
+          address: {}
+      upstream_remote_address:
+        socket_address:
+          address: {}
+      upstream_local_address:
+        socket_address:
+          address: {}
+      upstream_cluster: cluster_0
+      upstream_request_attempt_count: 1
+      connection_termination_details: rbac_access_denied_matched_policy[none]
       downstream_direct_remote_address:
         socket_address:
           address: {}
