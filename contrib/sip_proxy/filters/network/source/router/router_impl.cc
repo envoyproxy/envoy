@@ -709,13 +709,6 @@ void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
             conn_data_->connection().connectionInfoProvider().localAddress()->asStringView(),
             data.length());
 
-  // A new Transaction from Upstream won't have an activeTrans
-  // if (!callbacks_) {
-  //   ENVOY_LOG(error, "There is no activeTrans, drain data.");
-  //   data.drain(data.length());
-  //   return;
-  // }
-
   upstream_buffer_.move(data);
   auto response_decoder = std::make_unique<ResponseDecoder>(*this);
   response_decoder->onData(upstream_buffer_);

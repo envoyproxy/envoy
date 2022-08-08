@@ -181,7 +181,7 @@ public:
   void addXEnvoyOriginIngressHeader(IngressID ingress_id);
   void removeXEnvoyOriginIngressHeader();
   bool hasXEnvoyOriginIngressHeader();
-  void addNewMsgHeader(HeaderType type, absl::string_view value);
+  void addNewMsgHeader(HeaderType type, const std::string& value);
   void removeMsgHeader(HeaderType type);
   bool hasMsgHeader(HeaderType type);
 

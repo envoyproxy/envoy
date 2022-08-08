@@ -223,7 +223,7 @@ private:
     void startUpstreamResponse() override { parent_.startUpstreamResponse(); }
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
                                             Router::RouteConstSharedPtr return_route,
-                                            std::string return_destination,
+                                            const std::string& return_destination,
                                             Network::Connection* return_connection) override {
       return parent_.upstreamData(metadata, return_route, return_destination, return_connection);
     }
@@ -322,9 +322,7 @@ private:
     // SipFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     std::string transactionId() const override { return transaction_id_; }
-    absl::optional<IngressID> ingressID() override {
-      return parent_.local_ingress_id_;
-    }
+    absl::optional<IngressID> ingressID() override { return parent_.local_ingress_id_; }
     const Network::Connection* connection() const override;
     Router::RouteConstSharedPtr route() override;
     SipFilterStats& stats() override { return parent_.stats_; }
@@ -332,7 +330,7 @@ private:
     void startUpstreamResponse() override;
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
                                             Router::RouteConstSharedPtr return_route,
-                                            std::string return_destination,
+                                            const std::string& return_destination,
                                             Network::Connection* return_connection) override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
@@ -446,7 +444,7 @@ private:
     void startUpstreamResponse() override;
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
                                             Router::RouteConstSharedPtr return_route,
-                                            std::string return_destination,
+                                            const std::string& return_destination,
                                             Network::Connection* return_connection) override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
@@ -496,7 +494,7 @@ private:
 
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
                                             Router::RouteConstSharedPtr return_route,
-                                            std::string return_destination,
+                                            const std::string& return_destination,
                                             Network::Connection* connection) override;
 
     void resetDownstreamConnection() override{};

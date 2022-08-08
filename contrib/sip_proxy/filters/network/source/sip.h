@@ -86,15 +86,22 @@ public:
     }
   }
 
+  HeaderType str2Header(const std::string& header) const {
+    if (const auto& result = sip_header_type_map_.find(header);
+        result != sip_header_type_map_.end()) {
+      return result->second;
+    } else {
+      return HeaderType::Other;
+    }
+  }
+
   absl::string_view header2Str(const HeaderType type) const {
-    auto it = std::find_if(sip_header_type_map_.begin(), sip_header_type_map_.end(),
-                        [&type](const std::pair<absl::string_view, HeaderType> &p) {
-                            return p.second == type;
-                        });
+    auto it = std::find_if(
+        sip_header_type_map_.begin(), sip_header_type_map_.end(),
+        [&type](const std::pair<absl::string_view, HeaderType>& p) { return p.second == type; });
     if (it == sip_header_type_map_.end()) {
       return nullptr;
-    }
-    else {
+    } else {
       return it->first;
     }
   }
@@ -117,7 +124,6 @@ private:
       {"TopLine", HeaderType::TopLine},
       {"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap},
       {"X-Envoy-Origin-Ingress", HeaderType::XEnvoyOriginIngress}};
-
 };
 
 using HeaderTypes = ConstSingleton<HeaderTypeMap>;

@@ -171,11 +171,19 @@ ConnectionManager::ConnectionManager(
 ConnectionManager::~ConnectionManager() = default;
 
 Network::FilterStatus ConnectionManager::onNewConnection() {
-  std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() + "@" + read_callbacks_->connection().connectionInfoProvider().localAddress()->ip()->addressAsString();
-  std::string downstream_conn_id = read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() + "@" + random_generator_.uuid();
+  std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() +
+                          "@" +
+                          read_callbacks_->connection()
+                              .connectionInfoProvider()
+                              .localAddress()
+                              ->ip()
+                              ->addressAsString();
+  std::string downstream_conn_id =
+      read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() +
+      "@" + random_generator_.uuid();
   local_ingress_id_ = IngressID(thread_id, downstream_conn_id);
   downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
-  
+
   ENVOY_LOG(info, "Created downstream connection with thread_id={}, downstream_connection_id={}",
             thread_id, downstream_conn_id);
   ENVOY_LOG(debug, "Number of downstream connections={}", downstream_connection_infos_->size());
@@ -314,7 +322,8 @@ void ConnectionManager::doDeferredTransDestroy(ConnectionManager::ActiveTrans& t
   transactions_.erase(trans.transactionId());
 }
 
-void ConnectionManager::doDeferredUpstreamTransDestroy(ConnectionManager::UpstreamActiveTrans& trans) {
+void ConnectionManager::doDeferredUpstreamTransDestroy(
+    ConnectionManager::UpstreamActiveTrans& trans) {
   upstream_transactions_info_->deleteTransaction(trans.transactionId());
 }
 
@@ -362,14 +371,12 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
   std::string&& k = std::string(metadata->transactionId().value());
 
-  if (metadata->msgType() == MsgType::Response) {
-    if (upstream_transactions_info_->hasTransaction(k)) {
-      ENVOY_LOG(debug, "Response from upstream transaction ID {} received.", k);
-      return *(upstream_transactions_info_->getTransaction(k));
-    }
+  if ((metadata->msgType() == MsgType::Response) &&
+      (upstream_transactions_info_->hasTransaction(k))) {
+    ENVOY_LOG(debug, "Response from upstream transaction ID {} received.", k);
+    return *(upstream_transactions_info_->getTransaction(k));
   }
 
-  // request handling
   stats_.request_active_.inc();
   
   stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
@@ -482,7 +489,7 @@ FilterStatus ConnectionManager::ActiveTrans::transportBegin(MessageMetadataShare
   if (ingressID().has_value()) {
     if (metadata->hasXEnvoyOriginIngressHeader()) {
       ENVOY_LOG(debug, "X-Envoy-Origin-Ingress header existing in current message, removing it "
-                "for being replaced ...");
+                       "for being replaced ...");
       metadata_->removeXEnvoyOriginIngressHeader();
     }
     ENVOY_LOG(debug, "Adding X-Envoy-Origin-Ingress header for current message ...");
@@ -587,7 +594,7 @@ void ConnectionManager::ActiveTrans::startUpstreamResponse() {
 
 SipFilters::ResponseStatus ConnectionManager::ActiveTrans::upstreamData(
     MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
-    std::string return_destination, Network::Connection* return_connection) {
+    const std::string& return_destination, Network::Connection* return_connection) {
   ASSERT(response_decoder_ != nullptr);
   UNREFERENCED_PARAMETER(return_route);
   UNREFERENCED_PARAMETER(return_destination);
@@ -675,7 +682,7 @@ void ConnectionManager::UpstreamActiveTrans::startUpstreamResponse() {
 
 SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
     MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
-    std::string return_destination, Network::Connection* return_connection) {
+    const std::string& return_destination, Network::Connection* return_connection) {
   route_ = return_route;
   destination_ = return_destination;
   return_connection_ = return_connection;
@@ -742,7 +749,7 @@ void ConnectionManager::DownstreamConnectionInfoItem::startUpstreamResponse() {}
 
 SipFilters::ResponseStatus ConnectionManager::DownstreamConnectionInfoItem::upstreamData(
     MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
-    std::string return_destination, Network::Connection* return_connection) {
+    const std::string& return_destination, Network::Connection* return_connection) {
   std::string&& k = std::string(metadata->transactionId().value());
 
   if (upstreamTransactionInfo()->hasTransaction(k)) {
@@ -796,7 +803,6 @@ size_t DownstreamConnectionInfos::size() {
 
 void DownstreamConnectionInfos::deleteDownstreamConnection(std::string&& conn_id) {
   if (hasDownstreamConnection(conn_id)) {
-    // fixme - probably need to have this run on the main thread?
     tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.erase(
         conn_id);
   }
@@ -883,8 +889,8 @@ void SipProxy::UpstreamTransactionsInfo::deleteTransaction(std::string&& transac
 
 bool SipProxy::UpstreamTransactionsInfo::hasTransaction(std::string& transaction_id) {
   return tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transactions_info_map_.find(
-             transaction_id) !=
-         tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>().upstream_transactions_info_map_.end();
+             transaction_id) != tls_->getTyped<ThreadLocalUpstreamTransactionsInfo>()
+                                    .upstream_transactions_info_map_.end();
 }
 
 std::shared_ptr<SipProxy::ConnectionManager::UpstreamActiveTrans>

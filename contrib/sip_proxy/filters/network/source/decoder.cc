@@ -321,24 +321,29 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
 
   auto downstream_conn_start = header.find("downstream-connection=", thread_end);
   if (downstream_conn_start == absl::string_view::npos) {
-    ENVOY_LOG(error, "Not found start of thread downstream-connection for X-Envoy_origin-Ingress={}", header);
+    ENVOY_LOG(error,
+              "Not found start of thread downstream-connection for X-Envoy_origin-Ingress={}",
+              header);
     return 0;
   }
   downstream_conn_start += 22;
   auto downstream_conn_end = header.length();
   if (downstream_conn_end <= downstream_conn_start) {
-    ENVOY_LOG(error, "Not found end of thread downstream-connection for X-Envoy_origin-Ingress={}", header);
+    ENVOY_LOG(error, "Not found end of thread downstream-connection for X-Envoy_origin-Ingress={}",
+              header);
     return 0;
   }
 
   // todo error checks
   auto worker_thread_id = header.substr(thread_start, thread_end - thread_start);
-  auto downstream_conn_id = header.substr(downstream_conn_start, downstream_conn_end - downstream_conn_start);
-  auto ingress_id = std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
+  auto downstream_conn_id =
+      header.substr(downstream_conn_start, downstream_conn_end - downstream_conn_start);
+  auto ingress_id =
+      std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
   ENVOY_LOG(trace, "X-Envoy_origin-Ingress header processed: thread={}, downstream-connection={}",
             worker_thread_id, downstream_conn_id);
   metadata()->setIngressId(std::move(ingress_id));
-  
+
   return 0;
 }
 

@@ -135,7 +135,7 @@ bool MessageMetadata::hasXEnvoyOriginIngressHeader() {
   return hasMsgHeader(HeaderType::XEnvoyOriginIngress);
 }
 
-void MessageMetadata::addNewMsgHeader(HeaderType type, absl::string_view value) {
+void MessageMetadata::addNewMsgHeader(HeaderType type, const std::string& value) {
   if (new_headers_pos_ == 0) {
     // place new headers before the content headers
     new_headers_pos_ = raw_msg_.find("Content");
@@ -143,7 +143,7 @@ void MessageMetadata::addNewMsgHeader(HeaderType type, absl::string_view value) 
   ASSERT(new_headers_pos_ != absl::string_view::npos);
 
   absl::string_view str_type = HeaderTypes::get().header2Str(type);
-  std::string header = std::string(str_type) + ": " + std::string(value) + "\r\n";
+  std::string header = std::string(str_type) + ": " + value + "\r\n";
 
   setOperation(
       Operation(OperationType::Insert, new_headers_pos_, InsertOperationValue(std::move(header))));
