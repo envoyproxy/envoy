@@ -52,7 +52,7 @@ public:
   }
 
   void initialize() override {
-    BaseClientIntegrationTest::initialize();
+    XdsIntegrationTest::initialize();
     initializeXdsStream();
   }
 };
@@ -64,7 +64,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   initialize();
 
   // Send a request on the data plane.
-  stream_->sendHeaders(default_request_headers_, true);
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
   terminal_callback_.waitReady();
 
   EXPECT_EQ(cc_.on_headers_calls, 1);
