@@ -147,8 +147,8 @@ protected:
   std::string host_{"www.abc.com"};
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
-  spdy::SpdyHeaderBlock spdy_response_headers_;
-  spdy::SpdyHeaderBlock spdy_trailers_;
+  spdy::Http2HeaderBlock spdy_response_headers_;
+  spdy::Http2HeaderBlock spdy_trailers_;
   Buffer::OwnedImpl request_body_{"Hello world"};
   std::string response_body_{"OK\n"};
 };
@@ -266,7 +266,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
   for (const std::string& status : {"100", "199", "100"}) {
-    spdy::SpdyHeaderBlock continue_header;
+    spdy::Http2HeaderBlock continue_header;
     continue_header[":status"] = status;
     continue_header["i"] = absl::StrCat("", i++);
     std::string data = spdyHeaderToHttp3StreamPayload(continue_header);
@@ -285,7 +285,7 @@ TEST_F(EnvoyQuicClientStreamTest, ResetUpon101SwitchProtocol) {
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
-  spdy::SpdyHeaderBlock continue_header;
+  spdy::Http2HeaderBlock continue_header;
   continue_header[":status"] = "101";
   std::string data = spdyHeaderToHttp3StreamPayload(continue_header);
   quic::QuicStreamFrame frame(stream_id_, false, 0u, data);

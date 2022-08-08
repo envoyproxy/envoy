@@ -246,51 +246,6 @@ TEST_F(QatProviderRsaTest, TestQatDeviceInit) {
   delete private_key;
 }
 
-TEST_F(QatProviderRsaTest, TestQatDeviceSetup) {
-  std::string* key_file = new std::string(TestEnvironment::substitute(
-      "{{ test_rundir }}/contrib/qat/private_key_providers/test/test_data/rsa-2048.pem"));
-  envoy::config::core::v3::DataSource* private_key = new envoy::config::core::v3::DataSource();
-  private_key->set_allocated_filename(key_file);
-
-  envoy::extensions::private_key_providers::qat::v3alpha::QatPrivateKeyMethodConfig conf;
-  conf.set_allocated_private_key(private_key);
-
-  std::shared_ptr<QatPrivateKeyMethodProvider> provider;
-
-  // no errors
-  provider = std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_);
-  EXPECT_NE(provider, nullptr);
-
-  // can't count instances
-  libqat_->cpaCyGetNumInstances_return_value_ = CPA_STATUS_FAIL;
-  EXPECT_THROW_WITH_REGEX(
-      std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_),
-      EnvoyException, "Failed to start QAT.");
-  libqat_->resetReturnValues();
-
-  // can't list QAT instanecs
-  libqat_->cpaCyGetInstances_return_value_ = CPA_STATUS_FAIL;
-  EXPECT_THROW_WITH_REGEX(
-      std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_),
-      EnvoyException, "Failed to start QAT.");
-  libqat_->resetReturnValues();
-
-  // instance won't start
-  libqat_->cpaCyStartInstance_return_value_ = CPA_STATUS_FAIL;
-  EXPECT_THROW_WITH_REGEX(
-      std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_),
-      EnvoyException, "Failed to start QAT.");
-  libqat_->resetReturnValues();
-
-  // no instance info
-  libqat_->cpaCyInstanceGetInfo2_return_value_ = CPA_STATUS_FAIL;
-  EXPECT_THROW_WITH_REGEX(
-      std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_),
-      EnvoyException, "Failed to start QAT.");
-  libqat_->resetReturnValues();
-  delete private_key;
-}
-
 } // namespace
 } // namespace Qat
 } // namespace PrivateKeyMethodProvider

@@ -707,7 +707,7 @@ platform(
 platform(
     name = "android_armeabi",
     constraint_values = [
-        "@platforms//cpu:arm",  # TODO(keith): This should be armv7 https://github.com/bazelbuild/bazel/issues/14982
+        "@platforms//cpu:armv7",
         "@platforms//os:android",
     ],
 )

@@ -232,7 +232,7 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
       config, quic::kMinimumFlowControlSendWindow);
 }
 
-std::string spdyHeaderToHttp3StreamPayload(const spdy::SpdyHeaderBlock& header) {
+std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::test::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate);
@@ -240,10 +240,8 @@ std::string spdyHeaderToHttp3StreamPayload(const spdy::SpdyHeaderBlock& header) 
   // QpackEncoder does not use the dynamic table by default,
   // therefore the value of |stream_id| does not matter.
   std::string payload = qpack_encoder->EncodeHeaderList(/* stream_id = */ 0, header, nullptr);
-  std::unique_ptr<char[]> headers_buffer;
-  quic::QuicByteCount headers_frame_header_length =
-      quic::HttpEncoder::SerializeHeadersFrameHeader(payload.length(), &headers_buffer);
-  absl::string_view headers_frame_header(headers_buffer.get(), headers_frame_header_length);
+  std::string headers_frame_header =
+      quic::HttpEncoder::SerializeHeadersFrameHeader(payload.length());
   return absl::StrCat(headers_frame_header, payload);
 }
 
@@ -282,6 +280,8 @@ public:
   MOCK_METHOD(bool, isServer, (), (const));
   MOCK_METHOD(const Network::TransportSocketOptionsConstSharedPtr&, transportSocketOptions, (),
               (const));
+  MOCK_METHOD(Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext,
+              extraValidationContext, (), (const));
 };
 
 } // namespace Quic

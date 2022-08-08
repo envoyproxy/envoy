@@ -48,8 +48,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
-      encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
-      outlier_detection_timeout_recorded_(false),
+      router_sent_end_stream_(false), encode_trailers_(false), retried_(false),
+      awaiting_headers_(true), outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       cleaned_up_(false), had_upstream_(false),
@@ -243,16 +243,16 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
   parent_.onUpstreamHostSelected(host);
 }
 
-void UpstreamRequest::encodeHeaders(bool end_stream) {
-  ASSERT(!encode_complete_);
-  encode_complete_ = end_stream;
+void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
+  ASSERT(!router_sent_end_stream_);
+  router_sent_end_stream_ = end_stream;
 
   conn_pool_->newStream(this);
 }
 
-void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(!encode_complete_);
-  encode_complete_ = end_stream;
+void UpstreamRequest::acceptDataFromRouter(Buffer::Instance& data, bool end_stream) {
+  ASSERT(!router_sent_end_stream_);
+  router_sent_end_stream_ = end_stream;
 
   if (!upstream_ || paused_for_connect_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks(), data.length());
@@ -277,9 +277,9 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
-  ASSERT(!encode_complete_);
-  encode_complete_ = true;
+void UpstreamRequest::acceptTrailersFromRouter(const Http::RequestTrailerMap& trailers) {
+  ASSERT(!router_sent_end_stream_);
+  router_sent_end_stream_ = true;
   encode_trailers_ = true;
 
   if (!upstream_) {
@@ -293,7 +293,7 @@ void UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   }
 }
 
-void UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
+void UpstreamRequest::acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr) {
   if (!upstream_) {
     ENVOY_STREAM_LOG(trace, "upstream_ not ready. Store metadata_map to encode later: {}",
                      *parent_.callbacks(), *metadata_map_ptr);
@@ -327,7 +327,7 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
 
 void UpstreamRequest::resetStream() {
   // Don't reset the stream if we're already done with it.
-  if (encode_complete_ && decode_complete_) {
+  if (router_sent_end_stream_ && decode_complete_) {
     return;
   }
 
@@ -449,7 +449,6 @@ void UpstreamRequest::onPoolReady(
   }
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
-  parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
   if (info.upstreamInfo()) {
     auto& upstream_timing = info.upstreamInfo()->upstreamTiming();
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
@@ -576,14 +575,14 @@ void UpstreamRequest::encodeBodyAndTrailers() {
 
     if (buffered_request_body_) {
       stream_info_.addBytesSent(buffered_request_body_->length());
-      upstream_->encodeData(*buffered_request_body_, encode_complete_ && !encode_trailers_);
+      upstream_->encodeData(*buffered_request_body_, router_sent_end_stream_ && !encode_trailers_);
     }
 
     if (encode_trailers_) {
       upstream_->encodeTrailers(*parent_.downstreamTrailers());
     }
 
-    if (encode_complete_) {
+    if (router_sent_end_stream_) {
       upstreamTiming().onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
     }
   }

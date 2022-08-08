@@ -18,5 +18,8 @@ constexpr char TestPassThroughFilter::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<TestPassThroughFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
+static Registry::RegisterFactory<SimpleFilterConfig<TestPassThroughFilter>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy
