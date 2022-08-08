@@ -78,11 +78,28 @@ public:
   Http::Code handlerContention(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
-  Admin::RequestPtr makeRequest(absl::string_view path, AdminStream& admin_stream);
-  static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params);
+
+  /**
+   * When stats are rendered in HTML mode, we want users to be able to tweak
+   * parameters after the stats page is rendered, such as tweaking the filter or
+   * `usedonly`. We use the same stats UrlHandler both for the admin home page
+   * and for rendering in /stats?format=html. We share the same UrlHandler in
+   * both contexts by defining an API for it here.
+   *
+   * @return a URL handler for stats.
+   */
+  Admin::UrlHandler statsHandler();
+
+  static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
+                                       StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
+  Admin::RequestPtr makeRequest(absl::string_view path, AdminStream&);
+  // static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
+  //                                     StatsRequest::UrlHandlerFn url_handler_fn);
 
 private:
-  friend class StatsHandlerTest;
+  static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
+                                    Stats::Store& stats,
+                                    Stats::CustomStatNamespaces& custom_namespaces);
 };
 
 } // namespace Server

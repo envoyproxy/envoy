@@ -51,6 +51,7 @@
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/logical_dns_cluster.h"
 #include "source/common/upstream/original_dst_cluster.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -798,7 +799,8 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
-    Server::Configuration::ServerFactoryContext&, const envoy::config::cluster::v3::Cluster& config,
+    Server::Configuration::ServerFactoryContext& server_context,
+    const envoy::config::cluster::v3::Cluster& config,
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
     bool added_via_api, Server::Configuration::TransportSocketFactoryContext& factory_context)
@@ -868,7 +870,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                     config.cluster_type())
               : absl::nullopt),
       factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
+      server_factory_context_(server_context) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
@@ -974,6 +977,21 @@ ClusterInfoImpl::ClusterInfoImpl(
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(std::move(callback));
+  }
+
+  if (http_protocol_options_ && !http_protocol_options_->http_filters_.empty()) {
+    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
+        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+            server_factory_context_);
+    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
+
+    std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
+    Http::FilterChainHelper<Server::Configuration::ServerFactoryContext,
+                            Server::Configuration::UpstreamHttpFilterConfigFactory>
+        helper(*filter_config_provider_manager, server_factory_context_, server_factory_context_,
+               prefix);
+    // TODO(alyssawilk) make sure we have easy to debug logs about what filters are set up.
+    helper.processFilters(http_filters, "http", "http", http_filter_factories_, false);
   }
 }
 

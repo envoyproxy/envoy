@@ -268,12 +268,19 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
   case BalsaFrameEnums::HEADERS_TOO_LONG:
     error_message_ = "size exceeds limit";
     break;
+  case BalsaFrameEnums::TRAILER_MISSING_COLON:
+    error_message_ = "HPE_INVALID_HEADER_TOKEN";
+    break;
   default:
     error_message_ = BalsaFrameEnums::ErrorCodeToString(error_code);
   }
 }
 
-void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode /*error_code*/) {}
+void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode error_code) {
+  if (error_code == BalsaFrameEnums::TRAILER_MISSING_COLON) {
+    HandleError(error_code);
+  }
+}
 
 ParserStatus BalsaParser::convertResult(CallbackResult result) const {
   return result == CallbackResult::Error ? ParserStatus::Error : status_;

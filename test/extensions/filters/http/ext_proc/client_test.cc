@@ -31,13 +31,13 @@ protected:
   void SetUp() override {
     grpc_service_.mutable_envoy_grpc()->set_cluster_name("test");
 
-    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
+    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClient(_, _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doFactory));
 
     client_ = std::make_unique<ExternalProcessorClientImpl>(client_manager_, stats_store_);
   }
 
-  Grpc::RawAsyncClientSharedPtr doFactory(Unused, Unused, Unused, Unused) {
+  Grpc::RawAsyncClientSharedPtr doFactory(Unused, Unused, Unused) {
     auto async_client = std::make_shared<Grpc::MockAsyncClient>();
     EXPECT_CALL(*async_client,
                 startRaw("envoy.service.ext_proc.v3.ExternalProcessor", "Process", _, _))
