@@ -52,11 +52,6 @@ public:
       callbacks.addAccessLogHandler(handler);
     };
   }
-  FilterFactoryCb createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr filter) {
-    return [filter](FilterChainFactoryCallbacks& callbacks) {
-      callbacks.addStreamDecoderFilter(filter);
-    };
-  }
 
   std::unique_ptr<FilterManager> filter_manager_;
   NiceMock<MockFilterManagerCallbacks> filter_manager_callbacks_;
