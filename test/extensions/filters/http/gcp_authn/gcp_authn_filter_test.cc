@@ -224,7 +224,7 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIteration) {
   setupMockFilterMetadata(/*valid=*/true);
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
-            Http::FilterHeadersStatus::StopIteration);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "200"},
   }));
@@ -242,11 +242,11 @@ TEST_F(GcpAuthnFilterTest, DestoryFilter) {
   // Set up mock filter metadata.
   setupMockFilterMetadata(/*valid=*/true);
 
-  // decodeHeaders() is expected to return `StopIteration` and state is expected to be in `Calling`
-  // state because none of complete functions(i.e., onSuccess, onFailure, onDestroy, etc) has been
-  // called.
+  // decodeHeaders() is expected to return `StopAllIterationAndWatermark` and state is expected to
+  // be in `Calling` state because none of complete functions(i.e., onSuccess, onFailure, onDestroy,
+  // etc) has been called.
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
-            Http::FilterHeadersStatus::StopIteration);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
   EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Calling);
   filter_->onDestroy();
   // onDestroy() call is expected to update the state from `Calling` to `Complete`.
