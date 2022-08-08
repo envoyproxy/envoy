@@ -382,7 +382,7 @@ public:
     return nullptr;
   }
   const Network::Connection* downstreamConnection() const override {
-    return callbacks_->connection();
+    return callbacks_->connection().ptr();
   }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 

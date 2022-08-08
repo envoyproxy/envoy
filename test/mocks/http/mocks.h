@@ -222,7 +222,7 @@ public:
   ~MockStreamDecoderFilterCallbacks() override;
 
   // Http::StreamFilterCallbacks
-  MOCK_METHOD(const Network::Connection*, connection, ());
+  MOCK_METHOD(OptRef<const Network::Connection>, connection, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, resetStream, ());
   MOCK_METHOD(void, resetIdleTimer, ());
@@ -318,7 +318,7 @@ public:
   ~MockStreamEncoderFilterCallbacks() override;
 
   // Http::StreamFilterCallbacks
-  MOCK_METHOD(const Network::Connection*, connection, ());
+  MOCK_METHOD(OptRef<const Network::Connection>, connection, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, resetStream, ());
   MOCK_METHOD(void, resetIdleTimer, ());

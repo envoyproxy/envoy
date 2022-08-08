@@ -515,7 +515,9 @@ private:
 
     const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
-    const Network::Connection* connection() const override { return callbacks_->connection(); }
+    const Network::Connection* connection() const override {
+      return callbacks_->connection().ptr();
+    }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
 
     Filter& parent_;
@@ -537,7 +539,9 @@ private:
 
     const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
-    const Network::Connection* connection() const override { return callbacks_->connection(); }
+    const Network::Connection* connection() const override {
+      return callbacks_->connection().ptr();
+    }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
 
     Filter& parent_;

@@ -1108,9 +1108,9 @@ StreamInfo::StreamInfo* Context::getRequestStreamInfo() const {
 
 const Network::Connection* Context::getConnection() const {
   if (encoder_callbacks_) {
-    return encoder_callbacks_->connection();
+    return encoder_callbacks_->connection().ptr();
   } else if (decoder_callbacks_) {
-    return decoder_callbacks_->connection();
+    return decoder_callbacks_->connection().ptr();
   } else if (network_read_filter_callbacks_) {
     return &network_read_filter_callbacks_->connection();
   } else if (network_write_filter_callbacks_) {
