@@ -19,6 +19,30 @@ protected:
   ThreadFactory& thread_factory_{threadFactoryForTest()};
 };
 
+TEST_F(ThreadAsyncPtrTest, ThreadSynchronizerTimeoutReturnsFalse) {
+  ThreadSynchronizer sync;
+  sync.enable();
+  sync.waitOn("never_triggered");
+  EXPECT_FALSE(sync.barrierOn("never_triggered", absl::Microseconds(1)));
+}
+
+TEST_F(ThreadAsyncPtrTest, ThreadSynchronizerWithTimeoutReturnsTrueIfBarrierMet) {
+  ThreadSynchronizer sync;
+  sync.enable();
+  sync.waitOn("triggered_quickly");
+
+  // Thread triggers the syncPoint.
+  auto thread1 = thread_factory_.createThread(
+      [&sync]() {
+        sync.syncPoint("triggered_quickly");
+        return true;
+      },
+      Options{"thread1"});
+  EXPECT_TRUE(sync.barrierOn("triggered_quickly", absl::Seconds(1)));
+  sync.signal("triggered_quickly");
+  thread1->join();
+}
+
 // Tests that two threads racing to create an object have well-defined
 // behavior.
 TEST_F(ThreadAsyncPtrTest, DeleteOnDestruct) {

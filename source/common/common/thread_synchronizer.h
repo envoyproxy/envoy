@@ -51,10 +51,12 @@ public:
    * The event_name must have been previously registered for blocking via waitOn(). The typical
    * test pattern is to have a thread arrive at a sync point, block, and then release a test
    * thread which continues test execution, eventually calling signal() to release the other thread.
+   *
+   * Returns true if the barrier was released, or false if timeout was reached.
    */
-  void barrierOn(absl::string_view event_name) {
+  bool barrierOn(absl::string_view event_name, absl::Duration timeout = absl::InfiniteDuration()) {
     ASSERT(data_ != nullptr, "call enable() from test code before calling this method");
-    barrierOnWorker(event_name);
+    return barrierOnWorker(event_name, timeout);
   }
 
   /**
@@ -87,7 +89,7 @@ private:
   SynchronizerEntry& getOrCreateEntry(absl::string_view event_name);
   void syncPointWorker(absl::string_view event_name);
   void waitOnWorker(absl::string_view event_name);
-  void barrierOnWorker(absl::string_view event_name);
+  bool barrierOnWorker(absl::string_view event_name, absl::Duration timeout);
   void signalWorker(absl::string_view event_name);
 
   std::unique_ptr<SynchronizerData> data_;
