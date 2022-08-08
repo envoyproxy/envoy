@@ -1055,7 +1055,14 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
 
   if (path_rewrite_policy_.enabled()) {
     auto just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
-    return *std::move(path_rewrite_policy_.predicate()->rewriteUrl(just_path, matched_path));
+
+    absl::StatusOr<std::string> new_path = path_rewrite_policy_.predicate()->rewriteUrl(just_path, matched_path);
+
+    // if rewrite fails return old path.
+    if(!new_path.ok()) {
+      return *std::move(just_path);
+    }
+    return *std::move(new_path);
   }
 
   // There are no rewrites configured.
