@@ -189,7 +189,7 @@ Admin::UrlHandler StatsHandler::statsHandler() {
         "histogram_buckets",
         "Histogram bucket display mode",
         {"cumulative", "disjoint", "none"}},
-       {Admin::ParamDescriptor::Type::Hidden, "json_scopes",
+       {Admin::ParamDescriptor::Type::Hidden, "show_json_scopes",
         "Rendering JSON with explicit scopes"}}};
 }
 

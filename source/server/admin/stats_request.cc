@@ -199,9 +199,11 @@ template <class StatType>
 void StatsRequest::populateStatsFromScopes(absl::string_view scope_name,
                                            const ScopeVec& scope_vec) {
   // If we are showing a scoped view, then filter based on the scope prefix.
+#ifdef ENVOY_ADMIN_HTML
   if (params_.show_json_scopes_ && !absl::StartsWith(scope_name, params_.scope_)) {
     return;
   }
+#endif
 
   Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
     if (params_.used_only_ && !stat->used()) {
@@ -229,6 +231,7 @@ void StatsRequest::populateStatsFromScopes(absl::string_view scope_name,
 
     // When looking at the scoped view with "&scope=foo", and we find
     // a stat named "foo.bar.baz", we should show that as a scope "foo.bar".
+#ifdef ENVOY_ADMIN_HTML
     if (params_.show_json_scopes_) {
       if (!params_.scope_.empty() && !absl::StartsWith(name, absl::StrCat(params_.scope_, "."))) {
         return true;
@@ -243,6 +246,7 @@ void StatsRequest::populateStatsFromScopes(absl::string_view scope_name,
         return true;
       }
     }
+#endif
 
     stat_map_[name] = stat;
     return true;

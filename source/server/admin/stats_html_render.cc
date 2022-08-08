@@ -201,7 +201,7 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
     response.add("    </select>\n  ");
     break;
   case Admin::ParamDescriptor::Type::Hidden:
-    response.add(absl::StrCat("<input type='hidden' name='", id, "' id='", id, "' form='", path,
+    response.add(absl::StrCat("<input type='hidden' name='", name, "' id='", id, "' form='", path,
                               "'", on_change,
                               value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
     break;
