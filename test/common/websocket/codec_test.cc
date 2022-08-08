@@ -436,6 +436,16 @@ TEST(WebSocketCodecTest, encodeFrameHeader) {
   EXPECT_EQ(buffer[5], 0x3d);
 
   buffer.clear();
+  encoder.newFrameHeader({0x00, 5, 0x3c332a16, nullptr}, buffer);
+  EXPECT_EQ(buffer.size(), 6);
+  EXPECT_EQ(buffer[0], 0x00);
+  EXPECT_EQ(buffer[1], 0x85);
+  EXPECT_EQ(buffer[2], 0x3c);
+  EXPECT_EQ(buffer[3], 0x33);
+  EXPECT_EQ(buffer[4], 0x2a);
+  EXPECT_EQ(buffer[5], 0x16);
+
+  buffer.clear();
   encoder.newFrameHeader({0x82, 256, absl::nullopt, nullptr}, buffer);
   EXPECT_EQ(buffer.size(), 4);
   EXPECT_EQ(buffer[0], 0x82);
@@ -486,6 +496,23 @@ TEST(WebSocketCodecTest, encodeFrameHeader) {
   EXPECT_EQ(buffer[11], 0xfa);
   EXPECT_EQ(buffer[12], 0x21);
   EXPECT_EQ(buffer[13], 0x3d);
+}
+
+TEST(GrpcCodecTest, decodeClosingFrame) {
+  Encoder encoder;
+  Buffer::OwnedImpl buffer;
+  std::vector<uint8_t> header;
+
+  encoder.newFrameHeader({0x08, 0, absl::nullopt, nullptr}, header);
+  buffer.add(header.data(), header.size());
+
+  Decoder decoder;
+  std::vector<Frame> frames;
+
+  EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_EQ(1, frames.size());
+  EXPECT_EQ(0, frames[0].payload_length_);
+  EXPECT_EQ(0x08, frames[0].flags_and_opcode_);
 }
 
 TEST(GrpcCodecTest, decodeInvalidFrame) {
@@ -588,6 +615,76 @@ TEST(WebSocketCodecTest, decodeValidMaskedFrame) {
     text_payload[i] ^= (frames[0].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
   }
   EXPECT_EQ("Hello", text_payload);
+}
+
+TEST(WebSocketCodecTest, decodeValidMultipleMaskedFrames) {
+  Encoder encoder;
+  Buffer::OwnedImpl buffer;
+
+  // "hello "
+  std::vector<uint8_t> header;
+  encoder.newFrameHeader({0x01, 6, 0xaf4be87a, nullptr}, header);
+  std::vector<uint8_t> payload = {0xc7, 0x2e, 0x84, 0x16, 0xc0, 0x6b};
+  buffer.add(header.data(), header.size());
+  buffer.add(payload.data(), payload.size());
+
+  // " from"
+  std::vector<uint8_t> header1;
+  encoder.newFrameHeader({0x00, 5, 0x3c332a16, nullptr}, header1);
+  std::vector<uint8_t> payload1 = {0x1c, 0x55, 0x58, 0x79, 0x51};
+  buffer.add(header1.data(), header1.size());
+  buffer.add(payload1.data(), payload1.size());
+
+  // "client"
+  header.clear();
+  payload.clear();
+  encoder.newFrameHeader({0x80, 6, 0x7c96263f, nullptr}, header);
+  payload = {0x1f, 0xfa, 0x4f, 0x5a, 0x12, 0xe2};
+  buffer.add(header.data(), header.size());
+  buffer.add(payload.data(), payload.size());
+
+  Decoder decoder;
+  std::vector<Frame> frames;
+  EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_EQ(3, frames.size());
+
+  EXPECT_EQ(true, frames[0].masking_key_.has_value());
+  EXPECT_EQ(0xaf4be87a, frames[0].masking_key_.value());
+  EXPECT_EQ(6, frames[0].payload_length_);
+
+  EXPECT_EQ(true, frames[1].masking_key_.has_value());
+  EXPECT_EQ(0x3c332a16, frames[1].masking_key_.value());
+  EXPECT_EQ(5, frames[1].payload_length_);
+
+  EXPECT_EQ(true, frames[2].masking_key_.has_value());
+  EXPECT_EQ(0x7c96263f, frames[2].masking_key_.value());
+  EXPECT_EQ(6, frames[2].payload_length_);
+
+  std::string text_payload;
+
+  text_payload.resize(6);
+  (*(frames[0].payload_)).copyOut(0, 6, text_payload.data());
+  // Unmasking the text payload
+  for (size_t i = 0; i < text_payload.size(); ++i) {
+    text_payload[i] ^= (frames[0].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
+  }
+  EXPECT_EQ("hello ", text_payload);
+
+  text_payload.resize(5);
+  (*(frames[1].payload_)).copyOut(0, 5, text_payload.data());
+  // Unmasking the text payload
+  for (size_t i = 0; i < text_payload.size(); ++i) {
+    text_payload[i] ^= (frames[1].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
+  }
+  EXPECT_EQ(" from", text_payload);
+
+  text_payload.resize(6);
+  (*(frames[2].payload_)).copyOut(0, 6, text_payload.data());
+  // Unmasking the text payload
+  for (size_t i = 0; i < text_payload.size(); ++i) {
+    text_payload[i] ^= (frames[2].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
+  }
+  EXPECT_EQ("client", text_payload);
 }
 
 } // namespace

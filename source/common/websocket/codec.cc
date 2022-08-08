@@ -87,7 +87,10 @@ void Decoder::frameMaskFlag(uint8_t mask_and_length) {
   length_ = mask_and_length & 0x7F;
 }
 
-void Decoder::frameMaskingKey() { frame_.masking_key_ = masking_key_; }
+void Decoder::frameMaskingKey() {
+  frame_.masking_key_ = masking_key_;
+  masking_key_ = 0;
+}
 
 void Decoder::frameDataStart() {
   frame_.payload_length_ = length_;
