@@ -249,11 +249,12 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   // Set up the upstream filter manager.
-  fm_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
+  filter_manager_callbacks__ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
-      *fm_callbacks_, parent_.callbacks()->dispatcher(), parent_.callbacks()->connection(),
-      parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
-      parent_.callbacks()->decoderBufferLimit(), *parent_.cluster(), *this);
+      *filter_manager_callbacks__, parent_.callbacks()->dispatcher(),
+      parent_.callbacks()->connection(), parent_.callbacks()->streamId(),
+      parent_.callbacks()->account(), true, parent_.callbacks()->decoderBufferLimit(),
+      *parent_.cluster(), *this);
   std::cerr << "Allow " << allow_upstream_filters_ << "\n";
   parent_.cluster()->createFilterChain(*filter_manager_);
 
@@ -337,7 +338,7 @@ void UpstreamRequest::cleanUp() {
     --downstream_data_disabled_;
   }
   if (allow_upstream_filters_) {
-    parent_.callbacks()->dispatcher().deferredDelete(std::move(fm_callbacks_));
+    parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks__));
   }
 }
 
@@ -884,9 +885,8 @@ void UpstreamRequest::encodeBodyAndTrailers() {
 UpstreamToDownstream& UpstreamRequest::upstreamToDownstream() {
   if (allow_upstream_filters_) {
     return codec_filter_->bridge_;
-  } else {
-    return *this;
   }
+  return *this;
 }
 
 void UpstreamRequest::onStreamMaxDurationReached() {

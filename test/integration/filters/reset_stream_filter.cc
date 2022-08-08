@@ -10,6 +10,7 @@
 
 namespace Envoy {
 
+// A filter which resets the downstream stream when decoding headers.
 class ResetFilter : public Http::PassThroughFilter {
 public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
