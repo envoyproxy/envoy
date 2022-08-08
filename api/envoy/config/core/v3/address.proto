@@ -32,7 +32,7 @@ message Pipe {
 }
 
 // The address represents an envoy internal listener.
-// TODO(asraa): When address available, remove workaround from test/server/server_fuzz_test.cc:30.]
+// [#comment: TODO(asraa): When address available, remove workaround from test/server/server_fuzz_test.cc:30.]
 message EnvoyInternalAddress {
   oneof address_name_specifier {
     option (validate.required) = true;
@@ -43,7 +43,8 @@ message EnvoyInternalAddress {
   }
 
   // Specifies an endpoint identifier to distinguish between multiple endpoints for the same internal listener in a
-  // single upstream pool. Only used in the upstream addresses.
+  // single upstream pool. Only used in the upstream addresses for tracking changes to individual endpoints. This, for
+  // example, may be set to the final destination IP for the target internal listener.
   string endpoint_id = 2;
 }
 
