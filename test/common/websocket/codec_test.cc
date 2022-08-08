@@ -306,6 +306,98 @@ TEST(WebSocketCodecTest, decode64BitBinaryMaskedFrame) {
   EXPECT_EQ(0x96418d54, frames[0].masking_key_.value());
 }
 
+// Tests for frames with no payload
+TEST(WebSocketCodecTest, decodeFramesWithPayload) {
+
+  // Masked 7 bit
+  {
+    Buffer::OwnedImpl buffer;
+    Buffer::addSeq(buffer, {0x81, 0x80, 0x4f, 0x5a, 0x12, 0xe2});
+
+    Decoder decoder;
+    std::vector<Frame> frames;
+    EXPECT_TRUE(decoder.decode(buffer, frames));
+    EXPECT_EQ(true, frames[0].masking_key_.has_value());
+    EXPECT_EQ(0x4f5a12e2, frames[0].masking_key_.value());
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(0, frames[0].payload_length_);
+  }
+
+  // Non-masked 7 bit
+  {
+    Buffer::OwnedImpl buffer;
+    Buffer::addSeq(buffer, {0x81, 0x00});
+
+    Decoder decoder;
+    std::vector<Frame> frames;
+    EXPECT_TRUE(decoder.decode(buffer, frames));
+    EXPECT_EQ(false, frames[0].masking_key_.has_value());
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(0, frames[0].payload_length_);
+  }
+
+  // Masked 16 bit
+  {
+    Buffer::OwnedImpl buffer;
+    Buffer::addSeq(buffer, {0x81, 0xfe, 0x00, 0x00, 0x3c, 0x33, 0x2a, 0x16});
+
+    Decoder decoder;
+    std::vector<Frame> frames;
+    EXPECT_TRUE(decoder.decode(buffer, frames));
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(true, frames[0].masking_key_.has_value());
+    EXPECT_EQ(0x3c332a16, frames[0].masking_key_.value());
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(0, frames[0].payload_length_);
+  }
+
+  // Non-masked 16 bit
+  {
+    Buffer::OwnedImpl buffer;
+    Buffer::addSeq(buffer, {
+                               0x81,
+                               0x7e,
+                               0x00,
+                               0x00,
+                           });
+
+    Decoder decoder;
+    std::vector<Frame> frames;
+    EXPECT_TRUE(decoder.decode(buffer, frames));
+    EXPECT_EQ(false, frames[0].masking_key_.has_value());
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(0, frames[0].payload_length_);
+  }
+
+  // Masked 64 bit
+  {
+    Buffer::OwnedImpl buffer;
+    Buffer::addSeq(buffer, {0x81, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0xfa,
+                            0x4f, 0x5a});
+
+    Decoder decoder;
+    std::vector<Frame> frames;
+    EXPECT_TRUE(decoder.decode(buffer, frames));
+    EXPECT_EQ(true, frames[0].masking_key_.has_value());
+    EXPECT_EQ(0x1ffa4f5a, frames[0].masking_key_.value());
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(0, frames[0].payload_length_);
+  }
+
+  // Non-masked 64 bit
+  {
+    Buffer::OwnedImpl buffer;
+    Buffer::addSeq(buffer, {0x81, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+
+    Decoder decoder;
+    std::vector<Frame> frames;
+    EXPECT_TRUE(decoder.decode(buffer, frames));
+    EXPECT_EQ(false, frames[0].masking_key_.has_value());
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(0, frames[0].payload_length_);
+  }
+}
+
 TEST(WebSocketCodecTest, FrameInspectorTest) {
   {
     Buffer::OwnedImpl buffer;
