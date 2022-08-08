@@ -11,7 +11,7 @@ minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area:
   change: |
-    changed behavior of the fixed heap monitor to so it counts pages allocated to TCMalloc as free memory if it's not used by Envoy. This change can be reverted temporarily by setting the runtime guard "do_not_count_mapped_pages_as_free" to true.
+    changed behavior of the fixed heap monitor to count pages allocated to TCMalloc as free memory if it's not used by Envoy. This change can be reverted temporarily by setting the runtime guard "do_not_count_mapped_pages_as_free" to true.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
