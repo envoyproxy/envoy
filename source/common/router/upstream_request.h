@@ -248,7 +248,7 @@ private:
   Http::ConnectionPool::Instance::StreamOptions stream_options_;
   Event::TimerPtr max_stream_duration_timer_;
 
-  std::unique_ptr<UpstreamRequestFilterManagerCallbacks> filter_manager_callbacks__;
+  std::unique_ptr<UpstreamRequestFilterManagerCallbacks> filter_manager_callbacks_;
   std::unique_ptr<Http::FilterManager> filter_manager_;
 
   // TODO(alyssawilk) remove these with allow_upstream_filters_

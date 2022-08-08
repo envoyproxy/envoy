@@ -249,9 +249,9 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   // Set up the upstream filter manager.
-  filter_manager_callbacks__ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
+  filter_manager_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
-      *filter_manager_callbacks__, parent_.callbacks()->dispatcher(),
+      *filter_manager_callbacks_, parent_.callbacks()->dispatcher(),
       parent_.callbacks()->connection(), parent_.callbacks()->streamId(),
       parent_.callbacks()->account(), true, parent_.callbacks()->decoderBufferLimit(),
       *parent_.cluster(), *this);
@@ -338,7 +338,7 @@ void UpstreamRequest::cleanUp() {
     --downstream_data_disabled_;
   }
   if (allow_upstream_filters_) {
-    parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks__));
+    parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
   }
 }
 
