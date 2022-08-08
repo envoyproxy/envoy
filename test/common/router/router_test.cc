@@ -2060,6 +2060,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
+  EXPECT_EQ(0U, router_.upstreamRequests().size());
+  EXPECT_TRUE(router_.finalUpstreamRequest() == nullptr);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -2092,6 +2094,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   router_.retry_state_->callback_();
   EXPECT_EQ(2U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_EQ(2U, router_.upstreamRequests().size());
+  EXPECT_TRUE(router_.finalUpstreamRequest() == nullptr);
 
   // We should not have updated any stats yet because no requests have been
   // canceled
@@ -2116,6 +2120,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   ASSERT(response_decoder1);
   response_decoder1->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_EQ(0U, router_.upstreamRequests().size());
+  EXPECT_FALSE(router_.finalUpstreamRequest() == nullptr);
 
   // TODO: Verify hedge stats here once they are implemented.
 }

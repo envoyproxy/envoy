@@ -254,6 +254,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       *fm_callbacks_, parent_.callbacks()->dispatcher(), parent_.callbacks()->connection(),
       parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
       parent_.callbacks()->decoderBufferLimit(), *parent_.cluster(), *this);
+  std::cerr << "Allow " << allow_upstream_filters_ << "\n";
   parent_.cluster()->createFilterChain(*filter_manager_);
 
   // Similar to how the downstream filter chain ends with the router, the
@@ -431,6 +432,9 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
   DUMP_DETAILS(addressProvider);
   DUMP_DETAILS(request_headers);
+  if (filter_manager_) {
+    filter_manager_->dumpState(os, indent_level);
+  }
 }
 
 const Route& UpstreamRequest::route() const { return *parent_.route(); }
