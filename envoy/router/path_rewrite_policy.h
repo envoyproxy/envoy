@@ -48,17 +48,21 @@ using PathRewritePredicateSharedPtr = std::shared_ptr<PathRewritePredicate>;
  */
 class PathRewritePredicateFactory : public Envoy::Config::TypedFactory {
 public:
-  virtual ~PathRewritePredicateFactory() override = default;
+  ~PathRewritePredicateFactory() override = default;
 
+  /**
+   * @param rewrite_config contains the proto stored in TypedExtensionConfig for the predicate.
+   * @return an PathRewritePredicateSharedPtr.
+   */
   virtual absl::StatusOr<PathRewritePredicateSharedPtr>
   createPathRewritePredicate(const Protobuf::Message& rewrite_config) PURE;
 
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
 
   /**
    * @return the name of the rewrite pattern predicate to be created.
    */
-  virtual std::string name() const override PURE;
+  std::string name() const override PURE;
 
   /**
    * @return the category of the rewrite pattern predicate to be created.

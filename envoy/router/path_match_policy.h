@@ -45,19 +45,21 @@ using PathMatchPredicateSharedPtr = std::shared_ptr<PathMatchPredicate>;
  */
 class PathMatchPredicateFactory : public Envoy::Config::TypedFactory {
 public:
-  virtual ~PathMatchPredicateFactory() = default;
+  ~PathMatchPredicateFactory() override = default;
 
   /**
-   * @param config contains the proto stored in TypedExtensionConfig.typed_config for the predicate.
+   * @param config contains the proto stored in TypedExtensionConfig for the predicate.
    * @return an PathMatchPredicateSharedPtr.
    */
   virtual absl::StatusOr<PathMatchPredicateSharedPtr>
   createPathMatchPredicate(const Protobuf::Message& config) PURE;
 
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
+
   /**
    * @return the name of the match pattern predicate to be created.
    */
-  virtual std::string name() const override PURE;
+  std::string name() const override PURE;
 
   /**
    * @return the category of the match pattern predicate to be created.

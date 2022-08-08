@@ -1068,7 +1068,7 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   }
 
   // There are no rewrites configured.
-  return absl::optional<std::string>();
+  return {};
 }
 
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHeaderMap& headers,
@@ -1255,25 +1255,25 @@ InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
   if (route_config.has_max_internal_redirects()) {
     *policy_config.mutable_max_internal_redirects() = route_config.max_internal_redirects();
   }
-  return InternalRedirectPolicyImpl(policy_config, validator, current_route_name);
+  return InternalRedirectPolicyImpl{policy_config, validator, current_route_name};
 }
 PathRewritePolicyImpl
 RouteEntryImplBase::buildPathRewritePolicy(envoy::config::route::v3::Route route,
                                            ProtobufMessage::ValidationVisitor& validator) const {
   if (route.route().has_path_rewrite_policy()) {
-    return PathRewritePolicyImpl(route.route().path_rewrite_policy(), validator, route.name());
+    return PathRewritePolicyImpl{route.route().path_rewrite_policy(), validator, route.name()};
   }
-  return PathRewritePolicyImpl();
+  return {};
 }
 
 PathMatchPolicyImpl
 RouteEntryImplBase::buildPathMatchPolicy(envoy::config::route::v3::Route route,
                                          ProtobufMessage::ValidationVisitor& validator) const {
   if (route.match().has_path_match_policy()) {
-    return PathMatchPolicyImpl(route.match().path_match_policy(), validator, route.name());
+    return PathMatchPolicyImpl{route.match().path_match_policy(), validator, route.name()};
   }
 
-  return PathMatchPolicyImpl();
+  return {};
 }
 
 DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::config::route::v3::Route& route) {

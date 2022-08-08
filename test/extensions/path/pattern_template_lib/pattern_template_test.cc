@@ -169,7 +169,7 @@ TEST_P(ParseRewriteFailure, ParseRewriteFailureTest) {
 class RewriteUrlTemplateSuccess
     : public testing::TestWithParam<std::pair<std::string, std::string>> {
 protected:
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewrite_proto() const {
+  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewriteProto() const {
     envoy::extensions::pattern_template::PatternTemplateRewriteSegments proto;
     Envoy::TestUtility::loadFromYaml(std::get<0>(GetParam()), proto);
     return proto;
@@ -228,7 +228,7 @@ INSTANTIATE_TEST_SUITE_P(RewriteUrlTemplateSuccessTestSuite, RewriteUrlTemplateS
 
 TEST_P(RewriteUrlTemplateSuccess, RewriteUrlTemplateSuccessTest) {
   absl::StatusOr<std::string> rewritten_url =
-      rewriteURLTemplatePattern(kMatchUrl, kCaptureRegex, rewrite_proto());
+      rewriteURLTemplatePattern(kMatchUrl, kCaptureRegex, rewriteProto());
   ASSERT_OK(rewritten_url);
   EXPECT_EQ(rewritten_url.value(), expectedRewrittenUrl());
 }
@@ -296,7 +296,7 @@ class URLPatternMatchAndRewrite
     : public testing::TestWithParam<
           std::tuple<std::string, std::string, std::string, std::string>> {
 protected:
-  const std::string& url_pattern() const { return std::get<0>(GetParam()); }
+  const std::string& urlPattern() const { return std::get<0>(GetParam()); }
   const std::string& rewritePattern() const { return std::get<1>(GetParam()); }
   const std::string& matchUrl() const { return std::get<2>(GetParam()); }
   const std::string& expectedRewrittenUrl() const { return std::get<3>(GetParam()); }
@@ -316,7 +316,7 @@ INSTANTIATE_TEST_SUITE_P(
           "/region/eu/bucket/prod-storage/object.pdf", "/euprod-storage/object.pdf"}})));
 
 TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
-  absl::StatusOr<std::string> regex = convertURLPatternSyntaxToRegex(url_pattern());
+  absl::StatusOr<std::string> regex = convertURLPatternSyntaxToRegex(urlPattern());
   ASSERT_OK(regex);
 
   absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments>
