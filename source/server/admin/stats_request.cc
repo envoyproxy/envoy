@@ -235,8 +235,8 @@ void StatsRequest::populateStatsFromScopes(absl::string_view scope_name,
       }
 
       std::vector<absl::string_view> param_segments =
-          absl::StrSplit(params_.scope_, ".", absl::SkipEmpty());
-      std::vector<absl::string_view> stat_segments = absl::StrSplit(name, ".", absl::SkipEmpty());
+          absl::StrSplit(params_.scope_, '.', absl::SkipEmpty());
+      std::vector<absl::string_view> stat_segments = absl::StrSplit(name, '.', absl::SkipEmpty());
       if (stat_segments.size() > param_segments.size() + 1) {
         stat_segments.resize(param_segments.size() + 1);
         render_->scope(absl::StrJoin(stat_segments, "."));
@@ -264,9 +264,9 @@ void StatsRequest::renderStat(const std::string& name, Buffer::Instance& respons
 void StatsRequest::renderScope(absl::string_view scope_name) {
   if (params_.scope_.empty() || absl::StartsWith(scope_name, absl::StrCat(params_.scope_, "."))) {
     std::vector<absl::string_view> param_segments =
-        absl::StrSplit(params_.scope_, ".", absl::SkipEmpty());
+        absl::StrSplit(params_.scope_, '.', absl::SkipEmpty());
     std::vector<absl::string_view> scope_segments =
-        absl::StrSplit(scope_name, ".", absl::SkipEmpty());
+        absl::StrSplit(scope_name, '.', absl::SkipEmpty());
     if (scope_segments.size() > param_segments.size()) {
       // render_->scope(response, scope_segments[param_segments.size()]);
       scope_segments.resize(param_segments.size() + 1);
