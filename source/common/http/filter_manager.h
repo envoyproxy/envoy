@@ -806,7 +806,7 @@ public:
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
 
-  // TODO(alyssawilk) this should probably be an optref.
+  // TODO(alyssawilk) this should probably be an optional reference.
   const Network::Connection* connection() const { return connection_; }
 
   uint64_t streamId() const { return stream_id_; }
