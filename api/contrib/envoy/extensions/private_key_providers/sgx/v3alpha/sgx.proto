@@ -13,6 +13,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: SGX private key provider]
 // [#extension: envoy.tls.key_providers.sgx]
 
+// [#next-free-field: 7]
 message SgxPrivateKeyMethodConfig {
   // Path to the ctk library file.
   string sgx_library = 1;
