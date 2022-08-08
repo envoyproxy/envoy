@@ -79,6 +79,7 @@ std::string toString(const Operator val) {
   case Operator::KTextGlob:
     return "**";
   }
+  return "";
 }
 
 std::string toString(const Variable val) {
@@ -88,6 +89,7 @@ std::string toString(const Variable val) {
 
   return absl::StrCat("{", val.var_name, "=",
                       absl::StrJoin(val.var_match, "/", ToStringFormatter()), "}");
+  return "";
 }
 
 template <typename T> std::string ToStringVisitor::operator()(const T& val) const {
@@ -363,6 +365,7 @@ std::string toRegexPattern(Operator pattern) {
   case Operator::KTextGlob: // "**"
     return *kTextGlobRegex;
   }
+  return "";
 }
 
 std::string toRegexPattern(const Variable& pattern) {

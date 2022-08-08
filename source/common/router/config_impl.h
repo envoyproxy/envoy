@@ -499,7 +499,7 @@ public:
 
   PathRewritePredicateSharedPtr predicate() const override;
 
-  std::string routeUrl_() const { return route_url_; }
+  std::string routeUrl() const { return route_url_; }
 
 private:
   const std::string route_url_;

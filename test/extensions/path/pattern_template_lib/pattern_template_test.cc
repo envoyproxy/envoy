@@ -327,7 +327,7 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
       rewriteURLTemplatePattern(matchUrl(), regex.value(), rewrite_proto.value());
   ASSERT_OK(rewritten_url);
 
-  EXPECT_EQ(rewritten_url.value(), expected_rewritten_url());
+  EXPECT_EQ(rewritten_url.value(), expectedRewrittenUrl());
 }
 
 } // namespace
