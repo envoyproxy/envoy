@@ -158,6 +158,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/stats:histogram_lib",
+        "@com_google_absl//absl/container:btree",
     ] + envoy_select_admin_html([
         "//source/common/html:utility_lib",
     ]),

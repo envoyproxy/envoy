@@ -99,7 +99,7 @@ public:
   // each endpoint. The parameter descriptions also appear in the /help
   // endpoint, independent of how Envoy is compiled.
   struct ParamDescriptor {
-    enum class Type { Boolean, String, Enum };
+    enum class Type { Boolean, String, Enum, Hidden };
     const Type type_;
     const std::string id_;   // HTML form ID and query-param name (JS var name rules).
     const std::string help_; // Help text rendered into UI.

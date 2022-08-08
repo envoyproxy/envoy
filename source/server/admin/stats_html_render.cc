@@ -210,12 +210,12 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
     }
     response.add("    </select>\n  ");
     break;
-    /*
   case Admin::ParamDescriptor::Type::Hidden:
-    response_.add(absl::StrCat("<input type='hidden' name='", id, "' id='", id, "' form='", path,
-                               "'", on_change,
-                               value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
+    response.add(absl::StrCat("<input type='hidden' name='", id, "' id='", id, "' form='", path,
+                              "'", on_change,
+                              value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
     break;
+    /*
   case Admin::ParamDescriptor::Type::Mask: {
     response_.add("<table class='home-table'><tbody>\n");
     for (size_t row = 0; row < (choices.size() + 1) / 2; ++row) {

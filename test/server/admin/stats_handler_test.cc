@@ -303,6 +303,7 @@ TEST_F(AdminStatsTest, HandlerStatsPage) {
 }
 #endif
 
+#ifdef ENVOY_ADMIN_HTML
 TEST_F(AdminStatsTest, HandlerStatsScoped) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -339,10 +340,8 @@ TEST_F(AdminStatsTest, HandlerStatsScoped) {
        {"name": "scope1.scope2.scope3.c4", "value": 4},
        {"name": "scope4.c5", "value": 555}]})");
   test("&show_json_scopes", R"({
-    "stats": [
-      {"name":"foo.c0", "value": 0},
-      {"name":"foo.c1", "value": 1}],
-    "scopes": ["scope", "scope1", "scope4"]})");
+    "stats": [],
+    "scopes": ["foo", "scope", "scope1", "scope4"]})");
   test("&show_json_scopes&scope=scope", R"({
     "stats":[
        {"name":"scope.c2", "value": 2}],
@@ -355,6 +354,7 @@ TEST_F(AdminStatsTest, HandlerStatsScoped) {
        {"name":"scope4.c5", "value": 555}],
     "scopes": []})");
 }
+#endif
 
 TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
   const std::string url = "/stats?histogram_buckets=cumulative";

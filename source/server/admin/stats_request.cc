@@ -22,6 +22,9 @@ StatsRequest::StatsRequest(Stats::Store& stats, const StatsParams& params,
   case StatsType::Histograms:
     phase_ = Phase::Histograms;
     break;
+    // case StatsType::Scopes:
+    // phase_ = Phase::Scopes;
+    // break;
   }
 }
 
@@ -118,7 +121,11 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
       // second, so that we can use the name held as a map key, and don't need
       // to re-serialize the name from the symbol table.
       scope_name = iter->first; // Copy out the name before erasing the iterator.
-      renderScope(scope_name, response);
+#ifdef ENVOY_ADMIN_HTML
+      if (params_.show_json_scopes_) {
+        renderScope(scope_name);
+      }
+#endif
       stat_map_.erase(iter);
       populateStatsForCurrentPhase(scope_name, absl::get<ScopeVec>(variant));
       break;
@@ -188,11 +195,11 @@ void StatsRequest::populateStatsForCurrentPhase(absl::string_view scope_name,
   }
 }
 
-template <class StatType> void StatsRequest::populateStatsFromScopes(absl::string_view scope_name,
-                                                                     const ScopeVec& scope_vec) {
-  // If the 'scope' parameter is specified, then we want to skip iteration
-  // over scopes that mismatch the parameter.
-  if (!absl::StartsWith(scope_name, params_.scope_)) {
+template <class StatType>
+void StatsRequest::populateStatsFromScopes(absl::string_view scope_name,
+                                           const ScopeVec& scope_vec) {
+  // If we are showing a scoped view, then filter based on the scope prefix.
+  if (params_.show_json_scopes_ && !absl::StartsWith(scope_name, params_.scope_)) {
     return;
   }
 
@@ -210,6 +217,7 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(absl::strin
     // differs in that Prometheus only uses stat->name() for filtering, not
     // rendering, so it only grab the name if there's a filter.
     std::string name = stat->name();
+
     if (params_.filter_ != nullptr) {
       if (!std::regex_search(name, *params_.filter_)) {
         return true;
@@ -218,6 +226,24 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(absl::strin
                !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
       return true;
     }
+
+    // When looking at the scoped view with "&scope=foo", and we find
+    // a stat named "foo.bar.baz", we should show that as a scope "foo.bar".
+    if (params_.show_json_scopes_) {
+      if (!params_.scope_.empty() && !absl::StartsWith(name, absl::StrCat(params_.scope_, "."))) {
+        return true;
+      }
+
+      std::vector<absl::string_view> param_segments =
+          absl::StrSplit(params_.scope_, ".", absl::SkipEmpty());
+      std::vector<absl::string_view> stat_segments = absl::StrSplit(name, ".", absl::SkipEmpty());
+      if (stat_segments.size() > param_segments.size() + 1) {
+        stat_segments.resize(param_segments.size() + 1);
+        render_->scope(absl::StrJoin(stat_segments, "."));
+        return true;
+      }
+    }
+
     stat_map_[name] = stat;
     return true;
   };
@@ -234,11 +260,21 @@ void StatsRequest::renderStat(const std::string& name, Buffer::Instance& respons
   render_->generate(response, name, stat->value());
 }
 
-void StatsRequest::renderScope(absl::string_view scope_name, Buffer::Instance& response) {
-  if (absl::StartsWith(scope_name, params_.scope_)) {
-    render_->scope(response, scope_name);
+#ifdef ENVOY_ADMIN_HTML
+void StatsRequest::renderScope(absl::string_view scope_name) {
+  if (params_.scope_.empty() || absl::StartsWith(scope_name, absl::StrCat(params_.scope_, "."))) {
+    std::vector<absl::string_view> param_segments =
+        absl::StrSplit(params_.scope_, ".", absl::SkipEmpty());
+    std::vector<absl::string_view> scope_segments =
+        absl::StrSplit(scope_name, ".", absl::SkipEmpty());
+    if (scope_segments.size() > param_segments.size()) {
+      // render_->scope(response, scope_segments[param_segments.size()]);
+      scope_segments.resize(param_segments.size() + 1);
+      render_->scope(absl::StrJoin(scope_segments, "."));
+    }
   }
 }
+#endif
 
 } // namespace Server
 } // namespace Envoy

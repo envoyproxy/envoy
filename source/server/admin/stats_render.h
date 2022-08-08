@@ -7,6 +7,8 @@
 #include "source/server/admin/stats_params.h"
 #include "source/server/admin/utils.h"
 
+#include "absl/container/btree_set.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -31,7 +33,7 @@ public:
                         const Stats::ParentHistogram& histogram) PURE;
 
   // Writes a scope name.
-  virtual void scope(Buffer::Instance&, absl::string_view) {}
+  virtual void scope(absl::string_view) PURE;
 
   // Completes rendering any buffered data.
   virtual void finalize(Buffer::Instance& response) PURE;
@@ -51,6 +53,7 @@ public:
                 const std::string& value) override;
   void generate(Buffer::Instance& response, const std::string& name,
                 const Stats::ParentHistogram& histogram) override;
+  void scope(absl::string_view) override;
   void finalize(Buffer::Instance&) override;
 
 private:
@@ -73,6 +76,7 @@ public:
                 const std::string& value) override;
   void generate(Buffer::Instance&, const std::string& name,
                 const Stats::ParentHistogram& histogram) override;
+  void scope(absl::string_view scope_name) override;
   void finalize(Buffer::Instance& response) override;
 
 private:
@@ -92,10 +96,14 @@ private:
   ProtobufWkt::Struct histograms_obj_container_;
   std::unique_ptr<ProtobufWkt::ListValue> histogram_array_;
   bool found_used_histogram_{false};
+#ifdef ENVOY_ADMIN_HTML
+  bool show_scopes_;
+#endif
   absl::string_view delim_{""};
   const Utility::HistogramBucketsMode histogram_buckets_mode_;
   std::string name_buffer_;  // Used for Json::sanitize for names.
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
+  absl::btree_set<std::string> scopes_;
 };
 
 } // namespace Server

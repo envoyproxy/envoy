@@ -8,6 +8,9 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
   used_only_ = query_.find("usedonly") != query_.end();
   pretty_ = query_.find("pretty") != query_.end();
   prometheus_text_readouts_ = query_.find("text_readouts") != query_.end();
+#ifdef ENVOY_ADMIN_HTML
+  show_json_scopes_ = query_.find("show_json_scopes") != query_.end();
+#endif
 
   auto filter_iter = query_.find("filter");
   if (filter_iter != query_.end()) {
@@ -47,6 +50,8 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
       type = StatsType::TextReadouts;
     } else if (str == StatLabels::All) {
       type = StatsType::All;
+      //} else if (str == StatLabels::Scopes) {
+      // type = StatsType::Scopes;
     } else {
       return false;
     }
@@ -80,6 +85,13 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     }
   }
 
+#ifdef ENVOY_ADMIN_HTML
+  auto scope_iter = query_.find("scope");
+  if (scope_iter != query_.end()) {
+    scope_ = scope_iter->second;
+  }
+#endif
+
   return Http::Code::OK;
 }
 
@@ -98,6 +110,9 @@ absl::string_view StatsParams::typeToString(StatsType type) {
   case StatsType::Histograms:
     ret = StatLabels::Histograms;
     break;
+    // case StatsType::Scopes:
+    // ret = StatLabels::Scopes;
+    // break;
   case StatsType::All:
     ret = StatLabels::All;
     break;

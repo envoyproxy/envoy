@@ -45,6 +45,8 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
   }
 }
 
+void StatsTextRender::scope(absl::string_view) {}
+
 void StatsTextRender::finalize(Buffer::Instance&) {}
 
 // Computes disjoint buckets as text and adds them to the response buffer.
@@ -86,7 +88,11 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
 
 StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, const StatsParams& params)
-    : histogram_buckets_mode_(params.histogram_buckets_mode_) {
+    :
+#ifdef ENVOY_ADMIN_HTML
+      show_scopes_(params.show_json_scopes_),
+#endif
+      histogram_buckets_mode_(params.histogram_buckets_mode_) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   // We don't create a JSON data model for the entire stats output, as that
   // makes streaming difficult. Instead we emit the preamble in the
@@ -148,6 +154,10 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
   }
 }
 
+void StatsJsonRender::scope(absl::string_view scope_name) {
+  scopes_.insert(std::string(scope_name));
+}
+
 // Since histograms are buffered (see above), the finalize() method generates
 // all of them.
 void StatsJsonRender::finalize(Buffer::Instance& response) {
@@ -174,7 +184,19 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
       response.addFragments({delim_, str});
     }
   }
-  response.add("]}");
+  response.add("]");
+#ifdef ENVOY_ADMIN_HTML
+  if (show_scopes_) {
+    response.add(",\n\"scopes\":[");
+    const char* prefix = "";
+    for (const std::string& scope_name : scopes_) {
+      response.addFragments({prefix, "\"", Json::sanitize(name_buffer_, scope_name), "\""});
+      prefix = ", ";
+    }
+    response.add("]");
+  }
+#endif
+  response.add("}");
 }
 
 // Summarizes the buckets in the specified histogram, collecting JSON objects.

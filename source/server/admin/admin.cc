@@ -368,6 +368,9 @@ void AdminImpl::getHelp(Buffer::Instance& response) const {
   for (const UrlHandler* handler : sortedHandlers()) {
     response.add(fmt::format("  {}: {}\n", handler->prefix_, handler->help_text_));
     for (const ParamDescriptor& param : handler->params_) {
+      if (param.type_ == ParamDescriptor::Type::Hidden) {
+        continue;
+      }
       response.add(fmt::format("      {}: {}", param.id_, param.help_));
       if (param.type_ == ParamDescriptor::Type::Enum) {
         response.addFragments({"; One of (", absl::StrJoin(param.enum_choices_, ", "), ")"});

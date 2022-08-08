@@ -20,6 +20,7 @@ constexpr absl::string_view Counters = "Counters";
 constexpr absl::string_view Gauges = "Gauges";
 constexpr absl::string_view Histograms = "Histograms";
 constexpr absl::string_view TextReadouts = "TextReadouts";
+// constexpr absl::string_view Scopes = "Scopes";
 } // namespace StatLabels
 
 enum class StatsFormat {
@@ -37,6 +38,7 @@ enum class StatsType {
   Counters,
   Gauges,
   Histograms,
+  // Scopes,
   All,
 };
 
@@ -55,14 +57,20 @@ struct StatsParams {
   static absl::string_view typeToString(StatsType type);
 
   StatsType type_{StatsType::All};
+  uint32_t hack_;
   bool used_only_{false};
   bool prometheus_text_readouts_{false};
   bool pretty_{false};
+#ifdef ENVOY_ADMIN_HTML
+  bool show_json_scopes_{false};
+#endif
   StatsFormat format_{StatsFormat::Text};
   std::string filter_string_;
   std::shared_ptr<std::regex> filter_;
   std::shared_ptr<re2::RE2> re2_filter_;
+#ifdef ENVOY_ADMIN_HTML
   std::string scope_;
+#endif
   Utility::HistogramBucketsMode histogram_buckets_mode_{Utility::HistogramBucketsMode::NoBuckets};
   Http::Utility::QueryParams query_;
 };

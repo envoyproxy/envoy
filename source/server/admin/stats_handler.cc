@@ -188,7 +188,9 @@ Admin::UrlHandler StatsHandler::statsHandler() {
        {Admin::ParamDescriptor::Type::Enum,
         "histogram_buckets",
         "Histogram bucket display mode",
-        {"cumulative", "disjoint", "none"}}}};
+        {"cumulative", "disjoint", "none"}},
+       {Admin::ParamDescriptor::Type::Hidden, "json_scopes",
+        "Rendering JSON with explicit scopes"}}};
 }
 
 } // namespace Server
