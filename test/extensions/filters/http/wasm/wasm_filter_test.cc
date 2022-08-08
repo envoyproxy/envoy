@@ -718,15 +718,16 @@ TEST_P(WasmHttpFilterTest, AsyncCall) {
   cluster_manager_.initializeThreadLocalClusters({"cluster"});
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                       {":path", "/"},
                                                       {":authority", "foo"},
                                                       {"content-length", "11"}}),
                       message->headers());
             EXPECT_EQ((Http::TestRequestTrailerMapImpl{{"trail", "cow"}}), *message->trailers());
+            EXPECT_EQ(options.send_xff, false);
             callbacks = &cb;
             return &request;
           }));
@@ -974,6 +975,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
               callbacks = &cb;
               parent_span = &span;
               EXPECT_EQ(options.timeout->count(), 1000);
+              EXPECT_EQ(options.send_xff, false);
               return &request;
             }));
     EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
@@ -1370,11 +1372,12 @@ void WasmHttpFilterTest::setupGrpcStreamTest(Grpc::RawAsyncStreamCallbacks*& cal
           Invoke([&](const GrpcService&, Stats::Scope&, bool) -> Grpc::RawAsyncClientSharedPtr {
             auto async_client = std::make_unique<Grpc::MockAsyncClient>();
             EXPECT_CALL(*async_client, startRaw(_, _, _, _))
-                .WillRepeatedly(
-                    Invoke([&](absl::string_view service_full_name, absl::string_view method_name,
-                               Grpc::RawAsyncStreamCallbacks& cb,
-                               const Http::AsyncClient::StreamOptions&) -> Grpc::RawAsyncStream* {
+                .WillRepeatedly(Invoke(
+                    [&](absl::string_view service_full_name, absl::string_view method_name,
+                        Grpc::RawAsyncStreamCallbacks& cb,
+                        const Http::AsyncClient::StreamOptions& options) -> Grpc::RawAsyncStream* {
                       EXPECT_EQ(service_full_name, "service");
+                      EXPECT_EQ(options.send_xff, false);
                       if (method_name != "method") {
                         return nullptr;
                       }

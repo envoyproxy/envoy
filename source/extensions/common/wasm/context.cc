@@ -970,6 +970,7 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
   auto http_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), handler, options);
   if (!http_request) {
@@ -1011,6 +1012,7 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
 
   auto grpc_request =
       grpc_client->sendRaw(toAbslStringView(service_name), toAbslStringView(method_name),
@@ -1054,6 +1056,7 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
 
   auto grpc_stream = grpc_client->startRaw(toAbslStringView(service_name),
                                            toAbslStringView(method_name), handler, options);
