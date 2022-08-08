@@ -44,19 +44,19 @@ protected:
   void threadRoutine(absl::Notification& engine_running);
   // Must be called manually by subclasses in their TearDown();
   void TearDown();
-
+  // Converts TestRequestHeaderMapImpl to Envoy::Platform::RequestHeadersSharedPtr
+  Envoy::Platform::RequestHeadersSharedPtr
+  envoyToMobileHeaders(const Http::TestRequestHeaderMapImpl& request_headers);
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
   envoy_http_callbacks bridge_callbacks_;
   ConditionalInitializer terminal_callback_;
   callbacks_called cc_{0, 0, 0, 0, 0, 0, 0, "", &terminal_callback_, {}};
-  std::shared_ptr<Platform::RequestHeaders> default_request_headers_;
-  absl::flat_hash_map<std::string, std::string> custom_headers_;
+  Http::TestRequestHeaderMapImpl default_request_headers_;
   Event::DispatcherPtr full_dispatcher_;
   Platform::StreamPrototypeSharedPtr stream_prototype_;
   Platform::StreamSharedPtr stream_;
   Platform::EngineSharedPtr engine_;
   Thread::ThreadPtr envoy_thread_;
-  std::string scheme_ = "http";
   bool explicit_flow_control_ = false;
   bool expect_dns_ = true;
   bool override_builder_config_ = false;

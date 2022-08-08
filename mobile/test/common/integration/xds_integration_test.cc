@@ -22,7 +22,6 @@ XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()
   expect_dns_ = false;             // TODO(alyssawilk) debug.
   create_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
-  scheme_ = "https";
 
   if (sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
@@ -53,6 +52,11 @@ XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()
   });
   admin_filename_ = TestEnvironment::temporaryPath("admin_address.txt");
   setAdminAddressPathForTests(admin_filename_);
+}
+
+void XdsIntegrationTest::initialize() {
+  BaseClientIntegrationTest::initialize();
+  default_request_headers_.setScheme("https");
 }
 
 Network::Address::IpVersion XdsIntegrationTest::ipVersion() const {

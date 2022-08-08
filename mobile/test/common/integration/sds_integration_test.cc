@@ -95,7 +95,7 @@ TEST_P(SdsIntegrationTest, SdsForUpstreamCluster) {
   ASSERT_TRUE(
       waitForCounterGe("cluster.base_h2.client_ssl_socket_factory.ssl_context_update_by_sds", 1));
 
-  stream_->sendHeaders(default_request_headers_, true);
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
   terminal_callback_.waitReady();
 
   EXPECT_EQ(cc_.on_headers_calls, 1);

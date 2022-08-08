@@ -20,6 +20,7 @@ class XdsIntegrationTest : public BaseClientIntegrationTest,
 public:
   XdsIntegrationTest();
   virtual ~XdsIntegrationTest() = default;
+  void initialize() override;
 
 protected:
   void SetUp() override;
