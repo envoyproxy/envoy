@@ -1056,12 +1056,14 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   if (path_rewrite_policy_.enabled()) {
     auto just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
 
-    absl::StatusOr<std::string> new_path = path_rewrite_policy_.predicate()->rewriteUrl(just_path, matched_path);
+    absl::StatusOr<std::string> new_path =
+        path_rewrite_policy_.predicate()->rewriteUrl(just_path, matched_path);
 
     // if rewrite fails return old path.
-    if(!new_path.ok()) {
-      return *std::move(just_path);
+    if (!new_path.ok()) {
+      return std::string(headers.getPathValue());
     }
+
     return *std::move(new_path);
   }
 
@@ -1517,7 +1519,7 @@ PathMatchPolicyRouteEntryImpl::PathMatchPolicyRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      match_pattern_(path_match_policy_.predicate()->pattern()) {};
+      match_pattern_(path_match_policy_.predicate()->pattern()){};
 
 void PathMatchPolicyRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                       bool insert_envoy_original_path) const {
