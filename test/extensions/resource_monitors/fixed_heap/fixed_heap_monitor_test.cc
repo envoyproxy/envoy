@@ -8,13 +8,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Return;
-
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
 namespace {
+
+using testing::Return;
 
 class MockMemoryStatsReader : public MemoryStatsReader {
 public:
