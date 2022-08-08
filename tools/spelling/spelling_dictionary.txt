@@ -43,6 +43,7 @@ DLE
 DSR
 DSS
 EBADF
+ECH
 ENDIF
 ENOTCONN
 ENQ
@@ -347,6 +348,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIMD
 SIO
 SMTP
 SNI
@@ -1111,6 +1113,7 @@ retriable
 retriggers
 revalidated
 revalidation
+reverify
 rfield
 rmdir
 rocketmq

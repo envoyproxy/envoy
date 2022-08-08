@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.upstreams.http.v3;
 
 import "envoy/config/core/v3/protocol.proto";
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -57,7 +58,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
@@ -148,4 +149,8 @@ message HttpProtocolOptions {
     // This allows switching on protocol based on ALPN
     AutoHttpConfig auto_config = 5;
   }
+
+  // [#not-implemented-hide:]
+  // Optional HTTP filters for the upstream filter chain.
+  repeated filters.network.http_connection_manager.v3.HttpFilter http_filters = 6;
 }
