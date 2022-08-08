@@ -80,6 +80,44 @@ TEST(WebSocketCodecTest, decodeFragmentedUnmaskedTextMessage) {
   EXPECT_EQ("lo", text_payload_second_frame);
 }
 
+// A fragmented and unfragmented text message
+TEST(WebSocketCodecTest, decodeFragmentedAndUnfragmentedTextMessages) {
+  Buffer::OwnedImpl buffer;
+  Buffer::addSeq(buffer, {0x01, 0x03, 0x48, 0x65, 0x6c});
+  Buffer::addSeq(buffer, {0x80, 0x02, 0x6c, 0x6f});
+  Buffer::addSeq(buffer, {0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f});
+
+  Decoder decoder;
+  std::vector<Frame> frames;
+  EXPECT_TRUE(decoder.decode(buffer, frames));
+
+  EXPECT_EQ(3, frames.size());
+
+  EXPECT_EQ(false, frames[0].masking_key_.has_value());
+  EXPECT_EQ(3, frames[0].payload_length_);
+
+  std::string text_payload_first_frame;
+  text_payload_first_frame.resize(3);
+  (*(frames[0].payload_)).copyOut(0, 3, text_payload_first_frame.data());
+  EXPECT_EQ("Hel", text_payload_first_frame);
+
+  EXPECT_EQ(false, frames[1].masking_key_.has_value());
+  EXPECT_EQ(2, frames[1].payload_length_);
+
+  std::string text_payload_second_frame;
+  text_payload_second_frame.resize(2);
+  (*(frames[1].payload_)).copyOut(0, 2, text_payload_second_frame.data());
+  EXPECT_EQ("lo", text_payload_second_frame);
+
+  EXPECT_EQ(false, frames[2].masking_key_.has_value());
+  EXPECT_EQ(5, frames[2].payload_length_);
+
+  std::string text_payload_third_frame;
+  text_payload_third_frame.resize(5);
+  (*(frames[2].payload_)).copyOut(0, 5, text_payload_third_frame.data());
+  EXPECT_EQ("Hello", text_payload_third_frame);
+}
+
 // A single-frame masked text message ("Hello")
 // 0x81 0x85 0x37 0xfa 0x21 0x3d 0x7f 0x9f 0x4d 0x51 0x58
 //           M1   M2   M3   M4   B1   B2   B3   B4   B5
@@ -160,7 +198,7 @@ TEST(WebSocketCodecTest, decodePingFrames) {
 
 // 256 bytes binary message in a single unmasked frame
 // 0x82 0x7E 0x0100 [256 bytes of binary data]
-TEST(WebSocketCodecTest, decode16BitBinaryFrame) {
+TEST(WebSocketCodecTest, decode16BitBinaryUnmaskedFrame) {
   Buffer::OwnedImpl buffer;
   Buffer::addSeq(buffer,
                  {0x82, 0x7e, 0x01, 0x00, 0xd9, 0xac, 0x96, 0x06, 0xc2, 0x83, 0x41, 0x31, 0x16,
@@ -197,20 +235,75 @@ TEST(WebSocketCodecTest, decode16BitBinaryFrame) {
   EXPECT_EQ(false, frames[0].masking_key_.has_value());
 }
 
+// 126 bytes binary message in a single masked frame
+TEST(WebSocketCodecTest, decode16BitBinaryMaskedFrame) {
+  Buffer::OwnedImpl buffer;
+  Buffer::addSeq(
+      buffer,
+      {
+          0x82, 0xfe, 0x00, 0x7e, 0xa1, 0xe8, 0xd7, 0xb0, 0x75, 0xe6, 0x2e, 0x56, 0x91, 0x66, 0xb4,
+          0x89, 0x66, 0xa3, 0xd4, 0xaf, 0x15, 0x3e, 0x7d, 0xa0, 0xd6, 0xca, 0xf9, 0xc7, 0xd9, 0x5d,
+          0xc6, 0x33, 0x9d, 0xd5, 0x41, 0x22, 0x0f, 0x18, 0xc1, 0xe7, 0xff, 0x8f, 0x2e, 0x6c, 0xaa,
+          0x81, 0x0f, 0x4e, 0xa5, 0xb6, 0x25, 0x4e, 0x8e, 0x3b, 0x25, 0x1e, 0x14, 0x58, 0x12, 0x5f,
+          0xfc, 0xe8, 0xb8, 0xc8, 0xc9, 0xd0, 0xa1, 0x53, 0x04, 0xdb, 0x91, 0xd6, 0x9a, 0xc6, 0x49,
+          0x6d, 0x96, 0x41, 0x8d, 0x9a, 0xd8, 0x00, 0x96, 0x41, 0x8d, 0x54, 0xdf, 0x0a, 0x87, 0xea,
+          0xe7, 0x4c, 0xdf, 0x16, 0x9a, 0x30, 0xa0, 0x26, 0x1c, 0xc4, 0x2c, 0xad, 0xfd, 0xd0, 0x2a,
+          0x16, 0xc5, 0xb4, 0xd7, 0x26, 0xa8, 0xca, 0x78, 0xe2, 0x1d, 0xe1, 0x8c, 0xde, 0xa8, 0x35,
+          0xd7, 0xda, 0x3a, 0x07, 0xb2, 0xf7, 0x71, 0x54, 0xd7, 0x26, 0xa8, 0xca, 0x78, 0xe2,
+      });
+  Decoder decoder;
+  std::vector<Frame> frames;
+  EXPECT_TRUE(decoder.decode(buffer, frames));
+
+  EXPECT_EQ(1, frames.size());
+  EXPECT_EQ(0x82, frames[0].flags_and_opcode_);
+  EXPECT_EQ(126, frames[0].payload_length_);
+  EXPECT_EQ(true, frames[0].masking_key_.has_value());
+  EXPECT_EQ(0xa1e8d7b0, frames[0].masking_key_.value());
+}
+
 // 64KiB binary message in a single unmasked frame
-// 0x82 0x7F 0x0000000000010000 [65536 bytes of binary data]
-TEST(WebSocketCodecTest, decode64BitBinaryFrame) {
+// 0x82 0x7f 0x0000000000010000 [65536 bytes of binary data]
+TEST(WebSocketCodecTest, decode64BitBinaryUnmaskedFrame) {
   Buffer::OwnedImpl buffer;
   Buffer::addSeq(buffer, {0x82, 0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00});
+
+  // Add test payload 65536 bytes
+  for (uint16_t i = 0; i < 4096; ++i) {
+    Buffer::addSeq(buffer, {0x16, 0xc5, 0xb4, 0xd7, 0x26, 0xa8, 0xca, 0x78, 0xe2, 0x1d, 0xe1, 0x8c,
+                            0xde, 0xa8, 0x35, 0xde});
+  }
 
   Decoder decoder;
   std::vector<Frame> frames;
   EXPECT_TRUE(decoder.decode(buffer, frames));
 
-  EXPECT_EQ(0x82, decoder.getFrame().flags_and_opcode_);
-  EXPECT_EQ(65536, decoder.getFrame().payload_length_);
-  EXPECT_EQ(false, decoder.getFrame().masking_key_.has_value());
-  EXPECT_EQ(decoder.state(), State::FramePayload);
+  EXPECT_EQ(0x82, frames[0].flags_and_opcode_);
+  EXPECT_EQ(65536, frames[0].payload_length_);
+  EXPECT_EQ(false, frames[0].masking_key_.has_value());
+}
+
+// 1MiB binary message in a single unmasked frame
+// 0x82 0xff 0x0000000000100000 [1048576 bytes of binary data]
+TEST(WebSocketCodecTest, decode64BitBinaryMaskedFrame) {
+  Buffer::OwnedImpl buffer;
+  Buffer::addSeq(
+      buffer, {0x82, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x96, 0x41, 0x8d, 0x54});
+
+  // Add test payload 1048576 bytes
+  for (uint32_t i = 0; i < 65536; ++i) {
+    Buffer::addSeq(buffer, {0xe7, 0x4c, 0xdf, 0x16, 0x9a, 0x30, 0xa0, 0x26, 0x1c, 0xc4, 0x2c, 0x4e,
+                            0x8e, 0x3b, 0x25, 0x1e});
+  }
+
+  Decoder decoder;
+  std::vector<Frame> frames;
+  EXPECT_TRUE(decoder.decode(buffer, frames));
+
+  EXPECT_EQ(0x82, frames[0].flags_and_opcode_);
+  EXPECT_EQ(1048576, frames[0].payload_length_);
+  EXPECT_EQ(true, frames[0].masking_key_.has_value());
+  EXPECT_EQ(0x96418d54, frames[0].masking_key_.value());
 }
 
 TEST(WebSocketCodecTest, FrameInspectorTest) {
