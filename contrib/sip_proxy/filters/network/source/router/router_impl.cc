@@ -287,23 +287,6 @@ FilterStatus Router::handleAffinity() {
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
 
-  // metadata_->addXEnvoyOriginIngressHeader()
-  //  fixme
-  // - move this somewhere more appropriate??
-  // - only add the header if does not already exist - / need to revisit this - see security
-  // considerations
-  // - only add the header if the outbound-transactions feature is enabled for the cluster (may need
-  // to move this to the router where we have the route config)
-  if (metadata->checkXEnvoyOriginIngressHeaderExists()) {
-    ENVOY_STREAM_LOG(info,
-                     "X-Envoy-Origin-Ingress header existing in incoming message, removing it for "
-                     "being replaced ...",
-                     *callbacks_);
-    metadata->removeXEnvoyOriginIngressHeader();
-  }
-  ENVOY_STREAM_LOG(debug, "Adding X-Envoy-Origin-Ingress header ...", *callbacks_);
-  metadata->addXEnvoyOriginIngressHeader(callbacks_->ingressID());
-
   if (upstream_request_ != nullptr) {
     return FilterStatus::Continue;
   }
@@ -414,13 +397,14 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
   if (!metadata->destination().empty() && metadata->msgType() == MsgType::Response) {
-    ENVOY_LOG(info, "Using preset destination for response from downstream");
     std::string host = metadata->destination();
     metadata->setStopLoadBalance(true);
 
+    ENVOY_LOG(info, "Using preset destination {} for responses coming from downstream", host);
+
     if (auto upstream_request = transaction_info->getUpstreamRequest(std::string(host));
         upstream_request != nullptr) {
-      // There is action connection, reuse it.
+      // There is upstream request for the host, reuse it.
       ENVOY_STREAM_LOG(trace, "reuse upstream request from {}", *callbacks_, host);
       upstream_request_ = upstream_request;
       upstream_request_->setMetadata(metadata);
@@ -438,18 +422,9 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     }
 
     ENVOY_STREAM_LOG(trace,
-                     "no pre-existing upstream connection, select with load balancer host= {}",
+                     "no pre-existing upstream connection for host {}, stopping the iteration",
                      *callbacks_, host);
-
-    upstream_request_started = false;
-    auto ret =
-        messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_request_started);
-    if (upstream_request_started && ret == FilterStatus::StopIteration) {
-      // Defer to handle in upstream request onPoolReady or onPoolFailure
-      return FilterStatus::StopIteration;
-    } else {
-      return FilterStatus::Continue;
-    }
+    return FilterStatus::StopIteration;
 
   } else if (!metadata->affinity().empty() &&
              metadata->affinityIteration() != metadata->affinity().end()) {
@@ -868,6 +843,11 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
         ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
         active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val,
                                                                   absl::nullopt);
+      }
+
+      // It shouldn't be necessary to remove this header in this case, but just in case
+      if (metadata->hasXEnvoyOriginIngressHeader()) {
+        metadata->removeXEnvoyOriginIngressHeader();
       }
 
       active_trans->startUpstreamResponse();

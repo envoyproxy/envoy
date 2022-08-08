@@ -53,7 +53,7 @@ public:
       // in somewhere such as  ConnectionManager::ActiveTrans::transportBegin(
      fixme - should return a const ref
    */
-  virtual IngressID ingressID() PURE;
+  virtual absl::optional<IngressID> ingressID() PURE;
 
   /**
    * @return const Network::Connection* the originating connection, or nullptr if there is none.

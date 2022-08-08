@@ -214,7 +214,7 @@ private:
     uint64_t streamId() const override { return parent_.streamId(); }
     std::string transactionId() const override { return parent_.transactionId(); }
     const Network::Connection* connection() const override { return parent_.connection(); }
-    IngressID ingressID() override { return parent_.ingressID(); }
+    absl::optional<IngressID> ingressID() override { return parent_.ingressID(); }
     Router::RouteConstSharedPtr route() override { return parent_.route(); }
     SipFilterStats& stats() override { return parent_.stats(); }
     void sendLocalReply(const DirectResponse& response, bool end_stream) override {
@@ -322,9 +322,9 @@ private:
     // SipFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     std::string transactionId() const override { return transaction_id_; }
-    IngressID ingressID() override {
-      return parent_.local_ingress_id_.value();
-    } // fixme - careful need to ensure theres a value
+    absl::optional<IngressID> ingressID() override {
+      return parent_.local_ingress_id_;
+    }
     const Network::Connection* connection() const override;
     Router::RouteConstSharedPtr route() override;
     SipFilterStats& stats() override { return parent_.stats_; }
@@ -344,7 +344,7 @@ private:
       return parent_.downstream_connection_infos_;
     }
     std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstreamTransactionInfo() override {
-      return parent_.upstream_transaction_info_;
+      return parent_.upstream_transactions_info_;
     }
     std::shared_ptr<SipSettings> settings() const override { return parent_.config_.settings(); }
     void onReset() override;
@@ -439,11 +439,6 @@ private:
       return ActiveTrans::transportBegin(metadata);
     }
 
-    // SipFilters::DecoderFilterCallbacks
-    // uint64_t streamId() const override { return stream_id_; }
-    // std::string transactionId() const override { return transaction_id_; }
-    // IngressID ingressID() override { return parent_.local_ingress_id_.value(); } // fixme -
-    // careful need to ensure theres a value
     const Network::Connection* connection() const override;
     Router::RouteConstSharedPtr route() override { return route_; };
     SipFilterStats& stats() override { return parent_.stats_; }
@@ -488,7 +483,7 @@ private:
 
     uint64_t streamId() const override { return 0; }
     std::string transactionId() const override { return ""; }
-    IngressID ingressID() override { return IngressID{"", ""}; }
+    absl::optional<IngressID> ingressID() override { return IngressID{"", ""}; }
 
     Router::RouteConstSharedPtr route() override { return nullptr; }
 
@@ -513,7 +508,7 @@ private:
       return nullptr;
     }
     std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstreamTransactionInfo() override {
-      return parent_.upstream_transaction_info_;
+      return parent_.upstream_transactions_info_;
     }
 
     void onReset() override{};
@@ -561,6 +556,7 @@ private:
   void sendUpstreamLocalReply(MessageMetadata& metadata, const DirectResponse& response,
                               bool end_stream);
   void doDeferredTransDestroy(ActiveTrans& trans);
+  void doDeferredUpstreamTransDestroy(UpstreamActiveTrans& trans);
   void resetAllTrans(bool local_reset);
 
   Config& config_;
@@ -582,7 +578,7 @@ private:
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos_;
-  std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstream_transaction_info_;
+  std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstream_transactions_info_;
   PendingList pending_list_;
 };
 
@@ -626,7 +622,7 @@ struct ThreadLocalUpstreamTransactionsInfo : public ThreadLocal::ThreadLocalObje
   void auditTimerAction();
 
   absl::flat_hash_map<std::string, std::shared_ptr<ConnectionManager::UpstreamActiveTrans>>
-      upstream_transaction_info_map_{};
+      upstream_transactions_info_map_{};
 
   std::shared_ptr<UpstreamTransactionsInfo> parent_;
   Event::Dispatcher& dispatcher_;

@@ -131,8 +131,8 @@ void MessageMetadata::removeXEnvoyOriginIngressHeader() {
   removeMsgHeader(HeaderType::XEnvoyOriginIngress);
 }
 
-bool MessageMetadata::checkXEnvoyOriginIngressHeaderExists() {
-  return checkMsgHeaderExists(HeaderType::XEnvoyOriginIngress);
+bool MessageMetadata::hasXEnvoyOriginIngressHeader() {
+  return hasMsgHeader(HeaderType::XEnvoyOriginIngress);
 }
 
 void MessageMetadata::addNewMsgHeader(HeaderType type, absl::string_view value) {
@@ -162,7 +162,7 @@ void MessageMetadata::removeMsgHeader(HeaderType type) {
   headers_[type].clear();
 }
 
-bool MessageMetadata::checkMsgHeaderExists(HeaderType type) {
+bool MessageMetadata::hasMsgHeader(HeaderType type) {
   auto init_removal_pos = raw_msg_.find(HeaderTypes::get().header2Str(type).data());
   auto end_removal_pos = raw_msg_.find("\r\n", init_removal_pos);
   return ((init_removal_pos != std::string::npos) && (end_removal_pos != std::string::npos));

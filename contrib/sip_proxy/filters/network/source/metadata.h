@@ -105,6 +105,8 @@ public:
 
   std::string getDownstreamConnectionID() { return downstream_connection_id_; }
 
+  std::string getThreadID() { return thread_id_; }
+
 private:
   std::string thread_id_;
   std::string downstream_connection_id_;
@@ -178,10 +180,10 @@ public:
 
   void addXEnvoyOriginIngressHeader(IngressID ingress_id);
   void removeXEnvoyOriginIngressHeader();
-  bool checkXEnvoyOriginIngressHeaderExists();
+  bool hasXEnvoyOriginIngressHeader();
   void addNewMsgHeader(HeaderType type, absl::string_view value);
   void removeMsgHeader(HeaderType type);
-  bool checkMsgHeaderExists(HeaderType type);
+  bool hasMsgHeader(HeaderType type);
 
   void addEPOperation(
       size_t raw_offset, absl::string_view& header, HeaderType type,

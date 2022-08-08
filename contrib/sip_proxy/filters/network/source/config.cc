@@ -54,7 +54,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   }
 
   /**
-   *  ThreadLocalPool which only can be
+   * ConnPool::InstanceImpl contains ThreadLocalObject ThreadLocalPool which only can be
    * instantiated on main thread. so construct ConnPool::InstanceImpl here.
    */
   auto transaction_infos = std::make_shared<Router::TransactionInfos>();
@@ -69,31 +69,25 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
     transaction_infos->emplace(cluster, transaction_info_ptr);
   }
 
-  auto upstream_transaction_info = std::make_shared<SipProxy::UpstreamTransactionsInfo>(
+  // Map of upstream transactions per worker thread
+  auto upstream_transactions_info = std::make_shared<SipProxy::UpstreamTransactionsInfo>(
       context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
                                  proto_config.settings(), transaction_timeout, 32000)));
-  upstream_transaction_info->init();
+  upstream_transactions_info->init();
 
-  // We need a map of downstream connections per worker thread,
-  // to enable demultiplexing of new upstream transactions to the correct downstream
-  // Shouldn't really need to use a TLS I don't think, but we need a common place in a worker thread
-  // to share out the map from
+  // Map of downstream connections per worker thread
   auto downstream_connection_info =
       std::make_shared<SipProxy::DownstreamConnectionInfos>(context.threadLocal());
   downstream_connection_info->init();
 
-  std::cerr << "Main Thread: " << context.api().threadFactory().currentThreadId().debugString()
-            << std::endl;
-
   return [filter_config, &context, transaction_infos, downstream_connection_info,
-          upstream_transaction_info](Network::FilterManager& filter_manager) -> void {
+          upstream_transactions_info](Network::FilterManager& filter_manager) -> void {
     std::cerr << "Creating New ConnectionManager. Thread: "
               << context.api().threadFactory().currentThreadId().debugString() << std::endl;
-
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
         *filter_config, context.api().randomGenerator(),
         context.mainThreadDispatcher().timeSource(), context, transaction_infos,
-        downstream_connection_info, upstream_transaction_info));
+        downstream_connection_info, upstream_transactions_info));
   };
 }
 
