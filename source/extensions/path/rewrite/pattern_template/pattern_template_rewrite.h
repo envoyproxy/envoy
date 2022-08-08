@@ -1,5 +1,4 @@
-#ifndef SOURCE_EXTENSIONS_PATH_REWRITE_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H
-#define SOURCE_EXTENSIONS_PATH_REWRITE_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H
+#pragma once
 
 #include <string>
 
@@ -55,5 +54,3 @@ private:
 } // namespace PatternTemplate
 } // namespace Extensions
 } // namespace Envoy
-
-#endif // SOURCE_EXTENSIONS_PATH_REWRITE_PATTERN_TEMPLATE_PATTERN_TEMPLATE_H

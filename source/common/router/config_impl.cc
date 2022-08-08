@@ -368,7 +368,6 @@ PathRewritePolicyImpl::PathRewritePolicyImpl(
 
   predicate_config_ = Envoy::Config::Utility::translateAnyToFactoryConfig(
       typed_config.typed_config(), validator, *predicate_factory_);
-  ASSERT(predicate_config_); // config translation failed
 
   // Validate config format and inputs when creating factory.
   // As the validation and create are nearly 1:1 store for later use.
@@ -398,7 +397,6 @@ PathMatchPolicyImpl::PathMatchPolicyImpl(
 
   predicate_config_ = Envoy::Config::Utility::translateAnyToFactoryConfig(
       typed_config.typed_config(), validator, *predicate_factory_);
-  ASSERT(predicate_config_); // config translation failed
 
   // Validate config format and inputs when creating factory.
   // As the validation and create are nearly 1:1 store for later use.
@@ -743,10 +741,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        Extensions::PatternTemplate::Rewrite::NAME,
                                        Extensions::PatternTemplate::Match::NAME));
     }
-  }
 
-  // Validation between extensions as they share rewrite pattern variables.
-  if (path_rewrite_policy_.enabled() && path_match_policy_.enabled()) {
+    // Validation between extensions as they share rewrite pattern variables.
     if (!Extensions::PatternTemplate::isValidSharedVariableSet(
              path_rewrite_policy_.predicate()->pattern(), path_match_policy_.predicate()->pattern())
              .ok()) {
@@ -1513,7 +1509,8 @@ PathMatchPolicyRouteEntryImpl::PathMatchPolicyRouteEntryImpl(
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator) {}
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      match_pattern_(path_match_policy_.predicate()->pattern()) {};
 
 void PathMatchPolicyRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                       bool insert_envoy_original_path) const {

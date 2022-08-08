@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Router {
 
 /**
- * Used to decide if pattern template rewrite is needed based on the target route.
+ * Decides if the target route path is matching the provided pattern.
  * Subclassing Logger::Loggable so that implementations can log details.
  */
 class PathRewritePredicate : Logger::Loggable<Logger::Id::router> {
@@ -63,7 +63,7 @@ public:
   /**
    * @return the category of the rewrite pattern predicate to be created.
    */
-  virtual std::string category() const override PURE;
+  std::string category() const override { return "envoy.path.rewrite"; }
 };
 
 } // namespace Router

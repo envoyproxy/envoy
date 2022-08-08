@@ -1,5 +1,4 @@
-#ifndef SOURCE_EXTENSIONS_PATH_PATTERN_TEMPLATE_MATCHING_PATTERN_TEMPLATE_INTERNAL_H
-#define SOURCE_EXTENSIONS_PATH_PATTERN_TEMPLATE_MATCHING_PATTERN_TEMPLATE_INTERNAL_H
+#pragma once
 
 #include <optional>
 #include <string>
@@ -93,5 +92,3 @@ inline re2::StringPiece toStringPiece(absl::string_view text) { return {text.dat
 } // namespace PatternTemplate
 } // namespace Extensions
 } // namespace Envoy
-
-#endif // SOURCE_EXTENSIONS_PATH_PATTERN_TEMPLATE_MATCHING_PATTERN_TEMPLATE_INTERNAL_H

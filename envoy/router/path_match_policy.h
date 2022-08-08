@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Router {
 
 /**
- * Used to decide if path match is needed based on the target route.
+ * Decides if the target route path is matching the provided pattern.
  * Subclassing Logger::Loggable so that implementations can log details.
  */
 class PathMatchPredicate : Logger::Loggable<Logger::Id::router> {

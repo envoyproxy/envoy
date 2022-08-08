@@ -1,5 +1,4 @@
-#ifndef SOURCE_EXTENSIONS_PATH_MATCH_PATTERN_TEMPLATE_PATTERN_TEMPLATE_MATCH_H
-#define SOURCE_EXTENSIONS_PATH_MATCH_PATTERN_TEMPLATE_PATTERN_TEMPLATE_MATCH_H
+#pragma once
 
 #include <string>
 
@@ -38,5 +37,3 @@ private:
 } // namespace PatternTemplate
 } // namespace Extensions
 } // namespace Envoy
-
-#endif // SOURCE_EXTENSIONS_PATH_MATCH_PATTERN_TEMPLATE_PATTERN_TEMPLATE_MATCH_H

@@ -317,10 +317,8 @@ public:
   virtual bool enabled() const PURE;
 
   /**
-   * Creates the target route predicates. This should really be called only once for each upstream
-   * match. Creating the predicate lazily to avoid wasting CPU cycles on non-matching
-   * responses, which should be the most common case.
-   * @return a newly constructed PathMatchPredicate instance.
+   * Returns the stored target route predicate.
+   * @return a PathMatchPredicate instance.
    */
   virtual PathMatchPredicateSharedPtr predicate() const PURE;
 };
@@ -338,10 +336,8 @@ public:
   virtual bool enabled() const PURE;
 
   /**
-   * Creates the target route predicates. This should really be called only once for each upstream
-   * rewrite. Creating the predicate lazily to avoid wasting CPU cycles on non-rewrite
-   * responses, which should be the most common case.
-   * @return a newly constructed PathRewritePredicate instances.
+   * Returns the stored target route predicate.
+   * @return a PathRewritePredicate instance.
    */
   virtual PathRewritePredicateSharedPtr predicate() const PURE;
 };

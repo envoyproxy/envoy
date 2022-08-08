@@ -38,7 +38,6 @@ public:
   std::string name() const override {
     return "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate";
   }
-  std::string category() const override { return "envoy.path.rewrite"; }
 };
 
 } // namespace Rewrite

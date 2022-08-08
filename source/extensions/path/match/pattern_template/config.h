@@ -37,7 +37,7 @@ public:
   std::string name() const override {
     return "envoy.path.match.pattern_template.pattern_template_match_predicate";
   }
-  std::string category() const override { return "envoy.path.match"; }
+
 };
 
 } // namespace Match
