@@ -95,6 +95,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   framer_.set_balsa_trailer(&trailers_);
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
+  framer_.set_invalid_chars_level(quiche::BalsaFrame::InvalidCharsLevel::kError);
 
   switch (type) {
   case MessageType::Request:
@@ -270,6 +271,9 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
     break;
   case BalsaFrameEnums::TRAILER_MISSING_COLON:
     error_message_ = "HPE_INVALID_HEADER_TOKEN";
+    break;
+  case BalsaFrameEnums::INVALID_HEADER_CHARACTER:
+    error_message_ = "header value contains invalid chars";
     break;
   default:
     error_message_ = BalsaFrameEnums::ErrorCodeToString(error_code);
