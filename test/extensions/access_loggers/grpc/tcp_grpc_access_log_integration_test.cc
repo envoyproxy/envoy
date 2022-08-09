@@ -228,8 +228,7 @@ typed_config:
   tcp_client->waitForHalfClose();
   ASSERT_TRUE(tcp_client->write("", true));
 
-  // ASSERT_TRUE(fake_upstream_connection->waitForData(3));
-  // ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  // Connection blocked. Do not wait for data, but directly wait for disconnect.
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   ASSERT_TRUE(waitForAccessLogConnection());
