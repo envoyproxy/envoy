@@ -163,8 +163,19 @@ void BalsaParser::OnBodyChunkInput(absl::string_view input) {
   connection_->bufferBody(input.data(), input.size());
 }
 
-void BalsaParser::OnHeaderInput(absl::string_view /*input*/) {}
-void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
+void BalsaParser::OnHeaderInput(absl::string_view input) {
+  // NUL character is not allowed anywhere in the start line or in the header section.
+  if (input.find(absl::string_view("\0", 1)) != absl::string_view::npos) {
+    HandleError(BalsaFrameEnums::INVALID_HEADER_CHARACTER);
+  }
+}
+
+void BalsaParser::OnTrailerInput(absl::string_view input) {
+  // NUL character is not allowed anywhere in the trailers section.
+  if (input.find(absl::string_view("\0", 1)) != absl::string_view::npos) {
+    HandleError(BalsaFrameEnums::INVALID_HEADER_CHARACTER);
+  }
+}
 
 void BalsaParser::OnHeader(absl::string_view key, absl::string_view value) {
   if (status_ == ParserStatus::Error) {
