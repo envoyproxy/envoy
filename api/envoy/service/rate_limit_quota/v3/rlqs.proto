@@ -62,6 +62,7 @@ message RateLimitQuotaUsageReports {
   // .. note::
   //   Note that the first report sent for a ``BucketId`` indicates to the RLQS server that
   //   the RLQS client is subscribing for the future assignments for this ``BucketId``.
+  //
   message BucketQuotaUsage {
     // ``BucketId`` for which request quota usage is reported.
     BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
@@ -176,8 +177,7 @@ message RateLimitQuotaResponse {
     //
     // **Restarting the subscription**
     //
-    // If a new request is matched into a bucket previously abandoned, the data plane must behave
-    // as if it has never tracked the bucket, and it's the first request matched into it:
+    // If a new request is matched into a bucket previously abandoned, the data plane must behave as if it has never tracked the bucket, and it's the first request matched into it:
     //
     // 1. The process of :ref:`subscription and reporting
     //    <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.reporting_interval>`
