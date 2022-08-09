@@ -182,7 +182,7 @@ void StatsHtmlRender::input(Buffer::Instance& response, absl::string_view id,
   case Admin::ParamDescriptor::Type::String: {
     std::string sanitized;
     if (!value.empty()) {
-      sanitized = absl::StrCat(" value=", Html::Utility::sanitize(value));
+      sanitized = absl::StrCat(" value='", Html::Utility::sanitize(value), "'");
     }
     response.addFragments({"<input type='text' name='", name, "' id='", id, "' form='", path, "'",
                            on_change, sanitized, " />"});

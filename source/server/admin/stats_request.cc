@@ -90,11 +90,13 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
         return false;
       }
       switch (phase_) {
+        /*
       case Phase::Scopes:
         phase_ = Phase::Scopes;
         phase_string_ = "Scopes";
         startPhase();
         break;
+        */
       case Phase::TextReadouts:
         phase_ = Phase::CountersAndGauges;
         phase_string_ = "Counters and Gauges";
@@ -120,8 +122,8 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
       // does not have stable iterators. When we hit leaf stats we will erase
       // second, so that we can use the name held as a map key, and don't need
       // to re-serialize the name from the symbol table.
-      scope_name = iter->first; // Copy out the name before erasing the iterator.
 #ifdef ENVOY_ADMIN_HTML
+      scope_name = iter->first; // Copy out the name before erasing the iterator.
       if (params_.show_json_scopes_) {
         renderScope(scope_name);
       }
@@ -176,8 +178,8 @@ void StatsRequest::startPhase() {
 void StatsRequest::populateStatsForCurrentPhase(absl::string_view scope_name,
                                                 const ScopeVec& scope_vec) {
   switch (phase_) {
-  case Phase::Scopes:
-    break;
+    // case Phase::Scopes:
+    // break;
   case Phase::TextReadouts:
     populateStatsFromScopes<Stats::TextReadout>(scope_name, scope_vec);
     break;
@@ -203,6 +205,8 @@ void StatsRequest::populateStatsFromScopes(absl::string_view scope_name,
   if (params_.show_json_scopes_ && !absl::StartsWith(scope_name, params_.scope_)) {
     return;
   }
+#else
+  UNREFERENCED_PARAMETER(scope_name);
 #endif
 
   Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {

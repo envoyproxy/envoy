@@ -6,6 +6,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::EndsWith;
 using testing::HasSubstr;
 using testing::Not;
 
@@ -91,6 +92,19 @@ TEST_F(StatsHtmlRenderTest, RenderUrlHandlerSubmitOnChange) {
   EXPECT_THAT(out, HasSubstr(" onchange='prefix.submit()"));
   EXPECT_THAT(out, Not(HasSubstr("<button class='button-as-link'>prefix</button>")));
   EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
+}
+
+TEST_F(StatsHtmlRenderTest, RenderInput) {
+  query_params_["name"] = "multi escaped<value";
+  renderer_.input(response_, "id", "name", "path", Admin::ParamDescriptor::Type::String,
+                  query_params_, {});
+  std::string out = response_.toString();
+  EXPECT_THAT(out, HasSubstr("<input "));
+  std::string::size_type pos = out.rfind("<input ");
+  ASSERT_NE(std::string::npos, pos);
+  std::string input = out.substr(pos);
+  EXPECT_EQ("<input type='text' name='name' id='id' form='path' value='multi escaped&lt;value' />",
+            input);
 }
 
 } // namespace Server
