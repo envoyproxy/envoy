@@ -56,6 +56,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
 
+  absl::Statyus isCompatibleMatchPolicy
   /**
    * @return the name of the match pattern predicate to be created.
    */
