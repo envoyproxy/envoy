@@ -69,24 +69,15 @@ message HealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.Payload";
 
-    enum DecoderType {
-      HEX = 0;
-      UTF8 = 1;
-    }
-
     oneof payload {
       option (validate.required) = true;
 
-      // String payload. Default format is Hex encoded text. E.g., "000000FF".
+      // Hex encoded payload. E.g., "000000FF".
       string text = 1 [(validate.rules).string = {min_len: 1}];
 
       // Binary payload.
       bytes binary = 2;
     }
-
-    // Specify the text decode format. Only relevant if ``text`` payload is used.
-    // If not specified, text payload is assumed to be Hex encoded.
-    DecoderType text_decoder = 3 [(validate.rules).enum = {defined_only: true}];
   }
 
   // [#next-free-field: 15]
@@ -119,7 +110,7 @@ message HealthCheck {
     //
     // .. note::
     //
-    //   Only the first 1024 bytes of the response body is used to match.
+    //   Only the first 1024 bytes of the response body is used to match when ``response_buffer_size`` is not set.
     repeated Payload receive = 4;
 
     // Specifies the size of response buffer in bytes that is used to Payload match. Default value is 1024.

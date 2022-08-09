@@ -475,25 +475,6 @@ public:
     addCompletionCallback();
   }
 
-  void setupServiceValidationWithUtf8StringMatcherHC(const std::string& expected_response) {
-    std::string yaml = fmt::format(R"EOF(
-    timeout: 1s
-    interval: 1s
-    interval_jitter: 1s
-    unhealthy_threshold: 2
-    healthy_threshold: 2
-    http_health_check:
-      path: /healthcheck
-      receive:
-        text: {0}
-        text_decoder: UTF8
-    )EOF",
-                                   expected_response);
-
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
-
   void setupServiceValidationWithHexStringMatcherHC(const std::string& expected_response) {
     std::string yaml = fmt::format(R"EOF(
     timeout: 1s
@@ -533,6 +514,8 @@ public:
 
   void setupServiceValidationWithBufferSizeHC(const std::string& expected_response,
                                               int buffer_size) {
+    Buffer::OwnedImpl response_test(expected_response);
+    std::string response = Base64::encode(response_test, response_test.length());
     std::string yaml = fmt::format(R"EOF(
     timeout: 1s
     interval: 1s
@@ -542,11 +525,10 @@ public:
     http_health_check:
       path: /healthcheck
       receive:
-        text: {0}
-        text_decoder: UTF8
+        binary: {0}
       response_buffer_size: {1}
     )EOF",
-                                   expected_response, buffer_size);
+                                   response, buffer_size);
 
     allocHealthChecker(yaml);
     addCompletionCallback();
@@ -1181,7 +1163,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheck) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseStringContainsCheck) {
-  setupServiceValidationWithUtf8StringMatcherHC("Everything OK");
+  setupServiceValidationWithBytesMatcherHC("Everything OK");
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -3868,22 +3850,6 @@ TEST(PayloadMatcher, matchHexText) {
   addUint8(buffer, 3);
   addUint8(buffer, 1);
   addUint8(buffer, 2);
-  EXPECT_TRUE(PayloadMatcher::match(segments, buffer));
-}
-
-TEST(PayloadMatcher, matchUtf8Text) {
-  Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
-  envoy::config::core::v3::HealthCheck_Payload* payload = repeated_payload.Add();
-  payload->set_text("01");
-  payload->set_text_decoder(envoy::config::core::v3::HealthCheck::Payload::UTF8);
-
-  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
-
-  Buffer::OwnedImpl buffer("0");
-  EXPECT_FALSE(PayloadMatcher::match(segments, buffer));
-  addUint8(buffer, 0x31);
-  EXPECT_TRUE(PayloadMatcher::match(segments, buffer));
-  addUint8(buffer, 0x32);
   EXPECT_TRUE(PayloadMatcher::match(segments, buffer));
 }
 
