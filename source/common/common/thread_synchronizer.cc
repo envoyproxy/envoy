@@ -60,17 +60,14 @@ void ThreadSynchronizer::syncPointWorker(absl::string_view event_name) {
   entry.signaled_ = false;
 }
 
-bool ThreadSynchronizer::barrierOnWorker(absl::string_view event_name, absl::Duration timeout) {
+void ThreadSynchronizer::barrierOnWorker(absl::string_view event_name) {
   SynchronizerEntry& entry = getOrCreateEntry(event_name);
   absl::MutexLock lock(&entry.mutex_);
   ENVOY_LOG(debug, "thread synchronizer: barrier on {}", event_name);
-  bool is_success = entry.mutex_.AwaitWithTimeout(absl::Condition(&entry.at_barrier_), timeout);
-  if (is_success) {
-    ENVOY_LOG(debug, "thread synchronizer: barrier complete {}", event_name);
-  } else {
-    ENVOY_LOG(debug, "thread synchronizer: barrier timed out {}", event_name);
+  while (!entry.mutex_.AwaitWithTimeout(absl::Condition(&entry.at_barrier_), absl::Seconds(10))) {
+    ENVOY_LOG(warning, "thread synchronizer: barrier on {} stuck for 10 seconds");
   }
-  return is_success;
+  ENVOY_LOG(debug, "thread synchronizer: barrier complete {}", event_name);
 }
 
 void ThreadSynchronizer::signalWorker(absl::string_view event_name) {
