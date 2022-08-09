@@ -1,6 +1,6 @@
 .. _how_to_dump_heap_profile_of_envoy:
 
-Howw to dump heap profile of Envoy?
+How to dump heap profile of Envoy?
 ===================================
 
 If Envoy binary that build with ``gperftools`` is used, please check `PPROF.md <https://github.com/envoyproxy/envoy/blob/main/bazel/PPROF.md>`_
