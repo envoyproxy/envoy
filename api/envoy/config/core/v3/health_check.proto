@@ -122,7 +122,7 @@ message HealthCheck {
     //   Only the first 1024 bytes of the response body is used to match.
     repeated Payload receive = 4;
 
-    // Specifies the size of repsonse buffer in bytes that is used to Payload match. Default value is 1024.
+    // Specifies the size of response buffer in bytes that is used to Payload match. Default value is 1024.
     uint64 response_buffer_size = 14 [(validate.rules).uint64 = {gte: 0}];
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
