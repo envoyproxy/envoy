@@ -6,6 +6,7 @@
 #include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.validate.h"
 #include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.h"
 #include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.validate.h"
+#include "envoy/router/path_match_policy.h"
 #include "envoy/router/path_rewrite_policy.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
@@ -34,6 +35,9 @@ public:
 
   absl::StatusOr<std::string> rewriteUrl(absl::string_view current_pattern,
                                          absl::string_view matched_path) const override;
+
+  absl::Status
+  isCompatibleMatchPolicy(Router::PathMatchPredicateSharedPtr match_policy) const override;
 
   static absl::Status isValidRewritePattern(std::string match_pattern, std::string rewrite_pattern);
 

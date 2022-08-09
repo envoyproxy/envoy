@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
+#include "envoy/router/path_match_policy.h"
 
 #include "source/common/common/logger.h"
 
@@ -18,6 +19,15 @@ class PathRewritePredicate : Logger::Loggable<Logger::Id::router> {
 public:
   PathRewritePredicate() = default;
   virtual ~PathRewritePredicate() = default;
+
+  /**
+   * Used to determine if the match policy is compatible.
+   *
+   * @param match_policy current path match policy for route
+   * @return valid if current path match policy is acceptable
+   */
+  virtual absl::Status
+  isCompatibleMatchPolicy(PathMatchPredicateSharedPtr path_match_policy) const PURE;
 
   /**
    * Used to rewrite the current url to the specified output. Can return a failure in case rewrite

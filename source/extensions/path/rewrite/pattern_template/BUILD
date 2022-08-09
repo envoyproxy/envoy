@@ -19,9 +19,11 @@ envoy_cc_library(
         "//source/common/router:__subpackages__",
     ],
     deps = [
+        "//envoy/router:router_path_match_policy_interface",
         "//envoy/router:router_path_rewrite_policy_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/path/match/pattern_template:pattern_template_match_lib",
         "//source/extensions/path/pattern_template_lib",
         "@envoy_api//envoy/extensions/path/match/pattern_template/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/path/rewrite/pattern_template/v3:pkg_cc_proto",

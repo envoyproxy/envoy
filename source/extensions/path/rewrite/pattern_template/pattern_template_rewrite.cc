@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "source/common/http/path_utility.h"
+#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
 #include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
 #include "source/extensions/path/pattern_template_lib/proto/pattern_template_rewrite_segments.pb.h"
 
@@ -23,6 +24,25 @@ namespace Rewrite {
 // Silence warnings about missing initializers for members of LazyRE2.
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
+
+absl::Status PatternTemplateRewritePredicate::isCompatibleMatchPolicy(
+    Router::PathMatchPredicateSharedPtr path_match_predicate) const {
+  if (path_match_predicate->name() != Extensions::PatternTemplate::Match::NAME) {
+    return absl::InvalidArgumentError(fmt::format("unable to use {} extension without {} extension",
+                                                  Extensions::PatternTemplate::Rewrite::NAME,
+                                                  Extensions::PatternTemplate::Match::NAME));
+  }
+
+  // This is needed to match up variable values.
+  // Validation between extensions as they share rewrite pattern variables.
+  if (!isValidSharedVariableSet(url_rewrite_pattern_, path_match_predicate->pattern()).ok()) {
+    return absl::InvalidArgumentError(
+        fmt::format("mismatch between variables in path_match_policy {} and path_rewrite_policy {}",
+                    path_match_predicate->pattern(), url_rewrite_pattern_));
+  }
+
+  return absl::OkStatus();
+}
 
 absl::Status PatternTemplateRewritePredicate::isValidRewritePattern(std::string match_pattern,
                                                                     std::string rewrite_pattern) {

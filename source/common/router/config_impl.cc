@@ -704,25 +704,22 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
+  int num_rewrite_polices = 0;
   if (path_rewrite_policy_.enabled()) {
-    if (!prefix_rewrite_.empty() || route.route().has_regex_rewrite()) {
-      throw EnvoyException(
-          "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
-    }
+    ++num_rewrite_polices;
   }
 
   if (!prefix_rewrite_.empty()) {
-    if (route.route().has_regex_rewrite() || path_rewrite_policy_.enabled()) {
-      throw EnvoyException(
-          "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
-    }
+    ++num_rewrite_polices;
   }
 
   if (route.route().has_regex_rewrite()) {
-    if (!prefix_rewrite_.empty() || path_rewrite_policy_.enabled()) {
-      throw EnvoyException(
-          "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
-    }
+    ++num_rewrite_polices;
+  }
+
+  if (num_rewrite_polices > 1) {
+    throw EnvoyException(
+        "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
   }
 
   if (route.route().has_regex_rewrite()) {
@@ -731,24 +728,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
-  // Check if pattern rewrite is enabled that the pattern matching is also enabled.
-  // This is needed to match up variable values.
-  if (path_rewrite_policy_.enabled() &&
-      path_rewrite_policy_.predicate()->name() == Extensions::PatternTemplate::Rewrite::NAME) {
-    if (!path_match_policy_.enabled() ||
-        path_match_policy_.predicate()->name() != Extensions::PatternTemplate::Match::NAME) {
-      throw EnvoyException(fmt::format("unable to use {} extension without {} extension",
-                                       Extensions::PatternTemplate::Rewrite::NAME,
-                                       Extensions::PatternTemplate::Match::NAME));
-    }
-
-    // Validation between extensions as they share rewrite pattern variables.
-    if (!Extensions::PatternTemplate::isValidSharedVariableSet(
-             path_rewrite_policy_.predicate()->pattern(), path_match_policy_.predicate()->pattern())
-             .ok()) {
-      throw EnvoyException(fmt::format(
-          "mismatch between variables in path_match_policy {} and path_rewrite_policy {}",
-          path_match_policy_.predicate()->pattern(), path_rewrite_policy_.predicate()->pattern()));
+  // validate rewrite policy is valid with the provided match policy
+  if (path_rewrite_policy_.enabled()) {
+    absl::Status compatible_polices =
+        path_rewrite_policy_.predicate()->isCompatibleMatchPolicy(path_match_policy_.predicate());
+    if (!compatible_polices.ok()) {
+      throw EnvoyException(std::string(compatible_polices.message()));
     }
   }
 
