@@ -52,18 +52,6 @@ std::vector<uint8_t> Encoder::newFrameHeader(const Frame& frame) {
   return output;
 }
 
-bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
-  decoding_error_ = false;
-  output_ = &output;
-  inspect(input);
-  output_ = nullptr;
-  if (decoding_error_) {
-    return false;
-  }
-  input.drain(input.length());
-  return true;
-}
-
 bool Decoder::frameStart(uint8_t flags_and_opcode) {
   // Validate opcode (last 4 bits)
   uint8_t opcode = flags_and_opcode & 0x0f;
@@ -96,6 +84,12 @@ void Decoder::frameMaskingKey() {
 void Decoder::frameDataStart() {
   frame_.payload_length_ = length_;
   frame_.payload_ = std::make_unique<Buffer::OwnedImpl>();
+  if (length_ == 0) {
+    frameDataEnd();
+    state_ = State::KFrameHeaderFlagsAndOpcode;
+  } else {
+    state_ = State::KFramePayload;
+  }
 }
 
 void Decoder::frameData(const uint8_t* mem, uint64_t length) { frame_.payload_->add(mem, length); }
@@ -109,11 +103,96 @@ void Decoder::frameDataEnd() {
   frame_.masking_key_ = absl::nullopt;
 }
 
-uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
+void Decoder::doDecodeMaskFlagAndLength(const uint8_t c, const uint8_t*& mem,
+                                        uint64_t& slice_index) {
+  frameMaskFlag(c);
+  if (length_ == 0x7e) {
+    length_of_extended_length_ = kPayloadLength16Bit;
+    length_ = 0;
+    state_ = State::KFrameHeaderExtendedLength;
+  } else if (length_ == 0x7f) {
+    length_of_extended_length_ = kPayloadLength64Bit;
+    length_ = 0;
+    state_ = State::KFrameHeaderExtendedLength;
+  } else if (masking_key_length_ > 0) {
+    state_ = State::KFrameHeaderMaskingKey;
+  } else {
+    frameDataStart();
+  }
+  slice_index++;
+  mem++;
+}
+
+void Decoder::doDecodeExtendedLength(const uint8_t c, const uint8_t*& mem, uint64_t& slice_index) {
+  if (length_of_extended_length_ == 1) {
+    length_ |= static_cast<uint64_t>(c);
+  } else {
+    length_ |= static_cast<uint64_t>(c) << 8 * (length_of_extended_length_ - 1);
+  }
+  length_of_extended_length_--;
+  if (length_of_extended_length_ == 0) {
+    if (masking_key_length_ > 0) {
+      state_ = State::KFrameHeaderMaskingKey;
+    } else {
+      frameDataStart();
+    }
+  }
+  slice_index++;
+  mem++;
+}
+
+void Decoder::doDecodeMaskingKey(const uint8_t c, const uint8_t*& mem, uint64_t& slice_index) {
+  if (masking_key_length_ == 1) {
+    masking_key_ |= static_cast<uint32_t>(c);
+  } else {
+    masking_key_ |= static_cast<uint32_t>(c) << 8 * (masking_key_length_ - 1);
+  }
+  masking_key_length_--;
+  if (masking_key_length_ == 0) {
+    frameMaskingKey();
+    frameDataStart();
+  }
+  slice_index++;
+  mem++;
+}
+
+void Decoder::doDecodePayload(const Buffer::RawSlice& slice, const uint8_t*& mem,
+                              uint64_t& slice_index) {
+  uint64_t remain_in_buffer = slice.len_ - slice_index;
+  if (remain_in_buffer <= length_) {
+    frameData(mem, remain_in_buffer);
+    mem += remain_in_buffer;
+    slice_index += remain_in_buffer;
+    length_ -= remain_in_buffer;
+  } else {
+    frameData(mem, length_);
+    mem += length_;
+    slice_index += length_;
+    length_ = 0;
+  }
+  if (length_ == 0) {
+    frameDataEnd();
+    state_ = State::KFrameHeaderFlagsAndOpcode;
+  }
+}
+
+bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
+  decoding_error_ = false;
+  output_ = &output;
+  inspect(input);
+  output_ = nullptr;
+  if (decoding_error_) {
+    return false;
+  }
+  input.drain(input.length());
+  return true;
+}
+
+uint64_t Decoder::inspect(const Buffer::Instance& data) {
   uint64_t frames_count_ = 0;
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     const uint8_t* mem = reinterpret_cast<uint8_t*>(slice.mem_);
-    for (uint64_t j = 0; j < slice.len_;) {
+    for (uint64_t slice_index = 0; slice_index < slice.len_;) {
       uint8_t c = *mem;
       switch (state_) {
       case State::KFrameHeaderFlagsAndOpcode:
@@ -124,92 +203,19 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
         frames_count_ += 1;
         state_ = State::KFrameHeaderMaskFlagAndLength;
         mem++;
-        j++;
+        slice_index++;
         break;
       case State::KFrameHeaderMaskFlagAndLength:
-        frameMaskFlag(c);
-        if (length_ == 0x7e) {
-          length_of_extended_length_ = kPayloadLength16Bit;
-          length_ = 0;
-          state_ = State::KFrameHeaderExtendedLength;
-        } else if (length_ == 0x7f) {
-          length_of_extended_length_ = kPayloadLength64Bit;
-          length_ = 0;
-          state_ = State::KFrameHeaderExtendedLength;
-        } else if (masking_key_length_ > 0) {
-          state_ = State::KFrameHeaderMaskingKey;
-        } else {
-          frameDataStart();
-          if (length_ == 0) {
-            frameDataEnd();
-            state_ = State::KFrameHeaderFlagsAndOpcode;
-          } else {
-            state_ = State::KFramePayload;
-          }
-        }
-        mem++;
-        j++;
+        doDecodeMaskFlagAndLength(c, mem, slice_index);
         break;
       case State::KFrameHeaderExtendedLength:
-        if (length_of_extended_length_ == 1) {
-          length_ |= static_cast<uint64_t>(c);
-        } else {
-          length_ |= static_cast<uint64_t>(c) << 8 * (length_of_extended_length_ - 1);
-        }
-        length_of_extended_length_--;
-        if (length_of_extended_length_ == 0) {
-          if (masking_key_length_ > 0) {
-            state_ = State::KFrameHeaderMaskingKey;
-          } else {
-            frameDataStart();
-            if (length_ == 0) {
-              frameDataEnd();
-              state_ = State::KFrameHeaderFlagsAndOpcode;
-            } else {
-              state_ = State::KFramePayload;
-            }
-          }
-        }
-        mem++;
-        j++;
+        doDecodeExtendedLength(c, mem, slice_index);
         break;
       case State::KFrameHeaderMaskingKey:
-        if (masking_key_length_ == 1) {
-          masking_key_ |= static_cast<uint32_t>(c);
-        } else {
-          masking_key_ |= static_cast<uint32_t>(c) << 8 * (masking_key_length_ - 1);
-        }
-        masking_key_length_--;
-        if (masking_key_length_ == 0) {
-          frameMaskingKey();
-          frameDataStart();
-          if (length_ == 0) {
-            frameDataEnd();
-            state_ = State::KFrameHeaderFlagsAndOpcode;
-          } else {
-            state_ = State::KFramePayload;
-          }
-        }
-        mem++;
-        j++;
+        doDecodeMaskingKey(c, mem, slice_index);
         break;
       case State::KFramePayload:
-        uint64_t remain_in_buffer = slice.len_ - j;
-        if (remain_in_buffer <= length_) {
-          frameData(mem, remain_in_buffer);
-          mem += remain_in_buffer;
-          j += remain_in_buffer;
-          length_ -= remain_in_buffer;
-        } else {
-          frameData(mem, length_);
-          mem += length_;
-          j += length_;
-          length_ = 0;
-        }
-        if (length_ == 0) {
-          frameDataEnd();
-          state_ = State::KFrameHeaderFlagsAndOpcode;
-        }
+        doDecodePayload(slice, mem, slice_index);
         break;
       }
     }

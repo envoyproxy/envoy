@@ -96,49 +96,35 @@ enum class State {
 };
 
 // Inspects the number of frames contains in an input buffer without decoding into frames.
-class FrameInspector {
+class DecoderBase {
 public:
-  virtual ~FrameInspector() = default;
+  virtual ~DecoderBase() = default;
 
-  // Inspects the given buffer with WebSocket data frames and updates the frame count.
+protected:
+  // Decodes the given buffer with WebSocket data frames and updates the frame count.
   // Invokes visitor callbacks for each frame in the following sequence:
   // ----------------------------------------------------------------------------------
   //  frameStart frameMaskFlag frameMaskingKey? frameDataStart frameData* frameDataEnd
   // ----------------------------------------------------------------------------------
-  // If frameStart returns false, then the inspector aborts.
+  // If frameStart returns false, then the decoder aborts.
   // Returns the increase in the frame count.
-  uint64_t inspect(const Buffer::Instance& input);
+  virtual uint64_t inspect(const Buffer::Instance& input) PURE;
 
-  // Returns the current frame count, corresponding to the request/response
-  // message count. Counter is incremented on a frame start.
-  uint64_t frameCount() const { return total_frames_count_; }
+  virtual bool frameStart(uint8_t) PURE;
+  virtual void frameMaskFlag(uint8_t) PURE;
+  virtual void frameMaskingKey() PURE;
+  virtual void frameDataStart() PURE;
+  virtual void frameData(const uint8_t*, uint64_t) PURE;
+  virtual void frameDataEnd() PURE;
 
-  // Returns the current state in the frame parsing.
-  State state() const { return state_; }
-
-protected:
-  virtual bool frameStart(uint8_t) { return true; }
-  virtual void frameMaskFlag(uint8_t mask_and_length) {
-    masking_key_length_ = (mask_and_length & 0x80) ? kMaskingKeyLength : 0;
-    length_ = mask_and_length & 0x7F;
-  }
-  virtual void frameMaskingKey() {}
-  virtual void frameDataStart() {}
-  virtual void frameData(const uint8_t*, uint64_t) {}
-  virtual void frameDataEnd() {}
-
-  State state_ = State::KFrameHeaderFlagsAndOpcode;
-  uint32_t masking_key_ = 0;
-  uint64_t length_ = 0;
-  uint8_t masking_key_length_ = 0;
-
-private:
-  uint8_t length_of_extended_length_ = 0;
-  uint64_t total_frames_count_ = 0;
+  virtual void doDecodeMaskFlagAndLength(const uint8_t, const uint8_t*&, uint64_t&) PURE;
+  virtual void doDecodeExtendedLength(const uint8_t c, const uint8_t*&, uint64_t&) PURE;
+  virtual void doDecodeMaskingKey(const uint8_t c, const uint8_t*&, uint64_t&) PURE;
+  virtual void doDecodePayload(const Buffer::RawSlice&, const uint8_t*&, uint64_t&) PURE;
 };
 
 // Decoder decodes bytes in input buffer into in-memory WebSocket frames.
-class Decoder : public FrameInspector {
+class Decoder : public DecoderBase {
 public:
   // Decodes the given buffer with WebSocket frame. Drains the input buffer when
   // decoding succeeded (returns true). If the input is not sufficient to make a
@@ -149,17 +135,9 @@ public:
   // @return bool whether the decoding succeeded or not.
   bool decode(Buffer::Instance& input, std::vector<Frame>& output);
 
-  // Determine the length of the current frame being decoded. This is useful when supplying a
-  // partial frame to decode() and wanting to know how many more bytes need to be read to complete
-  // the frame.
-  uint32_t length() const { return frame_.payload_length_; }
-
-  // Indicates whether it has buffered any partial data.
-  bool hasBufferedData() const { return state_ != State::KFrameHeaderFlagsAndOpcode; }
-
-  Frame& getFrame() { return frame_; };
-
 protected:
+  uint64_t inspect(const Buffer::Instance& input) override;
+
   bool frameStart(uint8_t) override;
   void frameMaskFlag(uint8_t) override;
   void frameMaskingKey() override;
@@ -167,12 +145,23 @@ protected:
   void frameData(const uint8_t*, uint64_t) override;
   void frameDataEnd() override;
 
+  void doDecodeMaskFlagAndLength(const uint8_t, const uint8_t*& mem, uint64_t&) override;
+  void doDecodeExtendedLength(const uint8_t c, const uint8_t*&, uint64_t&) override;
+  void doDecodeMaskingKey(const uint8_t c, const uint8_t*&, uint64_t&) override;
+  void doDecodePayload(const Buffer::RawSlice&, const uint8_t*&, uint64_t&) override;
+
 private:
   // Current frame that is being decoded.
   Frame frame_;
   // Data holder for successfully decoded frames.
   std::vector<Frame>* output_ = nullptr;
   bool decoding_error_ = false;
+  State state_ = State::KFrameHeaderFlagsAndOpcode;
+  uint64_t total_frames_count_ = 0;
+  uint8_t length_of_extended_length_ = 0;
+  uint32_t masking_key_ = 0;
+  uint64_t length_ = 0;
+  uint8_t masking_key_length_ = 0;
 };
 
 } // namespace WebSocket
