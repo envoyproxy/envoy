@@ -14,8 +14,7 @@ UpstreamRequest::UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& po
     : parent_(parent), stats_(parent.stats()), conn_pool_data_(pool_data), metadata_(metadata),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
-      request_complete_(false), response_started_(false), response_complete_(false),
-      draining_(false), response_underflow_(false), charged_response_timing_(false),
+      request_complete_(false), response_underflow_(false), charged_response_timing_(false),
       close_downstream_on_error_(close_downstream_on_error) {}
 
 UpstreamRequest::~UpstreamRequest() {
@@ -127,9 +126,9 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
                                        UpstreamResponseCallbacks& callbacks) {
   ENVOY_LOG(trace, "reading response: {} bytes", data.length());
 
-  if (!response_started_) {
+  if (response_state_ == ResponseState::None) {
     callbacks.startUpstreamResponse(*transport_, *protocol_);
-    response_started_ = true;
+    response_state_ = ResponseState::Started;
   }
 
   const auto& cluster = parent_.cluster();
@@ -163,15 +162,16 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
       break;
     }
 
+    response_state_ = ResponseState::Completed;
     if (callbacks.responseMetadata()->isDraining()) {
       ENVOY_LOG(debug, "got draining signal");
       stats_.incCloseDrain(cluster);
       // ResetStream triggers a local connection failure. However, we want to
       // keep the downstream connection after the upstream connection, i.e.,
-      // `conn_data->connection()`, is closed. Therefore, introduce a new flag
-      // `draining_` to hint that we got a draining signal and not to close the
-      //  downstream connection.
-      draining_ = true;
+      // `conn_data->connection()`, is closed. Therefore, introduce a new state
+      // ResponseState::Completed before ResponseState::ConnectionReleased to
+      // hint that got all the response and not to close the downstream
+      // connection, especially while we got a draining signal.
       resetStream();
     }
     onResponseComplete();
@@ -188,7 +188,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
 
 bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream,
                                          UpstreamResponseCallbacks& callbacks) {
-  ASSERT(!response_complete_);
+  ASSERT(response_state_ < ResponseState::Completed);
 
   response_size_ += data.length();
 
@@ -214,7 +214,7 @@ bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream
 }
 
 void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
-  ASSERT(!response_complete_);
+  ASSERT(response_state_ != ResponseState::ConnectionReleased);
   bool end_downstream = true;
 
   switch (event) {
@@ -234,6 +234,7 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
 
   releaseConnection(false);
   if (!end_downstream && request_complete_) {
+    ENVOY_LOG(debug, "reset parent callbacks");
     parent_.onReset();
   }
 }
@@ -264,15 +265,16 @@ void UpstreamRequest::onRequestStart(bool continue_decoding) {
 }
 
 void UpstreamRequest::onRequestComplete() {
+  ENVOY_LOG(debug, "on request complete");
   Event::Dispatcher& dispatcher = parent_.dispatcher();
   downstream_request_complete_time_ = dispatcher.timeSource().monotonicTime();
   request_complete_ = true;
 }
 
 void UpstreamRequest::onResponseComplete() {
-  ENVOY_LOG(debug, "response complete");
+  ENVOY_LOG(debug, "on response complete");
   chargeResponseTiming();
-  response_complete_ = true;
+  response_state_ = ResponseState::ConnectionReleased;
   conn_state_ = nullptr;
   conn_data_.reset();
 }
@@ -318,10 +320,15 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
 
     // Error occurred after a partial or underflow response, propagate the reset to the
     // downstream.
-    if (response_underflow_ || (response_started_ && !draining_ && !response_complete_)) {
+    if (response_underflow_ || response_state_ == ResponseState::Started) {
       ENVOY_LOG(debug, "reset downstream connection for a partial or underflow response");
+      if (response_underflow_) {
+        stats_.incCloseUnderflowResponse(parent_.cluster());
+      } else {
+        stats_.incClosePartialResponse(parent_.cluster());
+      }
       parent_.resetDownstreamConnection();
-    } else if (!draining_ && !response_complete_) {
+    } else if (response_state_ == ResponseState::None) {
       close_downstream = close_downstream_on_error_;
       stats_.incResponseLocalException(parent_.cluster());
       parent_.sendLocalReply(
@@ -337,23 +344,22 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
   }
 
   ENVOY_LOG(debug,
-            "upstream reset complete. reason={}, close_downstream={}, response_started={}, "
-            "response_complete={}, draining={}, response_underflow={}",
+            "upstream reset complete. reason={}, close_downstream={}, response_state={}, "
+            "response_underflow={}",
             PoolFailureReasonNames::get().fromReason(reason), close_downstream,
-            static_cast<bool>(response_started_), static_cast<bool>(response_complete_),
-            static_cast<bool>(draining_), static_cast<bool>(response_underflow_));
+            static_cast<uint8_t>(response_state_), static_cast<bool>(response_underflow_));
   return close_downstream;
 }
 
 void UpstreamRequest::chargeResponseTiming() {
-  if (charged_response_timing_ || !request_complete_) {
+  if (charged_response_timing_ || !downstream_request_complete_time_.has_value()) {
     return;
   }
   charged_response_timing_ = true;
   Event::Dispatcher& dispatcher = parent_.dispatcher();
   const std::chrono::milliseconds response_time =
       std::chrono::duration_cast<std::chrono::milliseconds>(
-          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_.value());
   stats_.recordUpstreamResponseTime(parent_.cluster(), upstream_host_, response_time.count());
 }
 

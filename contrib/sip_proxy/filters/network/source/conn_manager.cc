@@ -108,7 +108,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
             });
       }
 
-      // If the wrong reponse received, then try next affinity
+      // If the wrong response received, then try next affinity
       parent_.onResponseHandleForPendingList(
           message_type, item.first,
           [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
@@ -330,7 +330,6 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  stats_.request_active_.inc();
   stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
 
   std::string&& k = std::string(metadata->transactionId().value());

@@ -49,7 +49,7 @@ public:
                          TimeSource& time_source, Api::Api& api, const StatNames& stat_names);
   RawAsyncClientSharedPtr
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
-                            bool skip_cluster_check, CacheOption cache_option) override;
+                            bool skip_cluster_check) override;
 
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
                                               Stats::Scope& scope,
