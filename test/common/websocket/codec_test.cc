@@ -398,7 +398,7 @@ TEST(WebSocketCodecTest, FrameInspectorTest) {
     Buffer::OwnedImpl buffer;
     FrameInspector counter;
     EXPECT_EQ(0, counter.inspect(buffer));
-    EXPECT_EQ(counter.state(), State::kFrameHeaderFlagsAndOpcode);
+    EXPECT_EQ(counter.state(), State::KFrameHeaderFlagsAndOpcode);
     EXPECT_EQ(counter.frameCount(), 0);
   }
 
@@ -407,7 +407,7 @@ TEST(WebSocketCodecTest, FrameInspectorTest) {
     FrameInspector counter;
     Buffer::addSeq(buffer, {0x81});
     EXPECT_EQ(1, counter.inspect(buffer));
-    EXPECT_EQ(counter.state(), State::kFrameHeaderMaskFlagAndLength);
+    EXPECT_EQ(counter.state(), State::KFrameHeaderMaskFlagAndLength);
     EXPECT_EQ(counter.frameCount(), 1);
   }
 
@@ -416,7 +416,7 @@ TEST(WebSocketCodecTest, FrameInspectorTest) {
     FrameInspector counter;
     Buffer::addSeq(buffer, {0x81, 0x05});
     EXPECT_EQ(1, counter.inspect(buffer));
-    EXPECT_EQ(counter.state(), State::kFramePayload);
+    EXPECT_EQ(counter.state(), State::KFramePayload);
     EXPECT_EQ(counter.frameCount(), 1);
   }
 
@@ -427,7 +427,7 @@ TEST(WebSocketCodecTest, FrameInspectorTest) {
     Buffer::addSeq(buffer, {0x80, 0x86, 0x7c, 0x96, 0x26, 0x3f});
     Buffer::addSeq(buffer, {0x1f, 0xfa, 0x4f, 0x5a, 0x12, 0xe2});
     EXPECT_EQ(1, counter.inspect(buffer));
-    EXPECT_EQ(counter.state(), State::kFrameHeaderFlagsAndOpcode);
+    EXPECT_EQ(counter.state(), State::KFrameHeaderFlagsAndOpcode);
     EXPECT_EQ(counter.frameCount(), 1);
   }
 
@@ -438,7 +438,7 @@ TEST(WebSocketCodecTest, FrameInspectorTest) {
     Buffer::addSeq(buffer,
                    {0x02, 0x03, 0xd7, 0xb0, 0x49, 0x00, 0x02, 0x89, 0xaf, 0x80, 0x01, 0xdd});
     EXPECT_EQ(3, counter.inspect(buffer));
-    EXPECT_EQ(counter.state(), State::kFrameHeaderFlagsAndOpcode);
+    EXPECT_EQ(counter.state(), State::KFrameHeaderFlagsAndOpcode);
     EXPECT_EQ(counter.frameCount(), 3);
   }
 
@@ -448,7 +448,7 @@ TEST(WebSocketCodecTest, FrameInspectorTest) {
     FrameInspector counter;
     Buffer::addSeq(buffer, {0x82, 0x7F, 0x00, 0x00});
     EXPECT_EQ(1, counter.inspect(buffer));
-    EXPECT_EQ(counter.state(), State::kFrameHeaderExtendedLength);
+    EXPECT_EQ(counter.state(), State::KFrameHeaderExtendedLength);
     EXPECT_EQ(counter.frameCount(), 1);
   }
 
@@ -458,7 +458,7 @@ TEST(WebSocketCodecTest, FrameInspectorTest) {
     FrameInspector counter;
     Buffer::addSeq(buffer, {0x01, 0x86, 0xaf, 0x4b});
     EXPECT_EQ(1, counter.inspect(buffer));
-    EXPECT_EQ(counter.state(), State::kFrameHeaderMaskingKey);
+    EXPECT_EQ(counter.state(), State::KFrameHeaderMaskingKey);
     EXPECT_EQ(counter.frameCount(), 1);
   }
 
@@ -476,11 +476,11 @@ TEST(WebSocketCodecTest, FrameInspectorTest) {
     Buffer::addSeq(buffer2, {0x80, 0x01, 0xdd});
 
     EXPECT_EQ(2, counter.inspect(buffer1));
-    EXPECT_EQ(counter.state(), State::kFrameHeaderFlagsAndOpcode);
+    EXPECT_EQ(counter.state(), State::KFrameHeaderFlagsAndOpcode);
     EXPECT_EQ(counter.frameCount(), 2);
 
     EXPECT_EQ(3, counter.inspect(buffer2));
-    EXPECT_EQ(counter.state(), State::kFrameHeaderFlagsAndOpcode);
+    EXPECT_EQ(counter.state(), State::KFrameHeaderFlagsAndOpcode);
     EXPECT_EQ(counter.frameCount(), 5);
   }
 
@@ -498,7 +498,7 @@ TEST(WebSocketCodecTest, FrameInspectorTest) {
                    {0x80, 0x86, 0x7c, 0x96, 0x26, 0x3f, 0x1f, 0xfa, 0x4f, 0x5a, 0x12, 0xe2});
 
     EXPECT_EQ(3, counter.inspect(buffer));
-    EXPECT_EQ(counter.state(), State::kFrameHeaderFlagsAndOpcode);
+    EXPECT_EQ(counter.state(), State::KFrameHeaderFlagsAndOpcode);
     EXPECT_EQ(counter.frameCount(), 3);
   }
 }

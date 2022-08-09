@@ -81,18 +81,18 @@ public:
 enum class State {
   // Decoding the first byte. Waiting for decoding the final frame flag (1 bit)
   // and reserved flags (3 bits) and opcode (4 bits) of the WebSocket data frame.
-  kFrameHeaderFlagsAndOpcode,
+  KFrameHeaderFlagsAndOpcode,
   // Decoding the second byte. Waiting for decoding the mask flag (1 bit) and
   // length/length flag (7 bit) of the WebSocket data frame.
-  kFrameHeaderMaskFlagAndLength,
+  KFrameHeaderMaskFlagAndLength,
   // Waiting for decoding the extended length of the frame if length read previously
   // is either 126 or 127. Respectively 2 bytes or 8 bytes will be decoded from the
   // WebSocket data frame.
-  kFrameHeaderExtendedLength,
+  KFrameHeaderExtendedLength,
   // Waiting for decoding the masking key (4 bytes) only if the mask bit is set.
-  kFrameHeaderMaskingKey,
+  KFrameHeaderMaskingKey,
   // Waiting for decoding the payload (both extension data and application data).
-  kFramePayload,
+  KFramePayload,
 };
 
 // Inspects the number of frames contains in an input buffer without decoding into frames.
@@ -127,7 +127,7 @@ protected:
   virtual void frameData(const uint8_t*, uint64_t) {}
   virtual void frameDataEnd() {}
 
-  State state_ = State::kFrameHeaderFlagsAndOpcode;
+  State state_ = State::KFrameHeaderFlagsAndOpcode;
   uint32_t masking_key_ = 0;
   uint64_t length_ = 0;
   uint8_t masking_key_length_ = 0;
@@ -155,7 +155,7 @@ public:
   uint32_t length() const { return frame_.payload_length_; }
 
   // Indicates whether it has buffered any partial data.
-  bool hasBufferedData() const { return state_ != State::kFrameHeaderFlagsAndOpcode; }
+  bool hasBufferedData() const { return state_ != State::KFrameHeaderFlagsAndOpcode; }
 
   Frame& getFrame() { return frame_; };
 

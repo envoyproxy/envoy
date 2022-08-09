@@ -116,41 +116,41 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
     for (uint64_t j = 0; j < slice.len_;) {
       uint8_t c = *mem;
       switch (state_) {
-      case State::kFrameHeaderFlagsAndOpcode:
+      case State::KFrameHeaderFlagsAndOpcode:
         if (!frameStart(c)) {
           return frames_count_;
         }
         total_frames_count_ += 1;
         frames_count_ += 1;
-        state_ = State::kFrameHeaderMaskFlagAndLength;
+        state_ = State::KFrameHeaderMaskFlagAndLength;
         mem++;
         j++;
         break;
-      case State::kFrameHeaderMaskFlagAndLength:
+      case State::KFrameHeaderMaskFlagAndLength:
         frameMaskFlag(c);
         if (length_ == 0x7e) {
           length_of_extended_length_ = kPayloadLength16Bit;
           length_ = 0;
-          state_ = State::kFrameHeaderExtendedLength;
+          state_ = State::KFrameHeaderExtendedLength;
         } else if (length_ == 0x7f) {
           length_of_extended_length_ = kPayloadLength64Bit;
           length_ = 0;
-          state_ = State::kFrameHeaderExtendedLength;
+          state_ = State::KFrameHeaderExtendedLength;
         } else if (masking_key_length_ > 0) {
-          state_ = State::kFrameHeaderMaskingKey;
+          state_ = State::KFrameHeaderMaskingKey;
         } else {
           frameDataStart();
           if (length_ == 0) {
             frameDataEnd();
-            state_ = State::kFrameHeaderFlagsAndOpcode;
+            state_ = State::KFrameHeaderFlagsAndOpcode;
           } else {
-            state_ = State::kFramePayload;
+            state_ = State::KFramePayload;
           }
         }
         mem++;
         j++;
         break;
-      case State::kFrameHeaderExtendedLength:
+      case State::KFrameHeaderExtendedLength:
         if (length_of_extended_length_ == 1) {
           length_ |= static_cast<uint64_t>(c);
         } else {
@@ -159,21 +159,21 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
         length_of_extended_length_--;
         if (length_of_extended_length_ == 0) {
           if (masking_key_length_ > 0) {
-            state_ = State::kFrameHeaderMaskingKey;
+            state_ = State::KFrameHeaderMaskingKey;
           } else {
             frameDataStart();
             if (length_ == 0) {
               frameDataEnd();
-              state_ = State::kFrameHeaderFlagsAndOpcode;
+              state_ = State::KFrameHeaderFlagsAndOpcode;
             } else {
-              state_ = State::kFramePayload;
+              state_ = State::KFramePayload;
             }
           }
         }
         mem++;
         j++;
         break;
-      case State::kFrameHeaderMaskingKey:
+      case State::KFrameHeaderMaskingKey:
         if (masking_key_length_ == 1) {
           masking_key_ |= static_cast<uint32_t>(c);
         } else {
@@ -185,15 +185,15 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
           frameDataStart();
           if (length_ == 0) {
             frameDataEnd();
-            state_ = State::kFrameHeaderFlagsAndOpcode;
+            state_ = State::KFrameHeaderFlagsAndOpcode;
           } else {
-            state_ = State::kFramePayload;
+            state_ = State::KFramePayload;
           }
         }
         mem++;
         j++;
         break;
-      case State::kFramePayload:
+      case State::KFramePayload:
         uint64_t remain_in_buffer = slice.len_ - j;
         if (remain_in_buffer <= length_) {
           frameData(mem, remain_in_buffer);
@@ -208,7 +208,7 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
         }
         if (length_ == 0) {
           frameDataEnd();
-          state_ = State::kFrameHeaderFlagsAndOpcode;
+          state_ = State::KFrameHeaderFlagsAndOpcode;
         }
         break;
       }
