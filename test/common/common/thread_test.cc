@@ -38,7 +38,7 @@ TEST_F(ThreadAsyncPtrTest, ThreadSynchronizerWithTimeoutReturnsTrueIfBarrierMet)
         return true;
       },
       Options{"thread1"});
-  EXPECT_TRUE(sync.barrierOn("triggered_quickly", absl::Seconds(1)));
+  EXPECT_TRUE(sync.barrierOn("triggered_quickly", absl::Seconds(30)));
   sync.signal("triggered_quickly");
   thread1->join();
 }
