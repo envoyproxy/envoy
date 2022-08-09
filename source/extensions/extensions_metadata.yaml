@@ -1232,3 +1232,10 @@ envoy.matching.custom_matchers.trie_matcher:
   status: alpha
   type_urls:
   - xds.type.matcher.v3.IPMatcher
+envoy.filters.http.custom_response:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.custom_response.v3.CustomResponse

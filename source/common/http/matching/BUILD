@@ -20,11 +20,15 @@ envoy_cc_library(
 envoy_cc_library(
     name = "inputs_lib",
     srcs = ["inputs.cc"],
-    hdrs = ["inputs.h"],
+    hdrs = [
+        "inputs.h",
+        "status_code_input.h",
+    ],
     deps = [
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
         "//source/common/http:header_utility_lib",
+        "//source/common/http:utility_lib",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )

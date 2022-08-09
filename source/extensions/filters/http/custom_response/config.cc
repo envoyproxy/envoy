@@ -1,13 +1,13 @@
 #include "source/extensions/filters/http/custom_response/config.h"
 
+#include <memory>
+
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
-#include "source/extensions/filters/http/custom_response/custom_response_filter.h"
-
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -63,19 +63,6 @@ public:
 
 } // namespace
 
-Http::FilterFactoryCb CustomFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto config_ptr =
-      std::make_shared<envoy::extensions::filters::http::custom_response::v3::CustomResponse>(
-          config);
-  return [config_ptr, stats_prefix,
-          &context](Http::FilterChainFactoryCallbacks& callbacks) mutable -> void {
-    callbacks.addStreamFilter(
-        std::make_shared<CustomResponseFilter>(config_ptr, context, stats_prefix));
-  };
-}
-
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
     Server::Configuration::FactoryContext& context) {
@@ -95,10 +82,24 @@ FilterConfig::FilterConfig(
   }
 }
 
-/**
- * Static registration for the filter. @see RegisterFactory.
- */
-REGISTER_FACTORY(CustomFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+ResponseSharedPtr FilterConfig::getResponse(Http::ResponseHeaderMap& headers,
+                                            const StreamInfo::StreamInfo& stream_info) {
+  if (!matcher_) {
+    return ResponseSharedPtr{};
+  }
+
+  Http::Matching::HttpMatchingDataImpl data(stream_info.downstreamAddressProvider());
+  data.onResponseHeaders(headers);
+  auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
+  if (!match.result_) {
+    return ResponseSharedPtr{};
+  }
+
+  const auto result = match.result_();
+  ASSERT(result->typeUrl() == CustomResponseNameAction::staticTypeUrl());
+  ASSERT(dynamic_cast<CustomResponseNameAction*>(result.get()));
+  return static_cast<const CustomResponseNameAction*>(result.get())->response_;
+}
 
 } // namespace CustomResponse
 } // namespace HttpFilters

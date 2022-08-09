@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "custom_response",
+    name = "custom_response_filter",
     srcs = [
         "custom_response_filter.cc",
     ],
@@ -18,6 +18,7 @@ envoy_cc_library(
         "custom_response_filter.h",
     ],
     deps = [
+        ":config",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -38,7 +39,6 @@ envoy_cc_extension(
         "response.h",
     ],
     deps = [
-        ":custom_response",
         "//envoy/api:api_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",
@@ -55,6 +55,23 @@ envoy_cc_extension(
         "//source/common/matcher:matcher_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_extension(
+    name = "factory",
+    srcs = [
+        "factory.cc",
+    ],
+    hdrs = [
+        "factory.h",
+    ],
+    deps = [
+        ":config",
+        ":custom_response_filter",
+        "//envoy/server:factory_context_interface",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
     ],

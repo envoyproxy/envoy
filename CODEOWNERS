@@ -256,6 +256,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
+# Custom response filter
+/*/extensions/filters/http/custom_response @pradeepcrao @yanavlasov
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
