@@ -10,24 +10,24 @@ namespace Envoy {
 namespace WebSocket {
 
 // Opcodes (https://datatracker.ietf.org/doc/html/rfc6455#section-11.8)
-constexpr uint8_t FRAME_OPCODE_CONTINUATION = 0;
-constexpr uint8_t FRAME_OPCODE_TEXT = 1;
-constexpr uint8_t FRAME_OPCODE_BINARY = 2;
-constexpr uint8_t FRAME_OPCODE_CLOSE = 8;
-constexpr uint8_t FRAME_OPCODE_PING = 9;
-constexpr uint8_t FRAME_OPCODE_PONG = 10;
-constexpr std::array<uint8_t, 6> FRAME_OPCODES = {FRAME_OPCODE_CONTINUATION, FRAME_OPCODE_TEXT,
-                                                  FRAME_OPCODE_BINARY,       FRAME_OPCODE_CLOSE,
-                                                  FRAME_OPCODE_PING,         FRAME_OPCODE_PONG};
+constexpr uint8_t kFrameOpcodeContinuation = 0;
+constexpr uint8_t kFrameOpcodeText = 1;
+constexpr uint8_t kFrameOpcodeBinary = 2;
+constexpr uint8_t kFrameOpcodeClose = 8;
+constexpr uint8_t kFrameOpcodePing = 9;
+constexpr uint8_t kFrameOpcodePong = 10;
+constexpr std::array<uint8_t, 6> kFrameOpcodes = {kFrameOpcodeContinuation, kFrameOpcodeText,
+                                                  kFrameOpcodeBinary,       kFrameOpcodeClose,
+                                                  kFrameOpcodePing,         kFrameOpcodePong};
 
 // Length of the masking key which is 4 bytes fixed size
-constexpr uint8_t MASKING_KEY_LENGTH = 4;
+constexpr uint8_t kMaskingKeyLength = 4;
 
 // 16 bit payload length
-constexpr uint8_t PAYLOAD_LENGTH_SIXTEEN_BIT = 2;
+constexpr uint8_t kPayloadLength16Bit = 2;
 
 // 64 bit payload length
-constexpr uint8_t PAYLOAD_LENGTH_SIXTY_FOUR_BIT = 8;
+constexpr uint8_t kPayloadLength64Bit = 8;
 
 // Wire format (https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
 // of WebSocket frame:
@@ -53,9 +53,10 @@ constexpr uint8_t PAYLOAD_LENGTH_SIXTY_FOUR_BIT = 8;
 
 // In-memory representation of the contents of a WebSocket frame.
 struct Frame {
-  // First byte of the WebSocket frame.
-  // |F|R|R|R| opcode(4) |
-  uint8_t flags_and_opcode_;
+  // Indicates that this is the final fragment in a message.
+  bool final_fragment_;
+  // Frame opcode.
+  uint8_t opcode_;
   // Length of the payload as the number of bytes.
   uint64_t payload_length_;
   // The 4 byte fixed size masking key used to mask the payload. Masking/unmasking should be
@@ -68,30 +69,30 @@ struct Frame {
 // Encoder encodes in memory WebSocket frames into frames in the wire format
 class Encoder {
 public:
-  Encoder();
+  Encoder() = default;
 
   // Creates a new Websocket data frame header with the given frame data.
   // @param frame supplies the frame to be encoded.
-  // @param output the buffer to store the encoded header data.
-  void newFrameHeader(const Frame& frame, std::vector<uint8_t>& output);
+  // @return std::vector<uint8_t> buffer with encoded header data.
+  std::vector<uint8_t> newFrameHeader(const Frame& frame);
 };
 
 // Current state of the frame that is being processed.
 enum class State {
   // Decoding the first byte. Waiting for decoding the final frame flag (1 bit)
   // and reserved flags (3 bits) and opcode (4 bits) of the WebSocket data frame.
-  FrameHeaderFinalFlagReservedFlagsOpcode,
+  kFrameHeaderFlagsAndOpcode,
   // Decoding the second byte. Waiting for decoding the mask flag (1 bit) and
   // length/length flag (7 bit) of the WebSocket data frame.
-  FrameHeaderMaskFlagAndLength,
+  kFrameHeaderMaskFlagAndLength,
   // Waiting for decoding the extended length of the frame if length read previously
   // is either 126 or 127. Respectively 2 bytes or 8 bytes will be decoded from the
   // WebSocket data frame.
-  FrameHeaderExtendedLength,
+  kFrameHeaderExtendedLength,
   // Waiting for decoding the masking key (4 bytes) only if the mask bit is set.
-  FrameHeaderMaskingKey,
+  kFrameHeaderMaskingKey,
   // Waiting for decoding the payload (both extension data and application data).
-  FramePayload,
+  kFramePayload,
 };
 
 // Inspects the number of frames contains in an input buffer without decoding into frames.
@@ -118,7 +119,7 @@ public:
 protected:
   virtual bool frameStart(uint8_t) { return true; }
   virtual void frameMaskFlag(uint8_t mask_and_length) {
-    masking_key_length_ = (mask_and_length & 0x80) ? MASKING_KEY_LENGTH : 0;
+    masking_key_length_ = (mask_and_length & 0x80) ? kMaskingKeyLength : 0;
     length_ = mask_and_length & 0x7F;
   }
   virtual void frameMaskingKey() {}
@@ -126,7 +127,7 @@ protected:
   virtual void frameData(const uint8_t*, uint64_t) {}
   virtual void frameDataEnd() {}
 
-  State state_ = State::FrameHeaderFinalFlagReservedFlagsOpcode;
+  State state_ = State::kFrameHeaderFlagsAndOpcode;
   uint32_t masking_key_ = 0;
   uint64_t length_ = 0;
   uint8_t masking_key_length_ = 0;
@@ -154,7 +155,7 @@ public:
   uint32_t length() const { return frame_.payload_length_; }
 
   // Indicates whether it has buffered any partial data.
-  bool hasBufferedData() const { return state_ != State::FrameHeaderFinalFlagReservedFlagsOpcode; }
+  bool hasBufferedData() const { return state_ != State::kFrameHeaderFlagsAndOpcode; }
 
   Frame& getFrame() { return frame_; };
 
