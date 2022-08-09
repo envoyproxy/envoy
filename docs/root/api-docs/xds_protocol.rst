@@ -679,12 +679,11 @@ itself during the initialization phase and the updates sent via CDS/LDS
 will not take effect until EDS/RDS responses are supplied.
 
 .. note::
-   Envoy specific implementation note: Warming of
-``Cluster`` is completed only when a new ``ClusterLoadAssignment`` response
-is supplied by management server even though there is no change in endpoints.
-However, If Envoy is already aware of ``RouteConfiguration`` referenced by ``Listener``,
-it will use it otherwise Envoy will initiate a new RDS request with the new
-route name referenced by ``Listener``.
+Envoy specific implementation note: Warming of ``Cluster`` is completed only
+when a new ``ClusterLoadAssignment`` response is supplied by management server
+even though there is no change in endpoints. However, If Envoy is already aware of
+``RouteConfiguration`` referenced by ``Listener``, it will use it otherwise Envoy will
+initiate a new RDS request with the new route name referenced by ``Listener``.
 
 .. _xds_protocol_eventual_consistency_considerations:
 
