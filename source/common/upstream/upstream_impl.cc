@@ -799,7 +799,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
-    Server::Configuration::ServerFactoryContext& server_context,
+    Init::Manager& init_manager, Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& config,
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
@@ -871,7 +871,7 @@ ClusterInfoImpl::ClusterInfoImpl(
               : absl::nullopt),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
-      server_factory_context_(server_context) {
+      upstream_context_(server_context, init_manager) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
@@ -982,14 +982,14 @@ ClusterInfoImpl::ClusterInfoImpl(
   if (http_protocol_options_ && !http_protocol_options_->http_filters_.empty()) {
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
-            server_factory_context_);
+            upstream_context_.getServerFactoryContext());
     Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
-    Http::FilterChainHelper<Server::Configuration::ServerFactoryContext,
+    Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*filter_config_provider_manager, server_factory_context_, server_factory_context_,
-               prefix);
+        helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
+               upstream_context_, prefix);
     // TODO(alyssawilk) make sure we have easy to debug logs about what filters are set up.
     helper.processFilters(http_filters, "http", "http", http_filter_factories_, false);
   }
@@ -1117,8 +1117,9 @@ ClusterImplBase::ClusterImplBase(
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = factory_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
-      new ClusterInfoImpl(server_context, cluster, factory_context.clusterManager().bindConfig(),
-                          runtime, std::move(socket_matcher), std::move(stats_scope), added_via_api,
+      new ClusterInfoImpl(init_manager_, server_context, cluster,
+                          factory_context.clusterManager().bindConfig(), runtime,
+                          std::move(socket_matcher), std::move(stats_scope), added_via_api,
                           factory_context),
       [&dispatcher](const ClusterInfoImpl* self) {
         ENVOY_LOG(trace, "Schedule destroy cluster info {}", self->name());
