@@ -69,7 +69,7 @@ message HealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.Payload";
 
-    enum Decoder {
+    enum DecoderType {
       HEX = 0;
       UTF8 = 1;
     }
@@ -77,15 +77,16 @@ message HealthCheck {
     oneof payload {
       option (validate.required) = true;
 
-      // String payload. Default is Hex encoded payload, eg. "000000FF".
-      string text = 1 [(validate.rules).string = {min_len: 1}];
+      // String payload. Default is Hex encoded payload, e.g., "000000FF".
+      string text = 1;
 
       // Binary payload.
       bytes binary = 2;
     }
 
-    // Specify the text decode format. It doesn't impact on the binary field.
-    Decoder text_decoder = 3 [(validate.rules).enum = {defined_only: true}];
+    // Specify the text decode format. Only relevant if ``text`` payload is used.
+    // If not specified, text payload is assumed to be Hex encoded.
+    DecoderType text_decoder = 3 [(validate.rules).enum = {defined_only: true}];
   }
 
   // [#next-free-field: 14]
@@ -111,8 +112,7 @@ message HealthCheck {
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
 
-    // HTTP specific expected response.
-    // An optional string or byte-string to match in the first 1024 bytes of the response body.
+    // Specifies a list of HTTP expected response to match in the first 1024 bytes of the response body.
     // If it is set, both the expected response check and status code determine the health check.
     // When checking the response, “fuzzy” matching is performed such that each binary block must be found,
     // and in the order specified, but not necessarily contiguous.

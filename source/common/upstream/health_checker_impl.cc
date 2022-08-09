@@ -153,7 +153,9 @@ PayloadMatcher::MatchSegments PayloadMatcher::loadProtoBytes(
     } else {
       decoded.assign(entry.binary().begin(), entry.binary().end());
     }
-    result.push_back(decoded);
+    if (decoded.size() != 0) {
+      result.push_back(decoded);
+    }
   }
 
   return result;
