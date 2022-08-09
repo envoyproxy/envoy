@@ -112,7 +112,7 @@ message HealthCheck {
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
 
-    // Specifies a list of HTTP expected response to match in the first 1024 bytes of the response body.
+    // Specifies a list of HTTP expected responses to match in the first 1024 bytes of the response body.
     // If it is set, both the expected response check and status code determine the health check.
     // When checking the response, “fuzzy” matching is performed such that each binary block must be found,
     // and in the order specified, but not necessarily contiguous.
