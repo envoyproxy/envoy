@@ -1522,10 +1522,10 @@ TEST_F(ConnectionHandlerTest, MatchhIpv4WhenBothIpv4AndIPv6WithIpv4CompatFlag2) 
   EXPECT_CALL(*access_log_, log(_, _, _, _));
 }
 
-// This test the case of there is stopped "0.0.0.0" listener, then add
-// "::" listener with ipv4_compat. Ensure the ipv6 listener will take over the
-// ipv4 listener.
-TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
+// This test the case of an update of existing listener which listening on
+// ipv4-mapped address, and expect the updated listener will replaced the old
+// one.
+TEST_F(ConnectionHandlerTest, UpdateIpv4MappedListener) {
   // Listener1 is response for redirect the connection.
   Network::TcpListenerCallbacks* listener_callbacks1;
   auto listener1 = new NiceMock<Network::MockListener>();
@@ -1543,20 +1543,17 @@ TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
   Network::TcpListenerCallbacks* ipv4_listener_callbacks;
   auto listener2 = new NiceMock<Network::MockListener>();
   TestListener* ipv4_listener =
-      addListener(2, false, false, "ipv4_test_listener", listener2, &ipv4_listener_callbacks,
+      addListener(2, false, false, "ipv6_test_listener", listener2, &ipv4_listener_callbacks,
                   nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
                   false, ipv4_overridden_filter_chain_manager);
-  Network::Address::InstanceConstSharedPtr ipv4_address(
-      new Network::Address::Ipv4Instance("0.0.0.0", 80, nullptr));
+  // Set the ipv6only as false.
+  Network::Address::InstanceConstSharedPtr ipv4_mapped_ipv6_address(
+      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
   EXPECT_CALL(ipv4_listener->socket_factory_, localAddress())
-      .WillRepeatedly(ReturnRef(ipv4_address));
+      .WillRepeatedly(ReturnRef(ipv4_mapped_ipv6_address));
   handler_->addListener(absl::nullopt, *ipv4_listener, runtime_);
 
-  EXPECT_CALL(*listener2, onDestroy());
-  // Stop the ipv4 listener.
-  handler_->stopListeners(2);
-
-  // Listener3 is listening on an Ipv4-mapped Ipv6 address.
+  // Listener3 is an updating of Listener2
   auto ipv6_overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
   Network::TcpListenerCallbacks* ipv6_any_listener_callbacks;
@@ -1565,9 +1562,6 @@ TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
       addListener(3, false, false, "ipv6_test_listener", listener3, &ipv6_any_listener_callbacks,
                   nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000),
                   false, ipv6_overridden_filter_chain_manager);
-  // Set the ipv6only as false.
-  Network::Address::InstanceConstSharedPtr ipv4_mapped_ipv6_address(
-      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
   EXPECT_CALL(ipv6_listener->socket_factory_, localAddress())
       .WillRepeatedly(ReturnRef(ipv4_mapped_ipv6_address));
   handler_->addListener(absl::nullopt, *ipv6_listener, runtime_);
@@ -1597,7 +1591,7 @@ TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
 
   // The listener1 will balance the request to listener2.
   EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
-  // The listener2 won't get the connection since it is stopped.
+  // The listener2 won't get the connection since it is replaced by listener3
   EXPECT_CALL(*ipv4_overridden_filter_chain_manager, findFilterChain(_)).Times(0);
   // The listener3 gets the connection.
   EXPECT_CALL(*ipv6_overridden_filter_chain_manager, findFilterChain(_))
@@ -1610,6 +1604,7 @@ TEST_F(ConnectionHandlerTest, AddIpv4MappedListenerAfterIpv4ListenerStopped) {
   EXPECT_EQ(1UL, handler_->numConnections());
 
   EXPECT_CALL(*listener3, onDestroy());
+  EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
   EXPECT_CALL(*access_log_, log(_, _, _, _));
 }
