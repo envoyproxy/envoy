@@ -28,8 +28,16 @@ def tcmalloc_external_deps(repository):
         repository + "//bazel:gperftools_tcmalloc": [envoy_external_dep_path("gperftools")],
         repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
         repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:linux_x86_64": [envoy_external_dep_path("tcmalloc")],
-        repository + "//bazel:linux_aarch64": [envoy_external_dep_path("tcmalloc")],
+        repository + "//bazel:linux_x86_64": [
+            envoy_external_dep_path("tcmalloc"),
+            envoy_external_dep_path("tcmalloc_profile_marshaler"),
+            envoy_external_dep_path("tcmalloc_malloc_extension"),
+        ],
+        repository + "//bazel:linux_aarch64": [
+            envoy_external_dep_path("tcmalloc"),
+            envoy_external_dep_path("tcmalloc_profile_marshaler"),
+            envoy_external_dep_path("tcmalloc_malloc_extension"),
+        ],
         "//conditions:default": [envoy_external_dep_path("gperftools")],
     })
 

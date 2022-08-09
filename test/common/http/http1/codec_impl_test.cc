@@ -928,11 +928,6 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidRequest) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   MockRequestDecoder decoder;
@@ -955,6 +950,7 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
   EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
@@ -1026,11 +1022,6 @@ TEST_P(Http1ServerConnectionImplTest, SimpleGet) {
 // Test that if the stream is not created at the time an error is detected, it
 // is created as part of sending the protocol error.
 TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   MockRequestDecoder decoder;
@@ -1043,7 +1034,7 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
   // Check that before any headers are parsed, requests do not look like HEAD or gRPC requests.
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
 
-  Buffer::OwnedImpl buffer("bad");
+  Buffer::OwnedImpl buffer("bad\r\n");
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
 }
@@ -1064,11 +1055,6 @@ TEST_P(Http1ServerConnectionImplTest, RejectInvalidMethod) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, BadRequestStartedStream) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   MockRequestDecoder decoder;
@@ -1078,9 +1064,9 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
 
-  Buffer::OwnedImpl buffer2("g");
+  Buffer::OwnedImpl buffer2("g\r\n");
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
-  status = codec_->dispatch(buffer);
+  status = codec_->dispatch(buffer2);
   EXPECT_TRUE(isCodecProtocolError(status));
 }
 
