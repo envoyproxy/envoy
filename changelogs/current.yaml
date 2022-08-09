@@ -50,5 +50,8 @@ new_features:
 - area: upstream
   change: |
     added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
+- area: access_log
+  change: |
+    added support for number values in Substitution format string in json_format
 
 deprecated:
