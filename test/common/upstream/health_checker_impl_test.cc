@@ -454,6 +454,23 @@ public:
     addCompletionCallback();
   }
 
+  void setupMethodValidationHC(const std::string method) {
+    std::string yaml = fmt::format(R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: {0}
+    )EOF",
+                                   method);
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
   const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig
   makeHealthCheckConfig(const uint32_t port_value) {
     envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
@@ -3044,6 +3061,78 @@ TEST_F(HttpHealthCheckerImplTest, ServiceNameMismatch) {
       Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+TEST_F(HttpHealthCheckerImplTest, DefaultMethodGet) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
+                  std::string(headers.Method()->value().getStringView()));
+        return Http::okStatus();
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+TEST_F(HttpHealthCheckerImplTest, MethodHead) {
+  setupMethodValidationHC("HEAD");
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        EXPECT_EQ(Http::Headers::get().MethodValues.Head,
+                  std::string(headers.Method()->value().getStringView()));
+        return Http::okStatus();
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+TEST_F(HttpHealthCheckerImplTest, MethodConnectDisallowedValidation) {
+  std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: "CONNECT"
+    )EOF";
+
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
+                          "Proto constraint validation failed.*")
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {

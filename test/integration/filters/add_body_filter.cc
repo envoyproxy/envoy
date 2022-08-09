@@ -124,15 +124,15 @@ private:
   const std::shared_ptr<AddBodyFilterConfig> config_;
 };
 
-class AddBodyFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
+class AddBodyFilterFactory : public Extensions::HttpFilters::Common::DualFactoryBase<
                                  test::integration::filters::AddBodyFilterConfig> {
 public:
-  AddBodyFilterFactory() : FactoryBase("add-body-filter") {}
+  AddBodyFilterFactory() : DualFactoryBase("add-body-filter") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::AddBodyFilterConfig& proto_config, const std::string&,
-      Server::Configuration::FactoryContext&) override {
+      Server::Configuration::ServerFactoryContext&) override {
     auto filter_config = std::make_shared<AddBodyFilterConfig>(
         proto_config.where_to_add_body(), proto_config.body_size(),
         proto_config.where_to_stop_and_buffer());
@@ -142,5 +142,9 @@ private:
   }
 };
 
+using UpstreamAddBodyFilterFactory = AddBodyFilterFactory;
+
 REGISTER_FACTORY(AddBodyFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamAddBodyFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 } // namespace Envoy
