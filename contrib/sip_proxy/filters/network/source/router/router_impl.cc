@@ -287,6 +287,21 @@ FilterStatus Router::handleAffinity() {
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
 
+  if (callbacks_->originIngress().has_value()) {
+    if (metadata->hasXEnvoyOriginIngressHeader()) {
+      ENVOY_STREAM_LOG(info,
+                      "X-Envoy-Origin-Ingress header existing in incoming message, removing it for "
+                      "being replaced ...",
+                      *callbacks_);
+      metadata->removeXEnvoyOriginIngressHeader();
+    }
+    ENVOY_STREAM_LOG(debug, "Adding X-Envoy-Origin-Ingress header ...", *callbacks_);
+    metadata->addXEnvoyOriginIngressHeader(callbacks_->originIngress().value());
+  } else {
+    ENVOY_STREAM_LOG(error, "No Ingress ID defined for current transaction. Discarding the message", *callbacks_);
+    return FilterStatus::StopIteration;
+  }
+
   if (upstream_request_ != nullptr) {
     return FilterStatus::Continue;
   }

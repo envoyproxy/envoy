@@ -486,19 +486,6 @@ FilterStatus ConnectionManager::ActiveTrans::transportBegin(MessageMetadataShare
   }
 
   metadata_ = metadata;
-  if (ingressID().has_value()) {
-    if (metadata->hasXEnvoyOriginIngressHeader()) {
-      ENVOY_LOG(debug, "X-Envoy-Origin-Ingress header existing in current message, removing it "
-                       "for being replaced ...");
-      metadata_->removeXEnvoyOriginIngressHeader();
-    }
-    ENVOY_LOG(debug, "Adding X-Envoy-Origin-Ingress header for current message ...");
-    metadata_->addXEnvoyOriginIngressHeader(ingressID().value());
-  } else {
-    ENVOY_LOG(error, "No Ingress ID defined for current transaction. Discarding the message");
-    return FilterStatus::StopIteration;
-  }
-
   filter_context_ = metadata;
   filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
     MessageMetadataSharedPtr metadata = absl::any_cast<MessageMetadataSharedPtr>(filter_context_);
