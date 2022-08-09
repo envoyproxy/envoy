@@ -686,7 +686,8 @@ will not take effect until EDS/RDS responses are supplied.
    Warming of ``Listener`` is completed even if management server does not send a 
    response for ``RouteConfiguration`` referenced by ``Listener``. Envoy will use the
    previously sent ``RouteConfiguration`` to finish ``Listener`` warming. Management Server
-   has to send the ``RouteConfiguration`` only if has changed or it was never sent in the past.
+   has to send the ``RouteConfiguration`` response only if it has changed or it was never 
+   sent in the past.
 
 .. _xds_protocol_eventual_consistency_considerations:
 
