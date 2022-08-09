@@ -177,12 +177,13 @@ message RateLimitQuotaResponse {
     //
     // **Restarting the subscription**
     //
-    // If a new request is matched into a bucket previously abandoned, the data plane must behave as if it has never tracked the bucket, and it's the first request matched into it:
+    // If a new request is matched into a bucket previously abandoned, the data plane must behave as if it has never tracked the bucket,
+    // and it's the first request matched into it:
     //
     // 1. The process of :ref:`subscription and reporting
     //    <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.reporting_interval>`
     //    starts from the beginning.
-    // 2. The bucket transitions to the :ref:`"no assignment"
+    // 2. The bucket transitions to the :ref:`no assignment
     //    <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
     //    state.
     // 3. Once the new assignment is received, it's applied per
