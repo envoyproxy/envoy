@@ -183,13 +183,14 @@ message RateLimitQuotaResponse {
     // 1. The process of :ref:`subscription and reporting
     //    <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.reporting_interval>`
     //    starts from the beginning.
-    // 2. The bucket transitions to the :ref:`no assignment
+    //
+    // 2. The bucket transitions to the :ref:`"no assignment"
     //    <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
     //    state.
+    //
     // 3. Once the new assignment is received, it's applied per
     //    "Applying the first assignment to the bucket" section of the :ref:`QuotaAssignmentAction
     //    <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction>`.
-    //
     message AbandonAction {
     }
 
