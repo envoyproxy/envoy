@@ -255,7 +255,6 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       parent_.callbacks()->connection(), parent_.callbacks()->streamId(),
       parent_.callbacks()->account(), true, parent_.callbacks()->decoderBufferLimit(),
       *parent_.cluster(), *this);
-  std::cerr << "Allow " << allow_upstream_filters_ << "\n";
   parent_.cluster()->createFilterChain(*filter_manager_);
 
   // Similar to how the downstream filter chain ends with the router, the
