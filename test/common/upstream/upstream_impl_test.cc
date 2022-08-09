@@ -2402,7 +2402,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
                               false);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddress()->asString());
+    Network::Address::InstanceConstSharedPtr remote_address = 
+      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddress()(remote_address)->asString());
   }
 
   const std::string cluster_address = "5.6.7.8";
@@ -2416,7 +2418,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
                               false);
-    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
+    Network::Address::InstanceConstSharedPtr remote_address = 
+      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()(remote_address)->ip()->addressAsString());
   }
 
   {
@@ -2429,7 +2433,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
                               false);
-    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
+    Network::Address::InstanceConstSharedPtr remote_address = 
+      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()(remote_address)->ip()->addressAsString());
   }
 }
 
