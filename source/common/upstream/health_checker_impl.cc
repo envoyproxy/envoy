@@ -1,5 +1,7 @@
 #include "source/common/upstream/health_checker_impl.h"
 
+#include <cstdint>
+#include <iterator>
 #include <memory>
 
 #include "envoy/config/core/v3/health_check.pb.h"
@@ -153,7 +155,7 @@ PayloadMatcher::MatchSegments PayloadMatcher::loadProtoBytes(
     } else {
       decoded.assign(entry.binary().begin(), entry.binary().end());
     }
-    if (decoded.size() != 0) {
+    if (!decoded.empty()) {
       result.push_back(decoded);
     }
   }
@@ -185,6 +187,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       receive_bytes_(PayloadMatcher::loadProtoBytes(config.http_health_check().receive())),
       method_(getMethod(config.http_health_check().method())),
+      response_buffer_size_(config.http_health_check().response_buffer_size()),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
@@ -197,15 +200,18 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }
 
+  if (response_buffer_size_ == 0) {
+    response_buffer_size_ = kDefaultMaxBytesInBuffer;
+  }
   if (!receive_bytes_.empty()) {
-    int total = 0;
+    uint64_t total = 0;
     for (auto const& bytes : receive_bytes_) {
       total += bytes.size();
     }
-    if (total > kMaxBytesInBuffer) {
+    if (total > response_buffer_size_) {
       throw EnvoyException(fmt::format(
           "The expected response length '{}' is over than http health response buffer size '{}'",
-          total, kMaxBytesInBuffer));
+          total, response_buffer_size_));
     }
   }
 }
@@ -322,8 +328,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeData(Buffer::Instance& data,
                                                                      bool end_stream) {
-  if (!parent_.receive_bytes_.empty() && response_body_->length() < kMaxBytesInBuffer) {
-    response_body_->move(data, kMaxBytesInBuffer - response_body_->length());
+  if (!parent_.receive_bytes_.empty() && response_body_->length() < parent_.response_buffer_size_) {
+    response_body_->move(data, parent_.response_buffer_size_ - response_body_->length());
   }
   if (end_stream) {
     onResponseComplete();

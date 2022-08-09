@@ -77,8 +77,8 @@ message HealthCheck {
     oneof payload {
       option (validate.required) = true;
 
-      // String payload. Default is Hex encoded payload, e.g., "000000FF".
-      string text = 1;
+      // String payload. Default format is Hex encoded text. E.g., "000000FF".
+      string text = 1 [(validate.rules).string = {min_len: 1}];
 
       // Binary payload.
       bytes binary = 2;
@@ -89,7 +89,7 @@ message HealthCheck {
     DecoderType text_decoder = 3 [(validate.rules).enum = {defined_only: true}];
   }
 
-  // [#next-free-field: 14]
+  // [#next-free-field: 15]
   message HttpHealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
@@ -112,15 +112,18 @@ message HealthCheck {
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
 
-    // Specifies a list of HTTP expected responses to match in the first 1024 bytes of the response body.
+    // Specifies a list of HTTP expected responses to match in the first ``response_buffer_size`` bytes of the response body.
     // If it is set, both the expected response check and status code determine the health check.
-    // When checking the response, “fuzzy” matching is performed such that each binary block must be found,
+    // When checking the response, “fuzzy” matching is performed such that each payload block must be found,
     // and in the order specified, but not necessarily contiguous.
     //
     // .. note::
     //
     //   Only the first 1024 bytes of the response body is used to match.
     repeated Payload receive = 4;
+
+    // Specifies the size of repsonse buffer in bytes that is used to Payload match. Default value is 1024.
+    uint64 response_buffer_size = 14 [(validate.rules).uint64 = {gte: 0}];
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
     // health checked cluster. For more information, including details on header value syntax, see
@@ -177,7 +180,7 @@ message HealthCheck {
     Payload send = 1;
 
     // When checking the response, “fuzzy” matching is performed such that each
-    // binary block must be found, and in the order specified, but not
+    // payload block must be found, and in the order specified, but not
     // necessarily contiguous.
     repeated Payload receive = 2;
   }

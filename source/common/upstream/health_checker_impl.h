@@ -23,7 +23,7 @@
 namespace Envoy {
 namespace Upstream {
 
-constexpr int kMaxBytesInBuffer = 1024;
+constexpr uint64_t kDefaultMaxBytesInBuffer = 1024;
 
 /**
  * Factory for creating health checker implementations.
@@ -227,6 +227,7 @@ private:
   const std::string host_value_;
   const PayloadMatcher::MatchSegments receive_bytes_;
   const envoy::config::core::v3::RequestMethod method_;
+  uint64_t response_buffer_size_;
   absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
       service_name_matcher_;
   Router::HeaderParserPtr request_headers_parser_;

@@ -531,6 +531,27 @@ public:
     addCompletionCallback();
   }
 
+  void setupServiceValidationWithBufferSizeHC(const std::string& expected_response,
+                                              int buffer_size) {
+    std::string yaml = fmt::format(R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      receive:
+        text: {0}
+        text_decoder: UTF8
+      response_buffer_size: {1}
+    )EOF",
+                                   expected_response, buffer_size);
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
   void setupMethodValidationHC(const std::string method) {
     std::string yaml = fmt::format(R"EOF(
     timeout: 1s
@@ -1256,6 +1277,9 @@ TEST_F(HttpHealthCheckerImplTest, ExpectedResponseSettingOverSize) {
   EXPECT_THROW_WITH_MESSAGE(
       setupServiceValidationWithBytesMatcherHC(expected_string), EnvoyException,
       "The expected response length '2048' is over than http health response buffer size '1024'");
+  EXPECT_THROW_WITH_MESSAGE(
+      setupServiceValidationWithBufferSizeHC("AAA", 2), EnvoyException,
+      "The expected response length '3' is over than http health response buffer size '2'");
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckHttp2) {
