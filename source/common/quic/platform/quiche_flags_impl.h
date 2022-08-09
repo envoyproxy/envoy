@@ -11,11 +11,24 @@
 
 #include "absl/container/flat_hash_map.h"
 
+// Not wired into command-line parsing.
+#define DEFINE_QUIC_COMMAND_LINE_FLAG_IMPL(type, flag, value, help)                                \
+  quiche::TypedFlag<type>* FLAGS_##flag = new TypedFlag<type>(#flag, value, help);
+
 namespace quiche {
 
 const std::string EnvoyQuicheReloadableFlagPrefix =
     "envoy.reloadable_features.FLAGS_quic_reloadable_flag_";
 const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
+
+// TODO(mpwarres): implement. Lower priority since only used by QUIC command-line tools.
+inline std::vector<std::string> quicParseCommandLineFlagsImpl(const char* /*usage*/, int /*argc*/,
+                                                              const char* const* /*argv*/) {
+  return {};
+}
+
+// TODO(mpwarres): implement. Lower priority since only used by QUIC command-line tools.
+inline void quicPrintCommandLineFlagHelpImpl(const char* /*usage*/) {}
 
 // Concrete class for QUICHE protocol and feature flags, templated by flag type.
 template <typename T> class TypedFlag {
@@ -66,6 +79,11 @@ QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) extern TypedFlag<type>* FLAGS_##flag;
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
+
+// Protocol flags.
+#define QUICHE_PROTOCOL_FLAG(type, flag, ...) extern TypedFlag<type>* FLAGS_##flag;
+#include "quiche/common/quiche_protocol_flags_list.h"
+#undef QUICHE_PROTOCOL_FLAG
 
 // |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
 #define GetQuicheFlagImpl(flag) (quiche::flag)->value()
