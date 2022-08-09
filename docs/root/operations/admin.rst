@@ -63,7 +63,9 @@ modify different aspects of the server:
 
 .. http:get:: /
 
-  Render an HTML home page with a table of links to all available options.
+  Render an HTML home page with a table of links to all available options. This can be
+  disabled by compiling Envoy with `--define=admin_html=disabled` in which case an error
+  message is printed. Disabling the HTML mode reduces the Envoy binary size.
 
 .. http:get:: /help
 

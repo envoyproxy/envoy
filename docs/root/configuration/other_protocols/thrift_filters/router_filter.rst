@@ -48,6 +48,8 @@ Since these stats utilize the underlying cluster scope, we prefix with the ``thr
   thrift.upstream_rq_size, Histogram, Request message size in bytes per upstream
   thrift.upstream_resp_size, Histogram, Response message size in bytes per upstream
   thrift.upstream_cx_drain_close, Counter, Total upstream connections that were closed due to draining.
+  thrift.downstream_cx_partial_response_close, Counter, Total downstream connections that were closed due to the partial response.
+  thrift.downstream_cx_underflow_response_close, Counter, Total downstream connections that were closed due to the underflow response.
 
 If the service zone is available for both the local service (via :option:`--service-zone`)
 and the :ref:`upstream cluster <arch_overview_service_discovery_types_eds>`,

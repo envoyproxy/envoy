@@ -384,6 +384,10 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
+  if (config.has_allow_private_network_access()) {
+    allow_private_network_access_ =
+        PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
+  }
 }
 
 void validateMirrorClusterSpecifier(
@@ -1388,12 +1392,12 @@ PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
 
 void PathTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                    bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, nullptr, insert_envoy_original_path);
+  finalizePathHeader(headers, "", insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathTemplateRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, nullptr);
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, "");
 }
 
 RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,

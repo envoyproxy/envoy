@@ -2871,6 +2871,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_protocol_flags_list_lib",
+    hdrs = ["quiche/common/quiche_protocol_flags_list.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+)
+
+envoy_cc_library(
     name = "quic_core_framer_lib",
     srcs = ["quiche/quic/core/quic_framer.cc"],
     hdrs = ["quiche/quic/core/quic_framer.h"],
@@ -4473,22 +4482,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "quic_test_tools_qpack_qpack_encoder_test_utils_lib",
-    srcs = ["quiche/quic/test_tools/qpack/qpack_encoder_test_utils.cc"],
-    hdrs = ["quiche/quic/test_tools/qpack/qpack_encoder_test_utils.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    tags = ["nofips"],
-    deps = [
-        ":quic_core_qpack_qpack_encoder_lib",
-        ":quic_platform_test",
-        ":quic_test_tools_qpack_qpack_test_utils_lib",
-        ":spdy_core_hpack_hpack_lib",
-        ":spdy_core_http2_header_block_lib",
-    ],
-)
-
-envoy_cc_test_library(
     name = "quic_test_tools_qpack_qpack_test_utils_lib",
     srcs = ["quiche/quic/test_tools/qpack/qpack_test_utils.cc"],
     hdrs = ["quiche/quic/test_tools/qpack/qpack_test_utils.h"],
@@ -4496,6 +4489,7 @@ envoy_cc_test_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":quic_core_qpack_qpack_encoder_lib",
         ":quic_core_qpack_qpack_stream_sender_delegate_lib",
         ":quic_platform_test",
     ],

@@ -3,6 +3,7 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
@@ -505,6 +506,17 @@ public:
    * If nullptr, don't write the Proxy-Status HTTP response header.
    */
   virtual const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const PURE;
+
+  /**
+   * Creates new header validator. This method always returns nullptr unless the `ENVOY_ENABLE_UHV`
+   * pre-processor variable is defined.
+   * @param protocol HTTP protocol version that is to be validated.
+   * @param stream_info stream info object for storing validation error details.
+   * @return pointer to the header validator.
+   *         If nullptr, header validation will not be done.
+   */
+  virtual HeaderValidatorPtr makeHeaderValidator(Protocol protocol,
+                                                 StreamInfo::StreamInfo& stream_info) PURE;
 };
 } // namespace Http
 } // namespace Envoy
