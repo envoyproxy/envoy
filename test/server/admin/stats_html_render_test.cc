@@ -6,7 +6,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::EndsWith;
 using testing::HasSubstr;
 using testing::Not;
 
