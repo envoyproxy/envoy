@@ -92,7 +92,8 @@ public:
   MOCK_METHOD(void, disarmRequestTimeout, ());
   MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(void, recreateStream, (StreamInfo::FilterStateSharedPtr filter_state));
-  MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(void, resetStream,
+              (Http::StreamResetReason reset_reason, absl::string_view transport_failure_reason));
   MOCK_METHOD(const Router::RouteEntry::UpgradeMap*, upgradeMap, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback& cb));
@@ -224,7 +225,8 @@ public:
   // Http::StreamFilterCallbacks
   MOCK_METHOD(OptRef<const Network::Connection>, connection, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(void, resetStream,
+              (Http::StreamResetReason reset_reason, absl::string_view transport_failure_reason));
   MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
@@ -320,7 +322,8 @@ public:
   // Http::StreamFilterCallbacks
   MOCK_METHOD(OptRef<const Network::Connection>, connection, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(void, resetStream,
+              (Http::StreamResetReason reset_reason, absl::string_view transport_failure_reason));
   MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(void, requestRouteConfigUpdate, (std::function<void()>));

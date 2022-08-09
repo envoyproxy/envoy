@@ -1799,7 +1799,7 @@ void ConnectionManagerImpl::ActiveStream::onResponseDataTooLarge() {
   connection_manager_.stats_.named_.rs_too_large_.inc();
 }
 
-void ConnectionManagerImpl::ActiveStream::resetStream() {
+void ConnectionManagerImpl::ActiveStream::resetStream(Http::StreamResetReason, absl::string_view) {
   connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
   connection_manager_.doEndStream(*this);
 }

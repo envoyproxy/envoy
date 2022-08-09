@@ -865,7 +865,7 @@ void DownstreamFilterManager::sendLocalReply(
   if (data.reset_imminent_) {
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
                      details);
-    filter_manager_callbacks_.resetStream();
+    filter_manager_callbacks_.resetStream(Http::StreamResetReason::LocalReset, "");
     return;
   }
 
@@ -1587,7 +1587,10 @@ void ActiveStreamEncoderFilter::responseDataDrained() {
   onEncoderFilterBelowWriteBufferLowWatermark();
 }
 
-void ActiveStreamFilterBase::resetStream() { parent_.filter_manager_callbacks_.resetStream(); }
+void ActiveStreamFilterBase::resetStream(Http::StreamResetReason reset_reason,
+                                         absl::string_view transport_failure_reason) {
+  parent_.filter_manager_callbacks_.resetStream(reset_reason, transport_failure_reason);
+}
 
 uint64_t ActiveStreamFilterBase::streamId() const { return parent_.streamId(); }
 
