@@ -144,6 +144,7 @@ TEST_P(AdminInstanceTest, Help) {
   /drain_listeners: drain listeners
   /healthcheck/fail: cause the server to fail health checks
   /healthcheck/ok: cause the server to pass health checks
+  /heap_dump: dump current Envoy heap (if supported)
   /heapprofiler: enable/disable the heap profiler
   /help: print out list of admin commands
   /hot_restart_version: print the hot restart compatibility version
