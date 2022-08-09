@@ -33,7 +33,7 @@ struct GcpAuthnFilterStats {
 };
 
 using FilterConfigSharedPtr =
-    std::shared_ptr<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>;
+    std::shared_ptr<const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>;
 
 class GcpAuthnFilter : public Http::PassThroughFilter,
                        public RequestCallbacks,
