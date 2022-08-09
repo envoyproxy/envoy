@@ -58,6 +58,23 @@ message Lua {
   // The default Lua code that Envoy will execute. If no per route config is provided
   // for the request, this Lua code will be applied.
   config.core.v3.DataSource default_source_code = 3;
+
+  // Optional additional prefix to use when emitting statistics. This allows to distinguish
+  // emitted statistics between configured ``lua`` filters in an HTTP filter chain. For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   http_filters:
+  //     - name: envoy.filters.http.lua
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  //         stat_prefix: foo_script # This emits lua.foo_script.errors etc.
+  //     - name: envoy.filters.http.lua
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  //         stat_prefix: bar_script # This emits lua.bar_script.errors etc.
+  //
+  string stat_prefix = 4;
 }
 
 message LuaPerRoute {
