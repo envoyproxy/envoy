@@ -15,7 +15,8 @@ namespace WebSocket {
 std::vector<uint8_t> Encoder::newFrameHeader(const Frame& frame) {
   std::vector<uint8_t> output;
   // Set flags and opcode
-  pushScalarToByteVector(static_cast<uint8_t>(frame.final_fragment_ ? (0x80 ^ frame.opcode_) : frame.opcode_), output);
+  pushScalarToByteVector(
+      static_cast<uint8_t>(frame.final_fragment_ ? (0x80 ^ frame.opcode_) : frame.opcode_), output);
 
   // Set payload length
   if (frame.payload_length_ <= 125) {
