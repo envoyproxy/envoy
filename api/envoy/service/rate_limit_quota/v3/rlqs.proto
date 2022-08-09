@@ -242,6 +242,7 @@ message RateLimitQuotaResponse {
 // .. note::
 //   The order of ``BucketId`` keys do not matter. Buckets ``{ a: 'A', b: 'B' }`` and
 //   ``{ b: 'B', a: 'A' }`` are identical.
+//
 message BucketId {
   map<string, string> bucket = 1 [(validate.rules).map = {
     min_pairs: 1
