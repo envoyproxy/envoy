@@ -136,7 +136,7 @@ public:
                                              Network::ConnectionCallbacks& upstream_callbacks)
       : FactoryBase(name), upstream_callbacks_(&upstream_callbacks) {}
   bool isTerminalFilterByProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
-                                    Server::Configuration::FactoryContext&) override {
+                                    Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
 

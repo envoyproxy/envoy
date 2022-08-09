@@ -32,6 +32,7 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.tls.key_providers.cryptomb":                         "//contrib/cryptomb/private_key_providers/source:config",
+    "envoy.tls.key_providers.qat":                              "//contrib/qat/private_key_providers/source:config",
 
     #
     # Socket interface extensions
@@ -50,4 +51,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.network.connection_balance.dlb":                     "//contrib/network/connection_balance/dlb/source:connection_balancer",
+
+    #
+    # Regex engines
+    #
+
+    "envoy.regex_engines.hyperscan":                            "//contrib/hyperscan/regex_engines/source:config",
 }

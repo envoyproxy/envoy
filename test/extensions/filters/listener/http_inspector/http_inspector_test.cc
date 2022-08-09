@@ -43,8 +43,9 @@ public:
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
     EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
-    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                              Event::FileReadyType::Read))
+    EXPECT_CALL(dispatcher_,
+                createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                 Event::FileReadyType::Read | Event::FileReadyType::Closed))
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
@@ -165,7 +166,7 @@ public:
       }));
 
       if (alpn == Http::Utility::AlpnNames::get().Http2c) {
-        for (size_t i = 1; i <= 24; i++) {
+        for (size_t i = 0; i <= 24; i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
               .WillOnce(Invoke(
                   [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -175,7 +176,7 @@ public:
                   }));
         }
       } else {
-        for (size_t i = 1; i <= header.size(); i++) {
+        for (size_t i = 0; i <= header.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
               .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
                                             int) -> Api::SysCallSizeResult {
@@ -412,6 +413,21 @@ TEST_F(HttpInspectorTest, OldHttpProtocol) {
 
 TEST_F(HttpInspectorTest, InvalidRequestLine) {
   const absl::string_view header = "GET /anything HTTP/1.1 BadRequestLine\r\n";
+  testHttpInspectNotFound(header);
+}
+
+TEST_F(HttpInspectorTest, InvalidRequestLine2) {
+  const absl::string_view header = "\r\n\r\n\r\n";
+  testHttpInspectNotFound(header);
+}
+
+TEST_F(HttpInspectorTest, InvalidRequestLine3) {
+  const absl::string_view header = "\r\n\r\n\r\n BAD";
+  testHttpInspectNotFound(header);
+}
+
+TEST_F(HttpInspectorTest, InvalidRequestLine4) {
+  const absl::string_view header = "\r\nGET /anything HTTP/1.1\r\n";
   testHttpInspectNotFound(header);
 }
 

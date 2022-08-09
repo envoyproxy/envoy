@@ -96,9 +96,11 @@ public:
   virtual UdpPacketWriterFactory& packetWriterFactory() PURE;
 
   /**
+   * @param address is used to query the address specific router.
    * @return the UdpListenerWorkerRouter for this listener.
    */
-  virtual UdpListenerWorkerRouter& listenerWorkerRouter() PURE;
+  virtual UdpListenerWorkerRouter&
+  listenerWorkerRouter(const Network::Address::Instance& address) PURE;
 
   /**
    * @return the configuration for the listener.
@@ -147,12 +149,6 @@ public:
   virtual FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * TODO(soulxu): This will be removed when multiple addresses listener implemented.
-   * @return ListenSocketFactory& the factory to create listen socket.
-   */
-  virtual ListenSocketFactory& listenSocketFactory() PURE;
-
-  /**
    * @return std::vector<ListenSocketFactoryPtr>& the factories to create listen sockets.
    */
   virtual std::vector<ListenSocketFactoryPtr>& listenSocketFactories() PURE;
@@ -162,7 +158,7 @@ public:
    *         A listener that doesn't listen on a port can only receive connections
    *         redirected from other listeners.
    */
-  virtual bool bindToPort() PURE;
+  virtual bool bindToPort() const PURE;
 
   /**
    * @return bool if a connection should be handed off to another Listener after the original

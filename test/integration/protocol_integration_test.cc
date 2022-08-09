@@ -543,7 +543,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("missing_required_header"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {

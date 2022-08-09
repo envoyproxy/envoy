@@ -21,17 +21,17 @@ class AsyncFileContextThreadPool final : public AsyncFileContextBase {
 public:
   explicit AsyncFileContextThreadPool(AsyncFileManager& manager, int fd);
 
-  absl::StatusOr<std::function<void()>>
+  absl::StatusOr<CancelFunction>
   createHardLink(absl::string_view filename,
                  std::function<void(absl::Status)> on_complete) override;
   absl::Status close(std::function<void(absl::Status)> on_complete) override;
-  absl::StatusOr<std::function<void()>>
+  absl::StatusOr<CancelFunction>
   read(off_t offset, size_t length,
        std::function<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete) override;
-  absl::StatusOr<std::function<void()>>
+  absl::StatusOr<CancelFunction>
   write(Buffer::Instance& contents, off_t offset,
         std::function<void(absl::StatusOr<size_t>)> on_complete) override;
-  absl::StatusOr<std::function<void()>>
+  absl::StatusOr<CancelFunction>
   duplicate(std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
 
   int& fileDescriptor() { return file_descriptor_; }
@@ -39,8 +39,7 @@ public:
   ~AsyncFileContextThreadPool() override;
 
 protected:
-  absl::StatusOr<std::function<void()>>
-  checkFileAndEnqueue(std::shared_ptr<AsyncFileAction> action);
+  absl::StatusOr<CancelFunction> checkFileAndEnqueue(std::shared_ptr<AsyncFileAction> action);
 
   int file_descriptor_;
 };

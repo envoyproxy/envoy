@@ -193,7 +193,6 @@ EXTENSIONS = {
     #
 
     "envoy.tracers.dynamic_ot":                         "//source/extensions/tracers/dynamic_ot:config",
-    "envoy.tracers.lightstep":                          "//source/extensions/tracers/lightstep:config",
     "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
@@ -206,6 +205,7 @@ EXTENSIONS = {
     #
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
+    "envoy.transport_sockets.http_11_proxy":            "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
     "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
@@ -339,9 +339,10 @@ EXTENSIONS = {
 
     # c-ares DNS resolver extension is recommended to be enabled to maintain the legacy DNS resolving behavior.
     "envoy.network.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:config",
-
     # apple DNS resolver extension is only needed in MacOS build plus one want to use apple library for DNS resolving.
     "envoy.network.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
+    # getaddrinfo DNS resolver extension can be used when the system resolver is desired (e.g., Android)
+    "envoy.network.dns_resolver.getaddrinfo":          "//source/extensions/network/dns_resolver/getaddrinfo:config",
 
     #
     # Custom matchers

@@ -80,7 +80,7 @@ getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostCons
   if (options && options->serverNameOverride().has_value()) {
     sni = options->serverNameOverride().value();
   }
-  if (sni.empty()) {
+  if (sni.empty() || !host->address() || !host->address()->ip()) {
     return absl::nullopt;
   }
   return {{"https", sni, host->address()->ip()->port()}};
@@ -1893,7 +1893,6 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
-    // TODO(alyssar) remove the origin check #21345
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_concurrency_for_alpn_pool") &&
         origin.has_value()) {
@@ -1949,9 +1948,9 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
-      cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, context_.runtime(),
-      context_.mainThreadDispatcher(), log_manager_, context_.localInfo(), admin_,
-      singleton_manager_, outlier_event_logger, added_via_api,
+      server_context_, cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
+      context_.runtime(), context_.mainThreadDispatcher(), log_manager_, context_.localInfo(),
+      admin_, singleton_manager_, outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
       context_.api(), context_.options());

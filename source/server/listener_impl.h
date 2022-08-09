@@ -264,7 +264,7 @@ public:
    */
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, uint32_t concurrency);
+               bool workers_started, uint64_t hash);
   ~ListenerImpl() override;
 
   // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
@@ -295,9 +295,13 @@ public:
   bool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !added_via_api_; }
   bool blockRemove() { return !added_via_api_; }
 
-  Network::Address::InstanceConstSharedPtr address() const { return address_; }
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
+    return addresses_;
+  }
   const envoy::config::listener::v3::Listener& config() const { return config_; }
-  const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factories_[0]; }
+  const std::vector<Network::ListenSocketFactoryPtr>& getSocketFactories() const {
+    return socket_factories_;
+  }
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const {
@@ -313,15 +317,16 @@ public:
 
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
+  // Check whether a new listener has duplicated listening address this listener.
+  bool hasDuplicatedAddress(const ListenerImpl& other) const;
 
   // Network::ListenerConfig
-  Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
+  Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
   std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
     return socket_factories_;
   }
-  bool bindToPort() override { return bind_to_port_; }
+  bool bindToPort() const override { return bind_to_port_; }
   bool mptcpEnabled() { return mptcp_enabled_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
@@ -370,6 +375,11 @@ public:
     }
   }
 
+  void cloneSocketFactoryFrom(const ListenerImpl& other);
+  void closeAllSockets();
+
+  Network::Socket::Type socketType() const { return socket_type_; }
+
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,
                                 const std::vector<Network::FilterFactoryCb>& factories) override;
@@ -387,15 +397,18 @@ private:
     // Network::UdpListenerConfig
     Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
     Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
-    Network::UdpListenerWorkerRouter& listenerWorkerRouter() override {
-      return *listener_worker_router_;
+    Network::UdpListenerWorkerRouter&
+    listenerWorkerRouter(const Network::Address::Instance& address) override {
+      auto iter = listener_worker_routers_.find(address.asString());
+      ASSERT(iter != listener_worker_routers_.end());
+      return *iter->second;
     }
     const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
 
     const envoy::config::listener::v3::UdpListenerConfig config_;
     Network::ActiveUdpListenerFactoryPtr listener_factory_;
     Network::UdpPacketWriterFactoryPtr writer_factory_;
-    Network::UdpListenerWorkerRouterPtr listener_worker_router_;
+    absl::flat_hash_map<std::string, Network::UdpListenerWorkerRouterPtr> listener_worker_routers_;
   };
 
   class InternalListenerConfigImpl : public Network::InternalListenerConfig {
@@ -422,6 +435,8 @@ private:
   void buildAccessLog();
   void buildInternalListener();
   void validateConfig();
+  void buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
+                                    uint32_t concurrency);
   void buildUdpListenerFactory(uint32_t concurrency);
   void buildListenSocketOptions();
   void createListenerFilterFactories();
@@ -431,6 +446,8 @@ private:
   void buildSocketOptions();
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
+  void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
+                              const envoy::config::core::v3::Address& proto_address);
 
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
@@ -438,7 +455,7 @@ private:
   }
 
   ListenerManagerImpl& parent_;
-  Network::Address::InstanceConstSharedPtr address_;
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
   const Network::Socket::Type socket_type_;
 
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
@@ -475,7 +492,7 @@ private:
   // TODO (soulxu): Add hash support for address, then needn't a string address as key anymore.
   absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
-  FilterChainManagerImpl filter_chain_manager_;
+  std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
   const bool reuse_port_;
 
   // Per-listener connection limits are only specified via runtime.

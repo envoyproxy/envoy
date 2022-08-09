@@ -51,6 +51,7 @@
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/logical_dns_cluster.h"
 #include "source/common/upstream/original_dst_cluster.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -279,6 +280,15 @@ Network::UpstreamTransportSocketFactory& HostDescriptionImpl::resolveTransportSo
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
+  // If the transport socket options indicate the connection should be
+  // redirected to a proxy, create the TCP connection to the proxy's address not
+  // the host's address.
+  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+    return createConnection(
+        dispatcher, cluster(), transport_socket_options->http11ProxyInfo()->proxy_address,
+        {transport_socket_options->http11ProxyInfo()->proxy_address}, transportSocketFactory(),
+        options, transport_socket_options, shared_from_this());
+  }
   return createConnection(dispatcher, cluster(), address(), addressList(), transportSocketFactory(),
                           options, transport_socket_options, shared_from_this());
 }
@@ -343,9 +353,6 @@ Host::CreateConnectionData HostImpl::createConnection(
   Network::ConnectionSocket::OptionsSharedPtr connection_options =
       combineConnectionSocketOptions(cluster, options);
 
-  ASSERT(!address->envoyInternalAddress() ||
-         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
-
   Network::ClientConnectionPtr connection =
       address_list.size() > 1
           ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
@@ -354,7 +361,7 @@ Host::CreateConnectionData HostImpl::createConnection(
           : dispatcher.createClientConnection(
                 address, cluster.sourceAddress(),
                 socket_factory.createTransportSocket(transport_socket_options, host),
-                connection_options);
+                connection_options, transport_socket_options);
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
@@ -792,6 +799,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
+    Init::Manager& init_manager, Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& config,
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
@@ -862,7 +870,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                     config.cluster_type())
               : absl::nullopt),
       factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
+      upstream_context_(server_context, init_manager) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
@@ -969,6 +978,21 @@ ClusterInfoImpl::ClusterInfoImpl(
         factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(std::move(callback));
   }
+
+  if (http_protocol_options_ && !http_protocol_options_->http_filters_.empty()) {
+    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
+        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+            upstream_context_.getServerFactoryContext());
+    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
+
+    std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
+    Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
+                            Server::Configuration::UpstreamHttpFilterConfigFactory>
+        helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
+               upstream_context_, prefix);
+    // TODO(alyssawilk) make sure we have easy to debug logs about what filters are set up.
+    helper.processFilters(http_filters, "http", "http", http_filter_factories_, false);
+  }
 }
 
 // Configures the load balancer based on config.load_balancing_policy
@@ -1072,6 +1096,7 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
 }
 
 ClusterImplBase::ClusterImplBase(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, TimeSource& time_source)
@@ -1092,7 +1117,8 @@ ClusterImplBase::ClusterImplBase(
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = factory_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
-      new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
+      new ClusterInfoImpl(init_manager_, server_context, cluster,
+                          factory_context.clusterManager().bindConfig(), runtime,
                           std::move(socket_matcher), std::move(stats_scope), added_via_api,
                           factory_context),
       [&dispatcher](const ClusterInfoImpl* self) {
@@ -1107,8 +1133,7 @@ ClusterImplBase::ClusterImplBase(
           fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                       cluster.name(), cluster.DebugString()));
     }
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correctly_validate_alpn") &&
-        !matcher_supports_alpn) {
+    if (!matcher_supports_alpn) {
       throw EnvoyException(fmt::format(
           "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
           cluster.name(), cluster.DebugString()));

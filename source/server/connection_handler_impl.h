@@ -65,7 +65,9 @@ public:
   getBalancedHandlerByAddress(const Network::Address::Instance& address) override;
 
   // Network::UdpConnectionHandler
-  Network::UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) override;
+  Network::UdpListenerCallbacksOptRef
+  getUdpListenerCallbacks(uint64_t listener_tag,
+                          const Network::Address::Instance& address) override;
 
   // Network::InternalListenerManager
   Network::InternalListenerOptRef
@@ -130,17 +132,24 @@ private:
   using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
 
+  using PerAddressActiveListenerDetailsOptRef =
+      absl::optional<std::reference_wrapper<PerAddressActiveListenerDetails>>;
+  PerAddressActiveListenerDetailsOptRef
+  findPerAddressActiveListenerDetails(const ActiveListenerDetailsOptRef active_listener_details,
+                                      const Network::Address::Instance& address);
+
   // This has a value on worker threads, and no value on the main thread.
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
   const std::string per_handler_stat_prefix_;
+  // Declare before its users ActiveListenerDetails.
+  std::atomic<uint64_t> num_handler_connections_{};
   absl::flat_hash_map<uint64_t, std::unique_ptr<ActiveListenerDetails>> listener_map_by_tag_;
   absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
       tcp_listener_map_by_address_;
   absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
       internal_listener_map_by_address_;
 
-  std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
   UnitFloat listener_reject_fraction_{UnitFloat::min()};
 };

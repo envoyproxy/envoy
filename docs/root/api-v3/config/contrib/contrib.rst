@@ -9,4 +9,7 @@ Contrib Extensions
 
   sip/sip
   cryptomb/cryptomb
-  hyperscan/hyperscan
+  hyperscan/matcher
+  hyperscan/regex_engine
+  dlb/dlb
+  qat/qat

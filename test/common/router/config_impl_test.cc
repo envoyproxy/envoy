@@ -3856,6 +3856,27 @@ virtual_hosts:
             config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
 }
 
+TEST_F(RouteMatcherTest, ClusterNotFoundResponseCodeConfig500) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: "not_found"
+          cluster_not_found_response_code: INTERNAL_SERVER_ERROR
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+
+  EXPECT_EQ("not_found", config.route(headers, 0)->routeEntry()->clusterName());
+  EXPECT_EQ(Http::Code::InternalServerError,
+            config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
+}
+
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCodeConfig404) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -5081,24 +5102,6 @@ virtual_hosts:
       "Cannot specify both prefix_rewrite and regex_rewrite");
 }
 
-TEST_F(RouteMatcherTest, TestPatternRewriteConfigLoad) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: path_template_rewrite
-  domains: ["*"]
-  routes:
-  - match:
-      path_template: "/bar/{country}/{lang}"
-    route:
-      path_template_rewrite: "/bar/{lang}/{country}"
-      cluster: www2
-  )EOF";
-
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-}
-
 TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -6099,28 +6102,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, WeightedClustersSumOFWeightsNotEqualToMax) {
-  std::string yaml = R"EOF(
-virtual_hosts:
-  - name: www2
-    domains: ["www.lyft.com"]
-    routes:
-      - match: { prefix: "/" }
-        route:
-          weighted_clusters:
-            clusters:
-              - name: cluster1
-                weight: 3
-              - name: cluster2
-                weight: 3
-              - name: cluster3
-                weight: 3
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Sum of weights in the weighted_cluster should add up to 100");
-
-  yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
@@ -6405,22 +6387,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-#ifndef GTEST_USES_SIMPLE_RE
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|path)' "
-      "for "
-      "type oneof");
-#else
-  EXPECT_THAT_THROWS_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      ::testing::AnyOf(::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'prefix' for "
-                                                "type oneof"),
-                       ::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'path' for "
-                                                "type oneof")));
-#endif
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
@@ -6454,22 +6422,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-#ifndef GTEST_USES_SIMPLE_RE
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|safe_regex)' "
-      "for "
-      "type oneof");
-#else
-  EXPECT_THAT_THROWS_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      ::testing::AnyOf(::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'prefix' for "
-                                                "type oneof"),
-                       ::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'safe_regex' for "
-                                                "type oneof")));
-#endif
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoAction) {
@@ -6502,23 +6456,8 @@ virtual_hosts:
     route:
       cluster: www2
   )EOF";
-
-#ifndef GTEST_USES_SIMPLE_RE
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set '(path|safe_regex)' "
-      "for "
-      "type oneof");
-#else
-  EXPECT_THAT_THROWS_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      ::testing::AnyOf(::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'path' for "
-                                                "type oneof"),
-                       ::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'safe_regex' for "
-                                                "type oneof")));
-#endif
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
@@ -6537,9 +6476,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set.");
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(RouteMatcherTest, TestOpaqueConfig) {
@@ -6648,6 +6586,7 @@ virtual_hosts:
       expose_headers: "test-expose-headers"
       max_age: "test-max-age"
       allow_credentials: true
+      allow_private_network_access: true
       filter_enabled:
         runtime_key: "cors.www.enabled"
         default_value:
@@ -6692,6 +6631,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
   EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
   EXPECT_EQ(cors_policy->allowCredentials(), true);
+  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), true);
 }
 
 TEST_F(RoutePropertyTest, TestRouteCorsConfig) {
@@ -6748,6 +6688,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
   EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
   EXPECT_EQ(cors_policy->allowCredentials(), true);
+  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), absl::nullopt);
 }
 
 TEST_F(RouteMatcherTest, Decorator) {

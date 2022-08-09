@@ -348,6 +348,34 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromNonParent) {
   EXPECT_FALSE(new_filter_state.hasDataWithName("test_6"));
 }
 
+TEST_F(FilterStateImplTest, SharedWithUpstream) {
+  auto shared = std::make_shared<SimpleType>(1);
+  filter_state().setData("shared_1", shared, FilterState::StateType::ReadOnly,
+                         FilterState::LifeSpan::FilterChain,
+                         FilterState::StreamSharing::SharedWithUpstreamConnection);
+  filter_state().setData("test_2", std::make_shared<SimpleType>(2), FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::FilterChain);
+  filter_state().setData("test_3", std::make_shared<SimpleType>(3),
+                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Request);
+  filter_state().setData("shared_4", std::make_shared<SimpleType>(4),
+                         FilterState::StateType::Mutable, FilterState::LifeSpan::Request,
+                         FilterState::StreamSharing::SharedWithUpstreamConnection);
+  filter_state().setData("shared_5", std::make_shared<SimpleType>(5),
+                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection,
+                         FilterState::StreamSharing::SharedWithUpstreamConnection);
+  filter_state().setData("test_6", std::make_shared<SimpleType>(6), FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::Connection);
+  auto objects = filter_state().objectsSharedWithUpstreamConnection();
+  EXPECT_EQ(objects->size(), 3);
+  EXPECT_EQ(objects->at(0).name_, "shared_5");
+  EXPECT_EQ(objects->at(0).state_type_, FilterState::StateType::ReadOnly);
+  EXPECT_EQ(objects->at(1).name_, "shared_4");
+  EXPECT_EQ(objects->at(1).state_type_, FilterState::StateType::Mutable);
+  EXPECT_EQ(objects->at(2).name_, "shared_1");
+  EXPECT_EQ(objects->at(2).state_type_, FilterState::StateType::ReadOnly);
+  EXPECT_EQ(objects->at(2).data_.get(), shared.get());
+}
+
 TEST_F(FilterStateImplTest, HasDataAtOrAboveLifeSpan) {
   filter_state().setData("test_1", std::make_unique<SimpleType>(1),
                          FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);

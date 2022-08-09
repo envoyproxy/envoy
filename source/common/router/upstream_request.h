@@ -20,6 +20,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
@@ -40,14 +41,15 @@ public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
                   bool can_send_early_data, bool can_use_http3);
   ~UpstreamRequest() override;
+  void deleteIsPending() override { cleanUp(); }
 
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();
 
-  void encodeHeaders(bool end_stream);
-  void encodeData(Buffer::Instance& data, bool end_stream);
-  void encodeTrailers(const Http::RequestTrailerMap& trailers);
-  void encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
+  void acceptHeadersFromRouter(bool end_stream);
+  void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
+  void acceptTrailersFromRouter(const Http::RequestTrailerMap& trailers);
+  void acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr);
 
   void resetStream();
   void setupPerTryTimeout();
@@ -122,8 +124,7 @@ public:
   bool createPerTryTimeoutOnRequestComplete() {
     return create_per_try_timeout_on_request_complete_;
   }
-  bool encodeComplete() const { return encode_complete_; }
-  RouterFilterInterface& parent() { return parent_; }
+  bool encodeComplete() const { return router_sent_end_stream_; }
   // Exposes streamInfo for the upstream stream.
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
   bool hadUpstream() const { return had_upstream_; }
@@ -135,7 +136,7 @@ private:
   bool shouldSendEndStream() {
     // Only encode end stream if the full request has been received, the body
     // has been sent, and any trailers or metadata have also been sent.
-    return encode_complete_ && !buffered_request_body_ && !encode_trailers_ &&
+    return router_sent_end_stream_ && !buffered_request_body_ && !encode_trailers_ &&
            downstream_metadata_map_vector_.empty();
   }
   void addResponseHeadersSize(uint64_t size) {
@@ -172,7 +173,7 @@ private:
   bool calling_encode_headers_ : 1;
   bool upstream_canary_ : 1;
   bool decode_complete_ : 1;
-  bool encode_complete_ : 1;
+  bool router_sent_end_stream_ : 1;
   bool encode_trailers_ : 1;
   bool retried_ : 1;
   bool awaiting_headers_ : 1;

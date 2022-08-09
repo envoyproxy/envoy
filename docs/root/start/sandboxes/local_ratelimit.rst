@@ -28,8 +28,8 @@ Change to the ``examples/local_ratelimit`` directory and bring up the docker com
 
     $ pwd
     envoy/examples/ratelimit
-    $ docker-compose build --pull
-    $ docker-compose up -d
+    $ docker-compose pull
+    $ docker-compose up --build -d
     $ docker-compose ps
     Name                        Command                          State   Ports
     -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
