@@ -95,6 +95,9 @@ new_features:
 - area: listener
   change: |
     expose the implementation of :ref:`internal listener <config_internal_listener>` in xDS API.
+- area: ratelimit
+  change: |
+    add support for :ref:`adding response headers <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.response_headers_to_add>` to rate-limited responses.
 - area: access_log
   change: |
     added support for number values in substitution format string in json_format.
