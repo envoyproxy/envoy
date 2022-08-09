@@ -62,7 +62,9 @@ Endpoint disambiguation
 In case there are multiple endpoints referencing the same internal listener in a single upstream cluster, use
 :ref:`endpoint ID field <envoy_v3_api_field_config.core.v3.EnvoyInternalAddress.endpoint_id>` to improve change tracking
 in the cluster pool. This field in combination with the internal listener name uniquely identify an endpoint in the
-pool.
+pool. For example, if multiple endpoints use distinct upstream host metadata, the value of the field should be a hash or
+a distinct value from the host metadata. For tunneling internal listeners, the value should be the actual destination
+address propagated to the internal listener.
 
 Examples
 --------
