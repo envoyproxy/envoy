@@ -50,7 +50,7 @@ public:
   /**
    * @return  ID for this Ingress worker thread + downstream connection.
    */
-  virtual absl::optional<IngressID> ingressID() PURE;
+  virtual absl::optional<OriginIngress> originIngress() PURE;
 
   /**
    * @return const Network::Connection* the originating connection, or nullptr if there is none.

@@ -54,7 +54,7 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks()
   ON_CALL(*this, transactionInfos()).WillByDefault(Return(transaction_infos_));
   ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(connection_.stream_info_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
-  ON_CALL(*this, ingressID()).WillByDefault(Return(ingress_id_));
+  ON_CALL(*this, originIngress()).WillByDefault(Return(origin_ingress_));
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 

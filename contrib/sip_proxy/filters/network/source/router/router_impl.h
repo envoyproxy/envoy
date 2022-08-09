@@ -100,12 +100,12 @@ struct RouterStats {
   ALL_SIP_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
-class UpstreamRequest;
+class UpstreamConnection;
 class TransactionInfoItem : public Logger::Loggable<Logger::Id::filter> {
 public:
   TransactionInfoItem(SipFilters::DecoderFilterCallbacks* active_trans,
-                      std::shared_ptr<UpstreamRequest> upstream_request)
-      : active_trans_(active_trans), upstream_request_(upstream_request) {}
+                      std::shared_ptr<UpstreamConnection> upstream_connection)
+      : active_trans_(active_trans), upstream_connection_(upstream_connection) {}
 
   ~TransactionInfoItem() = default;
 
@@ -114,7 +114,7 @@ public:
   void appendMessageList(std::shared_ptr<MessageMetadata> message) { messages_.push_back(message); }
 
   SipFilters::DecoderFilterCallbacks* activeTrans() const { return active_trans_; }
-  std::shared_ptr<UpstreamRequest> upstreamRequest() const { return upstream_request_; }
+  std::shared_ptr<UpstreamConnection> upstreamConnection() const { return upstream_connection_; }
 
   SystemTime timestamp() const { return this->active_trans_->streamInfo().startTime(); }
   void toDelete() { deleted_ = true; }
@@ -123,7 +123,7 @@ public:
 private:
   std::list<std::shared_ptr<MessageMetadata>> messages_;
   SipFilters::DecoderFilterCallbacks* active_trans_;
-  std::shared_ptr<UpstreamRequest> upstream_request_;
+  std::shared_ptr<UpstreamConnection> upstream_connection_;
   std::chrono::system_clock::time_point timestamp_;
   bool deleted_{false};
 };
@@ -137,7 +137,7 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
     audit_timer_->enableTimer(std::chrono::seconds(2));
   }
   absl::flat_hash_map<std::string, std::shared_ptr<TransactionInfoItem>> transaction_info_map_{};
-  absl::flat_hash_map<std::string, std::shared_ptr<UpstreamRequest>> upstream_request_map_{};
+  absl::flat_hash_map<std::string, std::shared_ptr<UpstreamConnection>> upstream_connection_map_{};
 
   std::shared_ptr<TransactionInfo> parent_;
   Event::Dispatcher& dispatcher_;
@@ -200,13 +200,13 @@ public:
 
   void insertTransaction(std::string&& transaction_id,
                          SipFilters::DecoderFilterCallbacks* active_trans,
-                         std::shared_ptr<UpstreamRequest> upstream_request) {
+                         std::shared_ptr<UpstreamConnection> upstream_connection) {
     if (hasTransaction(transaction_id)) {
       return;
     }
 
     tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.emplace(std::make_pair(
-        transaction_id, std::make_shared<TransactionInfoItem>(active_trans, upstream_request)));
+        transaction_id, std::make_shared<TransactionInfoItem>(active_trans, upstream_connection)));
   }
 
   void deleteTransaction(std::string&& transaction_id) {
@@ -227,22 +227,22 @@ public:
     return *(tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.at(transaction_id));
   }
 
-  void insertUpstreamRequest(const std::string& host,
-                             std::shared_ptr<UpstreamRequest> upstream_request) {
-    tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.emplace(
-        std::make_pair(host, upstream_request));
+  void insertUpstreamConnection(const std::string& host,
+                             std::shared_ptr<UpstreamConnection> upstream_connection) {
+    tls_->getTyped<ThreadLocalTransactionInfo>().upstream_connection_map_.emplace(
+        std::make_pair(host, upstream_connection));
   }
 
-  std::shared_ptr<UpstreamRequest> getUpstreamRequest(const std::string& host) {
+  std::shared_ptr<UpstreamConnection> getUpstreamConnection(const std::string& host) {
     try {
-      return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
+      return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_connection_map_.at(host);
     } catch (std::out_of_range const& e) {
       return nullptr;
     }
   }
 
-  void deleteUpstreamRequest(const std::string& host) {
-    tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.erase(host);
+  void deleteUpstreamConnection(const std::string& host) {
+    tls_->getTyped<ThreadLocalTransactionInfo>().upstream_connection_map_.erase(host);
   }
 
 private:
@@ -312,7 +312,7 @@ private:
   const RouteEntry* route_entry_{};
   MessageMetadataSharedPtr metadata_{};
 
-  std::shared_ptr<UpstreamRequest> upstream_request_;
+  std::shared_ptr<UpstreamConnection> upstream_connection_;
   SipFilters::DecoderFilterCallbacks* callbacks_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Upstream::ThreadLocalCluster* thread_local_cluster_;
@@ -325,7 +325,7 @@ class ResponseDecoder : public DecoderCallbacks,
                         public DecoderEventHandler,
                         public Logger::Loggable<Logger::Id::filter> {
 public:
-  ResponseDecoder(UpstreamRequest& parent)
+  ResponseDecoder(UpstreamConnection& parent)
       : parent_(parent), decoder_(std::make_unique<Decoder>(*this)) {}
   ~ResponseDecoder() override = default;
   bool onData(Buffer::Instance& data);
@@ -344,20 +344,20 @@ public:
   std::shared_ptr<SipSettings> settings() const override;
 
 private:
-  UpstreamRequest& parent_;
+  UpstreamConnection& parent_;
   DecoderPtr decoder_;
 };
 
 using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
-class UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
+class UpstreamConnection : public Tcp::ConnectionPool::Callbacks,
                         public Tcp::ConnectionPool::UpstreamCallbacks,
-                        public std::enable_shared_from_this<UpstreamRequest>,
+                        public std::enable_shared_from_this<UpstreamConnection>,
                         public Logger::Loggable<Logger::Id::connection> {
 public:
-  UpstreamRequest(std::shared_ptr<Upstream::TcpPoolData> pool_data,
+  UpstreamConnection(std::shared_ptr<Upstream::TcpPoolData> pool_data,
                   std::shared_ptr<TransactionInfo> transaction_info);
-  ~UpstreamRequest() override;
+  ~UpstreamConnection() override;
   FilterStatus start();
   void resetStream();
   void releaseConnection(bool close);

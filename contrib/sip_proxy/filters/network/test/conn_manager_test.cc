@@ -98,7 +98,7 @@ public:
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
-    EXPECT_NE("", filter_->local_ingress_id_->toHeaderValue());
+    EXPECT_NE("", filter_->local_origin_ingress_->toHeaderValue());
 
     // NOP currently.
     filter_->onAboveWriteBufferHighWatermark();
@@ -855,9 +855,9 @@ TEST_F(SipConnectionManagerTest, EncodeAddNewMsgHeaders) {
 
   metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
 
-  std::string origin_ingress_id = "dummy-origin-id";
+  std::string origin_origin_ingress = "dummy-origin-id";
   std::string auth = "dummy-auth-value";
-  metadata_->addNewMsgHeader(HeaderType::XEnvoyOriginIngress, origin_ingress_id);
+  metadata_->addNewMsgHeader(HeaderType::XEnvoyOriginIngress, origin_origin_ingress);
   metadata_->addNewMsgHeader(HeaderType::Auth, auth);
 
   Buffer::OwnedImpl request_buffer;
@@ -904,9 +904,9 @@ TEST_F(SipConnectionManagerTest, EncodeAddXEnvoyOriginIngressHeader) {
 
   metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
 
-  std::unique_ptr<IngressID> origin_ingress_id =
-      std::make_unique<IngressID>("thread_id_123", "xyz");
-  metadata_->addXEnvoyOriginIngressHeader(*origin_ingress_id);
+  std::unique_ptr<OriginIngress> origin_origin_ingress =
+      std::make_unique<OriginIngress>("thread_id_123", "xyz");
+  metadata_->addXEnvoyOriginIngressHeader(*origin_origin_ingress);
 
   Buffer::OwnedImpl request_buffer;
 
@@ -917,7 +917,7 @@ TEST_F(SipConnectionManagerTest, EncodeAddXEnvoyOriginIngressHeader) {
   EXPECT_EQ(request_buffer.length(),
             buffer_.length() +
                 (std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress)) +
-                 ": " + origin_ingress_id->toHeaderValue() + "\r\n")
+                 ": " + origin_origin_ingress->toHeaderValue() + "\r\n")
                     .length());
 }
 

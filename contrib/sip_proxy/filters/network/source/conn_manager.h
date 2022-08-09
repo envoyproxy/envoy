@@ -214,7 +214,7 @@ private:
     uint64_t streamId() const override { return parent_.streamId(); }
     std::string transactionId() const override { return parent_.transactionId(); }
     const Network::Connection* connection() const override { return parent_.connection(); }
-    absl::optional<IngressID> ingressID() override { return parent_.ingressID(); }
+    absl::optional<OriginIngress> originIngress() override { return parent_.originIngress(); }
     Router::RouteConstSharedPtr route() override { return parent_.route(); }
     SipFilterStats& stats() override { return parent_.stats(); }
     void sendLocalReply(const DirectResponse& response, bool end_stream) override {
@@ -322,7 +322,7 @@ private:
     // SipFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     std::string transactionId() const override { return transaction_id_; }
-    absl::optional<IngressID> ingressID() override { return parent_.local_ingress_id_; }
+    absl::optional<OriginIngress> originIngress() override { return parent_.local_origin_ingress_; }
     const Network::Connection* connection() const override;
     Router::RouteConstSharedPtr route() override;
     SipFilterStats& stats() override { return parent_.stats_; }
@@ -481,7 +481,7 @@ private:
 
     uint64_t streamId() const override { return 0; }
     std::string transactionId() const override { return ""; }
-    absl::optional<IngressID> ingressID() override { return IngressID{"", ""}; }
+    absl::optional<OriginIngress> originIngress() override { return OriginIngress{"", ""}; }
 
     Router::RouteConstSharedPtr route() override { return nullptr; }
 
@@ -571,7 +571,7 @@ private:
 
   std::shared_ptr<TrafficRoutingAssistantHandler> tra_handler_;
 
-  absl::optional<IngressID> local_ingress_id_;
+  absl::optional<OriginIngress> local_origin_ingress_;
 
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;

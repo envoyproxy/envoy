@@ -338,11 +338,11 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
   auto worker_thread_id = header.substr(thread_start, thread_end - thread_start);
   auto downstream_conn_id =
       header.substr(downstream_conn_start, downstream_conn_end - downstream_conn_start);
-  auto ingress_id =
-      std::make_unique<IngressID>(std::string(worker_thread_id), std::string(downstream_conn_id));
+  auto origin_ingress =
+      std::make_unique<OriginIngress>(std::string(worker_thread_id), std::string(downstream_conn_id));
   ENVOY_LOG(trace, "X-Envoy_origin-Ingress header processed: thread={}, downstream-connection={}",
             worker_thread_id, downstream_conn_id);
-  metadata()->setIngressId(std::move(ingress_id));
+  metadata()->setOriginIngress(std::move(origin_ingress));
 
   return 0;
 }

@@ -123,8 +123,8 @@ void Router::onDestroy() {
     }
   }
 
-  if (upstream_request_) {
-    upstream_request_->delDecoderFilterCallbacks(*callbacks_);
+  if (upstream_connection_) {
+    upstream_connection_->delDecoderFilterCallbacks(*callbacks_);
   }
 }
 
@@ -302,7 +302,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
     return FilterStatus::StopIteration;
   }
 
-  if (upstream_request_ != nullptr) {
+  if (upstream_connection_ != nullptr) {
     return FilterStatus::Continue;
   }
 
@@ -371,41 +371,41 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
     return FilterStatus::StopIteration;
   }
 
-  if (auto upstream_request =
-          transaction_info->getUpstreamRequest(host->address()->ip()->addressAsString());
-      upstream_request != nullptr) {
+  if (auto upstream_connection =
+          transaction_info->getUpstreamConnection(host->address()->ip()->addressAsString());
+      upstream_connection != nullptr) {
     // There is action connection, reuse it.
-    upstream_request_ = upstream_request;
-    upstream_request_->setDecoderFilterCallbacks(*callbacks_);
-    upstream_request_->setMetadata(metadata);
+    upstream_connection_ = upstream_connection;
+    upstream_connection_->setDecoderFilterCallbacks(*callbacks_);
+    upstream_connection_->setMetadata(metadata);
     ENVOY_STREAM_LOG(debug, "reuse upstream request for {}", *callbacks_,
                      host->address()->ip()->addressAsString());
   } else {
-    upstream_request_ = std::make_shared<UpstreamRequest>(
+    upstream_connection_ = std::make_shared<UpstreamConnection>(
         std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info);
-    upstream_request_->setDecoderFilterCallbacks(*callbacks_);
-    upstream_request_->setMetadata(metadata);
-    transaction_info->insertUpstreamRequest(host->address()->ip()->addressAsString(),
-                                            upstream_request_);
+    upstream_connection_->setDecoderFilterCallbacks(*callbacks_);
+    upstream_connection_->setMetadata(metadata);
+    transaction_info->insertUpstreamConnection(host->address()->ip()->addressAsString(),
+                                            upstream_connection_);
     ENVOY_STREAM_LOG(debug, "create new upstream request {}", *callbacks_,
                      host->address()->ip()->addressAsString());
   }
 
   if (metadata->msgType() == MsgType::Request) {
     transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
-                                        upstream_request_);
+                                        upstream_connection_);
   }
 
   lb_ret = true;
-  return upstream_request_->start();
+  return upstream_connection_->start();
 }
 
 FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
-  bool upstream_request_started = false;
+  bool upstream_connection_started = false;
 
   // ACK_4XX reuse
-  if (upstream_request_ != nullptr &&
-      upstream_request_->connectionState() == ConnectionState::Connected) {
+  if (upstream_connection_ != nullptr &&
+      upstream_connection_->connectionState() == ConnectionState::Connected) {
     return FilterStatus::Continue;
   }
 
@@ -417,18 +417,18 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
     ENVOY_LOG(info, "Using preset destination {} for responses coming from downstream", host);
 
-    if (auto upstream_request = transaction_info->getUpstreamRequest(std::string(host));
-        upstream_request != nullptr) {
+    if (auto upstream_connection = transaction_info->getUpstreamConnection(std::string(host));
+        upstream_connection != nullptr) {
       // There is upstream request for the host, reuse it.
       ENVOY_STREAM_LOG(trace, "reuse upstream request from {}", *callbacks_, host);
-      upstream_request_ = upstream_request;
-      upstream_request_->setMetadata(metadata);
-      upstream_request_->setDecoderFilterCallbacks(*callbacks_);
+      upstream_connection_ = upstream_connection;
+      upstream_connection_->setMetadata(metadata);
+      upstream_connection_->setDecoderFilterCallbacks(*callbacks_);
 
-      transaction_info->insertUpstreamRequest(host, upstream_request_);
-      ENVOY_STREAM_LOG(trace, "call upstream_request_->start()", *callbacks_);
+      transaction_info->insertUpstreamConnection(host, upstream_connection_);
+      ENVOY_STREAM_LOG(trace, "call upstream_connection_->start()", *callbacks_);
       // Continue: continue to messageEnd, StopIteration: continue to next affinity
-      if (FilterStatus::StopIteration == upstream_request_->start()) {
+      if (FilterStatus::StopIteration == upstream_connection_->start()) {
         // Defer to handle in upstream request onPoolReady or onPoolFailure
         ENVOY_LOG(trace, "sip: state {}", StateNameValues::name(metadata_->state()));
         return FilterStatus::StopIteration;
@@ -474,19 +474,19 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       return FilterStatus::Continue;
     }
 
-    if (auto upstream_request = transaction_info->getUpstreamRequest(std::string(host));
-        upstream_request != nullptr) {
+    if (auto upstream_connection = transaction_info->getUpstreamConnection(std::string(host));
+        upstream_connection != nullptr) {
       // There is action connection, reuse it.
       ENVOY_STREAM_LOG(trace, "reuse upstream request from {}", *callbacks_, host);
-      upstream_request_ = upstream_request;
-      upstream_request_->setMetadata(metadata);
-      upstream_request_->setDecoderFilterCallbacks(*callbacks_);
+      upstream_connection_ = upstream_connection;
+      upstream_connection_->setMetadata(metadata);
+      upstream_connection_->setDecoderFilterCallbacks(*callbacks_);
 
       transaction_info->insertTransaction(std::string(metadata->transactionId().value()),
-                                          callbacks_, upstream_request_);
-      ENVOY_STREAM_LOG(trace, "call upstream_request_->start()", *callbacks_);
+                                          callbacks_, upstream_connection_);
+      ENVOY_STREAM_LOG(trace, "call upstream_connection_->start()", *callbacks_);
       // Continue: continue to messageEnd, StopIteration: continue to next affinity
-      if (FilterStatus::StopIteration == upstream_request_->start()) {
+      if (FilterStatus::StopIteration == upstream_connection_->start()) {
         // Defer to handle in upstream request onPoolReady or onPoolFailure
         ENVOY_LOG(trace, "sip: state {}", StateNameValues::name(metadata_->state()));
         return FilterStatus::StopIteration;
@@ -497,13 +497,13 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     ENVOY_STREAM_LOG(trace, "no destination preset select with load balancer host= {}", *callbacks_,
                      host);
 
-    upstream_request_started = false;
+    upstream_connection_started = false;
     auto ret =
-        messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_request_started);
-    if (upstream_request_started && ret == FilterStatus::StopIteration) {
+        messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_connection_started);
+    if (upstream_connection_started && ret == FilterStatus::StopIteration) {
       // Defer to handle in upstream request onPoolReady or onPoolFailure
       return FilterStatus::StopIteration;
-    } else if (upstream_request_started && ret == FilterStatus::Continue) {
+    } else if (upstream_connection_started && ret == FilterStatus::Continue) {
       return FilterStatus::Continue;
     } else {
       // continue to next affinity
@@ -517,7 +517,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     if (!metadata->stopLoadBalance()) {
       ENVOY_STREAM_LOG(debug, "no destination from affinity, do load balance", *callbacks_);
       return messageHandlerWithLoadBalancer(transaction_info, metadata, "",
-                                            upstream_request_started);
+                                            upstream_connection_started);
     } else {
       ENVOY_STREAM_LOG(debug, "no destination without load balance", *callbacks_);
       throw AppException(AppExceptionType::UnknownMethod, "envoy no endpoint found");
@@ -551,19 +551,19 @@ const Network::Connection* Router::downstreamConnection() const {
   return nullptr;
 }
 
-void Router::cleanup() { upstream_request_.reset(); }
+void Router::cleanup() { upstream_connection_.reset(); }
 
-UpstreamRequest::UpstreamRequest(std::shared_ptr<Upstream::TcpPoolData> pool,
+UpstreamConnection::UpstreamConnection(std::shared_ptr<Upstream::TcpPoolData> pool,
                                  std::shared_ptr<TransactionInfo> transaction_info)
     : conn_pool_(pool), transaction_info_(transaction_info) {}
 
-UpstreamRequest::~UpstreamRequest() {
+UpstreamConnection::~UpstreamConnection() {
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
   }
 }
 
-FilterStatus UpstreamRequest::start() {
+FilterStatus UpstreamConnection::start() {
   if (!callbacks_) {
     ENVOY_LOG(info, "There is no callback");
     return FilterStatus::StopIteration;
@@ -596,7 +596,7 @@ FilterStatus UpstreamRequest::start() {
   return FilterStatus::Continue;
 }
 
-void UpstreamRequest::releaseConnection(const bool close) {
+void UpstreamConnection::releaseConnection(const bool close) {
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
     conn_pool_handle_ = nullptr;
@@ -612,9 +612,9 @@ void UpstreamRequest::releaseConnection(const bool close) {
   }
 }
 
-void UpstreamRequest::resetStream() { releaseConnection(true); }
+void UpstreamConnection::resetStream() { releaseConnection(true); }
 
-void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+void UpstreamConnection::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                     Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_LOG(info, "on pool failure {} reason {}", host->address()->ip()->addressAsString(),
             static_cast<int>(reason));
@@ -622,7 +622,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, ab
   conn_pool_handle_ = nullptr;
 
   // Once onPoolFailure, this instance is invalid, can't be reused.
-  transaction_info_->deleteUpstreamRequest(host->address()->ip()->addressAsString());
+  transaction_info_->deleteUpstreamConnection(host->address()->ip()->addressAsString());
 
   if (callbacks_) {
     callbacks_->continueHandling(host->address()->asString(), true);
@@ -632,7 +632,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, ab
   onUpstreamHostSelected(host);
 }
 
-void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+void UpstreamConnection::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                                   Upstream::HostDescriptionConstSharedPtr host) {
 
   ENVOY_LOG(trace, "onPoolReady");
@@ -653,11 +653,11 @@ void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_
   }
 }
 
-void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
+void UpstreamConnection::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
   upstream_host_ = host;
 }
 
-void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
+void UpstreamConnection::onResetStream(ConnectionPool::PoolFailureReason reason) {
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
     throw AppException(AppExceptionType::InternalError,
@@ -690,7 +690,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
   }
 }
 
-SipFilters::DecoderFilterCallbacks* UpstreamRequest::getTransaction(std::string&& transaction_id) {
+SipFilters::DecoderFilterCallbacks* UpstreamConnection::getTransaction(std::string&& transaction_id) {
   if (transaction_info_->hasTransaction(transaction_id)) {
     return transaction_info_->getTransaction(std::move(transaction_id)).activeTrans();
   } else {
@@ -699,7 +699,7 @@ SipFilters::DecoderFilterCallbacks* UpstreamRequest::getTransaction(std::string&
 }
 
 SipFilters::DecoderFilterCallbacks*
-UpstreamRequest::getDownstreamConnection(std::string& downstream_connection_id) {
+UpstreamConnection::getDownstreamConnection(std::string& downstream_connection_id) {
   if (downstream_connection_info_ == nullptr) {
     return nullptr;
   }
@@ -709,7 +709,7 @@ UpstreamRequest::getDownstreamConnection(std::string& downstream_connection_id) 
   return nullptr;
 }
 
-std::string UpstreamRequest::dumpDownstreamConnection() {
+std::string UpstreamConnection::dumpDownstreamConnection() {
   if (downstream_connection_info_ == nullptr) {
     return "";
   }
@@ -717,7 +717,7 @@ std::string UpstreamRequest::dumpDownstreamConnection() {
 }
 
 // Tcp::ConnectionPool::UpstreamCallbacks
-void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+void UpstreamConnection::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   UNREFERENCED_PARAMETER(end_stream);
   ENVOY_LOG(debug, "sip proxy received resp {} --> {} bytes {}",
             conn_data_->connection().connectionInfoProvider().remoteAddress()->asStringView(),
@@ -729,7 +729,7 @@ void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   response_decoder->onData(upstream_buffer_);
 }
 
-void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
+void UpstreamConnection::onEvent(Network::ConnectionEvent event) {
   ENVOY_LOG(info, "received upstream event {}", static_cast<int>(event));
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
@@ -743,11 +743,11 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
     return;
   }
 
-  transaction_info_->deleteUpstreamRequest(upstream_host_->address()->ip()->addressAsString());
+  transaction_info_->deleteUpstreamConnection(upstream_host_->address()->ip()->addressAsString());
   releaseConnection(false);
 }
 
-void UpstreamRequest::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
+void UpstreamConnection::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
   downstream_connection_info_ = callbacks_->downstreamConnectionInfos();
   route_ = callbacks_->route();
@@ -757,13 +757,13 @@ void UpstreamRequest::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbac
             downstream_connection_info_->dumpDownstreamConnection());
 }
 
-void UpstreamRequest::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
+void UpstreamConnection::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
   if (callbacks_ == &callbacks) {
     callbacks_ = nullptr;
   }
 }
 
-void UpstreamRequest::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
+void UpstreamConnection::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
                                      bool end_stream) {
   if (conn_data_->connection().state() == Network::Connection::State::Closed) {
     ENVOY_LOG(debug, "Connection state is closed for upstream local reply");
@@ -784,7 +784,7 @@ void UpstreamRequest::sendLocalReply(MessageMetadata& metadata, const DirectResp
   write(buffer, end_stream);
 }
 
-void UpstreamRequest::onError(MessageMetadataSharedPtr metadata, const ErrorCode error_code,
+void UpstreamConnection::onError(MessageMetadataSharedPtr metadata, const ErrorCode error_code,
                               const std::string& what) {
   auto response = AppException(AppExceptionType::ProtocolError, error_code, what);
   sendLocalReply(*metadata, response, false);
@@ -800,8 +800,8 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
   ENVOY_LOG(trace, "ResponseDecoder\n{}", metadata->rawMsg());
 
   if (metadata->msgType() == MsgType::Request) {
-    auto ingress_id = metadata->ingressId();
-    if (ingress_id == nullptr) {
+    auto origin_ingress = metadata->originIngress();
+    if (origin_ingress == nullptr) {
       ENVOY_LOG(
           error,
           "Dropping upstream request with no well formatted X-Envoy-Origin-Ingress header: \n{}",
@@ -811,7 +811,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       return FilterStatus::StopIteration;
     }
 
-    auto downstream_conn_id = ingress_id->getDownstreamConnectionID();
+    auto downstream_conn_id = origin_ingress->getDownstreamConnectionID();
     auto downstream_conn = parent_.getDownstreamConnection(downstream_conn_id);
     if (downstream_conn == nullptr) {
       ENVOY_LOG(debug, "No downstream connection found for: '{}'\n", downstream_conn_id);

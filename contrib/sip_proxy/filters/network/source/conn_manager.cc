@@ -181,7 +181,7 @@ Network::FilterStatus ConnectionManager::onNewConnection() {
   std::string downstream_conn_id =
       read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() +
       "@" + random_generator_.uuid();
-  local_ingress_id_ = IngressID(thread_id, downstream_conn_id);
+  local_origin_ingress_ = OriginIngress(thread_id, downstream_conn_id);
   downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
 
   ENVOY_LOG(info, "Created downstream connection with thread_id={}, downstream_connection_id={}",
@@ -359,12 +359,12 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   ENVOY_CONN_LOG(info, "received event {}", read_callbacks_->connection(), static_cast<int>(event));
   resetAllTrans(event == Network::ConnectionEvent::LocalClose);
 
-  if (local_ingress_id_.has_value() && ((event == Network::ConnectionEvent::RemoteClose) ||
+  if (local_origin_ingress_.has_value() && ((event == Network::ConnectionEvent::RemoteClose) ||
                                         (event == Network::ConnectionEvent::LocalClose))) {
     downstream_connection_infos_->deleteDownstreamConnection(
-        local_ingress_id_->getDownstreamConnectionID());
+        local_origin_ingress_->getDownstreamConnectionID());
     ENVOY_LOG(debug, "Deleted from Downstream connection map {}: {}\n",
-              downstream_connection_infos_, local_ingress_id_->getDownstreamConnectionID());
+              downstream_connection_infos_, local_origin_ingress_->getDownstreamConnectionID());
   }
 }
 
@@ -690,7 +690,7 @@ SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
     encoder->encode(metadata, buffer);
 
     ENVOY_LOG(debug, "Sending upstream request downstream to {}. {} bytes \n{}",
-              parent_.local_ingress_id_->getDownstreamConnectionID(), buffer.length(),
+              parent_.local_origin_ingress_->getDownstreamConnectionID(), buffer.length(),
               buffer.toString());
     parent_.read_callbacks_->connection().write(buffer, false);
 

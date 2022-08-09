@@ -385,7 +385,7 @@ TEST_F(SipRouterTest, AddXEnvoyOriginIngressHeader) {
         auto header_name =
             std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress));
         EXPECT_THAT(buffer.toString(),
-                    HasSubstr(header_name + ": " + callbacks_.ingress_id_.toHeaderValue()));
+                    HasSubstr(header_name + ": " + callbacks_.origin_ingress_.toHeaderValue()));
         buffer.drain(buffer.length());
       }));
 
@@ -426,7 +426,7 @@ TEST_F(SipRouterTest, SessionAffinity) {
   destroyRouter();
 }
 
-TEST_F(SipRouterTest, SendAnotherMsgInConnectedUpstreamRequest) {
+TEST_F(SipRouterTest, SendAnotherMsgInConnectedUpstreamConnection) {
   initializeTrans();
   initializeRouter();
   initializeTransaction();
@@ -514,7 +514,7 @@ TEST_F(SipRouterTest, QueryStop) {
   startRequest(FilterStatus::Continue);
 }
 
-TEST_F(SipRouterTest, SendAnotherMsgInConnectingUpstreamRequest) {
+TEST_F(SipRouterTest, SendAnotherMsgInConnectingUpstreamConnection) {
   initializeTrans();
   initializeRouter();
   initializeTransaction();
@@ -639,7 +639,7 @@ TEST_F(SipRouterTest, CallWithExistingConnection) {
   returnResponse();
 
   auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
-  transaction_info_ptr->getUpstreamRequest("10.0.0.1")
+  transaction_info_ptr->getUpstreamConnection("10.0.0.1")
       ->setConnectionState(ConnectionState::NotConnected);
 
   metadata_->affinity().emplace_back("Route", "ep", "ep", false, false);
@@ -672,7 +672,7 @@ TEST_F(SipRouterTest, CallWithExistingConnectionDefaultLoadBalance) {
   returnResponse();
 
   auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
-  transaction_info_ptr->getUpstreamRequest("10.0.0.1")
+  transaction_info_ptr->getUpstreamConnection("10.0.0.1")
       ->setConnectionState(ConnectionState::NotConnected);
 
   // initializeMetadata(MsgType::Request);
@@ -1000,14 +1000,14 @@ TEST_F(SipRouterTest, Audit) {
 
   auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
   EXPECT_NE(nullptr, transaction_info_ptr);
-  std::shared_ptr<UpstreamRequest> upstream_request_ptr =
-      transaction_info_ptr->getUpstreamRequest("10.0.0.1");
-  EXPECT_NE(nullptr, upstream_request_ptr);
+  std::shared_ptr<UpstreamConnection> upstream_connection_ptr =
+      transaction_info_ptr->getUpstreamConnection("10.0.0.1");
+  EXPECT_NE(nullptr, upstream_connection_ptr);
 
   std::shared_ptr<TransactionInfoItem> item =
-      std::make_shared<TransactionInfoItem>(&callbacks_, upstream_request_ptr);
+      std::make_shared<TransactionInfoItem>(&callbacks_, upstream_connection_ptr);
   std::shared_ptr<TransactionInfoItem> itemToDelete =
-      std::make_shared<TransactionInfoItem>(&callbacks_, upstream_request_ptr);
+      std::make_shared<TransactionInfoItem>(&callbacks_, upstream_connection_ptr);
   itemToDelete->toDelete();
   ThreadLocalTransactionInfo threadInfo(transaction_info_ptr, dispatcher_,
                                         std::chrono::milliseconds(0));

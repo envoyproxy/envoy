@@ -92,11 +92,11 @@ private:
   bool subscribe_;
 };
 
-// rename to IngressId for consistency
+// rename to OriginIngress for consistency
 // think about using string-view here if possible, and adding a move ctr
-class IngressID {
+class OriginIngress {
 public:
-  IngressID(const std::string& thread_id, const std::string& connection_id)
+  OriginIngress(const std::string& thread_id, const std::string& connection_id)
       : thread_id_(thread_id), downstream_connection_id_(connection_id) {}
 
   std::string toHeaderValue() {
@@ -154,8 +154,8 @@ public:
    */
   void setTransactionId(absl::string_view data);
 
-  IngressID* ingressId() { return ingress_id_.get(); };
-  void setIngressId(std::unique_ptr<IngressID> ingress_id);
+  OriginIngress* originIngress() { return origin_ingress_.get(); };
+  void setOriginIngress(std::unique_ptr<OriginIngress> origin_ingress);
 
   std::string destination() { return destination_; }
   void setDestination(std::string destination) { destination_ = destination; }
@@ -178,7 +178,7 @@ public:
     }
   };
 
-  void addXEnvoyOriginIngressHeader(IngressID ingress_id);
+  void addXEnvoyOriginIngressHeader(OriginIngress origin_ingress);
   void removeXEnvoyOriginIngressHeader();
   bool hasXEnvoyOriginIngressHeader();
   void addNewMsgHeader(HeaderType type, const std::string& value);
@@ -232,7 +232,7 @@ private:
   absl::optional<std::pair<std::string, std::string>> p_cookie_ip_map_{};
 
   absl::optional<absl::string_view> transaction_id_{};
-  std::unique_ptr<IngressID> ingress_id_;
+  std::unique_ptr<OriginIngress> origin_ingress_;
   std::string destination_{};
 
   std::vector<AffinityEntry> affinity_{};
