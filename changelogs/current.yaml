@@ -86,5 +86,8 @@ new_features:
 - area: access_log
   change: |
     updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
+- area: ratelimit
+  change: |
+    add support for :ref:`API version <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.response_headers_to_add>` .
 
 deprecated:
