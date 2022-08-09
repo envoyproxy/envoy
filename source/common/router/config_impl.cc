@@ -362,18 +362,17 @@ PathRewritePolicyImpl::PathRewritePolicyImpl(
     ProtobufMessage::ValidationVisitor& validator, std::string route_url)
     : route_url_(route_url), enabled_(true) {
 
-  predicate_factory_ =
+  const auto& predicate_factory =
       &Envoy::Config::Utility::getAndCheckFactory<PathRewritePredicateFactory>(typed_config);
-  ASSERT(predicate_factory_); // factory not found
 
   predicate_config_ = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      typed_config.typed_config(), validator, *predicate_factory_);
+      typed_config.typed_config(), validator, *predicate_factory);
 
   // Validate config format and inputs when creating factory.
   // As the validation and create are nearly 1:1 store for later use.
   // Predicate is only ever created once.
   absl::StatusOr<PathRewritePredicateSharedPtr> config_or_error =
-      predicate_factory_->createPathRewritePredicate(*predicate_config_);
+      predicate_factory->createPathRewritePredicate(*predicate_config_);
 
   if (!config_or_error.ok()) {
     throw EnvoyException(std::string(config_or_error.status().message()));
@@ -391,18 +390,17 @@ PathMatchPolicyImpl::PathMatchPolicyImpl(
     ProtobufMessage::ValidationVisitor& validator, std::string path)
     : path_(path), enabled_(true) {
 
-  predicate_factory_ =
+  const auto& predicate_factory =
       &Envoy::Config::Utility::getAndCheckFactory<PathMatchPredicateFactory>(typed_config);
-  ASSERT(predicate_factory_); // factory not found
 
   predicate_config_ = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      typed_config.typed_config(), validator, *predicate_factory_);
+      typed_config.typed_config(), validator, *predicate_factory);
 
   // Validate config format and inputs when creating factory.
   // As the validation and create are nearly 1:1 store for later use.
   // Predicate is only ever created once.
   absl::StatusOr<PathMatchPredicateSharedPtr> config_or_error =
-      predicate_factory_->createPathMatchPredicate(*predicate_config_);
+      predicate_factory->createPathMatchPredicate(*predicate_config_);
 
   if (!config_or_error.ok()) {
     throw EnvoyException(std::string(config_or_error.status().message()));
@@ -728,10 +726,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
-  // validate rewrite policy is valid with the provided match policy
   if (path_rewrite_policy_.enabled()) {
-    absl::Status compatible_polices =
-        path_rewrite_policy_.predicate()->isCompatibleMatchPolicy(path_match_policy_.predicate());
+    absl::Status compatible_polices = path_rewrite_policy_.predicate()->isCompatibleMatchPolicy(
+        path_match_policy_.predicate(), path_match_policy_.enabled());
     if (!compatible_polices.ok()) {
       throw EnvoyException(std::string(compatible_polices.message()));
     }

@@ -479,7 +479,6 @@ private:
   const std::string path_;
   const bool enabled_;
   ProtobufTypes::MessagePtr predicate_config_;
-  PathMatchPredicateFactory* predicate_factory_;
   PathMatchPredicateSharedPtr predicate_;
 };
 
@@ -505,7 +504,6 @@ private:
   const std::string route_url_;
   const bool enabled_;
   ProtobufTypes::MessagePtr predicate_config_;
-  PathRewritePredicateFactory* predicate_factory_;
   PathRewritePredicateSharedPtr predicate_;
 };
 

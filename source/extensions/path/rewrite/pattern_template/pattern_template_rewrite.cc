@@ -26,8 +26,8 @@ namespace Rewrite {
 #endif
 
 absl::Status PatternTemplateRewritePredicate::isCompatibleMatchPolicy(
-    Router::PathMatchPredicateSharedPtr path_match_predicate) const {
-  if (path_match_predicate->name() != Extensions::PatternTemplate::Match::NAME) {
+    Router::PathMatchPredicateSharedPtr path_match_predicate, bool active_policy) const {
+  if (!active_policy || path_match_predicate->name() != Extensions::PatternTemplate::Match::NAME) {
     return absl::InvalidArgumentError(fmt::format("unable to use {} extension without {} extension",
                                                   Extensions::PatternTemplate::Rewrite::NAME,
                                                   Extensions::PatternTemplate::Match::NAME));
