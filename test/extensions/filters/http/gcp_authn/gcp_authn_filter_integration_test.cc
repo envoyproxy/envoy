@@ -246,8 +246,8 @@ TEST_P(GcpAuthnFilterIntegrationTest, SendRequestWithBody) {
   // Send the request to `cluster_0` cluster.
   AssertionResult assert_result = fake_upstreams_[0]->waitForHttpConnection(
       *dispatcher_, fake_upstream_connection_, std::chrono::milliseconds(1));
-  // We expect the result here to be false because the filter chain iteration should has been
-  // stopped by waiting for the response from `gcp_authn` cluster.
+  // We expect the request fail to arrive at `cluster_0` because the filter chain iteration
+  // should has already been stopped by waiting for the response from `gcp_authn` cluster above.
   RELEASE_ASSERT(!assert_result, assert_result.message());
   // Clean up the codec and connections.
   cleanup();
