@@ -28,6 +28,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
 
@@ -183,8 +184,12 @@ StructFormatter::FormatBuilder::toFormatMapValue(const ProtobufWkt::Struct& stru
       output->emplace(pair.first, toFormatListValue(pair.second.list_value()));
       break;
 
+    case ProtobufWkt::Value::kNumberValue:
+      output->emplace(pair.first, toFormatNumberValue(pair.second.number_value()));
+      break;
+
     default:
-      throw EnvoyException("Only string values, nested structs and list values are "
+      throw EnvoyException("Only string values, nested structs, list values and number values are "
                            "supported in structured access log format.");
     }
   }
@@ -207,8 +212,13 @@ StructFormatter::StructFormatListWrapper StructFormatter::FormatBuilder::toForma
     case ProtobufWkt::Value::kListValue:
       output->emplace_back(toFormatListValue(value.list_value()));
       break;
+
+    case ProtobufWkt::Value::kNumberValue:
+      output->emplace_back(toFormatNumberValue(value.number_value()));
+      break;
+
     default:
-      throw EnvoyException("Only string values, nested structs and list values are "
+      throw EnvoyException("Only string values, nested structs, list values and number values are "
                            "supported in structured access log format.");
     }
   }
@@ -219,6 +229,13 @@ std::vector<FormatterProviderPtr>
 StructFormatter::FormatBuilder::toFormatStringValue(const std::string& string_format) const {
   std::vector<CommandParserPtr> commands;
   return SubstitutionFormatParser::parse(string_format, commands_.value_or(commands));
+}
+
+std::vector<FormatterProviderPtr>
+StructFormatter::FormatBuilder::toFormatNumberValue(double value) const {
+  std::vector<FormatterProviderPtr> formatters;
+  formatters.emplace_back(FormatterProviderPtr{new PlainNumberFormatter(value)});
+  return formatters;
 }
 
 ProtobufWkt::Value StructFormatter::providersCallback(
@@ -1539,6 +1556,25 @@ ProtobufWkt::Value PlainStringFormatter::formatValue(const Http::RequestHeaderMa
                                                      const StreamInfo::StreamInfo&,
                                                      absl::string_view) const {
   return str_;
+}
+
+PlainNumberFormatter::PlainNumberFormatter(double num) { num_.set_number_value(num); }
+
+absl::optional<std::string> PlainNumberFormatter::format(const Http::RequestHeaderMap&,
+                                                         const Http::ResponseHeaderMap&,
+                                                         const Http::ResponseTrailerMap&,
+                                                         const StreamInfo::StreamInfo&,
+                                                         absl::string_view) const {
+  std::string str = absl::StrFormat("%g", num_.number_value());
+  return str;
+}
+
+ProtobufWkt::Value PlainNumberFormatter::formatValue(const Http::RequestHeaderMap&,
+                                                     const Http::ResponseHeaderMap&,
+                                                     const Http::ResponseTrailerMap&,
+                                                     const StreamInfo::StreamInfo&,
+                                                     absl::string_view) const {
+  return num_;
 }
 
 absl::optional<std::string>
