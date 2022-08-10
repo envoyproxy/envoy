@@ -521,10 +521,10 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope);
 
-  return std::make_unique<ClusterInfoImpl>(params.server_context_, params.cluster_,
-                                           params.bind_config_, params.server_context_.runtime(),
-                                           std::move(socket_matcher), std::move(scope),
-                                           params.added_via_api_, factory_context);
+  return std::make_unique<ClusterInfoImpl>(
+      params.server_context_.initManager(), params.server_context_, params.cluster_,
+      params.bind_config_, params.server_context_.runtime(), std::move(socket_matcher),
+      std::move(scope), params.added_via_api_, factory_context);
 }
 
 void HdsCluster::initHealthchecks() {
