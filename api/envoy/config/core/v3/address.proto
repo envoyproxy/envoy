@@ -129,9 +129,8 @@ message BindConfig {
   // precompiled binaries.
   repeated SocketOption socket_options = 3;
 
-  // Additional addresses can be used to bind when creating a socket. When
-  // multiple source addresses specified, the address which has the same family with
-  // remote address will be chosen.
+  // Additional source addresses can be used to bind when creating a socket. The
+  // source address selection is based on the target host address' version.
   repeated SocketAddress additional_source_addresses = 4;
 }
 
