@@ -28,16 +28,15 @@ TEST(WebSocketCodecTest, decodeSingleUnmaskedFrame) {
   Buffer::addSeq(buffer, {0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(5, frames[0].payload_length_);
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(5, frames.value()[0].payload_length_);
 
   std::string text_payload;
   text_payload.resize(5);
-  (*(frames[0].payload_)).copyOut(0, 5, text_payload.data());
+  (*(frames.value()[0].payload_)).copyOut(0, 5, text_payload.data());
   EXPECT_EQ("Hello", text_payload);
 }
 
@@ -58,25 +57,24 @@ TEST(WebSocketCodecTest, decodeFragmentedUnmaskedTextMessage) {
   Buffer::addSeq(buffer, {0x80, 0x02, 0x6c, 0x6f});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(2, frames.size());
+  EXPECT_EQ(2, frames.value().size());
 
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
-  EXPECT_EQ(3, frames[0].payload_length_);
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(3, frames.value()[0].payload_length_);
 
   std::string text_payload_first_frame;
   text_payload_first_frame.resize(3);
-  (*(frames[0].payload_)).copyOut(0, 3, text_payload_first_frame.data());
+  (*(frames.value()[0].payload_)).copyOut(0, 3, text_payload_first_frame.data());
   EXPECT_EQ("Hel", text_payload_first_frame);
 
-  EXPECT_EQ(false, frames[1].masking_key_.has_value());
-  EXPECT_EQ(2, frames[1].payload_length_);
+  EXPECT_EQ(false, frames.value()[1].masking_key_.has_value());
+  EXPECT_EQ(2, frames.value()[1].payload_length_);
 
   std::string text_payload_second_frame;
   text_payload_second_frame.resize(2);
-  (*(frames[1].payload_)).copyOut(0, 2, text_payload_second_frame.data());
+  (*(frames.value()[1].payload_)).copyOut(0, 2, text_payload_second_frame.data());
   EXPECT_EQ("lo", text_payload_second_frame);
 }
 
@@ -88,33 +86,32 @@ TEST(WebSocketCodecTest, decodeFragmentedAndUnfragmentedTextMessages) {
   Buffer::addSeq(buffer, {0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(3, frames.size());
+  EXPECT_EQ(3, frames.value().size());
 
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
-  EXPECT_EQ(3, frames[0].payload_length_);
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(3, frames.value()[0].payload_length_);
 
   std::string text_payload_first_frame;
   text_payload_first_frame.resize(3);
-  (*(frames[0].payload_)).copyOut(0, 3, text_payload_first_frame.data());
+  (*(frames.value()[0].payload_)).copyOut(0, 3, text_payload_first_frame.data());
   EXPECT_EQ("Hel", text_payload_first_frame);
 
-  EXPECT_EQ(false, frames[1].masking_key_.has_value());
-  EXPECT_EQ(2, frames[1].payload_length_);
+  EXPECT_EQ(false, frames.value()[1].masking_key_.has_value());
+  EXPECT_EQ(2, frames.value()[1].payload_length_);
 
   std::string text_payload_second_frame;
   text_payload_second_frame.resize(2);
-  (*(frames[1].payload_)).copyOut(0, 2, text_payload_second_frame.data());
+  (*(frames.value()[1].payload_)).copyOut(0, 2, text_payload_second_frame.data());
   EXPECT_EQ("lo", text_payload_second_frame);
 
-  EXPECT_EQ(false, frames[2].masking_key_.has_value());
-  EXPECT_EQ(5, frames[2].payload_length_);
+  EXPECT_EQ(false, frames.value()[2].masking_key_.has_value());
+  EXPECT_EQ(5, frames.value()[2].payload_length_);
 
   std::string text_payload_third_frame;
   text_payload_third_frame.resize(5);
-  (*(frames[2].payload_)).copyOut(0, 5, text_payload_third_frame.data());
+  (*(frames.value()[2].payload_)).copyOut(0, 5, text_payload_third_frame.data());
   EXPECT_EQ("Hello", text_payload_third_frame);
 }
 
@@ -139,20 +136,19 @@ TEST(WebSocketCodecTest, decodeSingleMaskedFrame) {
   Buffer::addSeq(buffer, {0x81, 0x85, 0x37, 0xfa, 0x21, 0x3d, 0x7f, 0x9f, 0x4d, 0x51, 0x58});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(true, frames[0].masking_key_.has_value());
-  EXPECT_EQ(5, frames[0].payload_length_);
-  EXPECT_EQ(0x37fa213d, frames[0].masking_key_.value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(true, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(5, frames.value()[0].payload_length_);
+  EXPECT_EQ(0x37fa213d, frames.value()[0].masking_key_.value());
 
   std::string text_payload;
   text_payload.resize(5);
-  (*(frames[0].payload_)).copyOut(0, 5, text_payload.data());
+  (*(frames.value()[0].payload_)).copyOut(0, 5, text_payload.data());
   // Unmasking the text payload
   for (size_t i = 0; i < text_payload.size(); ++i) {
-    text_payload[i] ^= (frames[0].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
+    text_payload[i] ^= (frames.value()[0].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
   }
   EXPECT_EQ("Hello", text_payload);
 }
@@ -170,28 +166,28 @@ TEST(WebSocketCodecTest, decodePingFrames) {
   Buffer::addSeq(buffer, {0x8a, 0x85, 0x37, 0xfa, 0x21, 0x3d, 0x7f, 0x9f, 0x4d, 0x51, 0x58});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(2, frames.size());
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
-  EXPECT_EQ(5, frames[0].payload_length_);
+  EXPECT_EQ(2, frames.value().size());
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(5, frames.value()[0].payload_length_);
 
   std::string ping_request_payload;
   ping_request_payload.resize(5);
-  (*(frames[0].payload_)).copyOut(0, 5, ping_request_payload.data());
+  (*(frames.value()[0].payload_)).copyOut(0, 5, ping_request_payload.data());
   EXPECT_EQ("Hello", ping_request_payload);
 
-  EXPECT_EQ(true, frames[1].masking_key_.has_value());
-  EXPECT_EQ(5, frames[1].payload_length_);
-  EXPECT_EQ(0x37fa213d, frames[1].masking_key_.value());
+  EXPECT_EQ(true, frames.value()[1].masking_key_.has_value());
+  EXPECT_EQ(5, frames.value()[1].payload_length_);
+  EXPECT_EQ(0x37fa213d, frames.value()[1].masking_key_.value());
 
   std::string ping_response_payload;
   ping_response_payload.resize(5);
-  (*(frames[1].payload_)).copyOut(0, 5, ping_response_payload.data());
+  (*(frames.value()[1].payload_)).copyOut(0, 5, ping_response_payload.data());
   // Unmasking the ping response payload
   for (size_t i = 0; i < ping_response_payload.size(); ++i) {
-    ping_response_payload[i] ^= (frames[1].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
+    ping_response_payload[i] ^=
+        (frames.value()[1].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
   }
   EXPECT_EQ("Hello", ping_response_payload);
 }
@@ -226,14 +222,13 @@ TEST(WebSocketCodecTest, decode16BitBinaryUnmaskedFrame) {
                           0xdf, 0x16, 0x9a, 0x30, 0xa0, 0x26, 0x1c, 0xc4, 0x2c, 0xad, 0xfd});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(2, frames[0].opcode_);
-  EXPECT_TRUE(frames[0].final_fragment_);
-  EXPECT_EQ(256, frames[0].payload_length_);
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(2, frames.value()[0].opcode_);
+  EXPECT_TRUE(frames.value()[0].final_fragment_);
+  EXPECT_EQ(256, frames.value()[0].payload_length_);
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
 }
 
 // 126 bytes binary message in a single masked frame
@@ -253,15 +248,14 @@ TEST(WebSocketCodecTest, decode16BitBinaryMaskedFrame) {
           0xd7, 0xda, 0x3a, 0x07, 0xb2, 0xf7, 0x71, 0x54, 0xd7, 0x26, 0xa8, 0xca, 0x78, 0xe2,
       });
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(2, frames[0].opcode_);
-  EXPECT_TRUE(frames[0].final_fragment_);
-  EXPECT_EQ(126, frames[0].payload_length_);
-  EXPECT_EQ(true, frames[0].masking_key_.has_value());
-  EXPECT_EQ(0xa1e8d7b0, frames[0].masking_key_.value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(2, frames.value()[0].opcode_);
+  EXPECT_TRUE(frames.value()[0].final_fragment_);
+  EXPECT_EQ(126, frames.value()[0].payload_length_);
+  EXPECT_EQ(true, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(0xa1e8d7b0, frames.value()[0].masking_key_.value());
 }
 
 // 64KiB binary message in a single unmasked frame
@@ -277,13 +271,12 @@ TEST(WebSocketCodecTest, decode64BitBinaryUnmaskedFrame) {
   }
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(2, frames[0].opcode_);
-  EXPECT_TRUE(frames[0].final_fragment_);
-  EXPECT_EQ(65536, frames[0].payload_length_);
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
+  EXPECT_EQ(2, frames.value()[0].opcode_);
+  EXPECT_TRUE(frames.value()[0].final_fragment_);
+  EXPECT_EQ(65536, frames.value()[0].payload_length_);
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
 }
 
 // 1MiB binary message in a single unmasked frame
@@ -300,14 +293,13 @@ TEST(WebSocketCodecTest, decode64BitBinaryMaskedFrame) {
   }
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(2, frames[0].opcode_);
-  EXPECT_TRUE(frames[0].final_fragment_);
-  EXPECT_EQ(1048576, frames[0].payload_length_);
-  EXPECT_EQ(true, frames[0].masking_key_.has_value());
-  EXPECT_EQ(0x96418d54, frames[0].masking_key_.value());
+  EXPECT_EQ(2, frames.value()[0].opcode_);
+  EXPECT_TRUE(frames.value()[0].final_fragment_);
+  EXPECT_EQ(1048576, frames.value()[0].payload_length_);
+  EXPECT_EQ(true, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(0x96418d54, frames.value()[0].masking_key_.value());
 }
 
 TEST(WebSocketCodecTest, decodeFramesWithNoPayloadMasked7BitLength) {
@@ -316,12 +308,12 @@ TEST(WebSocketCodecTest, decodeFramesWithNoPayloadMasked7BitLength) {
   Buffer::addSeq(buffer, {0x81, 0x80, 0x4f, 0x5a, 0x12, 0xe2});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
-  EXPECT_EQ(true, frames[0].masking_key_.has_value());
-  EXPECT_EQ(0x4f5a12e2, frames[0].masking_key_.value());
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(0, frames[0].payload_length_);
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+
+  EXPECT_EQ(true, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(0x4f5a12e2, frames.value()[0].masking_key_.value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(0, frames.value()[0].payload_length_);
 }
 
 TEST(WebSocketCodecTest, decodeFramesWithNoPayloadNonMasked7BitLength) {
@@ -329,11 +321,11 @@ TEST(WebSocketCodecTest, decodeFramesWithNoPayloadNonMasked7BitLength) {
   Buffer::addSeq(buffer, {0x81, 0x00});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(0, frames[0].payload_length_);
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(0, frames.value()[0].payload_length_);
 }
 
 TEST(WebSocketCodecTest, decodeFramesWithNoPayloadMasked16BitLength) {
@@ -341,13 +333,13 @@ TEST(WebSocketCodecTest, decodeFramesWithNoPayloadMasked16BitLength) {
   Buffer::addSeq(buffer, {0x81, 0xfe, 0x00, 0x00, 0x3c, 0x33, 0x2a, 0x16});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(true, frames[0].masking_key_.has_value());
-  EXPECT_EQ(0x3c332a16, frames[0].masking_key_.value());
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(0, frames[0].payload_length_);
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(true, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(0x3c332a16, frames.value()[0].masking_key_.value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(0, frames.value()[0].payload_length_);
 }
 
 TEST(WebSocketCodecTest, decodeFramesWithNoPayloadNonMasked16BitLength) {
@@ -360,11 +352,11 @@ TEST(WebSocketCodecTest, decodeFramesWithNoPayloadNonMasked16BitLength) {
                          });
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(0, frames[0].payload_length_);
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(0, frames.value()[0].payload_length_);
 }
 
 TEST(WebSocketCodecTest, decodeFramesWithNoPayloadMasked64BitLength) {
@@ -373,12 +365,12 @@ TEST(WebSocketCodecTest, decodeFramesWithNoPayloadMasked64BitLength) {
       buffer, {0x81, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0xfa, 0x4f, 0x5a});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
-  EXPECT_EQ(true, frames[0].masking_key_.has_value());
-  EXPECT_EQ(0x1ffa4f5a, frames[0].masking_key_.value());
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(0, frames[0].payload_length_);
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+
+  EXPECT_EQ(true, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(0x1ffa4f5a, frames.value()[0].masking_key_.value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(0, frames.value()[0].payload_length_);
 }
 
 TEST(WebSocketCodecTest, decodeFramesWithNoPayloadNonMasked64BitLength) {
@@ -386,11 +378,11 @@ TEST(WebSocketCodecTest, decodeFramesWithNoPayloadNonMasked64BitLength) {
   Buffer::addSeq(buffer, {0x81, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(0, frames[0].payload_length_);
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(0, frames.value()[0].payload_length_);
 }
 
 TEST(WebSocketCodecTest, encodeFrameHeader) {
@@ -451,13 +443,12 @@ TEST(GrpcCodecTest, decodeClosingFrame) {
   buffer.add(header.data(), header.size());
 
   Decoder decoder;
-  std::vector<Frame> frames;
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_TRUE(decoder.decode(buffer, frames));
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(0, frames[0].payload_length_);
-  EXPECT_EQ(8, frames[0].opcode_);
-  EXPECT_FALSE(frames[0].final_fragment_);
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(0, frames.value()[0].payload_length_);
+  EXPECT_EQ(8, frames.value()[0].opcode_);
+  EXPECT_FALSE(frames.value()[0].final_fragment_);
 }
 
 TEST(GrpcCodecTest, decodeInvalidFrame) {
@@ -470,10 +461,10 @@ TEST(GrpcCodecTest, decodeInvalidFrame) {
   buffer.add("Hey");
 
   Decoder decoder;
-  std::vector<Frame> frames;
   size_t size = buffer.length();
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_FALSE(decoder.decode(buffer, frames));
+  EXPECT_EQ(frames, absl::nullopt);
   EXPECT_EQ(size, buffer.length());
 }
 
@@ -487,16 +478,15 @@ TEST(WebSocketCodecTest, encodeAndDecodeFrame) {
   buffer.add("Hello");
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(5, frames[0].payload_length_);
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(5, frames.value()[0].payload_length_);
 
   std::string text_payload;
   text_payload.resize(5);
-  (*(frames[0].payload_)).copyOut(0, 5, text_payload.data());
+  (*(frames.value()[0].payload_)).copyOut(0, 5, text_payload.data());
   EXPECT_EQ("Hello", text_payload);
 }
 
@@ -515,22 +505,21 @@ TEST(WebSocketCodecTest, decodeMultipleValidNonMaskedFrames) {
   buffer.add("Response!");
 
   Decoder decoder;
-  std::vector<Frame> frames;
   std::string text_payload;
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_TRUE(decoder.decode(buffer, frames));
-  EXPECT_EQ(2, frames.size());
+  EXPECT_EQ(2, frames.value().size());
 
-  EXPECT_EQ(false, frames[0].masking_key_.has_value());
-  EXPECT_EQ(5, frames[0].payload_length_);
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(5, frames.value()[0].payload_length_);
   text_payload.resize(5);
-  (*(frames[0].payload_)).copyOut(0, 5, text_payload.data());
+  (*(frames.value()[0].payload_)).copyOut(0, 5, text_payload.data());
   EXPECT_EQ("Text ", text_payload);
 
-  EXPECT_EQ(false, frames[1].masking_key_.has_value());
-  EXPECT_EQ(9, frames[1].payload_length_);
+  EXPECT_EQ(false, frames.value()[1].masking_key_.has_value());
+  EXPECT_EQ(9, frames.value()[1].payload_length_);
   text_payload.resize(9);
-  (*(frames[1].payload_)).copyOut(0, 9, text_payload.data());
+  (*(frames.value()[1].payload_)).copyOut(0, 9, text_payload.data());
   EXPECT_EQ("Response!", text_payload);
 }
 
@@ -545,19 +534,19 @@ TEST(WebSocketCodecTest, decodeValidMaskedFrame) {
   buffer.add(payload.data(), payload.size());
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
-  EXPECT_EQ(1, frames.size());
-  EXPECT_EQ(true, frames[0].masking_key_.has_value());
-  EXPECT_EQ(0x37fa213d, frames[0].masking_key_.value());
-  EXPECT_EQ(5, frames[0].payload_length_);
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(true, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(0x37fa213d, frames.value()[0].masking_key_.value());
+  EXPECT_EQ(5, frames.value()[0].payload_length_);
 
   std::string text_payload;
   text_payload.resize(5);
-  (*(frames[0].payload_)).copyOut(0, 5, text_payload.data());
+  (*(frames.value()[0].payload_)).copyOut(0, 5, text_payload.data());
   // Unmasking the text payload
   for (size_t i = 0; i < text_payload.size(); ++i) {
-    text_payload[i] ^= (frames[0].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
+    text_payload[i] ^= (frames.value()[0].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
   }
   EXPECT_EQ("Hello", text_payload);
 }
@@ -591,45 +580,45 @@ TEST(WebSocketCodecTest, decodeValidMultipleMaskedFrames) {
   buffer.add(payload.data(), payload.size());
 
   Decoder decoder;
-  std::vector<Frame> frames;
-  EXPECT_TRUE(decoder.decode(buffer, frames));
-  EXPECT_EQ(3, frames.size());
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
-  EXPECT_EQ(true, frames[0].masking_key_.has_value());
-  EXPECT_EQ(0xaf4be87a, frames[0].masking_key_.value());
-  EXPECT_EQ(6, frames[0].payload_length_);
+  EXPECT_EQ(3, frames.value().size());
 
-  EXPECT_EQ(true, frames[1].masking_key_.has_value());
-  EXPECT_EQ(0x3c332a16, frames[1].masking_key_.value());
-  EXPECT_EQ(5, frames[1].payload_length_);
+  EXPECT_EQ(true, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(0xaf4be87a, frames.value()[0].masking_key_.value());
+  EXPECT_EQ(6, frames.value()[0].payload_length_);
 
-  EXPECT_EQ(true, frames[2].masking_key_.has_value());
-  EXPECT_EQ(0x7c96263f, frames[2].masking_key_.value());
-  EXPECT_EQ(6, frames[2].payload_length_);
+  EXPECT_EQ(true, frames.value()[1].masking_key_.has_value());
+  EXPECT_EQ(0x3c332a16, frames.value()[1].masking_key_.value());
+  EXPECT_EQ(5, frames.value()[1].payload_length_);
+
+  EXPECT_EQ(true, frames.value()[2].masking_key_.has_value());
+  EXPECT_EQ(0x7c96263f, frames.value()[2].masking_key_.value());
+  EXPECT_EQ(6, frames.value()[2].payload_length_);
 
   std::string text_payload;
 
   text_payload.resize(6);
-  (*(frames[0].payload_)).copyOut(0, 6, text_payload.data());
+  (*(frames.value()[0].payload_)).copyOut(0, 6, text_payload.data());
   // Unmasking the text payload
   for (size_t i = 0; i < text_payload.size(); ++i) {
-    text_payload[i] ^= (frames[0].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
+    text_payload[i] ^= (frames.value()[0].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
   }
   EXPECT_EQ("hello ", text_payload);
 
   text_payload.resize(5);
-  (*(frames[1].payload_)).copyOut(0, 5, text_payload.data());
+  (*(frames.value()[1].payload_)).copyOut(0, 5, text_payload.data());
   // Unmasking the text payload
   for (size_t i = 0; i < text_payload.size(); ++i) {
-    text_payload[i] ^= (frames[1].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
+    text_payload[i] ^= (frames.value()[1].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
   }
   EXPECT_EQ(" from", text_payload);
 
   text_payload.resize(6);
-  (*(frames[2].payload_)).copyOut(0, 6, text_payload.data());
+  (*(frames.value()[2].payload_)).copyOut(0, 6, text_payload.data());
   // Unmasking the text payload
   for (size_t i = 0; i < text_payload.size(); ++i) {
-    text_payload[i] ^= (frames[2].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
+    text_payload[i] ^= (frames.value()[2].masking_key_.value() >> (8 * (3 - i % 4))) & 0xff;
   }
   EXPECT_EQ("client", text_payload);
 }

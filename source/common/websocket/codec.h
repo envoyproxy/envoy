@@ -87,7 +87,7 @@ public:
   // @param input supplies the binary octets wrapped in a WebSocket frame.
   // @param output supplies the buffer to store the decoded data.
   // @return bool whether the decoding succeeded or not.
-  bool decode(Buffer::Instance& input, std::vector<Frame>& output);
+  absl::optional<std::vector<Frame>> decode(Buffer::Instance& input);
 
 protected:
   // Decodes the given buffer with WebSocket data frames and updates the frame count.
@@ -132,7 +132,7 @@ private:
   // Current frame that is being decoded.
   Frame frame_;
   // Data holder for successfully decoded frames.
-  std::vector<Frame>* output_ = nullptr;
+  absl::optional<std::vector<Frame>> output_ = absl::nullopt;
   bool decoding_error_ = false;
   State state_ = State::KFrameHeaderFlagsAndOpcode;
   uint64_t total_frames_count_ = 0;

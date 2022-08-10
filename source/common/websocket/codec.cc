@@ -85,7 +85,10 @@ void Decoder::frameDataStart() {
 void Decoder::frameData(const uint8_t* mem, uint64_t length) { frame_.payload_->add(mem, length); }
 
 void Decoder::frameDataEnd() {
-  output_->push_back(std::move(frame_));
+  if (!output_) {
+    output_ = std::vector<Frame>();
+  }
+  output_.value().push_back(std::move(frame_));
   frame_.final_fragment_ = false;
   frame_.opcode_ = 0;
   frame_.payload_length_ = 0;
@@ -166,16 +169,14 @@ void Decoder::doDecodePayload(const Buffer::RawSlice& slice, const uint8_t*& mem
   }
 }
 
-bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
+absl::optional<std::vector<Frame>> Decoder::decode(Buffer::Instance& input) {
   decoding_error_ = false;
-  output_ = &output;
   inspect(input);
-  output_ = nullptr;
   if (decoding_error_) {
-    return false;
+    return absl::nullopt;
   }
   input.drain(input.length());
-  return true;
+  return std::move(output_);
 }
 
 uint64_t Decoder::inspect(const Buffer::Instance& data) {
