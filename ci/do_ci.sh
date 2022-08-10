@@ -521,7 +521,7 @@ elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
     exit 0
 elif [[ "$CI_TARGET" == "publish" ]]; then
-    GITHUB_TOKEN=TOKEN  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

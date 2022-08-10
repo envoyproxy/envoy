@@ -503,6 +503,8 @@ stages:
       displayName: "Publish release to Github"
       workingDirectory: $(Build.SourcesDirectory)
       condition: eq(variables['isDev'], 'false')
+      env:
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
 
 - stage: verify
   dependsOn: ["docker"]
