@@ -20,22 +20,6 @@ namespace Sgx {
 using envoy::extensions::private_key_providers::sgx::v3alpha::SgxPrivateKeyMethodConfig;
 using Server::Configuration::TransportSocketFactoryContext;
 
-// ssl_private_key_result_t rsaSignWithSgx(SSL* ssl, uint8_t* out, size_t* out_len,
-//                                         size_t max_out, uint16_t signature_algorithm,
-//                                         const uint8_t* in, size_t in_len);
-
-// ssl_private_key_result_t rsaDecryptWithSgx(SSL* ssl, uint8_t* out, size_t* out_len,
-//                                            size_t max_out, const uint8_t* in, size_t in_len);
-
-// ssl_private_key_result_t ecdsaSignWithSgx(SSL* ssl, uint8_t* out, size_t* out_len,
-//                                           size_t max_out, uint16_t signature_algorithm,
-//                                           const uint8_t* in, size_t in_len);
-
-// ssl_private_key_result_t ecdsaDecryptWithSgx(SSL*, uint8_t*, size_t*, size_t, const uint8_t*,
-//                                              size_t);
-
-// ssl_private_key_result_t completeWithSgx(SSL*, uint8_t*, size_t*, size_t);
-
 enum class RequestStatus { Retry, Success, Error };
 enum class KeyType { Rsa, Ec };
 

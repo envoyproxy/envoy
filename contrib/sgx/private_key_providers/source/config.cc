@@ -34,14 +34,7 @@ SgxPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
           *message, private_key_provider_context.messageValidationVisitor());
 
   SgxSharedPtr sgx = std::make_shared<Sgx>();
-
-  Ssl::PrivateKeyMethodProviderSharedPtr provider =
-      std::make_shared<SgxPrivateKeyMethodProvider>(conf, private_key_provider_context, sgx);
-  if (!provider) {
-    ENVOY_LOG(warn, "Failed to create sgx provider");
-  }
-
-  return provider;
+  return std::make_shared<SgxPrivateKeyMethodProvider>(conf, private_key_provider_context, sgx);
 }
 
 REGISTER_FACTORY(SgxPrivateKeyMethodFactory, Ssl::PrivateKeyMethodProviderInstanceFactory);
