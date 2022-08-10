@@ -147,6 +147,7 @@ TEST_P(AdminInstanceTest, Help) {
       inboundonly: Drains all inbound listeners. traffic_direction field in envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a listener is inbound or outbound.
   /healthcheck/fail (POST): cause the server to fail health checks
   /healthcheck/ok (POST): cause the server to pass health checks
+  /heap_dump: dump current Envoy heap (if supported)
   /heapprofiler (POST): enable/disable the heap profiler
   /help: print out list of admin commands
   /hot_restart_version: print the hot restart compatibility version

@@ -107,7 +107,8 @@ private:
   public:
     explicit EnvoyPathValidationResultDelegate(EnvoyQuicClientConnection& connection);
 
-    void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) override;
+    void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context,
+                                 quic::QuicTime start_time) override;
 
     void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context) override;
 

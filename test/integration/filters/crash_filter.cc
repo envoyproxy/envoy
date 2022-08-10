@@ -75,7 +75,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::CrashFilterConfig& proto_config, const std::string&,
-      Server::Configuration::ServerFactoryContext&) override {
+      DualInfo, Server::Configuration::ServerFactoryContext&) override {
     auto filter_config = std::make_shared<CrashFilterConfig>(
         proto_config.crash_in_encode_headers(), proto_config.crash_in_encode_data(),
         proto_config.crash_in_decode_headers(), proto_config.crash_in_decode_data(),
