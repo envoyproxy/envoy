@@ -357,10 +357,10 @@ public:
 
     if (GetParam() == UpdateOrder::RemovesFirst) {
       if (!add.empty()) {
-        host_set_.runCallbacks(add, {});
+        host_set.runCallbacks(add, {});
       }
     } else if (!add.empty() || !remove.empty()) {
-      host_set_.runCallbacks(add, remove);
+      host_set.runCallbacks(add, remove);
     }
   }
 
@@ -2412,38 +2412,124 @@ public:
   std::vector<SubsetSelectorPtr> default_subset_selectors_;
 };
 
-TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectMultipleSelectors) {
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, AcceptMultipleSelectors) {
   std::vector<SubsetSelectorPtr> subset_selectors = {
       makeSelector({"version"}, false),
-      makeSelector({"test"}, true),
+      makeSelector({"stage"}, true),
   };
-  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
-  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
-                            "subset_lb selector: single_host_per_subset cannot be set when there "
-                            "are multiple subset selectors.");
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+  ON_CALL(subset_info_, fallbackPolicy())
+      .WillByDefault(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  init({
+      {"tcp://127.0.0.1:80", {}},
+      {"tcp://127.0.0.1:81", {{"version", "v1"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:82", {{"version", "v1"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:83", {{"version", "v1"}, {"stage", "prod"}}},
+      {"tcp://127.0.0.1:84", {{"version", "v1"}, {"stage", "prod"}}},
+      {"tcp://127.0.0.1:85", {{"version", "v2"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:86", {{"version", "v2"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:87", {{"version", "v2"}, {"stage", "prod"}}},
+      {"tcp://127.0.0.1:88", {{"version", "v2"}, {"stage", "prod"}}},
+  });
+
+  TestLoadBalancerContext version_v1({{"version", "v1"}});
+  TestLoadBalancerContext version_v2({{"version", "v2"}});
+  TestLoadBalancerContext stage_dev({{"stage", "dev"}});
+  TestLoadBalancerContext stage_prod({{"stage", "prod"}});
+  TestLoadBalancerContext stage_test({{"stage", "test"}});
+
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&version_v1));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&version_v1));
+
+  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&version_v2));
+  EXPECT_EQ(host_set_.hosts_[6], lb_->chooseHost(&version_v2));
+
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&stage_dev));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&stage_dev));
+
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&stage_prod));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&stage_prod));
+
+  EXPECT_EQ(nullptr, lb_->chooseHost(&stage_test));
 }
 
-TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectMultipleKeys) {
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, AcceptMultipleKeys) {
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      makeSelector({"version", "test"}, true),
+      makeSelector({"version", "stage"}, true),
   };
-  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
-  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
-                            "subset_lb selector: single_host_per_subset cannot bet set when there "
-                            "isn't exactly 1 key or if that key is empty.");
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+  ON_CALL(subset_info_, fallbackPolicy())
+      .WillByDefault(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  init({
+      {"tcp://127.0.0.1:80", {}},
+      {"tcp://127.0.0.1:81", {{"version", "v1"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:82", {{"version", "v1"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:83", {{"version", "v1"}, {"stage", "prod"}}},
+      {"tcp://127.0.0.1:84", {{"version", "v1"}, {"stage", "prod"}}},
+      {"tcp://127.0.0.1:85", {{"version", "v2"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:86", {{"version", "v2"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:87", {{"version", "v2"}, {"stage", "prod"}}},
+      {"tcp://127.0.0.1:88", {{"version", "v2"}, {"stage", "prod"}}},
+  });
+
+  TestLoadBalancerContext v1_dev({{"version", "v1"}, {"stage", "dev"}});
+  TestLoadBalancerContext v1_prod({{"version", "v1"}, {"stage", "prod"}});
+  TestLoadBalancerContext v2_dev({{"version", "v2"}, {"stage", "dev"}});
+  TestLoadBalancerContext v2_prod({{"version", "v2"}, {"stage", "prod"}});
+  TestLoadBalancerContext v2_test({{"version", "v2"}, {"stage", "test"}});
+
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&v1_dev));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&v1_prod));
+  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&v2_dev));
+  EXPECT_EQ(host_set_.hosts_[7], lb_->chooseHost(&v2_prod));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&v2_test));
 }
 
-TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectEmptyKey) {
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, HybridMultipleSelectorsAndKeys) {
   std::vector<SubsetSelectorPtr> subset_selectors = {
-      makeSelector({""}, true),
+      makeSelector({"version", "stage"}, true),
+      makeSelector({"stage"}, false),
   };
-  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
-  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
-                            "subset_lb selector: single_host_per_subset cannot bet set when there "
-                            "isn't exactly 1 key or if that key is empty.");
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+  ON_CALL(subset_info_, fallbackPolicy())
+      .WillByDefault(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  init({
+      {"tcp://127.0.0.1:80", {}},
+      {"tcp://127.0.0.1:81", {{"version", "v1"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:82", {{"version", "v1"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:83", {{"version", "v1"}, {"stage", "prod"}}},
+      {"tcp://127.0.0.1:84", {{"version", "v1"}, {"stage", "prod"}}},
+      {"tcp://127.0.0.1:85", {{"version", "v2"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:86", {{"version", "v2"}, {"stage", "dev"}}},
+      {"tcp://127.0.0.1:87", {{"version", "v2"}, {"stage", "prod"}}},
+      {"tcp://127.0.0.1:88", {{"version", "v2"}, {"stage", "prod"}}},
+  });
+
+  TestLoadBalancerContext v1_dev({{"version", "v1"}, {"stage", "dev"}});
+  TestLoadBalancerContext v1_prod({{"version", "v1"}, {"stage", "prod"}});
+  TestLoadBalancerContext v2_dev({{"version", "v2"}, {"stage", "dev"}});
+  TestLoadBalancerContext v2_prod({{"version", "v2"}, {"stage", "prod"}});
+  TestLoadBalancerContext v2_test({{"version", "v2"}, {"stage", "test"}});
+  TestLoadBalancerContext stage_dev({{"stage", "dev"}});
+  TestLoadBalancerContext stage_prod({{"stage", "prod"}});
+  TestLoadBalancerContext stage_test({{"stage", "test"}});
+
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&v1_dev));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&v1_prod));
+  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&v2_dev));
+  EXPECT_EQ(host_set_.hosts_[7], lb_->chooseHost(&v2_prod));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&v2_test));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&stage_dev));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&stage_dev));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&stage_prod));
+  EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&stage_prod));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&stage_test));
 }
 
 TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, DuplicateMetadataStat) {
