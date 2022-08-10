@@ -715,7 +715,8 @@ class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {
 
 class TypedLoadBalancerFactory;
 
-using AddressSelectFn = std::function<const Network::Address::InstanceConstSharedPtr(const Network::Address::InstanceConstSharedPtr)>;
+using AddressSelectFn = std::function<const Network::Address::InstanceConstSharedPtr(
+    const Network::Address::InstanceConstSharedPtr)>;
 
 /**
  * Information about a given upstream cluster.
@@ -966,7 +967,8 @@ public:
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
   /**
-   * Returns an source address function which select source address for upstream connections to bind to.
+   * Returns an source address function which select source address for upstream connections to bind
+   * to.
    *
    * @return return a function used to select the source address.
    */

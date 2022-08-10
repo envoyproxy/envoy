@@ -2403,8 +2403,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
                               false);
-    Network::Address::InstanceConstSharedPtr remote_address = 
-      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    Network::Address::InstanceConstSharedPtr remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
     EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(remote_address)->asString());
   }
 
@@ -2419,9 +2419,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
                               false);
-    Network::Address::InstanceConstSharedPtr remote_address = 
-      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address, cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
+    Network::Address::InstanceConstSharedPtr remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ(cluster_address,
+              cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
   }
 
   {
@@ -2434,9 +2435,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
                               false);
-    Network::Address::InstanceConstSharedPtr remote_address = 
-      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address, cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
+    Network::Address::InstanceConstSharedPtr remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ(cluster_address,
+              cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
   }
 }
 

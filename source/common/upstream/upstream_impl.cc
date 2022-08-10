@@ -61,9 +61,8 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-AddressSelectFn
-getSourceAddressFn(const envoy::config::cluster::v3::Cluster& cluster,
-                 const envoy::config::core::v3::BindConfig& bind_config) {
+AddressSelectFn getSourceAddressFn(const envoy::config::cluster::v3::Cluster& cluster,
+                                   const envoy::config::core::v3::BindConfig& bind_config) {
   // The source address from cluster config takes precedence.
   if (cluster.upstream_bind_config().has_source_address()) {
     auto source_address = Network::Address::resolveProtoSocketAddress(
@@ -367,7 +366,7 @@ Host::CreateConnectionData HostImpl::createConnection(
                 dispatcher, address_list, source_address_fn, socket_factory,
                 transport_socket_options, host, connection_options)
           : dispatcher.createClientConnection(
-                address, source_address_fn? source_address_fn(address): nullptr,
+                address, source_address_fn ? source_address_fn(address) : nullptr,
                 socket_factory.createTransportSocket(transport_socket_options, host),
                 connection_options, transport_socket_options);
 

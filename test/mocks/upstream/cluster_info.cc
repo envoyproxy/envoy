@@ -93,7 +93,9 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, timeoutBudgetStats())
       .WillByDefault(
           Return(std::reference_wrapper<ClusterTimeoutBudgetStats>(*timeout_budget_stats_)));
-  ON_CALL(*this, sourceAddressFn()).WillByDefault(Return([addr = source_address_](const Network::Address::InstanceConstSharedPtr&) { return addr; }));
+  ON_CALL(*this, sourceAddressFn())
+      .WillByDefault(Return([addr = source_address_](
+                                const Network::Address::InstanceConstSharedPtr&) { return addr; }));
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
