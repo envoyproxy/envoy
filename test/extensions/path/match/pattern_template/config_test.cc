@@ -11,7 +11,6 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Match {
 
-
 TEST(ConfigTest, TestEmptyConfig) {
   const std::string yaml_string = R"EOF(
       name: envoy.path.match.pattern_template.pattern_template_match_predicate
@@ -65,7 +64,8 @@ TEST(ConfigTest, InvalidConfigSetup) {
       factory->createPathMatchPredicate(*message);
 
   EXPECT_FALSE(config_or_error.ok());
-  EXPECT_EQ(config_or_error.status().message(), "path_match_policy.path_template /bar/{lang}/{country is invalid");
+  EXPECT_EQ(config_or_error.status().message(),
+            "path_match_policy.path_template /bar/{lang}/{country is invalid");
 }
 
 TEST(ConfigTest, TestConfigSetup) {
@@ -96,7 +96,7 @@ TEST(ConfigTest, TestConfigSetup) {
   EXPECT_TRUE(config_or_error.ok());
 }
 
-} // namespace Rewrite
+} // namespace Match
 } // namespace PatternTemplate
 } // namespace Extensions
 } // namespace Envoy

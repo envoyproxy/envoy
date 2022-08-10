@@ -1,10 +1,10 @@
-#include "source/extensions/path/rewrite/pattern_template/pattern_template_rewrite.h"
-
 #include "source/common/config/utility.h"
 #include "source/extensions/path/rewrite/pattern_template/config.h"
+#include "source/extensions/path/rewrite/pattern_template/pattern_template_rewrite.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {

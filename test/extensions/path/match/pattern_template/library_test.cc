@@ -1,10 +1,10 @@
-#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
-
 #include "source/common/config/utility.h"
 #include "source/extensions/path/match/pattern_template/config.h"
+#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -38,7 +38,8 @@ TEST(MatchTest, BasicUsage) {
 
   Router::PathMatchPredicateSharedPtr predicate = createMatchPredicateFromYaml(yaml_string);
   EXPECT_EQ(predicate->pattern(), "/bar/{lang}/{country}");
-  EXPECT_EQ(predicate->name(), "envoy.path.match.pattern_template.pattern_template_match_predicate");
+  EXPECT_EQ(predicate->name(),
+            "envoy.path.match.pattern_template.pattern_template_match_predicate");
 
   EXPECT_TRUE(predicate->match("/bar/en/us"));
 }

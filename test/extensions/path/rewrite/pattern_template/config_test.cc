@@ -11,7 +11,6 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Rewrite {
 
-
 TEST(ConfigTest, TestEmptyConfig) {
   const std::string yaml_string = R"EOF(
       name: envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate
@@ -27,7 +26,8 @@ TEST(ConfigTest, TestEmptyConfig) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewritePredicateFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate");
+  EXPECT_EQ(factory->name(),
+            "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -54,7 +54,8 @@ TEST(ConfigTest, InvalidConfigSetup) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewritePredicateFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate");
+  EXPECT_EQ(factory->name(),
+            "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -65,9 +66,9 @@ TEST(ConfigTest, InvalidConfigSetup) {
       factory->createPathRewritePredicate(*message);
 
   EXPECT_FALSE(config_or_error.ok());
-  EXPECT_EQ(config_or_error.status().message(), "path_rewrite_policy.path_template_rewrite /bar/{lang}/{country is invalid");
+  EXPECT_EQ(config_or_error.status().message(),
+            "path_rewrite_policy.path_template_rewrite /bar/{lang}/{country is invalid");
 }
-
 
 TEST(ConfigTest, TestConfigSetup) {
   const std::string yaml_string = R"EOF(
@@ -84,7 +85,8 @@ TEST(ConfigTest, TestConfigSetup) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewritePredicateFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate");
+  EXPECT_EQ(factory->name(),
+            "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
