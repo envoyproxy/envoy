@@ -455,5 +455,54 @@ tcp_logs:
   cleanup();
 }
 
+// Ssl NOT Terminated by envoy, with only `ja3` fingerprint. No sni.
+TEST_P(TlsGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3NoSNI) {
+  Ssl::ClientSslTransportOptions ssl_options;
+  // ssl_options.setSni("sni");
+  ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
+  ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  setupConnections(/*ssl_terminate=*/false,
+                   /*expect_connection_open=*/false,
+                   /*ssl_options=*/ssl_options, /*curves_list=*/"P-256",
+                   /*enable_`ja3`_fingerprinting=*/true);
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(
+      waitForAccessLogRequest(fmt::format(R"EOF(
+identifier:
+  node:
+    id: node_name
+    cluster: cluster_name
+    locality:
+      zone: zone_name
+    user_agent_name: "envoy"
+  log_name: foo
+tcp_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: {}
+      downstream_local_address:
+        socket_address:
+          address: {}
+      upstream_remote_address:
+        socket_address:
+      upstream_local_address:
+        socket_address:
+      downstream_direct_remote_address:
+        socket_address:
+          address: {}
+      tls_properties:
+        ja3_fingerprint: "71d1f47d1125ac53c3c6a4863c087cfe"
+)EOF",
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy

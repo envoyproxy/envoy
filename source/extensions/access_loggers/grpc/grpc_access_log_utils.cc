@@ -172,13 +172,18 @@ void Utility::extractCommonAccessLogProperties(
         *stream_info.downstreamAddressProvider().localAddress(),
         *common_access_log.mutable_downstream_local_address());
   }
+  if (stream_info.downstreamAddressProvider().requestedServerName() != nullptr) {
+    common_access_log.mutable_tls_properties()->set_tls_sni_hostname(
+        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
+  }
+  if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
+    common_access_log.mutable_tls_properties()->set_ja3_fingerprint(
+        std::string(stream_info.downstreamAddressProvider().ja3Hash()));
+  }
   if (stream_info.downstreamAddressProvider().sslConnection() != nullptr) {
     auto* tls_properties = common_access_log.mutable_tls_properties();
     const Ssl::ConnectionInfoConstSharedPtr downstream_ssl_connection =
         stream_info.downstreamAddressProvider().sslConnection();
-
-    tls_properties->set_tls_sni_hostname(
-        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
 
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {
@@ -200,23 +205,6 @@ void Utility::extractCommonAccessLogProperties(
 
     auto* local_tls_cipher_suite = tls_properties->mutable_tls_cipher_suite();
     local_tls_cipher_suite->set_value(downstream_ssl_connection->ciphersuiteId());
-
-    if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
-      tls_properties->set_ja3_fingerprint(
-          std::string(stream_info.downstreamAddressProvider().ja3Hash()));
-    }
-  } else if (stream_info.downstreamAddressProvider().requestedServerName() != nullptr) {
-    // Otherwise check if the requested server name is present if when the connection is not a tls
-    // connection. This is true when the TLS inspector is used to check the sni name,
-    // but envoy does not terminate the tls connection.
-    auto* tls_properties = common_access_log.mutable_tls_properties();
-    tls_properties->set_tls_sni_hostname(
-        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
-
-    if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
-      tls_properties->set_ja3_fingerprint(
-          std::string(stream_info.downstreamAddressProvider().ja3Hash()));
-    }
   }
   common_access_log.mutable_start_time()->MergeFrom(
       Protobuf::util::TimeUtil::NanosecondsToTimestamp(
