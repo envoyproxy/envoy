@@ -1541,13 +1541,16 @@ TEST_F(ConnectionHandlerTest, UpdateIpv4MappedListener) {
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
   Network::TcpListenerCallbacks* listener2_listener_callbacks;
   auto listener2 = new NiceMock<Network::MockListener>();
+
+  TestListener* origin_ipv4_mapped_listener = addListener(
+      2, false, false, "ipv4_mapped_test_listener", listener2, &listener2_listener_callbacks,
+      nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
+      listener2_overridden_filter_chain_manager);
   // Set the ipv6only as false.
   Network::Address::InstanceConstSharedPtr ipv4_mapped_ipv6_address(
       new Network::Address::Ipv6Instance("::", 80, nullptr, false));
-  TestListener* origin_ipv4_mapped_listener = addListener(
-      2, false, false, "ipv4_mapped_test_listener", listener2, &listener2_listener_callbacks,
-      ipv4_mapped_ipv6_address, nullptr, nullptr, Network::Socket::Type::Stream,
-      std::chrono::milliseconds(15000), false, listener2_overridden_filter_chain_manager);
+  EXPECT_CALL(origin_ipv4_mapped_listener->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(ipv4_mapped_ipv6_address));
   handler_->addListener(absl::nullopt, *origin_ipv4_mapped_listener, runtime_);
 
   // Listener3 is an update of listener2.
@@ -1557,8 +1560,10 @@ TEST_F(ConnectionHandlerTest, UpdateIpv4MappedListener) {
   auto listener3 = new NiceMock<Network::MockListener>();
   TestListener* updated_ipv4_mapped_listener = addListener(
       3, false, false, "ipv4_mapped_test_listener", listener3, &listener3_any_listener_callbacks,
-      ipv4_mapped_ipv6_address, nullptr, nullptr, Network::Socket::Type::Stream,
-      std::chrono::milliseconds(15000), false, listener3_overridden_filter_chain_manager);
+      nullptr, nullptr, Network::Socket::Type::Stream, std::chrono::milliseconds(15000), false,
+      listener3_overridden_filter_chain_manager);
+  EXPECT_CALL(updated_ipv4_mapped_listener->socket_factory_, localAddress())
+      .WillRepeatedly(ReturnRef(ipv4_mapped_ipv6_address));
   handler_->addListener(absl::nullopt, *updated_ipv4_mapped_listener, runtime_);
 
   Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
