@@ -76,5 +76,18 @@ Http::Code ProfilingHandler::handlerHeapProfiler(absl::string_view url, Http::Re
   return res;
 }
 
+Http::Code TcmallocProfilingHandler::handlerHeapDump(absl::string_view, Http::ResponseHeaderMap&,
+                                                     Buffer::Instance& response, AdminStream&) {
+  auto dump_result = Profiler::TcmallocProfiler::tcmallocHeapProfile();
+
+  if (dump_result.ok()) {
+    response.add(dump_result.value());
+    return Http::Code::OK;
+  }
+
+  response.add(dump_result.status().message());
+  return Http::Code::NotImplemented;
+}
+
 } // namespace Server
 } // namespace Envoy
