@@ -74,8 +74,8 @@ getSourceAddressFnFromBindConfig(const envoy::config::core::v3::BindConfig& bind
              const Network::Address::InstanceConstSharedPtr& address) {
     if (address->type() == Network::Address::Type::Ip) {
       for (auto& source_address : source_address_list) {
-        if (source_address->type() == Network::Address::Type::Ip &&
-            source_address->ip()->version() == address->ip()->version()) {
+        ASSERT(source_address->type() == Network::Address::Type::Ip);
+        if (source_address->ip()->version() == address->ip()->version()) {
           return source_address;
         }
       }
