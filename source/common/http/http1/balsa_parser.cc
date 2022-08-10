@@ -58,7 +58,7 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
       return false;
     }
     ++it;
-    // Scheme started with an alpha character and the rest of it is alpha, digit, '+', '-' or '.'
+    // Scheme started with an alpha character and the rest of it is alpha, digit, '+', '-' or '.'.
     const auto is_scheme_suffix = [](char c) {
       return std::isalpha(c) || std::isdigit(c) || c == '+' || c == '-' || c == '.';
     };
