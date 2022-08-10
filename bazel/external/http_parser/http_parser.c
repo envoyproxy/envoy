@@ -513,7 +513,7 @@ parse_url_char(enum state s, const char ch)
         return s_req_path;
       }
 
-      if (IS_ALPHA(ch)) {
+      if (IS_ALPHANUM(ch) || ch == '+' || ch == '-' || ch == '.') {
         return s_req_schema;
       }
 

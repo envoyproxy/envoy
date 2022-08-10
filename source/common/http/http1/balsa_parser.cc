@@ -52,11 +52,17 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
 
   // If method is not CONNECT, parse scheme.
   if (!is_connect) {
-    // Scheme must be alpha and non-empty.
-    auto it = std::find_if_not(url.begin(), url.end(), [](char c) { return std::isalpha(c); });
-    if (it == url.begin()) {
+    // Scheme must start with alpha and be non-empty.
+    auto it = url.begin();
+    if (!std::isalpha(*it)) {
       return false;
     }
+    ++it;
+    // Scheme started with an alpha character and the rest of it is alpha, digit, '+', '-' or '.'.
+    const auto is_scheme_suffix = [](char c) {
+      return std::isalpha(c) || std::isdigit(c) || c == '+' || c == '-' || c == '.';
+    };
+    it = std::find_if_not(it, url.end(), is_scheme_suffix);
     url.remove_prefix(it - url.begin());
     if (!absl::StartsWith(url, kColonSlashSlash)) {
       return false;
