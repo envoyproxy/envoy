@@ -81,7 +81,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithVerifyDepth) {
 }
 
 // With only root trusted, certificate validation succeeds without max depth
-TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedWithBrokenChain) {
+TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedWithTrustRootOnly) {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
                                   .setTlsV13(true)
@@ -98,7 +98,7 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedWithBrokenChain) {
 
 // With only root ca trusted, certificate validation is expected to fail with max depth,
 // but it succeeds
-TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedWithBrokenChain) {
+TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedWithTrustRootOnly) {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
                                   .setTlsV13(true)
