@@ -473,6 +473,7 @@ private:
   Server::StatsHandler stats_handler_;
   Server::LogsHandler logs_handler_;
   Server::ProfilingHandler profiling_handler_;
+  Server::TcmallocProfilingHandler tcmalloc_profiling_handler_;
   Server::RuntimeHandler runtime_handler_;
   Server::ListenersHandler listeners_handler_;
   Server::ServerCmdHandler server_cmd_handler_;
