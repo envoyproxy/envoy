@@ -45,7 +45,7 @@ rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
 
 source_venv "$BUILD_DIR"
-pip install -r "${SCRIPT_DIR}"/requirements.txt
+pip install -r "${SCRIPT_DIR}"/requirements.txt --no-deps
 
 rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${GENERATED_RST_DIR}"
 sphinx-build -W --keep-going -b html "${GENERATED_RST_DIR}" "${DOCS_OUTPUT_DIR}"
