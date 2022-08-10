@@ -92,17 +92,11 @@ AddressSelectFn getSourceAddressFn(const envoy::config::cluster::v3::Cluster& cl
   // The source address from cluster config takes precedence.
   if (cluster.upstream_bind_config().has_source_address()) {
     return getSourceAddressFnFromBindConfig(cluster.upstream_bind_config());
-  } else if (cluster.upstream_bind_config().additional_source_addresses_size() > 0) {
-    throw EnvoyException(
-        "The additional_sources_addresses only can be specified when source_address was specified");
   }
 
   // If there's no source address in the cluster config, use any default from the bootstrap proto.
   if (bind_config.has_source_address()) {
     return getSourceAddressFnFromBindConfig(bind_config);
-  } else if (bind_config.additional_source_addresses_size() > 0) {
-    throw EnvoyException(
-        "The additional_sources_addresses only can be specified when source_address was specified");
   }
 
   return nullptr;
