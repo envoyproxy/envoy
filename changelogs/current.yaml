@@ -92,15 +92,14 @@ new_features:
 - area: access_log
   change: |
     updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
-- area: subset load balancer
-  change: |
-    added multiple keys or multiple selectors support for :ref:`single host per subset mode <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>`.
-
 - area: ratelimit
   change: |
     add support for :ref:`adding response headers <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.response_headers_to_add>` to rate-limited responses.
 - area: access_log
   change: |
     added support for number values in substitution format string in json_format.
+- area: subset load balancer
+  change: |
+    added multiple keys or multiple selectors support for :ref:`single host per subset mode <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>`.
 
 deprecated:
