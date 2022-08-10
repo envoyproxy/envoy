@@ -108,7 +108,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
             });
       }
 
-      // If the wrong reponse received, then try next affinity
+      // If the wrong response received, then try next affinity
       parent_.onResponseHandleForPendingList(
           message_type, item.first,
           [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {

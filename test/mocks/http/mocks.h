@@ -200,10 +200,11 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  MOCK_METHOD(void, createFilterChain, (FilterChainManager & manager));
+  MOCK_METHOD(void, createFilterChain, (FilterChainManager & manager), (const));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
-               FilterChainManager& manager));
+               FilterChainManager& manager),
+              (const));
 };
 
 class MockStreamFilterCallbacksBase {
@@ -250,6 +251,7 @@ public:
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
   MOCK_METHOD(void, traversePerFilterConfig,
               (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 
   // Http::StreamDecoderFilterCallbacks
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -340,6 +342,7 @@ public:
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
   MOCK_METHOD(void, traversePerFilterConfig,
               (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
@@ -354,7 +357,6 @@ public:
                std::function<void(ResponseHeaderMap& headers)> modify_headers,
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
-  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;

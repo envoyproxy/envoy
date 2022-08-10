@@ -125,6 +125,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true),
           makeHandler("/heapprofiler", "enable/disable the heap profiler",
                       MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true),
+          makeHandler("/heap_dump", "dump current Envoy heap (if supported)",
+                      MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerHeapDump), false,
+                      false),
           makeHandler("/healthcheck/fail", "cause the server to fail health checks",
                       MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail), false, true),
           makeHandler("/healthcheck/ok", "cause the server to pass health checks",
@@ -227,7 +230,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-void AdminImpl::createFilterChain(Http::FilterChainManager& manager) {
+void AdminImpl::createFilterChain(Http::FilterChainManager& manager) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
   };
@@ -313,7 +316,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 }
 
 Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
-                                         AdminStream& admin_stream) {
+                                         AdminStream& admin_stream) const {
   std::string::size_type query_index = path_and_query.find('?');
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
@@ -361,7 +364,7 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
   return Http::Code::OK;
 }
 
-void AdminImpl::getHelp(Buffer::Instance& response) {
+void AdminImpl::getHelp(Buffer::Instance& response) const {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
