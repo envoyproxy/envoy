@@ -149,6 +149,7 @@ TEST_P(AdminInstanceTest, Help) {
   /healthcheck/ok (POST): cause the server to pass health checks
   /heap_dump: dump current Envoy heap (if supported)
   /heapprofiler (POST): enable/disable the heap profiler
+      enable: enable/disable the heap profiler; One of (y, n)
   /help: print out list of admin commands
   /hot_restart_version: print the hot restart compatibility version
   /init_dump: dump current Envoy init manager information (experimental)
