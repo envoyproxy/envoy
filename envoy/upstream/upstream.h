@@ -715,8 +715,8 @@ class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {
 
 class TypedLoadBalancerFactory;
 
-using AddressSelectFn = std::function<const Network::Address::InstanceConstSharedPtr(
-    const Network::Address::InstanceConstSharedPtr)>;
+using AddressSelectFn = std::function<const Network::Address::InstanceConstSharedPtr&(
+    const Network::Address::InstanceConstSharedPtr&)>;
 
 /**
  * Information about a given upstream cluster.

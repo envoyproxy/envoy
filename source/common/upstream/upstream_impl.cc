@@ -61,22 +61,48 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
+AddressSelectFn
+getSourceAddressFnFromBindConfig(const envoy::config::core::v3::BindConfig& bind_config) {
+  std::vector<Network::Address::InstanceConstSharedPtr> source_address_list;
+  source_address_list.emplace_back(
+      Network::Address::resolveProtoSocketAddress(bind_config.source_address()));
+  for (auto i = 0; i < bind_config.additional_source_addresses_size(); i++) {
+    source_address_list.emplace_back(
+        Network::Address::resolveProtoSocketAddress(bind_config.additional_source_addresses(i)));
+  }
+  return [source_address_list = std::move(source_address_list)](
+             const Network::Address::InstanceConstSharedPtr& address) {
+    if (address->type() == Network::Address::Type::Ip) {
+      for (auto& source_address : source_address_list) {
+        if (source_address->type() == Network::Address::Type::Ip &&
+            source_address->ip()->version() == address->ip()->version()) {
+          return source_address;
+        }
+      }
+    }
+    // If this isn't IP address and no same version IP address, then fallback
+    // to legacy behavior just return the address in the `BindConfig::source_address`
+    // field.
+    return source_address_list[0];
+  };
+}
+
 AddressSelectFn getSourceAddressFn(const envoy::config::cluster::v3::Cluster& cluster,
                                    const envoy::config::core::v3::BindConfig& bind_config) {
   // The source address from cluster config takes precedence.
   if (cluster.upstream_bind_config().has_source_address()) {
-    auto source_address = Network::Address::resolveProtoSocketAddress(
-        cluster.upstream_bind_config().source_address());
-    return [source_address = source_address](const Network::Address::InstanceConstSharedPtr) {
-      return source_address;
-    };
+    return getSourceAddressFnFromBindConfig(cluster.upstream_bind_config());
+  } else if (cluster.upstream_bind_config().additional_source_addresses_size() > 0) {
+    throw EnvoyException(
+        "The additional_sources_addresses only can be specified when source_address was specified");
   }
+
   // If there's no source address in the cluster config, use any default from the bootstrap proto.
   if (bind_config.has_source_address()) {
-    auto source_address = Network::Address::resolveProtoSocketAddress(bind_config.source_address());
-    return [source_address = source_address](const Network::Address::InstanceConstSharedPtr) {
-      return source_address;
-    };
+    return getSourceAddressFnFromBindConfig(bind_config);
+  } else if (bind_config.additional_source_addresses_size() > 0) {
+    throw EnvoyException(
+        "The additional_sources_addresses only can be specified when source_address was specified");
   }
 
   return nullptr;
