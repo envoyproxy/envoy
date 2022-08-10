@@ -331,15 +331,20 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(nullptr, address.envoyInternalAddress());
 }
 
-TEST(InteralInstanceTest, Basic) {
+TEST(InternalInstanceTest, Basic) {
   EnvoyInternalInstance address("listener_foo");
-  EXPECT_EQ("envoy://listener_foo", address.asString());
+  EXPECT_EQ("envoy://listener_foo/", address.asString());
   EXPECT_EQ(Type::EnvoyInternal, address.type());
   EXPECT_EQ(nullptr, address.ip());
   EXPECT_EQ(nullptr, address.pipe());
   EXPECT_NE(nullptr, address.envoyInternalAddress());
   EXPECT_EQ(nullptr, address.sockAddr());
   EXPECT_EQ(static_cast<decltype(address.sockAddrLen())>(0), address.sockAddrLen());
+}
+
+TEST(InternalInstanceTest, BasicWithId) {
+  EnvoyInternalInstance address("listener_foo", "endpoint_bar");
+  EXPECT_EQ("envoy://listener_foo/endpoint_bar", address.asString());
 }
 
 // Excluding Windows; chmod(2) against Windows AF_UNIX socket files succeeds,

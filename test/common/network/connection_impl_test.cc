@@ -3051,7 +3051,8 @@ TEST_F(InternalClientConnectionImplTest,
   const Network::SocketInterface* sock_interface = Network::socketInterface(
       "envoy.extensions.network.socket_interface.default_socket_interface");
   Network::Address::InstanceConstSharedPtr address =
-      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", "endpoint_id_0",
+                                                                sock_interface);
 
   ASSERT_DEATH(
       {
