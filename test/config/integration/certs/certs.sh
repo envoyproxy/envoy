@@ -81,8 +81,6 @@ generate_ca intermediate_ca_2 intermediate_ca
 cat cacert.pem intermediate_cacert.pem  intermediate_ca_2cert.pem > intermediate_ca_cert_chain.pem
 # Concatenate ca certs create valid partial certificate chain
 cat intermediate_cacert.pem intermediate_ca_2cert.pem > intermediate_partial_ca_cert_chain.pem
-# Concatenate ca certs create invalid broken certificate chain
-cat cacert.pem intermediate_cacert.pem > broken_partial_ca_cert_chain.pem
 # Generate RSA cert for the server.
 generate_rsa_key server ca
 generate_x509_cert server ca
@@ -104,6 +102,9 @@ cp -f clientcert.cfg client_ecdsacert.cfg
 generate_ecdsa_key client_ecdsa ca
 generate_x509_cert client_ecdsa ca
 rm -f client_ecdsacert.cfg
+
+#  Concatenate intermediate and ca certs create client certificate full chain
+cat client2cert.pem intermediate_ca_2cert.pem intermediate_cacert.pem cacert.pem > client2_chain.pem
 
 # Generate cert for the upstream CA.
 generate_ca upstreamca
