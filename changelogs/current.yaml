@@ -83,6 +83,9 @@ new_features:
 - area: upstream
   change: |
     added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
+- area: upstream
+  change: |
+    added a new field :ref:`additional_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.additional_source_addresses>` to the BindConfig, it enables to specify multiple source addresses, and the source address selection is based on target host's address' version.
 - area: health check
   change: |
     added :ref:`method <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.method>` support to configure http health check http method.
