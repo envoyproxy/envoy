@@ -681,7 +681,7 @@ will not take effect until EDS/RDS responses are supplied.
 .. note::
 
    Envoy specific implementation notes:
-   
+
    - Warming of ``Cluster`` is completed only when a new ``ClusterLoadAssignment``
      response is supplied by management server even if there is no change in endpoints.
    - Warming of ``Listener`` is completed even if management server does not send a
