@@ -17,6 +17,7 @@ envoy_cc_library(
     hdrs = ["pattern_template_rewrite.h"],
     visibility = [
         "//source/common/router:__subpackages__",
+        "//test/extensions/path/rewrite/pattern_template:__subpackages__",
     ],
     deps = [
         "//envoy/router:router_path_match_policy_interface",
