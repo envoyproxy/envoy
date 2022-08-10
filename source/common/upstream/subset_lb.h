@@ -290,7 +290,7 @@ private:
     }
     bool active() const override { return subset_ != nullptr; }
 
-    // We will update subsets for every priority separatedly and these simple map can help us
+    // We will update subsets for every priority separately and these simple map can help us
     // to ensure which priority has valid host quickly.
     std::map<uint32_t, HostSharedPtr> hosts_;
     std::map<uint32_t, HostSharedPtr> new_hosts_;

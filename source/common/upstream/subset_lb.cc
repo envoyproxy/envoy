@@ -378,7 +378,7 @@ void SubsetLoadBalancer::initLbSubsetEntryOnce(LbSubsetEntryPtr& entry, bool sin
 }
 
 // Iterates all the hosts of specified priority, looking up an LbSubsetEntryPtr for each and add
-// hosts to related entry. Because the metadata of host can be updated inlinely, we must evaluate
+// hosts to related entry. Because the metadata of host can be updated inlined, we must evaluate
 // every hosts for every update.
 void SubsetLoadBalancer::processSubsets(uint32_t priority, const HostVector& all_hosts) {
   absl::flat_hash_set<const LbSubsetEntry*> single_host_entries;
