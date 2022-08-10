@@ -25,7 +25,7 @@ ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const 
                   address_list_[next_address_]);
   auto& address = address_list_[next_address_++];
   return dispatcher_.createClientConnection(
-      address, source_address_fn_(address),
+      address, source_address_fn_ ? source_address_fn_(address) : nullptr,
       socket_factory_.createTransportSocket(transport_socket_options_, host_), options_,
       transport_socket_options_);
 }

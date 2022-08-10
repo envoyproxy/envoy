@@ -62,20 +62,20 @@ namespace Upstream {
 namespace {
 
 AddressSelectFn
-getSourceAddress(const envoy::config::cluster::v3::Cluster& cluster,
+getSourceAddressFn(const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::config::core::v3::BindConfig& bind_config) {
   // The source address from cluster config takes precedence.
   if (cluster.upstream_bind_config().has_source_address()) {
     auto source_address = Network::Address::resolveProtoSocketAddress(
         cluster.upstream_bind_config().source_address());
-    return [source_address](const Network::Address::InstanceConstSharedPtr) {
+    return [source_address = source_address](const Network::Address::InstanceConstSharedPtr) {
       return source_address;
     };
   }
   // If there's no source address in the cluster config, use any default from the bootstrap proto.
   if (bind_config.has_source_address()) {
     auto source_address = Network::Address::resolveProtoSocketAddress(bind_config.source_address());
-    return [source_address](const Network::Address::InstanceConstSharedPtr) {
+    return [source_address = source_address](const Network::Address::InstanceConstSharedPtr) {
       return source_address;
     };
   }
@@ -359,13 +359,15 @@ Host::CreateConnectionData HostImpl::createConnection(
   Network::ConnectionSocket::OptionsSharedPtr connection_options =
       combineConnectionSocketOptions(cluster, options);
 
+  auto source_address_fn = cluster.sourceAddressFn();
+
   Network::ClientConnectionPtr connection =
       address_list.size() > 1
           ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
-                dispatcher, address_list, cluster.sourceAddressFn(), socket_factory,
+                dispatcher, address_list, source_address_fn, socket_factory,
                 transport_socket_options, host, connection_options)
           : dispatcher.createClientConnection(
-                address, cluster.sourceAddressFn()(address),
+                address, source_address_fn? source_address_fn(address): nullptr,
                 socket_factory.createTransportSocket(transport_socket_options, host),
                 connection_options, transport_socket_options);
 
@@ -848,7 +850,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
-      source_address_fn_(getSourceAddress(config, bind_config)),
+      source_address_fn_(getSourceAddressFn(config, bind_config)),
       lb_round_robin_config_(config.round_robin_lb_config()),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
