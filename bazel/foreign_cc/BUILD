@@ -116,10 +116,13 @@ configure_make(
 
 configure_make(
     name = "colm",
+    autogen = True,
     configure_in_place = True,
     configure_options = [
         "AUTOMAKE=automake",
         "ACLOCAL=aclocal",
+        "--disable-shared",
+        "--enable-static",
     ],
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
@@ -133,11 +136,14 @@ configure_make(
 
 configure_make(
     name = "ragel",
+    autogen = True,
     configure_in_place = True,
     configure_options = [
         "AUTOMAKE=automake",
         "ACLOCAL=aclocal",
         "--disable-manual",
+        "--disable-shared",
+        "--enable-static",
         "--with-colm=$EXT_BUILD_DEPS/colm",
     ],
     # Workaround for the issue with statically linked libstdc++
