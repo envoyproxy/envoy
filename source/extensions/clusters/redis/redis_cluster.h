@@ -243,7 +243,7 @@ private:
     void onUnexpectedResponse(const NetworkFilters::Common::Redis::RespValuePtr&);
 
     Network::Address::InstanceConstSharedPtr
-    ipAddressFromClusterEntry(const std::vector<NetworkFilters::Common::Redis::RespValue>& value);
+    ipAddressFromClusterEntry(const std::vector<NetworkFilters::Common::Redis::RespValue>& array);
     bool validateCluster(const NetworkFilters::Common::Redis::RespValue& value);
     void resolveClusterHostnames(ClusterSlotsSharedPtr&& slots,
                                  std::shared_ptr<std::uint64_t> hostname_resolution_required_cnt);
