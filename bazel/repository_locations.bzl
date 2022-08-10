@@ -523,7 +523,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.matching.input_matchers.hyperscan",
             "envoy.regex_engines.hyperscan",
         ],
-        release_date = "2021-12-29",
+        release_date = "2021-12-28",
         cpe = "N/A",
     ),
     net_colm_open_source_ragel = dict(
@@ -539,7 +539,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.matching.input_matchers.hyperscan",
             "envoy.regex_engines.hyperscan",
         ],
-        release_date = "2021-12-29",
+        release_date = "2021-12-28",
         cpe = "N/A",
     ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/13261.
