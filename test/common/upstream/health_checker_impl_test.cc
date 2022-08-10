@@ -455,7 +455,7 @@ public:
     addCompletionCallback();
   }
 
-  void setupServiceValidationWithBytesMatcherHC(const std::string& expected_response) {
+  void setupServiceValidationWithNoBufferSizeHC(const std::string& expected_response) {
     Buffer::OwnedImpl response_test(expected_response);
     std::string response = Base64::encode(response_test, response_test.length());
     std::string yaml = fmt::format(R"EOF(
@@ -505,6 +505,7 @@ public:
       path: /healthcheck
       receive:
         binary: RXZlcnl0aGluZyBPSw==
+      response_buffer_size: 128
       codec_client_type: Http2
     )EOF";
 
@@ -1141,7 +1142,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostSets) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheck) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
+  setupServiceValidationWithBufferSizeHC("Everything OK", 128);
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1163,7 +1164,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheck) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseStringContainsCheck) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
+  setupServiceValidationWithBufferSizeHC("Everything OK", 128);
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1208,7 +1209,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseHexStringContainsCheck)
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckBuffer) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
+  setupServiceValidationWithBufferSizeHC("Everything OK", 128);
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1231,7 +1232,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckBuffer) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckMaxBuffer) {
   std::string expected_string(1024, 'A');
-  setupServiceValidationWithBytesMatcherHC(expected_string);
+  setupServiceValidationWithBufferSizeHC(expected_string, 1024);
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1257,7 +1258,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckMaxBuffer) {
 TEST_F(HttpHealthCheckerImplTest, ExpectedResponseSettingOverSize) {
   std::string expected_string(2048, 'A');
   EXPECT_THROW_WITH_MESSAGE(
-      setupServiceValidationWithBytesMatcherHC(expected_string), EnvoyException,
+      setupServiceValidationWithBufferSizeHC(expected_string, 1024), EnvoyException,
       "The expected response length '2048' is over than http health response buffer size '1024'");
   EXPECT_THROW_WITH_MESSAGE(
       setupServiceValidationWithBufferSizeHC("AAA", 2), EnvoyException,
@@ -1287,7 +1288,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckHttp2) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, FailExpectedResponseCheck) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
+  setupServiceValidationWithNoBufferSizeHC("Everything OK");
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
@@ -1313,7 +1314,7 @@ TEST_F(HttpHealthCheckerImplTest, FailExpectedResponseCheck) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, FailStatusCheckWithExpectedResponseCheck) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
+  setupServiceValidationWithNoBufferSizeHC("Everything OK");
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
@@ -1338,7 +1339,7 @@ TEST_F(HttpHealthCheckerImplTest, FailStatusCheckWithExpectedResponseCheck) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, ImmediateFailExpectedResponseCheck) {
-  setupServiceValidationWithBytesMatcherHC("Everything OK");
+  setupServiceValidationWithNoBufferSizeHC("Everything OK");
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));

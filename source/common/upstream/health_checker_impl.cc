@@ -183,7 +183,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       receive_bytes_(PayloadMatcher::loadProtoBytes(config.http_health_check().receive())),
       method_(getMethod(config.http_health_check().method())),
-      response_buffer_size_(config.http_health_check().response_buffer_size()),
+      response_buffer_size_(config.http_health_check().response_buffer_size().value()),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
@@ -196,10 +196,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }
 
-  if (response_buffer_size_ == 0) {
-    response_buffer_size_ = kDefaultMaxBytesInBuffer;
-  }
-  if (!receive_bytes_.empty()) {
+  if (response_buffer_size_ != 0 && !receive_bytes_.empty()) {
     uint64_t total = 0;
     for (auto const& bytes : receive_bytes_) {
       total += bytes.size();
@@ -324,9 +321,17 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeData(Buffer::Instance& data,
                                                                      bool end_stream) {
-  if (!parent_.receive_bytes_.empty() && response_body_->length() < parent_.response_buffer_size_) {
-    response_body_->move(data, parent_.response_buffer_size_ - response_body_->length());
+  if (parent_.response_buffer_size_ != 0) {
+    if (!parent_.receive_bytes_.empty() &&
+        response_body_->length() < parent_.response_buffer_size_) {
+      response_body_->move(data, parent_.response_buffer_size_ - response_body_->length());
+    }
+  } else {
+    if (!parent_.receive_bytes_.empty()) {
+      response_body_->move(data, data.length());
+    }
   }
+
   if (end_stream) {
     onResponseComplete();
   }

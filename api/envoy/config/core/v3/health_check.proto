@@ -110,11 +110,13 @@ message HealthCheck {
     //
     // .. note::
     //
-    //   Only the first 1024 bytes of the response body is used to match when ``response_buffer_size`` is not set.
+    //   It is recommended to set ``response_buffer_size`` based on the Payload size for efficiency,
+    //   otherwise all response body will be recorded.
     repeated Payload receive = 4;
 
-    // Specifies the size of response buffer in bytes that is used to Payload match. Default value is 1024.
-    uint64 response_buffer_size = 14 [(validate.rules).uint64 = {gte: 0}];
+    // Specifies the size of response buffer in bytes that is used to Payload match.
+    // All the response body will be used for mathching if it is not set and ``receive`` is not empty.
+    google.protobuf.UInt64Value response_buffer_size = 14 [(validate.rules).uint64 = {gte: 0}];
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
     // health checked cluster. For more information, including details on header value syntax, see
