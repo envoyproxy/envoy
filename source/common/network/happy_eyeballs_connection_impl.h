@@ -34,8 +34,8 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  const std::vector<Address::InstanceConstSharedPtr> address_list_;
   // List of addresses to attempt to connect to.
+  const std::vector<Address::InstanceConstSharedPtr> address_list_;
   Upstream::AddressSelectFn source_address_fn_;
   UpstreamTransportSocketFactory& socket_factory_;
   TransportSocketOptionsConstSharedPtr transport_socket_options_;
