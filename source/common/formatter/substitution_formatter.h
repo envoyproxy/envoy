@@ -208,6 +208,7 @@ private:
     explicit FormatBuilder(const std::vector<CommandParserPtr>& commands) : commands_(commands) {}
     explicit FormatBuilder() : commands_(absl::nullopt) {}
     std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
+    std::vector<FormatterProviderPtr> toFormatNumberValue(double value) const;
     StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
     StructFormatListWrapper
     toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
@@ -278,6 +279,25 @@ public:
 
 private:
   ProtobufWkt::Value str_;
+};
+
+/**
+ * FormatterProvider for numbers.
+ */
+class PlainNumberFormatter : public FormatterProvider {
+public:
+  PlainNumberFormatter(double num);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+
+private:
+  ProtobufWkt::Value num_;
 };
 
 /**

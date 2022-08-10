@@ -101,6 +101,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override;
   void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -307,7 +308,6 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
-  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
 
   void responseDataTooLarge();
   void responseDataDrained();
