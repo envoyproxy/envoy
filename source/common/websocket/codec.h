@@ -57,11 +57,11 @@ struct Frame {
   bool final_fragment_;
   // Frame opcode.
   uint8_t opcode_;
-  // Length of the payload as the number of bytes.
-  uint64_t payload_length_;
   // The 4 byte fixed size masking key used to mask the payload. Masking/unmasking should be
   // performed as described in https://datatracker.ietf.org/doc/html/rfc6455#section-5.3
   absl::optional<uint32_t> masking_key_;
+  // Length of the payload as the number of bytes.
+  uint64_t payload_length_;
   // WebSocket payload data (extension data and application data).
   Buffer::InstancePtr payload_;
 };
@@ -74,57 +74,11 @@ public:
   // Creates a new Websocket data frame header with the given frame data.
   // @param frame supplies the frame to be encoded.
   // @return std::vector<uint8_t> buffer with encoded header data.
-  std::vector<uint8_t> newFrameHeader(const Frame& frame);
-};
-
-// Current state of the frame that is being processed.
-enum class State {
-  // Decoding the first byte. Waiting for decoding the final frame flag (1 bit)
-  // and reserved flags (3 bits) and opcode (4 bits) of the WebSocket data frame.
-  KFrameHeaderFlagsAndOpcode,
-  // Decoding the second byte. Waiting for decoding the mask flag (1 bit) and
-  // length/length flag (7 bit) of the WebSocket data frame.
-  KFrameHeaderMaskFlagAndLength,
-  // Waiting for decoding the extended length of the frame if length read previously
-  // is either 126 or 127. Respectively 2 bytes or 8 bytes will be decoded from the
-  // WebSocket data frame.
-  KFrameHeaderExtendedLength,
-  // Waiting for decoding the masking key (4 bytes) only if the mask bit is set.
-  KFrameHeaderMaskingKey,
-  // Waiting for decoding the payload (both extension data and application data).
-  KFramePayload,
-};
-
-// Inspects the number of frames contains in an input buffer without decoding into frames.
-class DecoderBase {
-public:
-  virtual ~DecoderBase() = default;
-
-protected:
-  // Decodes the given buffer with WebSocket data frames and updates the frame count.
-  // Invokes visitor callbacks for each frame in the following sequence:
-  // ----------------------------------------------------------------------------------
-  //  frameStart frameMaskFlag frameMaskingKey? frameDataStart frameData* frameDataEnd
-  // ----------------------------------------------------------------------------------
-  // If frameStart returns false, then the decoder aborts.
-  // Returns the increase in the frame count.
-  virtual uint64_t inspect(const Buffer::Instance& input) PURE;
-
-  virtual bool frameStart(uint8_t) PURE;
-  virtual void frameMaskFlag(uint8_t) PURE;
-  virtual void frameMaskingKey() PURE;
-  virtual void frameDataStart() PURE;
-  virtual void frameData(const uint8_t*, uint64_t) PURE;
-  virtual void frameDataEnd() PURE;
-
-  virtual void doDecodeMaskFlagAndLength(const uint8_t, const uint8_t*&, uint64_t&) PURE;
-  virtual void doDecodeExtendedLength(const uint8_t c, const uint8_t*&, uint64_t&) PURE;
-  virtual void doDecodeMaskingKey(const uint8_t c, const uint8_t*&, uint64_t&) PURE;
-  virtual void doDecodePayload(const Buffer::RawSlice&, const uint8_t*&, uint64_t&) PURE;
+  std::vector<uint8_t> encodeFrameHeader(const Frame& frame);
 };
 
 // Decoder decodes bytes in input buffer into in-memory WebSocket frames.
-class Decoder : public DecoderBase {
+class Decoder {
 public:
   // Decodes the given buffer with WebSocket frame. Drains the input buffer when
   // decoding succeeded (returns true). If the input is not sufficient to make a
@@ -136,21 +90,45 @@ public:
   bool decode(Buffer::Instance& input, std::vector<Frame>& output);
 
 protected:
-  uint64_t inspect(const Buffer::Instance& input) override;
+  // Decodes the given buffer with WebSocket data frames and updates the frame count.
+  // Invokes visitor callbacks for each frame in the following sequence:
+  // ----------------------------------------------------------------------------------
+  //  frameStart frameMaskFlag frameMaskingKey? frameDataStart frameData* frameDataEnd
+  // ----------------------------------------------------------------------------------
+  // If frameStart returns false, then the decoder aborts.
+  // Returns the increase in the frame count.
+  uint64_t inspect(const Buffer::Instance& input);
 
-  bool frameStart(uint8_t) override;
-  void frameMaskFlag(uint8_t) override;
-  void frameMaskingKey() override;
-  void frameDataStart() override;
-  void frameData(const uint8_t*, uint64_t) override;
-  void frameDataEnd() override;
+  bool frameStart(uint8_t);
+  void frameMaskFlag(uint8_t);
+  void frameMaskingKey();
+  void frameDataStart();
+  void frameData(const uint8_t*, uint64_t);
+  void frameDataEnd();
 
-  void doDecodeMaskFlagAndLength(const uint8_t, const uint8_t*& mem, uint64_t&) override;
-  void doDecodeExtendedLength(const uint8_t c, const uint8_t*&, uint64_t&) override;
-  void doDecodeMaskingKey(const uint8_t c, const uint8_t*&, uint64_t&) override;
-  void doDecodePayload(const Buffer::RawSlice&, const uint8_t*&, uint64_t&) override;
+  void doDecodeMaskFlagAndLength(const uint8_t, const uint8_t*& mem, uint64_t&);
+  void doDecodeExtendedLength(const uint8_t c, const uint8_t*&, uint64_t&);
+  void doDecodeMaskingKey(const uint8_t c, const uint8_t*&, uint64_t&);
+  void doDecodePayload(const Buffer::RawSlice&, const uint8_t*&, uint64_t&);
 
 private:
+  // Current state of the frame that is being processed.
+  enum class State {
+    // Decoding the first byte. Waiting for decoding the final frame flag (1 bit)
+    // and reserved flags (3 bits) and opcode (4 bits) of the WebSocket data frame.
+    KFrameHeaderFlagsAndOpcode,
+    // Decoding the second byte. Waiting for decoding the mask flag (1 bit) and
+    // length/length flag (7 bit) of the WebSocket data frame.
+    KFrameHeaderMaskFlagAndLength,
+    // Waiting for decoding the extended length of the frame if length read previously
+    // is either 126 or 127. Respectively 2 bytes or 8 bytes will be decoded from the
+    // WebSocket data frame.
+    KFrameHeaderExtendedLength,
+    // Waiting for decoding the masking key (4 bytes) only if the mask bit is set.
+    KFrameHeaderMaskingKey,
+    // Waiting for decoding the payload (both extension data and application data).
+    KFramePayload,
+  };
   // Current frame that is being decoded.
   Frame frame_;
   // Data holder for successfully decoded frames.

@@ -398,13 +398,13 @@ TEST(WebSocketCodecTest, encodeFrameHeader) {
   std::vector<uint8_t> buffer;
 
   buffer.clear();
-  buffer = encoder.newFrameHeader({true, 1, 5, absl::nullopt, nullptr});
+  buffer = encoder.encodeFrameHeader({true, 1, absl::nullopt, 5, nullptr});
   EXPECT_EQ(buffer.size(), 2);
   EXPECT_EQ(buffer[0], 0x81);
   EXPECT_EQ(buffer[1], 0x05);
 
   buffer.clear();
-  buffer = encoder.newFrameHeader({true, 1, 5, 0x37fa213d, nullptr});
+  buffer = encoder.encodeFrameHeader({true, 1, 0x37fa213d, 5, nullptr});
   EXPECT_EQ(buffer.size(), 6);
   EXPECT_EQ(buffer[0], 0x81);
   EXPECT_EQ(buffer[1], 0x85);
@@ -414,7 +414,7 @@ TEST(WebSocketCodecTest, encodeFrameHeader) {
   EXPECT_EQ(buffer[5], 0x3d);
 
   buffer.clear();
-  buffer = encoder.newFrameHeader({false, 0, 5, 0x3c332a16, nullptr});
+  buffer = encoder.encodeFrameHeader({false, 0, 0x3c332a16, 5, nullptr});
   EXPECT_EQ(buffer.size(), 6);
   EXPECT_EQ(buffer[0], 0x00);
   EXPECT_EQ(buffer[1], 0x85);
@@ -424,7 +424,7 @@ TEST(WebSocketCodecTest, encodeFrameHeader) {
   EXPECT_EQ(buffer[5], 0x16);
 
   buffer.clear();
-  buffer = encoder.newFrameHeader({true, 2, 256, absl::nullopt, nullptr});
+  buffer = encoder.encodeFrameHeader({true, 2, absl::nullopt, 256, nullptr});
   EXPECT_EQ(buffer.size(), 4);
   EXPECT_EQ(buffer[0], 0x82);
   EXPECT_EQ(buffer[1], 0x7e);
@@ -432,7 +432,7 @@ TEST(WebSocketCodecTest, encodeFrameHeader) {
   EXPECT_EQ(buffer[3], 0x00);
 
   buffer.clear();
-  buffer = encoder.newFrameHeader({true, 2, 256, 0x37fa213d, nullptr});
+  buffer = encoder.encodeFrameHeader({true, 2, 0x37fa213d, 256, nullptr});
   EXPECT_EQ(buffer.size(), 8);
   EXPECT_EQ(buffer[0], 0x82);
   EXPECT_EQ(buffer[1], 0xfe);
@@ -444,7 +444,7 @@ TEST(WebSocketCodecTest, encodeFrameHeader) {
   EXPECT_EQ(buffer[7], 0x3d);
 
   buffer.clear();
-  buffer = encoder.newFrameHeader({true, 2, 77777, absl::nullopt, nullptr});
+  buffer = encoder.encodeFrameHeader({true, 2, absl::nullopt, 77777, nullptr});
   EXPECT_EQ(buffer.size(), 10);
   EXPECT_EQ(buffer[0], 0x82);
   EXPECT_EQ(buffer[1], 0x7f);
@@ -458,7 +458,7 @@ TEST(WebSocketCodecTest, encodeFrameHeader) {
   EXPECT_EQ(buffer[9], 0xd1);
 
   buffer.clear();
-  buffer = encoder.newFrameHeader({true, 2, 77777, 0x37fa213d, nullptr});
+  buffer = encoder.encodeFrameHeader({true, 2, 0x37fa213d, 77777, nullptr});
   EXPECT_EQ(buffer.size(), 14);
   EXPECT_EQ(buffer[0], 0x82);
   EXPECT_EQ(buffer[1], 0xff);
@@ -481,7 +481,7 @@ TEST(GrpcCodecTest, decodeClosingFrame) {
   Buffer::OwnedImpl buffer;
   std::vector<uint8_t> header;
 
-  header = encoder.newFrameHeader({false, 8, 0, absl::nullopt, nullptr});
+  header = encoder.encodeFrameHeader({false, 8, absl::nullopt, 0, nullptr});
   buffer.add(header.data(), header.size());
 
   Decoder decoder;
@@ -499,7 +499,7 @@ TEST(GrpcCodecTest, decodeInvalidFrame) {
   Buffer::OwnedImpl buffer;
   std::vector<uint8_t> header;
   // Invalid opcode
-  header = encoder.newFrameHeader({false, 0x0b, 3, absl::nullopt, nullptr});
+  header = encoder.encodeFrameHeader({false, 0x0b, absl::nullopt, 3, nullptr});
   buffer.add(header.data(), header.size());
   buffer.add("Hey");
 
@@ -516,7 +516,7 @@ TEST(WebSocketCodecTest, encodeAndDecodeFrame) {
   Buffer::OwnedImpl buffer;
   std::vector<uint8_t> header;
 
-  header = encoder.newFrameHeader({true, 1, 5, absl::nullopt, nullptr});
+  header = encoder.encodeFrameHeader({true, 1, absl::nullopt, 5, nullptr});
   buffer.add(header.data(), header.size());
   buffer.add("Hello");
 
@@ -539,12 +539,12 @@ TEST(WebSocketCodecTest, decodeMultipleValidNonMaskedFrames) {
   Buffer::OwnedImpl buffer;
   std::vector<uint8_t> header;
 
-  header = encoder.newFrameHeader({false, 1, 5, absl::nullopt, nullptr});
+  header = encoder.encodeFrameHeader({false, 1, absl::nullopt, 5, nullptr});
   buffer.add(header.data(), header.size());
   buffer.add("Text ");
 
   header.clear();
-  header = encoder.newFrameHeader({true, 0, 9, absl::nullopt, nullptr});
+  header = encoder.encodeFrameHeader({true, 0, absl::nullopt, 9, nullptr});
   buffer.add(header.data(), header.size());
   buffer.add("Response!");
 
@@ -574,7 +574,7 @@ TEST(WebSocketCodecTest, decodeValidMaskedFrame) {
   std::vector<uint8_t> header;
   std::vector<uint8_t> payload = {0x7f, 0x9f, 0x4d, 0x51, 0x58};
 
-  header = encoder.newFrameHeader({true, 0x0a, 5, 0x37fa213d, nullptr});
+  header = encoder.encodeFrameHeader({true, 0x0a, 0x37fa213d, 5, nullptr});
   buffer.add(header.data(), header.size());
   buffer.add(payload.data(), payload.size());
 
@@ -603,7 +603,7 @@ TEST(WebSocketCodecTest, decodeValidMultipleMaskedFrames) {
   std::vector<uint8_t> payload;
 
   // "hello "
-  header = encoder.newFrameHeader({false, 1, 6, 0xaf4be87a, nullptr});
+  header = encoder.encodeFrameHeader({false, 1, 0xaf4be87a, 6, nullptr});
   payload = {0xc7, 0x2e, 0x84, 0x16, 0xc0, 0x6b};
   buffer.add(header.data(), header.size());
   buffer.add(payload.data(), payload.size());
@@ -611,7 +611,7 @@ TEST(WebSocketCodecTest, decodeValidMultipleMaskedFrames) {
   // " from"
   header.clear();
   payload.clear();
-  header = encoder.newFrameHeader({false, 0, 5, 0x3c332a16, nullptr});
+  header = encoder.encodeFrameHeader({false, 0, 0x3c332a16, 5, nullptr});
   payload = {0x1c, 0x55, 0x58, 0x79, 0x51};
   buffer.add(header.data(), header.size());
   buffer.add(payload.data(), payload.size());
@@ -619,7 +619,7 @@ TEST(WebSocketCodecTest, decodeValidMultipleMaskedFrames) {
   // "client"
   header.clear();
   payload.clear();
-  header = encoder.newFrameHeader({true, 0, 6, 0x7c96263f, nullptr});
+  header = encoder.encodeFrameHeader({true, 0, 0x7c96263f, 6, nullptr});
   payload = {0x1f, 0xfa, 0x4f, 0x5a, 0x12, 0xe2};
   buffer.add(header.data(), header.size());
   buffer.add(payload.data(), payload.size());

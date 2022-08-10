@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace WebSocket {
 
-std::vector<uint8_t> Encoder::newFrameHeader(const Frame& frame) {
+std::vector<uint8_t> Encoder::encodeFrameHeader(const Frame& frame) {
   std::vector<uint8_t> output;
   // Set flags and opcode
   pushScalarToByteVector(
