@@ -48,11 +48,9 @@ public:
   virtual std::shared_ptr<SipSettings> settings() PURE;
 };
 
-// class DownstreamConnectionInfoItem;
-//  class DownstreamConnectionInfos;
 class ConnectionManager;
 
-// Thread local wrapper aorund our map conn-id -> DownstreamConnectionInfoItem
+// Thread local wrapper aorund our map conn-id -> DownstreamConnection
 struct ThreadLocalDownstreamConnectionInfo : public ThreadLocal::ThreadLocalObject,
                                              public Logger::Loggable<Logger::Id::filter> {
   ThreadLocalDownstreamConnectionInfo(std::shared_ptr<DownstreamConnectionInfos> parent)
@@ -123,7 +121,7 @@ public:
       Server::Configuration::FactoryContext& context,
       std::shared_ptr<Router::TransactionInfos> transaction_infos,
       std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connections_info,
-      std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstream_transaction_info);
+      std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_info);
   ~ConnectionManager() override;
 
   // Network::ReadFilter
@@ -164,10 +162,10 @@ public:
 
 private:
   friend class SipConnectionManagerTest;
-  friend class DownstreamConnectionInfos; // Needs to access DownstreamConnectionInfoItem private
+  friend class DownstreamConnectionInfos; // Needs to access DownstreamConnection private
                                           // inner class
-  friend class UpstreamTransactionsInfo;  // Needs to access UpstreamActiveTrans private inner class
-  friend struct ThreadLocalUpstreamTransactionsInfo; // Needs to access UpstreamActiveTrans private
+  friend class UpstreamTransactionInfos;  // Needs to access UpstreamActiveTrans private inner class
+  friend struct ThreadLocalUpstreamTransactionInfo; // Needs to access UpstreamActiveTrans private
                                                      // inner class
 
   struct ActiveTrans;
@@ -235,7 +233,7 @@ private:
     std::shared_ptr<DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return parent_.downstreamConnectionInfos();
     }
-    std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstreamTransactionInfo() override {
+    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfo() override {
       return parent_.upstreamTransactionInfo();
     }
     std::shared_ptr<SipSettings> settings() const override { return parent_.settings(); }
@@ -341,8 +339,8 @@ private:
     std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return parent_.downstream_connection_infos_;
     }
-    std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstreamTransactionInfo() override {
-      return parent_.upstream_transactions_info_;
+    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfo() override {
+      return parent_.upstream_transaction_infos_;
     }
     std::shared_ptr<SipSettings> settings() const override { return parent_.config_.settings(); }
     void onReset() override;
@@ -468,11 +466,11 @@ private:
   };
 
   // Wrapper around a connection to enable routing of requests from upstream to downstream
-  class DownstreamConnectionInfoItem : public SipFilters::DecoderFilterCallbacks,
+  class DownstreamConnection : public SipFilters::DecoderFilterCallbacks,
                                        Logger::Loggable<Logger::Id::filter> {
   public:
-    DownstreamConnectionInfoItem(ConnectionManager& parent);
-    ~DownstreamConnectionInfoItem() override = default;
+    DownstreamConnection(ConnectionManager& parent);
+    ~DownstreamConnection() override = default;
 
     // // // SipFilters::DecoderFilterCallbacks
     const Network::Connection* connection() const override;
@@ -505,8 +503,8 @@ private:
     std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return nullptr;
     }
-    std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstreamTransactionInfo() override {
-      return parent_.upstream_transactions_info_;
+    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfo() override {
+      return parent_.upstream_transaction_infos_;
     }
 
     void onReset() override{};
@@ -576,7 +574,7 @@ private:
   // This is used in Router, put here to pass to Router
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos_;
-  std::shared_ptr<SipProxy::UpstreamTransactionsInfo> upstream_transactions_info_;
+  std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos_;
   PendingList pending_list_;
 };
 
@@ -605,9 +603,9 @@ private:
 
 // TODO Idea for getting upstream transactions cache in TLS as common to all, review it
 
-struct ThreadLocalUpstreamTransactionsInfo : public ThreadLocal::ThreadLocalObject,
+struct ThreadLocalUpstreamTransactionInfo : public ThreadLocal::ThreadLocalObject,
                                              public Logger::Loggable<Logger::Id::filter> {
-  ThreadLocalUpstreamTransactionsInfo(std::shared_ptr<UpstreamTransactionsInfo> parent,
+  ThreadLocalUpstreamTransactionInfo(std::shared_ptr<UpstreamTransactionInfos> parent,
                                       Event::Dispatcher& dispatcher,
                                       std::chrono::milliseconds transaction_timeout)
       : parent_(parent), dispatcher_(dispatcher), transaction_timeout_(transaction_timeout) {
@@ -620,21 +618,21 @@ struct ThreadLocalUpstreamTransactionsInfo : public ThreadLocal::ThreadLocalObje
   void auditTimerAction();
 
   absl::flat_hash_map<std::string, std::shared_ptr<ConnectionManager::UpstreamActiveTrans>>
-      upstream_transactions_info_map_{};
+      upstream_transaction_infos_map_{};
 
-  std::shared_ptr<UpstreamTransactionsInfo> parent_;
+  std::shared_ptr<UpstreamTransactionInfos> parent_;
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr audit_timer_;
   std::chrono::milliseconds transaction_timeout_;
 };
 
-class UpstreamTransactionsInfo : public std::enable_shared_from_this<UpstreamTransactionsInfo>,
+class UpstreamTransactionInfos : public std::enable_shared_from_this<UpstreamTransactionInfos>,
                                  Logger::Loggable<Logger::Id::connection> {
 public:
-  UpstreamTransactionsInfo(ThreadLocal::SlotAllocator& tls,
+  UpstreamTransactionInfos(ThreadLocal::SlotAllocator& tls,
                            std::chrono::milliseconds transaction_timeout)
       : tls_(tls.allocateSlot()), transaction_timeout_(transaction_timeout) {}
-  ~UpstreamTransactionsInfo() = default;
+  ~UpstreamTransactionInfos() = default;
 
   void init();
 

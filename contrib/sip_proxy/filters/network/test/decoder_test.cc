@@ -123,7 +123,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   std::unique_ptr<ConnectionManager> filter_;
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
-  std::shared_ptr<SipProxy::DownstreamConnectionInfo> downstream_connection_infos_;
+  std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos_;
   SipFilters::DecoderFilterSharedPtr custom_filter_;
 };
 

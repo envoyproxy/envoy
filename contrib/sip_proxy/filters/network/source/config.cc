@@ -70,10 +70,10 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   }
 
   // Map of upstream transactions per worker thread
-  auto upstream_transactions_info = std::make_shared<SipProxy::UpstreamTransactionsInfo>(
+  auto upstream_transaction_infos = std::make_shared<SipProxy::UpstreamTransactionInfos>(
       context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
                                  proto_config.settings(), transaction_timeout, 32000)));
-  upstream_transactions_info->init();
+  upstream_transaction_infos->init();
 
   // Map of downstream connections per worker thread
   auto downstream_connection_info =
@@ -81,13 +81,13 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   downstream_connection_info->init();
 
   return [filter_config, &context, transaction_infos, downstream_connection_info,
-          upstream_transactions_info](Network::FilterManager& filter_manager) -> void {
+          upstream_transaction_infos](Network::FilterManager& filter_manager) -> void {
     std::cerr << "Creating New ConnectionManager. Thread: "
               << context.api().threadFactory().currentThreadId().debugString() << std::endl;
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
         *filter_config, context.api().randomGenerator(),
         context.mainThreadDispatcher().timeSource(), context, transaction_infos,
-        downstream_connection_info, upstream_transactions_info));
+        downstream_connection_info, upstream_transaction_infos));
   };
 }
 
