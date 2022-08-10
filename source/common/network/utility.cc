@@ -360,8 +360,9 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
   int is_transparent;
   if (status != 0) {
     status = sock.getSocketOption(SOL_IP, IP_TRANSPARENT, &is_transparent, &flag_len).return_value_;
-    if (status != 0 || !is_transparent)
+    if (status != 0 || !is_transparent) {
       return nullptr;
+    }
     safeMemcpy(reinterpret_cast<sockaddr*>(&orig_addr), sock.ioHandle().localAddress()->sockAddr());
 #else
   if (status != 0) {
