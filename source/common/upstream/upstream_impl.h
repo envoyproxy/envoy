@@ -597,6 +597,23 @@ protected:
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
 
+class UpstreamHttpFactoryContextImpl : public Server::Configuration::UpstreamHttpFactoryContext {
+public:
+  UpstreamHttpFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
+                                 Init::Manager& init_manager)
+      : server_context_(context), init_manager_(init_manager) {}
+
+  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
+    return server_context_;
+  }
+
+  Init::Manager& initManager() override { return init_manager_; }
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+  Init::Manager& init_manager_;
+};
+
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
@@ -606,7 +623,7 @@ class ClusterInfoImpl : public ClusterInfo,
 public:
   using HttpProtocolOptionsConfigImpl =
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
-  ClusterInfoImpl(Server::Configuration::ServerFactoryContext& server_context,
+  ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
                   const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
@@ -856,7 +873,7 @@ private:
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
-  Server::Configuration::ServerFactoryContext& server_factory_context_;
+  UpstreamHttpFactoryContextImpl upstream_context_;
 };
 
 /**

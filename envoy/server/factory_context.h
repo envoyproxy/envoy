@@ -296,6 +296,29 @@ public:
  */
 using ProtocolOptionsFactoryContext = Server::Configuration::TransportSocketFactoryContext;
 
+/**
+ * FactoryContext for upstream HTTP filters.
+ */
+class UpstreamHttpFactoryContext {
+public:
+  virtual ~UpstreamHttpFactoryContext() = default;
+
+  /**
+   * @return ServerFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+
+  /**
+   * @return the init manager of the particular context. This can be used for extensions that need
+   *         to initialize after cluster manager init but before the server starts listening.
+   *         All extensions should register themselves during configuration load. initialize()
+   *         will be called on  each registered target after cluster manager init but before the
+   *         server starts listening. Once all targets have initialized and invoked their callbacks,
+   *         the server will start listening.
+   */
+  virtual Init::Manager& initManager() PURE;
+};
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
