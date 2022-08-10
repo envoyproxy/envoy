@@ -113,12 +113,13 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         !address->ip()->ipv6()->v6only()) {
       if (address->ip()->isAnyAddress()) {
         // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
-        // If there already one and it isn't shutdown for compatible addr,
-        // then won't insert a new one.
+        // Only override the listener when this is an update of the existing listener by
+        // checking the address, this ensures the Ipv4 address listener won't be override
+        // by the listener which has the same IPv4-mapped address.
         auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port()).asString();
         auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
         if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
-            ipv4_any_listener->second->listener_->listener() == nullptr) {
+            *ipv4_any_listener->second->address_ == *address) {
           tcp_listener_map_by_address_.insert_or_assign(ipv4_any_address, details);
         }
       } else {
