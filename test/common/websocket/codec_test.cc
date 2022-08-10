@@ -396,84 +396,50 @@ TEST(WebSocketCodecTest, decodeFramesWithNoPayloadNonMasked64BitLength) {
 TEST(WebSocketCodecTest, encodeFrameHeader) {
   Encoder encoder;
   std::vector<uint8_t> buffer;
+  std::vector<uint8_t> expected_header;
 
   buffer.clear();
   buffer = encoder.encodeFrameHeader({true, 1, absl::nullopt, 5, nullptr});
   EXPECT_EQ(buffer.size(), 2);
-  EXPECT_EQ(buffer[0], 0x81);
-  EXPECT_EQ(buffer[1], 0x05);
+  expected_header = {0x81, 0x05};
+  EXPECT_EQ(buffer, expected_header);
 
   buffer.clear();
   buffer = encoder.encodeFrameHeader({true, 1, 0x37fa213d, 5, nullptr});
   EXPECT_EQ(buffer.size(), 6);
-  EXPECT_EQ(buffer[0], 0x81);
-  EXPECT_EQ(buffer[1], 0x85);
-  EXPECT_EQ(buffer[2], 0x37);
-  EXPECT_EQ(buffer[3], 0xfa);
-  EXPECT_EQ(buffer[4], 0x21);
-  EXPECT_EQ(buffer[5], 0x3d);
+  expected_header = {0x81, 0x85, 0x37, 0xfa, 0x21, 0x3d};
+  EXPECT_EQ(buffer, expected_header);
 
   buffer.clear();
   buffer = encoder.encodeFrameHeader({false, 0, 0x3c332a16, 5, nullptr});
   EXPECT_EQ(buffer.size(), 6);
-  EXPECT_EQ(buffer[0], 0x00);
-  EXPECT_EQ(buffer[1], 0x85);
-  EXPECT_EQ(buffer[2], 0x3c);
-  EXPECT_EQ(buffer[3], 0x33);
-  EXPECT_EQ(buffer[4], 0x2a);
-  EXPECT_EQ(buffer[5], 0x16);
+  expected_header = {0x00, 0x85, 0x3c, 0x33, 0x2a, 0x16};
+  EXPECT_EQ(buffer, expected_header);
 
   buffer.clear();
   buffer = encoder.encodeFrameHeader({true, 2, absl::nullopt, 256, nullptr});
   EXPECT_EQ(buffer.size(), 4);
-  EXPECT_EQ(buffer[0], 0x82);
-  EXPECT_EQ(buffer[1], 0x7e);
-  EXPECT_EQ(buffer[2], 0x01);
-  EXPECT_EQ(buffer[3], 0x00);
+  expected_header = {0x82, 0x7e, 0x01, 0x00};
+  EXPECT_EQ(buffer, expected_header);
 
   buffer.clear();
   buffer = encoder.encodeFrameHeader({true, 2, 0x37fa213d, 256, nullptr});
   EXPECT_EQ(buffer.size(), 8);
-  EXPECT_EQ(buffer[0], 0x82);
-  EXPECT_EQ(buffer[1], 0xfe);
-  EXPECT_EQ(buffer[2], 0x01);
-  EXPECT_EQ(buffer[3], 0x00);
-  EXPECT_EQ(buffer[4], 0x37);
-  EXPECT_EQ(buffer[5], 0xfa);
-  EXPECT_EQ(buffer[6], 0x21);
-  EXPECT_EQ(buffer[7], 0x3d);
+  expected_header = {0x82, 0xfe, 0x01, 0x00, 0x37, 0xfa, 0x21, 0x3d};
+  EXPECT_EQ(buffer, expected_header);
 
   buffer.clear();
   buffer = encoder.encodeFrameHeader({true, 2, absl::nullopt, 77777, nullptr});
   EXPECT_EQ(buffer.size(), 10);
-  EXPECT_EQ(buffer[0], 0x82);
-  EXPECT_EQ(buffer[1], 0x7f);
-  EXPECT_EQ(buffer[2], 0x00);
-  EXPECT_EQ(buffer[3], 0x00);
-  EXPECT_EQ(buffer[4], 0x00);
-  EXPECT_EQ(buffer[5], 0x00);
-  EXPECT_EQ(buffer[6], 0x00);
-  EXPECT_EQ(buffer[7], 0x01);
-  EXPECT_EQ(buffer[8], 0x2f);
-  EXPECT_EQ(buffer[9], 0xd1);
+  expected_header = {0x82, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2f, 0xd1};
+  EXPECT_EQ(buffer, expected_header);
 
   buffer.clear();
   buffer = encoder.encodeFrameHeader({true, 2, 0x37fa213d, 77777, nullptr});
   EXPECT_EQ(buffer.size(), 14);
-  EXPECT_EQ(buffer[0], 0x82);
-  EXPECT_EQ(buffer[1], 0xff);
-  EXPECT_EQ(buffer[2], 0x00);
-  EXPECT_EQ(buffer[3], 0x00);
-  EXPECT_EQ(buffer[4], 0x00);
-  EXPECT_EQ(buffer[5], 0x00);
-  EXPECT_EQ(buffer[6], 0x00);
-  EXPECT_EQ(buffer[7], 0x01);
-  EXPECT_EQ(buffer[8], 0x2f);
-  EXPECT_EQ(buffer[9], 0xd1);
-  EXPECT_EQ(buffer[10], 0x37);
-  EXPECT_EQ(buffer[11], 0xfa);
-  EXPECT_EQ(buffer[12], 0x21);
-  EXPECT_EQ(buffer[13], 0x3d);
+  expected_header = {0x82, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00,
+                     0x01, 0x2f, 0xd1, 0x37, 0xfa, 0x21, 0x3d};
+  EXPECT_EQ(buffer, expected_header);
 }
 
 TEST(GrpcCodecTest, decodeClosingFrame) {

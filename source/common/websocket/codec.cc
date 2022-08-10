@@ -16,7 +16,7 @@ std::vector<uint8_t> Encoder::encodeFrameHeader(const Frame& frame) {
   std::vector<uint8_t> output;
   // Set flags and opcode
   pushScalarToByteVector(
-      static_cast<uint8_t>(frame.final_fragment_ ? (0x80 ^ frame.opcode_) : frame.opcode_), output);
+      static_cast<uint8_t>(frame.final_fragment_ ? (0x80 | frame.opcode_) : frame.opcode_), output);
 
   // Set payload length
   if (frame.payload_length_ <= 125) {
@@ -28,26 +28,16 @@ std::vector<uint8_t> Encoder::encodeFrameHeader(const Frame& frame) {
     // Set mask bit and 16-bit length indicator
     pushScalarToByteVector(static_cast<uint8_t>(frame.masking_key_ ? 0xfe : 0x7e), output);
     // Set 16-bit length
-    for (uint8_t i = 1; i <= kPayloadLength16Bit; i++) {
-      pushScalarToByteVector(
-          static_cast<uint8_t>(frame.payload_length_ >> (8 * (kPayloadLength16Bit - i))), output);
-    }
+    pushScalarToByteVector(htobe16(frame.payload_length_), output);
   } else {
     // Set mask bit and 64-bit length indicator
     pushScalarToByteVector(static_cast<uint8_t>(frame.masking_key_ ? 0xff : 0x7f), output);
     // Set 64-bit length
-    for (uint8_t i = 1; i <= kPayloadLength64Bit; i++) {
-      pushScalarToByteVector(
-          static_cast<uint8_t>(frame.payload_length_ >> (8 * (kPayloadLength64Bit - i))), output);
-    }
+    pushScalarToByteVector(htobe64(frame.payload_length_), output);
   }
   // Set masking key
   if (frame.masking_key_) {
-    for (uint8_t i = 1; i <= kMaskingKeyLength; i++) {
-      pushScalarToByteVector(
-          static_cast<uint8_t>(frame.masking_key_.value() >> (8 * (kMaskingKeyLength - i))),
-          output);
-    }
+    pushScalarToByteVector(htobe32(frame.masking_key_.value()), output);
   }
   return output;
 }
