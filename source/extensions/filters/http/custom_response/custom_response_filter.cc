@@ -55,6 +55,8 @@ void CustomResponseFilter::onRemoteResponse(Http::ResponseHeaderMap& headers,
     Http::Code code;
     custom_response->rewrite(headers, encoder_callbacks_->streamInfo(), body, code);
     encoder_callbacks_->sendLocalReply(code, "", nullptr, absl::nullopt, "");
+  } else {
+    stats_.get_remote_response_failed_.inc();
   }
   encoder_callbacks_->continueEncoding();
 }

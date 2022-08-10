@@ -37,10 +37,6 @@ message CustomResponse {
       config.core.v3.HttpUri http_uri = 1;
 
       config.core.v3.RetryPolicy retry_policy = 2;
-      //TODO(pradeepcrao): Does it make sense to have a TypedExtensionConfig to interpret the
-      // response of the upstream?
-      repeated config.core.v3.HeaderValueOption headers_to_add = 3
-          [(validate.rules).repeated = {max_items: 1000}];
     }
 
     // The new response status code if specified.
