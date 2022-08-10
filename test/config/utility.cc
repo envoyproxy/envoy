@@ -1374,10 +1374,10 @@ void ConfigHelper::initializeTls(
     if (options.client_with_intermediate_cert_) {
       validation_context->add_verify_certificate_hash(TEST_CLIENT2_CERT_HASH);
       std::string cert_yaml;
-      if (options.broken_chain_) {
+      if (options.trust_root_only_) {
         cert_yaml = R"EOF(
         trusted_ca:
-          filename: "{{ test_rundir }}/test/config/integration/certs/broken_partial_ca_cert_chain.pem"
+          filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
       )EOF";
       } else {
         cert_yaml = R"EOF(

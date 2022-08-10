@@ -110,8 +110,8 @@ public:
       return *this;
     }
 
-    ServerSslOptions& setBrokenChain(bool broken_chain) {
-      broken_chain_ = broken_chain;
+    ServerSslOptions& setTrustRootOnly(bool trust_root_only) {
+      trust_root_only_ = trust_root_only;
       return *this;
     }
 
@@ -134,7 +134,7 @@ public:
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
     bool client_with_intermediate_cert_{false};
-    bool broken_chain_{false};
+    bool trust_root_only_{false};
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 

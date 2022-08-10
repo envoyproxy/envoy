@@ -80,34 +80,38 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithVerifyDepth) {
   codec->close();
 }
 
-// With broken chain set, certificate validation fails without max depth
+// With only root trusted, certificate validation succeeds without max depth
+TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedWithBrokenChain) {
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true)
+                                  .setClientWithIntermediateCert(true)
+                                  .setTrustRootOnly(true));
+  initialize();
+  auto conn = makeSslClientConnection({});
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  ASSERT_TRUE(codec->connected());
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
+  codec->close();
+}
+
+// With only root ca trusted, certificate validation is expected to fail with max depth,
+// but it succeeds
 TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedWithBrokenChain) {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
                                   .setTlsV13(true)
                                   .setClientWithIntermediateCert(true)
-                                  .setBrokenChain(true));
-  initialize();
-  auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
-  ASSERT_TRUE(codec->waitForDisconnect());
-}
-
-// With broken chain set, certificate validation fails with max depth
-TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedWithBrokenChainAndDepth) {
-  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
-                                  .setRsaCert(true)
-                                  .setTlsV13(true)
-                                  .setClientWithIntermediateCert(true)
-                                  .setBrokenChain(true)
+                                  .setTrustRootOnly(true)
                                   .setVerifyDepth(1));
   initialize();
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
-  ASSERT_TRUE(codec->waitForDisconnect());
+  ASSERT_TRUE(codec->connected());
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
+  codec->close();
 }
-
 } // namespace Ssl
 } // namespace Envoy
