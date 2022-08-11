@@ -54,7 +54,7 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
   if (!is_connect) {
     // Scheme must start with alpha and be non-empty.
     auto it = url.begin();
-    if (!std::isalpha(it)) {
+    if (!std::isalpha(*it)) {
       return false;
     }
     ++it;
