@@ -299,7 +299,7 @@ TEST(WebSocketCodecTest, decodeIncompleteFrameWithgOnlyFrameHeader) {
   EXPECT_EQ(size, buffer.length());
 }
 
-// Frame only includes upto first few length bytes of the frame
+// Frame only includes up to first few length bytes of the frame
 TEST(WebSocketCodecTest, decodeIncompleteFrameUptoPartialLength) {
   Buffer::OwnedImpl buffer;
   Buffer::addSeq(buffer, {0x82, 0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00});
@@ -311,7 +311,7 @@ TEST(WebSocketCodecTest, decodeIncompleteFrameUptoPartialLength) {
   EXPECT_EQ(size, buffer.length());
 }
 
-// Masked frames with buffer includes only upto half of the masking key
+// Masked frames with buffer includes only up to half of the masking key
 TEST(WebSocketCodecTest, decodeIncompleteFrameUptoPartialMaskingKey) {
   Buffer::OwnedImpl buffer;
   Buffer::addSeq(buffer, {0x82, 0xfe, 0x00, 0x7e, 0xa1, 0xe8, 0xd7});
