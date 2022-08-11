@@ -514,7 +514,7 @@ parse_url_char(enum state s, const char ch)
         return s_req_path;
       }
 
-      if (IS_ALPHANUM(ch)) {
+      if (IS_ALPHA(ch)) {
         return s_req_schema;
       }
 
