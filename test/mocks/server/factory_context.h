@@ -81,6 +81,17 @@ public:
   Router::ContextImpl router_context_;
   testing::NiceMock<Api::MockApi> api_;
 };
+
+class MockUpstreamHttpFactoryContext : public UpstreamHttpFactoryContext {
+public:
+  MockUpstreamHttpFactoryContext();
+
+  MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, (), (const));
+  MOCK_METHOD(Init::Manager&, initManager, ());
+  testing::NiceMock<Init::MockManager> init_manager_;
+  testing::NiceMock<MockServerFactoryContext> server_factory_context_;
+};
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

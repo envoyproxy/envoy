@@ -259,7 +259,7 @@ EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::EnvoyPathValidatio
     : connection_(connection) {}
 
 void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidationSuccess(
-    std::unique_ptr<quic::QuicPathValidationContext> context) {
+    std::unique_ptr<quic::QuicPathValidationContext> context, quic::QuicTime /*start_time*/) {
   connection_.onPathValidationSuccess(std::move(context));
 }
 
