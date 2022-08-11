@@ -9,6 +9,7 @@ proto_library(
     name = "active_protos",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/envoy/extensions/compression/compressor/igzip/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
         "//contrib/envoy/extensions/filters/http/language/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
@@ -27,7 +28,6 @@ proto_library(
         "//contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha:pkg",
         "//contrib/envoy/extensions/private_key_providers/qat/v3alpha:pkg",
         "//contrib/envoy/extensions/regex_engines/hyperscan/v3alpha:pkg",
-        "//contrib/envoy/extensions/compression/compressor/igzip/v3alpha:pkg",
         "//contrib/envoy/extensions/vcl/v3alpha:pkg",
         "//envoy/admin/v3:pkg",
         "//envoy/config/accesslog/v3:pkg",

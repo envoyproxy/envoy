@@ -30,11 +30,11 @@ message Igzip {
     BEST_COMPRESSION = 3;
   }
 
-  // Value from 1 to 5 that controls the amount of internal memory used by isa-l. Higher values
+  // Value from 1 to 5 that controls the amount of internal memory. Higher values
   // use more memory, but are faster and produce better compression results. The default value is 5.
   google.protobuf.UInt32Value memory_level = 1 [(validate.rules).uint32 = {lte: 5 gte: 1}];
 
-  // A value used for selecting the isa-l compression level. This setting will affect speed and
+  // A value used for selecting the compression level. This setting will affect speed and
   // amount of compression applied to the content. "BEST_COMPRESSION" provides higher compression
   // at the cost of higher latency and is equal to "COMPRESSION_LEVEL_3". "BEST_SPEED" provides
   // lower compression with minimum impact on response time, the same as "COMPRESSION_LEVEL_1".

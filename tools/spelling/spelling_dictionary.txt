@@ -772,6 +772,7 @@ idx
 ifdef
 iff
 ified
+igzip
 impl
 implementors
 impls
