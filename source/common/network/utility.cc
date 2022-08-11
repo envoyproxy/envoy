@@ -361,7 +361,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
       socklen_t flag_len = sizeof(int);
       int is_transparent;
       status =
-		  sock.getSocketOption(SOL_IP, IP_TRANSPARENT, &is_transparent, &flag_len).return_value_;
+          sock.getSocketOption(SOL_IP, IP_TRANSPARENT, &is_transparent, &flag_len).return_value_;
       if (status == 0 && is_transparent) {
         return sock.ioHandle().localAddress();
       }
