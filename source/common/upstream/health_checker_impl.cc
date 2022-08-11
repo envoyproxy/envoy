@@ -183,7 +183,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       receive_bytes_(PayloadMatcher::loadProtoBytes(config.http_health_check().receive())),
       method_(getMethod(config.http_health_check().method())),
-      response_buffer_size_(config.http_health_check().response_buffer_size().value()),
+      response_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.http_health_check(), response_buffer_size, kDefaultMaxBytesInBuffer)),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),

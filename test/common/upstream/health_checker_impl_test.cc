@@ -1232,7 +1232,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckBuffer) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckMaxBuffer) {
   std::string expected_string(1024, 'A');
-  setupServiceValidationWithBufferSizeHC(expected_string, 1024);
+  // Use the default 1024 buffer size.
+  setupServiceValidationWithNoBufferSizeHC(expected_string);
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1255,7 +1256,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckMaxBuffer) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-TEST_F(HttpHealthCheckerImplTest, ExpectedResponseSettingOverSize) {
+TEST_F(HttpHealthCheckerImplTest, ExpectedResponseBufferSizeTest) {
   std::string expected_string(2048, 'A');
   EXPECT_THROW_WITH_MESSAGE(
       setupServiceValidationWithBufferSizeHC(expected_string, 1024), EnvoyException,
@@ -1263,6 +1264,11 @@ TEST_F(HttpHealthCheckerImplTest, ExpectedResponseSettingOverSize) {
   EXPECT_THROW_WITH_MESSAGE(
       setupServiceValidationWithBufferSizeHC("AAA", 2), EnvoyException,
       "The expected response length '3' is over than http health response buffer size '2'");
+
+  // Default buffer size is 1024 if response_buffer_size is not set.
+  EXPECT_THROW_WITH_MESSAGE(
+      setupServiceValidationWithNoBufferSizeHC(expected_string), EnvoyException,
+      "The expected response length '2048' is over than http health response buffer size '1024'");
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessExpectedResponseCheckHttp2) {

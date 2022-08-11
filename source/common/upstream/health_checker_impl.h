@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
@@ -22,6 +24,8 @@
 
 namespace Envoy {
 namespace Upstream {
+
+constexpr uint64_t kDefaultMaxBytesInBuffer = 1024;
 
 /**
  * Factory for creating health checker implementations.
