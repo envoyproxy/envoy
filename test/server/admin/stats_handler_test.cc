@@ -133,10 +133,10 @@ public:
   Stats::MockSink sink_;
   Stats::ThreadLocalStoreImplPtr store_;
   Stats::CustomStatNamespacesImpl custom_namespaces_;
+  Http::TestRequestHeaderMapImpl request_headers_;
   MockAdminStream admin_stream_;
   Configuration::MockStatsConfig stats_config_;
   TestScopedRuntime scoped_runtime_;
-  Http::TestRequestHeaderMapImpl request_headers_;
 };
 
 class AdminStatsTest : public StatsHandlerTest, public testing::Test {};

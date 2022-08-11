@@ -87,19 +87,19 @@ public:
   }
 
   Http::Code makeRequest(absl::string_view path) {
+    Http::TestResponseHeaderMapImpl response_headers;
     request_headers_.setPath(path);
     EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
-    return cb_(response_headers_, response_, admin_stream_);
+    return cb_(response_headers, response_, admin_stream_);
   }
 
 protected:
   Server::MockAdmin admin_;
+  Http::TestRequestHeaderMapImpl request_headers_;
   Server::StrictMockAdminStream admin_stream_;
   std::unique_ptr<AdminHandler> handler_;
   Server::Admin::HandlerCb cb_;
   MockDispatcherQueued main_thread_dispatcher_{"test_main_thread"};
-  Http::TestRequestHeaderMapImpl request_headers_;
-  Http::TestResponseHeaderMapImpl response_headers_;
   Buffer::OwnedImpl response_;
 };
 
@@ -141,7 +141,6 @@ tap_config:
     return fmt::format(buffered_admin_request_yaml_, max_traces, timeout_s);
   }
 
-  Buffer::OwnedImpl response_;
   // Cannot be moved into individual test cases as expected calls are validated on object
   // destruction, and the code that satisfies the expected calls on sink_ is in the TearDown method.
   StrictMock<Http::MockStreamDecoderFilterCallbacks> sink_;
