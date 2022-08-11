@@ -32,15 +32,20 @@ message Pipe {
 }
 
 // The address represents an envoy internal listener.
-// [#comment: TODO(lambdai): Make this address available for listener and endpoint.
-// TODO(asraa): When address available, remove workaround from test/server/server_fuzz_test.cc:30.]
+// [#comment: TODO(asraa): When address available, remove workaround from test/server/server_fuzz_test.cc:30.]
 message EnvoyInternalAddress {
   oneof address_name_specifier {
     option (validate.required) = true;
 
-    // [#not-implemented-hide:] The :ref:`listener name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the destination internal listener.
+    // Specifies the :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the
+    // internal listener.
     string server_listener_name = 1;
   }
+
+  // Specifies an endpoint identifier to distinguish between multiple endpoints for the same internal listener in a
+  // single upstream pool. Only used in the upstream addresses for tracking changes to individual endpoints. This, for
+  // example, may be set to the final destination IP for the target internal listener.
+  string endpoint_id = 2;
 }
 
 // [#next-free-field: 7]
@@ -143,7 +148,8 @@ message Address {
 
     Pipe pipe = 2;
 
-    // [#not-implemented-hide:]
+    // Specifies a user-space address handled by :ref:`internal listeners
+    // <envoy_v3_api_field_config.listener.v3.Listener.internal_listener>`.
     EnvoyInternalAddress envoy_internal_address = 3;
   }
 }
