@@ -19,6 +19,7 @@ envoy_cc_library(
         "//source/common/router:__subpackages__",
         "//source/extensions/path/rewrite/pattern_template:__subpackages__",
         "//test/extensions/path/match/pattern_template:__subpackages__",
+        "//test/extensions/path/rewrite/pattern_template:__subpackages__",
     ],
     deps = [
         "//envoy/router:router_path_match_policy_interface",

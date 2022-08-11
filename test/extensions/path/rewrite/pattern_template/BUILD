@@ -26,6 +26,8 @@ envoy_extension_cc_test(
     srcs = ["library_test.cc"],
     extension_names = ["envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate"],
     deps = [
+        "//source/extensions/path/match/pattern_template:config",
+        "//source/extensions/path/match/pattern_template:pattern_template_match_lib",
         "//source/extensions/path/rewrite/pattern_template:config",
         "//source/extensions/path/rewrite/pattern_template:pattern_template_rewrite_lib",
         "//test/mocks/server:factory_context_mocks",
