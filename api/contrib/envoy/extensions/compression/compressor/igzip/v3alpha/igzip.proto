@@ -16,9 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Igzip Compressor]
 // [#extension: envoy.compression.compressor.igzip]
 
-// [#next-free-field: 5]
 message Igzip {
-
   enum CompressionLevel {
     option allow_alias = true;
 

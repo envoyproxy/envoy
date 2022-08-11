@@ -610,7 +610,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "isa-l-{version}",
         urls = ["https://github.com/intel/isa-l/archive/v{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-11-12",
+        release_date = "2020-11-07",
         cpe = "N/A",
     ),
     com_github_netwide_assembler_nasm = dict(

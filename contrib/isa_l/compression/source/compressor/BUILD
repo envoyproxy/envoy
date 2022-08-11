@@ -13,7 +13,6 @@ envoy_cc_library(
     name = "igzip_compressor_lib",
     srcs = ["igzip_compressor_impl.cc"],
     hdrs = ["igzip_compressor_impl.h"],
-    external_deps = ["zlib"],
     deps = [
         "//bazel/foreign_cc:isa_l",
         "//contrib/isa_l/compression/source/common:igzip_base_lib",
