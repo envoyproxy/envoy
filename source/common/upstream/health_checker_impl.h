@@ -85,6 +85,7 @@ public:
     {"text": "00"}
    ]
  * Each text or binary filed in Payload is converted to a binary block.
+ * The text is Hex string by default.
  *
  * During each health check cycle, all of the "send" bytes are sent to the target server. Each
  * binary block can be of arbitrary length and is just concatenated together when sent.
@@ -94,8 +95,6 @@ public:
  * "FFFFFFFF" could be inserted in the response between "EEEEEEEE" and "01000000" and the check
  * would still pass.
  *
- * The payload can either be a sequence of UTF-8 characters or Hex encoded string. It is
- * configurable in Payload proto.
  */
 class PayloadMatcher {
 public:
