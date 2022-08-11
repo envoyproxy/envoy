@@ -26,6 +26,7 @@ public:
   MOCK_METHOD(NiceMock<Http::MockStreamDecoderFilterCallbacks>&, getDecoderFilterCallbacks, (),
               (const));
   MOCK_METHOD(Http::Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
+  MOCK_METHOD(Http::Utility::QueryParams, queryParams, (), (const));
 };
 
 /**
@@ -45,6 +46,7 @@ public:
   MOCK_METHOD(::testing::StrictMock<Http::MockStreamDecoderFilterCallbacks>&,
               getDecoderFilterCallbacks, (), (const));
   MOCK_METHOD(Http::Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
+  MOCK_METHOD(Http::Utility::QueryParams, queryParams, (), (const));
 };
 } // namespace Server
 } // namespace Envoy

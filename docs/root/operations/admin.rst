@@ -239,6 +239,13 @@ modify different aspects of the server:
 
   Enable or disable the Heap profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.
 
+.. _operations_admin_interface_heap_dump:
+
+.. http:get:: /heap_dump
+
+  Dump current heap profile of Envoy process. The output content is parsable binary by the ``pprof`` tool.
+  Requires compiling with tcmalloc (default).
+
 .. _operations_admin_interface_healthcheck_fail:
 
 .. http:post:: /healthcheck/fail
