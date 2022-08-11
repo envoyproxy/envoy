@@ -33,9 +33,9 @@ namespace {
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-unsigned long pattern_matching_max_variables_per_url = 5;
-unsigned long pattern_matching_max_variable_name_len = 16;
-unsigned long pattern_matching_min_variable_name_len = 1;
+constexpr unsigned long kPatternMatchingMaxVariablesPerUrl = 5;
+constexpr unsigned long kPatternMatchingMaxVariableNameLen = 16;
+constexpr unsigned long kPatternMatchingMinVariableNameLen = 1;
 
 // Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
 constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
@@ -223,13 +223,13 @@ gatherCaptureNames(struct ParsedUrlPattern pattern) {
     if (!absl::holds_alternative<Variable>(segment)) {
       continue;
     }
-    if (captured_variables.size() >= pattern_matching_max_variables_per_url) {
+    if (captured_variables.size() >= kPatternMatchingMaxVariablesPerUrl) {
       return absl::InvalidArgumentError("Exceeded variable count limit");
     }
     absl::string_view var_name = absl::get<Variable>(segment).var_name;
 
-    if (var_name.size() < pattern_matching_min_variable_name_len ||
-        var_name.size() > pattern_matching_max_variable_name_len) {
+    if (var_name.size() < kPatternMatchingMinVariableNameLen ||
+        var_name.size() > kPatternMatchingMaxVariableNameLen) {
       return absl::InvalidArgumentError("Invalid variable length");
     }
     if (captured_variables.contains(var_name)) {

@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Router {
 
 /**
- * Decides if the target route path is matching the provided pattern.
+ * Creates the new route path based on the provided rewrite pattern.
  * Subclassing Logger::Loggable so that implementations can log details.
  */
 class PathRewritePredicate : Logger::Loggable<Logger::Id::router> {
@@ -24,7 +24,7 @@ public:
    * Used to determine if the match policy is compatible.
    *
    * @param match_policy current path match policy for route
-   * @return valid if current path match policy is acceptable
+   * @return true if current path match policy is acceptable
    */
   virtual absl::Status isCompatibleMatchPolicy(PathMatchPredicateSharedPtr path_match_policy,
                                                bool active_policy) const PURE;

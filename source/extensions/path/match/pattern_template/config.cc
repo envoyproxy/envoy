@@ -9,6 +9,7 @@ namespace PatternTemplate {
 namespace Match {
 
 REGISTER_FACTORY(PatternTemplateMatchPredicateFactory, Router::PathMatchPredicateFactory);
+
 } // namespace Match
 } // namespace PatternTemplate
 } // namespace Extensions

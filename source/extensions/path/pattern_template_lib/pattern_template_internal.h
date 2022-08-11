@@ -20,11 +20,18 @@ namespace PatternTemplate {
 namespace PatternTemplateInternal {
 
 using Literal = absl::string_view;
+
+/**
+ * Determines what operations to use on the input pattern segment
+ */
 enum class Operator { KPathGlob, KTextGlob };
 
+/**
+ * Represents a segment of the rewritten URL, including any path segments,
+ * slash and prefix.
+ */
 struct RewriteSegment {
-  // Represents a segment of the rewritten URL, including any path segments,
-  // slash and prefix.
+
   absl::string_view literal;
 
   // Represents an index into the RE2 capture which value should be used
@@ -33,6 +40,9 @@ struct RewriteSegment {
   int var_index;
 };
 
+/**
+ * Represents a pattern variable. Variables are included in both path match and rewrite paths.
+ */
 struct Variable {
   absl::string_view var_name;
   std::vector<absl::variant<Operator, Literal>> var_match;
@@ -45,6 +55,9 @@ struct Variable {
 
 using ParsedSegment = absl::variant<Operator, Variable, Literal>;
 
+/**
+ * Represents the parsed path including literals and variables.
+ */
 struct ParsedUrlPattern {
   std::vector<ParsedSegment> parsed_segments;
   absl::optional<absl::string_view> suffix;
@@ -53,16 +66,27 @@ struct ParsedUrlPattern {
   std::string debugString() const;
 };
 
+/**
+ * Check if literal is valid
+ */
 bool isValidLiteral(absl::string_view pattern);
 
+/**
+ * Check if rewrite literal is valid
+ */
 bool isValidRewriteLiteral(absl::string_view pattern);
 
+/**
+ * Check if indent is valid
+ */
 bool isValidIndent(absl::string_view pattern);
 
-// Used by the following Consume{Literal.Operator,Variable} functions
-// in the return value. The functions would take the given pattern,
-// parse what it can into |parsed_value| and return the unconsumed
-// portion of the pattern in |unconsumed_pattern|.
+/**
+ * Used by the following Consume{Literal.Operator,Variable} functions
+ * in the return value. The functions would take the given pattern,
+ * parse what it can into |parsed_value| and return the unconsumed
+ *  portion of the pattern in |unconsumed_pattern|.
+ */
 template <typename T> struct ParsedResult {
   ParsedResult(T val, absl::string_view pattern) : parsed_value(val), unconsumed_pattern(pattern) {}
 
@@ -70,22 +94,49 @@ template <typename T> struct ParsedResult {
   absl::string_view unconsumed_pattern;
 };
 
+/**
+ * Converts input pattern to ParsedResult<Literal>
+ */
 absl::StatusOr<ParsedResult<Literal>> consumeLiteral(absl::string_view pattern);
 
+/**
+ * Converts input pattern to ParsedResult<Operator>
+ */
 absl::StatusOr<ParsedResult<Operator>> consumeOperator(absl::string_view pattern);
 
+/**
+ * Converts input pattern to ParsedResult<Variable>
+ */
 absl::StatusOr<ParsedResult<Variable>> consumeVariable(absl::string_view pattern);
 
+/**
+ * Converts input pattern to ParsedUrlPattern
+ */
 absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pattern);
 
+/**
+ * Converts Literal to std::string
+ */
 std::string toRegexPattern(Literal pattern);
 
+/**
+ * Converts Operator to std::string
+ */
 std::string toRegexPattern(Operator pattern);
 
+/**
+ * Converts Variable to std::string
+ */
 std::string toRegexPattern(const Variable& pattern);
 
+/**
+ * Converts ParsedUrlPattern to std::string
+ */
 std::string toRegexPattern(const struct ParsedUrlPattern& pattern);
 
+/**
+ * Converts string_view to be used in re2
+ */
 inline re2::StringPiece toStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
 
 } // namespace PatternTemplateInternal

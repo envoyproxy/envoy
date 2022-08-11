@@ -39,8 +39,6 @@ public:
   absl::Status isCompatibleMatchPolicy(Router::PathMatchPredicateSharedPtr match_policy,
                                        bool active_policy) const override;
 
-  static absl::Status isValidRewritePattern(std::string match_pattern, std::string rewrite_pattern);
-
   absl::string_view name() const override { return NAME; }
 
 private:

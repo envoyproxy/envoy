@@ -17,8 +17,9 @@ namespace PatternTemplate {
 enum class RewriteStringKind { KVariable, KLiteral };
 
 struct RewritePatternSegment {
-  RewritePatternSegment(absl::string_view str, RewriteStringKind kind) : str(str), kind(kind) {}
-  absl::string_view str;
+  RewritePatternSegment(absl::string_view segment_value, RewriteStringKind kind)
+      : segment_value(segment_value), kind(kind) {}
+  absl::string_view segment_value;
   RewriteStringKind kind;
 };
 

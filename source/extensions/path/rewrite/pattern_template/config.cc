@@ -9,6 +9,7 @@ namespace PatternTemplate {
 namespace Rewrite {
 
 REGISTER_FACTORY(PatternTemplateRewritePredicateFactory, Router::PathRewritePredicateFactory);
+
 } // namespace Rewrite
 } // namespace PatternTemplate
 } // namespace Extensions

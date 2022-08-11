@@ -44,30 +44,6 @@ absl::Status PatternTemplateRewritePredicate::isCompatibleMatchPolicy(
   return absl::OkStatus();
 }
 
-absl::Status PatternTemplateRewritePredicate::isValidRewritePattern(std::string match_pattern,
-                                                                    std::string rewrite_pattern) {
-
-  if (!isValidPathTemplateRewritePattern(rewrite_pattern).ok()) {
-    return absl::InvalidArgumentError(
-        fmt::format("path_template_rewrite {} is invalid", match_pattern));
-  }
-
-  absl::StatusOr<std::string> converted_pattern = convertURLPatternSyntaxToRegex(match_pattern);
-  if (!converted_pattern.ok()) {
-    return absl::InvalidArgumentError(fmt::format("path_template {} is invalid", match_pattern));
-  }
-
-  std::string path_template_match_regex = *std::move(converted_pattern);
-  if (path_template_match_regex.empty() ||
-      !isValidSharedVariableSet(rewrite_pattern, path_template_match_regex).ok()) {
-    return absl::InvalidArgumentError(
-        fmt::format("mismatch between path_template {} and path_template_rewrite {}", match_pattern,
-                    rewrite_pattern));
-  }
-
-  return absl::OkStatus();
-};
-
 absl::StatusOr<std::string>
 PatternTemplateRewritePredicate::rewriteUrl(absl::string_view current_pattern,
                                             absl::string_view matched_path) const {

@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Router {
 
 /**
- * Decides if the target route path is matching the provided pattern.
+ * Decides if the target route path matches the provided pattern.
  * Subclassing Logger::Loggable so that implementations can log details.
  */
 class PathMatchPredicate : Logger::Loggable<Logger::Id::router> {
@@ -23,7 +23,7 @@ public:
    * Used to determine if the current url matches the predicate pattern.
    *
    * @param url current url of route
-   * @return valid if route url matches the predicate pattern.
+   * @return true if route url matches the predicate pattern.
    */
   virtual bool match(absl::string_view url) const PURE;
 
