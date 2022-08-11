@@ -298,6 +298,7 @@ envoy_cc_library(
         "//envoy/tcp:conn_pool_interface",
         "//source/common/common:assert_lib",
         "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 

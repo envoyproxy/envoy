@@ -259,6 +259,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
+/*/extensions/health_checkers/thrift @zuercher @JuniorHsu
 # IP tagging
 /*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
 # Header to metadata
