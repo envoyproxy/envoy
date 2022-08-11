@@ -89,57 +89,54 @@ public:
   // @return bool whether the decoding succeeded or not.
   absl::optional<std::vector<Frame>> decode(Buffer::Instance& input);
 
-protected:
+private:
   // Decodes the given buffer with WebSocket data frames and updates the frame count.
   // Invokes visitor callbacks for each frame in the following sequence:
-  // ----------------------------------------------------------------------------------
-  //  frameStart frameMaskFlag frameMaskingKey? frameDataStart frameData* frameDataEnd
-  // ----------------------------------------------------------------------------------
-  // If frameStart returns false, then the decoder aborts.
-  // Returns the increase in the frame count.
-  uint64_t inspect(const Buffer::Instance& input);
+  // --------------------------------------------------------------------------------------------
+  // doDecodeFlagsAndOpcode doDecodeMaskFlagAndLength doDecodeExtendedLength* doDecodeMaskingKey*
+  // doDecodePayload*
+  // --------------------------------------------------------------------------------------------
+  // If doDecodeFlagsAndOpcode returns false, then the decoder aborts.
+  bool inspect(Buffer::Instance&, absl::optional<std::vector<Frame>>&);
 
-  bool frameStart(uint8_t);
   void frameMaskFlag(uint8_t);
-  void frameMaskingKey();
-  void frameDataStart();
+  void frameDataStart(Buffer::Instance&, absl::optional<std::vector<Frame>>&);
   void frameData(const uint8_t*, uint64_t);
-  void frameDataEnd();
+  void frameDataEnd(Buffer::Instance&, absl::optional<std::vector<Frame>>&);
 
-  void doDecodeMaskFlagAndLength(const uint8_t, const uint8_t*& mem, uint64_t&);
-  void doDecodeExtendedLength(const uint8_t c, const uint8_t*&, uint64_t&);
-  void doDecodeMaskingKey(const uint8_t c, const uint8_t*&, uint64_t&);
-  void doDecodePayload(const Buffer::RawSlice&, const uint8_t*&, uint64_t&);
+  bool doDecodeFlagsAndOpcode(uint8_t);
+  void doDecodeMaskFlagAndLength(const uint8_t, Buffer::Instance&,
+                                 absl::optional<std::vector<Frame>>&);
+  void doDecodeExtendedLength(const uint8_t, Buffer::Instance&,
+                              absl::optional<std::vector<Frame>>&);
+  void doDecodeMaskingKey(const uint8_t, Buffer::Instance&, absl::optional<std::vector<Frame>>&);
+  void doDecodePayload(const uint64_t, const uint8_t*&, uint64_t&, Buffer::Instance&,
+                       absl::optional<std::vector<Frame>>&);
 
-private:
   // Current state of the frame that is being processed.
   enum class State {
     // Decoding the first byte. Waiting for decoding the final frame flag (1 bit)
     // and reserved flags (3 bits) and opcode (4 bits) of the WebSocket data frame.
-    KFrameHeaderFlagsAndOpcode,
+    FrameHeaderFlagsAndOpcode,
     // Decoding the second byte. Waiting for decoding the mask flag (1 bit) and
     // length/length flag (7 bit) of the WebSocket data frame.
-    KFrameHeaderMaskFlagAndLength,
+    FrameHeaderMaskFlagAndLength,
     // Waiting for decoding the extended length of the frame if length read previously
     // is either 126 or 127. Respectively 2 bytes or 8 bytes will be decoded from the
     // WebSocket data frame.
-    KFrameHeaderExtendedLength,
+    FrameHeaderExtendedLength,
     // Waiting for decoding the masking key (4 bytes) only if the mask bit is set.
-    KFrameHeaderMaskingKey,
+    FrameHeaderMaskingKey,
     // Waiting for decoding the payload (both extension data and application data).
-    KFramePayload,
+    FramePayload,
   };
   // Current frame that is being decoded.
   Frame frame_;
-  // Data holder for successfully decoded frames.
-  absl::optional<std::vector<Frame>> output_ = absl::nullopt;
-  bool decoding_error_ = false;
-  State state_ = State::KFrameHeaderFlagsAndOpcode;
-  uint64_t total_frames_count_ = 0;
+  State state_ = State::FrameHeaderFlagsAndOpcode;
   uint8_t length_of_extended_length_ = 0;
-  uint32_t masking_key_ = 0;
   uint64_t length_ = 0;
   uint8_t masking_key_length_ = 0;
+  uint64_t bytes_consumed_by_frame_ = 0;
 };
 
 } // namespace WebSocket
