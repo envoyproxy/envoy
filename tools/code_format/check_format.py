@@ -95,9 +95,10 @@ class FormatConfig:
     def _header_order_path(self) -> str:
         return os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
 
-    def _normalize(self,
-                   config_type: str,
-                   cb: Callable = tuple) -> Dict[str, Union[Tuple[str, ...], Dict[str, Tuple[str, ...]]]]:
+    def _normalize(
+            self,
+            config_type: str,
+            cb: Callable = tuple) -> Dict[str, Union[Tuple[str, ...], Dict[str, Tuple[str, ...]]]]:
         config = {}
         for k, v in self[config_type].items():
             if isinstance(v, dict):
