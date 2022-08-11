@@ -62,7 +62,7 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
     const auto is_scheme_suffix = [](char c) {
       return std::isalpha(c) || std::isdigit(c) || c == '+' || c == '-' || c == '.';
     };
-    it = std::find_if_not(it, url.end(), [](char c) { return std::isalpha(c); });
+    it = std::find_if_not(it, url.end(), is_scheme_suffix);
     url.remove_prefix(it - url.begin());
     if (!absl::StartsWith(url, kColonSlashSlash)) {
       return false;
