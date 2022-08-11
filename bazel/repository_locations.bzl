@@ -514,6 +514,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Colm",
         project_desc = "The Colm Programming Language",
         project_url = "https://www.colm.net/open-source/colm/",
+        # The latest release version v0.14.7 prevents building statically (see
+        # https://github.com/adrian-thurston/colm/issues/146). The latest SHA includes the fix (see
+        # https://github.com/adrian-thurston/colm/commit/fc61ecb3a22b89864916ec538eaf04840e7dd6b5).
+        # TODO(zhxie): Update to the next release version when it is released.
         version = "2d8ba76ddaf6634f285d0a81ee42d5ee77d084cf",
         sha256 = "0399e9bef7603a8f3d94acd0b0af6b5944cc3103e586734719379d3ec09620c0",
         strip_prefix = "colm-{version}",
@@ -530,6 +534,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Ragel",
         project_desc = "Ragel State Machine Compiler",
         project_url = "https://www.colm.net/open-source/ragel/",
+        # We used the stable release Ragel 6.10 previously and it is under GPLv2 license (see
+        # http://www.colm.net/open-source/ragel). Envoy uses its binary only as a tool for
+        # compiling contrib extension Hyperscan. For copyright consideration, we update Ragel to
+        # its development release which is under MIT license.
+        # The latest release version v7.0.4 is not compatible with its dependency Colm we use. The
+        # latest SHA includes fix for compatibility.
+        # TODO(zhxie): Update to the next release version when it is released.
         version = "d4577c924451b331c73c8ed0af04f6efd35ac0b4",
         sha256 = "fa3474d50da9c870b79b51ad43f8d11cdf05268f5ec05a602ecd5b1b5f5febb0",
         strip_prefix = "ragel-{version}",
