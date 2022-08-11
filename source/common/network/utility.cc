@@ -360,7 +360,8 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     if (Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
       socklen_t flag_len = sizeof(int);
       int is_transparent;
-      status = sock.getSocketOption(SOL_IP, IP_TRANSPARENT, &is_transparent, &flag_len).return_value_;
+      status =
+		  sock.getSocketOption(SOL_IP, IP_TRANSPARENT, &is_transparent, &flag_len).return_value_;
       if (status == 0 && is_transparent) {
         return sock.ioHandle().localAddress();
       }
