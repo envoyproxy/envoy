@@ -355,19 +355,18 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
         sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).return_value_;
   }
 
+  if (status != 0) {
 #ifdef IP_TRANSPARENT
-  socklen_t flag_len = sizeof(int);
-  int is_transparent;
-  if (status != 0) {
-    status = sock.getSocketOption(SOL_IP, IP_TRANSPARENT, &is_transparent, &flag_len).return_value_;
-    if (status != 0 || !is_transparent) {
-      return nullptr;
+    if (Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
+      socklen_t flag_len = sizeof(int);
+      int is_transparent;
+      status = sock.getSocketOption(SOL_IP, IP_TRANSPARENT, &is_transparent, &flag_len).return_value_;
+      if (status == 0 && is_transparent) {
+        return sock.ioHandle().localAddress();
+      }
     }
-    safeMemcpy(reinterpret_cast<sockaddr*>(&orig_addr), sock.ioHandle().localAddress()->sockAddr());
-#else
-  if (status != 0) {
-    return nullptr;
 #endif
+    return nullptr;
   }
 
   return Address::addressFromSockAddrOrDie(orig_addr, 0, -1, true /* default for v6 constructor */);
