@@ -72,10 +72,6 @@ struct ByteString {
     bytes = NULL_PTR;
     byte_size = 0;
   }
-
-  std::string to_str() const {
-    return std::string(reinterpret_cast<const char*>(bytes), byte_size);
-  }
 };
 
 /**

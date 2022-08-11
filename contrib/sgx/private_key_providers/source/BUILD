@@ -17,13 +17,12 @@ envoy_cc_library(
         "utility.cc",
     ],
     hdrs = [
-        "pkcs11.h",
-        "pkcs11f.h",
-        "pkcs11t.h",
         "sgx.h",
         "sgx_private_key_provider.h",
         "utility.h",
+        "@pkcs11//:pkcs11headers",
     ],
+    copts = ["-I external/pkcs11/include/pkcs11-v2.40"],
     external_deps = ["ssl"],
     repository = "@envoy",
     deps = [
@@ -47,6 +46,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    copts = ["-I external/pkcs11/include/pkcs11-v2.40"],
     visibility = ["//visibility:public"],
     deps = [
         ":sgx_private_key_provider_lib",
