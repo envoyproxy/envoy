@@ -21,15 +21,6 @@ const std::string EnvoyQuicheReloadableFlagPrefix =
     "envoy.reloadable_features.FLAGS_quic_reloadable_flag_";
 const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
 
-// TODO(mpwarres): implement. Lower priority since only used by QUIC command-line tools.
-inline std::vector<std::string> quicParseCommandLineFlagsImpl(const char* /*usage*/, int /*argc*/,
-                                                              const char* const* /*argv*/) {
-  return {};
-}
-
-// TODO(mpwarres): implement. Lower priority since only used by QUIC command-line tools.
-inline void quicPrintCommandLineFlagHelpImpl(const char* /*usage*/) {}
-
 // Concrete class for QUICHE protocol and feature flags, templated by flag type.
 template <typename T> class TypedFlag {
 public:

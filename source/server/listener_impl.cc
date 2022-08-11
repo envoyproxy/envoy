@@ -213,16 +213,25 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
 #endif
 }
 
+namespace {
+std::string listenerStatsScope(const envoy::config::listener::v3::Listener& config) {
+  if (!config.stat_prefix().empty()) {
+    return config.stat_prefix();
+  }
+  if (config.has_internal_listener()) {
+    return absl::StrCat("envoy_internal_", config.name());
+  }
+  return Network::Address::resolveProtoAddress(config.address())->asString();
+}
+} // namespace
+
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
     : server_(server), metadata_(config.metadata()), typed_metadata_(config.metadata()),
       direction_(config.traffic_direction()), global_scope_(server.stats().createScope("")),
-      listener_scope_(server_.stats().createScope(
-          fmt::format("listener.{}.",
-                      !config.stat_prefix().empty()
-                          ? config.stat_prefix()
-                          : Network::Address::resolveProtoAddress(config.address())->asString()))),
+      listener_scope_(
+          server_.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config)))),
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
       is_quic_(config.udp_listener_config().has_quic_options()) {}
 
@@ -298,7 +307,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash)
-    : parent_(parent), socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
+    : parent_(parent),
+      socket_type_(config.has_internal_listener()
+                       ? Network::Socket::Type::Stream
+                       : Network::Utility::protobufAddressSocketType(config.address())),
       bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
@@ -323,7 +335,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, this, *this,
           parent.factory_.createDrainManager(config.drain_type()))),
-      reuse_port_(getReusePortOrDefault(parent_.server_, config_)),
+      reuse_port_(getReusePortOrDefault(parent_.server_, config_, socket_type_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
                             ".connection_limit"),
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
@@ -350,22 +362,29 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
-  // All the addresses should be same socket type, so get the first address's socket type is enough.
-  auto address = Network::Address::resolveProtoAddress(config.address());
-  checkIpv4CompatAddress(address, config.address());
-  addresses_.emplace_back(address);
+  if (config.has_internal_listener()) {
+    addresses_.emplace_back(
+        std::make_shared<Network::Address::EnvoyInternalInstance>(config.name()));
+  } else {
+    // All the addresses should be same socket type, so get the first address's socket type is
+    // enough.
+    auto address = Network::Address::resolveProtoAddress(config.address());
+    checkIpv4CompatAddress(address, config.address());
+    addresses_.emplace_back(address);
 
-  for (auto i = 0; i < config.additional_addresses_size(); i++) {
-    if (socket_type_ !=
-        Network::Utility::protobufAddressSocketType(config.additional_addresses(i).address())) {
-      throw EnvoyException(fmt::format("listener {}: has different socket type. The listener only "
-                                       "support same socket type for all the addresses.",
-                                       name_));
+    for (auto i = 0; i < config.additional_addresses_size(); i++) {
+      if (socket_type_ !=
+          Network::Utility::protobufAddressSocketType(config.additional_addresses(i).address())) {
+        throw EnvoyException(
+            fmt::format("listener {}: has different socket type. The listener only "
+                        "support same socket type for all the addresses.",
+                        name_));
+      }
+      auto additional_address =
+          Network::Address::resolveProtoAddress(config.additional_addresses(i).address());
+      checkIpv4CompatAddress(address, config.additional_addresses(i).address());
+      addresses_.emplace_back(additional_address);
     }
-    auto additional_address =
-        Network::Address::resolveProtoAddress(config.additional_addresses(i).address());
-    checkIpv4CompatAddress(address, config.additional_addresses(i).address());
-    addresses_.emplace_back(additional_address);
   }
 
   const absl::optional<std::string> runtime_val =
@@ -512,11 +531,11 @@ void ListenerImpl::buildAccessLog() {
 }
 
 void ListenerImpl::buildInternalListener() {
-  if (config_.address().has_envoy_internal_address()) {
-    if (config_.has_api_listener()) {
-      throw EnvoyException(
-          fmt::format("error adding listener '{}': internal address cannot be used in api listener",
-                      absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
+  if (config_.has_internal_listener()) {
+    if (config_.has_address() || !config_.additional_addresses().empty()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': address should not be used "
+                                       "when an internal listener config is provided",
+                                       name_));
     }
     if ((config_.has_connection_balance_config() &&
          config_.connection_balance_config().has_exact_balance()) ||
@@ -525,32 +544,32 @@ void ListenerImpl::buildInternalListener() {
         || (config_.has_freebind() && config_.freebind().value()) ||
         config_.has_tcp_backlog_size() || config_.has_tcp_fast_open_queue_length() ||
         (config_.has_transparent() && config_.transparent().value())) {
-      throw EnvoyException(
-          fmt::format("error adding listener '{}': has unsupported tcp listener feature",
-                      absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
+      throw EnvoyException(fmt::format(
+          "error adding listener named '{}': has unsupported tcp listener feature", name_));
     }
     if (!config_.socket_options().empty()) {
       throw EnvoyException(
-          fmt::format("error adding listener '{}': does not support socket option",
-                      absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
+          fmt::format("error adding listener named '{}': does not support socket option", name_));
     }
     std::shared_ptr<Network::InternalListenerRegistry> internal_listener_registry =
         parent_.server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
             "internal_listener_registry_singleton");
     if (internal_listener_registry == nullptr) {
-      throw EnvoyException(
-          fmt::format("error adding listener '{}': internal listener registry is not initialized.",
-                      absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
+      throw EnvoyException(fmt::format(
+          "error adding listener named '{}': internal listener registry is not initialized.",
+          name_));
     }
     internal_listener_config_ =
         std::make_unique<InternalListenerConfigImpl>(*internal_listener_registry);
-  } else {
-    if (config_.has_internal_listener()) {
-      throw EnvoyException(
-          fmt::format("error adding listener '{}': address is not an internal "
-                      "address but an internal listener config is provided",
-                      absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
-    }
+  } else if (config_.address().has_envoy_internal_address() ||
+             std::any_of(config_.additional_addresses().begin(),
+                         config_.additional_addresses().end(),
+                         [](const envoy::config::listener::v3::AdditionalAddress& proto_address) {
+                           return proto_address.address().has_envoy_internal_address();
+                         })) {
+    throw EnvoyException(fmt::format("error adding listener named '{}': use internal_listener "
+                                     "field instead of address for internal listeners",
+                                     name_));
   }
 }
 
@@ -1005,7 +1024,8 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
 }
 
 bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
-                                         const envoy::config::listener::v3::Listener& config) {
+                                         const envoy::config::listener::v3::Listener& config,
+                                         Network::Socket::Type socket_type) {
   bool initial_reuse_port_value = [&server, &config]() {
     // If someone set the new field, adhere to it.
     if (config.has_enable_reuse_port()) {
@@ -1029,7 +1049,6 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
   }();
 
 #ifndef __linux__
-  const auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   if (initial_reuse_port_value && socket_type == Network::Socket::Type::Stream) {
     // reuse_port is the default on Linux for TCP. On other platforms even if set it is disabled
     // and the user is warned. For UDP it's always the default even if not effective.
@@ -1039,6 +1058,8 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
               config.name());
     initial_reuse_port_value = false;
   }
+#else
+  UNREFERENCED_PARAMETER(socket_type);
 #endif
 
   return initial_reuse_port_value;
