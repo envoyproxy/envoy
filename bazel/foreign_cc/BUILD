@@ -200,6 +200,7 @@ configure_make(
     name = "isa_l",
     autogen = True,
     configure_in_place = True,
+    env = {"PATH":"$$PATH:$$EXT_BUILD_ROOT/bazel-out/k8-fastbuild/bin/bazel/foreign_cc/copy_libnasm/libnasm/bin"},
     lib_source = "@com_github_intel_isa_l//:all",
     out_static_libs = ["libisal.a"],
     deps = [":libnasm"],
