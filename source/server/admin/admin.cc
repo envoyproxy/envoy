@@ -76,6 +76,15 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
   }
 }
 
+namespace {
+// Prepends an element to an array, modifying it as passed in.
+std::vector<absl::string_view> prepend(const absl::string_view first,
+                                       std::vector<absl::string_view> strings) {
+  strings.insert(strings.begin(), first);
+  return strings;
+}
+} // namespace
+
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                      bool ignore_global_conn_limit)
     : server_(server),
@@ -122,9 +131,17 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
           makeHandler("/contention", "dump current Envoy mutex contention stats (if enabled)",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false),
           makeHandler("/cpuprofiler", "enable/disable the CPU profiler",
-                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true),
+                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true,
+                      {{Admin::ParamDescriptor::Type::Enum,
+                        "enable",
+                        "enables the CPU profiler",
+                        {"y", "n"}}}),
           makeHandler("/heapprofiler", "enable/disable the heap profiler",
-                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true),
+                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true,
+                      {{Admin::ParamDescriptor::Type::Enum,
+                        "enable",
+                        "enable/disable the heap profiler",
+                        {"y", "n"}}}),
           makeHandler("/heap_dump", "dump current Envoy heap (if supported)",
                       MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerHeapDump), false,
                       false),
@@ -138,20 +155,34 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion), false,
                       false),
 
-          // TODO(jmarantz): add support for param-passing through a POST. Browsers send
-          // those params as the post-body rather than query-params and that requires some
-          // re-plumbing through the admin callback API. See also drain_listeners.
+          // The logging "level" parameter, if specified as a non-blank entry,
+          // changes all the logging-paths to that level. So the enum parameter
+          // needs to include a an empty string as the default (first) option.
+          // Thus we prepend an empty string to the logging-levels list.
           makeHandler("/logging", "query/change logging levels",
-                      MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true),
-
+                      MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true,
+                      {{Admin::ParamDescriptor::Type::String, "paths",
+                        "Change multiple logging levels by setting to "
+                        "<logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>."},
+                       {Admin::ParamDescriptor::Type::Enum, "level", "desired logging level",
+                        prepend("", LogsHandler::levelStrings())}}),
           makeHandler("/memory", "print current allocation/heap usage",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false),
           makeHandler("/quitquitquit", "exit the server",
                       MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true),
           makeHandler("/reset_counters", "reset all counters to zero",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true),
-          makeHandler("/drain_listeners", "drain listeners",
-                      MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true),
+          makeHandler(
+              "/drain_listeners", "drain listeners",
+              MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true,
+              {{ParamDescriptor::Type::Boolean, "graceful",
+                "When draining listeners, enter a graceful drain period prior to closing "
+                "listeners. This behaviour and duration is configurable via server options "
+                "or CLI"},
+               {ParamDescriptor::Type::Boolean, "inboundonly",
+                "Drains all inbound listeners. traffic_direction field in "
+                "envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a "
+                "listener is inbound or outbound."}}),
           makeHandler("/server_info", "print server version/status information",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
           makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
@@ -335,6 +366,7 @@ Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
         }
       }
 
+      ASSERT(admin_stream.getRequestHeaders().getPathValue() == path_and_query);
       return handler.handler_(path_and_query, admin_stream);
     }
   }
@@ -369,7 +401,8 @@ void AdminImpl::getHelp(Buffer::Instance& response) const {
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   for (const UrlHandler* handler : sortedHandlers()) {
-    response.add(fmt::format("  {}: {}\n", handler->prefix_, handler->help_text_));
+    const absl::string_view method = handler->mutates_server_state_ ? " (POST)" : "";
+    response.add(fmt::format("  {}{}: {}\n", handler->prefix_, method, handler->help_text_));
     for (const ParamDescriptor& param : handler->params_) {
       response.add(fmt::format("      {}: {}", param.id_, param.help_));
       if (param.type_ == ParamDescriptor::Type::Enum) {
@@ -440,6 +473,7 @@ Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_vie
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
   request_headers->setMethod(method);
+  request_headers->setPath(path_and_query);
   filter.decodeHeaders(*request_headers, false);
   Buffer::OwnedImpl response;
 
