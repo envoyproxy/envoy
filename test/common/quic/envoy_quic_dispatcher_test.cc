@@ -257,7 +257,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
         read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks);
         read_filter->callbacks_->connection().setConnectionStats(
             {read_total, read_current, write_total, write_current, nullptr, nullptr});
-        // This will not close connection right away during processing the first packet, but .
+        // This will not close connection right away, but during processing the first packet.
         read_filter->callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       }});
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
