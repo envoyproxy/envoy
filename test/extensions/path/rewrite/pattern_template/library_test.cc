@@ -82,7 +82,8 @@ TEST(RewriteTest, RewriteInvalidRegex) {
 )EOF";
 
   Router::PathRewritePredicateSharedPtr predicate = createRewritePredicateFromYaml(yaml_string);
-  absl::StatusOr<std::string> rewrite_or_error = predicate->rewriteUrl("/bar/en/usa", "/bar/invalid}/{lang}");
+  absl::StatusOr<std::string> rewrite_or_error =
+      predicate->rewriteUrl("/bar/en/usa", "/bar/invalid}/{lang}");
   EXPECT_FALSE(rewrite_or_error.ok());
   EXPECT_EQ(rewrite_or_error.status().message(), "Unable to parse url pattern regex");
 }
