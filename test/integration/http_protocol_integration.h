@@ -89,7 +89,7 @@ protected:
 
   enum class SkipOnStream { Upstream, Downstream, AnyStream };
 
-  bool skipForH2Uhv(SkipOnStream stream) {
+  bool skipForH2Uhv([[maybe_unused]] SkipOnStream stream) {
 #ifdef ENVOY_ENABLE_UHV
     return GetParam().http2_implementation == Http2Impl::Oghttp2 &&
            (stream == SkipOnStream::AnyStream ||
