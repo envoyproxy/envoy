@@ -73,6 +73,20 @@ TEST(RewriteTest, BasicUsage) {
             "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate");
 }
 
+TEST(RewriteTest, RewriteInvalidRegex) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+        path_template_rewrite: "/bar/{lang}/{country}"
+)EOF";
+
+  Router::PathRewritePredicateSharedPtr predicate = createRewritePredicateFromYaml(yaml_string);
+  absl::StatusOr<std::string> rewrite_or_error = predicate->rewriteUrl("/bar/en/usa", "/bar/invalid}/{lang}");
+  EXPECT_FALSE(rewrite_or_error.ok());
+  EXPECT_EQ(rewrite_or_error.status().message(), "Unable to parse url pattern regex");
+}
+
 TEST(RewriteTest, MatchPatternValidation) {
   const std::string rewrite_yaml_string = R"EOF(
       name: envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate

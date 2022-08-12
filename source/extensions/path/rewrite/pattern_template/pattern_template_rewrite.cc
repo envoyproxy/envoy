@@ -60,24 +60,8 @@ PatternTemplateRewritePredicate::rewriteUrl(absl::string_view current_pattern,
     return absl::InvalidArgumentError("Unable to parse url rewrite pattern");
   }
 
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewrite_pattern_proto =
-      *std::move(rewrite_pattern);
-
-  absl::StatusOr<std::string> new_path =
-      rewriteURLTemplatePattern(current_pattern, regex_pattern_str, rewrite_pattern_proto);
-
-  if (!new_path.ok()) {
-    return absl::InvalidArgumentError("Unable rewrite url to new URL");
-  }
-
-  return *std::move(new_path);
-}
-
-absl::StatusOr<std::string> PatternTemplateRewritePredicate::rewriteURLTemplatePattern(
-    absl::string_view url, absl::string_view capture_regex,
-    const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern)
-    const {
-  RE2 regex = RE2(PatternTemplateInternal::toStringPiece(capture_regex));
+ const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern_proto = *std::move(rewrite_pattern);
+    RE2 regex = RE2(PatternTemplateInternal::toStringPiece(regex_pattern_str));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
   }
@@ -85,26 +69,25 @@ absl::StatusOr<std::string> PatternTemplateRewritePredicate::rewriteURLTemplateP
   // First capture is the whole matched regex pattern.
   int capture_num = regex.NumberOfCapturingGroups() + 1;
   std::vector<re2::StringPiece> captures(capture_num);
-  if (!regex.Match(PatternTemplateInternal::toStringPiece(url), /*startpos=*/0,
-                   /*endpos=*/url.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
+  if (!regex.Match(PatternTemplateInternal::toStringPiece(current_pattern), /*startpos=*/0,
+                   /*endpos=*/current_pattern.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
     return absl::InvalidArgumentError("Pattern not match");
   }
 
-  std::string rewritten_url;
-
+  std::string new_path;
   for (const envoy::extensions::pattern_template::PatternTemplateRewriteSegments::RewriteSegment&
-           segment : rewrite_pattern.segments()) {
+           segment : rewrite_pattern_proto.segments()) {
     if (segment.has_literal()) {
-      absl::StrAppend(&rewritten_url, segment.literal());
+      absl::StrAppend(&new_path, segment.literal());
     } else if (segment.has_var_index()) {
       if (segment.var_index() < 1 || segment.var_index() >= capture_num) {
         return absl::InvalidArgumentError("Invalid variable index");
       }
-      absl::StrAppend(&rewritten_url, absl::string_view(captures[segment.var_index()].as_string()));
+      absl::StrAppend(&new_path, absl::string_view(captures[segment.var_index()].as_string()));
     }
   }
 
-  return rewritten_url;
+  return absl::StatusOr<std::string>(new_path);
 }
 
 } // namespace Rewrite

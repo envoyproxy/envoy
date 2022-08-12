@@ -42,13 +42,6 @@ public:
   absl::string_view name() const override { return NAME; }
 
 private:
-  // Returns the rewritten URL path based on the given parsed rewrite pattern.
-  // Used for template-based URL rewrite.
-  absl::StatusOr<std::string> rewriteURLTemplatePattern(
-      absl::string_view url, absl::string_view capture_regex,
-      const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern)
-      const;
-
   std::string url_rewrite_pattern_{nullptr};
 };
 
