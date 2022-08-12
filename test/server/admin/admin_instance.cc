@@ -35,6 +35,7 @@ Http::Code AdminInstanceTest::runCallback(absl::string_view path_and_query,
   }
 
   request_headers_.setMethod(method);
+  request_headers_.setPath(path_and_query);
   admin_filter_.decodeHeaders(request_headers_, false);
 
   return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
