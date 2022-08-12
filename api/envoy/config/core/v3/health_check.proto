@@ -115,7 +115,7 @@ message HealthCheck {
     repeated Payload receive = 4;
 
     // Specifies the size of response buffer in bytes that is used to Payload match.
-    // The default value is 1024 when not set. When set, use the set value, and 0 is as unlimited.
+    // The default value is 1024. Setting to 0 implies that the Payload will be matched against the entire response.
     google.protobuf.UInt64Value response_buffer_size = 14 [(validate.rules).uint64 = {gte: 0}];
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
