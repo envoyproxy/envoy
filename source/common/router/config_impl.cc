@@ -359,8 +359,8 @@ PathRewritePolicyImpl::PathRewritePolicyImpl() : enabled_(false){};
 
 PathRewritePolicyImpl::PathRewritePolicyImpl(
     const envoy::config::core::v3::TypedExtensionConfig typed_config,
-    ProtobufMessage::ValidationVisitor& validator, std::string route_url)
-    : route_url_(route_url), enabled_(true) {
+    ProtobufMessage::ValidationVisitor& validator)
+    : enabled_(true) {
 
   const auto& predicate_factory =
       &Envoy::Config::Utility::getAndCheckFactory<PathRewritePredicateFactory>(typed_config);
@@ -387,8 +387,8 @@ PathMatchPolicyImpl::PathMatchPolicyImpl() : enabled_(false){};
 
 PathMatchPolicyImpl::PathMatchPolicyImpl(
     const envoy::config::core::v3::TypedExtensionConfig typed_config,
-    ProtobufMessage::ValidationVisitor& validator, std::string path)
-    : path_(path), enabled_(true) {
+    ProtobufMessage::ValidationVisitor& validator)
+    : enabled_(true) {
 
   const auto& predicate_factory =
       &Envoy::Config::Utility::getAndCheckFactory<PathMatchPredicateFactory>(typed_config);
@@ -1243,7 +1243,7 @@ PathRewritePolicyImpl
 RouteEntryImplBase::buildPathRewritePolicy(envoy::config::route::v3::Route route,
                                            ProtobufMessage::ValidationVisitor& validator) const {
   if (route.route().has_path_rewrite_policy()) {
-    return PathRewritePolicyImpl{route.route().path_rewrite_policy(), validator, route.name()};
+    return PathRewritePolicyImpl{route.route().path_rewrite_policy(), validator};
   }
   return {};
 }
@@ -1252,7 +1252,7 @@ PathMatchPolicyImpl
 RouteEntryImplBase::buildPathMatchPolicy(envoy::config::route::v3::Route route,
                                          ProtobufMessage::ValidationVisitor& validator) const {
   if (route.match().has_path_match_policy()) {
-    return PathMatchPolicyImpl{route.match().path_match_policy(), validator, route.name()};
+    return PathMatchPolicyImpl{route.match().path_match_policy(), validator};
   }
 
   return {};

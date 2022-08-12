@@ -464,7 +464,7 @@ private:
 class PathMatchPolicyImpl : public PathMatchPolicy {
 public:
   PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
-                      ProtobufMessage::ValidationVisitor& validator, std::string path);
+                      ProtobufMessage::ValidationVisitor& validator);
 
   // Default constructor that disables internal redirect.
   PathMatchPolicyImpl();
@@ -473,10 +473,7 @@ public:
 
   PathMatchPredicateSharedPtr predicate() const override;
 
-  std::string path() const { return path_; }
-
 private:
-  const std::string path_;
   const bool enabled_;
   ProtobufTypes::MessagePtr predicate_config_;
   PathMatchPredicateSharedPtr predicate_;
@@ -489,7 +486,7 @@ private:
 class PathRewritePolicyImpl : public PathRewritePolicy {
 public:
   PathRewritePolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
-                        ProtobufMessage::ValidationVisitor& validator, std::string route_url);
+                        ProtobufMessage::ValidationVisitor& validator);
 
   // Default constructor that disables internal redirect.
   PathRewritePolicyImpl();
@@ -498,10 +495,7 @@ public:
 
   PathRewritePredicateSharedPtr predicate() const override;
 
-  std::string routeUrl() const { return route_url_; }
-
 private:
-  const std::string route_url_;
   const bool enabled_;
   ProtobufTypes::MessagePtr predicate_config_;
   PathRewritePredicateSharedPtr predicate_;

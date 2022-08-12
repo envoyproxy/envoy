@@ -34,8 +34,7 @@ absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url
   if (!status.ok()) {
     return status.status();
   }
-  struct ParsedUrlPattern pattern = *std::move(status);
-  return PatternTemplateInternal::toRegexPattern(pattern);
+  return PatternTemplateInternal::toRegexPattern(*status);
 }
 
 absl::StatusOr<std::vector<RewritePatternSegment>>
@@ -146,7 +145,7 @@ absl::StatusOr<std::string> rewriteURLTemplatePattern(
   std::vector<re2::StringPiece> captures(capture_num);
   if (!regex.Match(PatternTemplateInternal::toStringPiece(url), /*startpos=*/0,
                    /*endpos=*/url.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
-    return absl::InvalidArgumentError("Pattern not match");
+    return absl::InvalidArgumentError("Pattern does not match");
   }
 
   std::string rewritten_url;
