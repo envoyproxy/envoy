@@ -335,6 +335,64 @@ TEST(WebSocketCodecTest, decodeIncompleteFrameWithPartialPayload) {
   EXPECT_EQ(size, buffer.length());
 }
 
+// Check frame decoding iteratively
+TEST(WebSocketCodecTest, decodeFrameIteratively) {
+  // A complete frame - 0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f
+  Buffer::OwnedImpl buffer;
+  absl::optional<std::vector<Frame>> frames = absl::nullopt;
+  Decoder decoder;
+
+  Buffer::addSeq(buffer, {0x81});
+  frames = decoder.decode(buffer);
+  EXPECT_EQ(1, buffer.length());
+  ASSERT_FALSE(frames.has_value());
+  EXPECT_EQ(1, buffer.length());
+
+  Buffer::addSeq(buffer, {0x05});
+  EXPECT_EQ(2, buffer.length());
+  frames = decoder.decode(buffer);
+  ASSERT_FALSE(frames.has_value());
+  EXPECT_EQ(2, buffer.length());
+
+  Buffer::addSeq(buffer, {0x48});
+  EXPECT_EQ(3, buffer.length());
+  frames = decoder.decode(buffer);
+  ASSERT_FALSE(frames.has_value());
+  EXPECT_EQ(3, buffer.length());
+
+  Buffer::addSeq(buffer, {0x65});
+  EXPECT_EQ(4, buffer.length());
+  frames = decoder.decode(buffer);
+  ASSERT_FALSE(frames.has_value());
+  EXPECT_EQ(4, buffer.length());
+
+  Buffer::addSeq(buffer, {0x6c});
+  frames = decoder.decode(buffer);
+  EXPECT_EQ(5, buffer.length());
+  ASSERT_FALSE(frames.has_value());
+  EXPECT_EQ(5, buffer.length());
+
+  Buffer::addSeq(buffer, {0x6c});
+  frames = decoder.decode(buffer);
+  EXPECT_EQ(6, buffer.length());
+  ASSERT_FALSE(frames.has_value());
+  EXPECT_EQ(6, buffer.length());
+
+  Buffer::addSeq(buffer, {0x6f});
+  EXPECT_EQ(7, buffer.length());
+  frames = decoder.decode(buffer);
+  EXPECT_EQ(0, buffer.length());
+  ASSERT_TRUE(frames.has_value());
+  EXPECT_EQ(false, frames.value()[0].masking_key_.has_value());
+  EXPECT_EQ(1, frames.value().size());
+  EXPECT_EQ(5, frames.value()[0].payload_length_);
+
+  std::string text_payload;
+  text_payload.resize(5);
+  (*(frames.value()[0].payload_)).copyOut(0, 5, text_payload.data());
+  EXPECT_EQ("Hello", text_payload);
+}
+
 // Frame spans over two slices
 TEST(WebSocketCodecTest, decodeFrameSpansOverTwoSlices) {
   Buffer::OwnedImpl buffer;
