@@ -129,9 +129,11 @@ message BindConfig {
   // precompiled binaries.
   repeated SocketOption socket_options = 3;
 
-  // Additional source addresses append to the `source_address`. This enables
-  // to specify multiple source addresses. The
-  // source address selection is based on the target host address' version.
+  // Additional source addresses append to the address specified in  the `source_address`
+  // field. This enables to specify multiple source addresses. Currently, only one additional
+  // address can be supported, and the additional address should have a different IP version
+  // with the address in the `source_address` field. Then the address, which has the same IP
+  // version with the target host's address IP version, will be used as bind address.
   repeated SocketAddress additional_source_addresses = 4;
 }
 
