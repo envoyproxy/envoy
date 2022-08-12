@@ -341,8 +341,8 @@ Http2HeaderValidator::validateGenericHeaderName(const ::Envoy::Http::HeaderStrin
   // https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2:
   //
   // Just as in HTTP/1.x, header field names are strings of ASCII characters that are compared in
-  // a case-insensitive fashion.  However, header field names MUST be converted to lowercase prior
-  // to their encoding in HTTP/2.  A request or response containing uppercase header field names
+  // a case-insensitive fashion. However, header field names MUST be converted to lowercase prior
+  // to their encoding in HTTP/2. A request or response containing uppercase header field names
   // MUST be treated as malformed (Section 8.1.2.6).
   //
   bool is_valid = true;
