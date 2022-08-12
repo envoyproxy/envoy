@@ -41,17 +41,18 @@ absl::StatusOr<std::vector<RewritePatternSegment>>
 parseRewritePatternHelper(absl::string_view pattern) {
   std::vector<RewritePatternSegment> result;
 
-  // Don't allow contiguous '/' patterns.
-  static const LazyRE2 invalid_regex = {"^.*//.*$"};
-  if (RE2::FullMatch(toStringPiece(pattern), *invalid_regex)) {
-    return absl::InvalidArgumentError("Invalid rewrite literal pattern");
-  }
-
   // The pattern should start with a '/' and thus the first segment should
   // always be a literal.
   if (pattern.empty() || pattern[0] != '/') {
     return absl::InvalidArgumentError("Invalid rewrite variable placement");
   }
+
+  // Don't allow contiguous '/' patterns.
+  static const LazyRE2 invalid_regex = {"^.*//.*$"};
+  if (RE2::FullMatch(toStringPiece(pattern), *invalid_regex)) {
+    return absl::InvalidArgumentError("Invalid rewrite literal");
+  }
+
   while (!pattern.empty()) {
     std::vector<absl::string_view> segments1 = absl::StrSplit(pattern, absl::MaxSplits('{', 1));
     if (!segments1[0].empty()) {
@@ -149,7 +150,6 @@ absl::StatusOr<std::string> rewriteURLTemplatePattern(
   }
 
   std::string rewritten_url;
-
   for (const envoy::extensions::pattern_template::PatternTemplateRewriteSegments::RewriteSegment&
            segment : rewrite_pattern.segments()) {
     if (segment.has_literal()) {
