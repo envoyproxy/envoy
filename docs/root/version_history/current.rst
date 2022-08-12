@@ -13,6 +13,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* listener: fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
 * repo: fix version to resolve release issue.
 * transport_socket: fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
 
