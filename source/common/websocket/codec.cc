@@ -113,11 +113,18 @@ uint8_t Decoder::doDecodeMaskFlagAndLength(absl::Span<const uint8_t>& data) {
 }
 
 uint8_t Decoder::doDecodeExtendedLength(absl::Span<const uint8_t>& data) {
-  if (num_remaining_extended_length_bytes_ > 0) {
-    length_ |= static_cast<uint64_t>(data.front())
+  uint8_t bytes_decoded = 0;
+  uint64_t bytes_to_decode = data.length() <= num_remaining_extended_length_bytes_
+                                 ? data.length()
+                                 : num_remaining_extended_length_bytes_;
+  while (bytes_to_decode > 0) {
+    length_ |= static_cast<uint64_t>(data.at(bytes_decoded))
                << 8 * (num_remaining_extended_length_bytes_ - 1);
+    num_remaining_extended_length_bytes_--;
+    bytes_to_decode--;
+    bytes_decoded++;
   }
-  num_remaining_extended_length_bytes_--;
+
   if (num_remaining_extended_length_bytes_ == 0) {
     if (num_remaining_masking_key_bytes_ > 0) {
       state_ = State::FrameHeaderMaskingKey;
@@ -125,22 +132,28 @@ uint8_t Decoder::doDecodeExtendedLength(absl::Span<const uint8_t>& data) {
       frameDataStart();
     }
   }
-  return 1;
+  return bytes_decoded;
 }
 
 uint8_t Decoder::doDecodeMaskingKey(absl::Span<const uint8_t>& data) {
   if (!frame_.masking_key_.has_value()) {
     frame_.masking_key_ = 0;
   }
-  if (num_remaining_masking_key_bytes_ > 0) {
-    frame_.masking_key_.value() |= static_cast<uint32_t>(data.front())
+  uint8_t bytes_decoded = 0;
+  uint64_t bytes_to_decode = data.length() <= num_remaining_masking_key_bytes_
+                                 ? data.length()
+                                 : num_remaining_masking_key_bytes_;
+  while (bytes_to_decode > 0) {
+    frame_.masking_key_.value() |= static_cast<uint32_t>(data.at(bytes_decoded))
                                    << 8 * (num_remaining_masking_key_bytes_ - 1);
+    num_remaining_masking_key_bytes_--;
+    bytes_to_decode--;
+    bytes_decoded++;
   }
-  num_remaining_masking_key_bytes_--;
   if (num_remaining_masking_key_bytes_ == 0) {
     frameDataStart();
   }
-  return 1;
+  return bytes_decoded;
 }
 
 uint64_t Decoder::doDecodePayload(absl::Span<const uint8_t>& data) {
