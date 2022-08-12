@@ -34,6 +34,15 @@ getAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& conte
 ::Envoy::AccessLog::InstanceSharedPtr
 AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
                                           ::Envoy::AccessLog::FilterPtr&& filter,
+                                          Server::Configuration::AccessLogFactoryContext& context) {
+  return createAccessLogInstance(
+      config, std::move(filter),
+      static_cast<Server::Configuration::CommonFactoryContext&>(context));
+}
+
+::Envoy::AccessLog::InstanceSharedPtr
+AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
+                                          ::Envoy::AccessLog::FilterPtr&& filter,
                                           Server::Configuration::CommonFactoryContext& context) {
   validateProtoDescriptors();
 

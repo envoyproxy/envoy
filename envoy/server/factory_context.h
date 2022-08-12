@@ -180,11 +180,34 @@ public:
 };
 
 /**
+ * Factory context for access loggers that need access to listener properties.
+ */
+class AccessLogFactoryContext : public virtual CommonFactoryContext {
+public:
+  /**
+   * @return Stats::Scope& the listener's stats scope.
+   */
+  virtual Stats::Scope& listenerScope() PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
+   * listener.
+   */
+  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
+
+  /**
+   * @return ProcessContextOptRef an optional reference to the
+   * process context. Will be unset when running in validation mode.
+   */
+  virtual ProcessContextOptRef processContext() PURE;
+};
+
+/**
  * Context passed to network and HTTP filters to access server resources.
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
  * access the rest of the server via interfaces exposed here.
  */
-class FactoryContext : public virtual CommonFactoryContext {
+class FactoryContext : public virtual AccessLogFactoryContext {
 public:
   ~FactoryContext() override = default;
 
@@ -216,20 +239,9 @@ public:
   virtual bool healthCheckFailed() PURE;
 
   /**
-   * @return Stats::Scope& the listener's stats scope.
-   */
-  virtual Stats::Scope& listenerScope() PURE;
-
-  /**
    * @return bool if these filters are created under the scope of a Quic listener.
    */
   virtual bool isQuicListener() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
-   * listener.
-   */
-  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
 
   /**
    * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
@@ -256,12 +268,6 @@ public:
    * @return Router::Context& a reference to the router context.
    */
   virtual Router::Context& routerContext() PURE;
-
-  /**
-   * @return ProcessContextOptRef an optional reference to the
-   * process context. Will be unset when running in validation mode.
-   */
-  virtual ProcessContextOptRef processContext() PURE;
 };
 
 /**
