@@ -715,6 +715,11 @@ class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {
 
 class TypedLoadBalancerFactory;
 
+/**
+ * This is a function used by upstream binding config to select the source address based on the
+ * target address. Given the target address through the parameter expect the source address
+ * returned.
+ */
 using AddressSelectFn = std::function<const Network::Address::InstanceConstSharedPtr(
     const Network::Address::InstanceConstSharedPtr&)>;
 
