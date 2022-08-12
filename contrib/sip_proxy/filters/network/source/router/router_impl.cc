@@ -60,8 +60,13 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
   header = metadata.header(type).text();
   if (header.empty()) {
     if (type == HeaderType::Route) {
+      if (metadata.header(HeaderType::TopLine).empty()) {
+        ENVOY_LOG(error, "No route and r-uri");
+        return nullptr;
+      }
       header = metadata.header(HeaderType::TopLine).text();
       ENVOY_LOG(debug, "No route, r-uri {} is used ", header);
+      type = HeaderType::TopLine;
     } else {
       ENVOY_LOG(debug, "header {} is empty", header_);
       return nullptr;
@@ -73,7 +78,7 @@ RouteConstSharedPtr GeneralRouteEntryImpl::matches(MessageMetadata& metadata) co
     return clusterEntry(metadata);
   }
 
-  auto domain = metadata.getDomainFromHeaderParameter(header, parameter_);
+  auto domain = metadata.getDomainFromHeaderParameter(type, parameter_);
 
   if (domain_ == domain) {
     ENVOY_LOG(trace, "Route matched with header: {}, parameter: {} and domain: {}", header_,
@@ -142,11 +147,16 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
       host = std::string(metadata->opaque().value());
     } else {
       // Handler other Requests except REGISTER
-      if ((metadata->header(HeaderType::Route).empty() &&
-           metadata->header(HeaderType::TopLine).hasParam("ep"))) {
-        host = std::string(metadata->header(HeaderType::TopLine).param("ep"));
-      } else if (metadata->header(HeaderType::Route).hasParam("ep")) {
-        host = std::string(metadata->header(HeaderType::Route).param("ep"));
+      if (metadata->header(HeaderType::Route).empty()) {
+        metadata->parseHeader(HeaderType::TopLine);
+        if (metadata->header(HeaderType::TopLine).hasParam("ep")) {
+          host = std::string(metadata->header(HeaderType::TopLine).param("ep"));
+        }
+      } else {
+        metadata->parseHeader(HeaderType::Route);
+        if (metadata->header(HeaderType::Route).hasParam("ep")) {
+          host = std::string(metadata->header(HeaderType::Route).param("ep"));
+        }
       }
     }
 
@@ -238,10 +248,18 @@ FilterStatus Router::handleAffinity() {
     } else if (metadata->methodType() != MethodType::Register && options->sessionAffinity()) {
       metadata->setStopLoadBalance(false);
 
-      if ((metadata->header(HeaderType::Route).empty() &&
-           metadata->header(HeaderType::TopLine).hasParam("ep")) ||
-          (metadata->header(HeaderType::Route).hasParam("ep"))) {
-        metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
+      if (metadata->header(HeaderType::Route).empty()) {
+        if (!metadata->header(HeaderType::TopLine).empty()) {
+          metadata->parseHeader(HeaderType::TopLine);
+          if (metadata->header(HeaderType::TopLine).hasParam("ep")) {
+            metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
+          }
+        }
+      } else {
+        metadata->parseHeader(HeaderType::Route);
+        if (metadata->header(HeaderType::Route).hasParam("ep")) {
+          metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
+        }
       }
     } else if (metadata->methodType() == MethodType::Register && options->registrationAffinity()) {
       metadata->setStopLoadBalance(false);
