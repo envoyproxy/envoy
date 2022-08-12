@@ -31,7 +31,7 @@ public:
    */
   virtual AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          AccessLogFactoryContext& context) PURE;
+                          ListenerAccessLogFactoryContext& context) PURE;
 
   /**
    * Create a particular AccessLog::Instance implementation from a config proto. If the

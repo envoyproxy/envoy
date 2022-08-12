@@ -14,7 +14,7 @@ class StdoutAccessLogFactory : public Server::Configuration::AccessLogInstanceFa
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::AccessLogFactoryContext& context) override;
+                          Server::Configuration::ListenerAccessLogFactoryContext& context) override;
 
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
@@ -32,7 +32,7 @@ class StderrAccessLogFactory : public Server::Configuration::AccessLogInstanceFa
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::AccessLogFactoryContext& context) override;
+                          Server::Configuration::ListenerAccessLogFactoryContext& context) override;
 
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,

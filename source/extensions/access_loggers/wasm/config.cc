@@ -18,7 +18,7 @@ using Common::Wasm::PluginHandleSharedPtrThreadLocal;
 
 AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& proto_config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::AccessLogFactoryContext& context) {
+    Server::Configuration::ListenerAccessLogFactoryContext& context) {
   return createAccessLogInstance(
       proto_config, std::move(filter),
       static_cast<Server::Configuration::CommonFactoryContext&>(context));

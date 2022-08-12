@@ -21,7 +21,7 @@ namespace File {
 
 AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::AccessLogFactoryContext& context) {
+    Server::Configuration::ListenerAccessLogFactoryContext& context) {
   return createAccessLogInstance(
       config, std::move(filter),
       static_cast<Server::Configuration::CommonFactoryContext&>(context));

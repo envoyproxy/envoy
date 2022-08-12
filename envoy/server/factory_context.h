@@ -181,8 +181,12 @@ public:
 
 /**
  * Factory context for access loggers that need access to listener properties.
+ * This context is supplied to the access log factory when called with the listener context
+ * available, such as from downstream HTTP filters.
+ * NOTE: this interface is used in proprietary access loggers, please do not delete
+ * without reaching to Envoy maintainers first.
  */
-class AccessLogFactoryContext : public virtual CommonFactoryContext {
+class ListenerAccessLogFactoryContext : public virtual CommonFactoryContext {
 public:
   /**
    * @return Stats::Scope& the listener's stats scope.
@@ -207,7 +211,7 @@ public:
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
  * access the rest of the server via interfaces exposed here.
  */
-class FactoryContext : public virtual AccessLogFactoryContext {
+class FactoryContext : public virtual ListenerAccessLogFactoryContext {
 public:
   ~FactoryContext() override = default;
 
