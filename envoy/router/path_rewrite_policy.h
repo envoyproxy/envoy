@@ -23,7 +23,8 @@ public:
   /**
    * Used to determine if the match policy is compatible.
    *
-   * @param match_policy current path match policy for route
+   * @param path_match_policy current path match policy for route
+   * @param active_policy true if user provided policy
    * @return true if current path match policy is acceptable
    */
   virtual absl::Status isCompatibleMatchPolicy(PathMatchPredicateSharedPtr path_match_policy,
