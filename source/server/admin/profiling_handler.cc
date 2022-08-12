@@ -8,9 +8,10 @@ namespace Server {
 
 ProfilingHandler::ProfilingHandler(const std::string& profile_path) : profile_path_(profile_path) {}
 
-Http::Code ProfilingHandler::handlerCpuProfiler(absl::string_view url, Http::ResponseHeaderMap&,
-                                                Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
+Http::Code ProfilingHandler::handlerCpuProfiler(absl::string_view, Http::ResponseHeaderMap&,
+                                                Buffer::Instance& response,
+                                                AdminStream& admin_stream) {
+  Http::Utility::QueryParams query_params = admin_stream.queryParams();
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
     response.add("?enable=<y|n>\n");
@@ -32,14 +33,15 @@ Http::Code ProfilingHandler::handlerCpuProfiler(absl::string_view url, Http::Res
   return Http::Code::OK;
 }
 
-Http::Code ProfilingHandler::handlerHeapProfiler(absl::string_view url, Http::ResponseHeaderMap&,
-                                                 Buffer::Instance& response, AdminStream&) {
+Http::Code ProfilingHandler::handlerHeapProfiler(absl::string_view, Http::ResponseHeaderMap&,
+                                                 Buffer::Instance& response,
+                                                 AdminStream& admin_stream) {
   if (!Profiler::Heap::profilerEnabled()) {
     response.add("The current build does not support heap profiler");
     return Http::Code::NotImplemented;
   }
 
-  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
+  Http::Utility::QueryParams query_params = admin_stream.queryParams();
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
     response.add("?enable=<y|n>\n");

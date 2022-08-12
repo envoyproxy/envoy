@@ -23,6 +23,10 @@ public:
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
 
+#define QUICHE_PROTOCOL_FLAG(type, flag, ...) saved_##flag##_ = GetQuicheFlagImpl(FLAGS_##flag);
+#include "quiche/common/quiche_protocol_flags_list.h"
+#undef QUICHE_PROTOCOL_FLAG
+
 #define QUIC_FLAG(flag, ...) saved_##flag##_ = GetQuicheFlagImpl(FLAGS_##flag);
 #include "quiche/quic/core/quic_flags_list.h"
 #undef QUIC_FLAG
@@ -34,6 +38,10 @@ public:
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
 
+#define QUICHE_PROTOCOL_FLAG(type, flag, ...) SetQuicheFlagImpl(FLAGS_##flag, saved_##flag##_);
+#include "quiche/common/quiche_protocol_flags_list.h"
+#undef QUICHE_PROTOCOL_FLAG
+
 #define QUIC_FLAG(flag, ...) SetQuicheFlagImpl(FLAGS_##flag, saved_##flag##_);
 #include "quiche/quic/core/quic_flags_list.h"
 #undef QUIC_FLAG
@@ -44,6 +52,10 @@ private:
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) type saved_##flag##_;
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
+
+#define QUICHE_PROTOCOL_FLAG(type, flag, ...) type saved_##flag##_;
+#include "quiche/common/quiche_protocol_flags_list.h"
+#undef QUICHE_PROTOCOL_FLAG
 
 #define QUIC_FLAG(flag, ...) bool saved_##flag##_;
 #include "quiche/quic/core/quic_flags_list.h"
