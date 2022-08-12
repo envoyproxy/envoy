@@ -586,18 +586,22 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
   return final_action;
 }
 
-absl::optional<uint32_t>
+ConnectionManagerUtility::NormalizeHostResult
 ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
                                              const ConnectionManagerConfig& config, uint32_t port) {
   if (config.shouldStripTrailingHostDot()) {
     HeaderUtility::stripTrailingHostDot(request_headers);
   }
-  if (config.stripPortType() == Http::StripPortType::Any) {
-    return HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
-  } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
-    return HeaderUtility::stripPortFromHost(request_headers, port);
+  switch (config.stripPortType()) {
+  case Http::StripPortType::Any:
+    return {HeaderUtility::stripPortFromHost(request_headers, absl::nullopt), false};
+  case Http::StripPortType::Ignore:
+    return {HeaderUtility::stripPortFromHost(request_headers, absl::nullopt), true};
+  case Http::StripPortType::MatchingHost:
+    return {HeaderUtility::stripPortFromHost(request_headers, port), false};
+  case Http::StripPortType::None:
+    return {absl::nullopt, false};
   }
-  return absl::nullopt;
 }
 
 } // namespace Http

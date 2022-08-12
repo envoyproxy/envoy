@@ -1600,6 +1600,14 @@ TEST_F(ConnectionManagerUtilityTest, RemovePort) {
   ConnectionManagerUtility::maybeNormalizeHost(header_map_any, config_, 7777);
   EXPECT_EQ(header_map_any.getHostValue(), "host");
 
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::Ignore));
+  TestRequestHeaderMapImpl original_headers_ignore;
+  original_headers_ignore.setHost("host:9999");
+
+  TestRequestHeaderMapImpl header_map_ignore(original_headers_ignore);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_ignore, config_, 7777);
+  EXPECT_EQ(header_map_ignore.getHostValue(), "host");
+
   ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::None));
   TestRequestHeaderMapImpl original_headers_none;
   original_headers_none.setHost("host:9999");

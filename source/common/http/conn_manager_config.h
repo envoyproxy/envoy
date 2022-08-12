@@ -181,6 +181,8 @@ enum class StripPortType {
   MatchingHost,
   // Removes any port from host/authority header.
   Any,
+  // Ignores any port from host/authority header.
+  Ignore,
   // Keeps the port in host/authority header as is.
   None
 };

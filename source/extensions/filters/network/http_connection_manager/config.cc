@@ -361,17 +361,39 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = absl::nullopt;
   }
 
-  if (config.strip_any_host_port() && config.strip_matching_host_port()) {
-    throw EnvoyException(fmt::format(
-        "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set."));
-  }
-
-  if (config.strip_any_host_port()) {
-    strip_port_type_ = Http::StripPortType::Any;
-  } else if (config.strip_matching_host_port()) {
-    strip_port_type_ = Http::StripPortType::MatchingHost;
-  } else {
-    strip_port_type_ = Http::StripPortType::None;
+  switch (config.strip_port_mode_case()) {
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      kStripAnyHostPort:
+    if (config.strip_matching_host_port()) {
+      throw EnvoyException(fmt::format(
+          "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set."));
+    }
+    if (config.strip_any_host_port()) {
+      strip_port_type_ = Http::StripPortType::Any;
+    } else {
+      strip_port_type_ = Http::StripPortType::None;
+    }
+    break;
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      kIgnoreAnyHostPort:
+    if (config.strip_matching_host_port()) {
+      throw EnvoyException(fmt::format(
+          "Error: Only one of `strip_matching_host_port` or `ignore_any_host_port` can be set."));
+    }
+    if (config.ignore_any_host_port()) {
+      strip_port_type_ = Http::StripPortType::Ignore;
+    } else {
+      strip_port_type_ = Http::StripPortType::None;
+    }
+    break;
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      STRIP_PORT_MODE_NOT_SET:
+    if (config.strip_matching_host_port()) {
+      strip_port_type_ = Http::StripPortType::MatchingHost;
+    } else {
+      strip_port_type_ = Http::StripPortType::None;
+    }
+    break;
   }
 
   // If we are provided a different request_id_extension implementation to use try and create a

@@ -782,7 +782,9 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
     header_parser->evaluateHeaders(headers, stream_info);
   }
 
-  // Restore the port if this was a CONNECT request.
+  // Restore the port if this was a stored original connect port. The original connect port will
+  // be stored if it is getting stripped by strip_matching_host_port or strip_any_host_port on
+  // CONNECT requests, and by ignore_any_host_port on any requests.
   // Note this will restore the port for HTTP/2 CONNECT-upgrades as well as as HTTP/1.1 style
   // CONNECT requests.
   if (Http::HeaderUtility::getPortStart(headers.getHostValue()) == absl::string_view::npos) {

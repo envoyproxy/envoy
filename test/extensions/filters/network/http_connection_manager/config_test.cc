@@ -1248,8 +1248,8 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
   EXPECT_EQ(Http::StripPortType::MatchingHost, config.stripPortType());
 }
 
-// Validated that when both strip options are configured, we throw exception.
-TEST_F(HttpConnectionManagerConfigTest, BothStripOptionsAreSet) {
+// Validated that when multiple strip options are configured, we throw exception.
+TEST_F(HttpConnectionManagerConfigTest, MultipleStripOptionsAreSet) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   route_config:
@@ -1269,6 +1269,29 @@ TEST_F(HttpConnectionManagerConfigTest, BothStripOptionsAreSet) {
                                   filter_config_provider_manager_),
       EnvoyException,
       "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set.");
+}
+
+// Validated that when multiple strip options are configured, we throw exception.
+TEST_F(HttpConnectionManagerConfigTest, MultipleStripOptionsAreSet2) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_matching_host_port: true
+  ignore_any_host_port: true
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException,
+      "Error: Only one of `strip_matching_host_port` or `ignore_any_host_port` can be set.");
 }
 
 // Validated that when explicitly set false, we don't remove port.
@@ -1318,6 +1341,46 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
   route_config:
     name: local_route
   strip_any_host_port: false
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
+}
+
+// Validated that when configured, we ignore any port.
+TEST_F(HttpConnectionManagerConfigTest, IgnoreAnyPortTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  ignore_any_host_port: true
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(Http::StripPortType::Ignore, config.stripPortType());
+}
+
+// Validated that when explicitly set false, we don't ignore any port.
+TEST_F(HttpConnectionManagerConfigTest, IgnoreAnyPortFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  ignore_any_host_port: false
   http_filters:
   - name: envoy.filters.http.router
     typed_config:

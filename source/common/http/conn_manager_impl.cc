@@ -1065,13 +1065,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   ASSERT(action == ConnectionManagerUtility::NormalizePathAction::Continue);
-  auto optional_port = ConnectionManagerUtility::maybeNormalizeHost(
+  auto result = ConnectionManagerUtility::maybeNormalizeHost(
       *request_headers_, connection_manager_.config_, localPort());
-  if (optional_port.has_value() &&
-      requestWasConnect(request_headers_, connection_manager_.codec_->protocol())) {
+  if (result.port_.has_value() &&
+      (result.should_store_ ||
+       requestWasConnect(request_headers_, connection_manager_.codec_->protocol()))) {
     filter_manager_.streamInfo().filterState()->setData(
         Router::OriginalConnectPort::key(),
-        std::make_unique<Router::OriginalConnectPort>(optional_port.value()),
+        std::make_unique<Router::OriginalConnectPort>(result.port_.value()),
         StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
   }
 

@@ -123,9 +123,17 @@ public:
   static NormalizePathAction maybeNormalizePath(RequestHeaderMap& request_headers,
                                                 const ConnectionManagerConfig& config);
 
-  static absl::optional<uint32_t> maybeNormalizeHost(RequestHeaderMap& request_headers,
-                                                     const ConnectionManagerConfig& config,
-                                                     uint32_t port);
+  struct NormalizeHostResult {
+    // The stripped port.
+    absl::optional<uint32_t> port_;
+
+    // The result if the port should be forced restoring when finalize request headers.
+    bool should_store_;
+  };
+
+  static NormalizeHostResult maybeNormalizeHost(RequestHeaderMap& request_headers,
+                                                const ConnectionManagerConfig& config,
+                                                uint32_t port);
 
   /**
    * Mutate request headers if request needs to be traced.
