@@ -60,8 +60,9 @@ PatternTemplateRewritePredicate::rewriteUrl(absl::string_view current_pattern,
     return absl::InvalidArgumentError("Unable to parse url rewrite pattern");
   }
 
- const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern_proto = *std::move(rewrite_pattern);
-    RE2 regex = RE2(PatternTemplateInternal::toStringPiece(regex_pattern_str));
+  const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern_proto =
+      *std::move(rewrite_pattern);
+  RE2 regex = RE2(PatternTemplateInternal::toStringPiece(regex_pattern_str));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
   }
@@ -70,7 +71,8 @@ PatternTemplateRewritePredicate::rewriteUrl(absl::string_view current_pattern,
   int capture_num = regex.NumberOfCapturingGroups() + 1;
   std::vector<re2::StringPiece> captures(capture_num);
   if (!regex.Match(PatternTemplateInternal::toStringPiece(current_pattern), /*startpos=*/0,
-                   /*endpos=*/current_pattern.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
+                   /*endpos=*/current_pattern.size(), RE2::ANCHOR_BOTH, captures.data(),
+                   captures.size())) {
     return absl::InvalidArgumentError("Pattern not match");
   }
 
