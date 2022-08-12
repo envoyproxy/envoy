@@ -146,10 +146,6 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_by
 
 void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
   if (!inDelayedClose()) {
-    if (close_type_during_initialize_.has_value()) {
-      close(close_type_during_initialize_.value());
-      close_type_during_initialize_ = absl::nullopt;
-    }
     return;
   }
   if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
@@ -256,6 +252,13 @@ absl::optional<uint64_t> QuicFilterManagerConnectionImpl::congestionWindowInByte
   }
 
   return cwnd;
+}
+
+void QuicFilterManagerConnectionImpl::maybeHandleCloseDuringInitialize() {
+  if (close_type_during_initialize_.has_value()) {
+    close(close_type_during_initialize_.value());
+    close_type_during_initialize_ = absl::nullopt;
+  }
 }
 
 } // namespace Quic

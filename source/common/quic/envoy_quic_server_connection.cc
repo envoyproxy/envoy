@@ -17,7 +17,9 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     : quic::QuicConnection(server_connection_id, initial_self_address, initial_peer_address,
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_SERVER, supported_versions),
-      QuicNetworkConnection(std::move(connection_socket)) {}
+      QuicNetworkConnection(std::move(connection_socket)) {
+  set_defer_send_in_response_to_packets(GetQuicFlag(FLAGS_quic_defer_send_in_response));
+}
 
 bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
   quic::QuicSocketAddress old_self_address = self_address();
