@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/router/path_match_policy.h"
+#include "envoy/router/path_match.h"
 
 #include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
 #include "source/extensions/path/pattern_template_lib/proto/pattern_template_rewrite_segments.pb.h"

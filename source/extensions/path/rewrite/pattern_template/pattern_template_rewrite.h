@@ -6,8 +6,8 @@
 #include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.validate.h"
 #include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.h"
 #include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.validate.h"
-#include "envoy/router/path_match_policy.h"
-#include "envoy/router/path_rewrite_policy.h"
+#include "envoy/router/path_match.h"
+#include "envoy/router/path_rewrite.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"

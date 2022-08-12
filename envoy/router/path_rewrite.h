@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
-#include "envoy/router/path_match_policy.h"
+#include "envoy/router/path_match.h"
 
 #include "source/common/common/logger.h"
 

@@ -1,7 +1,7 @@
 #include "source/extensions/path/rewrite/pattern_template/config.h"
 
 #include "envoy/registry/registry.h"
-#include "envoy/router/path_rewrite_policy.h"
+#include "envoy/router/path_rewrite.h"
 
 namespace Envoy {
 namespace Extensions {

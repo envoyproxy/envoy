@@ -1,7 +1,7 @@
 #include "source/extensions/path/match/pattern_template/config.h"
 
 #include "envoy/registry/registry.h"
-#include "envoy/router/path_match_policy.h"
+#include "envoy/router/path_match.h"
 
 namespace Envoy {
 namespace Extensions {
