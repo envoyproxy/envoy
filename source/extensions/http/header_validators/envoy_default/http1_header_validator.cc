@@ -69,6 +69,11 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
     if (!name_result) {
       return name_result;
     }
+  } else {
+    // kHeaderValidatorMap contains every known pseudo header. If the header name starts with ":"
+    // and we don't have a validator registered in the map, then the header name is an unknown
+    // pseudo header.
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidPseudoHeader};
   }
 
   return validateGenericHeaderValue(value);
@@ -95,6 +100,10 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
     if (!name_result) {
       return name_result;
     }
+  } else {
+    // The only valid pseudo header for responses is :status. If the header name starts with ":"
+    // and it's not ":status", then the header name is an unknown pseudo header.
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidPseudoHeader};
   }
 
   // Validate the header value
@@ -103,8 +112,6 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 
 ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
 Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
-  static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {
-      ":method", ":scheme", ":authority", ":path"};
   absl::string_view path = header_map.getPathValue();
   //
   // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requires the
@@ -271,10 +278,6 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
 
     if (string_header_name.empty()) {
       reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
-    } else if (string_header_name.at(0) == ':' &&
-               !kAllowedPseudoHeaders.contains(string_header_name)) {
-      // This is an unrecognized pseudo header, reject the request
-      reject_details = UhvResponseCodeDetail::get().InvalidPseudoHeader;
     } else {
       auto entry_result = validateRequestHeaderEntry(header_name, header_value);
       if (!entry_result) {
@@ -293,8 +296,6 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
 
 ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
 Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
-  static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {":status"};
-
   //
   // Step 1: verify that required pseudo headers are present
   //
@@ -319,10 +320,6 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 
     if (string_header_name.empty()) {
       reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
-    } else if (string_header_name.at(0) == ':' &&
-               !kAllowedPseudoHeaders.contains(header_name.getStringView())) {
-      // This is an unrecognized pseudo header, reject the response
-      reject_details = UhvResponseCodeDetail::get().InvalidPseudoHeader;
     } else {
       auto entry_result = validateResponseHeaderEntry(header_name, header_value);
       if (!entry_result) {

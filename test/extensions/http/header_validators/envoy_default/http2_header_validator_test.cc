@@ -457,6 +457,16 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderRejectUnderscores) {
                              UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateLowercaseHeader) {
+  HeaderString valid{"x-foo"};
+  HeaderString invalid{"X-Foo"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid),
+                             "uhv.http2.invalid_header_name");
+}
+
 } // namespace
 } // namespace EnvoyDefault
 } // namespace HeaderValidators

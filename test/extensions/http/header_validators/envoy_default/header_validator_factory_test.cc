@@ -62,9 +62,9 @@ TEST_F(HeaderValidatorFactoryTest, CreateHttp2) {
   EXPECT_NE(dynamic_cast<Http2HeaderValidator*>(uhv.get()), nullptr);
 }
 
-TEST_F(HeaderValidatorFactoryTest, CreateNull) {
+TEST_F(HeaderValidatorFactoryTest, CreateHttp3) {
   auto uhv = create(empty_config, Protocol::Http3);
-  EXPECT_NE(dynamic_cast<NullHeaderValidator*>(uhv.get()), nullptr);
+  EXPECT_NE(dynamic_cast<Http2HeaderValidator*>(uhv.get()), nullptr);
 }
 
 } // namespace

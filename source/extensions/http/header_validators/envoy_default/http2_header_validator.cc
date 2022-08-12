@@ -19,6 +19,7 @@ using HeaderValidatorFunction = ::Envoy::Http::HeaderValidator::HeaderEntryValid
 struct Http2ResponseCodeDetailValues {
   const std::string InvalidTE = "uhv.http2.invalid_te";
   const std::string ConnectionHeaderSanitization = "uhv.http2.connection_header_rejected";
+  const std::string InvalidHeaderName = "uhv.http2.invalid_header_name";
 };
 
 using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
@@ -68,6 +69,11 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
     if (!name_result) {
       return name_result;
     }
+  } else {
+    // kHeaderValidatorMap contains every known pseudo header. If the header name starts with ":"
+    // and we don't have a validator registered in the map, then the header name is an unknown
+    // pseudo header.
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidPseudoHeader};
   }
 
   return validateGenericHeaderValue(value);
@@ -93,6 +99,10 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
     if (!name_result) {
       return name_result;
     }
+  } else {
+    // The only valid pseudo header for responses is :status. If the header name starts with ":"
+    // and it's not ":status", then the header name is an unknown pseudo header.
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidPseudoHeader};
   }
 
   // Validate the header value
@@ -259,10 +269,6 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 
     if (string_header_name.empty()) {
       reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
-    } else if (string_header_name.at(0) == ':' &&
-               !kAllowedPseudoHeaders.contains(header_name.getStringView())) {
-      // This is an unrecognized pseudo header, reject the response
-      reject_details = UhvResponseCodeDetail::get().InvalidPseudoHeader;
     } else {
       auto entry_result = validateResponseHeaderEntry(header_name, header_value);
       if (!entry_result) {
@@ -328,6 +334,25 @@ Http2HeaderValidator::validateGenericHeaderName(const ::Envoy::Http::HeaderStrin
   const auto& key_string_view = key.getStringView();
   if (kRejectHeaderNames.contains(key_string_view)) {
     return {RejectAction::Reject, Http2ResponseCodeDetail::get().ConnectionHeaderSanitization};
+  }
+
+  //
+  // Verify that the header name is all lowercase. From RFC 7540,
+  // https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2:
+  //
+  // Just as in HTTP/1.x, header field names are strings of ASCII characters that are compared in
+  // a case-insensitive fashion.  However, header field names MUST be converted to lowercase prior
+  // to their encoding in HTTP/2.  A request or response containing uppercase header field names
+  // MUST be treated as malformed (Section 8.1.2.6).
+  //
+  bool is_valid = true;
+  for (std::size_t i = 0; i < key_string_view.size() && is_valid; ++i) {
+    char c = key_string_view.at(i);
+    is_valid = c < 'A' || c > 'Z';
+  }
+
+  if (!is_valid) {
+    return {RejectAction::Reject, Http2ResponseCodeDetail::get().InvalidHeaderName};
   }
 
   return HeaderValidator::validateGenericHeaderName(key);
