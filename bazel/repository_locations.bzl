@@ -323,7 +323,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2021-08-12",
+        release_date = "2021-08-13",
         cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
     com_github_unicode_org_icu = dict(
