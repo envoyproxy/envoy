@@ -59,8 +59,11 @@ message Lua {
   // for the request, this Lua code will be applied.
   config.core.v3.DataSource default_source_code = 3;
 
-  // Optional additional prefix to use when emitting statistics. This allows to distinguish
-  // emitted statistics between configured ``lua`` filters in an HTTP filter chain. For example:
+  // Optional additional prefix to use when emitting statistics. By default
+  // metrics are emitted in *.lua.* namespace. If multiple lua filters are
+  // configured in a filter chain, the stats from each filter instance can
+  // be emitted using custom stat prefix to distinguish emitted
+  // statistics. For example:
   //
   // .. code-block:: yaml
   //

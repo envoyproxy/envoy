@@ -160,8 +160,10 @@ Statistics
 .. _config_http_filters_lua_stats:
 
 The lua filter outputs statistics in the *.lua.* namespace by default. When
-there are multiple lua filters configured, metrics namespace can be
-customized by providing a per filter :ref:`stat prefix <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.stat_prefix>`.
+there are multiple lua filters configured in a filter chain, stats from
+individual filter instance/script can be tracked by providing a per filter
+:ref:`stat prefix
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.stat_prefix>`.
 
 .. csv-table::
   :header: Name, Type, Description
