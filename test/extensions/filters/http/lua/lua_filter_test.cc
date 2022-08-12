@@ -1565,7 +1565,8 @@ TEST_F(LuaHttpFilterTest, ImmediateResponseWithSendLocalReply) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:respond(
-        {[":status"] = "503"},
+        {[":status"] = "503",
+         ["fake"] = "fakeValue"},
         "nope")
 
       -- Should not run
@@ -1578,19 +1579,23 @@ TEST_F(LuaHttpFilterTest, ImmediateResponseWithSendLocalReply) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code code, absl::string_view body,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                          absl::string_view details) {
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Http::Code code, absl::string_view body,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           absl::string_view details) {
         EXPECT_EQ(Http::Code::ServiceUnavailable, code);
         EXPECT_EQ("nope", body);
-        EXPECT_EQ(modify_headers, nullptr);
         EXPECT_EQ(grpc_status, absl::nullopt);
         EXPECT_EQ(details, "lua_response");
+        modify_headers(immediate_response_headers);
       }));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
+  EXPECT_TRUE(immediate_response_headers.has("fake"));
+  EXPECT_EQ(immediate_response_headers.get_("fake"), "fakeValue");
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
