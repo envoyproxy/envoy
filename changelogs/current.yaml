@@ -104,5 +104,8 @@ new_features:
 - area: access_log
   change: |
     added support for number values in substitution format string in json_format.
+- area: lua
+  change: |
+    added stats for lua filter, please see :ref:`lua filter stats <config_http_filters_lua_stats>`.
 
 deprecated:
