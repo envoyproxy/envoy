@@ -7,20 +7,17 @@ import multiprocessing
 import os
 import pathlib
 import re
-import shutil
-import stat
 import subprocess
+import stat
 import sys
 import traceback
+import shutil
+from functools import cached_property
+from typing import Callable, Dict, List, Pattern, Tuple, Union
+
 # The way this script is currently used (ie no bazel) it relies on system deps.
 # As `pyyaml` is present in `envoy-build-ubuntu` it should be safe to use here.
 import yaml
-from functools import cached_property
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Pattern
-from typing import Tuple
 
 import paths
 
@@ -63,7 +60,7 @@ class FormatConfig:
         return self["dir_order"]
 
     @cached_property
-    def paths(self) -> Dict[str, Tuple[str, ...] | Dict[str, Tuple[str, ...]]]:
+    def paths(self) -> Dict[str, Union[Tuple[str, ...], Dict[str, Tuple[str, ...]]]]:
         """Mapping of named paths."""
         paths = self._normalize("paths", cb=lambda paths: tuple(f"./{p}" for p in paths))
         paths["build_fixer_py"] = self._build_fixer_path
@@ -86,7 +83,7 @@ class FormatConfig:
         return self["replacements"]
 
     @cached_property
-    def suffixes(self) -> Dict[str, Tuple[str, ...] | Dict[str, Tuple[str, ...]]]:
+    def suffixes(self) -> Dict[str, Union[Tuple[str, ...], Dict[str, Tuple[str, ...]]]]:
         """Mapping of named file suffixes for target files."""
         return self._normalize("suffixes")
 
@@ -98,9 +95,10 @@ class FormatConfig:
     def _header_order_path(self) -> str:
         return os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
 
-    def _normalize(self,
-                   config_type: str,
-                   cb: Callable = tuple) -> Dict[str, Tuple[str, ...] | Dict[str, Tuple[str, ...]]]:
+    def _normalize(
+            self,
+            config_type: str,
+            cb: Callable = tuple) -> Dict[str, Union[Tuple[str, ...], Dict[str, Tuple[str, ...]]]]:
         config = {}
         for k, v in self[config_type].items():
             if isinstance(v, dict):

@@ -462,8 +462,8 @@ message Cluster {
   // Specific configuration for the :ref:`Maglev<arch_overview_load_balancing_types_maglev>`
   // load balancing policy.
   message MaglevLbConfig {
-    // The table size for Maglev hashing. The Maglev aims for ‘minimal disruption’ rather than an absolute guarantee.
-    // Minimal disruption means that when the set of upstreams changes, a connection will likely be sent to the same
+    // The table size for Maglev hashing. Maglev aims for "minimal disruption" rather than an absolute guarantee.
+    // Minimal disruption means that when the set of upstream hosts change, a connection will likely be sent to the same
     // upstream as it was before. Increasing the table size reduces the amount of disruption.
     // The table size must be prime number limited to 5000011. If it is not specified, the default is 65537.
     google.protobuf.UInt64Value table_size = 1 [(validate.rules).uint64 = {lte: 5000011}];

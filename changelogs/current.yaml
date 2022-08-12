@@ -15,12 +15,18 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: resource_monitors
+  change: |
+    changed behavior of the fixed heap monitor to count pages allocated to TCMalloc as free memory if it's not used by Envoy. This change can be reverted temporarily by setting the runtime guard ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true.
 - area: prometheus_stats
   change: |
     removed blank line for being compatible with OpenMetrics.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: listener
+  change: |
+    fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
 - area: transport_socket
   change: |
     fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
@@ -80,11 +86,23 @@ new_features:
 - area: upstream
   change: |
     added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
+- area: admin
+  change: |
+    added new :ref:`/heap_dump <operations_admin_interface_heap_dump>` endpoint to dump heap profile of Envoy.
 - area: health check
   change: |
     added :ref:`method <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.method>` support to configure http health check http method.
 - area: access_log
   change: |
     updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
+- area: listener
+  change: |
+    expose the implementation of :ref:`internal listener <config_internal_listener>` in xDS API.
+- area: ratelimit
+  change: |
+    add support for :ref:`adding response headers <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.response_headers_to_add>` to rate-limited responses.
+- area: access_log
+  change: |
+    added support for number values in substitution format string in json_format.
 
 deprecated:
