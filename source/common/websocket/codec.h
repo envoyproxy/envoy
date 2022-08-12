@@ -129,8 +129,8 @@ private:
   // Current frame that is being decoded.
   Frame frame_;
   State state_ = State::FrameHeaderFlagsAndOpcode;
-  uint8_t num_remaining_extended_length_bytes_ = 0;
   uint64_t length_ = 0;
+  uint8_t num_remaining_extended_length_bytes_ = 0;
   uint8_t num_remaining_masking_key_bytes_ = 0;
 };
 

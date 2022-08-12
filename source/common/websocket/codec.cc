@@ -61,7 +61,7 @@ void Decoder::frameDataStart() {
 
 void Decoder::frameData(const uint8_t* mem, uint64_t length) { frame_.payload_->add(mem, length); }
 
-void Decoder::frameDataEnd(uint64_t& bytes_consumed_by_frame_, Buffer::Instance& input,
+void Decoder::frameDataEnd(uint64_t& bytes_consumed_by_frame, Buffer::Instance& input,
                            absl::optional<std::vector<Frame>>& output) {
   if (!output.has_value()) {
     output = std::vector<Frame>();
@@ -70,8 +70,8 @@ void Decoder::frameDataEnd(uint64_t& bytes_consumed_by_frame_, Buffer::Instance&
 
   resetDecoder();
 
-  input.drain(bytes_consumed_by_frame_);
-  bytes_consumed_by_frame_ = 0;
+  input.drain(bytes_consumed_by_frame);
+  bytes_consumed_by_frame = 0;
 }
 
 void Decoder::resetDecoder() {
@@ -163,7 +163,7 @@ uint64_t Decoder::doDecodePayload(absl::Span<const uint8_t>& data) {
 
 absl::optional<std::vector<Frame>> Decoder::decode(Buffer::Instance& input) {
   absl::optional<std::vector<Frame>> output = absl::nullopt;
-  uint64_t bytes_consumed_by_frame_ = 0;
+  uint64_t bytes_consumed_by_frame = 0;
   resetDecoder();
   for (const Buffer::RawSlice& slice : input.getRawSlices()) {
     absl::Span<const uint8_t> data(reinterpret_cast<uint8_t*>(slice.mem_), slice.len_);
@@ -189,15 +189,15 @@ absl::optional<std::vector<Frame>> Decoder::decode(Buffer::Instance& input) {
         bytes_decoded = doDecodePayload(data);
         break;
       case State::FrameFinished:
-        frameDataEnd(bytes_consumed_by_frame_, input, output);
+        frameDataEnd(bytes_consumed_by_frame, input, output);
         break;
       }
       data.remove_prefix(bytes_decoded);
-      bytes_consumed_by_frame_ += bytes_decoded;
+      bytes_consumed_by_frame += bytes_decoded;
     }
     // Handles when slice ended with a complete frame scenario
     if (state_ == State::FrameFinished) {
-      frameDataEnd(bytes_consumed_by_frame_, input, output);
+      frameDataEnd(bytes_consumed_by_frame, input, output);
     }
   }
   return output;
