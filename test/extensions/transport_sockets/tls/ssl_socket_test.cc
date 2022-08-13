@@ -6453,6 +6453,7 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
       custom_validator_config:
         name: "envoy.tls.cert_validator.timed_cert_validator"
+  sni: "example.com"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -6472,6 +6473,8 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
       "envoy.tls.cert_validator.timed_cert_validator");
   static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(0));
+  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
+      ->setExpectedHostName("example.com");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
   testUtil(test_options.setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)

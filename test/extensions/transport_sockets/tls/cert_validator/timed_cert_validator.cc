@@ -4,6 +4,8 @@
 
 #include <cstdint>
 
+#include "gtest/gtest.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -20,7 +22,9 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
   }
   ASSERT(callback_ == nullptr);
   callback_ = std::move(callback);
-  validation_context_ = validation_context;
+  if (expected_host_name_.has_value()) {
+    EXPECT_EQ(expected_host_name_.value(), validation_context.host_name);
+  }
   // Store cert chain for the delayed validation.
   for (size_t i = 0; i < sk_X509_num(&cert_chain); i++) {
     X509* cert = sk_X509_value(&cert_chain, i);
@@ -42,8 +46,7 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
           }
         }
         ValidationResults result = DefaultCertValidator::doVerifyCertChain(
-            *certs, nullptr, nullptr, transport_socket_options, ssl_ctx, validation_context_,
-            is_server);
+            *certs, nullptr, nullptr, transport_socket_options, ssl_ctx, {}, is_server);
         callback_->onCertValidationResult(
             result.status == ValidationResults::ValidationStatus::Successful,
             (result.error_details.has_value() ? result.error_details.value() : ""),

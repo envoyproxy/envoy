@@ -16,9 +16,9 @@ class TimedCertValidator : public DefaultCertValidator {
 public:
   TimedCertValidator(std::chrono::milliseconds validation_time_out_ms,
                      const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                     TimeSource& time_source)
+                     TimeSource& time_source, absl::optional<std::string> expected_host_name)
       : DefaultCertValidator(config, stats, time_source),
-        validation_time_out_ms_(validation_time_out_ms) {}
+        validation_time_out_ms_(validation_time_out_ms), expected_host_name_(expected_host_name) {}
 
   int doSynchronousVerifyCertChain(
       X509_STORE_CTX* /*store_ctx*/, Ssl::SslExtendedSocketInfo* /*ssl_extended_info*/,
@@ -42,15 +42,15 @@ private:
   std::chrono::milliseconds validation_time_out_ms_;
   Ssl::ValidateResultCallbackPtr callback_;
   std::vector<std::string> cert_chain_in_str_;
-  CertValidator::ExtraValidationContext validation_context_;
+  absl::optional<std::string> expected_host_name_;
 };
 
 class TimedCertValidatorFactory : public CertValidatorFactory {
 public:
   CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                                        SslStats& stats, TimeSource& time_source) override {
-    return std::make_unique<TimedCertValidator>(validation_time_out_ms_, config, stats,
-                                                time_source);
+    return std::make_unique<TimedCertValidator>(validation_time_out_ms_, config, stats, time_source,
+                                                expected_host_name_);
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.timed_cert_validator"; }
@@ -59,8 +59,11 @@ public:
     validation_time_out_ms_ = validation_time_out_ms;
   }
 
+  void setExpectedHostName(const std::string host_name) { expected_host_name_ = host_name; }
+
 private:
   std::chrono::milliseconds validation_time_out_ms_{5};
+  absl::optional<std::string> expected_host_name_;
 };
 
 DECLARE_FACTORY(TimedCertValidatorFactory);

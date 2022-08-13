@@ -43,7 +43,9 @@ struct ValidationResults {
 class CertValidator {
 public:
   // Wraps cert validation parameters added from time to time.
-  struct ExtraValidationContext {};
+  struct ExtraValidationContext {
+    absl::string_view host_name;
+  };
 
   virtual ~CertValidator() = default;
 
