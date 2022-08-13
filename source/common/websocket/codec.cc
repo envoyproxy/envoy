@@ -97,11 +97,11 @@ uint8_t Decoder::doDecodeMaskFlagAndLength(absl::Span<const uint8_t>& data) {
   if (length_ == 0x7e) {
     num_remaining_extended_length_bytes_ = kPayloadLength16Bit;
     length_ = 0;
-    state_ = State::FrameHeaderExtendedLength;
+    state_ = State::FrameHeaderExtendedLength16Bit;
   } else if (length_ == 0x7f) {
     num_remaining_extended_length_bytes_ = kPayloadLength64Bit;
     length_ = 0;
-    state_ = State::FrameHeaderExtendedLength;
+    state_ = State::FrameHeaderExtendedLength64Bit;
   } else if (num_remaining_masking_key_bytes_ > 0) {
     state_ = State::FrameHeaderMaskingKey;
   } else {
@@ -111,47 +111,44 @@ uint8_t Decoder::doDecodeMaskFlagAndLength(absl::Span<const uint8_t>& data) {
 }
 
 uint8_t Decoder::doDecodeExtendedLength(absl::Span<const uint8_t>& data) {
-  uint8_t bytes_decoded = 0;
   uint64_t bytes_to_decode = data.length() <= num_remaining_extended_length_bytes_
                                  ? data.length()
                                  : num_remaining_extended_length_bytes_;
-  while (bytes_to_decode > 0) {
-    length_ |= static_cast<uint64_t>(data.at(bytes_decoded))
-               << 8 * (num_remaining_extended_length_bytes_ - 1);
-    num_remaining_extended_length_bytes_--;
-    bytes_to_decode--;
-    bytes_decoded++;
-  }
+  memcpy((reinterpret_cast<uint8_t*>(&length_) +
+          (state_ == State::FrameHeaderExtendedLength16Bit ? kPayloadLength16Bit
+                                                           : kPayloadLength64Bit) -
+          num_remaining_extended_length_bytes_),
+         data.data(), bytes_to_decode);
+  num_remaining_extended_length_bytes_ -= bytes_to_decode;
 
   if (num_remaining_extended_length_bytes_ == 0) {
+    length_ = state_ == State::FrameHeaderExtendedLength16Bit ? htobe16(length_) : htobe64(length_);
     if (num_remaining_masking_key_bytes_ > 0) {
       state_ = State::FrameHeaderMaskingKey;
     } else {
       frameDataStart();
     }
   }
-  return bytes_decoded;
+  return bytes_to_decode;
 }
 
 uint8_t Decoder::doDecodeMaskingKey(absl::Span<const uint8_t>& data) {
   if (!frame_.masking_key_.has_value()) {
     frame_.masking_key_ = 0;
   }
-  uint8_t bytes_decoded = 0;
   uint64_t bytes_to_decode = data.length() <= num_remaining_masking_key_bytes_
                                  ? data.length()
                                  : num_remaining_masking_key_bytes_;
-  while (bytes_to_decode > 0) {
-    frame_.masking_key_.value() |= static_cast<uint32_t>(data.at(bytes_decoded))
-                                   << 8 * (num_remaining_masking_key_bytes_ - 1);
-    num_remaining_masking_key_bytes_--;
-    bytes_to_decode--;
-    bytes_decoded++;
-  }
+  memcpy((reinterpret_cast<uint8_t*>(&(frame_.masking_key_.value())) + kMaskingKeyLength -
+          num_remaining_masking_key_bytes_),
+         data.data(), bytes_to_decode);
+  num_remaining_masking_key_bytes_ -= bytes_to_decode;
+
   if (num_remaining_masking_key_bytes_ == 0) {
+    frame_.masking_key_ = htobe32(frame_.masking_key_.value());
     frameDataStart();
   }
-  return bytes_decoded;
+  return bytes_to_decode;
 }
 
 uint64_t Decoder::doDecodePayload(absl::Span<const uint8_t>& data) {
@@ -190,7 +187,8 @@ absl::optional<std::vector<Frame>> Decoder::decode(Buffer::Instance& input) {
       case State::FrameHeaderMaskFlagAndLength:
         bytes_decoded = doDecodeMaskFlagAndLength(data);
         break;
-      case State::FrameHeaderExtendedLength:
+      case State::FrameHeaderExtendedLength16Bit:
+      case State::FrameHeaderExtendedLength64Bit:
         bytes_decoded = doDecodeExtendedLength(data);
         break;
       case State::FrameHeaderMaskingKey:

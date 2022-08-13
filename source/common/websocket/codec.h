@@ -24,10 +24,8 @@ constexpr std::array<uint8_t, 6> kFrameOpcodes = {kFrameOpcodeContinuation, kFra
 
 // Length of the masking key which is 4 bytes fixed size
 constexpr uint8_t kMaskingKeyLength = 4;
-
 // 16 bit payload length
 constexpr uint8_t kPayloadLength16Bit = 2;
-
 // 64 bit payload length
 constexpr uint8_t kPayloadLength64Bit = 8;
 
@@ -112,10 +110,10 @@ private:
     // Decoding the second byte. Waiting for decoding the mask flag (1 bit) and
     // length/length flag (7 bit) of the WebSocket data frame.
     FrameHeaderMaskFlagAndLength,
-    // Waiting for decoding the extended length of the frame if length read previously
-    // is either 126 or 127. Respectively 2 bytes or 8 bytes will be decoded from the
-    // WebSocket data frame.
-    FrameHeaderExtendedLength,
+    // Waiting for decoding the extended 16 bit length.
+    FrameHeaderExtendedLength16Bit,
+    // Waiting for decoding the extended 64 bit length.
+    FrameHeaderExtendedLength64Bit,
     // Waiting for decoding the masking key (4 bytes) only if the mask bit is set.
     FrameHeaderMaskingKey,
     // Waiting for decoding the payload (both extension data and application data).
