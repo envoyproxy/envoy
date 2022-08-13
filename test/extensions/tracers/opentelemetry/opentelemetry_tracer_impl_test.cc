@@ -147,7 +147,8 @@ resource_spans:
                             ->mutable_spans(0);
   expected_span->set_trace_id(absl::HexStringToBytes(trace_id_hex));
   expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(Hex::uint64ToHex(new_span_id))));
-  expected_span->set_parent_span_id(absl::HexStringToBytes(absl::StrCat(Hex::uint64ToHex(parent_span_id))));
+  expected_span->set_parent_span_id(
+      absl::HexStringToBytes(absl::StrCat(Hex::uint64ToHex(parent_span_id))));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)

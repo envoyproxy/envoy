@@ -157,15 +157,13 @@ TEST(SpanContextExtractorTest, ExtractSpanContextWithEmptyTracestate) {
 TEST(SpanContextExtractorTest, ExtractSpanContextWithTracestate) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"traceparent", fmt::format("{}-{}-{}-{}", version, trace_id, parent_id, trace_flags)},
-      {"tracestate", "sample-tracestate"}
-      };
+      {"tracestate", "sample-tracestate"}};
   SpanContextExtractor span_context_extractor(request_headers);
   absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
 
   EXPECT_OK(span_context);
   EXPECT_EQ(span_context->tracestate(), "sample-tracestate");
 }
-
 
 } // namespace
 } // namespace OpenTelemetry
