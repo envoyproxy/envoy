@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace WebSocket {
@@ -67,45 +68,40 @@ struct Frame {
 };
 
 // Encoder encodes in memory WebSocket frames into frames in the wire format
-class Encoder {
+class Encoder : public Logger::Loggable<Logger::Id::websocket> {
 public:
   Encoder() = default;
 
   // Creates a new Websocket data frame header with the given frame data.
   // @param frame supplies the frame to be encoded.
   // @return std::vector<uint8_t> buffer with encoded header data.
-  std::vector<uint8_t> encodeFrameHeader(const Frame& frame);
+  absl::optional<std::vector<uint8_t>> encodeFrameHeader(const Frame& frame);
 };
 
 // Decoder decodes bytes in input buffer into in-memory WebSocket frames.
-class Decoder {
+class Decoder : public Logger::Loggable<Logger::Id::websocket> {
 public:
   // Decodes the given buffer with WebSocket frame. Drains the input buffer when
   // decoding succeeded (returns true). If the input is not sufficient to make a
   // complete WebSocket frame, it will be buffered in the decoder. If a decoding
   // error happened, the input buffer remains unchanged.
-  // Invokes visitor callbacks for each frame in the following sequence:
-  // --------------------------------------------------------------------------------------------
-  // doDecodeFlagsAndOpcode doDecodeMaskFlagAndLength doDecodeExtendedLength* doDecodeMaskingKey*
-  // doDecodePayload*
-  // --------------------------------------------------------------------------------------------
-  // If doDecodeFlagsAndOpcode returns false, then the decoder aborts.
   // @param input supplies the binary octets wrapped in a WebSocket frame.
   // @return the decoded frames.
   absl::optional<std::vector<Frame>> decode(Buffer::Instance& input);
 
 private:
   void resetDecoder();
-  void frameMaskFlag(uint8_t);
+  void frameMaskFlag(uint8_t mask_and_length);
   void frameDataStart();
-  void frameData(const uint8_t*, uint64_t);
-  void frameDataEnd(uint64_t&, Buffer::Instance&, absl::optional<std::vector<Frame>>&);
+  void frameData(const uint8_t* mem, uint64_t length);
+  void frameDataEnd(uint64_t& bytes_consumed_by_frame, Buffer::Instance& input,
+                    absl::optional<std::vector<Frame>>& output);
 
-  uint8_t doDecodeFlagsAndOpcode(absl::Span<const uint8_t>&);
-  uint8_t doDecodeMaskFlagAndLength(absl::Span<const uint8_t>&);
-  uint8_t doDecodeExtendedLength(absl::Span<const uint8_t>&);
-  uint8_t doDecodeMaskingKey(absl::Span<const uint8_t>&);
-  uint64_t doDecodePayload(absl::Span<const uint8_t>&);
+  uint8_t doDecodeFlagsAndOpcode(absl::Span<const uint8_t>& data);
+  uint8_t doDecodeMaskFlagAndLength(absl::Span<const uint8_t>& data);
+  uint8_t doDecodeExtendedLength(absl::Span<const uint8_t>& data);
+  uint8_t doDecodeMaskingKey(absl::Span<const uint8_t>& data);
+  uint64_t doDecodePayload(absl::Span<const uint8_t>& data);
 
   // Current state of the frame that is being processed.
   enum class State {

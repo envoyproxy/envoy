@@ -12,7 +12,11 @@
 namespace Envoy {
 namespace WebSocket {
 
-std::vector<uint8_t> Encoder::encodeFrameHeader(const Frame& frame) {
+absl::optional<std::vector<uint8_t>> Encoder::encodeFrameHeader(const Frame& frame) {
+  if (std::find(kFrameOpcodes.begin(), kFrameOpcodes.end(), frame.opcode_) == kFrameOpcodes.end()) {
+    ENVOY_LOG(error, "Failed to encode websocket frame with invalid opcode: {}", frame.opcode_);
+    return absl::nullopt;
+  }
   std::vector<uint8_t> output;
   // Set flags and opcode
   pushScalarToByteVector(
@@ -43,9 +47,7 @@ std::vector<uint8_t> Encoder::encodeFrameHeader(const Frame& frame) {
 }
 
 void Decoder::frameMaskFlag(uint8_t mask_and_length) {
-  // Set the mask length to be read
   num_remaining_masking_key_bytes_ = mask_and_length & 0x80 ? kMaskingKeyLength : 0;
-  // Set length (0 to 125) or length flag (126 or 127)
   length_ = mask_and_length & 0x7F;
 }
 
@@ -63,13 +65,8 @@ void Decoder::frameData(const uint8_t* mem, uint64_t length) { frame_.payload_->
 
 void Decoder::frameDataEnd(uint64_t& bytes_consumed_by_frame, Buffer::Instance& input,
                            absl::optional<std::vector<Frame>>& output) {
-  if (!output.has_value()) {
-    output = std::vector<Frame>();
-  }
-  output.value().push_back(std::move(frame_));
-
+  output->push_back(std::move(frame_));
   resetDecoder();
-
   input.drain(bytes_consumed_by_frame);
   bytes_consumed_by_frame = 0;
 }
@@ -86,7 +83,8 @@ uint8_t Decoder::doDecodeFlagsAndOpcode(absl::Span<const uint8_t>& data) {
   // Validate opcode (last 4 bits)
   uint8_t opcode = data.front() & 0x0f;
   if (std::find(kFrameOpcodes.begin(), kFrameOpcodes.end(), opcode) == kFrameOpcodes.end()) {
-    return false;
+    ENVOY_LOG(error, "Failed to decode websocket frame with invalid opcode: {}", opcode);
+    return 0;
   }
   frame_.opcode_ = opcode;
   frame_.final_fragment_ = data.front() & 0x80;
@@ -175,12 +173,12 @@ uint64_t Decoder::doDecodePayload(absl::Span<const uint8_t>& data) {
 }
 
 absl::optional<std::vector<Frame>> Decoder::decode(Buffer::Instance& input) {
-  absl::optional<std::vector<Frame>> output = absl::nullopt;
+  absl::optional<std::vector<Frame>> output = std::vector<Frame>();
   uint64_t bytes_consumed_by_frame = 0;
   resetDecoder();
   for (const Buffer::RawSlice& slice : input.getRawSlices()) {
     absl::Span<const uint8_t> data(reinterpret_cast<uint8_t*>(slice.mem_), slice.len_);
-    while (!data.empty()) {
+    while (!data.empty() || state_ == State::FrameFinished) {
       uint64_t bytes_decoded = 0;
       switch (state_) {
       case State::FrameHeaderFlagsAndOpcode:
@@ -208,12 +206,8 @@ absl::optional<std::vector<Frame>> Decoder::decode(Buffer::Instance& input) {
       data.remove_prefix(bytes_decoded);
       bytes_consumed_by_frame += bytes_decoded;
     }
-    // Handles when slice ended with a complete frame scenario
-    if (state_ == State::FrameFinished) {
-      frameDataEnd(bytes_consumed_by_frame, input, output);
-    }
   }
-  return output;
+  return output->size() ? std::move(output) : absl::nullopt;
 }
 
 } // namespace WebSocket
