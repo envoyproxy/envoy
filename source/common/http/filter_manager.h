@@ -30,6 +30,7 @@ namespace Envoy {
 namespace Http {
 
 class FilterManager;
+class DownstreamFilterManager;
 
 struct ActiveStreamFilterBase;
 
@@ -100,6 +101,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override;
   void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -306,7 +308,6 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
-  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
 
   void responseDataTooLarge();
   void responseDataDrained();
@@ -354,7 +355,7 @@ public:
    * Called when the provided metadata has been encoded by all filters in the chain.
    * @param trailers the encoded trailers.
    */
-  virtual void encodeMetadata(MetadataMapVector& metadata) PURE;
+  virtual void encodeMetadata(MetadataMapPtr&& metadata) PURE;
 
   /**
    * Injects request trailers into a stream that originally did not have request trailers.
@@ -612,16 +613,11 @@ public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
                 const Network::Connection& connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
-                uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
-                const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
-                TimeSource& time_source, StreamInfo::FilterStateSharedPtr parent_filter_state,
-                StreamInfo::FilterState::LifeSpan filter_state_life_span)
+                uint32_t buffer_limit, FilterChainFactory& filter_chain_factory)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
-        filter_chain_factory_(filter_chain_factory), local_reply_(local_reply),
-        stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
-                     parent_filter_state, filter_state_life_span) {}
+        filter_chain_factory_(filter_chain_factory) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
@@ -636,7 +632,7 @@ public:
     DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
     DUMP_DETAILS(filter_manager_callbacks_.responseHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.responseTrailers());
-    DUMP_DETAILS(&stream_info_);
+    DUMP_DETAILS(&streamInfo());
   }
 
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
@@ -684,7 +680,7 @@ public:
     }
 
     for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers, response_headers, response_trailers, stream_info_);
+      log_handler->log(request_headers, response_headers, response_trailers, streamInfo());
     }
   }
 
@@ -749,44 +745,15 @@ public:
   void disarmRequestTimeout();
 
   /**
-   * If end_stream is true, marks decoding as complete. This is a noop if end_stream is false.
-   * @param end_stream whether decoding is complete.
-   */
-  void maybeEndDecode(bool end_stream);
-
-  /**
    * If end_stream is true, marks encoding as complete. This is a noop if end_stream is false.
    * @param end_stream whether encoding is complete.
    */
   void maybeEndEncode(bool end_stream);
 
-  /**
-   * Called before local reply is made by the filter manager.
-   * @param data the data associated with the local reply.
-   */
-  void onLocalReply(StreamFilterBase::LocalReplyData& data);
-
-  void sendLocalReply(Code code, absl::string_view body,
-                      const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                      absl::string_view details);
-  /**
-   * Sends a local reply by constructing a response and passing it through all the encoder
-   * filters. The resulting response will be passed out via the FilterManagerCallbacks.
-   */
-  void sendLocalReplyViaFilterChain(
-      bool is_grpc_request, Code code, absl::string_view body,
-      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
-
-  /**
-   * Sends a local reply by constructing a response and skipping the encoder filters. The
-   * resulting response will be passed out via the FilterManagerCallbacks.
-   */
-  void sendDirectLocalReply(Code code, absl::string_view body,
-                            const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                            bool is_head_request,
-                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+  virtual void sendLocalReply(Code code, absl::string_view body,
+                              const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details) PURE;
 
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint32_t limit);
@@ -824,8 +791,8 @@ public:
    * Whether remote processing has been marked as complete.
    */
   bool remoteDecodeComplete() const {
-    return stream_info_.downstreamTiming() &&
-           stream_info_.downstreamTiming()->lastDownstreamRxByteReceived().has_value();
+    return streamInfo().downstreamTiming() &&
+           streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
   }
 
   /**
@@ -837,13 +804,8 @@ public:
     state_.created_filter_chain_ = true;
   }
 
-  // TODO(snowp): This should probably return a StreamInfo instead of the impl.
-  StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
-  const StreamInfo::StreamInfoImpl& streamInfo() const { return stream_info_; }
-  void setDownstreamRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
-    stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
-  }
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
@@ -860,6 +822,7 @@ public:
   void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
 
 private:
+  friend class DownstreamFilterManager;
   class FilterChainFactoryCallbacksImpl : public Http::FilterChainFactoryCallbacks {
   public:
     FilterChainFactoryCallbacksImpl(FilterManager& manager, const Http::FilterContext& context)
@@ -983,8 +946,6 @@ private:
   absl::optional<absl::string_view> upstream_override_host_;
 
   FilterChainFactory& filter_chain_factory_;
-  const LocalReply::LocalReply& local_reply_;
-  OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;
@@ -1056,6 +1017,68 @@ private:
   };
 
   State state_;
+};
+
+// The DownstreamFilterManager has explicit handling to send local replies.
+// The UpstreamFilterManager will not, and will instead defer local reply
+// management to the DownstreamFilterManager.
+class DownstreamFilterManager : public FilterManager {
+public:
+  DownstreamFilterManager(FilterManagerCallbacks& filter_manager_callbacks,
+                          Event::Dispatcher& dispatcher, const Network::Connection& connection,
+                          uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
+                          bool proxy_100_continue, uint32_t buffer_limit,
+                          FilterChainFactory& filter_chain_factory,
+                          const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
+                          TimeSource& time_source,
+                          StreamInfo::FilterStateSharedPtr parent_filter_state,
+                          StreamInfo::FilterState::LifeSpan filter_state_life_span)
+      : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
+                      proxy_100_continue, buffer_limit, filter_chain_factory),
+        stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
+                     parent_filter_state, filter_state_life_span),
+        local_reply_(local_reply) {}
+
+  // TODO(snowp): This should probably return a StreamInfo instead of the impl.
+  StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
+  const StreamInfo::StreamInfoImpl& streamInfo() const override { return stream_info_; }
+
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
+  }
+
+  /**
+   * Called before local reply is made by the filter manager.
+   * @param data the data associated with the local reply.
+   */
+  void onLocalReply(StreamFilterBase::LocalReplyData& data);
+
+  void sendLocalReply(Code code, absl::string_view body,
+                      const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) override;
+  /**
+   * Sends a local reply by constructing a response and passing it through all the encoder
+   * filters. The resulting response will be passed out via the FilterManagerCallbacks.
+   */
+  void sendLocalReplyViaFilterChain(
+      bool is_grpc_request, Code code, absl::string_view body,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  /**
+   * Sends a local reply by constructing a response and skipping the encoder filters. The
+   * resulting response will be passed out via the FilterManagerCallbacks.
+   */
+  void sendDirectLocalReply(Code code, absl::string_view body,
+                            const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                            bool is_head_request,
+                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+
+private:
+  OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
+  const LocalReply::LocalReply& local_reply_;
 };
 
 } // namespace Http

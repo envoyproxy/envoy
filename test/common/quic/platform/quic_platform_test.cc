@@ -490,6 +490,10 @@ TEST_F(QuicPlatformTest, QuicFlags) {
     SetQuicRestartFlag(quic_testonly_default_false, true);
     EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
 
+    EXPECT_FALSE(GetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace));
+    SetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace, true);
+    EXPECT_TRUE(GetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace));
+
     EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
     SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
     EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
@@ -499,6 +503,7 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+  EXPECT_FALSE(GetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace));
 }
 
 TEST_F(QuicPlatformTest, UpdateReloadableFlags) {

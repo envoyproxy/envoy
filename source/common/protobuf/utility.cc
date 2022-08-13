@@ -158,7 +158,7 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
   const bool runtime_overridden = (warn_default == false && warn_only == true);
 
   std::string with_overridden = fmt::format(
-      error,
+      fmt::runtime(error),
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
 
   validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " + with_overridden,
@@ -560,6 +560,17 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
                                      message.GetDescriptor()->full_name(),
                                      any_message.DebugString()));
   }
+}
+
+absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
+                                          Protobuf::Message& message) {
+  if (!any_message.UnpackTo(&message)) {
+    return absl::InternalError(absl::StrCat("Unable to unpack as ",
+                                            message.GetDescriptor()->full_name(), ": ",
+                                            any_message.DebugString()));
+  }
+  // Ok Status is returned if `UnpackTo` succeeded.
+  return absl::OkStatus();
 }
 
 void MessageUtil::jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest) {

@@ -200,7 +200,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
     const Api::SysCallIntResult rc =
         Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
-    RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+    RELEASE_ASSERT(!rc.return_value_, fmt::format("getifaddrs error: {}", rc.errno_));
 
     // man getifaddrs(3)
     for (const auto& interface_address : interface_addresses) {
@@ -465,6 +465,7 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
     ASSERT(address.type() == Address::Type::EnvoyInternal);
     auto* internal_address = proto_address.mutable_envoy_internal_address();
     internal_address->set_server_listener_name(address.envoyInternalAddress()->addressId());
+    internal_address->set_endpoint_id(address.envoyInternalAddress()->endpointId());
   }
 }
 

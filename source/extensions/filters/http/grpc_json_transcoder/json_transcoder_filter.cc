@@ -415,7 +415,7 @@ JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& messa
       message.SerializeAsString(), json_out, print_options_);
 }
 
-JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
+JsonTranscoderFilter::JsonTranscoderFilter(const JsonTranscoderConfig& config) : config_(config) {}
 
 void JsonTranscoderFilter::initPerRouteConfig() {
   const auto* route_local =

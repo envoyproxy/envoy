@@ -41,7 +41,7 @@ Protoc-Gen-Validate Annotations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The protobuf messages for the individual xDS resource types have annotations
-using `protoc-gen-validate<https://github.com/envoyproxy/protoc-gen-validate>`
+using `protoc-gen-validate <https://github.com/envoyproxy/protoc-gen-validate>`_
 (PGV), which indicate semantic constraints to be used to validate the contents
 of a resource when it is received by a client.
 
@@ -677,6 +677,18 @@ is expected to provide the EDS/RDS updates during warming. If management
 server does not provide EDS/RDS responses, Envoy will not initialize
 itself during the initialization phase and the updates sent via CDS/LDS
 will not take effect until EDS/RDS responses are supplied.
+
+.. note::
+
+   Envoy specific implementation notes:
+
+   - Warming of ``Cluster`` is completed only when a new ``ClusterLoadAssignment``
+     response is supplied by management server even if there is no change in endpoints.
+   - Warming of ``Listener`` is completed even if management server does not send a
+     response for ``RouteConfiguration`` referenced by ``Listener``. Envoy will use the
+     previously sent ``RouteConfiguration`` to finish ``Listener`` warming. Management Server
+     has to send the ``RouteConfiguration`` response only if it has changed or it was never
+     sent in the past.
 
 .. _xds_protocol_eventual_consistency_considerations:
 
