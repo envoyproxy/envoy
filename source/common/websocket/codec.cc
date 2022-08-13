@@ -207,7 +207,7 @@ absl::optional<std::vector<Frame>> Decoder::decode(Buffer::Instance& input) {
       bytes_consumed_by_frame += bytes_decoded;
     }
   }
-  return output->size() ? std::move(output) : absl::nullopt;
+  return !output->empty() ? std::move(output) : absl::nullopt;
 }
 
 } // namespace WebSocket
