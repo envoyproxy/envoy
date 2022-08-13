@@ -128,6 +128,11 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   EXPECT_EQ(sampled_tracestate_entry[0]->value().getStringView(), "test=foo");
   const std::string request_yaml = R"(
 resource_spans:
+  resource:
+    attributes:
+      key: "service.name"
+      value:
+        string_value: "unknown_service:envoy"
   instrumentation_library_spans:
     spans:
       trace_id: "AAA"
