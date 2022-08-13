@@ -124,8 +124,7 @@ void Tracer::flushSpans() {
   key_value.set_key(std::string{kServiceNameKey});
   *key_value.mutable_value() = value_proto;
   (*resource_span->mutable_resource()->add_attributes()) = key_value;
-  ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span =
-      resource_span->add_scope_spans();
+  ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
   for (const auto& pending_span : span_buffer_) {
     (*scope_span->add_spans()) = pending_span;
   }
