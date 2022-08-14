@@ -107,7 +107,7 @@ TEST(WebSocketCodecTest, DecodeSingleUnmaskedFrame) {
   absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
                              {true, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Hello")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // A fragmented unmasked text message
 //
@@ -134,7 +134,7 @@ TEST(WebSocketCodecTest, DecodeTwoUnmaskedFrames) {
                              {false, kFrameOpcodeText, absl::nullopt, 3, makeBuffer("Hel")}));
   EXPECT_TRUE(areFramesEqual(frames.value()[1],
                              {true, kFrameOpcodeContinuation, absl::nullopt, 2, makeBuffer("lo")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // A fragmented and unfragmented text message
 TEST(WebSocketCodecTest, DecodeThreeFrames) {
@@ -154,7 +154,7 @@ TEST(WebSocketCodecTest, DecodeThreeFrames) {
                              {true, kFrameOpcodeContinuation, absl::nullopt, 2, makeBuffer("lo")}));
   EXPECT_TRUE(areFramesEqual(frames.value()[2], {true, kFrameOpcodeText, absl::nullopt, 5,
                                                  makeBuffer("\x48\x65\x6c\x6c\x6f")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // A single-frame masked text message ("Hello")
 // 0x81 0x85 0x37 0xfa 0x21 0x3d 0x7f 0x9f 0x4d 0x51 0x58
@@ -183,7 +183,7 @@ TEST(WebSocketCodecTest, DecodeSingleMaskedFrame) {
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, 0x37fa213d, 5,
                                                  makeBuffer("\x7f\x9f\x4d\x51\x58")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // Unmasked Ping request and masked Ping response
 //
@@ -206,7 +206,7 @@ TEST(WebSocketCodecTest, DecodePingFrames) {
                              {true, kFrameOpcodePing, absl::nullopt, 5, makeBuffer("Hello")}));
   EXPECT_TRUE(areFramesEqual(frames.value()[1], {true, kFrameOpcodePong, 0x37fa213d, 5,
                                                  makeBuffer("\x7f\x9f\x4d\x51\x58")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // 256 bytes binary message in a single unmasked frame
 // 0x82 0x7E 0x0100 [256 bytes of binary data]
@@ -400,7 +400,7 @@ TEST(WebSocketCodecTest, DecodeFrameIteratively) {
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
                              {true, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Hello")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // Frame spans over two slices
 TEST(WebSocketCodecTest, DecodeFrameSpansOverTwoSlices) {
@@ -415,7 +415,7 @@ TEST(WebSocketCodecTest, DecodeFrameSpansOverTwoSlices) {
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0], {true, kFrameOpcodeContinuation, 0x7c96263f, 6,
                                                  makeBuffer("\x1f\xfa\x4f\x5a\x12\xe2")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // A complete frame and an incomplete frame present
 TEST(WebSocketCodecTest, DecodeFrameCompleteAndIncompleteFrame) {
@@ -640,7 +640,7 @@ TEST(WebSocketCodecTest, EncodeAndDecodeFrame) {
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
                              {true, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Hello")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST(WebSocketCodecTest, DecodeMultipleValidNonMaskedFrames) {
   Encoder encoder;
@@ -668,7 +668,7 @@ TEST(WebSocketCodecTest, DecodeMultipleValidNonMaskedFrames) {
                              {false, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Text ")}));
   EXPECT_TRUE(areFramesEqual(frames.value()[1], {true, kFrameOpcodeContinuation, absl::nullopt, 9,
                                                  makeBuffer("Response!")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST(WebSocketCodecTest, DecodeValidMaskedFrame) {
   Encoder encoder;
@@ -688,7 +688,7 @@ TEST(WebSocketCodecTest, DecodeValidMaskedFrame) {
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0], {true, kFrameOpcodePong, 0x37fa213d, 5,
                                                  makeBuffer("\x7f\x9f\x4d\x51\x58")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST(WebSocketCodecTest, DecodeValidMultipleMaskedFrames) {
   Encoder encoder;
@@ -732,7 +732,7 @@ TEST(WebSocketCodecTest, DecodeValidMultipleMaskedFrames) {
                                                  makeBuffer("\x1c\x55\x58\x79\x51")}));
   EXPECT_TRUE(areFramesEqual(frames.value()[2], {true, kFrameOpcodeContinuation, 0x7c96263f, 6,
                                                  makeBuffer("\x1f\xfa\x4f\x5a\x12\xe2")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 } // namespace
 } // namespace WebSocket
