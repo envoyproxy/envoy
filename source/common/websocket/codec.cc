@@ -14,7 +14,7 @@ namespace WebSocket {
 
 absl::optional<std::vector<uint8_t>> Encoder::encodeFrameHeader(const Frame& frame) {
   if (std::find(kFrameOpcodes.begin(), kFrameOpcodes.end(), frame.opcode_) == kFrameOpcodes.end()) {
-    ENVOY_LOG(error, "Failed to encode websocket frame with invalid opcode: {}", frame.opcode_);
+    ENVOY_LOG(debug, "Failed to encode websocket frame with invalid opcode: {}", frame.opcode_);
     return absl::nullopt;
   }
   std::vector<uint8_t> output;
@@ -83,7 +83,7 @@ uint8_t Decoder::doDecodeFlagsAndOpcode(absl::Span<const uint8_t>& data) {
   // Validate opcode (last 4 bits)
   uint8_t opcode = data.front() & 0x0f;
   if (std::find(kFrameOpcodes.begin(), kFrameOpcodes.end(), opcode) == kFrameOpcodes.end()) {
-    ENVOY_LOG(error, "Failed to decode websocket frame with invalid opcode: {}", opcode);
+    ENVOY_LOG(debug, "Failed to decode websocket frame with invalid opcode: {}", opcode);
     return 0;
   }
   frame_.opcode_ = opcode;

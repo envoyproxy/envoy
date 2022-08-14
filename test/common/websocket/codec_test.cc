@@ -22,6 +22,10 @@ bool areFramesEqual(const Frame& a, const Frame& b) {
           (a.payload_->toString() == b.payload_->toString()));
 }
 
+Buffer::InstancePtr makeBuffer(absl::string_view data) {
+  return std::make_unique<Buffer::OwnedImpl>(data.data(), data.length());
+}
+
 TEST(WebSocketCodecTest, EncodeFrameHeader) {
   Encoder encoder;
   absl::optional<std::vector<uint8_t>> header = absl::nullopt;
@@ -101,9 +105,8 @@ TEST(WebSocketCodecTest, DecodeSingleUnmaskedFrame) {
 
   Decoder decoder;
   absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
-
-  EXPECT_TRUE(areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, absl::nullopt, 5,
-                                                 std::make_unique<Buffer::OwnedImpl>("Hello", 5)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0],
+                             {true, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Hello")}));
 }
 
 // A fragmented unmasked text message
@@ -127,10 +130,10 @@ TEST(WebSocketCodecTest, DecodeTwoUnmaskedFrames) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(2, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0], {false, kFrameOpcodeText, absl::nullopt, 3,
-                                                 std::make_unique<Buffer::OwnedImpl>("Hel", 3)}));
-  EXPECT_TRUE(areFramesEqual(frames.value()[1], {true, kFrameOpcodeContinuation, absl::nullopt, 2,
-                                                 std::make_unique<Buffer::OwnedImpl>("lo", 2)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0],
+                             {false, kFrameOpcodeText, absl::nullopt, 3, makeBuffer("Hel")}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[1],
+                             {true, kFrameOpcodeContinuation, absl::nullopt, 2, makeBuffer("lo")}));
 }
 
 // A fragmented and unfragmented text message
@@ -145,13 +148,12 @@ TEST(WebSocketCodecTest, DecodeThreeFrames) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(3, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0], {false, kFrameOpcodeText, absl::nullopt, 3,
-                                                 std::make_unique<Buffer::OwnedImpl>("Hel", 3)}));
-  EXPECT_TRUE(areFramesEqual(frames.value()[1], {true, kFrameOpcodeContinuation, absl::nullopt, 2,
-                                                 std::make_unique<Buffer::OwnedImpl>("lo", 2)}));
-  EXPECT_TRUE(areFramesEqual(frames.value()[2],
-                             {true, kFrameOpcodeText, absl::nullopt, 5,
-                              std::make_unique<Buffer::OwnedImpl>("\x48\x65\x6c\x6c\x6f", 5)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0],
+                             {false, kFrameOpcodeText, absl::nullopt, 3, makeBuffer("Hel")}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[1],
+                             {true, kFrameOpcodeContinuation, absl::nullopt, 2, makeBuffer("lo")}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[2], {true, kFrameOpcodeText, absl::nullopt, 5,
+                                                 makeBuffer("\x48\x65\x6c\x6c\x6f")}));
 }
 
 // A single-frame masked text message ("Hello")
@@ -179,9 +181,8 @@ TEST(WebSocketCodecTest, DecodeSingleMaskedFrame) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodeText, 0x37fa213d, 5,
-                              std::make_unique<Buffer::OwnedImpl>("\x7f\x9f\x4d\x51\x58", 5)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, 0x37fa213d, 5,
+                                                 makeBuffer("\x7f\x9f\x4d\x51\x58")}));
 }
 
 // Unmasked Ping request and masked Ping response
@@ -201,11 +202,10 @@ TEST(WebSocketCodecTest, DecodePingFrames) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(2, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0], {true, kFrameOpcodePing, absl::nullopt, 5,
-                                                 std::make_unique<Buffer::OwnedImpl>("Hello", 5)}));
-  EXPECT_TRUE(areFramesEqual(frames.value()[1],
-                             {true, kFrameOpcodePong, 0x37fa213d, 5,
-                              std::make_unique<Buffer::OwnedImpl>("\x7f\x9f\x4d\x51\x58", 5)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0],
+                             {true, kFrameOpcodePing, absl::nullopt, 5, makeBuffer("Hello")}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[1], {true, kFrameOpcodePong, 0x37fa213d, 5,
+                                                 makeBuffer("\x7f\x9f\x4d\x51\x58")}));
 }
 
 // 256 bytes binary message in a single unmasked frame
@@ -240,9 +240,9 @@ TEST(WebSocketCodecTest, Decode16BitBinaryUnmaskedFrame) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodeBinary, absl::nullopt, 256,
-                              std::make_unique<Buffer::OwnedImpl>(payload.begin(), 256)}));
+  EXPECT_TRUE(areFramesEqual(
+      frames.value()[0], {true, kFrameOpcodeBinary, absl::nullopt, 256,
+                          std::make_unique<Buffer::OwnedImpl>(payload.begin(), payload.size())}));
 }
 
 // 126 bytes binary message in a single masked frame
@@ -268,9 +268,9 @@ TEST(WebSocketCodecTest, Decode16BitBinaryMaskedFrame) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodeBinary, 0xa1e8d7b0, 126,
-                              std::make_unique<Buffer::OwnedImpl>(payload.begin(), 126)}));
+  EXPECT_TRUE(areFramesEqual(
+      frames.value()[0], {true, kFrameOpcodeBinary, 0xa1e8d7b0, 126,
+                          std::make_unique<Buffer::OwnedImpl>(payload.begin(), payload.size())}));
 }
 
 // 64KiB binary message in a single unmasked frame
@@ -398,8 +398,8 @@ TEST(WebSocketCodecTest, DecodeFrameIteratively) {
   EXPECT_EQ(0, buffer.length());
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, absl::nullopt, 5,
-                                                 std::make_unique<Buffer::OwnedImpl>("Hello", 5)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0],
+                             {true, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Hello")}));
 }
 
 // Frame spans over two slices
@@ -413,9 +413,8 @@ TEST(WebSocketCodecTest, DecodeFrameSpansOverTwoSlices) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodeContinuation, 0x7c96263f, 6,
-                              std::make_unique<Buffer::OwnedImpl>("\x1f\xfa\x4f\x5a\x12\xe2", 6)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0], {true, kFrameOpcodeContinuation, 0x7c96263f, 6,
+                                                 makeBuffer("\x1f\xfa\x4f\x5a\x12\xe2")}));
 }
 
 // A complete frame and an incomplete frame present
@@ -476,9 +475,9 @@ TEST(WebSocketCodecTest, DecodeFrameSpansOverTwoSlicesSplitByLength) {
       0xc5, 0xb4, 0xd7, 0x26, 0xa8, 0xca, 0x78, 0xe2, 0x1d, 0xe1, 0x8c, 0xde, 0xa8, 0x35,
       0xd7, 0xda, 0x3a, 0x07, 0xb2, 0xf7, 0x71, 0x54, 0xd7, 0x26, 0xa8, 0xca, 0x78, 0xe2,
   };
-  EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodeBinary, 0xa1e8d7b0, 126,
-                              std::make_unique<Buffer::OwnedImpl>(payload.data(), 126)}));
+  EXPECT_TRUE(areFramesEqual(
+      frames.value()[0], {true, kFrameOpcodeBinary, 0xa1e8d7b0, 126,
+                          std::make_unique<Buffer::OwnedImpl>(payload.data(), payload.size())}));
 }
 
 // 1MiB binary message in a single unmasked frame
@@ -639,8 +638,8 @@ TEST(WebSocketCodecTest, EncodeAndDecodeFrame) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, absl::nullopt, 5,
-                                                 std::make_unique<Buffer::OwnedImpl>("Hello", 5)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0],
+                             {true, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Hello")}));
 }
 
 TEST(WebSocketCodecTest, DecodeMultipleValidNonMaskedFrames) {
@@ -665,11 +664,10 @@ TEST(WebSocketCodecTest, DecodeMultipleValidNonMaskedFrames) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(2, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0], {false, kFrameOpcodeText, absl::nullopt, 5,
-                                                 std::make_unique<Buffer::OwnedImpl>("Text ", 5)}));
-  EXPECT_TRUE(
-      areFramesEqual(frames.value()[1], {true, kFrameOpcodeContinuation, absl::nullopt, 9,
-                                         std::make_unique<Buffer::OwnedImpl>("Response!", 9)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0],
+                             {false, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Text ")}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[1], {true, kFrameOpcodeContinuation, absl::nullopt, 9,
+                                                 makeBuffer("Response!")}));
 }
 
 TEST(WebSocketCodecTest, DecodeValidMaskedFrame) {
@@ -688,9 +686,8 @@ TEST(WebSocketCodecTest, DecodeValidMaskedFrame) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(1, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {true, kFrameOpcodePong, 0x37fa213d, 5,
-                              std::make_unique<Buffer::OwnedImpl>("\x7f\x9f\x4d\x51\x58", 5)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0], {true, kFrameOpcodePong, 0x37fa213d, 5,
+                                                 makeBuffer("\x7f\x9f\x4d\x51\x58")}));
 }
 
 TEST(WebSocketCodecTest, DecodeValidMultipleMaskedFrames) {
@@ -729,15 +726,12 @@ TEST(WebSocketCodecTest, DecodeValidMultipleMaskedFrames) {
 
   ASSERT_TRUE(frames.has_value());
   EXPECT_EQ(3, frames->size());
-  EXPECT_TRUE(areFramesEqual(frames.value()[0],
-                             {false, kFrameOpcodeText, 0xaf4be87a, 6,
-                              std::make_unique<Buffer::OwnedImpl>("\xc7\x2e\x84\x16\xc0\x6b", 6)}));
-  EXPECT_TRUE(areFramesEqual(frames.value()[1],
-                             {false, kFrameOpcodeContinuation, 0x3c332a16, 5,
-                              std::make_unique<Buffer::OwnedImpl>("\x1c\x55\x58\x79\x51", 5)}));
-  EXPECT_TRUE(areFramesEqual(frames.value()[2],
-                             {true, kFrameOpcodeContinuation, 0x7c96263f, 6,
-                              std::make_unique<Buffer::OwnedImpl>("\x1f\xfa\x4f\x5a\x12\xe2", 6)}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[0], {false, kFrameOpcodeText, 0xaf4be87a, 6,
+                                                 makeBuffer("\xc7\x2e\x84\x16\xc0\x6b")}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[1], {false, kFrameOpcodeContinuation, 0x3c332a16, 5,
+                                                 makeBuffer("\x1c\x55\x58\x79\x51")}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[2], {true, kFrameOpcodeContinuation, 0x7c96263f, 6,
+                                                 makeBuffer("\x1f\xfa\x4f\x5a\x12\xe2")}));
 }
 
 } // namespace
