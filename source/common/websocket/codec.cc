@@ -118,7 +118,7 @@ uint8_t Decoder::doDecodeExtendedLength(absl::Span<const uint8_t>& data) {
           (state_ == State::FrameHeaderExtendedLength16Bit ? kPayloadLength16Bit
                                                            : kPayloadLength64Bit) -
           num_remaining_extended_length_bytes_),
-         data.data(), bytes_to_decode);
+         data.data(), bytes_to_decode); // NOLINT(safe-memcpy)
   num_remaining_extended_length_bytes_ -= bytes_to_decode;
 
   if (num_remaining_extended_length_bytes_ == 0) {
@@ -141,7 +141,7 @@ uint8_t Decoder::doDecodeMaskingKey(absl::Span<const uint8_t>& data) {
                                  : num_remaining_masking_key_bytes_;
   memcpy((reinterpret_cast<uint8_t*>(&(frame_.masking_key_.value())) + kMaskingKeyLength -
           num_remaining_masking_key_bytes_),
-         data.data(), bytes_to_decode);
+         data.data(), bytes_to_decode); // NOLINT(safe-memcpy)
   num_remaining_masking_key_bytes_ -= bytes_to_decode;
 
   if (num_remaining_masking_key_bytes_ == 0) {
