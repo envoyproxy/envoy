@@ -70,6 +70,11 @@ message SipProxy {
     // False: sip service proxy
     // True:  sip load balancer
     bool operate_via = 4;
+
+    // Whether upstream transactions are allowed by the use of X-Envoy-Origin-Ingress header custom header
+    // False: upstream transactions disabled
+    // True:  upstream transactions enabled
+    bool allow_upstream_tx = 5;
   }
 
   // The human readable prefix to use when emitting statistics.

@@ -170,8 +170,8 @@ private:
 
   struct ActiveTrans;
 
-  struct ResponseDecoder : public DecoderCallbacks, public DecoderEventHandler {
-    ResponseDecoder(ActiveTrans& parent) : parent_(parent) {}
+  struct UpstreamMessageDecoder : public DecoderCallbacks, public DecoderEventHandler {
+    UpstreamMessageDecoder(ActiveTrans& parent) : parent_(parent) {}
 
     bool onData(MessageMetadataSharedPtr metadata);
 
@@ -199,7 +199,7 @@ private:
     ActiveTrans& parent_;
     MessageMetadataSharedPtr metadata_;
   };
-  using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
+  using UpstreamMessageDecoderPtr = std::unique_ptr<UpstreamMessageDecoder>;
 
   // Wraps a DecoderFilter and acts as the DecoderFilterCallbacks for the filter, enabling filter
   // chain continuation.
@@ -220,10 +220,9 @@ private:
     }
     void startUpstreamResponse() override { parent_.startUpstreamResponse(); }
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
-                                            Router::RouteConstSharedPtr return_route,
-                                            const std::string& return_destination,
-                                            Network::Connection* return_connection) override {
-      return parent_.upstreamData(metadata, return_route, return_destination, return_connection);
+                                      Router::RouteConstSharedPtr return_route,
+                                            const std::string& return_destination) override {
+      return parent_.upstreamData(metadata, return_route, return_destination);
     }
     void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
@@ -279,22 +278,149 @@ private:
                        public SipFilters::DecoderFilterCallbacks,
                        public SipFilters::FilterChainFactoryCallbacks {
     ActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
-        : parent_(parent), request_timer_(new Stats::HistogramCompletableTimespanImpl(
-                               parent_.stats_.request_time_ms_, parent_.time_source_)),
-          stream_id_(parent_.random_generator_.random()),
+        : parent_(parent), stream_id_(parent_.random_generator_.random()),
           transaction_id_(metadata->transactionId().value()),
           stream_info_(parent_.time_source_,
                        parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
-          metadata_(metadata) {
-      parent.stats_.request_active_.inc();
+          metadata_(metadata) {}
+    ~ActiveTrans() override {
+      for (auto& filter : decoder_filters_) {
+        filter->handle_->onDestroy();
+      }
     }
-    ~ActiveTrans() override = default;
 
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus transportEnd() override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus messageEnd() override;
+
+    // SipFilters::DecoderFilterCallbacks
+    uint64_t streamId() const override { return stream_id_; }
+    std::string transactionId() const override { return transaction_id_; }
+    absl::optional<OriginIngress> originIngress() override { return parent_.local_origin_ingress_; }
+    const Network::Connection* connection() const override;
+    SipFilterStats& stats() override { return parent_.stats_; }
+    void resetDownstreamConnection() override;
+    StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+
+    std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
+      return parent_.transaction_infos_;
+    }
+    std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
+      return parent_.downstream_connection_infos_;
+    }
+    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfo() override {
+      return parent_.upstream_transaction_infos_;
+    }
+    std::shared_ptr<SipSettings> settings() const override { return parent_.config_.settings(); }
+    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
+      return parent_.tra_handler_;
+    }
+    void continueHandling(const std::string& key, bool try_next_affinity) override {
+      return parent_.continueHandling(key, try_next_affinity);
+    }
+
+    // Sip::FilterChainFactoryCallbacks
+    void addDecoderFilter(SipFilters::DecoderFilterSharedPtr filter) override {
+      ActiveTransDecoderFilterPtr wrapper =
+          std::make_unique<ActiveTransDecoderFilter>(*this, filter);
+      filter->setDecoderFilterCallbacks(wrapper->parent_);
+      LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
+    }
+
+    FilterStatus applyDecoderFilters(ActiveTransDecoderFilter* filter);
+    void finalizeRequest();
+
+    void createFilterChain();
+    virtual void onError(const std::string& what) PURE;
+    MessageMetadataSharedPtr metadata() override { return metadata_; }
+    bool localResponseSent() { return local_response_sent_; }
+    void setLocalResponseSent(bool local_response_sent) {
+      local_response_sent_ = local_response_sent;
+    }
+
+    ConnectionManager& parent_;
+    Stats::TimespanPtr request_timer_;
+    uint64_t stream_id_;
+    std::string transaction_id_;
+    StreamInfo::StreamInfoImpl stream_info_;
+    MessageMetadataSharedPtr metadata_;
+    std::list<ActiveTransDecoderFilterPtr> decoder_filters_;
+    UpstreamMessageDecoderPtr response_decoder_;
+    absl::optional<Router::RouteConstSharedPtr> cached_route_;
+
+    std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
+
+    absl::any filter_context_;
+    bool local_response_sent_{false};
+
+    /* Used by Router */
+    std::shared_ptr<Router::TransactionInfos> transaction_infos_;
+  };
+
+  struct DownstreamActiveTrans : public ActiveTrans {
+    DownstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
+        : ActiveTrans(parent, metadata) {
+      parent.stats_.request_active_.inc();
+      request_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(parent_.stats_.request_time_ms_, parent_.time_source_);
+    }
+
+    ~DownstreamActiveTrans() override {
+      ENVOY_LOG(debug, "DownstreamActiveTrans Dtor");
+      request_timer_->complete();
+      parent_.stats_.request_active_.dec();
+
+      parent_.eraseActiveTransFromPendingList(transaction_id_);
+    }
+
+    // DecoderEventHandler
+    FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
+
+    // PendingListHandler
+    void pushIntoPendingList(const std::string& type, const std::string& key,
+                             SipFilters::DecoderFilterCallbacks& activetrans,
+                             std::function<void(void)> func) override {
+      return parent_.pushIntoPendingList(type, key, activetrans, func);
+    }
+    void onResponseHandleForPendingList(
+        const std::string& type, const std::string& key,
+        std::function<void(MessageMetadataSharedPtr metadata, DecoderEventHandler&)> func)
+        override {
+      return parent_.onResponseHandleForPendingList(type, key, func);
+    }
+    void eraseActiveTransFromPendingList(std::string& transaction_id) override {
+      return parent_.eraseActiveTransFromPendingList(transaction_id);
+    }
+    
+    // SipFilters::DecoderFilterCallbacks
+    Router::RouteConstSharedPtr route() override;
+    void sendLocalReply(const DirectResponse& response, bool end_stream) override;
+    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
+                                      Router::RouteConstSharedPtr return_route,
+                                      const std::string& return_destination) override;
+    void startUpstreamResponse() override;
+
+    void onError(const std::string& what) override;
+
+    void onReset() override;
+  };
+
+  struct UpstreamActiveTrans : public ActiveTrans {
+    UpstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
+        : ActiveTrans(parent, metadata) {
+      parent.stats_.upstream_request_active_.inc();
+      request_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(parent_.stats_.upstream_request_time_ms_, parent_.time_source_);
+    }
+
+    ~UpstreamActiveTrans() override { 
+      ENVOY_LOG(debug, "UpstreamActiveTrans Dtor"); 
+      request_timer_->complete();
+      parent_.stats_.upstream_request_active_.dec();
+    }
+
+    // DecoderEventHandler
+    FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
 
     // PendingListHandler
     void pushIntoPendingList(const std::string& type, const std::string& key,
@@ -316,134 +442,15 @@ private:
     void eraseActiveTransFromPendingList(std::string& transaction_id) override {
       UNREFERENCED_PARAMETER(transaction_id);
     }
-
+    
     // SipFilters::DecoderFilterCallbacks
-    uint64_t streamId() const override { return stream_id_; }
-    std::string transactionId() const override { return transaction_id_; }
-    absl::optional<OriginIngress> originIngress() override { return parent_.local_origin_ingress_; }
-    const Network::Connection* connection() const override;
-    Router::RouteConstSharedPtr route() override;
-    SipFilterStats& stats() override { return parent_.stats_; }
+    Router::RouteConstSharedPtr route() override { return return_route_; };
     void sendLocalReply(const DirectResponse& response, bool end_stream) override;
-    void startUpstreamResponse() override;
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
-                                            Router::RouteConstSharedPtr return_route,
-                                            const std::string& return_destination,
-                                            Network::Connection* return_connection) override;
-    void resetDownstreamConnection() override;
-    StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
-
-    std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
-      return parent_.transaction_infos_;
-    }
-    std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
-      return parent_.downstream_connection_infos_;
-    }
-    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfo() override {
-      return parent_.upstream_transaction_infos_;
-    }
-    std::shared_ptr<SipSettings> settings() const override { return parent_.config_.settings(); }
-    void onReset() override;
-    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
-      return parent_.tra_handler_;
-    }
-    void continueHandling(const std::string& key, bool try_next_affinity) override {
-      return parent_.continueHandling(key, try_next_affinity);
-    }
-
-    // Sip::FilterChainFactoryCallbacks
-    void addDecoderFilter(SipFilters::DecoderFilterSharedPtr filter) override {
-      ActiveTransDecoderFilterPtr wrapper =
-          std::make_unique<ActiveTransDecoderFilter>(*this, filter);
-      filter->setDecoderFilterCallbacks(wrapper->parent_);
-      LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
-    }
-
-    FilterStatus applyDecoderFilters(ActiveTransDecoderFilter* filter);
-    void finalizeRequest();
-
-    void createFilterChain();
-    void onError(const std::string& what);
-    MessageMetadataSharedPtr metadata() override { return metadata_; }
-    bool localResponseSent() { return local_response_sent_; }
-    void setLocalResponseSent(bool local_response_sent) {
-      local_response_sent_ = local_response_sent;
-    }
-
-    ConnectionManager& parent_;
-    Stats::TimespanPtr request_timer_;
-    uint64_t stream_id_;
-    std::string transaction_id_;
-    StreamInfo::StreamInfoImpl stream_info_;
-    MessageMetadataSharedPtr metadata_;
-    std::list<ActiveTransDecoderFilterPtr> decoder_filters_;
-    ResponseDecoderPtr response_decoder_;
-    absl::optional<Router::RouteConstSharedPtr> cached_route_;
-
-    std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
-
-    absl::any filter_context_;
-    bool local_response_sent_{false};
-
-    /* Used by Router */
-    std::shared_ptr<Router::TransactionInfos> transaction_infos_;
-  };
-
-  struct DownstreamActiveTrans : public ActiveTrans {
-    DownstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
-        : ActiveTrans(parent, metadata) {}
-
-    ~DownstreamActiveTrans() override {
-      ENVOY_LOG(debug, "DownstreamActiveTrans Dtor");
-      request_timer_->complete();
-      parent_.stats_.request_active_.dec();
-
-      parent_.eraseActiveTransFromPendingList(transaction_id_);
-      for (auto& filter : decoder_filters_) {
-        filter->handle_->onDestroy();
-      }
-    }
-
-    // PendingListHandler
-    void pushIntoPendingList(const std::string& type, const std::string& key,
-                             SipFilters::DecoderFilterCallbacks& activetrans,
-                             std::function<void(void)> func) override {
-      return parent_.pushIntoPendingList(type, key, activetrans, func);
-    }
-    void onResponseHandleForPendingList(
-        const std::string& type, const std::string& key,
-        std::function<void(MessageMetadataSharedPtr metadata, DecoderEventHandler&)> func)
-        override {
-      return parent_.onResponseHandleForPendingList(type, key, func);
-    }
-    void eraseActiveTransFromPendingList(std::string& transaction_id) override {
-      return parent_.eraseActiveTransFromPendingList(transaction_id);
-    }
-  };
-
-  struct UpstreamActiveTrans : public ActiveTrans {
-    UpstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
-        : ActiveTrans(parent, metadata) {}
-
-    ~UpstreamActiveTrans() override { ENVOY_LOG(debug, "UpstreamActiveTrans Dtor"); }
-
-    // DecoderEventHandler
-    FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
-      ENVOY_LOG(debug, "Setting destination for response recvd from downstream: {}", destination_);
-      metadata->setDestination(
-          destination_); // response should have affinity to the upstream request
-      return ActiveTrans::transportBegin(metadata);
-    }
-
-    const Network::Connection* connection() const override;
-    Router::RouteConstSharedPtr route() override { return route_; };
-    SipFilterStats& stats() override { return parent_.stats_; }
-    void sendLocalReply(const DirectResponse& response, bool end_stream) override;
+                                      Router::RouteConstSharedPtr return_route,
+                                      const std::string& return_destination) override;
     void startUpstreamResponse() override;
-    SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
-                                            Router::RouteConstSharedPtr return_route,
-                                            const std::string& return_destination,
-                                            Network::Connection* return_connection) override;
+
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
 
@@ -454,14 +461,10 @@ private:
       UNREFERENCED_PARAMETER(try_next_affinity);
     }
 
-    void onError(const std::string& what);
-    void setReturnConnection(Network::Connection* return_connection) {
-      return_connection_ = return_connection;
-    }
+    void onError(const std::string& what) override;
 
-    Router::RouteConstSharedPtr route_;
-    std::string destination_;
-    Network::Connection* return_connection_;
+    Router::RouteConstSharedPtr return_route_;
+    std::string return_destination_;
     MessageMetadataSharedPtr metadata_;
   };
 
@@ -491,9 +494,8 @@ private:
     void startUpstreamResponse() override;
 
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
-                                            Router::RouteConstSharedPtr return_route,
-                                            const std::string& return_destination,
-                                            Network::Connection* connection) override;
+                                      Router::RouteConstSharedPtr return_route,
+                                      const std::string& return_destination) override;
 
     void resetDownstreamConnection() override{};
 
@@ -541,7 +543,7 @@ private:
   private:
     ConnectionManager& parent_;
     StreamInfo::StreamInfoImpl stream_info_;
-    // std::unique_ptr<ResponseDecoder> message_decoder_;
+    // std::unique_ptr<UpstreamMessageDecoder> message_decoder_;
   };
 
   using ActiveTransPtr = std::unique_ptr<ActiveTrans>;
@@ -551,7 +553,7 @@ private:
   void setLocalResponseSent(absl::string_view transaction_id);
   void sendUpstreamLocalReply(MessageMetadata& metadata, const DirectResponse& response,
                               bool end_stream);
-  void doDeferredTransDestroy(ActiveTrans& trans);
+  void doDeferredDownstreamTransDestroy(DownstreamActiveTrans& trans);
   void doDeferredUpstreamTransDestroy(UpstreamActiveTrans& trans);
   void resetAllTrans(bool local_reset);
 

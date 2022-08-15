@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 
+#include "metadata.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
@@ -316,7 +317,7 @@ void ConnectionManager::setLocalResponseSent(absl::string_view transaction_id) {
   }
 }
 
-void ConnectionManager::doDeferredTransDestroy(ConnectionManager::ActiveTrans& trans) {
+void ConnectionManager::doDeferredDownstreamTransDestroy(ConnectionManager::DownstreamActiveTrans& trans) {
   read_callbacks_->connection().dispatcher().deferredDelete(
       std::move(transactions_.at(trans.transactionId())));
   transactions_.erase(trans.transactionId());
@@ -371,31 +372,29 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
   std::string&& k = std::string(metadata->transactionId().value());
 
-  if ((metadata->msgType() == MsgType::Response) &&
+  if ((metadata->msgType() == MsgType::Response) && 
       (upstream_transaction_infos_->hasTransaction(k))) {
     ENVOY_LOG(debug, "Response from upstream transaction ID {} received.", k);
     return *(upstream_transaction_infos_->getTransaction(k));
-  }
+  } else {
+    stats_.request_active_.inc();
+        stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
+    // if (metadata->methodType() == MethodType::Ack) {
+    if (transactions_.find(k) != transactions_.end()) {
+      // ACK_4XX metadata will updated later.
+      return *transactions_.at(k);
+    }
+    // }
 
-  stats_.request_active_.inc();
-  
-  stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
+    ActiveTransPtr new_trans = std::make_unique<DownstreamActiveTrans>(*this, metadata);
+    new_trans->createFilterChain();
+    transactions_.emplace(k, std::move(new_trans));
 
-  // if (metadata->methodType() == MethodType::Ack) {
-  if (transactions_.find(k) != transactions_.end()) {
-    // ACK_4XX metadata will updated later.
     return *transactions_.at(k);
-  }
-  // }
-
-  ActiveTransPtr new_trans = std::make_unique<DownstreamActiveTrans>(*this, metadata);
-  new_trans->createFilterChain();
-  transactions_.emplace(k, std::move(new_trans));
-
-  return *transactions_.at(k);
+  } 
 }
 
-bool ConnectionManager::ResponseDecoder::onData(MessageMetadataSharedPtr metadata) {
+bool ConnectionManager::UpstreamMessageDecoder::onData(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
   if (auto status = transportBegin(metadata_); status == FilterStatus::StopIteration) {
     return true;
@@ -416,14 +415,14 @@ bool ConnectionManager::ResponseDecoder::onData(MessageMetadataSharedPtr metadat
   return true;
 }
 
-FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
+FilterStatus ConnectionManager::UpstreamMessageDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
   UNREFERENCED_PARAMETER(metadata);
   return FilterStatus::Continue;
 }
 
-FilterStatus ConnectionManager::ResponseDecoder::messageEnd() { return FilterStatus::Continue; }
+FilterStatus ConnectionManager::UpstreamMessageDecoder::messageEnd() { return FilterStatus::Continue; }
 
-FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
+FilterStatus ConnectionManager::UpstreamMessageDecoder::transportEnd() {
   ASSERT(metadata_ != nullptr);
 
   ConnectionManager& cm = parent_.parent_;
@@ -480,11 +479,6 @@ FilterStatus ConnectionManager::ActiveTrans::applyDecoderFilters(ActiveTransDeco
 }
 
 FilterStatus ConnectionManager::ActiveTrans::transportBegin(MessageMetadataSharedPtr metadata) {
-  if (local_response_sent_) {
-    ENVOY_LOG(debug, "Message after local 503 message, return directly");
-    return FilterStatus::StopIteration;
-  }
-
   metadata_ = metadata;
   filter_context_ = metadata;
   filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
@@ -535,23 +529,26 @@ void ConnectionManager::ActiveTrans::createFilterChain() {
   parent_.config_.filterFactory().createFilterChain(*this);
 }
 
-void ConnectionManager::ActiveTrans::onReset() { parent_.doDeferredTransDestroy(*this); }
-
-void ConnectionManager::ActiveTrans::onError(const std::string& what) {
-  if (metadata_) {
-    sendLocalReply(AppException(AppExceptionType::ProtocolError, what), false);
-    return;
-  }
-
-  parent_.doDeferredTransDestroy(*this);
-  parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-}
-
 const Network::Connection* ConnectionManager::ActiveTrans::connection() const {
   return &parent_.read_callbacks_->connection();
 }
 
-Router::RouteConstSharedPtr ConnectionManager::ActiveTrans::route() {
+void ConnectionManager::ActiveTrans::resetDownstreamConnection() {
+  parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+// start of DownstreamActiveTrans
+
+FilterStatus ConnectionManager::DownstreamActiveTrans::transportBegin(MessageMetadataSharedPtr metadata) {
+  if (local_response_sent_) {
+    ENVOY_LOG(debug, "Message after local 503 message, return directly");
+    return FilterStatus::StopIteration;
+  }
+
+  return ActiveTrans::transportBegin(metadata);;
+}
+
+Router::RouteConstSharedPtr ConnectionManager::DownstreamActiveTrans::route() {
   if (!cached_route_) {
     if (metadata_ != nullptr) {
       Router::RouteConstSharedPtr route = parent_.config_.routerConfig().route(*metadata_);
@@ -563,7 +560,7 @@ Router::RouteConstSharedPtr ConnectionManager::ActiveTrans::route() {
   return cached_route_.value();
 }
 
-void ConnectionManager::ActiveTrans::sendLocalReply(const DirectResponse& response,
+void ConnectionManager::DownstreamActiveTrans::sendLocalReply(const DirectResponse& response,
                                                     bool end_stream) {
   parent_.sendLocalReply(*metadata_, response, end_stream);
 
@@ -575,17 +572,11 @@ void ConnectionManager::ActiveTrans::sendLocalReply(const DirectResponse& respon
   local_response_sent_ = true;
 }
 
-void ConnectionManager::ActiveTrans::startUpstreamResponse() {
-  response_decoder_ = std::make_unique<ResponseDecoder>(*this);
-}
-
-SipFilters::ResponseStatus ConnectionManager::ActiveTrans::upstreamData(
-    MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
-    const std::string& return_destination, Network::Connection* return_connection) {
+SipFilters::ResponseStatus ConnectionManager::DownstreamActiveTrans::upstreamData(
+    MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, const std::string& return_destination) {
   ASSERT(response_decoder_ != nullptr);
   UNREFERENCED_PARAMETER(return_route);
   UNREFERENCED_PARAMETER(return_destination);
-  UNREFERENCED_PARAMETER(return_connection);
 
   try {
     if (response_decoder_->onData(metadata)) {
@@ -608,13 +599,31 @@ SipFilters::ResponseStatus ConnectionManager::ActiveTrans::upstreamData(
   }
 }
 
-void ConnectionManager::ActiveTrans::resetDownstreamConnection() {
+void ConnectionManager::DownstreamActiveTrans::startUpstreamResponse() {
+  response_decoder_ = std::make_unique<UpstreamMessageDecoder>(*this);
+}
+
+void ConnectionManager::DownstreamActiveTrans::onError(const std::string& what) {
+  if (metadata_) {
+    sendLocalReply(AppException(AppExceptionType::ProtocolError, what), false);
+    return;
+  }
+
+  parent_.doDeferredDownstreamTransDestroy(*this);
   parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
+void ConnectionManager::DownstreamActiveTrans::onReset() { parent_.doDeferredDownstreamTransDestroy(*this); }
+
 // start of upstreamActiveTrans
 
-void ConnectionManager::UpstreamActiveTrans::onReset() {}
+void ConnectionManager::UpstreamActiveTrans::onReset() {parent_.doDeferredUpstreamTransDestroy(*this); }
+    
+FilterStatus ConnectionManager::UpstreamActiveTrans::transportBegin(MessageMetadataSharedPtr metadata) {
+  ENVOY_LOG(debug, "Setting destination for response recvd from downstream: {}", return_destination_);
+  metadata->setDestination(return_destination_);
+  return ActiveTrans::transportBegin(metadata);
+}
 
 void ConnectionManager::UpstreamActiveTrans::onError(const std::string& what) {
   if (metadata_) {
@@ -624,38 +633,34 @@ void ConnectionManager::UpstreamActiveTrans::onError(const std::string& what) {
   parent_.doDeferredUpstreamTransDestroy(*this);
 }
 
-const Network::Connection* ConnectionManager::UpstreamActiveTrans::connection() const {
-  return &parent_.read_callbacks_->connection();
-}
-
 void ConnectionManager::UpstreamActiveTrans::sendLocalReply(const DirectResponse& response,
                                                             bool end_stream) {
   Buffer::OwnedImpl buffer;
 
-  metadata_->setEP(
-      return_connection_->connectionInfoProvider().localAddress()->ip()->addressAsString());
-  const DirectResponse::ResponseType result = response.encode(*metadata_, buffer);
+  metadata_->setEP(return_destination_);
+  response.encode(*metadata_, buffer);
 
-  ENVOY_CONN_LOG(debug, "send upstream local reply {} --> {} bytes {}\n{}", *return_connection_,
-                 return_connection_->connectionInfoProvider().localAddress()->asStringView(),
-                 return_connection_->connectionInfoProvider().remoteAddress()->asStringView(),
+  MessageMetadataSharedPtr response_metadata = std::make_shared<MessageMetadata>(buffer.toString());
+  response_metadata->setEP(return_destination_);
+  response_metadata->setMsgType(MsgType::Response);
+
+  ENVOY_LOG(debug, "send upstream local reply to {} bytes {}\n{}", return_destination_,
                  buffer.length(), buffer.toString());
 
-  return_connection_->write(buffer, false);
+  if (auto status = transportBegin(response_metadata); status == FilterStatus::StopIteration) {
+    return;
+  }
 
-  // TODO implement stats related to upstream requests
-  switch (result) {
-  case DirectResponse::ResponseType::SuccessReply:
-    stats().upstream_response_success_.inc();
-    break;
-  case DirectResponse::ResponseType::ErrorReply:
-    stats().upstream_response_error_.inc();
-    break;
-  case DirectResponse::ResponseType::Exception:
-    stats().upstream_response_exception_.inc();
-    break;
-  default:
-    PANIC("not reached");
+  if (auto status = messageBegin(response_metadata); status == FilterStatus::StopIteration) {
+    return;
+  }
+
+  if (auto status = messageEnd(); status == FilterStatus::StopIteration) {
+    return;
+  }
+
+  if (auto status = transportEnd(); status == FilterStatus::StopIteration) {
+    return;
   }
   stats().counterFromElements("", "upstream-local-generated-response").inc();
 
@@ -669,11 +674,11 @@ void ConnectionManager::UpstreamActiveTrans::startUpstreamResponse() {
 
 SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
     MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
-    const std::string& return_destination, Network::Connection* return_connection) {
-  route_ = return_route;
-  destination_ = return_destination;
-  return_connection_ = return_connection;
+    const std::string& return_destination) {
+  return_route_ = return_route;
+  return_destination_ = return_destination;
   metadata_ = metadata;
+                                  
 
   if (local_response_sent_) {
     ENVOY_LOG(error, "Message after local response sent closing the transaction, return directly");
@@ -736,14 +741,12 @@ void ConnectionManager::DownstreamConnection::startUpstreamResponse() {}
 
 SipFilters::ResponseStatus ConnectionManager::DownstreamConnection::upstreamData(
     MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
-    const std::string& return_destination, Network::Connection* return_connection) {
+    const std::string& return_destination) {
   std::string&& k = std::string(metadata->transactionId().value());
 
   if (upstreamTransactionInfo()->hasTransaction(k)) {
-    ;
     auto active_trans = upstreamTransactionInfo()->getTransaction(k);
-    return active_trans->upstreamData(metadata, return_route, return_destination,
-                                      return_connection);
+    return active_trans->upstreamData(metadata, return_route, return_destination);
   }
 
   auto active_trans = std::make_shared<UpstreamActiveTrans>(parent_, metadata);
@@ -754,7 +757,7 @@ SipFilters::ResponseStatus ConnectionManager::DownstreamConnection::upstreamData
   // Todo decide what if this should be a different stat..
   // parent_.stats_.request_active_.inc();
 
-  return active_trans->upstreamData(metadata, return_route, return_destination, return_connection);
+  return active_trans->upstreamData(metadata, return_route, return_destination);
 }
 
 void DownstreamConnectionInfos::init() {
@@ -828,7 +831,6 @@ void SipProxy::ThreadLocalUpstreamTransactionInfo::auditTimerAction() {
     if (diff.count() >= transaction_timeout_.count()) {
       it++;
       trans_to_end->onReset();
-      upstream_transaction_infos_map_.erase(key);
       ENVOY_LOG(info, "Removing from cache upstream transaction with ID {} due to timeout reached",
                 key);
       continue;

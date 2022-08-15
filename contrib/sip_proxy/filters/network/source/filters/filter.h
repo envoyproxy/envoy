@@ -86,8 +86,7 @@ public:
    */
   virtual ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
                                       Router::RouteConstSharedPtr return_route,
-                                      const std::string& return_destination,
-                                      Network::Connection* return_connection) PURE;
+                                      const std::string& return_destination) PURE;
 
   /**
    * Reset the downstream connection.

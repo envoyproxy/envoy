@@ -199,7 +199,8 @@ FilterStatus Router::handleAffinity() {
       cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
           SipFilters::SipFilterNames::get().SipProxy);
 
-  if (!metadata->destination().empty()) {
+  // ONLY used in case of responses to upstream initiated transactions
+  if (!metadata->destination().empty() && settings_->allowUpstreamTx()) {
     ENVOY_LOG(info, "Got message with pre-set destination: {}", metadata->destination());
     return FilterStatus::Continue;
   }
@@ -287,19 +288,21 @@ FilterStatus Router::handleAffinity() {
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
 
-  if (callbacks_->originIngress().has_value()) {
-    if (metadata->hasXEnvoyOriginIngressHeader()) {
-      ENVOY_STREAM_LOG(info,
-                      "X-Envoy-Origin-Ingress header existing in incoming message, removing it for "
-                      "being replaced ...",
-                      *callbacks_);
-      metadata->removeXEnvoyOriginIngressHeader();
+  if (settings_->allowUpstreamTx()) {
+    if (callbacks_->originIngress().has_value()) {
+      if (metadata->hasXEnvoyOriginIngressHeader()) {
+        ENVOY_STREAM_LOG(info,
+                        "X-Envoy-Origin-Ingress header existing in incoming message, removing it for "
+                        "being replaced ...",
+                        *callbacks_);
+        metadata->removeXEnvoyOriginIngressHeader();
+      }
+      ENVOY_STREAM_LOG(debug, "Adding X-Envoy-Origin-Ingress header ...", *callbacks_);
+      metadata->addXEnvoyOriginIngressHeader(callbacks_->originIngress().value());
+    } else {
+      ENVOY_STREAM_LOG(error, "No Ingress ID defined for current transaction. Discarding the message", *callbacks_);
+      return FilterStatus::StopIteration;
     }
-    ENVOY_STREAM_LOG(debug, "Adding X-Envoy-Origin-Ingress header ...", *callbacks_);
-    metadata->addXEnvoyOriginIngressHeader(callbacks_->originIngress().value());
-  } else {
-    ENVOY_STREAM_LOG(error, "No Ingress ID defined for current transaction. Discarding the message", *callbacks_);
-    return FilterStatus::StopIteration;
   }
 
   if (upstream_connection_ != nullptr) {
@@ -411,7 +414,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
-  if (!metadata->destination().empty() && metadata->msgType() == MsgType::Response) {
+  // ONLY used in case of responses to upstream initiated transactions
+  if (!metadata->destination().empty() && metadata->msgType() == MsgType::Response && settings_->allowUpstreamTx()) {
     std::string host = metadata->destination();
     metadata->setStopLoadBalance(true);
 
@@ -437,9 +441,17 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     }
 
     ENVOY_STREAM_LOG(trace,
-                     "no pre-existing upstream connection for host {}, stopping the iteration",
+                     "no pre-existing upstream connection for host {}, select with load balancer",
                      *callbacks_, host);
-    return FilterStatus::StopIteration;
+
+    auto upstream_connection_started = false;
+    auto ret =
+        messageHandlerWithLoadBalancer(transaction_info, metadata, host, upstream_connection_started);
+    if (upstream_connection_started && ret == FilterStatus::Continue) {
+      return FilterStatus::Continue;
+    } else {
+      return FilterStatus::StopIteration;
+    }
 
   } else if (!metadata->affinity().empty() &&
              metadata->affinityIteration() != metadata->affinity().end()) {
@@ -725,8 +737,8 @@ void UpstreamConnection::onUpstreamData(Buffer::Instance& data, bool end_stream)
             data.length());
 
   upstream_buffer_.move(data);
-  auto response_decoder = std::make_unique<ResponseDecoder>(*this);
-  response_decoder->onData(upstream_buffer_);
+  auto message_decoder = std::make_unique<UpstreamMessageDecoder>(*this);
+  message_decoder->onData(upstream_buffer_);
 }
 
 void UpstreamConnection::onEvent(Network::ConnectionEvent event) {
@@ -790,22 +802,21 @@ void UpstreamConnection::onError(MessageMetadataSharedPtr metadata, const ErrorC
   sendLocalReply(*metadata, response, false);
 }
 
-bool ResponseDecoder::onData(Buffer::Instance& data) {
+bool UpstreamMessageDecoder::onData(Buffer::Instance& data) {
   decoder_->onData(data);
   return true;
 }
 
-// todo - perhaps rename ResponseDecoder to UpstreamMessageDecoder ?
-FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) {
-  ENVOY_LOG(trace, "ResponseDecoder\n{}", metadata->rawMsg());
+FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr metadata) {
+  ENVOY_LOG(trace, "UpstreamMessageDecoder\n{}", metadata->rawMsg());
 
-  if (metadata->msgType() == MsgType::Request) {
+  // ONLY used in case of responses to upstream initiated transactions
+  if ((metadata->msgType() == MsgType::Request) && (settings()->allowUpstreamTx())) {
     auto origin_ingress = metadata->originIngress();
     if (origin_ingress == nullptr) {
       ENVOY_LOG(
           error,
-          "Dropping upstream request with no well formatted X-Envoy-Origin-Ingress header: \n{}",
-          metadata->rawMsg());
+          "Dropping upstream request with no well formatted X-Envoy-Origin-Ingress header.\n");
       parent_.onError(metadata, ErrorCode::BadRequest,
                       "Missing or bad formatted X-Envoy-Origin-Ingress header");
       return FilterStatus::StopIteration;
@@ -814,17 +825,13 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
     auto downstream_conn_id = origin_ingress->getDownstreamConnectionID();
     auto downstream_conn = parent_.getDownstreamConnection(downstream_conn_id);
     if (downstream_conn == nullptr) {
-      ENVOY_LOG(debug, "No downstream connection found for: '{}'\n", downstream_conn_id);
-      ENVOY_LOG(debug, "Downstream connection map dumped: \n{}\n",
-                parent_.dumpDownstreamConnection());
-      ENVOY_LOG(debug, "Raw message failing to get a valid downstream connection: \n{}\n",
-                metadata->rawMsg());
+      ENVOY_LOG(debug, "No downstream connection found for: {}", downstream_conn_id);
       parent_.onError(metadata, ErrorCode::TransactionNotExist,
                       "No downstream connection found for provided ID");
       return FilterStatus::StopIteration;
     }
 
-    ENVOY_LOG(debug, "Got upstream request from host={},cluster={}. For downstream-connection={}",
+    ENVOY_LOG(debug, "Got upstream connection from host={},cluster={}. For downstream-connection={}",
               parent_.getUpstreamHost()->address()->ip()->addressAsString(),
               parent_.route()->routeEntry()->clusterName(), downstream_conn_id);
 
@@ -833,14 +840,16 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
     // pass the destination and route, so responses to this request have affinity
     // to upstream host where we recvd this request from
-    downstream_conn->upstreamData(metadata, parent_.route(),
-                                  parent_.getUpstreamHost()->address()->ip()->addressAsString(),
-                                  parent_.getUpstreamConnection());
-
-    return FilterStatus::Continue;
-  }
-
-  if (metadata->transactionId().has_value()) {
+    SipFilters::ResponseStatus status = downstream_conn->upstreamData(metadata, parent_.route(),
+                                  parent_.getUpstreamHost()->address()->ip()->addressAsString());
+    switch (status) {
+    case SipFilters::ResponseStatus::Complete:
+      return FilterStatus::Continue;
+    default:
+      return FilterStatus::StopIteration;
+    }
+                                  
+  } else if (metadata->transactionId().has_value()) {
     auto transaction_id = metadata->transactionId().value();
 
     auto active_trans = parent_.getTransaction(std::string(transaction_id));
@@ -853,13 +862,14 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
                                                                   absl::nullopt);
       }
 
+      // ONLY used in case of responses to upstream initiated transactions
       // It shouldn't be necessary to remove this header in this case, but just in case
-      if (metadata->hasXEnvoyOriginIngressHeader()) {
+      if (settings()->allowUpstreamTx() && metadata->hasXEnvoyOriginIngressHeader()) {
         metadata->removeXEnvoyOriginIngressHeader();
       }
 
       active_trans->startUpstreamResponse();
-      active_trans->upstreamData(metadata, nullptr, "", nullptr);
+      active_trans->upstreamData(metadata, nullptr, "");
     } else {
       ENVOY_LOG(debug, "no active trans selected {}\n{}", transaction_id, metadata->rawMsg());
       return FilterStatus::StopIteration;
@@ -877,7 +887,7 @@ DecoderEventHandler& ResponseDecoder::newDecoderEventHandler(MessageMetadataShar
   return *this;
 }
 
-std::shared_ptr<SipSettings> ResponseDecoder::settings() const { return parent_.settings(); }
+std::shared_ptr<SipSettings> UpstreamMessageDecoder::settings() const { return parent_.settings(); }
 
 } // namespace Router
 } // namespace SipProxy

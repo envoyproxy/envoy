@@ -321,13 +321,13 @@ private:
   Server::Configuration::FactoryContext& context_;
 };
 
-class ResponseDecoder : public DecoderCallbacks,
+class UpstreamMessageDecoder : public DecoderCallbacks,
                         public DecoderEventHandler,
                         public Logger::Loggable<Logger::Id::filter> {
 public:
-  ResponseDecoder(UpstreamConnection& parent)
+  UpstreamMessageDecoder(UpstreamConnection& parent)
       : parent_(parent), decoder_(std::make_unique<Decoder>(*this)) {}
-  ~ResponseDecoder() override = default;
+  ~UpstreamMessageDecoder() override = default;
   bool onData(Buffer::Instance& data);
 
   // DecoderEventHandler
@@ -348,7 +348,7 @@ private:
   DecoderPtr decoder_;
 };
 
-using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
+using UpstreamMessageDecoderPtr = std::unique_ptr<UpstreamMessageDecoder>;
 
 class UpstreamConnection : public Tcp::ConnectionPool::Callbacks,
                         public Tcp::ConnectionPool::UpstreamCallbacks,
@@ -398,7 +398,6 @@ public:
   void write(Buffer::Instance& data, bool end_stream) {
     return conn_data_->connection().write(data, end_stream);
   }
-  Envoy::Network::Connection* getUpstreamConnection() { return &conn_data_->connection(); }
 
   std::shared_ptr<TransactionInfo> transactionInfo() { return transaction_info_; }
   void setMetadata(MessageMetadataSharedPtr metadata) { metadata_ = metadata; }
