@@ -12,6 +12,7 @@ services:
     ports:
     - "${PORT_PROXY:-19092}:19092"
     - "${PORT_ADMIN:-8001}:8001"
+
   kafka:
     build:
       context: .
