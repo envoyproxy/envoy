@@ -107,7 +107,7 @@ new_features:
 - area: http
   change: |
     added the expected :ref:`receive <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.receive>` payload check for HTTP health check.
-    made the HTTP response buffer size configurable through :ref:`response_buffer_size <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_buffer_size>`.
+    added :ref:`response_buffer_size <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_buffer_size>` to configure the maximum HTTP response buffer size.
 - area: lua
   change: |
     added stats for lua filter, please see :ref:`lua filter stats <config_http_filters_lua_stats>`.
