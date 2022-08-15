@@ -1281,9 +1281,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
 // Mutate the trailers with an HTTP POST with embedded NULs.
 // This should always be rejected.
 TEST_P(Http1ServerConnectionImplTest, TrailerMutateEmbeddedNul) {
-  if (parser_impl_ == ParserImpl::HttpParser) {
-    return;
-  }
+  codec_settings_.enable_trailers_ = true;
 
   const absl::string_view headers_and_body = "POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
                                              "6\r\nHello \r\n"
