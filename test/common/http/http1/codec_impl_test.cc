@@ -3595,7 +3595,7 @@ const char* kValidFirstLines[] = {
 
 const char* kInvalidFirstLines[] = {
     "GET www.somewhere.com HTTP/1.1\r\n",
-    "GET http11://www.somewhere.com HTTP/1.1\r\n",
+    "GET http!://www.somewhere.com HTTP/1.1\r\n",
     "GET 0ttp:/\r\n",
     "GET http:/www.somewhere.com HTTP/1.1\r\n",
     "GET http:://www.somewhere.com HTTP/1.1\r\n",
