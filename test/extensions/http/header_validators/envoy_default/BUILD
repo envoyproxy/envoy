@@ -20,6 +20,7 @@ envoy_extension_cc_test(
         "http1_header_validator_test.cc",
         "http2_header_validator_test.cc",
         "null_validator_test.cc",
+        "path_normalizer_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [

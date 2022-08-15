@@ -191,17 +191,18 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   }
 
   if (path_is_absolute && !config_.uri_path_normalization_options().skip_path_normalization()) {
-    // Normalize the path
-    // TODO(meilya) - this will be something like:
     //
-    // auto path_result = normalizePathUri(header_map);
-    // if (!path_result) {
-    //   return path_result;
-    // }
+    // Validate and normalize the path, which must be a valid URI. This is only run if the config
+    // is active and the path is absolute (starts with "/").
+    //
+    // If path normalization is disabled or the path isn't absolute then the path will be validated
+    // against the RFC character set in validateRequestHeaderEntry.
+    //
+    auto path_result = path_normalizer_.normalizePathUri(header_map);
+    if (!path_result) {
+      return path_result;
+    }
   }
-
-  // If path normalization is disabled or the path isn't absolute then the path will be validated
-  // against the RFC character set in validateRequestHeaderEntry.
 
   //
   // Step 3: Verify each request header

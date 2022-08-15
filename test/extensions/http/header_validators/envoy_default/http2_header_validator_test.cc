@@ -467,6 +467,38 @@ TEST_F(Http2HeaderValidatorTest, ValidateLowercaseHeader) {
                              "uhv.http2.invalid_header_name");
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/./dir1/../dir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_EQ(headers.path(), "/dir2");
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"}, {":method", "GET"}, {":path", "/.."}, {":authority", "envoy.com"}};
+  auto uhv = createH2(empty_config);
+  auto result = uhv->validateRequestHeaderMap(headers);
+  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Reject);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%2fdir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(redirect_encoded_slash_config);
+  auto result = uhv->validateRequestHeaderMap(headers);
+  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Redirect);
+  EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
+  EXPECT_EQ(headers.path(), "/dir1/dir2");
+}
+
 } // namespace
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
