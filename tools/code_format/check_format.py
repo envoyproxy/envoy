@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
 
 import argparse
-import common
 import functools
 import logging
 import multiprocessing
 import os
 import pathlib
 import re
-import subprocess
+import shutil
 import stat
+import subprocess
 import sys
 import traceback
-import shutil
-from functools import cached_property
-from typing import Callable, Dict, List, Pattern, Tuple, Union
-
 # The way this script is currently used (ie no bazel) it relies on system deps.
 # As `pyyaml` is present in `envoy-build-ubuntu` it should be safe to use here.
 import yaml
+from functools import cached_property
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Pattern
+from typing import Tuple
+from typing import Union
 
 import paths
 
@@ -1077,7 +1080,7 @@ if __name__ == "__main__":
     def check_visibility(error_messages):
         command = (
             "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
-            % [f"':(exclude){c}' " for c in format_checker.config["visibility_excludes"]])
+            % ''.join([f"':(exclude){c}' " for c in format_checker.config["visibility_excludes"]]))
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
