@@ -55,6 +55,14 @@ public:
    * absl::nullopt.
    */
   virtual Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+  /**
+   * Construct query-param map for the stream, using the URL-specified params,
+   * or the request data if that is url-form-encoded.
+   *
+   * @param The query name/value map.
+   */
+  virtual Http::Utility::QueryParams queryParams() const PURE;
 };
 
 /**
@@ -102,7 +110,7 @@ public:
     enum class Type { Boolean, String, Enum };
     const Type type_;
     const std::string id_;   // HTML form ID and query-param name (JS var name rules).
-    const std::string help_; // Help text rendered into UI.
+    const std::string help_; // Rendered into home-page HTML and /help text.
     std::vector<absl::string_view> enum_choices_{};
   };
   using ParamDescriptorVec = std::vector<ParamDescriptor>;

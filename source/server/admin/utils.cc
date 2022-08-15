@@ -45,13 +45,15 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
   auto p = params.find("filter");
   if (p != params.end()) {
     const std::string& pattern = p->second;
-    TRY_ASSERT_MAIN_THREAD { regex = std::make_shared<std::regex>(pattern); }
-    END_TRY
-    catch (std::regex_error& error) {
-      // Include the offending pattern in the log, but not the error message.
-      response.add(fmt::format("Invalid regex: \"{}\"\n", error.what()));
-      ENVOY_LOG_MISC(error, "admin: Invalid regex: \"{}\": {}", error.what(), pattern);
-      return false;
+    if (!pattern.empty()) {
+      TRY_ASSERT_MAIN_THREAD { regex = std::make_shared<std::regex>(pattern); }
+      END_TRY
+      catch (std::regex_error& error) {
+        // Include the offending pattern in the log, but not the error message.
+        response.add(fmt::format("Invalid regex: \"{}\"\n", error.what()));
+        ENVOY_LOG_MISC(error, "admin: Invalid regex: \"{}\": {}", error.what(), pattern);
+        return false;
+      }
     }
   }
   return true;
@@ -85,8 +87,14 @@ absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params
 // Helper method to get a query parameter.
 absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
                                        const std::string& key) {
-  return (params.find(key) != params.end()) ? absl::optional<std::string>{params.at(key)}
-                                            : absl::nullopt;
+  const auto iter = params.find(key);
+  if (iter != params.end()) {
+    const std::string& value = iter->second;
+    if (!value.empty()) {
+      return value;
+    }
+  }
+  return absl::nullopt;
 }
 
 } // namespace Utility

@@ -90,6 +90,19 @@ public:
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
+    // Emulate main implementation of initializing bootstrap extensions.
+    std::vector<Server::BootstrapExtensionPtr> bootstrap_extensions;
+    for (const auto& bootstrap_extension : bootstrap.bootstrap_extensions()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::BootstrapExtensionFactory>(
+              bootstrap_extension);
+      auto config = Config::Utility::translateAnyToFactoryConfig(
+          bootstrap_extension.typed_config(),
+          server_.messageValidationContext().staticValidationVisitor(), factory);
+      bootstrap_extensions.push_back(
+          factory.createBootstrapExtension(*config, server_factory_context_));
+    }
+
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),

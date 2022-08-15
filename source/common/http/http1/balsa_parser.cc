@@ -266,7 +266,10 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
     error_message_ = "HPE_INVALID_CHUNK_SIZE";
     break;
   case BalsaFrameEnums::HEADERS_TOO_LONG:
-    error_message_ = "size exceeds limit";
+    error_message_ = "headers size exceeds limit";
+    break;
+  case BalsaFrameEnums::TRAILER_TOO_LONG:
+    error_message_ = "trailers size exceeds limit";
     break;
   case BalsaFrameEnums::TRAILER_MISSING_COLON:
     error_message_ = "HPE_INVALID_HEADER_TOKEN";
