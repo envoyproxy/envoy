@@ -43,8 +43,8 @@ absl::Status isValidPathTemplateRewritePattern(const std::string& path_template_
 // Returns if path_template and rewrite_template have valid variables.
 // Every variable in rewrite MUST be present in match
 // For example:
-// Match: /foo/{bar}/{var} and Rewrite: /goo/{var} is vaild
-// Match: /foo/{bar} and Rewrite: /goo/{bar}/{var} is invaild. Match is missing {var}.
+// Match: /foo/{bar}/{var} and Rewrite: /goo/{var} is valid
+// Match: /foo/{bar} and Rewrite: /goo/{bar}/{var} is invalid. Match is missing {var}.
 absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
                                       const std::string& capture_regex);
 
