@@ -107,7 +107,7 @@ ConfigImpl::ConfigImpl(
           static_cast<std::chrono::milliseconds>(
               PROTOBUF_GET_MS_OR_DEFAULT(config.settings(), transaction_timeout, 32000)),
           config.settings().local_services(), config.settings().tra_service_config(),
-          config.settings().operate_via(), config.settings().allow_upstream_tx())) {
+          config.settings().operate_via(), config.settings().allow_upstream_requests())) {
 
   if (config.sip_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");

@@ -597,8 +597,6 @@ public:
   bool hasDownstreamConnection(std::string& conn_id);
   SipFilters::DecoderFilterCallbacks& getDownstreamConnection(std::string& conn_id);
 
-  std::string dumpDownstreamConnection();
-
 private:
   ThreadLocal::SlotPtr tls_;
 };

@@ -365,7 +365,6 @@ public:
   SipFilters::DecoderFilterCallbacks* getTransaction(std::string&& transaction_id);
   SipFilters::DecoderFilterCallbacks*
   getDownstreamConnection(std::string& downstream_connection_id);
-  std::string dumpDownstreamConnection();
 
   Upstream::HostDescriptionConstSharedPtr getUpstreamHost() { return upstream_host_; }
 

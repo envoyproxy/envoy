@@ -30,9 +30,9 @@ public:
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig&
           tra_service_config,
       bool operate_via,
-      bool allow_upstream_tx)
+      bool allow_upstream_requests)
       : transaction_timeout_(transaction_timeout), tra_service_config_(tra_service_config),
-        operate_via_(operate_via), allow_upstream_tx_(allow_upstream_tx) {
+        operate_via_(operate_via), allow_upstream_requests_(allow_upstream_requests) {
 
     for (const auto& service : local_services) {
       local_services_.emplace_back(service);
@@ -45,7 +45,7 @@ public:
         PROTOBUF_GET_MS_OR_DEFAULT(sip_settings, transaction_timeout, 32000));
     tra_service_config_ = sip_settings.tra_service_config();
     operate_via_ = sip_settings.operate_via();
-    allow_upstream_tx_ = sip_settings.allow_upstream_tx();
+    allow_upstream_requests_ = sip_settings.allow_upstream_requests();
     for (const auto& service : sip_settings.local_services()) {
       local_services_.emplace_back(service);
     }
@@ -60,7 +60,7 @@ public:
   traServiceConfig() {
     return tra_service_config_;
   }
-  bool allowUpstreamTx() { return allow_upstream_tx_; }
+  bool allowUpstreamRequests() { return allow_upstream_requests_; }
 
 private:
   std::chrono::milliseconds transaction_timeout_;
@@ -70,7 +70,7 @@ private:
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig
       tra_service_config_;
   bool operate_via_;
-  bool allow_upstream_tx_;
+  bool allow_upstream_requests_;
 };
 
 /**

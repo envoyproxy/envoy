@@ -364,8 +364,6 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
                                         (event == Network::ConnectionEvent::LocalClose))) {
     downstream_connection_infos_->deleteDownstreamConnection(
         local_origin_ingress_->getDownstreamConnectionID());
-    ENVOY_LOG(debug, "Deleted from Downstream connection map {}: {}\n",
-              downstream_connection_infos_, local_origin_ingress_->getDownstreamConnectionID());
   }
 }
 
@@ -780,6 +778,8 @@ void DownstreamConnectionInfos::insertDownstreamConnection(std::string conn_id,
   if (hasDownstreamConnection(conn_id)) {
     return;
   }
+   
+  ENVOY_LOG(debug, "Insert into Downstream connection map {}", conn_id);
 
   tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(
       std::make_pair(conn_id, std::make_shared<ConnectionManager::DownstreamConnection>(
@@ -792,6 +792,7 @@ size_t DownstreamConnectionInfos::size() {
 }
 
 void DownstreamConnectionInfos::deleteDownstreamConnection(std::string&& conn_id) {
+  ENVOY_LOG(debug, "Deleted from Downstream connection map {}", conn_id);
   if (hasDownstreamConnection(conn_id)) {
     tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.erase(
         conn_id);
@@ -809,17 +810,6 @@ DownstreamConnectionInfos::getDownstreamConnection(std::string& conn_id) {
       conn_id));
 }
 
-std::string DownstreamConnectionInfos::dumpDownstreamConnection() {
-  std::stringstream output;
-  absl::flat_hash_map<std::string, std::shared_ptr<SipFilters::DecoderFilterCallbacks>> dc_map =
-      tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_;
-  for (auto element = dc_map.begin(); element != dc_map.end(); element++) {
-    output << "   Downstream Connection ID: '" << element->first
-           << "'; Downstream Connection pointer '" << element->second << "'\n";
-  }
-  return output.str();
-}
-
 void SipProxy::ThreadLocalUpstreamTransactionInfo::auditTimerAction() {
   const auto p1 = dispatcher_.timeSource().systemTime();
   for (auto it = upstream_transaction_infos_map_.cbegin();
@@ -830,9 +820,9 @@ void SipProxy::ThreadLocalUpstreamTransactionInfo::auditTimerAction() {
         p1 - trans_to_end->streamInfo().startTime());
     if (diff.count() >= transaction_timeout_.count()) {
       it++;
-      trans_to_end->onReset();
-      ENVOY_LOG(info, "Removing from cache upstream transaction with ID {} due to timeout reached",
+      ENVOY_LOG(info, "Timeout reached for upstream transaction {}",
                 key);
+      trans_to_end->onReset();
       continue;
     }
     it++;
@@ -870,7 +860,6 @@ void SipProxy::UpstreamTransactionInfos::insertTransaction(
 void SipProxy::UpstreamTransactionInfos::deleteTransaction(std::string&& transaction_id) {
   ENVOY_LOG(debug, "Deleting from cache upstream transaction with ID {} ... ", transaction_id);
   if (hasTransaction(transaction_id)) {
-    getTransaction(transaction_id)->onReset();
     tls_->getTyped<ThreadLocalUpstreamTransactionInfo>().upstream_transaction_infos_map_.erase(
         transaction_id);
   }

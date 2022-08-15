@@ -200,7 +200,7 @@ FilterStatus Router::handleAffinity() {
           SipFilters::SipFilterNames::get().SipProxy);
 
   // ONLY used in case of responses to upstream initiated transactions
-  if (!metadata->destination().empty() && settings_->allowUpstreamTx()) {
+  if (!metadata->destination().empty() && settings_->allowUpstreamRequests()) {
     ENVOY_LOG(info, "Got message with pre-set destination: {}", metadata->destination());
     return FilterStatus::Continue;
   }
@@ -288,7 +288,7 @@ FilterStatus Router::handleAffinity() {
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
 
-  if (settings_->allowUpstreamTx()) {
+  if (settings_->allowUpstreamRequests()) {
     if (callbacks_->originIngress().has_value()) {
       if (metadata->hasXEnvoyOriginIngressHeader()) {
         ENVOY_STREAM_LOG(info,
@@ -415,7 +415,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
   // ONLY used in case of responses to upstream initiated transactions
-  if (!metadata->destination().empty() && metadata->msgType() == MsgType::Response && settings_->allowUpstreamTx()) {
+  if (!metadata->destination().empty() && metadata->msgType() == MsgType::Response && settings_->allowUpstreamRequests()) {
     std::string host = metadata->destination();
     metadata->setStopLoadBalance(true);
 
@@ -721,13 +721,6 @@ UpstreamConnection::getDownstreamConnection(std::string& downstream_connection_i
   return nullptr;
 }
 
-std::string UpstreamConnection::dumpDownstreamConnection() {
-  if (downstream_connection_info_ == nullptr) {
-    return "";
-  }
-  return downstream_connection_info_->dumpDownstreamConnection();
-}
-
 // Tcp::ConnectionPool::UpstreamCallbacks
 void UpstreamConnection::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   UNREFERENCED_PARAMETER(end_stream);
@@ -765,8 +758,6 @@ void UpstreamConnection::setDecoderFilterCallbacks(SipFilters::DecoderFilterCall
   route_ = callbacks_->route();
   settings_ = callbacks_->settings();
   stats_ = &callbacks_->stats();
-  ENVOY_LOG(debug, "Downstream connection map dumped: \n{}\n",
-            downstream_connection_info_->dumpDownstreamConnection());
 }
 
 void UpstreamConnection::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
@@ -811,7 +802,7 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
   ENVOY_LOG(trace, "UpstreamMessageDecoder\n{}", metadata->rawMsg());
 
   // ONLY used in case of responses to upstream initiated transactions
-  if ((metadata->msgType() == MsgType::Request) && (settings()->allowUpstreamTx())) {
+  if ((metadata->msgType() == MsgType::Request) && (settings()->allowUpstreamRequests())) {
     auto origin_ingress = metadata->originIngress();
     if (origin_ingress == nullptr) {
       ENVOY_LOG(
@@ -864,7 +855,7 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
 
       // ONLY used in case of responses to upstream initiated transactions
       // It shouldn't be necessary to remove this header in this case, but just in case
-      if (settings()->allowUpstreamTx() && metadata->hasXEnvoyOriginIngressHeader()) {
+      if (settings()->allowUpstreamRequests() && metadata->hasXEnvoyOriginIngressHeader()) {
         metadata->removeXEnvoyOriginIngressHeader();
       }
 
