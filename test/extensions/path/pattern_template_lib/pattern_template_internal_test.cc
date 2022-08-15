@@ -22,7 +22,7 @@ namespace Envoy {
 namespace Extensions {
 namespace PatternTemplate {
 
-namespace PatternTemplateInternal {
+namespace Internal {
 
 namespace {
 
@@ -98,8 +98,8 @@ TEST(InternalParsing, ConsumeLiteralWorks) {
   absl::StatusOr<ParsedResult<Literal>> result = consumeLiteral(pattern);
 
   ASSERT_OK(result);
-  EXPECT_EQ(result->parsed_value, "abc");
-  EXPECT_EQ(result->unconsumed_pattern, "/123");
+  EXPECT_EQ(result->parsed_value_, "abc");
+  EXPECT_EQ(result->unconsumed_pattern_, "/123");
 }
 
 TEST(InternalParsing, ConsumeTextGlob) {
@@ -108,8 +108,8 @@ TEST(InternalParsing, ConsumeTextGlob) {
   absl::StatusOr<ParsedResult<Operator>> result = consumeOperator(pattern);
 
   ASSERT_OK(result);
-  EXPECT_EQ(result->parsed_value, Operator::KTextGlob);
-  EXPECT_EQ(result->unconsumed_pattern, "*abc/123");
+  EXPECT_EQ(result->parsed_value_, Operator::KTextGlob);
+  EXPECT_EQ(result->unconsumed_pattern_, "*abc/123");
 }
 
 TEST(InternalParsing, ConsumePathGlob) {
@@ -118,8 +118,8 @@ TEST(InternalParsing, ConsumePathGlob) {
   absl::StatusOr<ParsedResult<Operator>> result = consumeOperator(pattern);
 
   ASSERT_OK(result);
-  EXPECT_EQ(result->parsed_value, Operator::KPathGlob);
-  EXPECT_EQ(result->unconsumed_pattern, "/123");
+  EXPECT_EQ(result->parsed_value_, Operator::KPathGlob);
+  EXPECT_EQ(result->unconsumed_pattern_, "/123");
 }
 
 class ConsumeVariableSuccess : public testing::TestWithParam<std::string> {};
@@ -135,8 +135,8 @@ TEST_P(ConsumeVariableSuccess, ConsumeVariableSuccessTest) {
   absl::StatusOr<ParsedResult<Variable>> result = consumeVariable(pattern);
 
   ASSERT_OK(result);
-  EXPECT_EQ(result->parsed_value.debugString(), pattern);
-  EXPECT_TRUE(result->unconsumed_pattern.empty());
+  EXPECT_EQ(result->parsed_value_.debugString(), pattern);
+  EXPECT_TRUE(result->unconsumed_pattern_.empty());
 }
 
 class ConsumeVariableFailure : public testing::TestWithParam<std::string> {};
@@ -295,7 +295,7 @@ TEST(InternalRegexGen, VariableRegexDefaultMatch) {
   ASSERT_OK(var);
 
   std::string capture;
-  EXPECT_TRUE(RE2::FullMatch("abc", toRegexPattern(var->parsed_value), &capture));
+  EXPECT_TRUE(RE2::FullMatch("abc", toRegexPattern(var->parsed_value_), &capture));
   EXPECT_EQ(capture, "abc");
 }
 
@@ -303,7 +303,7 @@ TEST(InternalRegexGen, VariableRegexDefaultNotMatch) {
   absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var}");
   ASSERT_OK(var);
 
-  EXPECT_FALSE(RE2::FullMatch("abc/def", toRegexPattern(var->parsed_value)));
+  EXPECT_FALSE(RE2::FullMatch("abc/def", toRegexPattern(var->parsed_value_)));
 }
 
 TEST(InternalRegexGen, VariableRegexSegmentsMatch) {
@@ -311,7 +311,7 @@ TEST(InternalRegexGen, VariableRegexSegmentsMatch) {
   ASSERT_OK(var);
 
   std::string capture;
-  EXPECT_TRUE(RE2::FullMatch("abc/123/def", toRegexPattern(var->parsed_value), &capture));
+  EXPECT_TRUE(RE2::FullMatch("abc/123/def", toRegexPattern(var->parsed_value_), &capture));
   EXPECT_EQ(capture, "abc/123/def");
 }
 
@@ -320,7 +320,7 @@ TEST(InternalRegexGen, VariableRegexTextGlobMatch) {
   ASSERT_OK(var);
 
   std::string capture;
-  EXPECT_TRUE(RE2::FullMatch("abc/123/def", toRegexPattern(var->parsed_value), &capture));
+  EXPECT_TRUE(RE2::FullMatch("abc/123/def", toRegexPattern(var->parsed_value_), &capture));
   EXPECT_EQ(capture, "abc/123/def");
 }
 
@@ -329,7 +329,7 @@ TEST(InternalRegexGen, VariableRegexNamedCapture) {
   absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var=*}");
   ASSERT_OK(var);
 
-  RE2 regex = RE2(toRegexPattern(var->parsed_value));
+  RE2 regex = RE2(toRegexPattern(var->parsed_value_));
   ASSERT_EQ(regex.NumberOfCapturingGroups(), 1);
 
   // Full matched string + capture groups
