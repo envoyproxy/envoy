@@ -462,7 +462,7 @@ TEST_P(GenPatternRegexWithoutMatch, WithCapture) {
 }
 
 } // namespace
-} // namespace PatternTemplateInternal
+} // namespace Internal
 } // namespace PatternTemplate
 } // namespace Extensions
 } // namespace Envoy
