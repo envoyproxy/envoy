@@ -14,6 +14,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+
+
 envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
@@ -397,6 +399,15 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "metadata_interface_test",
+    srcs = ["metadata_interface_test.cc"],
+    deps = [
+    "//envoy/http:metadata_interface",  
+    "//source/common/http:utility_lib",
     ],
 )
 
