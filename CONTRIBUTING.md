@@ -134,7 +134,7 @@ versioning guidelines:
   maintainer will be assigned to review and merge the PR.
 * Once your PR is under review, *please do not rebase it*. If you rebase, you will need to force push to
   github, and github's user interface will force your reviewer to review the PR
-  from stratch rather than simply look at your latest changes.  It's much easier to review
+  from scratch rather than simply look at your latest changes.  It's much easier to review
   new commits and/or merges. We squash rebase the final merged commit so the number of commits
   you have in the PR don't matter. Again once your PR is assigned a reviewer, unless you need to fix DCO
   *please do not force push*.  If you need to pull recent changes you can run
@@ -287,6 +287,7 @@ extension mostly mirrors adding a normal extension above. Some differences are n
   to core).
 * Build config and metadata should be included in [contrib/contrib_build_config.bzl](contrib/contrib_build_config.bzl)
   and [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml).
+* An entrypoint should be added in `docs/root/api-v3/config/contrib/contrib.rst`
 
 # DCO: Sign your work
 
