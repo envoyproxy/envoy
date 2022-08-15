@@ -7,7 +7,10 @@
 
 #include "contrib/envoy/extensions/compression/compressor/igzip/v3alpha/igzip.pb.h"
 #include "contrib/envoy/extensions/compression/compressor/igzip/v3alpha/igzip.pb.validate.h"
+
+#ifndef IGZIP_DISABLED
 #include "contrib/isa_l/compression/source/compressor/igzip_compressor_impl.h"
+#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -37,11 +40,13 @@ public:
   }
 
 private:
+#ifndef IGZIP_DISABLED
   static IgzipCompressorImpl::CompressionLevel compressionLevelEnum(
       envoy::extensions::compression::compressor::igzip::v3alpha::Igzip::CompressionLevel
           compression_level);
 
   IgzipCompressorImpl::CompressionLevel compression_level_;
+#endif
   const int32_t memory_level_;
   const int32_t window_bits_;
   const uint32_t chunk_size_;

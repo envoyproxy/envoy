@@ -121,9 +121,7 @@ void IgzipCompressorImpl::process(Buffer::Instance& output_buffer, int64_t flush
   zstream_ptr_->end_of_stream = (flush_state == FULL_FLUSH);
   zstream_ptr_->flush = flush_state;
   while (deflateNext()) {
-    if (zstream_ptr_->avail_out == 0) {
-      updateOutput(output_buffer);
-    }
+    updateOutput(output_buffer);
   }
   RELEASE_ASSERT(zstream_ptr_->avail_in == 0, "");
 

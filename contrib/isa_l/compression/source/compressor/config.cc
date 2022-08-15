@@ -18,6 +18,7 @@ const uint64_t DefaultWindowBits = 15;
 const uint32_t DefaultChunkSize = 4096;
 } // namespace
 
+#ifndef IGZIP_DISABLED
 IgzipCompressorFactory::IgzipCompressorFactory(
     const envoy::extensions::compression::compressor::igzip::v3alpha::Igzip& igzip)
     : compression_level_(compressionLevelEnum(igzip.compression_level())),
@@ -45,6 +46,8 @@ Envoy::Compression::Compressor::CompressorPtr IgzipCompressorFactory::createComp
   compressor->init(compression_level_, window_bits_, memory_level_);
   return compressor;
 }
+
+#endif
 
 Envoy::Compression::Compressor::CompressorFactoryPtr
 IgzipCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(

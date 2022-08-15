@@ -14,8 +14,8 @@ envoy_cc_library(
     srcs = ["igzip_compressor_impl.cc"],
     hdrs = ["igzip_compressor_impl.h"],
     deps = [
-        "//bazel/foreign_cc:isa_l",
         "//contrib/isa_l/compression/source/common:igzip_base_lib",
+        "//contrib/isa_l/compression/source/common:isa_l",
         "//envoy/compression/compressor:compressor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
