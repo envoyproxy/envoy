@@ -147,9 +147,8 @@ resource_spans:
   SystemTime timestamp = time_system_.systemTime();
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
   TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
-  auto* expected_span = request_proto.mutable_resource_spans(0)
-                            ->mutable_scope_spans(0)
-                            ->mutable_spans(0);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
   expected_span->set_trace_id(absl::HexStringToBytes(trace_id_hex));
   expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(Hex::uint64ToHex(new_span_id))));
   expected_span->set_parent_span_id(
