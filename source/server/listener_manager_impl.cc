@@ -383,20 +383,15 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
     name = server_.api().randomGenerator().uuid();
   }
 
-  // TODO (soulxu): Support multiple internal addresses in the future.
-  if ((config.address().has_envoy_internal_address() && config.additional_addresses_size() > 0) ||
-      std::any_of(config.additional_addresses().begin(), config.additional_addresses().end(),
-                  [](const envoy::config::listener::v3::AdditionalAddress& proto_address) {
-                    return proto_address.address().has_envoy_internal_address();
-                  })) {
-    throw EnvoyException(
-        fmt::format("listener {}: internal address doesn't support multiple addresses.", name));
-  }
-
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
   if (config.has_api_listener()) {
+    if (config.has_internal_listener()) {
+      throw EnvoyException(fmt::format(
+          "error adding listener named '{}': api_listener and internal_listener cannot be both set",
+          name));
+    }
     if (!api_listener_ && !added_via_api) {
       // TODO(junr03): dispatch to different concrete constructors when there are other
       // ApiListenerImplBase derived classes.
