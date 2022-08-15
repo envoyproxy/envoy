@@ -63,6 +63,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/sni_dynamic_forward_proxy:95.2"
 "source/extensions/filters/network/thrift_proxy/router:96.4"
 "source/extensions/filters/network/wasm:95.7"
+"source/extensions/path/pattern_template_lib:93.2"
 "source/extensions/filters/udp:96.4"
 "source/extensions/filters/udp/dns_filter:96.1"
 "source/extensions/health_checkers:95.7"
