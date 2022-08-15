@@ -68,6 +68,7 @@ public:
                           Server::Configuration::CommonFactoryContext&) override {
     // This method should never be called in this test
     ASSERT(false);
+    return nullptr;
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
