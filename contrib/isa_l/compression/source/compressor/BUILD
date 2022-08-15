@@ -26,10 +26,21 @@ envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    defines = select({
+        "//bazel:linux_x86_64": [],
+        "//conditions:default": [
+            "IGZIP_DISABLED=1",
+        ],
+    }),
     deps = [
-        ":igzip_compressor_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/compression/common/compressor:compressor_factory_base_lib",
         "@envoy_api//contrib/envoy/extensions/compression/compressor/igzip/v3alpha:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:linux_x86_64": [
+            ":igzip_compressor_lib",
+        ],
+        "//conditions:default": [
+        ],
+    }),
 )

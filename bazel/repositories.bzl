@@ -471,20 +471,10 @@ def _com_github_intel_isa_l():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-    native.bind(
-        name = "isa_l",
-        actual = "@envoy//bazel/foreign_cc:isa",
-    )
-
 def _com_github_netwide_assembler_nasm():
     external_http_archive(
         name = "com_github_netwide_assembler_nasm",
         build_file_content = BUILD_ALL_CONTENT,
-    )
-
-    native.bind(
-        name = "libnasm",
-        actual = "@envoy//bazel/foreign_cc:libnasm",
     )
 
 # Boost in general is not approved for Envoy use, and the header-only

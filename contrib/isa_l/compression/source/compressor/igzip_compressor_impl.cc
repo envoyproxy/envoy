@@ -25,7 +25,7 @@ IgzipCompressorImpl::IgzipCompressorImpl(uint64_t chunk_size)
 
 void IgzipCompressorImpl::init(CompressionLevel comp_level, int64_t window_bits,
                                int64_t memory_level) {
-  ASSERT(initialized_ == false);
+  RELEASE_ASSERT(initialized_ == false, "");
   isal_deflate_init(zstream_ptr_.get());
   zstream_ptr_->avail_out = chunk_size_;
   zstream_ptr_->next_out = chunk_char_ptr_.get();
@@ -98,7 +98,7 @@ void IgzipCompressorImpl::init(CompressionLevel comp_level, int64_t window_bits,
 
 void IgzipCompressorImpl::compress(Buffer::Instance& buffer,
                                    Envoy::Compression::Compressor::State state) {
-  ASSERT(initialized_);
+  RELEASE_ASSERT(initialized_, "");
   for (const Buffer::RawSlice& input_slice : buffer.getRawSlices()) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<uint8_t*>(input_slice.mem_);
