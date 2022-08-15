@@ -26,16 +26,14 @@ using Internal::ParsedUrlPattern;
 #endif
 
 absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url_pattern) {
-  absl::StatusOr<ParsedUrlPattern> status =
-      Internal::parseURLPatternSyntax(url_pattern);
+  absl::StatusOr<ParsedUrlPattern> status = Internal::parseURLPatternSyntax(url_pattern);
   if (!status.ok()) {
     return status.status();
   }
   return Internal::toRegexPattern(*status);
 }
 
-absl::StatusOr<std::vector<RewritePatternSegment>>
-parseRewritePattern(absl::string_view pattern) {
+absl::StatusOr<std::vector<RewritePatternSegment>> parseRewritePattern(absl::string_view pattern) {
   std::vector<RewritePatternSegment> result;
 
   // The pattern should start with a '/' and thus the first segment should

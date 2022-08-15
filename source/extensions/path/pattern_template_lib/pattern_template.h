@@ -28,8 +28,7 @@ absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url
 
 // Parses the specified pattern into a sequence of segments (which are
 // either literals or variable names).
-absl::StatusOr<std::vector<RewritePatternSegment>>
-parseRewritePattern(absl::string_view pattern);
+absl::StatusOr<std::vector<RewritePatternSegment>> parseRewritePattern(absl::string_view pattern);
 
 // Returns the parsed Url rewrite pattern to be used by
 // RewriteURLTemplatePattern()  |capture_regex| should
