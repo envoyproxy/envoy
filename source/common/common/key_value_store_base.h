@@ -27,7 +27,7 @@ public:
 
   std::string error;
   // KeyValueStore
-  void addOrUpdate(absl::string_view key, absl::string_view value) override;
+  void addOrUpdate(absl::string_view key, absl::string_view value, absl::optional<std::chrono::seconds> ttl = absl::nullopt) override;
   void remove(absl::string_view key) override;
   absl::optional<absl::string_view> get(absl::string_view key) override;
   void iterate(ConstIterateCb cb) const override;
