@@ -58,37 +58,37 @@ public:
 
 using MetadataCallback = std::function<void(MetadataMapPtr&&)>;
 
-  } // namespace Http
-  } // namespace Envoy
+} // namespace Http
+} // namespace Envoy
 
-  // NOLINT(namespace-envoy)
-  namespace fmt {
+// NOLINT(namespace-envoy)
+namespace fmt {
 
-  // Specialize printing Envoy::Http::MetadataMap as we need to escape possible
-  // invalid utf8 string contained in MetadataMap.
-  template <> struct formatter<Envoy::Http::MetadataMap> {
-    template <typename ParseContext>
-    FMT_CONSTEXPR auto parse(ParseContext& ctx) -> decltype(ctx.begin()) {
-      return ctx.begin();
+// Specialize printing Envoy::Http::MetadataMap as we need to escape possible
+// invalid utf8 string contained in MetadataMap.
+template <> struct formatter<Envoy::Http::MetadataMap> {
+  template <typename ParseContext>
+  FMT_CONSTEXPR auto parse(ParseContext& ctx) -> decltype(ctx.begin()) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const Envoy::Http::MetadataMap& map, FormatContext& ctx) -> decltype(ctx.out()) {
+    auto out = ctx.out();
+    *out++ = '{';
+    int i = 0;
+    for (const auto& item : map) {
+      if (i > 0)
+        *out++ = ',';
+      out = detail::write_range_entry<char>(out, absl::CEscape(item.first));
+      *out++ = ':';
+      *out++ = ' ';
+      out = detail::write_range_entry<char>(out, absl::CEscape(item.second));
+      ++i;
     }
+    *out++ = '}';
+    return out;
+  }
+};
 
-    template <typename FormatContext>
-    auto format(const Envoy::Http::MetadataMap& map, FormatContext& ctx) -> decltype(ctx.out()) {
-      auto out = ctx.out();
-      *out++ = '{';
-      int i = 0;
-      for (const auto& item : map) {
-        if (i > 0)
-          *out++ = ',';
-        out = detail::write_range_entry<char>(out, absl::CEscape(item.first));
-        *out++ = ':';
-        *out++ = ' ';
-        out = detail::write_range_entry<char>(out, absl::CEscape(item.second));
-        ++i;
-      }
-      *out++ = '}';
-      return out;
-    }
-  };
-
-  } // namespace fmt
+} // namespace fmt

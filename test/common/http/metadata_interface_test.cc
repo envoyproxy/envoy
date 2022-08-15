@@ -1,0 +1,52 @@
+#include <array>
+#include <cstdint>
+#include <string>
+
+#include "envoy/http/metadata_interface.h"
+
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+using ::testing::HasSubstr;
+
+namespace Envoy {
+namespace Http {
+namespace {
+
+TEST(MetadataMapTest, KeyValueEscaped) {
+  MetadataMap m;
+  m.insert({"a1", "a2"});
+  m.insert({"b1", "b2"});
+  // Broken at the 2nd byte.
+  m.insert({"non-utf8", "\xc3\x28"});
+  // Length incorrect: the (\xf0) "1110" requires 4 bytes, but there are only 2.
+  // ASAN should fail if no escaping.
+  m.insert({"broken-utf8", "\xf0\x28"});
+
+  // Now check the "<<" operator.
+  std::ostringstream oss;
+  oss << m;
+  std::string output_str = oss.str();
+
+  EXPECT_THAT(output_str, HasSubstr("key: b1, value: b2"));
+  EXPECT_THAT(output_str, HasSubstr("key: a1, value: a2"));
+  // Escaped.
+  EXPECT_THAT(output_str, HasSubstr("key: non-utf8, value: \\303("));
+  EXPECT_THAT(output_str, HasSubstr("key: broken-utf8, value: \\360("));
+
+  // The spdlog macro expansion should just work.
+  EXPECT_EXIT(
+      {
+        ENVOY_LOG_MISC(error, "output: {}", m);
+        _exit(0);
+      },
+      ::testing::ExitedWithCode(0), "");
+}
+} // namespace
+
+} // namespace Http
+} // namespace Envoy
