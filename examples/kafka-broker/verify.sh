@@ -9,7 +9,7 @@ export PORT_ADMIN="${KAFKA_PORT_ADMIN:-11101}"
 
 # Topic
 run_log "Create a Kafka topic"
-TOPIC="envoy.kafka.broker"
+TOPIC="envoy-kafka-broker"
 docker-compose exec -T kafka kafka-topics --bootstrap-server localhost:19092 --create --topic $TOPIC quickstart-events
 
 run_log "Checking topic"
@@ -26,7 +26,7 @@ MESSAGE="Welcome to Envoy and Kafka Broker filter!"
 
 # Producer
 run_log "Create Producer and send message"
-docker-compose exec -T kafka /bin/bash -c "echo $MESSAGE >> message.txt & kafka-console-producer --request-required-acks 1 --broker-list localhost:19092 --topic envoy.kafka.broker < message.txt"
+docker-compose exec -T kafka /bin/bash -c "echo $MESSAGE >> message.txt & kafka-console-producer --request-required-acks 1 --broker-list localhost:19092 --topic $TOPIC < message.txt"
 run_log "Sent messages succesfully"
 
 # Consumer

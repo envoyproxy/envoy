@@ -7,7 +7,8 @@ services:
       dockerfile: Dockerfile-proxy
     container_name: proxy
     depends_on:
-    - kafka
+      kafka:
+        condition: service_healthy
     ports:
     - "${PORT_PROXY:-19092}:19092"
     - "${PORT_ADMIN:-8001}:8001"
