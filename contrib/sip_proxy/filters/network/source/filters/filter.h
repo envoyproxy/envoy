@@ -100,7 +100,7 @@ public:
 
   virtual std::shared_ptr<Router::TransactionInfos> transactionInfos() PURE;
   virtual std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() PURE;
-  virtual std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfo() PURE;
+  virtual std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfos() PURE;
   virtual std::shared_ptr<SipProxy::SipSettings> settings() const PURE;
   virtual std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler> traHandler() PURE;
   virtual void onReset() PURE;

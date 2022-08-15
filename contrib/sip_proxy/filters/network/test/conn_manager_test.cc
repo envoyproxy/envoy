@@ -314,7 +314,7 @@ settings:
     trans3->resetDownstreamConnection();
   }
 
-  void resetAllTransTest(bool local_reset) {
+  void resetAllDownstreamTransTest(bool local_reset) {
     // int before = stats_.cx_destroy_local_with_active_rq_;
     const std::string yaml = R"EOF(
 stat_prefix: egress
@@ -370,7 +370,7 @@ settings:
     new_trans->createFilterChain();
     filter_->transactions_.emplace(k, std::move(new_trans));
     filter_->newDecoderEventHandler(metadata);
-    filter_->resetAllTrans(local_reset);
+    filter_->resetAllDownstreamTrans(local_reset);
   }
 
   void resumeResponseTest() {
@@ -695,12 +695,12 @@ TEST_F(SipConnectionManagerTest, SendLocalReply_Exception) {
 // TEST_F(SipConnectionManagerTest, UpstreamData) { upstreamDataTest(); }
 
 TEST_F(SipConnectionManagerTest, ResetLocalTrans) {
-  resetAllTransTest(true);
+  resetAllDownstreamTransTest(true);
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
 }
 
 TEST_F(SipConnectionManagerTest, ResetRemoteTrans) {
-  resetAllTransTest(false);
+  resetAllDownstreamTransTest(false);
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
 // broken in main

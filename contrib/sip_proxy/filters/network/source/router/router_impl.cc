@@ -714,11 +714,12 @@ SipFilters::DecoderFilterCallbacks*
 UpstreamConnection::getDownstreamConnection(std::string& downstream_connection_id) {
   if (downstream_connection_info_ == nullptr) {
     return nullptr;
+  } else {
+    if (downstream_connection_info_->hasDownstreamConnection(downstream_connection_id)) {
+      return &downstream_connection_info_->getDownstreamConnection(downstream_connection_id);
+    }
+    return nullptr;
   }
-  if (downstream_connection_info_->hasDownstreamConnection(downstream_connection_id)) {
-    return &downstream_connection_info_->getDownstreamConnection(downstream_connection_id);
-  }
-  return nullptr;
 }
 
 // Tcp::ConnectionPool::UpstreamCallbacks

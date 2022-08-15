@@ -232,8 +232,8 @@ private:
     std::shared_ptr<DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return parent_.downstreamConnectionInfos();
     }
-    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfo() override {
-      return parent_.upstreamTransactionInfo();
+    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfos() override {
+      return parent_.upstreamTransactionInfos();
     }
     std::shared_ptr<SipSettings> settings() const override { return parent_.settings(); }
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
@@ -310,7 +310,7 @@ private:
     std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return parent_.downstream_connection_infos_;
     }
-    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfo() override {
+    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfos() override {
       return parent_.upstream_transaction_infos_;
     }
     std::shared_ptr<SipSettings> settings() const override { return parent_.config_.settings(); }
@@ -362,14 +362,14 @@ private:
   struct DownstreamActiveTrans : public ActiveTrans {
     DownstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
         : ActiveTrans(parent, metadata) {
-      parent.stats_.request_active_.inc();
-      request_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(parent_.stats_.request_time_ms_, parent_.time_source_);
+      stats().request_active_.inc();
+      request_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(stats().request_time_ms_, parent_.time_source_);
     }
 
     ~DownstreamActiveTrans() override {
       ENVOY_LOG(debug, "DownstreamActiveTrans Dtor");
       request_timer_->complete();
-      parent_.stats_.request_active_.dec();
+      stats().request_active_.dec();
 
       parent_.eraseActiveTransFromPendingList(transaction_id_);
     }
@@ -407,16 +407,17 @@ private:
   };
 
   struct UpstreamActiveTrans : public ActiveTrans {
-    UpstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
+    UpstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata, std::string downstream_conn_id)
         : ActiveTrans(parent, metadata) {
-      parent.stats_.upstream_request_active_.inc();
-      request_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(parent_.stats_.upstream_request_time_ms_, parent_.time_source_);
+      downstream_conn_id_ = downstream_conn_id;
+      stats().upstream_request_active_.inc();
+      request_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(stats().upstream_request_time_ms_, parent_.time_source_);
     }
 
     ~UpstreamActiveTrans() override { 
       ENVOY_LOG(debug, "UpstreamActiveTrans Dtor"); 
       request_timer_->complete();
-      parent_.stats_.upstream_request_active_.dec();
+      stats().upstream_request_active_.dec();
     }
 
     // DecoderEventHandler
@@ -466,13 +467,14 @@ private:
     Router::RouteConstSharedPtr return_route_;
     std::string return_destination_;
     MessageMetadataSharedPtr metadata_;
+    std::string downstream_conn_id_;
   };
 
   // Wrapper around a connection to enable routing of requests from upstream to downstream
   class DownstreamConnection : public SipFilters::DecoderFilterCallbacks,
                                        Logger::Loggable<Logger::Id::filter> {
   public:
-    DownstreamConnection(ConnectionManager& parent);
+    DownstreamConnection(ConnectionManager& parent, std::string downstream_conn_id);
     ~DownstreamConnection() override = default;
 
     // // // SipFilters::DecoderFilterCallbacks
@@ -505,7 +507,7 @@ private:
     std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
       return nullptr;
     }
-    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfo() override {
+    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfos() override {
       return parent_.upstream_transaction_infos_;
     }
 
@@ -540,10 +542,12 @@ private:
       UNREFERENCED_PARAMETER(transaction_id);
     }
 
+    std::string getDownstreamConnectionId() { return downstream_conn_id_; }
+
   private:
     ConnectionManager& parent_;
+    std::string downstream_conn_id_;
     StreamInfo::StreamInfoImpl stream_info_;
-    // std::unique_ptr<UpstreamMessageDecoder> message_decoder_;
   };
 
   using ActiveTransPtr = std::unique_ptr<ActiveTrans>;
@@ -555,7 +559,8 @@ private:
                               bool end_stream);
   void doDeferredDownstreamTransDestroy(DownstreamActiveTrans& trans);
   void doDeferredUpstreamTransDestroy(UpstreamActiveTrans& trans);
-  void resetAllTrans(bool local_reset);
+  void resetAllDownstreamTrans(bool local_reset);
+  void resetAllUpstreamTrans();
 
   Config& config_;
   SipFilterStats& stats_;
@@ -639,6 +644,7 @@ public:
   void insertTransaction(std::string transaction_id,
                          std::shared_ptr<ConnectionManager::UpstreamActiveTrans> active_trans);
   void deleteTransaction(std::string&& transaction_id);
+  void resetDownstreamConnRelatedTransactions(std::string&& downstream_conn_id);
   bool hasTransaction(std::string& transaction_id);
   std::shared_ptr<ConnectionManager::UpstreamActiveTrans>
   getTransaction(std::string& transaction_id);

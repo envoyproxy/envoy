@@ -5,6 +5,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
+#include "filters/filter.h"
 #include "source/common/config/utility.h"
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.h"
@@ -69,25 +70,30 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
     transaction_infos->emplace(cluster, transaction_info_ptr);
   }
 
-  // Map of upstream transactions per worker thread
-  auto upstream_transaction_infos = std::make_shared<SipProxy::UpstreamTransactionInfos>(
-      context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
-                                 proto_config.settings(), transaction_timeout, 32000)));
-  upstream_transaction_infos->init();
+  std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos = nullptr;
+  std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos = nullptr;
 
-  // Map of downstream connections per worker thread
-  auto downstream_connection_info =
-      std::make_shared<SipProxy::DownstreamConnectionInfos>(context.threadLocal());
-  downstream_connection_info->init();
+  if (proto_config.settings().allow_upstream_requests()) {
+    // Map of upstream transactions per worker thread
+    upstream_transaction_infos = std::make_shared<SipProxy::UpstreamTransactionInfos>(
+        context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
+                                  proto_config.settings(), transaction_timeout, 32000)));
+    upstream_transaction_infos->init();
 
-  return [filter_config, &context, transaction_infos, downstream_connection_info,
+    // Map of downstream connections per worker thread
+    downstream_connection_infos =
+        std::make_shared<SipProxy::DownstreamConnectionInfos>(context.threadLocal());
+    downstream_connection_infos->init();
+  }
+
+  return [filter_config, &context, transaction_infos, downstream_connection_infos,
           upstream_transaction_infos](Network::FilterManager& filter_manager) -> void {
     std::cerr << "Creating New ConnectionManager. Thread: "
               << context.api().threadFactory().currentThreadId().debugString() << std::endl;
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
         *filter_config, context.api().randomGenerator(),
         context.mainThreadDispatcher().timeSource(), context, transaction_infos,
-        downstream_connection_info, upstream_transaction_infos));
+        downstream_connection_infos, upstream_transaction_infos));
   };
 }
 

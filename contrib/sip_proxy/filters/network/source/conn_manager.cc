@@ -162,32 +162,36 @@ ConnectionManager::ConnectionManager(
     Server::Configuration::FactoryContext& context,
     std::shared_ptr<Router::TransactionInfos> transaction_infos,
     std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos,
-    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_info)
+    std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos)
     : config_(config), stats_(config_.stats()), decoder_(std::make_unique<Decoder>(*this)),
       random_generator_(random_generator), time_source_(time_source), context_(context),
       transaction_infos_(transaction_infos),
       downstream_connection_infos_(downstream_connection_infos),
-      upstream_transaction_infos_(upstream_transaction_info) {}
+      upstream_transaction_infos_(upstream_transaction_infos) {}
 
-ConnectionManager::~ConnectionManager() = default;
+ConnectionManager::~ConnectionManager() {
+    ENVOY_LOG(debug, "Killing connection manager");
+}
 
 Network::FilterStatus ConnectionManager::onNewConnection() {
-  std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() +
-                          "@" +
-                          read_callbacks_->connection()
-                              .connectionInfoProvider()
-                              .localAddress()
-                              ->ip()
-                              ->addressAsString();
-  std::string downstream_conn_id =
-      read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() +
-      "@" + random_generator_.uuid();
-  local_origin_ingress_ = OriginIngress(thread_id, downstream_conn_id);
-  downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
+  if (settings()->allowUpstreamRequests()) {
+    std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() +
+                            "@" +
+                            read_callbacks_->connection()
+                                .connectionInfoProvider()
+                                .localAddress()
+                                ->ip()
+                                ->addressAsString();
+    std::string downstream_conn_id =
+        read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() +
+        "@" + random_generator_.uuid();
+    local_origin_ingress_ = OriginIngress(thread_id, downstream_conn_id);
+    downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
 
-  ENVOY_LOG(info, "Created downstream connection with thread_id={}, downstream_connection_id={}",
-            thread_id, downstream_conn_id);
-  ENVOY_LOG(debug, "Number of downstream connections={}", downstream_connection_infos_->size());
+    ENVOY_LOG(info, "Created downstream connection with thread_id={}, downstream_connection_id={}",
+              thread_id, downstream_conn_id);
+    ENVOY_LOG(debug, "Number of downstream connections={}", downstream_connection_infos_->size());
+  }
 
   return Network::FilterStatus::Continue;
 }
@@ -204,7 +208,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   if (end_stream) {
     ENVOY_CONN_LOG(info, "downstream half-closed", read_callbacks_->connection());
 
-    resetAllTrans(false);
+    resetAllDownstreamTrans(false);
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 
@@ -328,7 +332,7 @@ void ConnectionManager::doDeferredUpstreamTransDestroy(
   upstream_transaction_infos_->deleteTransaction(trans.transactionId());
 }
 
-void ConnectionManager::resetAllTrans(bool local_reset) {
+void ConnectionManager::resetAllDownstreamTrans(bool local_reset) {
   ENVOY_LOG(info, "active_trans to be deleted {}", transactions_.size());
   for (auto it = transactions_.cbegin(); it != transactions_.cend();) {
     if (local_reset) {
@@ -341,6 +345,10 @@ void ConnectionManager::resetAllTrans(bool local_reset) {
 
     (it++)->second->onReset();
   }
+}
+
+void ConnectionManager::resetAllUpstreamTrans() {
+  upstream_transaction_infos_->resetDownstreamConnRelatedTransactions(local_origin_ingress_->getDownstreamConnectionID());
 }
 
 void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -358,10 +366,10 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   ENVOY_CONN_LOG(info, "received event {}", read_callbacks_->connection(), static_cast<int>(event));
-  resetAllTrans(event == Network::ConnectionEvent::LocalClose);
+  resetAllDownstreamTrans(event == Network::ConnectionEvent::LocalClose);
 
-  if (local_origin_ingress_.has_value() && ((event == Network::ConnectionEvent::RemoteClose) ||
-                                        (event == Network::ConnectionEvent::LocalClose))) {
+  if (settings()->allowUpstreamRequests() && local_origin_ingress_.has_value() && ((event == Network::ConnectionEvent::RemoteClose) || (event == Network::ConnectionEvent::LocalClose))) {
+    resetAllUpstreamTrans();
     downstream_connection_infos_->deleteDownstreamConnection(
         local_origin_ingress_->getDownstreamConnectionID());
   }
@@ -370,7 +378,8 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
   std::string&& k = std::string(metadata->transactionId().value());
 
-  if ((metadata->msgType() == MsgType::Response) && 
+  if ((settings()->allowUpstreamRequests()) &&
+      (metadata->msgType() == MsgType::Response) && 
       (upstream_transaction_infos_->hasTransaction(k))) {
     ENVOY_LOG(debug, "Response from upstream transaction ID {} received.", k);
     return *(upstream_transaction_infos_->getTransaction(k));
@@ -711,15 +720,15 @@ SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
 }
 
 void ConnectionManager::UpstreamActiveTrans::resetDownstreamConnection() {
-  ENVOY_LOG(info, "JONAH = Unexpected call to UpstreamActiveTrans::resetDownstreamConnection");
   parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
 // start of DownstreamConnection
 
 ConnectionManager::DownstreamConnection::DownstreamConnection(
-    ConnectionManager& parent)
+    ConnectionManager& parent, std::string downstream_conn_id)
     : parent_(parent),
+      downstream_conn_id_(downstream_conn_id),
       stream_info_(parent.time_source_,
                    parent.read_callbacks_->connection().connectionInfoProviderSharedPtr()) {}
 
@@ -742,18 +751,14 @@ SipFilters::ResponseStatus ConnectionManager::DownstreamConnection::upstreamData
     const std::string& return_destination) {
   std::string&& k = std::string(metadata->transactionId().value());
 
-  if (upstreamTransactionInfo()->hasTransaction(k)) {
-    auto active_trans = upstreamTransactionInfo()->getTransaction(k);
+  if (upstreamTransactionInfos()->hasTransaction(k)) {
+    auto active_trans = upstreamTransactionInfos()->getTransaction(k);
     return active_trans->upstreamData(metadata, return_route, return_destination);
   }
 
-  auto active_trans = std::make_shared<UpstreamActiveTrans>(parent_, metadata);
+  auto active_trans = std::make_shared<UpstreamActiveTrans>(parent_, metadata, downstream_conn_id_);
   active_trans->createFilterChain();
-  upstreamTransactionInfo()->insertTransaction(k, active_trans);
-
-  // keep the counter happy to avoid crashes when the UpstreamActiveTrans decrements
-  // Todo decide what if this should be a different stat..
-  // parent_.stats_.request_active_.inc();
+  upstreamTransactionInfos()->insertTransaction(k, active_trans);
 
   return active_trans->upstreamData(metadata, return_route, return_destination);
 }
@@ -783,7 +788,7 @@ void DownstreamConnectionInfos::insertDownstreamConnection(std::string conn_id,
 
   tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(
       std::make_pair(conn_id, std::make_shared<ConnectionManager::DownstreamConnection>(
-                                  conn_manager)));
+                                  conn_manager, conn_id)));
 }
 
 size_t DownstreamConnectionInfos::size() {
@@ -862,6 +867,20 @@ void SipProxy::UpstreamTransactionInfos::deleteTransaction(std::string&& transac
   if (hasTransaction(transaction_id)) {
     tls_->getTyped<ThreadLocalUpstreamTransactionInfo>().upstream_transaction_infos_map_.erase(
         transaction_id);
+  }
+}
+
+void SipProxy::UpstreamTransactionInfos::resetDownstreamConnRelatedTransactions(std::string&& downstream_conn_id) {
+  ENVOY_LOG(debug, "Deleting from cache all upstream transactions related with downstream connection ID {} ... ", downstream_conn_id);
+  auto upstream_transaction_infos_map = tls_->getTyped<ThreadLocalUpstreamTransactionInfo>().upstream_transaction_infos_map_;
+  for (auto it = upstream_transaction_infos_map.cbegin(); it != upstream_transaction_infos_map.cend();) {
+    auto trans_to_end = it->second;
+    if (trans_to_end->downstream_conn_id_ == downstream_conn_id) {
+      it++;
+      trans_to_end->onReset();
+      continue;
+    }
+    it++;
   }
 }
 
