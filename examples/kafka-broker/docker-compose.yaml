@@ -1,23 +1,32 @@
 version: "3.7"
 services:
 
+  kafka-client:
+    build:
+      context: .
+      dockerfile: Dockerfile-kafka
+    container_name: kafka-client
+    restart: "no"
+    deploy:
+      replicas: 0
+
   proxy:
     build:
       context: .
       dockerfile: Dockerfile-proxy
     container_name: proxy
     depends_on:
-      kafka:
+      kafka-server:
         condition: service_healthy
     ports:
     - "${PORT_PROXY:-19092}:19092"
     - "${PORT_ADMIN:-8001}:8001"
 
-  kafka:
+  kafka-server:
     build:
       context: .
       dockerfile: Dockerfile-kafka
-    container_name: kafka
+    container_name: kafka-server
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -31,10 +40,10 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       # Listener value needs to be equal to cluster value in Envoy config
       # (will receive payloads from Envoy).
-      KAFKA_LISTENER: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER: PLAINTEXT://kafka-server:9092
       # Advertised listener value needs to be equal to Envoy's listener
       # (will make clients discovering this broker talk to it through Envoy).
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-server:19092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
