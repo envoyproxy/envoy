@@ -1079,9 +1079,11 @@ typed_config:
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config);
 
   // Change the configured cert validation to defer 1s.
-  auto cert_validator_factory =
+  auto* cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
@@ -1122,6 +1124,8 @@ typed_config:
   auto cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();

@@ -6469,8 +6469,9 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
       custom_validator_config:
         name: "envoy.tls.cert_validator.timed_cert_validator"
 )EOF";
-  auto cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
+  auto* cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
       "envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)->resetForTest();
   static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(0));
   static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
@@ -6512,8 +6513,9 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
 )EOF";
-  auto cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
+  auto* cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
       "envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)->resetForTest();
   static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(0));
 

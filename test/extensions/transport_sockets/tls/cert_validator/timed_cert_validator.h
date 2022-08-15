@@ -61,6 +61,11 @@ public:
 
   void setExpectedHostName(const std::string host_name) { expected_host_name_ = host_name; }
 
+  void resetForTest() {
+    validation_time_out_ms_ = std::chrono::milliseconds(5);
+    expected_host_name_.reset();
+  }
+
 private:
   std::chrono::milliseconds validation_time_out_ms_{5};
   absl::optional<std::string> expected_host_name_;
