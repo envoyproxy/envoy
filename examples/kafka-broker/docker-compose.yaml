@@ -13,7 +13,9 @@ services:
     - "${PORT_PROXY:-19092}:19092"
     - "${PORT_ADMIN:-8001}:8001"
   kafka:
-    image: confluentinc/cp-kafka:latest
+    build:
+      context: .
+      dockerfile: Dockerfile-kafka
     container_name: kafka
     depends_on:
       zookeeper:
@@ -37,7 +39,9 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+    build:
+      context: .
+      dockerfile: Dockerfile-zookeeper
     container_name: zookeeper
     healthcheck:
       test: ["CMD", "sh", "-c", "nc -nz 127.0.0.1 2181"]
