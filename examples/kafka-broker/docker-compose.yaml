@@ -18,7 +18,7 @@ services:
       zookeeper:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "kafka-topics.sh", "--list", "--zookeeper", "zookeeper:2181"]
+      test: ["CMD", "kafka-topics", "--list", "--bootstrap-server", "localhost:19092"]
       interval: 5s
       timeout: 60s
       retries: 120

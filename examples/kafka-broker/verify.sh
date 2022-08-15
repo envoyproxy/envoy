@@ -8,8 +8,8 @@ export PORT_ADMIN="${KAFKA_PORT_ADMIN:-11101}"
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
 # Topic
+run_log "Create a Kafka topic"
 TOPIC="envoy.kafka.broker"
-run_log "Creating topic"
 docker-compose exec -T kafka kafka-topics --bootstrap-server localhost:19092 --create --topic $TOPIC quickstart-events
 
 run_log "Checking topic"
