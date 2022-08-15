@@ -126,7 +126,8 @@ TEST(ConfigTest, TestInvalidConfigSetup) {
       factory->createPathRewritePredicate(*message);
 
   EXPECT_FALSE(config_or_error.ok());
-  EXPECT_EQ(config_or_error.status().message(), "path_rewrite_policy.path_template_rewrite /bar/{lang}/country} is invalid");
+  EXPECT_EQ(config_or_error.status().message(),
+            "path_rewrite_policy.path_template_rewrite /bar/{lang}/country} is invalid");
 }
 
 } // namespace Rewrite
