@@ -89,7 +89,7 @@ PatternTemplateRewritePredicate::rewriteUrl(absl::string_view current_pattern,
     }
   }
 
-  return absl::StatusOr<std::string>(new_path);
+  return absl::StatusOr<std::string>{new_path};
 }
 
 } // namespace Rewrite
