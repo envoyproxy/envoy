@@ -66,7 +66,7 @@ TEST_P(ParseRewriteHelperSuccess, ParseRewriteHelperSuccessTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_OK(parseRewritePatternHelper(pattern));
+  EXPECT_OK(parseRewritePattern(pattern));
 }
 
 class ParseRewriteHelperFailure : public testing::TestWithParam<std::string> {};
@@ -79,7 +79,7 @@ TEST_P(ParseRewriteHelperFailure, ParseRewriteHelperFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_THAT(parseRewritePatternHelper(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(parseRewritePattern(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 class ParseRewriteSuccess : public testing::TestWithParam<std::pair<std::string, std::string>> {

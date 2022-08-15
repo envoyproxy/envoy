@@ -24,7 +24,7 @@ namespace Envoy {
 namespace Extensions {
 namespace PatternTemplate {
 
-namespace PatternTemplateInternal {
+namespace Internal {
 
 namespace {
 
@@ -83,12 +83,12 @@ std::string toString(const Operator val) {
 }
 
 std::string toString(const Variable val) {
-  if (val.var_match.empty()) {
-    return absl::StrCat("{", val.var_name, "}");
+  if (val.var_match_.empty()) {
+    return absl::StrCat("{", val.var_name_, "}");
   }
 
-  return absl::StrCat("{", val.var_name, "=",
-                      absl::StrJoin(val.var_match, "/", ToStringFormatter()), "}");
+  return absl::StrCat("{", val.var_name_, "=",
+                      absl::StrJoin(val.var_match_, "/", ToStringFormatter()), "}");
   return "";
 }
 
@@ -107,8 +107,8 @@ absl::StatusOr<T> alsoUpdatePattern(
   }
   ParsedResult<T> result = *std::move(status);
 
-  *patt = result.unconsumed_pattern;
-  return result.parsed_value;
+  *patt = result.unconsumed_pattern_;
+  return result.parsed_value_;
 }
 
 } // namespace
@@ -116,27 +116,27 @@ absl::StatusOr<T> alsoUpdatePattern(
 std::string Variable::debugString() const { return toString(*this); }
 
 std::string ParsedUrlPattern::debugString() const {
-  return absl::StrCat("/", absl::StrJoin(parsed_segments, "/", ToStringFormatter()),
-                      suffix.value_or(""));
+  return absl::StrCat("/", absl::StrJoin(parsed_segments_, "/", ToStringFormatter()),
+                      suffix_.value_or(""));
 }
 
-bool isValidLiteral(absl::string_view pattern) {
+bool isValidLiteral(absl::string_view literal) {
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "]+$"));
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  return RE2::FullMatch(toStringPiece(pattern), *literal_regex);
+  return RE2::FullMatch(toStringPiece(literal), *literal_regex);
 }
 
-bool isValidRewriteLiteral(absl::string_view pattern) {
+bool isValidRewriteLiteral(absl::string_view literal) {
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "/]+$"));
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  return RE2::FullMatch(toStringPiece(pattern), *literal_regex);
+  return RE2::FullMatch(toStringPiece(literal), *literal_regex);
 }
 
-bool isValidIndent(absl::string_view pattern) {
+bool isValidVariableName(absl::string_view indent) {
   static const LazyRE2 ident_regex = {"^[a-zA-Z][a-zA-Z0-9_]*$"};
-  return RE2::FullMatch(toStringPiece(pattern), *ident_regex);
+  return RE2::FullMatch(toStringPiece(indent), *ident_regex);
 }
 
 absl::StatusOr<ParsedResult<Literal>> consumeLiteral(absl::string_view pattern) {
@@ -172,7 +172,7 @@ absl::StatusOr<ParsedResult<Variable>> consumeVariable(absl::string_view pattern
 
   // Parse the actual variable pattern, starting with the variable name.
   std::vector<absl::string_view> var_parts = absl::StrSplit(parts[0], absl::MaxSplits('=', 1));
-  if (!isValidIndent(var_parts[0])) {
+  if (!isValidVariableName(var_parts[0])) {
     return absl::InvalidArgumentError("Invalid variable name");
   }
   Variable var = Variable(var_parts[0], {});
@@ -203,7 +203,7 @@ absl::StatusOr<ParsedResult<Variable>> consumeVariable(absl::string_view pattern
       }
       var_match = *std::move(status);
     }
-    var.var_match.push_back(var_match);
+    var.var_match_.push_back(var_match);
     if (!var_patt.empty()) {
       if (var_patt[0] != '/' || var_patt.size() == 1) {
         return absl::InvalidArgumentError("Invalid variable match");
@@ -219,14 +219,14 @@ absl::StatusOr<absl::flat_hash_set<absl::string_view>>
 gatherCaptureNames(struct ParsedUrlPattern pattern) {
   absl::flat_hash_set<absl::string_view> captured_variables;
 
-  for (const ParsedSegment& segment : pattern.parsed_segments) {
+  for (const ParsedSegment& segment : pattern.parsed_segments_) {
     if (!absl::holds_alternative<Variable>(segment)) {
       continue;
     }
     if (captured_variables.size() >= kPatternMatchingMaxVariablesPerUrl) {
       return absl::InvalidArgumentError("Exceeded variable count limit");
     }
-    absl::string_view var_name = absl::get<Variable>(segment).var_name;
+    absl::string_view var_name = absl::get<Variable>(segment).var_name_;
 
     if (var_name.size() < kPatternMatchingMinVariableNameLen ||
         var_name.size() > kPatternMatchingMaxVariableNameLen) {
@@ -243,7 +243,7 @@ gatherCaptureNames(struct ParsedUrlPattern pattern) {
 
 absl::Status validateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
   bool seen_text_glob = false;
-  for (const ParsedSegment& segment : pattern.parsed_segments) {
+  for (const ParsedSegment& segment : pattern.parsed_segments_) {
     if (absl::holds_alternative<Operator>(segment)) {
       if (seen_text_glob) {
         return absl::InvalidArgumentError("Glob after text glob.");
@@ -251,13 +251,13 @@ absl::Status validateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
       seen_text_glob = (absl::get<Operator>(segment) == Operator::KTextGlob);
     } else if (absl::holds_alternative<Variable>(segment)) {
       const Variable& var = absl::get<Variable>(segment);
-      if (var.var_match.empty()) {
+      if (var.var_match_.empty()) {
         if (seen_text_glob) {
           // A variable with no explicit matcher is treated as a path glob.
           return absl::InvalidArgumentError("Implicit variable path glob after text glob.");
         }
       } else {
-        for (const absl::variant<Operator, absl::string_view>& var_seg : var.var_match) {
+        for (const absl::variant<Operator, absl::string_view>& var_seg : var.var_match_) {
           if (!absl::holds_alternative<Operator>(var_seg)) {
             continue;
           }
@@ -309,13 +309,13 @@ absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pat
       }
       segment = *std::move(status);
     }
-    parsed_pattern.parsed_segments.push_back(segment);
+    parsed_pattern.parsed_segments_.push_back(segment);
 
     // Deal with trailing '/' or suffix.
     if (!url_pattern.empty()) {
       if (url_pattern == "/") {
         // Single trailing '/' at the end, mark this with empty literal.
-        parsed_pattern.parsed_segments.emplace_back("");
+        parsed_pattern.parsed_segments_.emplace_back("");
         break;
       } else if (url_pattern[0] == '/') {
         // Have '/' followed by more text, consume the '/'.
@@ -327,7 +327,7 @@ absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pat
         if (!status.ok()) {
           return status.status();
         }
-        parsed_pattern.suffix = *std::move(status);
+        parsed_pattern.suffix_ = *std::move(status);
         if (!url_pattern.empty()) {
           // Suffix didn't consume whole remaining pattern ('/' in url_pattern).
           return absl::InvalidArgumentError("Prefix match not supported.");
@@ -341,7 +341,7 @@ absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pat
   if (!status.ok()) {
     return status.status();
   }
-  parsed_pattern.captured_variables = *std::move(status);
+  parsed_pattern.captured_variables_ = *std::move(status);
 
   absl::Status validate_status = validateNoOperatorAfterTextGlob(parsed_pattern);
   if (!validate_status.ok()) {
@@ -369,19 +369,19 @@ std::string toRegexPattern(Operator pattern) {
 }
 
 std::string toRegexPattern(const Variable& pattern) {
-  return absl::StrCat("(?P<", pattern.var_name, ">",
-                      pattern.var_match.empty()
+  return absl::StrCat("(?P<", pattern.var_name_, ">",
+                      pattern.var_match_.empty()
                           ? toRegexPattern(kDefaultVariableOperator)
-                          : absl::StrJoin(pattern.var_match, "/", ToRegexPatternFormatter()),
+                          : absl::StrJoin(pattern.var_match_, "/", ToRegexPatternFormatter()),
                       ")");
 }
 
 std::string toRegexPattern(const struct ParsedUrlPattern& pattern) {
-  return absl::StrCat("/", absl::StrJoin(pattern.parsed_segments, "/", ToRegexPatternFormatter()),
-                      toRegexPattern(pattern.suffix.value_or("")));
+  return absl::StrCat("/", absl::StrJoin(pattern.parsed_segments_, "/", ToRegexPatternFormatter()),
+                      toRegexPattern(pattern.suffix_.value_or("")));
 }
 
-} // namespace PatternTemplateInternal
+} // namespace Internal
 } // namespace PatternTemplate
 } // namespace Extensions
 } // namespace Envoy

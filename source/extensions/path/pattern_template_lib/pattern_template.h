@@ -12,13 +12,13 @@ namespace Envoy {
 namespace Extensions {
 namespace PatternTemplate {
 
-enum class RewriteStringKind { KVariable, KLiteral };
+enum class RewriteStringKind { Variable, Literal };
 
 struct RewritePatternSegment {
-  RewritePatternSegment(absl::string_view segment_value, RewriteStringKind kind)
-      : segment_value(segment_value), kind(kind) {}
-  absl::string_view segment_value;
-  RewriteStringKind kind;
+  RewritePatternSegment(absl::string_view value, RewriteStringKind kind)
+      : value_(value), kind_(kind) {}
+  absl::string_view value_;
+  RewriteStringKind kind_;
 };
 
 // Returns the regex pattern that is equivalent to the given url_pattern.
@@ -26,12 +26,10 @@ struct RewritePatternSegment {
 // the safe regex Envoy can understand. Strips away any variable captures.
 absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url_pattern);
 
-// Helper function that parses the pattern and breaks it down to either
-// literals or variable names. To be used by ParseRewritePattern().
-// Exposed here so that the validator for the rewrite pattern can also
-// use it.
+// Parses the specified pattern into a sequence of segments (which are
+// either literals or variable names).
 absl::StatusOr<std::vector<RewritePatternSegment>>
-parseRewritePatternHelper(absl::string_view pattern);
+parseRewritePattern(absl::string_view pattern);
 
 // Returns the parsed Url rewrite pattern to be used by
 // RewriteURLTemplatePattern()  |capture_regex| should
@@ -42,7 +40,11 @@ parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex);
 // Returns if provided rewrite pattern is valid
 absl::Status isValidPathTemplateRewritePattern(const std::string& path_template_rewrite);
 
-// Returns if path_template and rewrite_template have valid variables
+// Returns if path_template and rewrite_template have valid variables.
+// Every variable in rewrite MUST be present in match
+// For example:
+// Match: /foo/{bar}/{var} and Rewrite: /goo/{var} is vaild
+// Match: /foo/{bar} and Rewrite: /goo/{bar}/{var} is invaild. Match is missing {var}.
 absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
                                       const std::string& capture_regex);
 

@@ -79,17 +79,17 @@ TEST(InternalParsing, IsValidRewriteLiteralWorks) {
   EXPECT_FALSE(isValidRewriteLiteral("?a=c"));
 }
 
-TEST(InternalParsing, IsValidIndentWorks) {
-  EXPECT_TRUE(isValidIndent("abc"));
-  EXPECT_TRUE(isValidIndent("ABC_def_123"));
-  EXPECT_TRUE(isValidIndent("a1"));
-  EXPECT_TRUE(isValidIndent("T"));
-  EXPECT_FALSE(isValidIndent("123"));
-  EXPECT_FALSE(isValidIndent("__undefined__"));
-  EXPECT_FALSE(isValidIndent("abc-def"));
-  EXPECT_FALSE(isValidIndent("abc=def"));
-  EXPECT_FALSE(isValidIndent("abc def"));
-  EXPECT_FALSE(isValidIndent("a!!!"));
+TEST(InternalParsing, IsValidVariableNameWorks) {
+  EXPECT_TRUE(isValidVariableName("abc"));
+  EXPECT_TRUE(isValidVariableName("ABC_def_123"));
+  EXPECT_TRUE(isValidVariableName("a1"));
+  EXPECT_TRUE(isValidVariableName("T"));
+  EXPECT_FALSE(isValidVariableName("123"));
+  EXPECT_FALSE(isValidVariableName("__undefined__"));
+  EXPECT_FALSE(isValidVariableName("abc-def"));
+  EXPECT_FALSE(isValidVariableName("abc=def"));
+  EXPECT_FALSE(isValidVariableName("abc def"));
+  EXPECT_FALSE(isValidVariableName("a!!!"));
 }
 
 TEST(InternalParsing, ConsumeLiteralWorks) {
