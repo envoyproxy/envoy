@@ -70,6 +70,7 @@ PathNormalizer::DecodedOctet PathNormalizer::normalizeAndDecodeOctet(char* octet
     // We decoded a slash character and how we handle it depends on the active configuration.
     switch (config_.uri_path_normalization_options().path_with_escaped_slashes_action()) {
     case HeaderValidatorConfig_UriPathNormalizationOptions::IMPLEMENTATION_SPECIFIC_DEFAULT:
+      ABSL_FALLTHROUGH_INTENDED;
     case HeaderValidatorConfig_UriPathNormalizationOptions::KEEP_UNCHANGED:
       // default implementation: normalize the encoded octet and accept the path
       return {PercentDecodeResult::Normalized};
@@ -103,8 +104,8 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // Make a copy of the original path so we can edit it in place.
   absl::string_view original_path = header_map.path();
   size_t length = original_path.size();
-  char* path = new char[length + 1];
-  std::unique_ptr<char> path_ptr{path}; // auto free on return
+  auto path_ptr = std::make_unique<char[]>(length + 1); // auto free on return
+  char* path = path_ptr.get();
 
   original_path.copy(path, length);
 
@@ -168,7 +169,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
       case PercentDecodeResult::Normalized:
         // Valid encoding but outside the UNRESERVED character set. The encoding was normalized to
-        // UPPERCASE and the octet must not be decoded. Copy the encoding (3 characters).
+        // UPPERCASE and the octet must not be decoded. Copy the normalized encoding.
         *write++ = *read++;
         *write++ = *read++;
         *write++ = *read++;
