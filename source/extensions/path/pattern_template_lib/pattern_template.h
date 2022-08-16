@@ -37,19 +37,19 @@ absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegmen
 parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex);
 
 // Returns if provided rewrite pattern is valid
-absl::Status isValidPathTemplateRewritePattern(const std::string& path_template_rewrite);
+absl::Status isValidPathTemplateRewritePattern(absl::string_view path_template_rewrite);
 
 // Returns if path_template_rewrite and capture_regex have valid variables.
 // Every variable in rewrite MUST be present in match.
 // For example:
 // Match: /foo/{bar}/{var} and Rewrite: /goo/{var} is valid
 // Match: /foo/{bar} and Rewrite: /goo/{bar}/{var} is invalid. Match is missing {var}.
-absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
-                                      const std::string& capture_regex);
+absl::Status isValidSharedVariableSet(absl::string_view path_template_rewrite,
+                                      absl::string_view capture_regex);
 
 // Returns is the match_pattern is valid.
 // Validation attempts to parse pattern into literals and variables.
-absl::Status isValidMatchPattern(const std::string match_pattern);
+absl::Status isValidMatchPattern(absl::string_view match_pattern);
 
 // Concatenates literals and extracts variable values to form the final rewritten url.
 absl::StatusOr<std::string> rewriteURLTemplatePattern(

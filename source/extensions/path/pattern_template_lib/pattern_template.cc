@@ -111,16 +111,16 @@ parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) 
   return parsed_pattern;
 }
 
-absl::Status isValidMatchPattern(const std::string path_template_match) {
+absl::Status isValidMatchPattern(absl::string_view path_template_match) {
   return convertURLPatternSyntaxToRegex(path_template_match).status();
 }
 
-absl::Status isValidPathTemplateRewritePattern(const std::string& path_template_rewrite) {
+absl::Status isValidPathTemplateRewritePattern(absl::string_view path_template_rewrite) {
   return parseRewritePattern(path_template_rewrite).status();
 }
 
-absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
-                                      const std::string& capture_regex) {
+absl::Status isValidSharedVariableSet(absl::string_view path_template_rewrite,
+                                      absl::string_view capture_regex) {
   absl::StatusOr<std::string> status = convertURLPatternSyntaxToRegex(capture_regex).value();
   if (!status.ok()) {
     return status.status();
