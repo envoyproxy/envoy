@@ -72,3 +72,12 @@ genrule(
         "//bazel:all_repository_locations",
     ],
 )
+
+py_binary(
+    name = "cython_test",
+    srcs = ["cython_test.py"],
+    deps = [
+        requirement("orjson"),
+        requirement("uvloop"),
+    ],
+)
