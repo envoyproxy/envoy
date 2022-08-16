@@ -14,8 +14,8 @@ namespace Envoy {
 namespace Regex {
 
 CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
-                                                 bool do_program_size_check)
-    : regex_(regex, re2::RE2::Quiet) {
+                                                 bool do_program_size_check, bool partial_match)
+    : regex_(regex, re2::RE2::Quiet), partial_match_(partial_match) {
   if (!regex_.ok()) {
     throw EnvoyException(regex_.error());
   }
@@ -44,7 +44,7 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
 
 CompiledGoogleReMatcher::CompiledGoogleReMatcher(
     const envoy::type::matcher::v3::RegexMatcher& config)
-    : CompiledGoogleReMatcher(config.regex(), !config.google_re2().has_max_program_size()) {
+    : CompiledGoogleReMatcher(config.regex(), !config.google_re2().has_max_program_size(), false) {
   const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
 
   // Check if the deprecated field max_program_size is set first, and follow the old logic if so.
@@ -59,13 +59,20 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(
   }
 }
 
+GoogleReEngine::GoogleReEngine(bool partial_match) : partial_match_(partial_match) {}
+
 CompiledMatcherPtr GoogleReEngine::matcher(const std::string& regex) const {
-  return std::make_unique<CompiledGoogleReMatcher>(regex, true);
+  return std::make_unique<CompiledGoogleReMatcher>(regex, true, partial_match_);
 }
 
-EnginePtr GoogleReEngineFactory::createEngine(const Protobuf::Message&,
-                                              Server::Configuration::ServerFactoryContext&) {
-  return std::make_shared<GoogleReEngine>();
+EnginePtr GoogleReEngineFactory::createEngine(
+    const Protobuf::Message& config,
+    Server::Configuration::ServerFactoryContext& server_factory_context) {
+  const auto google_re2 =
+      MessageUtil::downcastAndValidate<const envoy::extensions::regex_engines::v3::GoogleRE2&>(
+          config, server_factory_context.messageValidationVisitor());
+
+  return std::make_shared<GoogleReEngine>(google_re2.partial_match());
 }
 
 ProtobufTypes::MessagePtr GoogleReEngineFactory::createEmptyConfigProto() {

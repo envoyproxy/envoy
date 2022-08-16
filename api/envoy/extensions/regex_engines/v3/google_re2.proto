@@ -21,4 +21,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // which records the program size, and the counter ``re2.exceeded_warn_level``, which is incremented
 // each time the program size exceeds the warn level threshold.
 message GoogleRE2 {
+  // Allow to return matched if a substring of the input matches the regex pattern. By default, the
+  // engine will return matched only if the input matches the regex pattern fully, from the
+  // beginning to the end of the input.
+  bool partial_match = 1;
 }
